@@ -47,11 +47,11 @@ public:
     using port_type = util::network::Endpoint::port_type;
     using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
-    static constexpr milliseconds_type default_connect_timeout        = 120000; // 2 minutes
-    static constexpr milliseconds_type default_connection_linger_time =  30000; // 30 seconds
-    static constexpr milliseconds_type default_ping_keepalive_period  =  60000; // 1 minute
+    static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
+    static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
+    static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
     static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
-    static constexpr milliseconds_type default_fast_reconnect_limit   =  60000; // 1 minute
+    static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
 
     struct Config {
         Config() {}
@@ -296,8 +296,8 @@ public:
     bool wait_for_session_terminations_or_client_stopped();
 
     /// Returns false if the specified URL is invalid.
-    bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol,
-                              std::string& address, port_type& port, std::string& path) const;
+    bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
+                              port_type& port, std::string& path) const;
 
 private:
     class Impl;
@@ -367,19 +367,12 @@ class Session {
 public:
     using port_type = util::network::Endpoint::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
-    using ProgressHandler = void(std::uint_fast64_t downloaded_bytes,
-                                 std::uint_fast64_t downloadable_bytes,
-                                 std::uint_fast64_t uploaded_bytes,
-                                 std::uint_fast64_t uploadable_bytes,
-                                 std::uint_fast64_t progress_version,
-                                 std::uint_fast64_t snapshot_version);
+    using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
+                                 std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
+                                 std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version);
     using WaitOperCompletionHandler = std::function<void(std::error_code)>;
-    using SSLVerifyCallback = bool(const std::string& server_address,
-                                   port_type server_port,
-                                   const char* pem_data,
-                                   size_t pem_size,
-                                   int preverify_ok,
-                                   int depth);
+    using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
+                                   size_t pem_size, int preverify_ok, int depth);
 
     struct Config {
         Config() {}
@@ -927,9 +920,8 @@ public:
     /// \throw BadServerUrl if the specified server URL is malformed.
     void bind();
     void bind(std::string server_url, std::string signed_user_token);
-    void bind(std::string server_address, std::string server_path,
-              std::string signed_user_token, port_type server_port = 0,
-              ProtocolEnvelope protocol = ProtocolEnvelope::realm);
+    void bind(std::string server_address, std::string server_path, std::string signed_user_token,
+              port_type server_port = 0, ProtocolEnvelope protocol = ProtocolEnvelope::realm);
     /// @}
 
     /// \brief Refresh the access token associated with this session.
@@ -1103,8 +1095,7 @@ private:
     Impl* m_impl = nullptr;
 
     void abandon() noexcept;
-    void async_wait_for(bool upload_completion, bool download_completion,
-                        WaitOperCompletionHandler);
+    void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);
 };
 
 
@@ -1115,36 +1106,36 @@ private:
 /// the application via the connection state change listeners of the affected
 /// sessions.
 enum class Client::Error {
-    connection_closed           = 100, ///< Connection closed (no error)
-    unknown_message             = 101, ///< Unknown type of input message
-    bad_syntax                  = 102, ///< Bad syntax in input message head
-    limits_exceeded             = 103, ///< Limits exceeded in input message
-    bad_session_ident           = 104, ///< Bad session identifier in input message
-    bad_message_order           = 105, ///< Bad input message order
-    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
-    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
+    connection_closed = 100,           ///< Connection closed (no error)
+    unknown_message = 101,             ///< Unknown type of input message
+    bad_syntax = 102,                  ///< Bad syntax in input message head
+    limits_exceeded = 103,             ///< Limits exceeded in input message
+    bad_session_ident = 104,           ///< Bad session identifier in input message
+    bad_message_order = 105,           ///< Bad input message order
+    bad_client_file_ident = 106,       ///< Bad client file identifier (IDENT)
+    bad_progress = 107,                ///< Bad progress information (DOWNLOAD)
     bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = 113, ///< Bad request identifier (MARK)
-    bad_error_code              = 114, ///< Bad error code (ERROR),
-    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
-    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
-    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
-    connect_timeout             = 121, ///< Sync connection was not fully established in time
-    bad_timestamp               = 122, ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
+    bad_changeset_size = 109,          ///< Bad changeset size in changeset header (DOWNLOAD)
+    bad_origin_file_ident = 110,       ///< Bad origin file identifier in changeset header (DOWNLOAD)
+    bad_server_version = 111,          ///< Bad server version in changeset header (DOWNLOAD)
+    bad_changeset = 112,               ///< Bad changeset (DOWNLOAD)
+    bad_request_ident = 113,           ///< Bad request identifier (MARK)
+    bad_error_code = 114,              ///< Bad error code (ERROR),
+    bad_compression = 115,             ///< Bad compression (DOWNLOAD)
+    bad_client_version = 116,          ///< Bad last integrated client version in changeset header (DOWNLOAD)
+    ssl_server_cert_rejected = 117,    ///< SSL server certificate rejected
+    pong_timeout = 118,                ///< Timeout on reception of PONG respone message
+    bad_client_file_ident_salt = 119,  ///< Bad client file identifier salt (IDENT)
+    bad_file_ident = 120,              ///< Bad file identifier (ALLOC)
+    connect_timeout = 121,             ///< Sync connection was not fully established in time
+    bad_timestamp = 122,               ///< Bad timestamp (PONG)
+    bad_protocol_from_server = 123,    ///< Bad or missing protocol version information from server
+    client_too_old_for_server = 124,   ///< Protocol version negotiation failed: Client is too old for server
+    client_too_new_for_server = 125,   ///< Protocol version negotiation failed: Client is too new for server
+    protocol_mismatch = 126, ///< Protocol version negotiation failed: No version supported by both client and server
+    bad_state_message = 127, ///< Bad values in state message (STATE)
+    missing_protocol_feature = 128, ///< Requested feature missing in negotiated protocol version
+    http_tunnel_failed = 131,       ///< Failed to establish HTTP tunnel with configured proxy
 };
 
 const std::error_category& client_error_category() noexcept;
@@ -1158,7 +1149,8 @@ std::ostream& operator<<(std::ostream& os, Session::Config::ProxyConfig::Type);
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::sync::Client::Error> {
+template <>
+struct is_error_code_enum<realm::sync::Client::Error> {
     static const bool value = true;
 };
 
@@ -1168,10 +1160,9 @@ namespace realm {
 namespace sync {
 
 
-
 // Implementation
 
-class BadServerUrl: public std::exception {
+class BadServerUrl : public std::exception {
 public:
     const char* what() const noexcept override
     {
@@ -1179,15 +1170,13 @@ public:
     }
 };
 
-inline Session::Session(Session&& sess) noexcept:
-    m_impl{sess.m_impl}
+inline Session::Session(Session&& sess) noexcept
+    : m_impl{sess.m_impl}
 {
     sess.m_impl = nullptr;
 }
 
-inline Session::Session() noexcept
-{
-}
+inline Session::Session() noexcept {}
 
 inline Session::~Session() noexcept
 {
@@ -1213,8 +1202,7 @@ inline void Session::detach() noexcept
 
 inline void Session::set_error_handler(std::function<ErrorHandler> handler)
 {
-    auto handler_2 = [handler=std::move(handler)](ConnectionState state,
-                                                  const ErrorInfo* error_info) {
+    auto handler_2 = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);

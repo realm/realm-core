@@ -68,8 +68,8 @@ TEST_IF(Sync_HistoryMigration, false)
     // version, and for which corresponding files exist in
     // `resources/history_migration/`. See the `produce_new_files` above for an
     // easy way to generate new files.
-    std::vector<int> client_schema_versions = { 1, 2, 10 };
-    std::vector<int> server_schema_versions = { 7, 8, 9, 10, 20 };
+    std::vector<int> client_schema_versions = {1, 2, 10};
+    std::vector<int> server_schema_versions = {7, 8, 9, 10, 20};
 
     // Before bootstrapping, there can be no client or server files. After
     // bootstrapping, there must be at least one client, and one server file.
@@ -109,8 +109,7 @@ TEST_IF(Sync_HistoryMigration, false)
         auto history = sync::make_client_replication(client_path);
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
-        TableRef table =
-            sync::create_table_with_primary_key(wt, "class_Table", type_String, "label");
+        TableRef table = sync::create_table_with_primary_key(wt, "class_Table", type_String, "label");
         ColKey col_key = table->add_column(type_Int, "value");
         table->create_object_with_primary_key("Banach").set(col_key, 88);
         table->create_object_with_primary_key("Hausdorff").set(col_key, 99);
@@ -118,8 +117,7 @@ TEST_IF(Sync_HistoryMigration, false)
         wt.commit();
     };
 
-    auto modify = [&](const std::string& client_path, StringData label,
-                      int old_value, int new_value) {
+    auto modify = [&](const std::string& client_path, StringData label, int old_value, int new_value) {
         auto history = sync::make_client_replication(client_path);
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
@@ -177,6 +175,7 @@ TEST_IF(Sync_HistoryMigration, false)
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
@@ -184,15 +183,13 @@ TEST_IF(Sync_HistoryMigration, false)
     _impl::ServerHistory::DummyCompactionControl compaction_control;
 
     // Accesses file without migrating it
-    auto get_history_info = [&](const std::string& path, int& history_type,
-                                int& history_schema_version) {
+    auto get_history_info = [&](const std::string& path, int& history_type, int& history_schema_version) {
         Group group{path};
         using gf = _impl::GroupFriend;
         Allocator& alloc = gf::get_alloc(group);
         ref_type top_ref = gf::get_top_ref(group);
         _impl::History::version_type version; // Dummy
-        gf::get_version_and_history_info(alloc, top_ref, version, history_type,
-                                         history_schema_version);
+        gf::get_version_and_history_info(alloc, top_ref, version, history_type, history_schema_version);
     };
 
     auto verify_client_file = [&](const std::string& client_path) {
@@ -209,8 +206,7 @@ TEST_IF(Sync_HistoryMigration, false)
         rt.get_group().verify();
     };
 
-    auto compare_client_files = [&](const std::string& client_path_1,
-                                    const std::string& client_path_2) {
+    auto compare_client_files = [&](const std::string& client_path_1, const std::string& client_path_2) {
         auto history_1 = sync::make_client_replication(client_path_1);
         auto history_2 = sync::make_client_replication(client_path_2);
         DBRef sg_1 = DB::create(*history_1);
@@ -220,8 +216,7 @@ TEST_IF(Sync_HistoryMigration, false)
         return compare_groups(rt_1, rt_2, test_context.logger);
     };
 
-    auto compare_client_and_server_files = [&](const std::string& client_path,
-                                               const std::string& server_path) {
+    auto compare_client_and_server_files = [&](const std::string& client_path, const std::string& server_path) {
         auto history_1 = sync::make_client_replication(client_path);
         _impl::ServerHistory history_2{server_path, server_history_context, compaction_control};
         DBRef sg_1 = DB::create(*history_1);
@@ -246,8 +241,7 @@ TEST_IF(Sync_HistoryMigration, false)
         return std::move(formatter).str();
     };
 
-    auto fetch_file = [&](const char* prefix, int history_schema_version,
-                          const std::string& path) {
+    auto fetch_file = [&](const char* prefix, int history_schema_version, const std::string& path) {
         bool with_new = false;
         std::string fetch_name = get_name(prefix, history_schema_version, with_new);
         std::string fetch_path = util::File::resolve(fetch_name, history_migration_dir);
@@ -255,8 +249,7 @@ TEST_IF(Sync_HistoryMigration, false)
         util::File::copy(fetch_path, path);
     };
 
-    auto stash_file = [&](const std::string& path, const char* prefix,
-                          int history_schema_version) {
+    auto stash_file = [&](const std::string& path, const char* prefix, int history_schema_version) {
         bool with_new = true;
         std::string stash_name = get_name(prefix, history_schema_version, with_new);
         std::string stash_path = util::File::resolve(stash_name, history_migration_dir);
@@ -265,8 +258,7 @@ TEST_IF(Sync_HistoryMigration, false)
         util::File::copy(path, stash_path);
     };
 
-    auto fetch_and_migrate_client_file = [&](int client_schema_version,
-                                             const std::string& client_path) {
+    auto fetch_and_migrate_client_file = [&](int client_schema_version, const std::string& client_path) {
         fetch_file("client", client_schema_version, client_path);
         // Verify that it is a client-side file and that it uses the specified
         // history schema version
@@ -287,8 +279,7 @@ TEST_IF(Sync_HistoryMigration, false)
             throw std::runtime_error{"Bad contents in fetched client-side file"};
     };
 
-    auto fetch_and_migrate_server_file = [&](int server_schema_version,
-                                             const std::string& server_path) {
+    auto fetch_and_migrate_server_file = [&](int server_schema_version, const std::string& server_path) {
         fetch_file("server", server_schema_version, server_path);
         // Verify that it is a server-side file and that it uses the specified
         // history schema version
@@ -355,8 +346,7 @@ TEST_IF(Sync_HistoryMigration, false)
     };
 
     auto test = [&](int client_schema_version, int server_schema_version) {
-        log("Test: client_schema_version=%1, server_schema_version=%2",
-            client_schema_version, server_schema_version);
+        log("Test: client_schema_version=%1, server_schema_version=%2", client_schema_version, server_schema_version);
 
         SHARED_GROUP_TEST_PATH(local_client_path);
         SHARED_GROUP_TEST_PATH(remote_client_path);
@@ -381,7 +371,7 @@ TEST_IF(Sync_HistoryMigration, false)
         // Make a modification through one file, and check that it arrives
         // faithfully in the other, and keep doing this fow a while with
         // alternating directions
-        std::string client_path_in  = local_client_path;
+        std::string client_path_in = local_client_path;
         std::string client_path_out = remote_client_path;
         int prior_new_value = 55;
         int n = 5;
@@ -390,7 +380,7 @@ TEST_IF(Sync_HistoryMigration, false)
             int new_value = 1000 + i;
             modify(client_path_in, "Hilbert", old_value, new_value);
             prior_new_value = new_value;
-            synchronize(client_path_in,  server_dir);
+            synchronize(client_path_in, server_dir);
             synchronize(client_path_out, server_dir);
             verify_client_file(client_path_in);
             verify_client_file(client_path_out);
@@ -424,7 +414,7 @@ TEST_IF(Sync_HistoryMigration, false)
             // changes that are not in the other.
             SHARED_GROUP_TEST_PATH(init_client_path);
             reference_initialize(init_client_path);
-            synchronize(init_client_path,  server_dir);
+            synchronize(init_client_path, server_dir);
             synchronize(local_client_path, server_dir);
 
             // Make local changes that will not be uploaded until after migration

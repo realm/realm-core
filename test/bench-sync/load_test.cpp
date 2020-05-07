@@ -29,28 +29,26 @@ int main(int argc, char** argv)
     int verbose = 0;
     int listen = 0;
     unsigned int sleep_in_between = 0; // Sleep in between transactions
-    unsigned int num_operations = 0; // Number of operations in a transaction
+    unsigned int num_operations = 0;   // Number of operations in a transaction
     int num_transactions = -1;
     unsigned int client_id = 0;
     std::string machine_id = "1";
     util::Optional<std::string> token_path;
     util::Optional<std::string> signature_path;
-    std::string statsd_hostname {"localhost"};
+    std::string statsd_hostname{"localhost"};
     unsigned int statsd_port = 8125;
     // Process command line
-    const struct option long_options[] = {
-        {"verbose",   no_argument, &verbose, 1},
-        {"token",  required_argument, 0, 't'},
-        {"machine-id", required_argument, 0, 'm'},
-        {"client-id", required_argument, 0, 'c'},
-        {"sleep-between", optional_argument, 0, 's'},
-        {"num-transactions", optional_argument, 0, 'n'},
-        {"num-operations", optional_argument, 0, 'o'},
-        {"listen",   no_argument, &listen, 1},
-        {"help",      no_argument,       0, 'h'},
-        {"statsd-host", optional_argument, 0, 'x'},
-        {"statsd-port", optional_argument, 0, 'y'}
-    };
+    const struct option long_options[] = {{"verbose", no_argument, &verbose, 1},
+                                          {"token", required_argument, 0, 't'},
+                                          {"machine-id", required_argument, 0, 'm'},
+                                          {"client-id", required_argument, 0, 'c'},
+                                          {"sleep-between", optional_argument, 0, 's'},
+                                          {"num-transactions", optional_argument, 0, 'n'},
+                                          {"num-operations", optional_argument, 0, 'o'},
+                                          {"listen", no_argument, &listen, 1},
+                                          {"help", no_argument, 0, 'h'},
+                                          {"statsd-host", optional_argument, 0, 'x'},
+                                          {"statsd-port", optional_argument, 0, 'y'}};
     while (true) {
         int option_index = 0;
         int c = getopt_long(argc, argv, "l:t:m:c:s:n:o:h:x:y", long_options, &option_index);
@@ -58,7 +56,8 @@ int main(int argc, char** argv)
             break; // no more options
 
         switch (c) {
-            case 0: /* flag set */ break;
+            case 0: /* flag set */
+                break;
             case 't': {
                 token_path = std::string(optarg);
                 break;
@@ -88,8 +87,8 @@ int main(int argc, char** argv)
                 break;
             }
             case 'x': {
-              statsd_hostname = std::string(optarg);
-              break;
+                statsd_hostname = std::string(optarg);
+                break;
             }
             case 'y': {
                 std::stringstream ss;
@@ -139,7 +138,7 @@ int main(int argc, char** argv)
     }
 
     server_url = argv[optind];
-    root_dir   = argv[optind+1];
+    root_dir = argv[optind + 1];
 
     if (!token_path) {
         std::cerr << "Please provide a user token file. :-)\n";
@@ -157,8 +156,8 @@ int main(int argc, char** argv)
     identity_file >> syncUserToken;
     std::string realm_path = root_dir + "/load.realm";
 
-    LoadTester ld{syncUserToken, realm_path, server_url, machine_id, client_id, sleep_in_between, num_operations,
-    num_transactions, listen == 1, statsd_hostname, statsd_port};
+    LoadTester ld{syncUserToken,  realm_path,       server_url,  machine_id,      client_id,  sleep_in_between,
+                  num_operations, num_transactions, listen == 1, statsd_hostname, statsd_port};
     ld.run();
     return 0;
 }

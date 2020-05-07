@@ -25,8 +25,7 @@ std::string calculate_fingerprint(const util::Optional<std::array<char, 64>> enc
 // verify_fingerprint() returns true if `fingerprint` was obtained previously
 // from calculate_fingerprint() with `encryption_key` as argument.  Otherwise,
 // verify_fingerprint() returns false with extremely high probability.
-bool verify_fingerprint(const std::string& fingerprint,
-                        const util::Optional<std::array<char, 64>> encryption_key);
+bool verify_fingerprint(const std::string& fingerprint, const util::Optional<std::array<char, 64>> encryption_key);
 
 } // namespace encrypt
 } // namespace realm

@@ -1,5 +1,5 @@
 #if REALM_HAVE_DOGLESS
-#  include <dogless.hpp>
+#include <dogless.hpp>
 #endif
 
 #include <algorithm>
@@ -12,22 +12,20 @@
 using namespace realm;
 
 sync::MetricsExclusion::MetricsExclusion(sync::MetricsOptions::OptionType mask)
-: m_mask(mask)
+    : m_mask(mask)
 {
 }
 
-sync::MetricsExclusion::MetricsExclusion()
-{
-}
+sync::MetricsExclusion::MetricsExclusion() {}
 
 sync::Metrics::Metrics(const MetricsExclusion& exclusions)
-: m_exclusions(exclusions)
+    : m_exclusions(exclusions)
 {
 }
 
 
 sync::Metrics::Metrics()
-: m_exclusions(0)
+    : m_exclusions(0)
 {
 }
 
@@ -62,7 +60,7 @@ std::string sync::Metrics::percent_encode(const std::string& string)
 
 namespace {
 
-class DoglessMetrics: public sync::Metrics {
+class DoglessMetrics : public sync::Metrics {
 public:
     DoglessMetrics(const std::string& prefix, const sync::MetricsExclusion& exclusions)
         : Metrics(exclusions)
@@ -163,7 +161,7 @@ std::unique_ptr<sync::Metrics> sync::make_buffered_statsd_metrics(const std::str
 {
 #if REALM_HAVE_DOGLESS
     std::unique_ptr<DoglessMetrics> metrics = std::make_unique<DoglessMetrics>(prefix, exclusions); // Throws
-    metrics->add_endpoint(endpoint); // Throws
+    metrics->add_endpoint(endpoint);                                                                // Throws
     return metrics;
 #else
     static_cast<void>(endpoint);

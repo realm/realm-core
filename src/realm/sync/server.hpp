@@ -24,8 +24,8 @@ namespace sync {
 // file descriptors at connection accept.
 class OutOfFilesError : public std::exception {
 public:
-    OutOfFilesError(const std::error_code ec) :
-        m_ec{ec}
+    OutOfFilesError(const std::error_code ec)
+        : m_ec{ec}
     {
     }
     std::error_code code() const noexcept
@@ -36,6 +36,7 @@ public:
     {
         return "Out of file despriptors (EMFILE)";
     }
+
 private:
     std::error_code m_ec;
 };
@@ -63,8 +64,7 @@ public:
     /// rejected for that server-side Realm.
     using ClientFileBlacklists = std::map<std::string, ClientFileBlacklist>;
 
-    using SessionBootstrapCallback = void(util::StringView virt_path,
-                                          file_ident_type client_file_ident);
+    using SessionBootstrapCallback = void(util::StringView virt_path, file_ident_type client_file_ident);
 
     // FIXME: The default values for `http_request_timeout`,
     // `http_response_timeout`, `connection_reaper_timeout`, and
@@ -72,11 +72,11 @@ public:
     // minutes, and 30 seconds respectively) than they are. Their current values
     // are due to the fact that the server is single threaded, and that some
     // operations take more than 5 minutes to complete.
-    static constexpr milliseconds_type default_http_request_timeout       =   600000; // 10 minutes
-    static constexpr milliseconds_type default_http_response_timeout      =   600000; // 10 minutes
-    static constexpr milliseconds_type default_connection_reaper_timeout  =  1800000; // 30 minutes
-    static constexpr milliseconds_type default_connection_reaper_interval =    60000; //  1 minute
-    static constexpr milliseconds_type default_soft_close_timeout         =   600000; // 10 minutes
+    static constexpr milliseconds_type default_http_request_timeout = 600000;       // 10 minutes
+    static constexpr milliseconds_type default_http_response_timeout = 600000;      // 10 minutes
+    static constexpr milliseconds_type default_connection_reaper_timeout = 1800000; // 30 minutes
+    static constexpr milliseconds_type default_connection_reaper_interval = 60000;  //  1 minute
+    static constexpr milliseconds_type default_soft_close_timeout = 600000;         // 10 minutes
 
     struct Config {
         Config() {}
@@ -334,9 +334,7 @@ public:
 
     /// A helper function, for backwards compatibility, that starts a listening
     /// socket without SSL at the specified address and port.
-    void start(const std::string& listen_address,
-               const std::string& listen_port,
-               bool reuse_address = true);
+    void start(const std::string& listen_address, const std::string& listen_port, bool reuse_address = true);
 
     /// Return the resolved and bound endpoint of the listening socket.
     util::network::Endpoint listen_endpoint() const;
@@ -421,14 +419,12 @@ public:
 
     /// Get accumulated time spent on runs of the worker thread(s) since start
     /// of the server.
-    void get_workunit_timers(milliseconds_type& parallel_section,
-                             milliseconds_type& sequential_section);
+    void get_workunit_timers(milliseconds_type& parallel_section, milliseconds_type& sequential_section);
 
 private:
     class Implementation;
     std::unique_ptr<Implementation> m_impl;
 };
-
 
 
 class Server::NoSupportedProtocolVersions : public std::exception {

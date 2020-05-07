@@ -71,8 +71,8 @@ public:
     const std::string realm_path;
     const std::string virt_path;
 
-    Slot(ServerFileAccessCache&, std::string realm_path, std::string virt_path,
-         ServerHistory::CompactionControl&, bool disable_sync_to_disk) noexcept;
+    Slot(ServerFileAccessCache&, std::string realm_path, std::string virt_path, ServerHistory::CompactionControl&,
+         bool disable_sync_to_disk) noexcept;
 
     Slot(Slot&&) = default;
 
@@ -130,19 +130,17 @@ private:
 };
 
 
-
-
 // Implementation
 
 inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, util::Logger& logger,
                                                     ServerHistory::Context& history_context,
                                                     util::Optional<std::array<char, 64>> encryption_key,
-                                                    sync::Metrics* metrics):
-    m_max_open_files{max_open_files},
-    m_encryption_key{encryption_key},
-    m_logger{logger},
-    m_history_context{history_context},
-    m_metrics{metrics}
+                                                    sync::Metrics* metrics)
+    : m_max_open_files{max_open_files}
+    , m_encryption_key{encryption_key}
+    , m_logger{logger}
+    , m_history_context{history_context}
+    , m_metrics{metrics}
 {
     REALM_ASSERT(m_max_open_files >= 1);
 }
@@ -189,15 +187,13 @@ inline void ServerFileAccessCache::insert(Slot& slot) noexcept
     m_first_open_file = &slot;
 }
 
-inline ServerFileAccessCache::Slot::Slot(ServerFileAccessCache& cache, std::string rp,
-                                         std::string vp,
-                                         ServerHistory::CompactionControl& cc,
-                                         bool dstd) noexcept :
-    realm_path{std::move(rp)},
-    virt_path{std::move(vp)},
-    m_cache{cache},
-    m_compaction_control{cc},
-    m_disable_sync_to_disk{dstd}
+inline ServerFileAccessCache::Slot::Slot(ServerFileAccessCache& cache, std::string rp, std::string vp,
+                                         ServerHistory::CompactionControl& cc, bool dstd) noexcept
+    : realm_path{std::move(rp)}
+    , virt_path{std::move(vp)}
+    , m_cache{cache}
+    , m_compaction_control{cc}
+    , m_disable_sync_to_disk{dstd}
 {
 }
 
@@ -256,8 +252,9 @@ inline void ServerFileAccessCache::Slot::do_close() noexcept
     m_file.reset();
 }
 
-inline ServerFileAccessCache::File::File(const Slot& slot) :
-    history{slot.realm_path, slot.m_cache.m_history_context, slot.m_compaction_control}, // Throws
+inline ServerFileAccessCache::File::File(const Slot& slot)
+    : history{slot.realm_path, slot.m_cache.m_history_context, slot.m_compaction_control}
+    ,                                                                   // Throws
     shared_group{DB::create(history, slot.make_shared_group_options())} // Throws
 {
 }

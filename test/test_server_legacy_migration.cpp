@@ -55,6 +55,7 @@ public:
     {
         return m_random;
     }
+
 private:
     std::mt19937_64 m_random;
 };

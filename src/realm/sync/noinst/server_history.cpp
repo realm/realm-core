@@ -78,7 +78,8 @@ Abstract history schema
   table client_files:
     int ident_salt
     int client_version
-    int rh_base_version (0 if recip_hist is null) (doubles as last server version integrated by client in `client_version`)
+    int rh_base_version (0 if recip_hist is null) (doubles as last server version integrated by client in
+`client_version`)
     // recip_hist_index = produced_server_version - recip_hist_base_version - 1
     table recip_hist: (nullable)
       string changeset (nullable)
@@ -127,7 +128,8 @@ Abstract history schema
   //
   // `ct_history_entry_index = realm_version - ct_history_base_version - 1`
   table ct_history:
-    link history_entry (nullable) (references sync_history) (null for empty changesets of local origin) // FIXME: This looks wrong!
+    link history_entry (nullable) (references sync_history) (null for empty changesets of local origin) // FIXME: This
+looks wrong!
 
   int history_byte_size
 
@@ -312,8 +314,7 @@ const AllocationMetricName g_log_compaction_metric{"log_compaction"};
 } // unnamed namespace
 
 
-void ServerHistory::get_status(VersionInfo& version_info,
-                               bool& has_upstream_sync_status,
+void ServerHistory::get_status(VersionInfo& version_info, bool& has_upstream_sync_status,
                                file_ident_type& partial_file_ident,
                                version_type& partial_progress_reference_version) const
 {
@@ -322,12 +323,11 @@ void ServerHistory::get_status(VersionInfo& version_info,
     const_cast<ServerHistory*>(this)->set_group(rt.get());
     ensure_updated(realm_version); // Throws
     version_info.realm_version = realm_version;
-    version_info.sync_version  = get_salted_server_version();
+    version_info.sync_version = get_salted_server_version();
     has_upstream_sync_status = (m_acc && m_acc->upstream_status.is_attached());
     bool is_initiated_as_partial_view = (m_acc && m_acc->partial_sync.is_attached());
     if (is_initiated_as_partial_view) {
-        partial_file_ident =
-            file_ident_type(m_acc->partial_sync.get(s_ps_partial_file_ident_iip));
+        partial_file_ident = file_ident_type(m_acc->partial_sync.get(s_ps_partial_file_ident_iip));
         REALM_ASSERT(partial_file_ident != 0);
         partial_progress_reference_version =
             version_type(m_acc->partial_sync.get(s_ps_progress_reference_version_iip));
@@ -346,46 +346,42 @@ version_type ServerHistory::get_compacted_until_version() const
     const_cast<ServerHistory*>(this)->set_group(rt.get());
     ensure_updated(realm_version); // Throws
     if (m_acc && m_acc->root.is_attached()) {
-        auto value =
-            m_acc->root.get_as_ref_or_tagged(s_compacted_until_version_iip).get_as_int();
+        auto value = m_acc->root.get_as_ref_or_tagged(s_compacted_until_version_iip).get_as_int();
         return version_type(value);
     }
     return 0;
 }
 
 
-void ServerHistory::allocate_file_identifiers(FileIdentAllocSlots& slots,
-                                              VersionInfo& version_info)
+void ServerHistory::allocate_file_identifiers(FileIdentAllocSlots& slots, VersionInfo& version_info)
 {
     TransactionRef tr = m_shared_group->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     if (REALM_UNLIKELY(m_acc->upstream_status.is_attached())) {
         throw util::runtime_error("Cannot allocate new client file identifiers in a file "
-                                 "that is associated with an upstream server");
+                                  "that is associated with an upstream server");
     }
 
-    for (FileIdentAllocSlot& slot: slots)
+    for (FileIdentAllocSlot& slot : slots)
         slot.file_ident = allocate_file_ident(slot.proxy_file, slot.client_type); // Throws
 
     version_type new_realm_version = tr->commit(); // Throws
     version_info.realm_version = new_realm_version;
-    version_info.sync_version  = get_salted_server_version();
+    version_info.sync_version = get_salted_server_version();
 }
 
 
 bool ServerHistory::register_received_file_identifier(file_ident_type received_file_ident,
-                                                      file_ident_type proxy_file_ident,
-                                                      ClientType client_type,
-                                                      salt_type& file_ident_salt,
-                                                      VersionInfo& version_info)
+                                                      file_ident_type proxy_file_ident, ClientType client_type,
+                                                      salt_type& file_ident_salt, VersionInfo& version_info)
 {
     TransactionRef tr = m_shared_group->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     salt_type salt = 0;
     bool success = try_register_file_ident(received_file_ident, proxy_file_ident, client_type,
@@ -396,16 +392,14 @@ bool ServerHistory::register_received_file_identifier(file_ident_type received_f
     version_type new_realm_version = tr->commit(); // Throws
     file_ident_salt = salt;
     version_info.realm_version = new_realm_version;
-    version_info.sync_version  = get_salted_server_version();
+    version_info.sync_version = get_salted_server_version();
     return true;
 }
 
 
 bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& integratable_changesets,
-                                                VersionInfo& version_info,
-                                                bool& backup_whole_realm,
-                                                IntegrationResult& result,
-                                                util::Logger& logger)
+                                                VersionInfo& version_info, bool& backup_whole_realm,
+                                                IntegrationResult& result, util::Logger& logger)
 {
     REALM_ASSERT(!integratable_changesets.empty());
 
@@ -419,7 +413,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
     std::vector<file_ident_type>& client_file_order = m_client_file_order_buffer;
     client_file_order.clear();
     bool has_changesets = false;
-    for (const auto& pair: integratable_changesets) {
+    for (const auto& pair : integratable_changesets) {
         file_ident_type client_file_ident = pair.first;
         client_file_order.push_back(client_file_ident);
         const IntegratableChangesetList& list = pair.second;
@@ -435,8 +429,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
             result.partial_clear();
         }
 
-        bool anything_to_do = (integratable_changesets.size() >
-                               result.excluded_client_files.size());
+        bool anything_to_do = (integratable_changesets.size() > result.excluded_client_files.size());
         if (REALM_UNLIKELY(!anything_to_do))
             return false;
 
@@ -449,7 +442,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
             TransactionRef tr = m_shared_group->start_write(); // Throws
             version_type realm_version = tr->get_version_of_current_transaction().version;
             ensure_updated(realm_version); // Throws
-            prepare_for_write(); // Throws
+            prepare_for_write();           // Throws
 
             TableInfoCache table_info_cache{*tr};
 
@@ -459,8 +452,8 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                 REALM_ASSERT(client_file_ident > 0);
                 REALM_ASSERT(client_file_ident != g_root_node_file_ident);
                 REALM_ASSERT(client_file_ident != m_local_file_ident);
-                bool excluded = (result.excluded_client_files.find(client_file_ident) !=
-                                 result.excluded_client_files.end());
+                bool excluded =
+                    (result.excluded_client_files.find(client_file_ident) != result.excluded_client_files.end());
                 if (REALM_UNLIKELY(excluded))
                     continue;
                 current_client_file_ident = client_file_ident;
@@ -471,8 +464,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                 bool expired = (last_seen_timestamp == 0);
                 if (REALM_UNLIKELY(expired))
                     goto error;
-                const IntegratableChangesetList& list =
-                    integratable_changesets.find(client_file_ident)->second;
+                const IntegratableChangesetList& list = integratable_changesets.find(client_file_ident)->second;
                 std::vector<RemoteChangeset> changesets;
                 current_error_potential = ExtendedIntegrationError::bad_origin_file_ident;
                 for (const IntegratableChangeset& ic : list.changesets) {
@@ -486,37 +478,30 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                         static_assert(g_root_node_file_ident == 1, "");
                         if (REALM_UNLIKELY(origin_file_ident <= g_root_node_file_ident))
                             goto error;
-                        if (REALM_UNLIKELY(std::uint_fast64_t(origin_file_ident) >=
-                                           m_num_client_files))
+                        if (REALM_UNLIKELY(std::uint_fast64_t(origin_file_ident) >= m_num_client_files))
                             goto error;
                         std::size_t index = std::size_t(origin_file_ident);
-                        file_ident_type proxy_file_ident =
-                            file_ident_type(m_acc->cf_proxy_files.get(index));
+                        file_ident_type proxy_file_ident = file_ident_type(m_acc->cf_proxy_files.get(index));
                         if (REALM_UNLIKELY(proxy_file_ident != ic.client_file_ident))
                             goto error;
                     }
                     RemoteChangeset changeset{ic};
-                    changesets.push_back(changeset); // Throws
+                    changesets.push_back(changeset);             // Throws
                     result.integrated_changesets.push_back(&ic); // Throws
                 }
 
-                auto integrate = [&](std::size_t begin, std::size_t end,
-                                     UploadCursor upload_progress) {
+                auto integrate = [&](std::size_t begin, std::size_t end, UploadCursor upload_progress) {
                     const RemoteChangeset* changesets_2 = changesets.data() + begin;
                     std::size_t num_changesets = end - begin;
                     num_changesets_to_dump += num_changesets;
-                    bool dirty_2 =
-                        integrate_remote_changesets(client_file_ident, upload_progress,
-                                                    list.locked_server_version, changesets_2,
-                                                    num_changesets, table_info_cache, &reporter,
-                                                    &reporter, logger); // Throws
+                    bool dirty_2 = integrate_remote_changesets(
+                        client_file_ident, upload_progress, list.locked_server_version, changesets_2, num_changesets,
+                        table_info_cache, &reporter, &reporter, logger); // Throws
                     if (dirty_2) {
                         dirty = true;
                         bool backup_whole_realm_3 =
-                            (begin == end || upload_progress.client_version !=
-                             changesets[end - 1].remote_version ||
-                             list.locked_server_version !=
-                             upload_progress.last_integrated_server_version);
+                            (begin == end || upload_progress.client_version != changesets[end - 1].remote_version ||
+                             list.locked_server_version != upload_progress.last_integrated_server_version);
                         if (backup_whole_realm_3)
                             backup_whole_realm_2 = true;
                     }
@@ -530,8 +515,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
 
                 std::size_t num_changesets = changesets.size();
                 std::size_t aug_num_changesets = num_changesets;
-                logger.debug("Integrating %1 changesets from client file %2", aug_num_changesets,
-                             client_file_ident);
+                logger.debug("Integrating %1 changesets from client file %2", aug_num_changesets, client_file_ident);
 
                 integrate(0, num_changesets, list.upload_progress); // Throws
             }
@@ -544,7 +528,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
 
                 auto ta = util::make_temp_assign(m_is_local_changeset, false, true);
                 version_info.realm_version = tr->commit(); // Throws
-                version_info.sync_version  = get_salted_server_version();
+                version_info.sync_version = get_salted_server_version();
                 if (backup_whole_realm_2)
                     backup_whole_realm = true;
                 return true;
@@ -569,33 +553,30 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                 // Regular changeset
                 const IntegratableChangeset& ic = *result.integrated_changesets[changeset_ndx];
                 std::string hex_dump = util::hex_dump(ic.changeset.data(),
-                                                        ic.changeset.size()); // Throws
+                                                      ic.changeset.size()); // Throws
                 logger.error("Failed transaction (part %1/%2): Changeset "
-                                "(client_file_ident=%3, origin_timestamp=%4, "
-                                "origin_file_ident=%5, client_version=%6, "
-                                "last_integrated_server_version=%7): %8", (i + 1), num_parts,
-                                ic.client_file_ident, ic.origin_timestamp, ic.origin_file_ident,
-                                ic.upload_cursor.client_version,
-                                ic.upload_cursor.last_integrated_server_version,
-                                hex_dump); // Throws
+                             "(client_file_ident=%3, origin_timestamp=%4, "
+                             "origin_file_ident=%5, client_version=%6, "
+                             "last_integrated_server_version=%7): %8",
+                             (i + 1), num_parts, ic.client_file_ident, ic.origin_timestamp, ic.origin_file_ident,
+                             ic.upload_cursor.client_version, ic.upload_cursor.last_integrated_server_version,
+                             hex_dump); // Throws
                 ++changeset_ndx;
                 continue;
             }
         }
 
-      error:
+    error:
         REALM_ASSERT(current_client_file_ident != 0);
-        result.excluded_client_files[current_client_file_ident] =
-            current_error_potential; // Throws
+        result.excluded_client_files[current_client_file_ident] = current_error_potential; // Throws
     }
 }
 
 
-auto ServerHistory::integrate_backup_idents_and_changeset(version_type expected_realm_version,
-                                                          salt_type server_version_salt,
-                                                          const FileIdentAllocSlots& file_ident_alloc_slots,
-                                                          const std::vector<IntegratableChangeset>& integratable_changesets,
-                                                          util::Logger& logger) -> IntegratedBackup
+auto ServerHistory::integrate_backup_idents_and_changeset(
+    version_type expected_realm_version, salt_type server_version_salt,
+    const FileIdentAllocSlots& file_ident_alloc_slots,
+    const std::vector<IntegratableChangeset>& integratable_changesets, util::Logger& logger) -> IntegratedBackup
 {
     IntegratedBackup result;
     result.success = false;
@@ -604,7 +585,7 @@ auto ServerHistory::integrate_backup_idents_and_changeset(version_type expected_
         TransactionRef tr = m_shared_group->start_write(); // Throws
         version_type realm_version = tr->get_version_of_current_transaction().version;
         ensure_updated(realm_version); // Throws
-        prepare_for_write(); // Throws
+        prepare_for_write();           // Throws
 
         TableInfoCache table_info_cache{*tr};
 
@@ -636,21 +617,18 @@ auto ServerHistory::integrate_backup_idents_and_changeset(version_type expected_
             // locked server version. This requires extending the backup
             // protocol.
             const auto& back = pair.second.back();
-            UploadCursor upload_progress = {
-                back.remote_version,
-                back.last_integrated_local_version
-            };
+            UploadCursor upload_progress = {back.remote_version, back.last_integrated_local_version};
             version_type locked_server_version = upload_progress.last_integrated_server_version;
             IntegrationReporter* integration_reporter = nullptr;
-            integrate_remote_changesets(client_file_ident, upload_progress, locked_server_version,
-                                        pair.second.data(), pair.second.size(), table_info_cache,
-                                        transform_reporter, integration_reporter,
+            integrate_remote_changesets(client_file_ident, upload_progress, locked_server_version, pair.second.data(),
+                                        pair.second.size(), table_info_cache, transform_reporter,
+                                        integration_reporter,
                                         logger); // Throws
         }
 
         auto ta = util::make_temp_assign(m_is_local_changeset, false, true);
         result.version_info.realm_version = tr->commit(); // Throws
-        result.version_info.sync_version  = get_salted_server_version();
+        result.version_info.sync_version = get_salted_server_version();
         result.success = true;
     }
     catch (BadChangesetError& e) {
@@ -664,14 +642,12 @@ auto ServerHistory::integrate_backup_idents_and_changeset(version_type expected_
 }
 
 
-auto ServerHistory::allocate_file_ident(file_ident_type proxy_file_ident,
-                                        ClientType client_type) -> SaltedFileIdent
+auto ServerHistory::allocate_file_ident(file_ident_type proxy_file_ident, ClientType client_type) -> SaltedFileIdent
 {
     REALM_ASSERT(!m_acc->upstream_status.is_attached());
 
     std::size_t file_index = m_num_client_files;
-    salt_type salt =
-        register_client_file_by_index(file_index, proxy_file_ident, client_type); // Throws
+    salt_type salt = register_client_file_by_index(file_index, proxy_file_ident, client_type); // Throws
 
     if (file_index > std::uint_fast64_t(get_max_file_ident()))
         throw util::overflow_error{"File identifier"};
@@ -686,15 +662,13 @@ void ServerHistory::register_assigned_file_ident(file_ident_type file_ident)
     file_ident_type proxy_file_ident = 0; // No proxy
     ClientType client_type = ClientType::self;
     salt_type file_ident_salt; // Dummy
-    bool success =
-        try_register_file_ident(file_ident, proxy_file_ident, client_type,
-                                file_ident_salt); // Throws
+    bool success = try_register_file_ident(file_ident, proxy_file_ident, client_type,
+                                           file_ident_salt); // Throws
     REALM_ASSERT(success);
 }
 
 
-bool ServerHistory::try_register_file_ident(file_ident_type file_ident,
-                                            file_ident_type proxy_file_ident,
+bool ServerHistory::try_register_file_ident(file_ident_type file_ident, file_ident_type proxy_file_ident,
                                             ClientType client_type, salt_type& file_ident_salt)
 {
     REALM_ASSERT(m_acc->upstream_status.is_attached());
@@ -707,14 +681,12 @@ bool ServerHistory::try_register_file_ident(file_ident_type file_ident,
     std::size_t file_index = std::size_t(file_ident);
     if (file_index < m_num_client_files)
         return false;
-    file_ident_salt =
-        register_client_file_by_index(file_index, proxy_file_ident, client_type); // Throws
+    file_ident_salt = register_client_file_by_index(file_index, proxy_file_ident, client_type); // Throws
     return true;
 }
 
 
-auto ServerHistory::register_client_file_by_index(std::size_t file_index,
-                                                  file_ident_type proxy_file_ident,
+auto ServerHistory::register_client_file_by_index(std::size_t file_index, file_ident_type proxy_file_ident,
                                                   ClientType client_type) -> salt_type
 {
     REALM_ASSERT(file_index >= m_num_client_files);
@@ -727,7 +699,7 @@ auto ServerHistory::register_client_file_by_index(std::size_t file_index,
         salt = std::uniform_int_distribution<salt_type>(1, max_salt)(random);
     }
     while (file_index > m_num_client_files)
-        add_client_file(0, 0, ClientType::upstream); // Throws
+        add_client_file(0, 0, ClientType::upstream);      // Throws
     add_client_file(salt, proxy_file_ident, client_type); // Throws
     return salt;
 }
@@ -752,7 +724,8 @@ bool ServerHistory::ensure_upstream_file_ident(file_ident_type file_ident)
         REALM_ASSERT(m_acc->cf_proxy_files.get(file_index) == 0);
         return true;
     }
-    do add_client_file(0, 0, ClientType::upstream); // Throws
+    do
+        add_client_file(0, 0, ClientType::upstream); // Throws
     while (file_index >= m_num_client_files);
     return true;
 }
@@ -793,14 +766,14 @@ void ServerHistory::add_client_file(salt_type file_ident_salt, file_ident_type p
         if (REALM_UNLIKELY(last_seen_timestamp <= 0))
             last_seen_timestamp = 1;
     }
-    m_acc->cf_ident_salts.insert(realm::npos, std::int_fast64_t(file_ident_salt)); // Throws
-    m_acc->cf_client_versions.insert(realm::npos, client_version); // Throws
-    m_acc->cf_rh_base_versions.insert(realm::npos, recip_hist_base_version); // Throws
-    m_acc->cf_recip_hist_refs.insert(realm::npos, recip_hist_ref); // Throws
+    m_acc->cf_ident_salts.insert(realm::npos, std::int_fast64_t(file_ident_salt));  // Throws
+    m_acc->cf_client_versions.insert(realm::npos, client_version);                  // Throws
+    m_acc->cf_rh_base_versions.insert(realm::npos, recip_hist_base_version);        // Throws
+    m_acc->cf_recip_hist_refs.insert(realm::npos, recip_hist_ref);                  // Throws
     m_acc->cf_proxy_files.insert(realm::npos, std::int_fast64_t(proxy_file_ident)); // Throws
-    m_acc->cf_client_types.insert(realm::npos, std::int_fast64_t(client_type)); // Throws
-    m_acc->cf_last_seen_timestamps.insert(realm::npos, last_seen_timestamp); // Throws
-    m_acc->cf_locked_server_versions.insert(realm::npos, locked_server_version); // Throws
+    m_acc->cf_client_types.insert(realm::npos, std::int_fast64_t(client_type));     // Throws
+    m_acc->cf_last_seen_timestamps.insert(realm::npos, last_seen_timestamp);        // Throws
+    m_acc->cf_locked_server_versions.insert(realm::npos, locked_server_version);    // Throws
     std::size_t max_size = std::numeric_limits<std::size_t>::max();
     if (m_num_client_files == max_size)
         throw util::overflow_error{"Client file index"};
@@ -826,14 +799,10 @@ void ServerHistory::save_upstream_sync_progress(const SyncProgress& progress)
 }
 
 
-auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_ident,
-                                                DownloadCursor download_progress,
-                                                SaltedVersion server_version,
-                                                ClientType client_type,
-                                                UploadCursor& upload_progress,
-                                                version_type& locked_server_version,
-                                                Logger& logger) const noexcept ->
-    BootstrapError
+auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_ident, DownloadCursor download_progress,
+                                                SaltedVersion server_version, ClientType client_type,
+                                                UploadCursor& upload_progress, version_type& locked_server_version,
+                                                Logger& logger) const noexcept -> BootstrapError
 {
     REALM_ASSERT(is_direct_client(client_type));
     REALM_ASSERT(client_type != ClientType::legacy);
@@ -842,8 +811,8 @@ auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_iden
     if (!m_acc)
         return BootstrapError::bad_client_file_ident;
     {
-        bool good = (client_file_ident.ident >= 1 &&
-                     util::int_less_than(client_file_ident.ident, m_num_client_files));
+        bool good =
+            (client_file_ident.ident >= 1 && util::int_less_than(client_file_ident.ident, m_num_client_files));
         if (!good)
             return BootstrapError::bad_client_file_ident;
     }
@@ -860,8 +829,7 @@ auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_iden
     // asks to download from a point before the base of its reciprocal history.
     auto recip_hist_base_version = version_type(m_acc->cf_rh_base_versions.get(client_file_index));
     if (download_progress.server_version < recip_hist_base_version) {
-        logger.debug("Bad dwoload progress: %1 < %2", download_progress.server_version,
-                     recip_hist_base_version);
+        logger.debug("Bad dwoload progress: %1 < %2", download_progress.server_version, recip_hist_base_version);
         return BootstrapError::bad_download_server_version;
     }
 
@@ -887,8 +855,7 @@ auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_iden
     version_type current_server_version = get_server_version();
     if (download_progress.server_version > current_server_version)
         return BootstrapError::bad_download_server_version;
-    auto last_integrated_client_version =
-        version_type(m_acc->cf_client_versions.get(client_file_index));
+    auto last_integrated_client_version = version_type(m_acc->cf_client_versions.get(client_file_index));
     if (download_progress.last_integrated_client_version > last_integrated_client_version)
         return BootstrapError::bad_download_client_version;
 
@@ -921,32 +888,24 @@ auto ServerHistory::do_bootstrap_client_session(SaltedFileIdent client_file_iden
 }
 
 
-auto ServerHistory::bootstrap_client_session(SaltedFileIdent client_file_ident,
-                                             DownloadCursor download_progress,
-                                             SaltedVersion server_version,
-                                             ClientType client_type,
-                                             UploadCursor& upload_progress,
-                                             version_type& locked_server_version,
-                                             Logger& logger) const ->
-    BootstrapError
+auto ServerHistory::bootstrap_client_session(SaltedFileIdent client_file_ident, DownloadCursor download_progress,
+                                             SaltedVersion server_version, ClientType client_type,
+                                             UploadCursor& upload_progress, version_type& locked_server_version,
+                                             Logger& logger) const -> BootstrapError
 {
     TransactionRef tr = m_shared_group->start_read(); // Throws
     auto realm_version = tr->get_version();
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
 
-    BootstrapError error =
-        do_bootstrap_client_session(client_file_ident, download_progress, server_version,
-                                    client_type, upload_progress, locked_server_version,
-                                    logger);
+    BootstrapError error = do_bootstrap_client_session(client_file_ident, download_progress, server_version,
+                                                       client_type, upload_progress, locked_server_version, logger);
     return error;
 }
 
 
-bool ServerHistory::fetch_download_info(file_ident_type client_file_ident,
-                                        DownloadCursor& download_progress,
-                                        version_type end_version,
-                                        UploadCursor& upload_progress,
+bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, DownloadCursor& download_progress,
+                                        version_type end_version, UploadCursor& upload_progress,
                                         HistoryEntryHandler& handler,
                                         std::uint_fast64_t& cumulative_byte_size_current,
                                         std::uint_fast64_t& cumulative_byte_size_total,
@@ -980,21 +939,20 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident,
     std::vector<std::size_t> original_changeset_sizes;
     if (!disable_download_compaction) {
         std::size_t reserve = to_size_t(end_version - download_progress_2.server_version);
-        changesets.reserve(reserve); // Throws
+        changesets.reserve(reserve);               // Throws
         original_changeset_sizes.reserve(reserve); // Throws
     }
 
     for (;;) {
         version_type begin_version = download_progress_2.server_version;
         HistoryEntry entry;
-        version_type version =
-            find_history_entry(client_file_ident, begin_version, end_version, entry,
-                               download_progress_2.last_integrated_client_version);
+        version_type version = find_history_entry(client_file_ident, begin_version, end_version, entry,
+                                                  download_progress_2.last_integrated_client_version);
         if (version == 0) {
             // End of history reached
             download_progress_2.server_version = end_version;
             break;
-         }
+        }
 
         download_progress_2.server_version = version;
 
@@ -1011,12 +969,12 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident,
             changeset.last_integrated_remote_version = entry.remote_version;
             changeset.origin_timestamp = entry.origin_timestamp;
             changeset.origin_file_ident = entry.origin_file_ident;
-            changesets.push_back(std::move(changeset)); // Throws
+            changesets.push_back(std::move(changeset));                 // Throws
             original_changeset_sizes.push_back(entry.changeset.size()); // Throws
         }
-	else {
+        else {
             handler.handle(download_progress_2.server_version, entry, entry.changeset.size()); // Throws
-	}
+        }
 
         accum_byte_size += entry.changeset.size();
 
@@ -1073,7 +1031,7 @@ void ServerHistory::add_upstream_sync_status()
     TransactionRef tr = m_shared_group->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     REALM_ASSERT(!m_acc->upstream_status.is_attached());
     REALM_ASSERT(m_local_file_ident == g_root_node_file_ident);
@@ -1093,15 +1051,15 @@ void ServerHistory::add_upstream_sync_status()
     m_acc->upstream_status.create(Array::type_Normal, context_flag_no, size); // Throws
     _impl::ShallowArrayDestroyGuard adg{&m_acc->upstream_status};
     m_acc->upstream_status.update_parent(); // Throws
-    adg.release(); // Ref ownership transferred to parent array
-    tr->commit(); // Throws
+    adg.release();                          // Ref ownership transferred to parent array
+    tr->commit();                           // Throws
 }
 
 bool ServerHistory::compact_history(const TransactionRef& wt, Logger& logger)
 {
     version_type realm_version = wt->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
     bool force = true;
     return do_compact_history(logger, force); // Throws
 }
@@ -1149,7 +1107,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
 
     // Must be in write transaction!
 
-    static const std::size_t compaction_input_soft_limit = 1024*1024*1024; // 1 GB
+    static const std::size_t compaction_input_soft_limit = 1024 * 1024 * 1024; // 1 GB
     namespace chrono = std::chrono;
 
     if (!m_enable_compaction)
@@ -1166,7 +1124,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
         using Range = CompactionControl::LastClientAccessesRange;
         Range range = m_compaction_control.get_last_client_accesses(); // Throws
         const Entry* begin = range.first;
-        const Entry* end   = range.second;
+        const Entry* end = range.second;
         for (auto i = begin; i != end; ++i) {
             std::size_t client_file_index = std::size_t(i->client_file_ident);
             REALM_ASSERT_RELEASE(client_file_index < num_client_files);
@@ -1179,8 +1137,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
                 m_acc->cf_client_types.set(client_file_index, std::int_fast64_t(client_type)); // Throws
             }
             // Take care to never de-expire a client file entry
-            std::int_fast64_t last_seen_timestamp =
-                m_acc->cf_last_seen_timestamps.get(client_file_index);
+            std::int_fast64_t last_seen_timestamp = m_acc->cf_last_seen_timestamps.get(client_file_index);
             bool expired = (last_seen_timestamp == 0);
             if (REALM_UNLIKELY(expired))
                 continue;
@@ -1199,12 +1156,15 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
     // history compaction interval plus/minus a fuzz factor (currently half the
     // interval).
     auto now = m_context.get_compaction_clock_now();
-    chrono::seconds last_compaction_time_from_epoch{m_acc->root.get_as_ref_or_tagged(s_last_compaction_timestamp_iip).get_as_int()};
+    chrono::seconds last_compaction_time_from_epoch{
+        m_acc->root.get_as_ref_or_tagged(s_last_compaction_timestamp_iip).get_as_int()};
     chrono::system_clock::time_point last_compaction_time{last_compaction_time_from_epoch};
     auto duration_since_last_compaction = chrono::duration_cast<chrono::seconds>(now - last_compaction_time);
     auto& random = m_context.server_history_get_random();
-    auto duration_fuzz = std::uniform_int_distribution<std::int_fast64_t>(0, m_compaction_interval.count() / 2)(random);
-    auto minimum_duration_until_compact = chrono::duration_cast<chrono::seconds>(m_compaction_interval) + chrono::seconds{duration_fuzz};
+    auto duration_fuzz =
+        std::uniform_int_distribution<std::int_fast64_t>(0, m_compaction_interval.count() / 2)(random);
+    auto minimum_duration_until_compact =
+        chrono::duration_cast<chrono::seconds>(m_compaction_interval) + chrono::seconds{duration_fuzz};
     if (!force && duration_since_last_compaction.count() < minimum_duration_until_compact.count()) {
         logger.trace("History compaction: Skipping because we are still within the compaction interval (%1 < %2)",
                      duration_since_last_compaction.count(), minimum_duration_until_compact.count()); // Throws
@@ -1216,13 +1176,12 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
 
     version_type current_version = get_server_version();
     if (current_version <= compacted_until_version) {
-        logger.trace("History compaction: Everything is already compacted (%1 <= %2)",
-                     current_version, compacted_until_version); // Throws
+        logger.trace("History compaction: Everything is already compacted (%1 <= %2)", current_version,
+                     compacted_until_version); // Throws
         return dirty;
     }
 
-    version_type limit_due_to_state_realms =
-        m_compaction_control.get_max_compactable_server_version(); // Throws
+    version_type limit_due_to_state_realms = m_compaction_control.get_max_compactable_server_version(); // Throws
     if (limit_due_to_state_realms <= compacted_until_version) {
         logger.debug("History compaction: Further progress blocked by state Realms (%1 <= %2)",
                      limit_due_to_state_realms, compacted_until_version); // Throws
@@ -1255,7 +1214,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
             Allocator& alloc = m_acc->cf_recip_hist_refs.get_alloc();
             BinaryColumn recip_hist{alloc};
             recip_hist.init_from_ref(recip_hist_ref);
-            recip_hist.destroy(); // Throws
+            recip_hist.destroy();                                // Throws
             m_acc->cf_recip_hist_refs.set(client_file_index, 0); // Throws
         }
         dirty = true;
@@ -1283,8 +1242,9 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
                 bool expire_now = (age > max_time_to_live);
                 if (REALM_UNLIKELY(expire_now)) {
                     logger.debug("History compaction: Expiring client file %1 due to age (%2 > "
-                                 "%3)", file_ident, age, max_time_to_live); // Throws
-                    expire_client_file(i); // Throws
+                                 "%3)",
+                                 file_ident, age, max_time_to_live); // Throws
+                    expire_client_file(i);                           // Throws
                     continue;
                 }
             }
@@ -1295,8 +1255,8 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
                 logger.debug("History compaction: Further progress blocked by client file %1, "
                              "that has not progressed far enough in terms of synchronization (%2 "
                              "<= min(%3, %4)), and has also not yet expired (%5 <= %6)",
-                             file_ident, rh_base_version, locked_server_version,
-                             compacted_until_version, age, max_time_to_live); // Throws
+                             file_ident, rh_base_version, locked_server_version, compacted_until_version, age,
+                             max_time_to_live); // Throws
                 return dirty;
             }
             if (locked_version < can_compact_until_version)
@@ -1324,8 +1284,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
                                  compacted_until_version + 1, age, max_time_to_live); // Throws
                     return dirty;
                 }
-                can_compact_until_version =
-                    version_type(m_history_base_version + history_entry_index);
+                can_compact_until_version = version_type(m_history_base_version + history_entry_index);
                 break;
             }
         }
@@ -1350,9 +1309,9 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
             auto locked_version = std::min(rh_base_version, locked_server_version);
             if (locked_version < can_compact_until_version) {
                 logger.debug("History compaction: Expiring client file %1 due to lack of progress "
-                             "(min(%2, %3) < %4)", file_ident, rh_base_version,
-                             locked_server_version, can_compact_until_version); // Throws
-                expire_client_file(i); // Throws
+                             "(min(%2, %3) < %4)",
+                             file_ident, rh_base_version, locked_server_version, can_compact_until_version); // Throws
+                expire_client_file(i);                                                                       // Throws
                 ++num_expirations;
             }
         }
@@ -1364,13 +1323,12 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
 
     REALM_ASSERT(can_compact_until_version > compacted_until_version);
     logger.debug("History compaction: Compacting until version %1 (was previously compacted "
-                 "until version %2) (latest version is %3)", can_compact_until_version,
-                 compacted_until_version, current_version); // Throws
+                 "until version %2) (latest version is %3)",
+                 can_compact_until_version, compacted_until_version, current_version); // Throws
 
     dirty = true;
 
-    std::size_t num_compactable_changesets =
-        std::size_t(can_compact_until_version - m_history_base_version);
+    std::size_t num_compactable_changesets = std::size_t(can_compact_until_version - m_history_base_version);
     version_type compaction_begin_version = m_history_base_version; // always 0 for now
     std::size_t before_size = 0;
     std::size_t after_size = 0;
@@ -1418,8 +1376,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
             encode_changeset(compact_bootstrap_changesets[i], buffer);
             after_size += buffer.size();
             version_type server_version = begin_version + i + 1;
-            m_acc->sh_changesets.set(server_version - 1,
-                                 BinaryData{buffer.data(), buffer.size()}); // Throws
+            m_acc->sh_changesets.set(server_version - 1, BinaryData{buffer.data(), buffer.size()}); // Throws
         }
         compaction_begin_version = end_version;
     }
@@ -1447,10 +1404,11 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
     REALM_ASSERT(can_compact_until_version >
                  version_type(m_acc->root.get_as_ref_or_tagged(s_compacted_until_version_iip).get_as_int()));
     m_acc->root.set(s_compacted_until_version_iip,
-                       RefOrTagged::make_tagged(can_compact_until_version)); // Throws
+                    RefOrTagged::make_tagged(can_compact_until_version)); // Throws
 
     logger.detail("History compaction: Processed %1 changesets (saved %2 bytes in %3 "
-                  "milliseconds)", num_compactable_changesets, before_size - after_size,
+                  "milliseconds)",
+                  num_compactable_changesets, before_size - after_size,
                   chrono::duration_cast<chrono::milliseconds>(new_now - now).count()); // Throws
     return dirty;
 }
@@ -1459,13 +1417,13 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
 class ServerHistory::ReciprocalHistory : private ArrayParent {
 public:
     ReciprocalHistory(BPlusTree<ref_type>& cf_recip_hist_refs, std::size_t remote_file_index,
-                      version_type base_version) :
-        m_cf_recip_hist_refs{cf_recip_hist_refs},
-        m_remote_file_index{remote_file_index},
-        m_base_version{base_version}
+                      version_type base_version)
+        : m_cf_recip_hist_refs{cf_recip_hist_refs}
+        , m_remote_file_index{remote_file_index}
+        , m_base_version{base_version}
     {
         if (ref_type ref = to_ref(cf_recip_hist_refs.get(remote_file_index))) {
-            init(ref); // Throws
+            init(ref);                     // Throws
             m_size = m_changesets->size(); // Relatively expensive
         }
     }
@@ -1503,8 +1461,8 @@ public:
         auto ref = recip_hist.get_ref();
         DeepArrayRefDestroyGuard adg{ref, alloc};
         m_cf_recip_hist_refs.set(m_remote_file_index, ref); // Throws
-        adg.release(); // Ref ownership transferred to parent array
-        init(ref); // Throws
+        adg.release();                                      // Ref ownership transferred to parent array
+        init(ref);                                          // Throws
     }
 
     // The reciprocal history must have been instantiated (see
@@ -1602,22 +1560,20 @@ private:
 class ServerHistory::TransformHistoryImpl : public TransformHistory {
 public:
     TransformHistoryImpl(file_ident_type remote_file_ident, ServerHistory& history,
-                         ReciprocalHistory& recip_hist) noexcept :
-        m_remote_file_ident{remote_file_ident},
-        m_history{history},
-        m_recip_hist{recip_hist}
+                         ReciprocalHistory& recip_hist) noexcept
+        : m_remote_file_ident{remote_file_ident}
+        , m_history{history}
+        , m_recip_hist{recip_hist}
     {
     }
 
-    version_type find_history_entry(version_type begin_version, version_type end_version,
-                                    HistoryEntry& entry) const noexcept override final
+    version_type find_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry) const
+        noexcept override final
     {
-        return m_history.find_history_entry(m_remote_file_ident, begin_version,
-                                            end_version, entry);
+        return m_history.find_history_entry(m_remote_file_ident, begin_version, end_version, entry);
     }
 
-    ChunkedBinaryData get_reciprocal_transform(version_type server_version) const noexcept
-        override final
+    ChunkedBinaryData get_reciprocal_transform(version_type server_version) const noexcept override final
     {
         ChunkedBinaryData transform;
         if (m_recip_hist.get(server_version, transform))
@@ -1638,15 +1594,11 @@ private:
 };
 
 
-bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_ident,
-                                                UploadCursor upload_progress,
-                                                version_type locked_server_version,
-                                                const RemoteChangeset* changesets,
-                                                std::size_t num_changesets,
-                                                TableInfoCache& table_info_cache,
+bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_ident, UploadCursor upload_progress,
+                                                version_type locked_server_version, const RemoteChangeset* changesets,
+                                                std::size_t num_changesets, TableInfoCache& table_info_cache,
                                                 Transformer::Reporter* transform_reporter,
-                                                IntegrationReporter* integration_reporter,
-                                                util::Logger& logger)
+                                                IntegrationReporter* integration_reporter, util::Logger& logger)
 {
     std::size_t remote_file_index = std::size_t(remote_file_ident);
     REALM_ASSERT(remote_file_index < m_num_client_files);
@@ -1658,23 +1610,18 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         bool expired = (last_seen_timestamp == 0);
         REALM_ASSERT_RELEASE(!expired);
     }
-    version_type orig_client_version =
-        version_type(m_acc->cf_client_versions.get(remote_file_index));
-    version_type recip_hist_base_version =
-        version_type(m_acc->cf_rh_base_versions.get(remote_file_index));
+    version_type orig_client_version = version_type(m_acc->cf_client_versions.get(remote_file_index));
+    version_type recip_hist_base_version = version_type(m_acc->cf_rh_base_versions.get(remote_file_index));
     ReciprocalHistory recip_hist(m_acc->cf_recip_hist_refs, remote_file_index,
                                  recip_hist_base_version); // Throws
 
     {
-        UploadCursor prev_upload_cursor = { orig_client_version, recip_hist_base_version };
+        UploadCursor prev_upload_cursor = {orig_client_version, recip_hist_base_version};
         for (std::size_t i = 0; i < num_changesets; ++i) {
             // Note: remote_file_ident may be different from
             // changeset.origin_file_ident in a cluster setup.
             REALM_ASSERT(changesets[i].origin_file_ident > 0);
-            UploadCursor upload_cursor = {
-                changesets[i].remote_version,
-                changesets[i].last_integrated_local_version
-            };
+            UploadCursor upload_cursor = {changesets[i].remote_version, changesets[i].last_integrated_local_version};
             REALM_ASSERT(upload_cursor.client_version > prev_upload_cursor.client_version);
             REALM_ASSERT(are_mutually_consistent(upload_cursor, prev_upload_cursor));
             prev_upload_cursor = upload_cursor;
@@ -1684,8 +1631,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
     if (num_changesets > 0) {
         recip_hist.ensure_instantiated(); // Throws
 
-        version_type lowest_last_integrated_local_version =
-            changesets[0].last_integrated_local_version;
+        version_type lowest_last_integrated_local_version = changesets[0].last_integrated_local_version;
 
         // Parse the changesets
         std::vector<Changeset> parsed_transformed_changesets;
@@ -1695,17 +1641,14 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
 
         // Transform the changesets
         version_type current_server_version = get_server_version();
-        bool may_have_causally_unrelated_changes =
-            (current_server_version > lowest_last_integrated_local_version);
+        bool may_have_causally_unrelated_changes = (current_server_version > lowest_last_integrated_local_version);
         if (may_have_causally_unrelated_changes) {
             // Merge with causally unrelated changesets, and resolve the
             // conflicts if there are any.
             TransformHistoryImpl transform_hist{remote_file_ident, *this, recip_hist};
             Transformer& transformer = m_context.get_transformer(); // Throws
-            transformer.transform_remote_changesets(transform_hist, m_local_file_ident,
-                                                    current_server_version,
-                                                    parsed_transformed_changesets.data(),
-                                                    num_changesets,
+            transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
+                                                    parsed_transformed_changesets.data(), num_changesets,
                                                     transform_reporter,
                                                     &logger); // Throws
         }
@@ -1718,20 +1661,20 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
             const Changeset& changeset = parsed_transformed_changesets[i];
 
             HistoryEntry entry;
-            entry.origin_timestamp  = changeset.origin_timestamp;
+            entry.origin_timestamp = changeset.origin_timestamp;
             entry.origin_file_ident = changeset.origin_file_ident;
-            entry.remote_version    = changeset.version;
+            entry.remote_version = changeset.version;
 
             util::AppendBuffer<char> changeset_buffer;
 
             TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
             InstructionApplier applier{transaction, table_info_cache};
-            applier.apply(parsed_transformed_changesets[i], &logger); // Throws
+            applier.apply(parsed_transformed_changesets[i], &logger);             // Throws
             encode_changeset(parsed_transformed_changesets[i], changeset_buffer); // Throws
             entry.changeset = BinaryData{changeset_buffer.data(), changeset_buffer.size()};
 
             add_sync_history_entry(entry); // Throws
-            reset(); // Reset the instruction encoder
+            reset();                       // Reset the instruction encoder
 
             if (integration_reporter != nullptr) {
                 // Report the original size of the integrated changeset
@@ -1746,11 +1689,10 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
         dirty = true;
 
     if (from_downstream) {
-        version_type orig_version =
-            version_type(m_acc->cf_locked_server_versions.get(remote_file_index));
+        version_type orig_version = version_type(m_acc->cf_locked_server_versions.get(remote_file_index));
         if (locked_server_version > orig_version) {
             m_acc->cf_locked_server_versions.set(remote_file_index,
-                                            std::int_fast64_t(locked_server_version)); // Throws
+                                                 std::int_fast64_t(locked_server_version)); // Throws
             dirty = true;
         }
     }
@@ -1769,21 +1711,19 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
 }
 
 
-bool ServerHistory::update_upload_progress(version_type orig_client_version,
-                                           ReciprocalHistory& recip_hist,
+bool ServerHistory::update_upload_progress(version_type orig_client_version, ReciprocalHistory& recip_hist,
                                            UploadCursor upload_progress)
 {
-    UploadCursor orig_upload_progress = { orig_client_version, recip_hist.base_version() };
+    UploadCursor orig_upload_progress = {orig_client_version, recip_hist.base_version()};
     REALM_ASSERT(upload_progress.client_version >= orig_upload_progress.client_version);
     REALM_ASSERT(are_mutually_consistent(upload_progress, orig_upload_progress));
     std::size_t client_file_index = recip_hist.remote_file_index();
-    bool update_client_version = (upload_progress.client_version >
-                                  orig_upload_progress.client_version);
+    bool update_client_version = (upload_progress.client_version > orig_upload_progress.client_version);
     if (update_client_version) {
         auto value_1 = std::int_fast64_t(upload_progress.client_version);
         m_acc->cf_client_versions.set(client_file_index, value_1); // Throws
-        bool update_server_version = (upload_progress.last_integrated_server_version >
-                                      orig_upload_progress.last_integrated_server_version);
+        bool update_server_version =
+            (upload_progress.last_integrated_server_version > orig_upload_progress.last_integrated_server_version);
         if (update_server_version) {
             recip_hist.trim(upload_progress.last_integrated_server_version); // Throws
             auto value_2 = std::int_fast64_t(upload_progress.last_integrated_server_version);
@@ -1872,10 +1812,10 @@ _impl::History* ServerHistory::_get_history_write()
 std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 {
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    auto server_hist =
-        std::make_unique<ServerHistory>(get_database_path(), m_context, compaction_control); // Throws
-    server_hist->initialize(*m_shared_group); // Throws
-    return std::unique_ptr<_impl::History>(server_hist.release());;
+    auto server_hist = std::make_unique<ServerHistory>(get_database_path(), m_context, compaction_control); // Throws
+    server_hist->initialize(*m_shared_group);                                                               // Throws
+    return std::unique_ptr<_impl::History>(server_hist.release());
+    ;
 }
 
 
@@ -1888,8 +1828,7 @@ bool ServerHistory::is_sync_agent() const noexcept
 
 
 // Overriding member in TrivialReplication
-auto ServerHistory::prepare_changeset(const char* data, std::size_t size,
-                                      version_type realm_version) -> version_type
+auto ServerHistory::prepare_changeset(const char* data, std::size_t size, version_type realm_version) -> version_type
 {
     ensure_updated(realm_version);
     prepare_for_write(); // Throws
@@ -1900,10 +1839,10 @@ auto ServerHistory::prepare_changeset(const char* data, std::size_t size,
         auto& buffer = get_instruction_encoder().buffer();
         BinaryData changeset{buffer.data(), buffer.size()};
         HistoryEntry entry;
-        entry.origin_timestamp  = sync::generate_changeset_timestamp();
+        entry.origin_timestamp = sync::generate_changeset_timestamp();
         entry.origin_file_ident = 0; // Of local origin
-        entry.remote_version    = 0; // Of local origin on server-side
-        entry.changeset         = changeset;
+        entry.remote_version = 0;    // Of local origin on server-side
+        entry.changeset = changeset;
 
         add_sync_history_entry(entry); // Throws
     }
@@ -1918,14 +1857,11 @@ auto ServerHistory::prepare_changeset(const char* data, std::size_t size,
 
 
 // Overriding member in TrivialReplication
-void ServerHistory::finalize_changeset() noexcept
-{
-}
+void ServerHistory::finalize_changeset() noexcept {}
 
 
 // Overriding member in ClientHistoryBase
-void ServerHistory::get_status(version_type& current_client_version,
-                               SaltedFileIdent& client_file_ident,
+void ServerHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
                                SyncProgress& progress) const
 {
     TransactionRef tr = m_shared_group->start_read(); // Throws
@@ -1940,38 +1876,31 @@ void ServerHistory::get_status(version_type& current_client_version,
     // server
     current_client_version = get_server_version();
 
-    client_file_ident.ident = (m_local_file_ident == g_root_node_file_ident ? 0 :
-                               m_local_file_ident);
+    client_file_ident.ident = (m_local_file_ident == g_root_node_file_ident ? 0 : m_local_file_ident);
     const Array& us = m_acc->upstream_status;
     client_file_ident.salt = salt_type(us.get(s_us_client_file_ident_salt_iip));
-    progress.latest_server_version.version =
-        version_type(us.get(s_us_progress_latest_server_version_iip));
-    progress.latest_server_version.salt =
-        salt_type(us.get(s_us_progress_latest_server_version_salt_iip));
-    progress.download.server_version =
-        version_type(us.get(s_us_progress_download_server_version_iip));
+    progress.latest_server_version.version = version_type(us.get(s_us_progress_latest_server_version_iip));
+    progress.latest_server_version.salt = salt_type(us.get(s_us_progress_latest_server_version_salt_iip));
+    progress.download.server_version = version_type(us.get(s_us_progress_download_server_version_iip));
     progress.download.last_integrated_client_version =
         version_type(us.get(s_us_progress_download_client_version_iip));
-    progress.upload.client_version =
-        version_type(us.get(s_us_progress_upload_client_version_iip));
-    progress.upload.last_integrated_server_version =
-        version_type(us.get(s_us_progress_upload_server_version_iip));
+    progress.upload.client_version = version_type(us.get(s_us_progress_upload_client_version_iip));
+    progress.upload.last_integrated_server_version = version_type(us.get(s_us_progress_upload_server_version_iip));
 
     // FIXME: What about progress.downloadable_bytes?
 }
 
 
 // Overriding member in ClientHistoryBase
-void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident,
-                                          bool fix_up_object_ids)
+void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
 {
     REALM_ASSERT(client_file_ident.ident != g_root_node_file_ident);
 
     TransactionRef tr = m_shared_group->start_write(); // Throws
-    TableInfoCache table_info_cache {*tr};
+    TableInfoCache table_info_cache{*tr};
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     REALM_ASSERT(m_acc->upstream_status.is_attached());
     REALM_ASSERT(m_local_file_ident == g_root_node_file_ident);
@@ -2009,7 +1938,7 @@ void ServerHistory::set_sync_progress(const SyncProgress& progress, const std::u
     TransactionRef tr = m_shared_group->start_write(); // Throws
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     REALM_ASSERT(m_acc->upstream_status.is_attached());
     REALM_ASSERT(m_local_file_ident != g_root_node_file_ident);
@@ -2018,13 +1947,12 @@ void ServerHistory::set_sync_progress(const SyncProgress& progress, const std::u
 
     version_type new_realm_version = tr->commit(); // Throws
     version_info.realm_version = new_realm_version;
-    version_info.sync_version  = get_salted_server_version();
+    version_info.sync_version = get_salted_server_version();
 }
 
 
 // Overriding member in ClientHistoryBase
-void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress,
-                                               version_type end_version,
+void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
                                                std::vector<UploadChangeset>& uploadable_changesets,
                                                version_type& locked_server_version) const
 {
@@ -2048,8 +1976,7 @@ void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress,
         file_ident_type remote_file_ident = 0; // Remote file is on upstream server
         HistoryEntry entry;
         version_type version_2 =
-            find_history_entry(remote_file_ident, version, end_version, entry,
-                               last_integrated_upstream_version);
+            find_history_entry(remote_file_ident, version, end_version, entry, last_integrated_upstream_version);
 
         if (version_2 == 0) {
             version = end_version;
@@ -2059,10 +1986,10 @@ void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress,
 
         UploadChangeset uc;
         std::size_t size = entry.changeset.copy_to(uc.buffer);
-        uc.origin_timestamp  = entry.origin_timestamp;
+        uc.origin_timestamp = entry.origin_timestamp;
         uc.origin_file_ident = entry.origin_file_ident;
-        uc.progress          = UploadCursor{version, last_integrated_upstream_version};
-        uc.changeset         = BinaryData{uc.buffer.get(), size};
+        uc.progress = UploadCursor{version, last_integrated_upstream_version};
+        uc.changeset = BinaryData{uc.buffer.get(), size};
         uploadable_changesets.push_back(std::move(uc)); // Throws
 
         accum_byte_size += size;
@@ -2076,36 +2003,31 @@ void ServerHistory::find_uploadable_changesets(UploadCursor& upload_progress,
 
 
 // Overriding member in ClientHistoryBase
-bool ServerHistory::integrate_server_changesets(const SyncProgress& progress,
-                                                const std::uint_fast64_t*,
-                                                const RemoteChangeset* changesets,
-                                                std::size_t num_changesets,
-                                                VersionInfo& version_info,
-                                                IntegrationError& integration_error,
-                                                util::Logger& logger,
-                                                SyncTransactReporter* transact_reporter)
+bool ServerHistory::integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t*,
+                                                const RemoteChangeset* changesets, std::size_t num_changesets,
+                                                VersionInfo& version_info, IntegrationError& integration_error,
+                                                util::Logger& logger, SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(!transact_reporter);
 
     TransactionRef tr = m_shared_group->start_write(); // Throws
-    TableInfoCache table_info_cache {*tr};
+    TableInfoCache table_info_cache{*tr};
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     REALM_ASSERT(m_acc->upstream_status.is_attached());
     REALM_ASSERT(m_local_file_ident != g_root_node_file_ident);
 
     IntegrationReporter& reporter = m_context.get_integration_reporter(); // Throws
-    reporter.on_integration_session_begin(); // Throws
+    reporter.on_integration_session_begin();                              // Throws
 
     try {
         version_type server_version = get_server_version();
         for (std::size_t i = 0; i < num_changesets; ++i) {
             const RemoteChangeset& changeset = changesets[i];
             REALM_ASSERT(changeset.last_integrated_local_version <= server_version);
-            REALM_ASSERT(changeset.origin_file_ident > 0 &&
-                         changeset.origin_file_ident != m_local_file_ident);
+            REALM_ASSERT(changeset.origin_file_ident > 0 && changeset.origin_file_ident != m_local_file_ident);
 
             if (!ensure_upstream_file_ident(changeset.origin_file_ident)) {
                 logger.error("Bad origin file identifier in changeset received from "
@@ -2116,14 +2038,11 @@ bool ServerHistory::integrate_server_changesets(const SyncProgress& progress,
         }
 
         file_ident_type remote_file_ident = 0; // From upstream server
-        UploadCursor upload_progress = {
-            progress.download.server_version,
-            progress.download.last_integrated_client_version
-        };
+        UploadCursor upload_progress = {progress.download.server_version,
+                                        progress.download.last_integrated_client_version};
         version_type locked_server_version = upload_progress.last_integrated_server_version;
-        integrate_remote_changesets(remote_file_ident, upload_progress, locked_server_version,
-                                    changesets, num_changesets, table_info_cache,
-                                    &reporter, &reporter, logger); // Throws
+        integrate_remote_changesets(remote_file_ident, upload_progress, locked_server_version, changesets,
+                                    num_changesets, table_info_cache, &reporter, &reporter, logger); // Throws
     }
     catch (BadChangesetError& e) {
         logger.error("Failed to parse, or apply changeset received from server: %1",
@@ -2146,7 +2065,7 @@ bool ServerHistory::integrate_server_changesets(const SyncProgress& progress,
     auto ta = util::make_temp_assign(m_is_local_changeset, false, true);
     version_type new_realm_version = tr->commit(); // Throws
     version_info.realm_version = new_realm_version;
-    version_info.sync_version  = get_salted_server_version();
+    version_info.sync_version = get_salted_server_version();
     return true;
 }
 
@@ -2239,28 +2158,27 @@ void ServerHistory::verify() const
     salt_type base_version_salt = m_acc->root.get_as_ref_or_tagged(s_base_version_salt_iip).get_as_int();
     REALM_ASSERT((m_history_base_version == 0) == (base_version_salt == 0));
 
-    REALM_ASSERT(m_acc->cf_ident_salts.size()            == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_client_versions.size()        == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_rh_base_versions.size()       == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_recip_hist_refs.size()        == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_proxy_files.size()            == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_client_types.size()           == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_last_seen_timestamps.size()   == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_ident_salts.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_client_versions.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_rh_base_versions.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_recip_hist_refs.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_proxy_files.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_client_types.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_last_seen_timestamps.size() == m_num_client_files);
     REALM_ASSERT(m_acc->cf_locked_server_versions.size() == m_num_client_files);
 
-    REALM_ASSERT(m_acc->sh_version_salts.size()    == m_history_size);
-    REALM_ASSERT(m_acc->sh_origin_files.size()     == m_history_size);
-    REALM_ASSERT(m_acc->sh_client_versions.size()  == m_history_size);
-    REALM_ASSERT(m_acc->sh_timestamps.size()       == m_history_size);
-    REALM_ASSERT(m_acc->sh_changesets.size()       == m_history_size);
+    REALM_ASSERT(m_acc->sh_version_salts.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_origin_files.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_client_versions.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_timestamps.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_changesets.size() == m_history_size);
     REALM_ASSERT(m_acc->sh_cumul_byte_sizes.size() == m_history_size);
 
-    salt_type server_version_salt = (m_history_size == 0 ? base_version_salt :
-                                     salt_type(m_acc->sh_version_salts.get(m_history_size-1)));
+    salt_type server_version_salt =
+        (m_history_size == 0 ? base_version_salt : salt_type(m_acc->sh_version_salts.get(m_history_size - 1)));
     REALM_ASSERT(m_server_version_salt == server_version_salt);
 
-    REALM_ASSERT(m_local_file_ident > 0 &&
-                 std::uint_fast64_t(m_local_file_ident) < m_num_client_files);
+    REALM_ASSERT(m_local_file_ident > 0 && std::uint_fast64_t(m_local_file_ident) < m_num_client_files);
 
     // Check history entries
     std::int_fast64_t accum_byte_size = 0;
@@ -2272,15 +2190,13 @@ void ServerHistory::verify() const
         auto salt = m_acc->sh_version_salts.get(i);
         REALM_ASSERT(salt > 0 && salt <= 0x0'7FFF'FFFF'FFFF'FFFF);
         file_ident_type origin_file_ident = 0;
-        REALM_ASSERT(!util::int_cast_with_overflow_detect(m_acc->sh_origin_files.get(i),
-                                                          origin_file_ident));
+        REALM_ASSERT(!util::int_cast_with_overflow_detect(m_acc->sh_origin_files.get(i), origin_file_ident));
         REALM_ASSERT(origin_file_ident != m_local_file_ident);
         std::size_t origin_file_index = 0;
         REALM_ASSERT(!util::int_cast_with_overflow_detect(origin_file_ident, origin_file_index));
         REALM_ASSERT(origin_file_index < m_num_client_files);
         version_type client_version = 0;
-        REALM_ASSERT(!util::int_cast_with_overflow_detect(m_acc->sh_client_versions.get(i),
-                                                          client_version));
+        REALM_ASSERT(!util::int_cast_with_overflow_detect(m_acc->sh_client_versions.get(i), client_version));
         bool of_local_origin = (origin_file_ident == 0);
         if (of_local_origin) {
             REALM_ASSERT(client_version == 0);
@@ -2297,8 +2213,7 @@ void ServerHistory::verify() const
                         break;
                     case ClientType::indirect: {
                         auto proxy_file = m_acc->cf_proxy_files.get(origin_file_index);
-                        REALM_ASSERT(!util::int_cast_with_overflow_detect(proxy_file,
-                                                                          client_file_ident));
+                        REALM_ASSERT(!util::int_cast_with_overflow_detect(proxy_file, client_file_ident));
                         good_client_type = true;
                         break;
                     }
@@ -2339,40 +2254,39 @@ void ServerHistory::verify() const
         version_type last_integrated_client_version = 0;
         if (client_file)
             last_integrated_client_version = client_file->last_integrated_client_version;
-        auto ident_salt            = m_acc->cf_ident_salts.get(i);
-        auto client_version        = m_acc->cf_client_versions.get(i);
-        auto rh_base_version       = m_acc->cf_rh_base_versions.get(i);
-        auto recip_hist_ref        = m_acc->cf_recip_hist_refs.get(i);
-        auto proxy_file            = m_acc->cf_proxy_files.get(i);
-        auto client_type           = m_acc->cf_client_types.get(i);
-        auto last_seen_timestamp   = m_acc->cf_last_seen_timestamps.get(i);
+        auto ident_salt = m_acc->cf_ident_salts.get(i);
+        auto client_version = m_acc->cf_client_versions.get(i);
+        auto rh_base_version = m_acc->cf_rh_base_versions.get(i);
+        auto recip_hist_ref = m_acc->cf_recip_hist_refs.get(i);
+        auto proxy_file = m_acc->cf_proxy_files.get(i);
+        auto client_type = m_acc->cf_client_types.get(i);
+        auto last_seen_timestamp = m_acc->cf_last_seen_timestamps.get(i);
         auto locked_server_version = m_acc->cf_locked_server_versions.get(i);
         version_type client_version_2 = 0;
         REALM_ASSERT(!util::int_cast_with_overflow_detect(client_version, client_version_2));
         file_ident_type proxy_file_2 = 0;
         REALM_ASSERT(!util::int_cast_with_overflow_detect(proxy_file, proxy_file_2));
         version_type locked_server_version_2 = 0;
-        REALM_ASSERT(!util::int_cast_with_overflow_detect(locked_server_version,
-                                                          locked_server_version_2));
+        REALM_ASSERT(!util::int_cast_with_overflow_detect(locked_server_version, locked_server_version_2));
         if (client_file_ident == 0) {
             // Special entry
-            REALM_ASSERT(ident_salt              == 0);
-            REALM_ASSERT(proxy_file_2            == 0);
-            REALM_ASSERT(client_type             == 0);
-            REALM_ASSERT(last_seen_timestamp     == 0);
+            REALM_ASSERT(ident_salt == 0);
+            REALM_ASSERT(proxy_file_2 == 0);
+            REALM_ASSERT(client_type == 0);
+            REALM_ASSERT(last_seen_timestamp == 0);
             REALM_ASSERT(locked_server_version_2 == 0);
             // Upstream server
             REALM_ASSERT(client_version_2 >= last_integrated_client_version);
         }
         else if (client_file_ident == g_root_node_file_ident) {
             // Root node's entry
-            REALM_ASSERT(ident_salt              == 0);
-            REALM_ASSERT(client_version_2        == 0);
-            REALM_ASSERT(rh_base_version         == 0);
-            REALM_ASSERT(recip_hist_ref          == 0);
-            REALM_ASSERT(proxy_file_2            == 0);
-            REALM_ASSERT(client_type             == 0);
-            REALM_ASSERT(last_seen_timestamp     == 0);
+            REALM_ASSERT(ident_salt == 0);
+            REALM_ASSERT(client_version_2 == 0);
+            REALM_ASSERT(rh_base_version == 0);
+            REALM_ASSERT(recip_hist_ref == 0);
+            REALM_ASSERT(proxy_file_2 == 0);
+            REALM_ASSERT(client_type == 0);
+            REALM_ASSERT(last_seen_timestamp == 0);
             REALM_ASSERT(locked_server_version_2 == 0);
             REALM_ASSERT(!client_file);
             if (m_local_file_ident == g_root_node_file_ident)
@@ -2380,13 +2294,13 @@ void ServerHistory::verify() const
         }
         else if (client_file_ident == m_local_file_ident) {
             // Entry representing the Realm file itself
-            REALM_ASSERT(ident_salt              == 0);
-            REALM_ASSERT(client_version_2        == 0);
-            REALM_ASSERT(rh_base_version         == 0);
-            REALM_ASSERT(recip_hist_ref          == 0);
-            REALM_ASSERT(proxy_file_2            == 0);
-            REALM_ASSERT(client_type             == int(ClientType::self));
-            REALM_ASSERT(last_seen_timestamp     == 0);
+            REALM_ASSERT(ident_salt == 0);
+            REALM_ASSERT(client_version_2 == 0);
+            REALM_ASSERT(rh_base_version == 0);
+            REALM_ASSERT(recip_hist_ref == 0);
+            REALM_ASSERT(proxy_file_2 == 0);
+            REALM_ASSERT(client_type == int(ClientType::self));
+            REALM_ASSERT(last_seen_timestamp == 0);
             REALM_ASSERT(locked_server_version_2 == 0);
             REALM_ASSERT(!client_file);
             found_self = true;
@@ -2395,22 +2309,22 @@ void ServerHistory::verify() const
             if (proxy_file_2 == 0) {
                 // This entry represents a file reachable via the upstream
                 // server.
-                REALM_ASSERT(client_version_2        == 0);
-                REALM_ASSERT(rh_base_version         == 0);
-                REALM_ASSERT(recip_hist_ref          == 0);
-                REALM_ASSERT(client_type             == int(ClientType::upstream));
-                REALM_ASSERT(last_seen_timestamp     == 0);
+                REALM_ASSERT(client_version_2 == 0);
+                REALM_ASSERT(rh_base_version == 0);
+                REALM_ASSERT(recip_hist_ref == 0);
+                REALM_ASSERT(client_type == int(ClientType::upstream));
+                REALM_ASSERT(last_seen_timestamp == 0);
                 REALM_ASSERT(locked_server_version_2 == 0);
                 REALM_ASSERT(!client_file);
             }
             else {
                 // This entry represents a client of a direct client, such as
                 // client of a partial view, or a client of a subserver.
-                REALM_ASSERT(client_version_2        == 0);
-                REALM_ASSERT(rh_base_version         == 0);
-                REALM_ASSERT(recip_hist_ref          == 0);
-                REALM_ASSERT(client_type             == int(ClientType::indirect));
-                REALM_ASSERT(last_seen_timestamp     == 0);
+                REALM_ASSERT(client_version_2 == 0);
+                REALM_ASSERT(rh_base_version == 0);
+                REALM_ASSERT(recip_hist_ref == 0);
+                REALM_ASSERT(client_type == int(ClientType::indirect));
+                REALM_ASSERT(last_seen_timestamp == 0);
                 REALM_ASSERT(locked_server_version_2 == 0);
                 REALM_ASSERT(is_valid_proxy_file_ident(proxy_file_2));
                 REALM_ASSERT(!client_file);
@@ -2486,8 +2400,8 @@ void ServerHistory::discard_accessors() const noexcept
 
 class ServerHistory::DiscardAccessorsGuard {
 public:
-    DiscardAccessorsGuard(const ServerHistory& sh) noexcept:
-        m_server_history{&sh}
+    DiscardAccessorsGuard(const ServerHistory& sh) noexcept
+        : m_server_history{&sh}
     {
     }
     ~DiscardAccessorsGuard() noexcept
@@ -2499,6 +2413,7 @@ public:
     {
         m_server_history = nullptr;
     }
+
 private:
     const ServerHistory* m_server_history;
 };
@@ -2547,27 +2462,25 @@ void ServerHistory::update_from_ref_and_version(ref_type ref, version_type realm
     }
 
     m_num_client_files = m_acc->cf_ident_salts.size();
-    REALM_ASSERT(m_acc->cf_client_versions.size()        == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_rh_base_versions.size()       == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_recip_hist_refs.size()        == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_proxy_files.size()            == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_client_types.size()           == m_num_client_files);
-    REALM_ASSERT(m_acc->cf_last_seen_timestamps.size()   == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_client_versions.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_rh_base_versions.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_recip_hist_refs.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_proxy_files.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_client_types.size() == m_num_client_files);
+    REALM_ASSERT(m_acc->cf_last_seen_timestamps.size() == m_num_client_files);
     REALM_ASSERT(m_acc->cf_locked_server_versions.size() == m_num_client_files);
 
-    m_history_base_version =
-        version_type(m_acc->root.get_as_ref_or_tagged(s_history_base_version_iip).
-                     get_as_int());
+    m_history_base_version = version_type(m_acc->root.get_as_ref_or_tagged(s_history_base_version_iip).get_as_int());
     m_history_size = m_acc->sh_changesets.size();
-    REALM_ASSERT(m_acc->sh_version_salts.size()    == m_history_size);
-    REALM_ASSERT(m_acc->sh_origin_files.size()     == m_history_size);
-    REALM_ASSERT(m_acc->sh_client_versions.size()  == m_history_size);
-    REALM_ASSERT(m_acc->sh_timestamps.size()       == m_history_size);
+    REALM_ASSERT(m_acc->sh_version_salts.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_origin_files.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_client_versions.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_timestamps.size() == m_history_size);
     REALM_ASSERT(m_acc->sh_cumul_byte_sizes.size() == m_history_size);
 
     m_server_version_salt =
-        (m_history_size > 0 ? salt_type(m_acc->sh_version_salts.get(m_history_size-1)) :
-         salt_type(m_acc->root.get_as_ref_or_tagged(s_base_version_salt_iip).get_as_int()));
+        (m_history_size > 0 ? salt_type(m_acc->sh_version_salts.get(m_history_size - 1))
+                            : salt_type(m_acc->root.get_as_ref_or_tagged(s_base_version_salt_iip).get_as_int()));
 
     m_ct_history_size = m_acc->ct_history.size();
     m_ct_base_version = realm_version - m_ct_history_size;
@@ -2588,29 +2501,28 @@ void ServerHistory::Accessors::init_from_ref(ref_type ref)
         else {
             upstream_status.detach();
         }
-
     }
 
-    cf_ident_salts.init_from_parent(); // Throws
-    cf_client_versions.init_from_parent(); // Throws
-    cf_rh_base_versions.init_from_parent(); // Throws
-    cf_recip_hist_refs.init_from_parent(); // Throws
-    cf_proxy_files.init_from_parent(); // Throws
-    cf_client_types.init_from_parent(); // Throws
-    cf_last_seen_timestamps.init_from_parent(); // Throws
+    cf_ident_salts.init_from_parent();            // Throws
+    cf_client_versions.init_from_parent();        // Throws
+    cf_rh_base_versions.init_from_parent();       // Throws
+    cf_recip_hist_refs.init_from_parent();        // Throws
+    cf_proxy_files.init_from_parent();            // Throws
+    cf_client_types.init_from_parent();           // Throws
+    cf_last_seen_timestamps.init_from_parent();   // Throws
     cf_locked_server_versions.init_from_parent(); // Throws
-    sh_version_salts.init_from_parent(); // Throws
-    sh_origin_files.init_from_parent(); // Throws
-    sh_client_versions.init_from_parent(); // Throws
-    sh_timestamps.init_from_parent(); // Throws
-    sh_changesets.init_from_parent(); // Throws
-    sh_cumul_byte_sizes.init_from_parent(); // Throws
-    ct_history.init_from_parent(); // Throws
+    sh_version_salts.init_from_parent();          // Throws
+    sh_origin_files.init_from_parent();           // Throws
+    sh_client_versions.init_from_parent();        // Throws
+    sh_timestamps.init_from_parent();             // Throws
+    sh_changesets.init_from_parent();             // Throws
+    sh_cumul_byte_sizes.init_from_parent();       // Throws
+    ct_history.init_from_parent();                // Throws
 
-   // Note: If anything throws above, then accessors will be left in an
-   // undefined state. However, all IntegerBpTree accessors will still have
-   // a root array, and all optional BinaryColumn accessors will still
-   // exist, so it will be safe to call update_from_ref() again.
+    // Note: If anything throws above, then accessors will be left in an
+    // undefined state. However, all IntegerBpTree accessors will still have
+    // a root array, and all optional BinaryColumn accessors will still
+    // exist, so it will be safe to call update_from_ref() again.
 }
 
 
@@ -2630,7 +2542,7 @@ void ServerHistory::create_empty_history()
     DiscardAccessorsGuard dag{*this};
     gf::prepare_history_parent(*m_group, m_acc->root, Replication::hist_SyncServer,
                                get_server_history_schema_version(), m_local_file_ident); // Throws
-    m_acc->create(); // Throws
+    m_acc->create();                                                                     // Throws
     dag.release();
 
     // Add the special client file entry (index = 0), and the root servers entry
@@ -2638,13 +2550,13 @@ void ServerHistory::create_empty_history()
     static_assert(g_root_node_file_ident == 1, "");
     REALM_ASSERT(m_num_client_files == 0);
     for (int i = 0; i < 2; ++i) {
-        m_acc->cf_ident_salts.insert(realm::npos, 0);       // Throws
-        m_acc->cf_client_versions.insert(realm::npos, 0);   // Throws
-        m_acc->cf_rh_base_versions.insert(realm::npos, 0);  // Throws
-        m_acc->cf_recip_hist_refs.insert(realm::npos, 0);   // Throws
-        m_acc->cf_proxy_files.insert(realm::npos, 0);       // Throws
-        m_acc->cf_client_types.insert(realm::npos, 0);       // Throws
-        m_acc->cf_last_seen_timestamps.insert(realm::npos, 0); // Throws
+        m_acc->cf_ident_salts.insert(realm::npos, 0);            // Throws
+        m_acc->cf_client_versions.insert(realm::npos, 0);        // Throws
+        m_acc->cf_rh_base_versions.insert(realm::npos, 0);       // Throws
+        m_acc->cf_recip_hist_refs.insert(realm::npos, 0);        // Throws
+        m_acc->cf_proxy_files.insert(realm::npos, 0);            // Throws
+        m_acc->cf_client_types.insert(realm::npos, 0);           // Throws
+        m_acc->cf_last_seen_timestamps.insert(realm::npos, 0);   // Throws
         m_acc->cf_locked_server_versions.insert(realm::npos, 0); // Throws
         ++m_num_client_files;
     }
@@ -2665,10 +2577,10 @@ void ServerHistory::Accessors::create()
     _impl::DeepArrayDestroyGuard destroy_guard(&root);
 
     client_files.create(Array::type_HasRefs, context_flag_no, s_client_files_size); // Throws
-    client_files.update_parent(); // Throws
+    client_files.update_parent();                                                   // Throws
 
     sync_history.create(Array::type_HasRefs, context_flag_no, s_sync_history_size); // Throws
-    sync_history.update_parent(); // Throws
+    sync_history.update_parent();                                                   // Throws
 
     schema_versions.create(Array::type_HasRefs, context_flag_no, s_schema_versions_size); // Throws
     schema_versions.update_parent();
@@ -2679,20 +2591,20 @@ void ServerHistory::Accessors::create()
         schema_versions.set_as_ref(i, ref);
     }
 
-    cf_ident_salts.create(); // Throws
-    cf_client_versions.create(); // Throws
-    cf_rh_base_versions.create(); // Throws
-    cf_recip_hist_refs.create(); // Throws
-    cf_proxy_files.create(); // Throws
-    cf_client_types.create(); // Throws
-    cf_last_seen_timestamps.create(); // Throws
+    cf_ident_salts.create();            // Throws
+    cf_client_versions.create();        // Throws
+    cf_rh_base_versions.create();       // Throws
+    cf_recip_hist_refs.create();        // Throws
+    cf_proxy_files.create();            // Throws
+    cf_client_types.create();           // Throws
+    cf_last_seen_timestamps.create();   // Throws
     cf_locked_server_versions.create(); // Throws
 
-    sh_version_salts.create(); // Throws
-    sh_origin_files.create(); // Throws
-    sh_client_versions.create(); // Throws
-    sh_timestamps.create(); // Throws
-    sh_changesets.create(); // Throws
+    sh_version_salts.create();    // Throws
+    sh_origin_files.create();     // Throws
+    sh_client_versions.create();  // Throws
+    sh_timestamps.create();       // Throws
+    sh_changesets.create();       // Throws
     sh_cumul_byte_sizes.create(); // Throws
 
     ct_history.create(); // Throws
@@ -2702,8 +2614,7 @@ void ServerHistory::Accessors::create()
 }
 
 
-auto ServerHistory::get_server_version_salt(version_type server_version) const noexcept ->
-    salt_type
+auto ServerHistory::get_server_version_salt(version_type server_version) const noexcept -> salt_type
 {
     REALM_ASSERT(server_version >= m_history_base_version);
     if (server_version == m_history_base_version)
@@ -2739,16 +2650,16 @@ void ServerHistory::add_core_history_entry(BinaryData changeset)
 
 void ServerHistory::add_sync_history_entry(const HistoryEntry& entry)
 {
-    REALM_ASSERT(m_acc->sh_version_salts.size()   == m_history_size);
-    REALM_ASSERT(m_acc->sh_origin_files.size()    == m_history_size);
+    REALM_ASSERT(m_acc->sh_version_salts.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_origin_files.size() == m_history_size);
     REALM_ASSERT(m_acc->sh_client_versions.size() == m_history_size);
-    REALM_ASSERT(m_acc->sh_timestamps.size()      == m_history_size);
-    REALM_ASSERT(m_acc->sh_changesets.size()     == m_history_size);
+    REALM_ASSERT(m_acc->sh_timestamps.size() == m_history_size);
+    REALM_ASSERT(m_acc->sh_changesets.size() == m_history_size);
     REALM_ASSERT(m_acc->sh_cumul_byte_sizes.size() == m_history_size);
 
-    std::int_fast64_t client_file    = std::int_fast64_t(entry.origin_file_ident);
+    std::int_fast64_t client_file = std::int_fast64_t(entry.origin_file_ident);
     std::int_fast64_t client_version = std::int_fast64_t(entry.remote_version);
-    std::int_fast64_t timestamp      = std::int_fast64_t(entry.origin_timestamp);
+    std::int_fast64_t timestamp = std::int_fast64_t(entry.origin_timestamp);
 
     // FIXME: BinaryColumn::set() currently interprets BinaryData(0,0) as
     // null. It should probably be changed such that BinaryData(0,0) is
@@ -2760,10 +2671,10 @@ void ServerHistory::add_sync_history_entry(const HistoryEntry& entry)
         changeset = entry.changeset.get_first_chunk();
 
     m_acc->sh_version_salts.insert(realm::npos, m_salt_for_new_server_versions); // Throws
-    m_acc->sh_origin_files.insert(realm::npos, client_file); // Throws
-    m_acc->sh_client_versions.insert(realm::npos, client_version); // Throws
-    m_acc->sh_timestamps.insert(realm::npos, timestamp); // Throws
-    m_acc->sh_changesets.add(changeset); // Throws
+    m_acc->sh_origin_files.insert(realm::npos, client_file);                     // Throws
+    m_acc->sh_client_versions.insert(realm::npos, client_version);               // Throws
+    m_acc->sh_timestamps.insert(realm::npos, timestamp);                         // Throws
+    m_acc->sh_changesets.add(changeset);                                         // Throws
 
     // Update the cumulative byte size.
     std::int_fast64_t previous_history_byte_size =
@@ -2788,8 +2699,7 @@ void ServerHistory::trim_cont_transact_history()
     // of the other DB objects. In such a case, no trimming can be done
     // yet.
     if (m_version_of_oldest_bound_snapshot > m_ct_base_version) {
-        std::size_t num_entries_to_erase =
-            std::size_t(m_version_of_oldest_bound_snapshot - m_ct_base_version);
+        std::size_t num_entries_to_erase = std::size_t(m_version_of_oldest_bound_snapshot - m_ct_base_version);
         // The new changeset is always added before
         // set_oldest_bound_version() is called. Therefore, the trimming
         // operation can never leave the history empty.
@@ -2806,8 +2716,7 @@ void ServerHistory::trim_cont_transact_history()
 
 ChunkedBinaryData ServerHistory::get_changeset(version_type server_version) const noexcept
 {
-    REALM_ASSERT(server_version > m_history_base_version &&
-                 server_version <= get_server_version());
+    REALM_ASSERT(server_version > m_history_base_version && server_version <= get_server_version());
     std::size_t history_entry_ndx = to_size_t(server_version - m_history_base_version) - 1;
     return ChunkedBinaryData(m_acc->sh_changesets, history_entry_ndx);
 }
@@ -2821,11 +2730,9 @@ ChunkedBinaryData ServerHistory::get_changeset(version_type server_version) cons
 //
 // Returns zero if no history entry was found. Otherwise it returns the version
 // produced by the changeset of the located history entry.
-auto ServerHistory::find_history_entry(file_ident_type remote_file_ident,
-                                       version_type begin_version, version_type end_version,
-                                       HistoryEntry& entry,
-                                       version_type& last_integrated_remote_version) const
-    noexcept -> version_type
+auto ServerHistory::find_history_entry(file_ident_type remote_file_ident, version_type begin_version,
+                                       version_type end_version, HistoryEntry& entry,
+                                       version_type& last_integrated_remote_version) const noexcept -> version_type
 {
     REALM_ASSERT(remote_file_ident != g_root_node_file_ident);
     REALM_ASSERT(begin_version >= m_history_base_version);
@@ -2854,18 +2761,17 @@ auto ServerHistory::find_history_entry(file_ident_type remote_file_ident,
 
 auto ServerHistory::get_history_entry(version_type server_version) const noexcept -> HistoryEntry
 {
-    REALM_ASSERT(server_version > m_history_base_version &&
-                 server_version <= get_server_version());
+    REALM_ASSERT(server_version > m_history_base_version && server_version <= get_server_version());
     std::size_t history_entry_ndx = to_size_t(server_version - m_history_base_version) - 1;
-    auto origin_file    = m_acc->sh_origin_files.get(history_entry_ndx);
+    auto origin_file = m_acc->sh_origin_files.get(history_entry_ndx);
     auto client_version = m_acc->sh_client_versions.get(history_entry_ndx);
-    auto timestamp      = m_acc->sh_timestamps.get(history_entry_ndx);
+    auto timestamp = m_acc->sh_timestamps.get(history_entry_ndx);
     ChunkedBinaryData chunked_changeset(m_acc->sh_changesets, history_entry_ndx);
     HistoryEntry entry;
     entry.origin_file_ident = file_ident_type(origin_file);
-    entry.remote_version    = version_type(client_version);
-    entry.origin_timestamp  = timestamp_type(timestamp);
-    entry.changeset         = chunked_changeset;
+    entry.remote_version = version_type(client_version);
+    entry.origin_timestamp = timestamp_type(timestamp);
+    entry.changeset = chunked_changeset;
     return entry;
 }
 
@@ -2875,8 +2781,7 @@ auto ServerHistory::get_history_entry(version_type server_version) const noexcep
 // file. Use `remote_file_ident = 0` to specify the upstream server when on a
 // subtier node of a star topology server cluster, or to specify the reference
 // file when in a partial view.
-bool ServerHistory::received_from(const HistoryEntry& entry,
-                                  file_ident_type remote_file_ident) const noexcept
+bool ServerHistory::received_from(const HistoryEntry& entry, file_ident_type remote_file_ident) const noexcept
 {
     file_ident_type origin_file_ident = entry.origin_file_ident;
     std::size_t origin_file_index = std::size_t(origin_file_ident);
@@ -2935,10 +2840,8 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
         hc.client_files.push_back(cf);
     }
 
-    hc.history_base_version =
-        m_acc->root.get_as_ref_or_tagged(s_history_base_version_iip).get_as_int();
-    hc.base_version_salt =
-        m_acc->root.get_as_ref_or_tagged(s_base_version_salt_iip).get_as_int();
+    hc.history_base_version = m_acc->root.get_as_ref_or_tagged(s_history_base_version_iip).get_as_int();
+    hc.base_version_salt = m_acc->root.get_as_ref_or_tagged(s_base_version_salt_iip).get_as_int();
 
     hc.sync_history = {};
     for (size_t i = 0; i < m_history_size; ++i) {
@@ -2949,7 +2852,7 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
         he.timestamp = m_acc->sh_timestamps.get(i);
         he.cumul_byte_size = m_acc->sh_cumul_byte_sizes.get(i);
         ChunkedBinaryData chunked_changeset(m_acc->sh_changesets, i);
-        std::unique_ptr<char[]> buffer {};
+        std::unique_ptr<char[]> buffer{};
         chunked_changeset.copy_to(buffer);
         he.changeset = std::string(buffer.get(), chunked_changeset.size());
         hc.sync_history.push_back(he);
@@ -2961,8 +2864,7 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
 }
 
 
-void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transaction& group,
-                                                                       TableInfoCache&,
+void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transaction& group, TableInfoCache&,
                                                                        file_ident_type file_ident)
 {
     // Must be in write transaction!
@@ -2979,12 +2881,11 @@ void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transacti
     };
 
     auto promote_primary_key = [&](Instruction::PrimaryKey& pk) {
-        mpark::visit(overloaded {
-            [&](GlobalKey& key) {
-                promote_global_key(key);
-            },
-            [](auto&&) {}
-        }, pk);
+        mpark::visit(overloaded{[&](GlobalKey& key) {
+                                    promote_global_key(key);
+                                },
+                                [](auto&&) {}},
+                     pk);
     };
 
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
@@ -3052,13 +2953,12 @@ void ServerHistory::record_current_schema_version()
     Array schema_versions{alloc};
     schema_versions.set_parent(&root, s_schema_versions_iip);
     schema_versions.init_from_parent();
-    version_type snapshot_version  = m_shared_group->get_version_of_latest_snapshot();
+    version_type snapshot_version = m_shared_group->get_version_of_latest_snapshot();
     record_current_schema_version(schema_versions, snapshot_version); // Throws
 }
 
 
-void ServerHistory::record_current_schema_version(Array& schema_versions,
-                                                  version_type snapshot_version)
+void ServerHistory::record_current_schema_version(Array& schema_versions, version_type snapshot_version)
 {
     static_assert(s_schema_versions_size == 4, "");
     REALM_ASSERT(schema_versions.size() == s_schema_versions_size);
@@ -3084,8 +2984,8 @@ void ServerHistory::record_current_schema_version(Array& schema_versions,
         using uchar = unsigned char;
         for (std::size_t i = 0; i < size; ++i)
             value.set(i, std::int_fast64_t(uchar(library_version[i]))); // Throws
-        sv_library_versions.add(std::int_fast64_t(value.get_ref())); // Throws
-        adg.release(); // Ownership transferred to parent array
+        sv_library_versions.add(std::int_fast64_t(value.get_ref()));    // Throws
+        adg.release();                                                  // Ownership transferred to parent array
     }
     {
         Array sv_snapshot_versions{alloc};
@@ -3103,8 +3003,7 @@ void ServerHistory::record_current_schema_version(Array& schema_versions,
 }
 
 
-bool ServerHistory::Context::get_compaction_params(bool&, std::chrono::seconds&,
-                                                   std::chrono::seconds&) noexcept
+bool ServerHistory::Context::get_compaction_params(bool&, std::chrono::seconds&, std::chrono::seconds&) noexcept
 {
     return false;
 }
@@ -3147,9 +3046,9 @@ std::ostream& _impl::operator<<(std::ostream& out, const ServerHistory::HistoryC
         out << "  client_type = " << hc.client_files[i].client_type << "\n";
         out << "  locked_server_version = " << hc.client_files[i].locked_server_version << "\n";
         out << "  reciprocal history:\n";
-        for (const util::Optional<std::string>& transform: hc.client_files[i].reciprocal_history) {
+        for (const util::Optional<std::string>& transform : hc.client_files[i].reciprocal_history) {
             if (transform) {
-                out <<  "    " << util::hex_dump((*transform).data(), (*transform).size()) << "\n";
+                out << "    " << util::hex_dump((*transform).data(), (*transform).size()) << "\n";
             }
             else {
                 out << "    NULL\n";
@@ -3172,7 +3071,7 @@ std::ostream& _impl::operator<<(std::ostream& out, const ServerHistory::HistoryC
         out << "  timestamp = " << hc.sync_history[i].timestamp << "\n";
         out << "  cumul_byte_size = " << hc.sync_history[i].cumul_byte_size << "\n";
         const std::string& changeset = hc.sync_history[i].changeset;
-        out <<  "  changeset = " << util::hex_dump(changeset.data(), changeset.size()) << "\n";
+        out << "  changeset = " << util::hex_dump(changeset.data(), changeset.size()) << "\n";
         out << "\n";
     }
     out << "\n";
@@ -3182,8 +3081,7 @@ std::ostream& _impl::operator<<(std::ostream& out, const ServerHistory::HistoryC
     return out;
 }
 
-bool _impl::operator==(const ServerHistory::HistoryContents& hc_1,
-                       const ServerHistory::HistoryContents& hc_2)
+bool _impl::operator==(const ServerHistory::HistoryContents& hc_1, const ServerHistory::HistoryContents& hc_2)
 {
     if (hc_1.client_files.size() != hc_2.client_files.size())
         return false;
@@ -3193,12 +3091,9 @@ bool _impl::operator==(const ServerHistory::HistoryContents& hc_1,
         ServerHistory::HistoryContents::ClientFile cf_2 = hc_2.client_files[i];
 
         bool partially_equal =
-            (cf_1.ident_salt == cf_2.ident_salt &&
-             cf_1.client_version == cf_2.client_version &&
-             cf_1.rh_base_version == cf_2.rh_base_version &&
-             cf_1.proxy_file == cf_2.proxy_file &&
-             cf_1.client_type == cf_2.client_type &&
-             cf_1.locked_server_version == cf_2.locked_server_version &&
+            (cf_1.ident_salt == cf_2.ident_salt && cf_1.client_version == cf_2.client_version &&
+             cf_1.rh_base_version == cf_2.rh_base_version && cf_1.proxy_file == cf_2.proxy_file &&
+             cf_1.client_type == cf_2.client_type && cf_1.locked_server_version == cf_2.locked_server_version &&
              cf_1.reciprocal_history.size() == cf_2.reciprocal_history.size());
         if (!partially_equal)
             return false;
@@ -3209,8 +3104,8 @@ bool _impl::operator==(const ServerHistory::HistoryContents& hc_1,
         }
     }
 
-    bool same_base_version = (hc_1.history_base_version == hc_2.history_base_version &&
-                              hc_1.base_version_salt == hc_2.base_version_salt);
+    bool same_base_version =
+        (hc_1.history_base_version == hc_2.history_base_version && hc_1.base_version_salt == hc_2.base_version_salt);
     if (!same_base_version)
         return false;
 
@@ -3220,10 +3115,8 @@ bool _impl::operator==(const ServerHistory::HistoryContents& hc_1,
     for (std::size_t i = 0; i < hc_1.sync_history.size(); ++i) {
         ServerHistory::HistoryContents::HistoryEntry sh_1 = hc_1.sync_history[i];
         ServerHistory::HistoryContents::HistoryEntry sh_2 = hc_2.sync_history[i];
-        bool equal = (sh_1.version_salt == sh_2.version_salt &&
-                      sh_1.client_file_ident == sh_2.client_file_ident &&
-                      sh_1.client_version == sh_2.client_version &&
-                      sh_1.timestamp == sh_2.timestamp &&
+        bool equal = (sh_1.version_salt == sh_2.version_salt && sh_1.client_file_ident == sh_2.client_file_ident &&
+                      sh_1.client_version == sh_2.client_version && sh_1.timestamp == sh_2.timestamp &&
                       sh_1.cumul_byte_size == sh_2.cumul_byte_size);
         if (!equal)
             return false;

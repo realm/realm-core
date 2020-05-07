@@ -25,11 +25,10 @@ namespace {
 // HTTP/1.1 301 Moved Permanently response.
 class SurpriseServer {
 public:
-
-    SurpriseServer(util::Logger& logger):
-        m_acceptor{m_service},
-        m_socket{m_service},
-        m_http_server{*this, logger}
+    SurpriseServer(util::Logger& logger)
+        : m_acceptor{m_service}
+        , m_socket{m_service}
+        , m_http_server{*this, logger}
     {
     }
 
@@ -60,17 +59,16 @@ public:
         return m_acceptor.local_endpoint();
     }
 
-    void async_read_until(char* buffer, size_t size, char delim,
-                          std::function<void(std::error_code, size_t)> handler)
+    void async_read_until(char* buffer, size_t size, char delim, std::function<void(std::error_code, size_t)> handler)
     {
         m_socket.async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
     }
 
-    void async_read(char* buffer, size_t size,
-                    std::function<void(std::error_code, size_t)> handler)
+    void async_read(char* buffer, size_t size, std::function<void(std::error_code, size_t)> handler)
     {
         m_socket.async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
     }
+
 private:
     util::network::Service m_service;
     util::network::Acceptor m_acceptor;
@@ -141,149 +139,133 @@ private:
 
     void send_http_1_0()
     {
-        m_response =
-            "HTTP/1.0 200 OK\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.0 200 OK\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_invalid_status_code()
     {
-        m_response =
-            "HTTP/1.1 99999 Strange\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 99999 Strange\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_missing_websocket_headers()
     {
-        m_response =
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 101 Switching Protocols\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_200()
     {
-        m_response =
-            "HTTP/1.1 200 OK\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 200 OK\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_201()
     {
-        m_response =
-            "HTTP/1.1 201 Created\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 201 Created\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_300()
     {
-        m_response =
-            "HTTP/1.1 300 Multiple Choices\r\n"
-            "Server: surprise-server\r\n"
-            "Location: http://10.0.0.0\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 300 Multiple Choices\r\n"
+                     "Server: surprise-server\r\n"
+                     "Location: http://10.0.0.0\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_301()
     {
-        m_response =
-            "HTTP/1.1 301 Moved Permanently\r\n"
-            "Server: surprise-server\r\n"
-            "Location: http://10.0.0.0\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 301 Moved Permanently\r\n"
+                     "Server: surprise-server\r\n"
+                     "Location: http://10.0.0.0\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_400()
     {
-        m_response =
-            "HTTP/1.1 400 Bad Request\r\n"
-            "Server: surprise-server\r\n"
-            "Location: http://10.0.0.0\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 400 Bad Request\r\n"
+                     "Server: surprise-server\r\n"
+                     "Location: http://10.0.0.0\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_401()
     {
-        m_response =
-            "HTTP/1.1 401 Unauthorized\r\n"
-            "Server: surprise-server\r\n"
-            "Location: http://10.0.0.0\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 401 Unauthorized\r\n"
+                     "Server: surprise-server\r\n"
+                     "Location: http://10.0.0.0\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_403()
     {
-        m_response =
-            "HTTP/1.1 403 Forbidden\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 403 Forbidden\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_404()
     {
-        m_response =
-            "HTTP/1.1 404 Not Found\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 404 Not Found\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_500()
     {
-        m_response =
-            "HTTP/1.1 500 Internal Server Error\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 500 Internal Server Error\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_501()
     {
-        m_response =
-            "HTTP/1.1 501 Not Implemented\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 501 Not Implemented\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_502()
     {
-        m_response =
-            "HTTP/1.1 502 Bad Gateway\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 502 Bad Gateway\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_503()
     {
-        m_response =
-            "HTTP/1.1 503 Service Unavailable\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 503 Service Unavailable\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
     void send_504()
     {
-        m_response =
-            "HTTP/1.1 504 Gateway Timeout\r\n"
-            "Server: surprise-server\r\n"
-            "\r\n";
+        m_response = "HTTP/1.1 504 Gateway Timeout\r\n"
+                     "Server: surprise-server\r\n"
+                     "\r\n";
         send_response();
     }
 
@@ -298,10 +280,8 @@ private:
 // The response depends on the server path. The check is that the clients
 // ConnectionStateChangeListener is called with the proper error code and
 // is_fatal value.
-void run_client_surprise_server(unit_test::TestContext& test_context,
-              const std::string server_path,
-              std::error_code ec,
-              bool is_fatal)
+void run_client_surprise_server(unit_test::TestContext& test_context, const std::string server_path,
+                                std::error_code ec, bool is_fatal)
 {
     SHARED_GROUP_TEST_PATH(path);
 
@@ -309,7 +289,7 @@ void run_client_surprise_server(unit_test::TestContext& test_context,
     util::PrefixLogger server_logger("Server: ", logger);
     util::PrefixLogger client_logger("Client: ", logger);
 
-    SurpriseServer server {server_logger};
+    SurpriseServer server{server_logger};
     server.start();
     ThreadWrapper server_thread;
     server_thread.start([&] {
@@ -332,17 +312,17 @@ void run_client_surprise_server(unit_test::TestContext& test_context,
     session_config.server_port = server.listen_endpoint().port();
     session_config.server_path = server_path;
 
-    Session session {client, path, session_config};
+    Session session{client, path, session_config};
 
-    std::function<ConnectionStateChangeListener> connection_state_listener =
-        [&](ConnectionState connection_state, const ErrorInfo* error_info) {
-            if (error_info) {
-                CHECK(connection_state == ConnectionState::disconnected);
-                CHECK_EQUAL(ec, error_info->error_code);
-                CHECK_EQUAL(is_fatal, error_info->is_fatal);
-                client.stop();
-            }
-        };
+    std::function<ConnectionStateChangeListener> connection_state_listener = [&](ConnectionState connection_state,
+                                                                                 const ErrorInfo* error_info) {
+        if (error_info) {
+            CHECK(connection_state == ConnectionState::disconnected);
+            CHECK_EQUAL(ec, error_info->error_code);
+            CHECK_EQUAL(is_fatal, error_info->is_fatal);
+            client.stop();
+        }
+    };
     session.set_connection_state_change_listener(connection_state_listener);
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
@@ -489,10 +469,10 @@ TEST(Handshake_504)
 // Enable when the client gets a handshake timeout.
 TEST_IF(Handshake_Timeout, false)
 {
-    //const std::string server_path = "/nothing";
-    //std::error_code ec = util::websocket::Error::; // CHANGE
-    //bool is_fatal = false;
-    //run_client_surprise_server(test_context, server_path, ec, is_fatal);
+    // const std::string server_path = "/nothing";
+    // std::error_code ec = util::websocket::Error::; // CHANGE
+    // bool is_fatal = false;
+    // run_client_surprise_server(test_context, server_path, ec, is_fatal);
 }
 
 // Test connection to external server. This test should Only be enabled
@@ -522,10 +502,10 @@ TEST_IF(Handshake_ExternalServer, false)
     session_config.server_port = server_port;
     session_config.server_path = "/default";
 
-    Session session {client, path, session_config};
+    Session session{client, path, session_config};
 
-    std::function<ConnectionStateChangeListener> connection_state_listener =
-        [&](ConnectionState connection_state, const ErrorInfo* error_info) {
+    std::function<ConnectionStateChangeListener> connection_state_listener = [&](ConnectionState connection_state,
+                                                                                 const ErrorInfo* error_info) {
         if (error_info) {
             CHECK(connection_state == ConnectionState::disconnected);
             std::error_code ec = util::websocket::Error::bad_response_301_moved_permanently;

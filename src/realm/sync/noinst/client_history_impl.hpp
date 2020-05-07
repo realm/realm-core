@@ -42,23 +42,20 @@ constexpr int get_client_history_schema_version() noexcept
     return 10;
 }
 
-class ClientHistoryImpl:
-        public sync::ClientReplication,
-        private History,
-        public sync::TransformHistory {
+class ClientHistoryImpl : public sync::ClientReplication, private History, public sync::TransformHistory {
 public:
     using file_ident_type = sync::file_ident_type;
     using version_type = sync::version_type;
 
     using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion   = sync::SaltedVersion;
-    using DownloadCursor  = sync::DownloadCursor;
-    using UploadCursor    = sync::UploadCursor;
-    using SyncProgress    = sync::SyncProgress;
-    using VersionInfo     = sync::VersionInfo;
-    using HistoryEntry    = sync::HistoryEntry;
-    using Transformer     = sync::Transformer;
-    using TableInfoCache  = sync::TableInfoCache;
+    using SaltedVersion = sync::SaltedVersion;
+    using DownloadCursor = sync::DownloadCursor;
+    using UploadCursor = sync::UploadCursor;
+    using SyncProgress = sync::SyncProgress;
+    using VersionInfo = sync::VersionInfo;
+    using HistoryEntry = sync::HistoryEntry;
+    using Transformer = sync::Transformer;
+    using TableInfoCache = sync::TableInfoCache;
 
     struct LocalChangeset {
         version_type version;
@@ -67,7 +64,7 @@ public:
 
     ClientHistoryImpl(const std::string& realm_path, Config config = {});
     ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client,
-                std::unique_ptr<ChangesetCooker> changeset_cooker);
+                      std::unique_ptr<ChangesetCooker> changeset_cooker);
 
     /// set_client_file_ident_and_downloaded_bytes() sets the salted client
     /// file ident and downloaded_bytes. The function is used when a state
@@ -118,20 +115,18 @@ public:
     void do_initiate_transact(Group& group, version_type version, bool history_updated) override final;
 
     // Overriding member functions in realm::TrivialReplication
-    version_type prepare_changeset(const char*, size_t,
-                                   version_type) override final;
+    version_type prepare_changeset(const char*, size_t, version_type) override final;
     void finalize_changeset() noexcept override final;
 
     // Overriding member functions in realm::sync::ClientReplicationBase
     void get_status(version_type&, SaltedFileIdent&, SyncProgress&) const override final;
     void set_client_file_ident(SaltedFileIdent, bool) override final;
-    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*,
-                           VersionInfo&) override final;
+    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*, VersionInfo&) override final;
     void find_uploadable_changesets(UploadCursor&, version_type, std::vector<UploadChangeset>&,
                                     version_type&) const override final;
-    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*,
-                                     const RemoteChangeset*, std::size_t, VersionInfo&,
-                                     IntegrationError&, util::Logger&, SyncTransactReporter*) override final;
+    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*, const RemoteChangeset*,
+                                     std::size_t, VersionInfo&, IntegrationError&, util::Logger&,
+                                     SyncTransactReporter*) override final;
 
     // Overriding member functions in realm::sync::ClientHistory
     void get_upload_download_bytes(std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
@@ -188,45 +183,45 @@ private:
     };
 
     // Sizes of fixed-size arrays
-    static constexpr int s_root_size            = 21;
+    static constexpr int s_root_size = 21;
     static constexpr int s_cooked_history_size = 5;
-    static constexpr int s_schema_versions_size =  4;
+    static constexpr int s_schema_versions_size = 4;
 
     // Slots in root array of history compartment
-    static constexpr int s_ct_history_iip                          =  0; // column ref
-    static constexpr int s_client_file_ident_iip                   =  1; // integer
-    static constexpr int s_client_file_ident_salt_iip              =  2; // integer
-    static constexpr int s_progress_latest_server_version_iip      =  3; // integer
-    static constexpr int s_progress_latest_server_version_salt_iip =  4; // integer
-    static constexpr int s_progress_download_server_version_iip    =  5; // integer
-    static constexpr int s_progress_download_client_version_iip    =  6; // integer
-    static constexpr int s_progress_upload_client_version_iip      =  7; // integer
-    static constexpr int s_progress_upload_server_version_iip      =  8; // integer
-    static constexpr int s_progress_downloaded_bytes_iip           =  9; // integer
-    static constexpr int s_progress_downloadable_bytes_iip         = 10; // integer
-    static constexpr int s_progress_uploaded_bytes_iip             = 11; // integer
-    static constexpr int s_progress_uploadable_bytes_iip           = 12; // integer
-    static constexpr int s_changesets_iip                          = 13; // column ref
-    static constexpr int s_reciprocal_transforms_iip               = 14; // column ref
-    static constexpr int s_remote_versions_iip                     = 15; // column ref
-    static constexpr int s_origin_file_idents_iip                  = 16; // column ref
-    static constexpr int s_origin_timestamps_iip                   = 17; // column ref
-    static constexpr int s_object_id_history_state_iip             = 18; // ref
-    static constexpr int s_cooked_history_iip                      = 19; // ref (optional)
-    static constexpr int s_schema_versions_iip                     = 20; // table ref
+    static constexpr int s_ct_history_iip = 0;                          // column ref
+    static constexpr int s_client_file_ident_iip = 1;                   // integer
+    static constexpr int s_client_file_ident_salt_iip = 2;              // integer
+    static constexpr int s_progress_latest_server_version_iip = 3;      // integer
+    static constexpr int s_progress_latest_server_version_salt_iip = 4; // integer
+    static constexpr int s_progress_download_server_version_iip = 5;    // integer
+    static constexpr int s_progress_download_client_version_iip = 6;    // integer
+    static constexpr int s_progress_upload_client_version_iip = 7;      // integer
+    static constexpr int s_progress_upload_server_version_iip = 8;      // integer
+    static constexpr int s_progress_downloaded_bytes_iip = 9;           // integer
+    static constexpr int s_progress_downloadable_bytes_iip = 10;        // integer
+    static constexpr int s_progress_uploaded_bytes_iip = 11;            // integer
+    static constexpr int s_progress_uploadable_bytes_iip = 12;          // integer
+    static constexpr int s_changesets_iip = 13;                         // column ref
+    static constexpr int s_reciprocal_transforms_iip = 14;              // column ref
+    static constexpr int s_remote_versions_iip = 15;                    // column ref
+    static constexpr int s_origin_file_idents_iip = 16;                 // column ref
+    static constexpr int s_origin_timestamps_iip = 17;                  // column ref
+    static constexpr int s_object_id_history_state_iip = 18;            // ref
+    static constexpr int s_cooked_history_iip = 19;                     // ref (optional)
+    static constexpr int s_schema_versions_iip = 20;                    // table ref
 
     // Slots in root array of `cooked_history` substructure
-    static constexpr int s_ch_base_index_iip              = 0; // integer
+    static constexpr int s_ch_base_index_iip = 0;              // integer
     static constexpr int s_ch_intrachangeset_progress_iip = 1; // integer
     static constexpr int s_ch_base_server_version_iip = 2;     // integer
     static constexpr int s_ch_changesets_iip = 3;              // column ref
     static constexpr int s_ch_server_versions_iip = 4;         // column ref
 
     // Slots in root array of `schema_versions` table
-    static constexpr int s_sv_schema_versions_iip   = 0; // integer
-    static constexpr int s_sv_library_versions_iip  = 1; // ref
+    static constexpr int s_sv_schema_versions_iip = 0;   // integer
+    static constexpr int s_sv_library_versions_iip = 1;  // ref
     static constexpr int s_sv_snapshot_versions_iip = 2; // integer (version_type)
-    static constexpr int s_sv_timestamps_iip        = 3; // integer (seconds since epoch)
+    static constexpr int s_sv_timestamps_iip = 3;        // integer (seconds since epoch)
 
     // `progress_server_version` is the latest server version, V, that has been
     // integrated locally (client-side) prior to the currently bound snapshot,
@@ -301,16 +296,15 @@ private:
     mutable std::unique_ptr<BinaryColumn> m_ch_changesets; // Not nullable
     mutable std::unique_ptr<IntegerBpTree> m_ch_server_versions;
 
-    version_type find_sync_history_entry(version_type begin_version, version_type end_version,
-                                         HistoryEntry& entry,
+    version_type find_sync_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry,
                                          version_type& last_integrated_server_version) const noexcept;
     void do_get_cooked_changeset(std::int_fast64_t index, util::AppendBuffer<char>& buffer,
                                  version_type& server_version) const noexcept;
 
     // sum_of_history_entry_sizes calculates the sum of the changeset sizes of the local history
     // entries that produced a version that succeeds `begin_version` and precedes `end_version`.
-    std::uint_fast64_t sum_of_history_entry_sizes(version_type begin_version,
-                                                  version_type end_version) const noexcept;
+    std::uint_fast64_t sum_of_history_entry_sizes(version_type begin_version, version_type end_version) const
+        noexcept;
 
     void prepare_for_write();
     void add_ct_history_entry(BinaryData changeset);
@@ -329,8 +323,7 @@ private:
     void migrate_from_history_schema_version_1_to_2(int orig_schema_version);
     void migrate_from_history_schema_version_2_to_10();
     void record_current_schema_version();
-    static void record_current_schema_version(Array& schema_versions,
-                                              version_type snapshot_version);
+    static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
     bool was_migrated_from_schema_version_earlier_than(int schema_version) const noexcept;
 
     // Overriding member functions in realm::_impl::History
@@ -354,16 +347,16 @@ inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, Confi
 }
 
 inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path, bool owner_is_sync_client,
-            std::unique_ptr<ChangesetCooker> changeset_cooker)
+                                            std::unique_ptr<ChangesetCooker> changeset_cooker)
     : ClientReplication{realm_path} // Throws
     , m_owner_is_sync_client{owner_is_sync_client}
     , m_changeset_cooker{std::move(changeset_cooker)}
 {
 }
 
-inline ClientHistoryImpl::Arrays::Arrays(Allocator& alloc) noexcept :
-    root{alloc},
-    cooked_history{alloc}
+inline ClientHistoryImpl::Arrays::Arrays(Allocator& alloc) noexcept
+    : root{alloc}
+    , cooked_history{alloc}
 {
     cooked_history.set_parent(&root, s_cooked_history_iip);
 }

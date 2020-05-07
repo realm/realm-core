@@ -236,25 +236,10 @@ TEST(Util_Uri_Basics)
 
 TEST(Util_UriPercentEncoding_1)
 {
-    std::vector<std::string> unescaped_strings {
-        "",
-        { 'A', '\0'},
-        "/",
-        "abc",
-        "def",
-        { '\xff', '\x7f', '\x80'},
-        "/sync/calendar"
-    };
+    std::vector<std::string> unescaped_strings{
+        "", {'A', '\0'}, "/", "abc", "def", {'\xff', '\x7f', '\x80'}, "/sync/calendar"};
 
-    std::vector<std::string> escaped_strings {
-        "",
-        "A%00",
-        "%2F",
-        "abc",
-        "def",
-        "%FF%7F%80",
-        "%2Fsync%2Fcalendar"
-    };
+    std::vector<std::string> escaped_strings{"", "A%00", "%2F", "abc", "def", "%FF%7F%80", "%2Fsync%2Fcalendar"};
 
     REALM_ASSERT(unescaped_strings.size() == escaped_strings.size());
     for (size_t i = 0; i < unescaped_strings.size(); ++i) {
@@ -268,7 +253,7 @@ TEST(Util_UriPercentEncoding_1)
 TEST(Util_UriPercentEncoding_2)
 {
     for (int ch = 0; ch < 256; ++ch) {
-        const std::string str {static_cast<char>(ch)};
+        const std::string str{static_cast<char>(ch)};
         std::string escaped = uri_percent_encode(str);
         std::string unescaped = uri_percent_decode(escaped);
         CHECK_EQUAL(str, unescaped);
@@ -277,20 +262,10 @@ TEST(Util_UriPercentEncoding_2)
 
 TEST(Util_UriPercentEncoding_3)
 {
-    std::vector<std::string> invalid_escaped_strings {
-        "/",
-        "%",
-        "%q",
-        "%Aq",
-        ">",
-        { '\xdd' },
-        "%%%%",
-        "%AG"
-    };
+    std::vector<std::string> invalid_escaped_strings{"/", "%", "%q", "%Aq", ">", {'\xdd'}, "%%%%", "%AG"};
 
     for (size_t i = 0; i < invalid_escaped_strings.size(); ++i)
-        CHECK_THROW(uri_percent_decode(invalid_escaped_strings[i]),
-                    std::runtime_error);
+        CHECK_THROW(uri_percent_decode(invalid_escaped_strings[i]), std::runtime_error);
 }
 
 } // unnamed namespace

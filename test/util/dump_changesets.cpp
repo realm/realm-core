@@ -12,7 +12,7 @@
 namespace realm {
 namespace test_util {
 
-std::unique_ptr<TestDirNameGenerator> get_changeset_dump_dir_generator(const unit_test::TestContext& test_context, 
+std::unique_ptr<TestDirNameGenerator> get_changeset_dump_dir_generator(const unit_test::TestContext& test_context,
                                                                        const char* env_var)
 {
     auto dump_path = StringData{::getenv(env_var)};

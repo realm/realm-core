@@ -22,8 +22,10 @@ namespace _private {
 
 class SubstituterBase {
 protected:
-    template<class, class...> struct FindArg1;
-    template<class, bool, class, class...> struct FindArg2;
+    template <class, class...>
+    struct FindArg1;
+    template <class, bool, class, class...>
+    struct FindArg2;
     static StderrLogger s_default_logger;
 };
 
@@ -80,7 +82,8 @@ struct SubstituterConfig {
 ///     <4:2>
 ///
 /// to STDOUT.
-template<class... A> class Substituter : private _private::SubstituterBase {
+template <class... A>
+class Substituter : private _private::SubstituterBase {
 public:
     using EvalFunc = void(std::ostream&, A&...);
     class ProtoDef;
@@ -109,11 +112,13 @@ private:
 };
 
 
-
-template<class... A> class Substituter<A...>::ProtoDef {
+template <class... A>
+class Substituter<A...>::ProtoDef {
 public:
-    template<class T> void operator=(T*);
-    template<class T, class C> void operator=(T C::*);
+    template <class T>
+    void operator=(T*);
+    template <class T, class C>
+    void operator=(T C::*);
     void operator=(std::function<EvalFunc>);
 
 private:
@@ -126,8 +131,8 @@ private:
 };
 
 
-
-template<class... A> class Substituter<A...>::Template {
+template <class... A>
+class Substituter<A...>::Template {
 public:
     /// Uses std::locale::classic().
     std::string expand(A&&...) const;
@@ -144,21 +149,19 @@ private:
 };
 
 
-
-
-
 // Implementation
 
 namespace _private {
 
-template<class T, bool, class A, class... B> struct SubstituterBase::FindArg2 {
+template <class T, bool, class A, class... B>
+struct SubstituterBase::FindArg2 {
     static const T& find(const A&, const B&... b) noexcept
     {
         return FindArg1<T, B...>::find(b...);
     }
 };
 
-template<class T, class A, class... B>
+template <class T, class A, class... B>
 struct SubstituterBase::FindArg2<T, true, A, B...> {
     static const T& find(const A& a, const B&...) noexcept
     {
@@ -166,7 +169,8 @@ struct SubstituterBase::FindArg2<T, true, A, B...> {
     }
 };
 
-template<class T, class A, class... B> struct SubstituterBase::FindArg1<T, A, B...> {
+template <class T, class A, class... B>
+struct SubstituterBase::FindArg1<T, A, B...> {
     static const T& find(const A& a, const B&... b) noexcept
     {
         using P = typename std::remove_reference<A>::type*;
@@ -176,39 +180,43 @@ template<class T, class A, class... B> struct SubstituterBase::FindArg1<T, A, B.
 
 } // namespace _private
 
-template<class... A> struct Substituter<A...>::Substitution {
+template <class... A>
+struct Substituter<A...>::Substitution {
     size_type begin, end;
     const typename Variables::value_type* var_def;
 };
 
-template<class... A> inline Substituter<A...>::Substituter(SubstituterConfig config) noexcept :
-    m_lenient{config.lenient},
-    m_logger{config.logger ? *config.logger : s_default_logger}
+template <class... A>
+inline Substituter<A...>::Substituter(SubstituterConfig config) noexcept
+    : m_lenient{config.lenient}
+    , m_logger{config.logger ? *config.logger : s_default_logger}
 {
 }
 
-template<class... A> inline auto Substituter<A...>::operator[](const char* name) noexcept -> ProtoDef
+template <class... A>
+inline auto Substituter<A...>::operator[](const char* name) noexcept -> ProtoDef
 {
     return ProtoDef{*this, name};
 }
 
-template<class... A>
+template <class... A>
 inline bool Substituter<A...>::expand(StringView text, std::ostream& out, A&&... arg) const
 {
     Template templ;
-    if (parse(text, templ)) { // Throws
+    if (parse(text, templ)) {                       // Throws
         templ.expand(out, std::forward<A>(arg)...); // Throws
         return true;
     }
     return false;
 }
 
-template<class... A> inline bool Substituter<A...>::parse(StringView text, Template& templ) const
+template <class... A>
+inline bool Substituter<A...>::parse(StringView text, Template& templ) const
 {
     return parse(text, templ, m_logger); // Throws
 }
 
-template<class... A>
+template <class... A>
 bool Substituter<A...>::parse(StringView text, Template& templ, Logger& logger) const
 {
     bool error = false;
@@ -216,7 +224,7 @@ bool Substituter<A...>::parse(StringView text, Template& templ, Logger& logger) 
     std::vector<Substitution> substitutions;
     StringView var_name;
     size_type curr = 0;
-    size_type end  = text.size();
+    size_type end = text.size();
     for (;;) {
         size_type i = text.find('@', curr);
         if (i == StringView::npos)
@@ -262,7 +270,7 @@ bool Substituter<A...>::parse(StringView text, Template& templ, Logger& logger) 
     return true;
 }
 
-template<class... A>
+template <class... A>
 inline void Substituter<A...>::define(const char* name, std::function<EvalFunc> func)
 {
     auto p = m_variables.emplace(name, std::move(func)); // Throws
@@ -271,15 +279,18 @@ inline void Substituter<A...>::define(const char* name, std::function<EvalFunc> 
         throw std::runtime_error("Multiple definitions for same variable name");
 }
 
-template<class... A> template<class T> inline void Substituter<A...>::ProtoDef::operator=(T* var)
+template <class... A>
+template <class T>
+inline void Substituter<A...>::ProtoDef::operator=(T* var)
 {
     *this = [var](std::ostream& out, const A&...) {
         out << *var; // Throws
     };
 }
 
-template<class... A>
-template<class T, class C> inline void Substituter<A...>::ProtoDef::operator=(T C::* var)
+template <class... A>
+template <class T, class C>
+inline void Substituter<A...>::ProtoDef::operator=(T C::*var)
 {
     *this = [var](std::ostream& out, const A&... arg) {
         const C& obj = FindArg1<C, A...>::find(arg...);
@@ -287,34 +298,36 @@ template<class T, class C> inline void Substituter<A...>::ProtoDef::operator=(T 
     };
 }
 
-template<class... A>
+template <class... A>
 inline void Substituter<A...>::ProtoDef::operator=(std::function<EvalFunc> func)
 {
     m_substituter.define(m_name, std::move(func)); // Throws
 }
 
-template<class... A>
-inline Substituter<A...>::ProtoDef::ProtoDef(Substituter& substituter, const char* name) noexcept :
-    m_substituter{substituter},
-    m_name{name}
+template <class... A>
+inline Substituter<A...>::ProtoDef::ProtoDef(Substituter& substituter, const char* name) noexcept
+    : m_substituter{substituter}
+    , m_name{name}
 {
 }
 
-template<class... A> std::string Substituter<A...>::Template::expand(A&&... arg) const
+template <class... A>
+std::string Substituter<A...>::Template::expand(A&&... arg) const
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
-    expand(out, std::forward<A>(arg)...); // Throws
+    expand(out, std::forward<A>(arg)...);   // Throws
     std::string str = std::move(out).str(); // Throws
     return str;
 }
 
-template<class... A> void Substituter<A...>::Template::expand(std::ostream& out, A... arg) const
+template <class... A>
+void Substituter<A...>::Template::expand(std::ostream& out, A... arg) const
 {
     std::ios_base::fmtflags flags = out.flags();
     try {
         size_type curr = 0;
-        for (const Substitution& subst: m_substitutions) {
+        for (const Substitution& subst : m_substitutions) {
             out << m_text.substr(curr, subst.begin - curr); // Throws
             if (subst.var_def) {
                 const std::function<EvalFunc>& eval_func = subst.var_def->second;
@@ -334,11 +347,11 @@ template<class... A> void Substituter<A...>::Template::expand(std::ostream& out,
     }
 }
 
-template<class... A>
+template <class... A>
 inline bool Substituter<A...>::Template::refers_to(const char* name) const noexcept
 {
     StringView name_2 = name;
-    for (const auto& subst: m_substitutions) {
+    for (const auto& subst : m_substitutions) {
         if (subst.var_def) {
             if (name_2 != subst.var_def->first)
                 continue;

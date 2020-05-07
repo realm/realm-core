@@ -93,7 +93,10 @@ struct ChangesetIndex {
     }
     //@}
 
-    size_t get_num_conflict_groups() const noexcept { return m_num_conflict_groups; }
+    size_t get_num_conflict_groups() const noexcept
+    {
+        return m_num_conflict_groups;
+    }
 
     struct RangeIterator;
 
@@ -297,8 +300,10 @@ inline bool is_container_instruction(const sync::Instruction& instr) noexcept
     using Instruction = realm::sync::Instruction;
     auto& v = instr.m_instr;
 
-    return mpark::holds_alternative<Instruction::ArrayInsert>(v) || mpark::holds_alternative<Instruction::ArrayMove>(v) ||
-            mpark::holds_alternative<Instruction::ArrayErase>(v) || mpark::holds_alternative<Instruction::ArrayClear>(v);
+    return mpark::holds_alternative<Instruction::ArrayInsert>(v) ||
+           mpark::holds_alternative<Instruction::ArrayMove>(v) ||
+           mpark::holds_alternative<Instruction::ArrayErase>(v) ||
+           mpark::holds_alternative<Instruction::ArrayClear>(v);
 }
 
 } // namespace _impl

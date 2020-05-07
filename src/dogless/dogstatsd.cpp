@@ -24,23 +24,27 @@ namespace dogless {
 
 DogStatsd::DogStatsd(Tags const& default_tags)
     : m_default_tags(default_tags)
-{}
+{
+}
 
 // accessors
 
-DogStatsd::Tags const& DogStatsd::default_tags() const noexcept {
+DogStatsd::Tags const& DogStatsd::default_tags() const noexcept
+{
     return m_default_tags;
 }
 
 // modifiers
 
-void DogStatsd::default_tags(Tags const& default_tags) {
+void DogStatsd::default_tags(Tags const& default_tags)
+{
     m_default_tags = default_tags;
 }
 
 // internal methods
 
-string DogStatsd::build_eol(const char** tags, size_t num_tags) const {
+string DogStatsd::build_eol(const char** tags, size_t num_tags) const
+{
     if (!m_default_tags.empty() || num_tags) {
         std::stringstream ss;
 
@@ -69,79 +73,72 @@ string DogStatsd::build_eol(const char** tags, size_t num_tags) const {
 
 // ctors & dtors
 
-UnbufferedDogStatsd::UnbufferedDogStatsd(string const& hostname,
-                                         int port,
-                                         Tags const& default_tags)
+UnbufferedDogStatsd::UnbufferedDogStatsd(string const& hostname, int port, Tags const& default_tags)
     : DogStatsd(default_tags)
     , m_statsd({}, hostname, port)
-{}
+{
+}
 
-UnbufferedDogStatsd::UnbufferedDogStatsd(
-        std::vector<string> const& endpoints,
-        Tags const& default_tags)
+UnbufferedDogStatsd::UnbufferedDogStatsd(std::vector<string> const& endpoints, Tags const& default_tags)
     : DogStatsd(default_tags)
     , m_statsd(endpoints)
-{}
+{
+}
 
 UnbufferedDogStatsd::UnbufferedDogStatsd(Tags const& default_tags)
     : DogStatsd(default_tags)
-{}
+{
+}
 
 // modifiers
 
-void UnbufferedDogStatsd::add_endpoint(string const& endpoint) {
+void UnbufferedDogStatsd::add_endpoint(string const& endpoint)
+{
     m_statsd.add_endpoint(endpoint);
 }
 
-void UnbufferedDogStatsd::add_endpoint(string const& hostname,
-                                       int port)
+void UnbufferedDogStatsd::add_endpoint(string const& hostname, int port)
 {
     m_statsd.add_endpoint(hostname, port);
 }
 
-void UnbufferedDogStatsd::add_endpoints(
-        std::vector<string> const& endpoints)
+void UnbufferedDogStatsd::add_endpoints(std::vector<string> const& endpoints)
 {
     m_statsd.add_endpoints(endpoints);
 }
 
 // main API
 
-void UnbufferedDogStatsd::decrement(const char* metric, int value,
-                                    const char** tags, size_t num_tags,
+void UnbufferedDogStatsd::decrement(const char* metric, int value, const char** tags, size_t num_tags,
                                     float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.decrement(metric, value, sample_rate, eol.c_str());
 }
 
-void UnbufferedDogStatsd::gauge(const char* metric, double value,
-                                const char** tags, size_t num_tags,
+void UnbufferedDogStatsd::gauge(const char* metric, double value, const char** tags, size_t num_tags,
                                 float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.gauge(metric, value, sample_rate, eol.c_str());
 }
 
-void UnbufferedDogStatsd::histogram(const char* metric, double value,
-                                    const char** tags, size_t num_tags,
+void UnbufferedDogStatsd::histogram(const char* metric, double value, const char** tags, size_t num_tags,
                                     float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.histogram(metric, value, sample_rate, eol.c_str());
 }
 
-void UnbufferedDogStatsd::increment(const char* metric, int value,
-                                    const char** tags, size_t num_tags,
+void UnbufferedDogStatsd::increment(const char* metric, int value, const char** tags, size_t num_tags,
                                     float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.increment(metric, value, sample_rate, eol.c_str());
 }
 
-void UnbufferedDogStatsd::timing(const char* metric, double value,
-                                    const char** tags, size_t num_tags,
-                                    float sample_rate)
+void UnbufferedDogStatsd::timing(const char* metric, double value, const char** tags, size_t num_tags,
+                                 float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.timing(metric, value, sample_rate, eol.c_str());
@@ -149,104 +146,100 @@ void UnbufferedDogStatsd::timing(const char* metric, double value,
 
 // ctors & dtors
 
-BufferedDogStatsd::BufferedDogStatsd(string const& hostname, int port,
-                                     Tags const& default_tags,
-                                     std::size_t mtu)
+BufferedDogStatsd::BufferedDogStatsd(string const& hostname, int port, Tags const& default_tags, std::size_t mtu)
     : DogStatsd(default_tags)
     , m_statsd({}, hostname, port, mtu)
-{}
+{
+}
 
-BufferedDogStatsd::BufferedDogStatsd(
-        std::vector<string> const& endpoints,
-        Tags const& default_tags,
-        std::size_t mtu)
+BufferedDogStatsd::BufferedDogStatsd(std::vector<string> const& endpoints, Tags const& default_tags, std::size_t mtu)
     : DogStatsd(default_tags)
     , m_statsd(endpoints, {}, mtu)
-{}
+{
+}
 
 BufferedDogStatsd::BufferedDogStatsd(Tags const& default_tags)
     : DogStatsd(default_tags)
-{}
+{
+}
 
 // accessors
 
-int BufferedDogStatsd::loop_interval() const noexcept {
+int BufferedDogStatsd::loop_interval() const noexcept
+{
     return m_statsd.loop_interval();
 }
 
-std::size_t BufferedDogStatsd::mtu() const noexcept {
+std::size_t BufferedDogStatsd::mtu() const noexcept
+{
     return m_statsd.mtu();
 }
 
 // modifiers
 
-void BufferedDogStatsd::add_endpoint(string const& endpoint) {
+void BufferedDogStatsd::add_endpoint(string const& endpoint)
+{
     m_statsd.add_endpoint(endpoint);
 }
 
-void BufferedDogStatsd::add_endpoint(string const& hostname,
-                                     int port)
+void BufferedDogStatsd::add_endpoint(string const& hostname, int port)
 {
     m_statsd.add_endpoint(hostname, port);
 }
 
-void BufferedDogStatsd::add_endpoints(
-        std::vector<string> const& endpoints)
+void BufferedDogStatsd::add_endpoints(std::vector<string> const& endpoints)
 {
     m_statsd.add_endpoints(endpoints);
 }
 
-void BufferedDogStatsd::loop_interval(int interval) noexcept {
+void BufferedDogStatsd::loop_interval(int interval) noexcept
+{
     m_statsd.loop_interval(interval);
 }
 
-void BufferedDogStatsd::mtu(std::size_t mtu) noexcept {
+void BufferedDogStatsd::mtu(std::size_t mtu) noexcept
+{
     m_statsd.mtu(mtu);
 }
 
 // main API
 
-void BufferedDogStatsd::decrement(const char* metric, int value,
-                                  const char** tags, size_t num_tags,
+void BufferedDogStatsd::decrement(const char* metric, int value, const char** tags, size_t num_tags,
                                   float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.decrement(metric, value, sample_rate, eol.c_str());
 }
 
-void BufferedDogStatsd::gauge(const char* metric, double value,
-                              const char** tags, size_t num_tags,
-                              float sample_rate)
+void BufferedDogStatsd::gauge(const char* metric, double value, const char** tags, size_t num_tags, float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.gauge(metric, value, sample_rate, eol.c_str());
 }
 
-void BufferedDogStatsd::histogram(const char* metric, double value,
-                                  const char** tags, size_t num_tags,
+void BufferedDogStatsd::histogram(const char* metric, double value, const char** tags, size_t num_tags,
                                   float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.histogram(metric, value, sample_rate, eol.c_str());
 }
 
-void BufferedDogStatsd::increment(const char* metric, int value,
-                                  const char** tags, size_t num_tags,
+void BufferedDogStatsd::increment(const char* metric, int value, const char** tags, size_t num_tags,
                                   float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.increment(metric, value, sample_rate, eol.c_str());
 }
 
-void BufferedDogStatsd::timing(const char* metric, double value,
-                                  const char** tags, size_t num_tags,
-                                  float sample_rate)
+void BufferedDogStatsd::timing(const char* metric, double value, const char** tags, size_t num_tags,
+                               float sample_rate)
 {
     auto eol = build_eol(tags, num_tags);
     m_statsd.timing(metric, value, sample_rate, eol.c_str());
 }
 
-void BufferedDogStatsd::flush() {
+void BufferedDogStatsd::flush()
+{
     m_statsd.flush();
 }
 

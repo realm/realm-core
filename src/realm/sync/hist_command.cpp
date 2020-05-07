@@ -27,12 +27,12 @@
 using namespace realm;
 using util::TimestampFormatter;
 using IntegerBpTree = BPlusTree<std::int64_t>; // FIXME: Avoid use of optional type `std::int64_t`
-using sync::version_type;
-using sync::salt_type;
 using sync::file_ident_type;
-using sync::timestamp_type;
+using sync::salt_type;
 using sync::SaltedFileIdent;
+using sync::timestamp_type;
 using sync::UploadCursor;
+using sync::version_type;
 using ClientType = _impl::ServerHistory::ClientType;
 
 
@@ -48,54 +48,49 @@ namespace {
 enum class Format { auto_, nothing, version, info, annotate, changeset, hexdump, raw };
 enum class Summary { auto_, off, brief, full };
 
-struct FormatSpec { static util::EnumAssoc map[]; };
-util::EnumAssoc FormatSpec::map[] = {
-    { int(Format::auto_),     "auto"      },
-    { int(Format::nothing),   "nothing"   },
-    { int(Format::version),   "version"   },
-    { int(Format::info),      "info"      },
-    { int(Format::annotate),  "annotate"  },
-    { int(Format::changeset), "changeset" },
-    { int(Format::hexdump),   "hexdump"   },
-    { int(Format::raw),       "raw"       },
-    { 0, nullptr }
+struct FormatSpec {
+    static util::EnumAssoc map[];
 };
+util::EnumAssoc FormatSpec::map[] = {
+    {int(Format::auto_), "auto"},      {int(Format::nothing), "nothing"},   {int(Format::version), "version"},
+    {int(Format::info), "info"},       {int(Format::annotate), "annotate"}, {int(Format::changeset), "changeset"},
+    {int(Format::hexdump), "hexdump"}, {int(Format::raw), "raw"},           {0, nullptr}};
 using FormatEnum = util::Enum<Format, FormatSpec>;
 
-struct SummarySpec { static util::EnumAssoc map[]; };
-util::EnumAssoc SummarySpec::map[] = {
-    { int(Summary::auto_), "auto"  },
-    { int(Summary::off),   "off"   },
-    { int(Summary::brief), "brief" },
-    { int(Summary::full),  "full"  },
-    { 0, nullptr }
+struct SummarySpec {
+    static util::EnumAssoc map[];
 };
+util::EnumAssoc SummarySpec::map[] = {{int(Summary::auto_), "auto"},
+                                      {int(Summary::off), "off"},
+                                      {int(Summary::brief), "brief"},
+                                      {int(Summary::full), "full"},
+                                      {0, nullptr}};
 using SummaryEnum = util::Enum<Summary, SummarySpec>;
 
 
-struct InstructionTypeSpec { static util::EnumAssoc map[]; };
-util::EnumAssoc InstructionTypeSpec::map[] = {
-    { int(sync::Instruction::Type::SelectTable),     "SelectTable"     },
-    { int(sync::Instruction::Type::SelectField),     "SelectField"     },
-    { int(sync::Instruction::Type::AddTable),        "AddTable"        },
-    { int(sync::Instruction::Type::EraseTable),      "EraseTable"      },
-    { int(sync::Instruction::Type::CreateObject),    "CreateObject"    },
-    { int(sync::Instruction::Type::EraseObject),     "EraseObject"     },
-    { int(sync::Instruction::Type::Set),             "Set"             },
-    { int(sync::Instruction::Type::AddInteger),      "AddInteger"      },
-    { int(sync::Instruction::Type::AddColumn),       "AddColumn"       },
-    { int(sync::Instruction::Type::EraseColumn),     "EraseColumn"     },
-    { int(sync::Instruction::Type::ArraySet),        "ArraySet"        },
-    { int(sync::Instruction::Type::ArrayInsert),     "ArrayInsert"     },
-    { int(sync::Instruction::Type::ArrayMove),       "ArrayMove"       },
-    { int(sync::Instruction::Type::ArrayErase),      "ArrayErase"      },
-    { int(sync::Instruction::Type::ArrayClear),      "ArrayClear"      },
-    { 0, nullptr }
+struct InstructionTypeSpec {
+    static util::EnumAssoc map[];
 };
+util::EnumAssoc InstructionTypeSpec::map[] = {{int(sync::Instruction::Type::SelectTable), "SelectTable"},
+                                              {int(sync::Instruction::Type::SelectField), "SelectField"},
+                                              {int(sync::Instruction::Type::AddTable), "AddTable"},
+                                              {int(sync::Instruction::Type::EraseTable), "EraseTable"},
+                                              {int(sync::Instruction::Type::CreateObject), "CreateObject"},
+                                              {int(sync::Instruction::Type::EraseObject), "EraseObject"},
+                                              {int(sync::Instruction::Type::Set), "Set"},
+                                              {int(sync::Instruction::Type::AddInteger), "AddInteger"},
+                                              {int(sync::Instruction::Type::AddColumn), "AddColumn"},
+                                              {int(sync::Instruction::Type::EraseColumn), "EraseColumn"},
+                                              {int(sync::Instruction::Type::ArraySet), "ArraySet"},
+                                              {int(sync::Instruction::Type::ArrayInsert), "ArrayInsert"},
+                                              {int(sync::Instruction::Type::ArrayMove), "ArrayMove"},
+                                              {int(sync::Instruction::Type::ArrayErase), "ArrayErase"},
+                                              {int(sync::Instruction::Type::ArrayClear), "ArrayClear"},
+                                              {0, nullptr}};
 using InstructionTypeEnum = util::Enum<sync::Instruction::Type, InstructionTypeSpec>;
 
 
-template<class T>
+template <class T>
 std::string format_num_something(T num, const char* singular_form, const char* plural_form,
                                  std::locale loc = std::locale{})
 {
@@ -150,29 +145,22 @@ bool get_changeset(const BinaryColumn& col, std::size_t row_ndx, util::AppendBuf
 
 
 enum class LogicalClientType {
-  special,
-  upstream,
-  self,
-  indirect,
-  regular,
-  subserver,
-  partial,
-  legacy,
+    special,
+    upstream,
+    self,
+    indirect,
+    regular,
+    subserver,
+    partial,
+    legacy,
 };
 
 
 void all_client_files(std::set<LogicalClientType>& types)
 {
-    types = {
-        LogicalClientType::special,
-        LogicalClientType::upstream,
-        LogicalClientType::self,
-        LogicalClientType::indirect,
-        LogicalClientType::regular,
-        LogicalClientType::subserver,
-        LogicalClientType::partial,
-        LogicalClientType::legacy
-    };
+    types = {LogicalClientType::special,  LogicalClientType::upstream, LogicalClientType::self,
+             LogicalClientType::indirect, LogicalClientType::regular,  LogicalClientType::subserver,
+             LogicalClientType::partial,  LogicalClientType::legacy};
 }
 
 
@@ -208,7 +196,7 @@ bool parse_client_types(util::StringView string, std::set<LogicalClientType>& ty
         }
         return false;
     }
-    types   = types_2;
+    types = types_2;
     return true;
 }
 
@@ -216,9 +204,9 @@ bool parse_client_types(util::StringView string, std::set<LogicalClientType>& ty
 class Expr {
 public:
     using InternString = sync::InternString;
-    using Instruction  = sync::Instruction;
-    using Payload      = Instruction::Payload;
-    using Changeset    = sync::Changeset;
+    using Instruction = sync::Instruction;
+    using Payload = Instruction::Payload;
+    using Changeset = sync::Changeset;
 
     struct InstrInfo {
         Instruction::Type type;
@@ -252,22 +240,18 @@ public:
         }
     };
 
-    virtual void reset(const Changeset&) noexcept
-    {
-    }
+    virtual void reset(const Changeset&) noexcept {}
 
     virtual bool eval(const InstrInfo&) const noexcept = 0;
 
-    virtual ~Expr() noexcept
-    {
-    }
+    virtual ~Expr() noexcept {}
 };
 
 
 class InstructionTypeExpr : public Expr {
 public:
-    InstructionTypeExpr(Instruction::Type type) noexcept :
-        m_type{type}
+    InstructionTypeExpr(Instruction::Type type) noexcept
+        : m_type{type}
     {
     }
 
@@ -283,8 +267,8 @@ private:
 
 class ModifiesClassExpr : public Expr {
 public:
-    ModifiesClassExpr(std::string class_name) noexcept :
-        m_class_name{std::move(class_name)}
+    ModifiesClassExpr(std::string class_name) noexcept
+        : m_class_name{std::move(class_name)}
     {
     }
 
@@ -295,8 +279,7 @@ public:
 
     bool eval(const InstrInfo& instr) const noexcept override
     {
-        return (instr.class_name && instr.class_name == m_interned_class_name &&
-                instr.is_modification());
+        return (instr.class_name && instr.class_name == m_interned_class_name && instr.is_modification());
     }
 
 private:
@@ -307,16 +290,15 @@ private:
 
 class ModifiesObjectExpr : public ModifiesClassExpr {
 public:
-    ModifiesObjectExpr(std::string class_name, GlobalKey object_id) noexcept :
-        ModifiesClassExpr{std::move(class_name)},
-        m_object_id{std::move(object_id)}
+    ModifiesObjectExpr(std::string class_name, GlobalKey object_id) noexcept
+        : ModifiesClassExpr{std::move(class_name)}
+        , m_object_id{std::move(object_id)}
     {
     }
 
     bool eval(const InstrInfo& instr) const noexcept override
     {
-        return (ModifiesClassExpr::eval(instr) &&
-                instr.object_id && instr.object_id == m_object_id);
+        return (ModifiesClassExpr::eval(instr) && instr.object_id && instr.object_id == m_object_id);
     }
 
 private:
@@ -326,10 +308,9 @@ private:
 
 class ModifiesPropertyExpr : public ModifiesObjectExpr {
 public:
-    ModifiesPropertyExpr(std::string class_name, GlobalKey object_id,
-                         std::string property) noexcept :
-        ModifiesObjectExpr{std::move(class_name), std::move(object_id)},
-        m_property{std::move(property)}
+    ModifiesPropertyExpr(std::string class_name, GlobalKey object_id, std::string property) noexcept
+        : ModifiesObjectExpr{std::move(class_name), std::move(object_id)}
+        , m_property{std::move(property)}
     {
     }
 
@@ -341,8 +322,7 @@ public:
 
     bool eval(const InstrInfo& instr) const noexcept override final
     {
-        return (ModifiesObjectExpr::eval(instr) &&
-                instr.property && instr.property == m_interned_property);
+        return (ModifiesObjectExpr::eval(instr) && instr.property && instr.property == m_interned_property);
     }
 
 private:
@@ -353,9 +333,9 @@ private:
 
 class LinksToObjectExpr : public Expr {
 public:
-    LinksToObjectExpr(std::string class_name, GlobalKey object_id) noexcept :
-        m_class_name{std::move(class_name)},
-        m_object_id{std::move(object_id)}
+    LinksToObjectExpr(std::string class_name, GlobalKey object_id) noexcept
+        : m_class_name{std::move(class_name)}
+        , m_object_id{std::move(object_id)}
     {
     }
 
@@ -380,9 +360,9 @@ private:
 
 class AndExpr : public Expr {
 public:
-    AndExpr(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right) noexcept :
-        m_left{std::move(left)},
-        m_right{std::move(right)}
+    AndExpr(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right) noexcept
+        : m_left{std::move(left)}
+        , m_right{std::move(right)}
     {
     }
 
@@ -405,11 +385,11 @@ private:
 class InstructionMatcher {
 public:
     using InternString = sync::InternString;
-    using Instruction  = sync::Instruction;
-    using Payload      = Instruction::Payload;
+    using Instruction = sync::Instruction;
+    using Payload = Instruction::Payload;
 
-    explicit InstructionMatcher(const Expr& expression) noexcept :
-        m_expression{expression}
+    explicit InstructionMatcher(const Expr& expression) noexcept
+        : m_expression{expression}
     {
     }
 
@@ -431,13 +411,7 @@ public:
         GlobalKey object_id;
         InternString property;
         const Payload* payload = nullptr;
-        Expr::InstrInfo info = {
-            Instruction::Type::SelectTable,
-            m_selected_class_name,
-            object_id,
-            property,
-            payload
-        };
+        Expr::InstrInfo info = {Instruction::Type::SelectTable, m_selected_class_name, object_id, property, payload};
         return m_expression.eval(info);
     }
 
@@ -477,13 +451,8 @@ public:
     {
         select_property(instr);
         const Payload* payload = nullptr;
-        Expr::InstrInfo info = {
-            Instruction::Type::SelectField,
-            m_selected_class_name,
-            m_selected_object_id,
-            m_selected_property,
-            payload
-        };
+        Expr::InstrInfo info = {Instruction::Type::SelectField, m_selected_class_name, m_selected_object_id,
+                                m_selected_property, payload};
         return m_expression.eval(info);
     }
 
@@ -528,32 +497,20 @@ private:
                        const Payload* payload = nullptr) const noexcept
     {
         InternString property;
-        Expr::InstrInfo info = {
-            instruction_type,
-            m_selected_class_name,
-            object_id,
-            property,
-            payload
-        };
+        Expr::InstrInfo info = {instruction_type, m_selected_class_name, object_id, property, payload};
         return m_expression.eval(info);
     }
 
     void select_property(const Instruction::FieldInstructionBase& instr) noexcept
     {
         m_selected_object_id = instr.object;
-        m_selected_property  = instr.field;
+        m_selected_property = instr.field;
     }
 
-    bool modify_property(Instruction::Type instruction_type,
-                         const Payload* payload = nullptr) const noexcept
+    bool modify_property(Instruction::Type instruction_type, const Payload* payload = nullptr) const noexcept
     {
-        Expr::InstrInfo info = {
-            instruction_type,
-            m_selected_class_name,
-            m_selected_object_id,
-            m_selected_property,
-            payload
-        };
+        Expr::InstrInfo info = {instruction_type, m_selected_class_name, m_selected_object_id, m_selected_property,
+                                payload};
         return m_expression.eval(info);
     }
 };
@@ -595,8 +552,7 @@ public:
     virtual HistoryCursorPtr create_history_cursor(util::Optional<file_ident_type> reciprocal,
                                                    version_type version) = 0;
     virtual HistoryCursorPtr create_history_cursor(util::Optional<file_ident_type> reciprocal,
-                                                   version_type begin_version,
-                                                   version_type end_version) = 0;
+                                                   version_type begin_version, version_type end_version) = 0;
 
     virtual ClientFilesCursorPtr create_client_files_cursor() = 0;
     virtual ClientFilesCursorPtr create_client_files_cursor(file_ident_type client_file) = 0;
@@ -610,8 +566,8 @@ public:
     void init()
     {
         m_begin_version = m_base_version;
-        m_end_version   = m_last_version;
-        m_curr_version  = m_begin_version;
+        m_end_version = m_last_version;
+        m_curr_version = m_begin_version;
     }
 
     bool init(version_type version)
@@ -621,8 +577,8 @@ public:
             return false;
         }
         m_begin_version = version_type(version - 1);
-        m_end_version   = version;
-        m_curr_version  = m_begin_version;
+        m_end_version = version;
+        m_curr_version = m_begin_version;
         return true;
     }
 
@@ -637,8 +593,8 @@ public:
             return false;
         }
         m_begin_version = begin_version;
-        m_end_version   = end_version;
-        m_curr_version  = m_begin_version;
+        m_end_version = end_version;
+        m_curr_version = m_begin_version;
         return true;
     }
 
@@ -675,8 +631,8 @@ protected:
 
 private:
     version_type m_begin_version = 0;
-    version_type m_end_version   = 0;
-    version_type m_curr_version  = 0;
+    version_type m_end_version = 0;
+    version_type m_curr_version = 0;
 };
 
 
@@ -685,8 +641,8 @@ public:
     void init()
     {
         m_begin = 0;
-        m_end   = m_size;
-        m_next  = 0;
+        m_end = m_size;
+        m_next = 0;
     }
 
     bool init(file_ident_type client_file)
@@ -697,8 +653,8 @@ public:
             return false;
         }
         m_begin = client_file_index;
-        m_end   = std::size_t(client_file_index + 1);
-        m_next  = client_file_index;
+        m_end = std::size_t(client_file_index + 1);
+        m_next = client_file_index;
         return true;
     }
 
@@ -723,8 +679,8 @@ protected:
 
 private:
     std::size_t m_begin = 0;
-    std::size_t m_end   = 0;
-    std::size_t m_next  = 0;
+    std::size_t m_end = 0;
+    std::size_t m_next = 0;
 };
 
 
@@ -743,8 +699,7 @@ public:
         return cursor;
     }
 
-    HistoryCursorPtr create_history_cursor(util::Optional<file_ident_type> reciprocal,
-                                           version_type version) override
+    HistoryCursorPtr create_history_cursor(util::Optional<file_ident_type> reciprocal, version_type version) override
     {
         std::unique_ptr<RegularSyncHistoryCursor> cursor = do_create_history_cursor(); // Throws
         if (REALM_UNLIKELY(!cursor))
@@ -758,8 +713,7 @@ public:
         return cursor;
     }
 
-    HistoryCursorPtr create_history_cursor(util::Optional<file_ident_type> reciprocal,
-                                           version_type begin_version,
+    HistoryCursorPtr create_history_cursor(util::Optional<file_ident_type> reciprocal, version_type begin_version,
                                            version_type end_version) override
     {
         std::unique_ptr<RegularSyncHistoryCursor> cursor = do_create_history_cursor(); // Throws
@@ -776,8 +730,7 @@ public:
 
     ClientFilesCursorPtr create_client_files_cursor() override
     {
-        std::unique_ptr<RegularClientFilesCursor> cursor =
-            do_create_client_files_cursor(); // Throws
+        std::unique_ptr<RegularClientFilesCursor> cursor = do_create_client_files_cursor(); // Throws
         if (REALM_UNLIKELY(!cursor))
             return nullptr;
         cursor->init(); // Throws
@@ -786,8 +739,7 @@ public:
 
     ClientFilesCursorPtr create_client_files_cursor(file_ident_type client_file) override
     {
-        std::unique_ptr<RegularClientFilesCursor> cursor =
-            do_create_client_files_cursor(); // Throws
+        std::unique_ptr<RegularClientFilesCursor> cursor = do_create_client_files_cursor(); // Throws
         if (REALM_UNLIKELY(!cursor))
             return nullptr;
         if (!cursor->init(client_file)) // Throws
@@ -900,17 +852,17 @@ public:
             root_size = 23;
 
         // Slots in root array of history compartment
-        std::size_t changesets_iip            = 13;
+        std::size_t changesets_iip = 13;
         std::size_t reciprocal_transforms_iip = 14;
-        std::size_t remote_versions_iip       = 15;
-        std::size_t origin_file_idents_iip    = 16;
-        std::size_t origin_timestamps_iip     = 17;
+        std::size_t remote_versions_iip = 15;
+        std::size_t origin_file_idents_iip = 16;
+        std::size_t origin_timestamps_iip = 17;
         if (schema_version < 2) {
-            changesets_iip            = 0;
+            changesets_iip = 0;
             reciprocal_transforms_iip = 1;
-            remote_versions_iip       = 2;
-            origin_file_idents_iip    = 3;
-            origin_timestamps_iip     = 4;
+            remote_versions_iip = 2;
+            origin_file_idents_iip = 3;
+            origin_timestamps_iip = 4;
         }
 
         Array root{alloc};
@@ -930,7 +882,7 @@ public:
         {
             ref_type ref = root.get_as_ref(remote_versions_iip);
             m_remote_versions.reset(new IntegerBpTree(alloc)); // Throws
-            m_remote_versions->init_from_ref(ref); // Throws
+            m_remote_versions->init_from_ref(ref);             // Throws
         }
         {
             m_origin_file_idents.reset(new IntegerBpTree(alloc)); // Throws
@@ -977,12 +929,13 @@ public:
         timestamp_type origin_timestamp = timestamp_type(m_origin_timestamps->get(index));
         version_type server_version = version_type(m_remote_versions->get(index));
         std::size_t changeset_size = get_changeset_size(index);
-        out << client_version << " " << origin_file << " " << origin_timestamp << " "
-            "" << server_version << " " << changeset_size << "\n"; // Throws
+        out << client_version << " " << origin_file << " " << origin_timestamp
+            << " "
+               ""
+            << server_version << " " << changeset_size << "\n"; // Throws
     }
 
-    void print_annotated_info(std::ostream& out,
-                              TimestampFormatter& timestamp_formatter) const override final
+    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const override final
     {
         std::size_t index = get_history_entry_index(); // Throws
         version_type client_version = get_current_version();
@@ -994,13 +947,22 @@ public:
         sync::map_changeset_timestamp(origin_timestamp, time, nanoseconds);
         version_type server_version = version_type(m_remote_versions->get(index));
         std::size_t changeset_size = get_changeset_size(index);
-        out <<
-            "Produced client version: " << client_version << "\n"
-            "Identifier of origin file: " << origin_file << " (" << origin << " origin)\n"
-            "Origin timestamp: " << origin_timestamp << " "
-            "(" << timestamp_formatter.format(time, nanoseconds) << ")\n"
-            "Last integrated server version: " << server_version << "\n"
-            "Changeset size: " << changeset_size << "\n"; // Throws
+        out << "Produced client version: " << client_version
+            << "\n"
+               "Identifier of origin file: "
+            << origin_file << " (" << origin
+            << " origin)\n"
+               "Origin timestamp: "
+            << origin_timestamp
+            << " "
+               "("
+            << timestamp_formatter.format(time, nanoseconds)
+            << ")\n"
+               "Last integrated server version: "
+            << server_version
+            << "\n"
+               "Changeset size: "
+            << changeset_size << "\n"; // Throws
     }
 
     void get_changeset(util::AppendBuffer<char>& buffer) const override final
@@ -1037,11 +999,11 @@ private:
 class ClientCursorFactory_1_to_2 : public RegularCursorFactory {
 public:
     ClientCursorFactory_1_to_2(Allocator& alloc, ref_type root_ref, int schema_version,
-                               version_type current_snapshot_version) noexcept :
-        m_alloc{alloc},
-        m_root_ref{root_ref},
-        m_schema_version{schema_version},
-        m_current_snapshot_version{current_snapshot_version}
+                               version_type current_snapshot_version) noexcept
+        : m_alloc{alloc}
+        , m_root_ref{root_ref}
+        , m_schema_version{schema_version}
+        , m_current_snapshot_version{current_snapshot_version}
     {
     }
 
@@ -1067,9 +1029,9 @@ private:
 
 class ServerHistoryCursor_6_to_10 : public RegularSyncHistoryCursor {
 public:
-    ServerHistoryCursor_6_to_10(Allocator& alloc, ref_type root_ref, int schema_version) :
-        m_schema_version{schema_version},
-        m_root{alloc}
+    ServerHistoryCursor_6_to_10(Allocator& alloc, ref_type root_ref, int schema_version)
+        : m_schema_version{schema_version}
+        , m_root{alloc}
     {
         REALM_ASSERT(schema_version >= 6 && schema_version <= 10);
 
@@ -1077,21 +1039,21 @@ public:
             return;
 
         // Size of fixed-size arrays
-        std::size_t root_size         = 11;
-        std::size_t sync_history_size =  6;
+        std::size_t root_size = 11;
+        std::size_t sync_history_size = 6;
         if (schema_version < 8)
             root_size = 10;
 
         // Slots in root array of history compartment
         std::size_t history_base_version_iip = 1;
-        std::size_t sync_history_iip         = 3;
+        std::size_t sync_history_iip = 3;
 
         // Slots in root array of `sync_history` table
-        std::size_t sh_version_salts_iip   = 0;
-        std::size_t sh_origin_files_iip    = 1;
+        std::size_t sh_version_salts_iip = 0;
+        std::size_t sh_origin_files_iip = 1;
         std::size_t sh_client_versions_iip = 2;
-        std::size_t sh_timestamps_iip      = 3;
-        std::size_t sh_changesets_iip      = 4;
+        std::size_t sh_timestamps_iip = 3;
+        std::size_t sh_changesets_iip = 4;
 
         m_root.init_from_ref(root_ref);
         if (m_root.size() != root_size)
@@ -1126,12 +1088,11 @@ public:
             m_changesets->init_from_ref(ref);
         }
         std::size_t history_size = m_version_salts->size();
-        REALM_ASSERT(m_origin_files->size()    == history_size);
+        REALM_ASSERT(m_origin_files->size() == history_size);
         REALM_ASSERT(m_client_versions->size() == history_size);
-        REALM_ASSERT(m_timestamps->size()      == history_size);
-        REALM_ASSERT(m_changesets->size()      == history_size);
-        m_base_version =
-            version_type(m_root.get_as_ref_or_tagged(history_base_version_iip).get_as_int());
+        REALM_ASSERT(m_timestamps->size() == history_size);
+        REALM_ASSERT(m_changesets->size() == history_size);
+        m_base_version = version_type(m_root.get_as_ref_or_tagged(history_base_version_iip).get_as_int());
         m_last_version = version_type(m_base_version + history_size);
     }
 
@@ -1151,7 +1112,7 @@ public:
 
         // Slots in root array of `client_files` table
         std::size_t cf_rh_base_versions_iip = 2;
-        std::size_t cf_recip_hist_refs_iip  = 3;
+        std::size_t cf_recip_hist_refs_iip = 3;
 
         Allocator& alloc = m_root.get_alloc();
         Array client_files{alloc};
@@ -1172,8 +1133,7 @@ public:
 
         std::size_t num_client_files = cf_rh_base_versions.size();
         std::size_t client_file_index = std::size_t(recip_file_ident);
-        bool good_recip_file_ident = (recip_file_ident >= 1 &&
-                                      client_file_index < num_client_files);
+        bool good_recip_file_ident = (recip_file_ident >= 1 && client_file_index < num_client_files);
         if (!good_recip_file_ident) {
             std::cerr << "ERROR: Bad reciprocal file identifier\n"; // Throws
             return false;
@@ -1189,13 +1149,12 @@ public:
             }
         }
 
-        version_type recip_hist_base_version =
-            version_type(cf_rh_base_versions.get(client_file_index));
+        version_type recip_hist_base_version = version_type(cf_rh_base_versions.get(client_file_index));
         std::size_t recip_hist_offset = std::size_t(recip_hist_base_version - m_base_version);
 
         m_base_version = recip_hist_base_version;
         m_recip_hist_offset = recip_hist_offset;
-        m_recip_hist_size   = recip_hist_size;
+        m_recip_hist_size = recip_hist_size;
         m_reciprocal = true;
         return true;
     }
@@ -1224,13 +1183,16 @@ public:
         timestamp_type origin_timestamp = timestamp_type(m_timestamps->get(index_2));
         version_type client_version = version_type(m_client_versions->get(index_2));
         std::size_t changeset_size = get_changeset_size(index_1);
-        out << server_version << " " << version_salt << " " << origin_file << " "
-            "" << origin_timestamp << " " << client_version << " "
-            "" << changeset_size << "\n"; // Throws
+        out << server_version << " " << version_salt << " " << origin_file
+            << " "
+               ""
+            << origin_timestamp << " " << client_version
+            << " "
+               ""
+            << changeset_size << "\n"; // Throws
     }
 
-    void print_annotated_info(std::ostream& out,
-                              TimestampFormatter& timestamp_formatter) const override final
+    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const override final
     {
         std::size_t index_1 = get_history_entry_index(); // Throws
         std::size_t index_2 = get_real_history_index(index_1);
@@ -1244,14 +1206,25 @@ public:
         sync::map_changeset_timestamp(origin_timestamp, time, nanoseconds);
         version_type client_version = version_type(m_client_versions->get(index_2));
         std::size_t changeset_size = get_changeset_size(index_1);
-        out <<
-            "Produced server version: " << server_version << "\n"
-            "Server version salt: " << version_salt << "\n"
-            "Identifier of origin file: " << origin_file << " (" << origin << " origin)\n"
-            "Origin timestamp: " << origin_timestamp << " "
-            "(" << timestamp_formatter.format(time, nanoseconds) << ")\n"
-            "Last integrated client version: " << client_version << "\n"
-            "Changeset size: " << changeset_size << "\n"; // Throws
+        out << "Produced server version: " << server_version
+            << "\n"
+               "Server version salt: "
+            << version_salt
+            << "\n"
+               "Identifier of origin file: "
+            << origin_file << " (" << origin
+            << " origin)\n"
+               "Origin timestamp: "
+            << origin_timestamp
+            << " "
+               "("
+            << timestamp_formatter.format(time, nanoseconds)
+            << ")\n"
+               "Last integrated client version: "
+            << client_version
+            << "\n"
+               "Changeset size: "
+            << changeset_size << "\n"; // Throws
     }
 
     void get_changeset(util::AppendBuffer<char>& buffer) const override final
@@ -1301,8 +1274,8 @@ private:
 
 class ServerClientFilesCursor_6_to_10 : public RegularClientFilesCursor {
 public:
-    ServerClientFilesCursor_6_to_10(Allocator& alloc, ref_type root_ref, int schema_version) :
-        m_root{alloc}
+    ServerClientFilesCursor_6_to_10(Allocator& alloc, ref_type root_ref, int schema_version)
+        : m_root{alloc}
     {
         REALM_ASSERT(schema_version >= 6 && schema_version <= 10);
 
@@ -1310,9 +1283,9 @@ public:
             return;
 
         // Size of fixed-size arrays
-        std::size_t root_size         = 11;
-        std::size_t client_files_size =  8;
-        std::size_t sync_history_size =  6;
+        std::size_t root_size = 11;
+        std::size_t client_files_size = 8;
+        std::size_t sync_history_size = 6;
         if (schema_version < 8) {
             root_size = 10;
             client_files_size = 6;
@@ -1322,23 +1295,23 @@ public:
         }
 
         // Slots in root array of history compartment
-        std::size_t client_files_iip         = 0;
+        std::size_t client_files_iip = 0;
         std::size_t history_base_version_iip = 1;
-        std::size_t sync_history_iip         = 3;
-        std::size_t upstream_status_iip      = 6;
-        std::size_t partial_sync_iip         = 7;
+        std::size_t sync_history_iip = 3;
+        std::size_t upstream_status_iip = 6;
+        std::size_t partial_sync_iip = 7;
 
         // Slots in root array of `client_files` table
-        std::size_t cf_ident_salts_iip            = 0;
-        std::size_t cf_client_versions_iip        = 1;
-        std::size_t cf_rh_base_versions_iip       = 2;
-        std::size_t cf_proxy_files_iip            = 4;
-        std::size_t cf_client_types_iip           = 5;
-        std::size_t cf_last_seen_timestamps_iip   = 6;
+        std::size_t cf_ident_salts_iip = 0;
+        std::size_t cf_client_versions_iip = 1;
+        std::size_t cf_rh_base_versions_iip = 2;
+        std::size_t cf_proxy_files_iip = 4;
+        std::size_t cf_client_types_iip = 5;
+        std::size_t cf_last_seen_timestamps_iip = 6;
         std::size_t cf_locked_server_versions_iip = 7;
         if (schema_version < 10) {
-            cf_client_types_iip           = std::size_t(-1);
-            cf_last_seen_timestamps_iip   = 5;
+            cf_client_types_iip = std::size_t(-1);
+            cf_last_seen_timestamps_iip = 5;
             cf_locked_server_versions_iip = 6;
         }
 
@@ -1394,14 +1367,12 @@ public:
             m_locked_server_versions->init_from_ref(ref); // Throws
         }
         m_size = m_ident_salts->size();
-        REALM_ASSERT(m_client_versions->size()        == m_size);
-        REALM_ASSERT(m_rh_base_versions->size()       == m_size);
-        REALM_ASSERT(m_proxy_files->size()            == m_size);
-        REALM_ASSERT(!m_client_types ||
-                     m_client_types->size()           == m_size);
-        REALM_ASSERT(m_last_seen_timestamps->size()   == m_size);
-        REALM_ASSERT(!m_locked_server_versions ||
-                     m_locked_server_versions->size() == m_size);
+        REALM_ASSERT(m_client_versions->size() == m_size);
+        REALM_ASSERT(m_rh_base_versions->size() == m_size);
+        REALM_ASSERT(m_proxy_files->size() == m_size);
+        REALM_ASSERT(!m_client_types || m_client_types->size() == m_size);
+        REALM_ASSERT(m_last_seen_timestamps->size() == m_size);
+        REALM_ASSERT(!m_locked_server_versions || m_locked_server_versions->size() == m_size);
 
         {
             Array sync_history{alloc};
@@ -1443,8 +1414,7 @@ public:
             return LogicalClientType::special;
         if (REALM_UNLIKELY(index == 1)) {
             file_ident_type client_file_ident = file_ident_type(index);
-            return (client_file_ident == m_self ? LogicalClientType::self :
-                    LogicalClientType::upstream);
+            return (client_file_ident == m_self ? LogicalClientType::self : LogicalClientType::upstream);
         }
         switch (get_client_type(index)) {
             case ClientType::upstream:
@@ -1487,28 +1457,39 @@ public:
         return std::min(version_type(value_1), version_type(value_2));
     }
 
-    void print_annotated_info(std::ostream& out,
-                              TimestampFormatter& timestamp_formatter) const override final
+    void print_annotated_info(std::ostream& out, TimestampFormatter& timestamp_formatter) const override final
     {
-        std::size_t client_file_index = get_client_file_index(); // Throws
-        SaltedFileIdent client_file_ident = get_client_file_ident(); // Throws
-        UploadCursor upload_progress = get_upload_progress(); // Throws
+        std::size_t client_file_index = get_client_file_index();          // Throws
+        SaltedFileIdent client_file_ident = get_client_file_ident();      // Throws
+        UploadCursor upload_progress = get_upload_progress();             // Throws
         version_type locked_server_version = get_locked_server_version(); // Throws
-        file_ident_type proxy_file = get_proxy_file(); // Throws
+        file_ident_type proxy_file = get_proxy_file();                    // Throws
         ClientType client_type = get_client_type(client_file_index);
-        std::time_t last_seen_timestamp = get_last_seen_timestamp(); // Throws
-        std::string client_description =
-            describe_client(client_file_ident.ident, client_type, proxy_file); // Throws
-        out <<
-            "Client file identifier: " << client_file_ident.ident << "\n"
-            "File identifier salt: " << client_file_ident.salt << "\n"
-            "Last integrated client version: " << upload_progress.client_version << "\n"
-            "Reciprocal history base version: "
-            "" << upload_progress.last_integrated_server_version << "\n"
-            "Locked server version: " << locked_server_version << "\n"
-            "Identifier of proxy file: " << proxy_file << "\n"
-            "Client type: " << int(client_type) << " (" << client_description << ")\n"
-            "Last seen timestamp: " << last_seen_timestamp; // Throws
+        std::time_t last_seen_timestamp = get_last_seen_timestamp();                                        // Throws
+        std::string client_description = describe_client(client_file_ident.ident, client_type, proxy_file); // Throws
+        out << "Client file identifier: " << client_file_ident.ident
+            << "\n"
+               "File identifier salt: "
+            << client_file_ident.salt
+            << "\n"
+               "Last integrated client version: "
+            << upload_progress.client_version
+            << "\n"
+               "Reciprocal history base version: "
+               ""
+            << upload_progress.last_integrated_server_version
+            << "\n"
+               "Locked server version: "
+            << locked_server_version
+            << "\n"
+               "Identifier of proxy file: "
+            << proxy_file
+            << "\n"
+               "Client type: "
+            << int(client_type) << " (" << client_description
+            << ")\n"
+               "Last seen timestamp: "
+            << last_seen_timestamp; // Throws
         if (_impl::ServerHistory::is_direct_client(client_type)) {
             out << " ";
             bool is_expired = (last_seen_timestamp == 0);
@@ -1591,7 +1572,7 @@ private:
         if (client_file_ident == 1) {
             REALM_ASSERT(client_type == ClientType(0));
             if (client_file_ident == m_self)
-                return "self"; // Throws
+                return "self";                             // Throws
             return "root of star topology server cluster"; // Throws
         }
         switch (client_type) {
@@ -1619,10 +1600,10 @@ private:
 
 class ServerCursorFactory_6_to_10 : public RegularCursorFactory {
 public:
-    ServerCursorFactory_6_to_10(Allocator& alloc, ref_type root_ref, int schema_version) :
-        m_alloc{alloc},
-        m_root_ref{root_ref},
-        m_schema_version{schema_version}
+    ServerCursorFactory_6_to_10(Allocator& alloc, ref_type root_ref, int schema_version)
+        : m_alloc{alloc}
+        , m_root_ref{root_ref}
+        , m_schema_version{schema_version}
     {
     }
 
@@ -1646,9 +1627,8 @@ private:
 };
 
 
-void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> origin_file,
-                     Expr* expression, Format format, Summary summary, bool with_versions,
-                     std::ostream& out)
+void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> origin_file, Expr* expression,
+                     Format format, Summary summary, bool with_versions, std::ostream& out)
 {
 
     TimestampFormatter::Config timestamp_config;
@@ -1727,13 +1707,13 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
                 if (with_versions)
                     out << version << " "; // Throws
                 buffer.clear();
-                cursor.get_changeset(buffer); // Throws
+                cursor.get_changeset(buffer);                                // Throws
                 out << util::hex_dump(buffer.data(), buffer.size()) << "\n"; // Throws
                 break;
             }
             case Format::raw: {
                 buffer.clear();
-                cursor.get_changeset(buffer); // Throws
+                cursor.get_changeset(buffer);            // Throws
                 out.write(buffer.data(), buffer.size()); // Throws
                 break;
             }
@@ -1764,8 +1744,10 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
         case Summary::brief:
             out << format_num_history_entries(num_history_entries);
             if (num_history_entries > 0) {
-                out << " (version " << (min_version - 1) << " -> "
-                    "" << max_version << ")"; // Throws
+                out << " (version " << (min_version - 1)
+                    << " -> "
+                       ""
+                    << max_version << ")"; // Throws
             }
             out << "\n"; // Throws
             break;
@@ -1776,12 +1758,19 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
                 long min_nanoseconds = 0, max_nanoseconds = 0;
                 sync::map_changeset_timestamp(min_timestamp, min_time, min_nanoseconds);
                 sync::map_changeset_timestamp(max_timestamp, max_time, max_nanoseconds);
-                out << "Version range: " << (min_version - 1) << " -> "
-                    "" << max_version << "\n"
-                    "Time range: "
-                    "" << timestamp_formatter.format(min_time, min_nanoseconds) << " -> "
-                    "" << timestamp_formatter.format(max_time, max_nanoseconds) << " "
-                    "(unreliable)\n"; // Throws
+                out << "Version range: " << (min_version - 1)
+                    << " -> "
+                       ""
+                    << max_version
+                    << "\n"
+                       "Time range: "
+                       ""
+                    << timestamp_formatter.format(min_time, min_nanoseconds)
+                    << " -> "
+                       ""
+                    << timestamp_formatter.format(max_time, max_nanoseconds)
+                    << " "
+                       "(unreliable)\n"; // Throws
             }
             break;
     }
@@ -1789,10 +1778,9 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
 
 
 void inspect_client_files(ClientFilesCursor& cursor, std::ostream& out,
-                          const std::set<LogicalClientType>& client_file_types,
-                          bool unexpired_client_files, bool expired_client_files,
-                          std::time_t min_last_seen_timestamp, std::time_t max_last_seen_timestamp,
-                          version_type max_locked_version)
+                          const std::set<LogicalClientType>& client_file_types, bool unexpired_client_files,
+                          bool expired_client_files, std::time_t min_last_seen_timestamp,
+                          std::time_t max_last_seen_timestamp, version_type max_locked_version)
 {
     TimestampFormatter timestamp_formatter;
     std::size_t num_client_files = 0;
@@ -1841,8 +1829,11 @@ void inspect_client_files(ClientFilesCursor& cursor, std::ostream& out,
     bool have_timestamp_range = (max_timestamp > 0);
     if (have_timestamp_range) {
         out << "Range of last seen timestamps: "
-            "" << min_timestamp << " (" << timestamp_formatter.format(min_timestamp, 0) << ") -> "
-            "" << max_timestamp << " (" << timestamp_formatter.format(max_timestamp, 0) << ")\n"; // Throws
+               ""
+            << min_timestamp << " (" << timestamp_formatter.format(min_timestamp, 0)
+            << ") -> "
+               ""
+            << max_timestamp << " (" << timestamp_formatter.format(max_timestamp, 0) << ")\n"; // Throws
     }
 }
 
@@ -1865,17 +1856,14 @@ int main(int argc, char* argv[])
     std::string property;
     std::unique_ptr<Expr> expression;
     file_ident_type client_file = 0;
-    std::set<LogicalClientType> client_file_types = {
-        LogicalClientType::regular,
-        LogicalClientType::subserver,
-        LogicalClientType::partial,
-        LogicalClientType::legacy
-    };
+    std::set<LogicalClientType> client_file_types = {LogicalClientType::regular, LogicalClientType::subserver,
+                                                     LogicalClientType::partial, LogicalClientType::legacy};
     bool unexpired_client_files = true;
     bool expired_client_files = false;
     std::time_t min_last_seen_timestamp = std::numeric_limits<std::time_t>::min();
     std::time_t max_last_seen_timestamp = std::numeric_limits<std::time_t>::max();
-    version_type max_locked_version = std::numeric_limits<version_type>::max();;
+    version_type max_locked_version = std::numeric_limits<version_type>::max();
+    ;
     std::string encryption_key;
 
     // Process command-line
@@ -1883,8 +1871,8 @@ int main(int argc, char* argv[])
         const char* prog = argv[0];
         --argc;
         ++argv;
-        bool error   = false;
-        bool help    = false;
+        bool error = false;
+        bool help = false;
         bool version = false;
         int argc_2 = 0;
         int i = 0;
@@ -1914,7 +1902,9 @@ int main(int argc, char* argv[])
             return false;
         };
         auto get_parsed_value = [&](auto& var) {
-            return get_parsed_value_with_check(var, [](auto) { return true; });
+            return get_parsed_value_with_check(var, [](auto) {
+                return true;
+            });
         };
         auto add_expr = [&](std::unique_ptr<Expr> e) {
             if (expression)
@@ -1932,7 +1922,7 @@ int main(int argc, char* argv[])
                     client_files = true;
                 }
                 else {
-                    std::cerr << "ERROR: Unexpected command-line argument: "<<arg<<"\n";
+                    std::cerr << "ERROR: Unexpected command-line argument: " << arg << "\n";
                     error = true;
                 }
                 continue;
@@ -2068,7 +2058,7 @@ int main(int argc, char* argv[])
                 version = true;
                 continue;
             }
-            std::cerr << "ERROR: Bad or missing value for command-line option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for command-line option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -2108,167 +2098,175 @@ int main(int argc, char* argv[])
             error = true;
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<" <realm file>\n"
-                "          "<<prog<<" <realm file> <version>\n"
-                "          "<<prog<<" <realm file> <begin version> <end version>\n"
-                "          "<<prog<<" <realm file> (-c | --client-files)\n"
-                "          "<<prog<<" <realm file> (-c | --client-files) <file ident>\n"
-                "\n"
-                "The first three forms are for inspecting a specific range of the\n"
-                "synchronization history of the specified Realm file. In the first form, the\n"
-                "range is the entire history. In the second form, the range is the one history\n"
-                "entry whose changeset produced the specifed synchronization version. In the\n"
-                "third form, the range is as specified.\n"
-                "\n"
-                "The last two forms are for inspecting the client files registry of a server-\n"
-                "side file. In the first of these two forms, information about all registered\n"
-                "client files is shown (subject to `--all-client-files`). In the last form,\n"
-                "information is shown only for the client file identified by the specified\n"
-                "client file identifier.\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  -f, --format <what>  What to output for each selected history entry. The\n"
-                "                       value can be `auto` (default), `nothing`, `version`,\n"
-                "                       `info`, `annotate`, `changeset`, `hexdump`, or `raw`.\n"
-                "                       When the value is `auto`, the effective value is\n"
-                "                       `nothing` in the 1st and 3rd command-line forms, and\n"
-                "                       `annotate` in the 2nd command-line form. `annotate`\n"
-                "                       shows information that is stored in each history entry,\n"
-                "                       but not the changeset itself. `info` shows the same\n"
-                "                       information, and in the same order as `annotate`, but\n"
-                "                       using only a single line per history entry, and without\n"
-                "                       annotations. `version` shows only the synchronization\n"
-                "                       version produced by the changeset of each of the\n"
-                "                       selected history entries. `hexdump` shows a hex dump of\n"
-                "                       the changeset (one line per history entry). `changeset`\n"
-                "                       shows the changeset in a human-readable form (only\n"
-                "                       available when tool is built in debug mode).\n"
-                "  -s, --summary <what>  What to output as a final summary. The value can be\n"
-                "                       `auto` (default), `off`, `brief`, or `full`. When the\n"
-                "                       value is `auto`, the effective value is `brief` if\n"
-                "                       `--format` is effectively `nothing`, `annotate`, or\n"
-                "                       `changeset`. Otherwise it is `off`.\n"
-                "  -V, --with-versions  When `--format` is `changeset` or `hexdump`, also show\n"
-                "                       which version is produced by each of the selected\n"
-                "                       changesets.\n"
-                "  -r, --reciprocal <file ident>\n"
-                "                       Instead of inspecting the main history, inspect instead\n"
-                "                       the reciprocal history for the reciprocal file\n"
-                "                       identified by <file ident>. With client-side files, this\n"
-                "                       must be zero, and the implied reciprocal file is the\n"
-                "                       server-side file.\n"
-                "  -a, --origin-file <file ident>\n"
-                "                       Only include history entries whose changeset originated\n"
-                "                       from the file identified by <file ident>.\n"
-                "  -I, --instruction-type <type>\n"
-                "                       Only include history entries whose changeset contains an\n"
-                "                       instruction of the specified type. See header file\n"
-                "                       `<realm/sync/instructions.hpp>` for the list of\n"
-                "                       instruction types. This acts as an additional\n"
-                "                       instruction condition. See `--modifies-object` for more\n"
-                "                       on instruction conditions.\n"
-                "  -C, --class <name>   The class name that applies when specifying various\n"
-                "                       instruction conditions, such as `--modifies-object`.\n"
-                "  -O, --object <object ident>\n"
-                "                       The object identifier that applies when specifying\n"
-                "                       various instruction conditions, such as\n"
-                "                       `--modifies-object`. An object identifier is a pair of\n"
-                "                       integers in hexadecimal form separated by a hyphen (`-`)\n"
-                "                       and enclosed in curly braces. It could be `{5-17A}`, for\n"
-                "                       example.\n"
-                "  -P, --property <name>  The property name that applies when specifying various\n"
-                "                       instruction conditions, such as `--modifies-property`.\n"
-                "  -m, --modifies-object  Only include history entries that contain an\n"
-                "                       instruction that modifies the object specified by\n"
-                "                       `--class` and `--object`. This acts as an additional\n"
-                "                       instruction condition. When at least one instruction\n"
-                "                       condition is specified (`--instruction-type`,\n"
-                "                       `--modifies-object`, `--modifies-property`, or\n"
-                "                       `--links-to-object`), a changeset is included only if an\n"
-                "                       instruction can be found in that changeset, that\n"
-                "                       satisfies all the specified instruction conditions.\n"
-                "  -p, --modifies-property\n"
-                "                       Only include history entries that contain an instruction\n"
-                "                       that modifies the property specified by `--class`,\n"
-                "                       `--object`, and `--property`. This acts as an additional\n"
-                "                       instruction condition. See `--modifies-object` for more\n"
-                "                       on instruction conditions.\n"
-                "  -l, --links-to-object  Only include history entries that contain an\n"
-                "                       instruction that establishes a link to the object\n"
-                "                       specified by `--class` and `--object`. This acts as an\n"
-                "                       additional instruction condition. See\n"
-                "                       `--modifies-object` for more on instruction conditions.\n"
-                "  -A, --all-client-files  Include all types of client file entries. Equivalent\n"
-                "                       to passing `rspliuSU` to `--client-file-types` and also\n"
-                "                       specifying `--also-expired-client-files`.\n"
-                "  -T, --client-file-types <types>\n"
-                "                       Specify which types of client file entries to include\n"
-                "                       when using the `--client-files` form of this command.\n"
-                "                       The argument is a string in which each letter specifies\n"
-                "                       that a particular type of client file entries must be\n"
-                "                       included. The valid letters are as follows: `r` for\n"
-                "                       regular direct clients, `s` for files on direct\n"
-                "                       subservers, `p` for direct partial views, `l` for legacy\n"
-                "                       entries, `i` for indirect clients (clients of subservers\n"
-                "                       or of partial views), `u` for entries reachable via the\n"
-                "                       upstream server or via the reference file, `S` for the\n"
-                "                       entry representing the file itself, and `U` for the\n"
-                "                       special entry used to represent the upstream server,\n"
-                "                       when one exists. The default value is `rspl`. This\n"
-                "                       option has no effect when a specific client file is\n"
-                "                       specified after `--client-files`, i.e., in the 5th form\n"
-                "                       shown above. See also `--also-expired-client-files`.\n"
-                "  -E, --also-expired-client-files\n"
-                "                       Include both expired and unexpired client file entries\n"
-                "                       when using the `--client-files` form of this command. By\n"
-                "                       default, only unexpired entries are included. The\n"
-                "                       expired / unexpired distinction only applies to types of\n"
-                "                       entries associated with direct clients (i.e., `r`, `s`,\n"
-                "                       `p`, and `l`). See also `--only-expired-client-files`,\n"
-                "                       `--only-unexpired-client-files`, and\n"
-                "                       `--client-file-types`.\n"
-                "  -F, --only-expired-client-files\n"
-                "                       Include only expired client file entries when using the\n"
-                "                       `--client-files` form of this command. See also\n"
-                "                       `--also-expired-client-files`.\n"
-                "  -U, --only-unexpired-client-files\n"
-                "                       Include only unexpired client file entries when using\n"
-                "                       the `--client-files` form of this command. See also\n"
-                "                       `--also-expired-client-files`.\n"
-                "  -M, --min-last-seen-timestamp <timestamp>\n"
-                "                       Only include entries for direct clients whose\n"
-                "                       'last seen' timestamp is at least <timestamp> (seconds\n"
-                "                       since beginning of UNIX epoch). This applies only to\n"
-                "                       unexpired entries associated with direct clients (i.e.,\n"
-                "                       `r`, `s`, `p`, and `l`). See also `--client-file-types`.\n"
-                "  -N, --max-last-seen-timestamp <timestamp>\n"
-                "                       Only include entries for direct clients wose 'last seen'\n"
-                "                       timestamp is at most <timestamp>. See also\n"
-                "                       `--min-last-seen-timestamp`.\n"
-                "  -L, --max-locked-version <version>\n"
-                "                       Only include entries for direct clients where either\n"
-                "                       `rh_base_version` or `locked_server_version` is less\n"
-                "                       than, or equal to `<version>`. Here, `rh_base_version`\n"
-                "                       is the base version of the base version of the\n"
-                "                       reciprocal history, and `locked_server_version` is as\n"
-                "                       explained in the specification of the UPLOAD message.\n"
-                "                       This applies only to unexpired entries associated with\n"
-                "                       direct clients (i.e., `r`, `s`, `p`, and `l`). To select\n"
-                "                       client file entries which are blocking in-place history\n"
-                "                       compaction beyond <version> (until <version> + 1) given\n"
-                "                       a particular <time to live>, use\n"
-                "                       `--min-last-seen-timestamp <timestamp>\n"
-                "                       --max-locked-version <version>`, where `<timestamp>` is\n"
-                "                       now minus `<time to live>`.\n"
-                "  -e, --encryption-key <path>\n"
-                "                       Access the Realm file using an encryption key. The\n"
-                "                       64-byte encryption key is assumed to be stored in the\n"
-                "                       file system at the specified path.\n"
-                "  -v, --version        Show the version of the Realm Sync release that this\n"
-                "                       command belongs to.\n";
+            std::cerr << "Synopsis: " << prog
+                      << " <realm file>\n"
+                         "          "
+                      << prog
+                      << " <realm file> <version>\n"
+                         "          "
+                      << prog
+                      << " <realm file> <begin version> <end version>\n"
+                         "          "
+                      << prog
+                      << " <realm file> (-c | --client-files)\n"
+                         "          "
+                      << prog
+                      << " <realm file> (-c | --client-files) <file ident>\n"
+                         "\n"
+                         "The first three forms are for inspecting a specific range of the\n"
+                         "synchronization history of the specified Realm file. In the first form, the\n"
+                         "range is the entire history. In the second form, the range is the one history\n"
+                         "entry whose changeset produced the specifed synchronization version. In the\n"
+                         "third form, the range is as specified.\n"
+                         "\n"
+                         "The last two forms are for inspecting the client files registry of a server-\n"
+                         "side file. In the first of these two forms, information about all registered\n"
+                         "client files is shown (subject to `--all-client-files`). In the last form,\n"
+                         "information is shown only for the client file identified by the specified\n"
+                         "client file identifier.\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  -f, --format <what>  What to output for each selected history entry. The\n"
+                         "                       value can be `auto` (default), `nothing`, `version`,\n"
+                         "                       `info`, `annotate`, `changeset`, `hexdump`, or `raw`.\n"
+                         "                       When the value is `auto`, the effective value is\n"
+                         "                       `nothing` in the 1st and 3rd command-line forms, and\n"
+                         "                       `annotate` in the 2nd command-line form. `annotate`\n"
+                         "                       shows information that is stored in each history entry,\n"
+                         "                       but not the changeset itself. `info` shows the same\n"
+                         "                       information, and in the same order as `annotate`, but\n"
+                         "                       using only a single line per history entry, and without\n"
+                         "                       annotations. `version` shows only the synchronization\n"
+                         "                       version produced by the changeset of each of the\n"
+                         "                       selected history entries. `hexdump` shows a hex dump of\n"
+                         "                       the changeset (one line per history entry). `changeset`\n"
+                         "                       shows the changeset in a human-readable form (only\n"
+                         "                       available when tool is built in debug mode).\n"
+                         "  -s, --summary <what>  What to output as a final summary. The value can be\n"
+                         "                       `auto` (default), `off`, `brief`, or `full`. When the\n"
+                         "                       value is `auto`, the effective value is `brief` if\n"
+                         "                       `--format` is effectively `nothing`, `annotate`, or\n"
+                         "                       `changeset`. Otherwise it is `off`.\n"
+                         "  -V, --with-versions  When `--format` is `changeset` or `hexdump`, also show\n"
+                         "                       which version is produced by each of the selected\n"
+                         "                       changesets.\n"
+                         "  -r, --reciprocal <file ident>\n"
+                         "                       Instead of inspecting the main history, inspect instead\n"
+                         "                       the reciprocal history for the reciprocal file\n"
+                         "                       identified by <file ident>. With client-side files, this\n"
+                         "                       must be zero, and the implied reciprocal file is the\n"
+                         "                       server-side file.\n"
+                         "  -a, --origin-file <file ident>\n"
+                         "                       Only include history entries whose changeset originated\n"
+                         "                       from the file identified by <file ident>.\n"
+                         "  -I, --instruction-type <type>\n"
+                         "                       Only include history entries whose changeset contains an\n"
+                         "                       instruction of the specified type. See header file\n"
+                         "                       `<realm/sync/instructions.hpp>` for the list of\n"
+                         "                       instruction types. This acts as an additional\n"
+                         "                       instruction condition. See `--modifies-object` for more\n"
+                         "                       on instruction conditions.\n"
+                         "  -C, --class <name>   The class name that applies when specifying various\n"
+                         "                       instruction conditions, such as `--modifies-object`.\n"
+                         "  -O, --object <object ident>\n"
+                         "                       The object identifier that applies when specifying\n"
+                         "                       various instruction conditions, such as\n"
+                         "                       `--modifies-object`. An object identifier is a pair of\n"
+                         "                       integers in hexadecimal form separated by a hyphen (`-`)\n"
+                         "                       and enclosed in curly braces. It could be `{5-17A}`, for\n"
+                         "                       example.\n"
+                         "  -P, --property <name>  The property name that applies when specifying various\n"
+                         "                       instruction conditions, such as `--modifies-property`.\n"
+                         "  -m, --modifies-object  Only include history entries that contain an\n"
+                         "                       instruction that modifies the object specified by\n"
+                         "                       `--class` and `--object`. This acts as an additional\n"
+                         "                       instruction condition. When at least one instruction\n"
+                         "                       condition is specified (`--instruction-type`,\n"
+                         "                       `--modifies-object`, `--modifies-property`, or\n"
+                         "                       `--links-to-object`), a changeset is included only if an\n"
+                         "                       instruction can be found in that changeset, that\n"
+                         "                       satisfies all the specified instruction conditions.\n"
+                         "  -p, --modifies-property\n"
+                         "                       Only include history entries that contain an instruction\n"
+                         "                       that modifies the property specified by `--class`,\n"
+                         "                       `--object`, and `--property`. This acts as an additional\n"
+                         "                       instruction condition. See `--modifies-object` for more\n"
+                         "                       on instruction conditions.\n"
+                         "  -l, --links-to-object  Only include history entries that contain an\n"
+                         "                       instruction that establishes a link to the object\n"
+                         "                       specified by `--class` and `--object`. This acts as an\n"
+                         "                       additional instruction condition. See\n"
+                         "                       `--modifies-object` for more on instruction conditions.\n"
+                         "  -A, --all-client-files  Include all types of client file entries. Equivalent\n"
+                         "                       to passing `rspliuSU` to `--client-file-types` and also\n"
+                         "                       specifying `--also-expired-client-files`.\n"
+                         "  -T, --client-file-types <types>\n"
+                         "                       Specify which types of client file entries to include\n"
+                         "                       when using the `--client-files` form of this command.\n"
+                         "                       The argument is a string in which each letter specifies\n"
+                         "                       that a particular type of client file entries must be\n"
+                         "                       included. The valid letters are as follows: `r` for\n"
+                         "                       regular direct clients, `s` for files on direct\n"
+                         "                       subservers, `p` for direct partial views, `l` for legacy\n"
+                         "                       entries, `i` for indirect clients (clients of subservers\n"
+                         "                       or of partial views), `u` for entries reachable via the\n"
+                         "                       upstream server or via the reference file, `S` for the\n"
+                         "                       entry representing the file itself, and `U` for the\n"
+                         "                       special entry used to represent the upstream server,\n"
+                         "                       when one exists. The default value is `rspl`. This\n"
+                         "                       option has no effect when a specific client file is\n"
+                         "                       specified after `--client-files`, i.e., in the 5th form\n"
+                         "                       shown above. See also `--also-expired-client-files`.\n"
+                         "  -E, --also-expired-client-files\n"
+                         "                       Include both expired and unexpired client file entries\n"
+                         "                       when using the `--client-files` form of this command. By\n"
+                         "                       default, only unexpired entries are included. The\n"
+                         "                       expired / unexpired distinction only applies to types of\n"
+                         "                       entries associated with direct clients (i.e., `r`, `s`,\n"
+                         "                       `p`, and `l`). See also `--only-expired-client-files`,\n"
+                         "                       `--only-unexpired-client-files`, and\n"
+                         "                       `--client-file-types`.\n"
+                         "  -F, --only-expired-client-files\n"
+                         "                       Include only expired client file entries when using the\n"
+                         "                       `--client-files` form of this command. See also\n"
+                         "                       `--also-expired-client-files`.\n"
+                         "  -U, --only-unexpired-client-files\n"
+                         "                       Include only unexpired client file entries when using\n"
+                         "                       the `--client-files` form of this command. See also\n"
+                         "                       `--also-expired-client-files`.\n"
+                         "  -M, --min-last-seen-timestamp <timestamp>\n"
+                         "                       Only include entries for direct clients whose\n"
+                         "                       'last seen' timestamp is at least <timestamp> (seconds\n"
+                         "                       since beginning of UNIX epoch). This applies only to\n"
+                         "                       unexpired entries associated with direct clients (i.e.,\n"
+                         "                       `r`, `s`, `p`, and `l`). See also `--client-file-types`.\n"
+                         "  -N, --max-last-seen-timestamp <timestamp>\n"
+                         "                       Only include entries for direct clients wose 'last seen'\n"
+                         "                       timestamp is at most <timestamp>. See also\n"
+                         "                       `--min-last-seen-timestamp`.\n"
+                         "  -L, --max-locked-version <version>\n"
+                         "                       Only include entries for direct clients where either\n"
+                         "                       `rh_base_version` or `locked_server_version` is less\n"
+                         "                       than, or equal to `<version>`. Here, `rh_base_version`\n"
+                         "                       is the base version of the base version of the\n"
+                         "                       reciprocal history, and `locked_server_version` is as\n"
+                         "                       explained in the specification of the UPLOAD message.\n"
+                         "                       This applies only to unexpired entries associated with\n"
+                         "                       direct clients (i.e., `r`, `s`, `p`, and `l`). To select\n"
+                         "                       client file entries which are blocking in-place history\n"
+                         "                       compaction beyond <version> (until <version> + 1) given\n"
+                         "                       a particular <time to live>, use\n"
+                         "                       `--min-last-seen-timestamp <timestamp>\n"
+                         "                       --max-locked-version <version>`, where `<timestamp>` is\n"
+                         "                       now minus `<time to live>`.\n"
+                         "  -e, --encryption-key <path>\n"
+                         "                       Access the Realm file using an encryption key. The\n"
+                         "                       64-byte encryption key is assumed to be stored in the\n"
+                         "                       file system at the specified path.\n"
+                         "  -v, --version        Show the version of the Realm Sync release that this\n"
+                         "                       command belongs to.\n";
             return EXIT_SUCCESS;
         }
 
@@ -2285,13 +2283,13 @@ int main(int argc, char* argv[])
 
         if (error) {
             std::cerr << "ERROR: Bad command line\n"
-                "Try `"<<prog<<" --help`\n";
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }
 
-    std::unique_ptr<CursorFactory> factory =
-        std::make_unique<NullCursorFactory>(); // Throws
+    std::unique_ptr<CursorFactory> factory = std::make_unique<NullCursorFactory>(); // Throws
 
     Group::OpenMode open_mode = Group::mode_ReadOnly;
     std::string encryption_key_2;
@@ -2305,7 +2303,8 @@ int main(int argc, char* argv[])
     int file_format_version = gf::get_file_format_version(group);
     if (file_format_version != 9) {
         std::cerr << "ERROR: Unexpected file format version "
-            "" << file_format_version << "\n"; // Throws
+                     ""
+                  << file_format_version << "\n"; // Throws
         return EXIT_FAILURE;
     }
     Allocator& alloc = gf::get_alloc(group);
@@ -2321,37 +2320,39 @@ int main(int argc, char* argv[])
         version_type version;
         int history_type;
         int history_schema_version;
-        gf::get_version_and_history_info(alloc, top_ref, version, history_type,
-                                         history_schema_version);
+        gf::get_version_and_history_info(alloc, top_ref, version, history_type, history_schema_version);
         if (history_type == Replication::hist_SyncClient) {
             if (history_schema_version >= 1 && history_schema_version <= 2) {
-                factory = std::make_unique<ClientCursorFactory_1_to_2>(alloc, history_ref,
-                                                                       history_schema_version,
+                factory = std::make_unique<ClientCursorFactory_1_to_2>(alloc, history_ref, history_schema_version,
                                                                        version); // Throws
             }
             else {
                 std::cerr << "ERROR: Unsupported schema version "
-                    "(" << history_schema_version << ") in client-side history "
-                    "compartment\n"; // Throws
+                             "("
+                          << history_schema_version
+                          << ") in client-side history "
+                             "compartment\n"; // Throws
                 return EXIT_FAILURE;
             }
         }
         else if (history_type == Replication::hist_SyncServer) {
             if (history_schema_version >= 6 && history_schema_version <= 10) {
-                factory =
-                    std::make_unique<ServerCursorFactory_6_to_10>(alloc, history_ref,
-                                                                  history_schema_version); // Throws
+                factory = std::make_unique<ServerCursorFactory_6_to_10>(alloc, history_ref,
+                                                                        history_schema_version); // Throws
             }
             else {
                 std::cerr << "ERROR: Unsupported schema version "
-                    "(" << history_schema_version << ") in server-side history "
-                    "compartment\n"; // Throws
+                             "("
+                          << history_schema_version
+                          << ") in server-side history "
+                             "compartment\n"; // Throws
                 return EXIT_FAILURE;
             }
         }
         else if (history_type != Replication::hist_None) {
-            std::cerr << "ERROR: Unsupported schema type (" << history_type << ") in history "
-                "compartment\n"; // Throws
+            std::cerr << "ERROR: Unsupported schema type (" << history_type
+                      << ") in history "
+                         "compartment\n"; // Throws
             return EXIT_FAILURE;
         }
     }
@@ -2393,7 +2394,7 @@ int main(int argc, char* argv[])
 #if !REALM_DEBUG
         if (format == Format::changeset) {
             std::cerr << "ERROR: Changesets can only be rendered in human-readable form when "
-                "this tool is built in debug mode\n"; // Throws
+                         "this tool is built in debug mode\n"; // Throws
             return EXIT_FAILURE;
         }
 #endif
@@ -2437,8 +2438,7 @@ int main(int argc, char* argv[])
         if (!cursor)
             return EXIT_FAILURE;
 
-        inspect_client_files(*cursor, std::cout, client_file_types, unexpired_client_files,
-                             expired_client_files, min_last_seen_timestamp,
-                             max_last_seen_timestamp, max_locked_version); // Throws
+        inspect_client_files(*cursor, std::cout, client_file_types, unexpired_client_files, expired_client_files,
+                             min_last_seen_timestamp, max_last_seen_timestamp, max_locked_version); // Throws
     }
 }

@@ -42,20 +42,17 @@ private:
 };
 
 
-
-
-
 // Implementation
 
-inline MockMetrics::MockMetrics(util::Logger* logger) :
-    sync::Metrics(),
-    m_logger{logger}
+inline MockMetrics::MockMetrics(util::Logger* logger)
+    : sync::Metrics()
+    , m_logger{logger}
 {
 }
 
-inline MockMetrics::MockMetrics(const sync::MetricsExclusion& exclusions, util::Logger* logger) :
-    sync::Metrics{exclusions},
-    m_logger{logger}
+inline MockMetrics::MockMetrics(const sync::MetricsExclusion& exclusions, util::Logger* logger)
+    : sync::Metrics{exclusions}
+    , m_logger{logger}
 {
 }
 

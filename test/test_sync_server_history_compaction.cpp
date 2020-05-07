@@ -20,8 +20,8 @@ namespace {
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContext(bool owner_is_sync_server = true) :
-        m_owner_is_sync_server{owner_is_sync_server}
+    ServerHistoryContext(bool owner_is_sync_server = true)
+        : m_owner_is_sync_server{owner_is_sync_server}
     {
     }
     bool owner_is_sync_server() const noexcept override
@@ -32,6 +32,7 @@ public:
     {
         return m_random;
     }
+
 private:
     const bool m_owner_is_sync_server;
     std::mt19937_64 m_random;
@@ -236,7 +237,7 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
     }
 
     BowlOfStonesSemaphore bowl;
-    fixture_config.server_disable_download_for = { client_1_file_ident };
+    fixture_config.server_disable_download_for = {client_1_file_ident};
     fixture_config.server_session_bootstrap_callback = [&](util::StringView virt_path,
                                                            file_ident_type client_file_ident) {
         if (virt_path == "/test" && client_file_ident == client_1_file_ident)
@@ -297,7 +298,6 @@ TEST(Sync_ServerHistoryCompaction_ExpiredAtUploadTime)
         sync::create_table(wt, "class_Bar");
         version_type version = wt.commit();
         session_1.nonsync_transact_notify(version);
-
     }
     // The client never figures out that upload has completed, because donwload
     // is disabled, the expiration error will cause the client to be stopped.
@@ -330,8 +330,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
     auto client_2_history = make_client_replication(client_2_path);
 
     bool client_reset_did_happen = false;
-    fixture.set_client_side_error_handler([&](std::error_code ec, bool fatal,
-                                              const std::string& message) {
+    fixture.set_client_side_error_handler([&](std::error_code ec, bool fatal, const std::string& message) {
         static_cast<void>(fatal);
         static_cast<void>(message);
         if (ec == ProtocolError::client_file_expired) {
@@ -527,10 +526,16 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
         {
             util::File server_realm{server_realm_path, util::File::mode_Read};
             size_t file_size = server_realm.get_size();
-            std::cout << "Server Realm Size: " << file_size << " "
-                "(compaction_enabled = " << enabled << ", "
-                "history_ttl = " << history_ttl.count() << ", "
-                "compaction_interval = " << compaction_interval.count() << ")\n";
+            std::cout << "Server Realm Size: " << file_size
+                      << " "
+                         "(compaction_enabled = "
+                      << enabled
+                      << ", "
+                         "history_ttl = "
+                      << history_ttl.count()
+                      << ", "
+                         "compaction_interval = "
+                      << compaction_interval.count() << ")\n";
         }
 
         {
@@ -549,8 +554,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
     };
 
     run_benchmark(false, 0s, 0s);
-    run_benchmark(true,  1s, 0s);
+    run_benchmark(true, 1s, 0s);
 }
 
 } // unnamed namespace
-

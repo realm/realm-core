@@ -72,7 +72,9 @@ void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
         service_1.run();
     }
     else {
-        std::thread thread{[&] { service_1.run(); }};
+        std::thread thread{[&] {
+            service_1.run();
+        }};
         service_2.run();
         thread.join();
     }
@@ -82,10 +84,8 @@ void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
 
 void configure_server_ssl_context_for_test(network::ssl::Context& ssl_context)
 {
-    ssl_context.use_certificate_chain_file(get_test_resource_path() +
-                                           "test_util_network_ssl_ca.pem");
-    ssl_context.use_private_key_file(get_test_resource_path() +
-                                     "test_util_network_ssl_key.pem");
+    ssl_context.use_certificate_chain_file(get_test_resource_path() + "test_util_network_ssl_ca.pem");
+    ssl_context.use_private_key_file(get_test_resource_path() + "test_util_network_ssl_key.pem");
 }
 
 void connect_ssl_streams(network::ssl::Stream& server_stream, network::ssl::Stream& client_stream)
@@ -110,7 +110,9 @@ void connect_ssl_streams(network::ssl::Stream& server_stream, network::ssl::Stre
         server_service.run();
     }
     else {
-        std::thread thread{[&] { server_service.run(); }};
+        std::thread thread{[&] {
+            server_service.run();
+        }};
         client_service.run();
         thread.join();
     }
@@ -121,14 +123,14 @@ void connect_ssl_streams(network::ssl::Stream& server_stream, network::ssl::Stre
 
 class PingPongDelayFixture {
 public:
-    PingPongDelayFixture(network::Service& service):
-        PingPongDelayFixture{service, service}
+    PingPongDelayFixture(network::Service& service)
+        : PingPongDelayFixture{service, service}
     {
     }
 
-    PingPongDelayFixture(network::Service& server_service, network::Service& client_service):
-        m_server_socket{server_service},
-        m_client_socket{client_service}
+    PingPongDelayFixture(network::Service& server_service, network::Service& client_service)
+        : m_server_socket{server_service}
+        , m_client_socket{client_service}
     {
         connect_sockets(m_server_socket, m_client_socket);
     }
@@ -324,7 +326,7 @@ TEST(Util_Network_SSL_ReadWriteShutdown)
         std::size_t n = ssl_stream_2.read(buffer, sizeof buffer, ec);
         if (CHECK_EQUAL(MiscExtErrors::end_of_input, ec)) {
             if (CHECK_EQUAL(std::strlen(message), n))
-                CHECK(std::equal(buffer, buffer+n, message));
+                CHECK(std::equal(buffer, buffer + n, message));
         }
     };
 
@@ -365,7 +367,7 @@ TEST(Util_Network_SSL_AsyncReadWriteShutdown)
     auto read_handler = [&](std::error_code ec, std::size_t n) {
         CHECK_EQUAL(MiscExtErrors::end_of_input, ec);
         if (CHECK_EQUAL(std::strlen(message), n))
-            CHECK(std::equal(buffer, buffer+n, message));
+            CHECK(std::equal(buffer, buffer + n, message));
         read_completed = true;
     };
 
@@ -400,8 +402,7 @@ TEST(Util_Network_SSL_PrematureEndOfInputOnHandshakeRead)
         std::error_code ec;
         do {
             socket_1.read_some(buffer.get(), size, ec);
-        }
-        while (!ec);
+        } while (!ec);
         REALM_ASSERT(ec == MiscExtErrors::end_of_input);
     };
 
@@ -446,8 +447,7 @@ TEST(Util_Network_SSL_BrokenPipeOnHandshakeWrite)
     std::error_code ec;
     do {
         socket_2.write_some(buffer.get(), size, ec);
-    }
-    while (!ec);
+    } while (!ec);
     REALM_ASSERT(ec == error::broken_pipe);
 
     CHECK_SYSTEM_ERROR(ssl_stream_2.handshake(), error::broken_pipe);
@@ -516,8 +516,7 @@ TEST(Util_Network_SSL_BrokenPipeOnWrite)
     std::error_code ec;
     do {
         socket_2.write_some(buffer.get(), size, ec);
-    }
-    while (!ec);
+    } while (!ec);
     REALM_ASSERT(ec == error::broken_pipe);
 
     char ch = 0;
@@ -547,8 +546,7 @@ TEST(Util_Network_SSL_BrokenPipeOnShutdown)
     std::error_code ec;
     do {
         socket_2.write_some(buffer.get(), size, ec);
-    }
-    while (!ec);
+    } while (!ec);
     REALM_ASSERT(ec == error::broken_pipe);
 
     CHECK_SYSTEM_ERROR(ssl_stream_2.shutdown(), error::broken_pipe);
@@ -655,7 +653,7 @@ TEST(Util_Network_SSL_BasicSendAndReceive)
     std::size_t n = ssl_stream_1.read(buffer, sizeof buffer, ec);
     CHECK_EQUAL(MiscExtErrors::end_of_input, ec);
     if (CHECK_EQUAL(std::strlen(message), n))
-        CHECK(std::equal(buffer, buffer+n, message));
+        CHECK(std::equal(buffer, buffer + n, message));
 }
 
 
@@ -700,13 +698,13 @@ TEST(Util_Network_SSL_StressTest)
 #else
     constexpr int num_cycles = 512;
 #endif
-    auto thread = [&](int id, network::ssl::Stream& ssl_stream, const char* read_original,
-                      const char* write_original, Stats& stats) {
+    auto thread = [&](int id, network::ssl::Stream& ssl_stream, const char* read_original, const char* write_original,
+                      Stats& stats) {
         std::unique_ptr<char[]> read_buffer{new char[original_size]};
         std::mt19937_64 prng{std::random_device()()};
         // Using range 1B -> 32KiB because that undershoots and overshoots in
         // equal amounts with respect to the SSL frame size of 16KiB.
-        std::uniform_int_distribution<size_t> read_write_size_dist(1, 32*1024);
+        std::uniform_int_distribution<size_t> read_write_size_dist(1, 32 * 1024);
         std::uniform_int_distribution<int> delayed_read_write_dist(0, 49);
         network::Service& service = ssl_stream.lowest_layer().get_service();
         network::DeadlineTimer cancellation_timer{service};
@@ -726,7 +724,7 @@ TEST(Util_Network_SSL_StressTest)
             };
             cancellation_timer.async_wait(std::chrono::microseconds(10), std::move(handler));
         };
-//        shedule_cancellation();
+        //        shedule_cancellation();
         char* read_begin = read_buffer.get();
         char* read_end = read_buffer.get() + original_size;
         int num_read_cycles = 0;
@@ -788,7 +786,7 @@ TEST(Util_Network_SSL_StressTest)
                     return;
                 }
                 write_begin = write_original;
-                write_end   = write_original + original_size;
+                write_end = write_original + original_size;
             }
             auto handler = [&](std::error_code ec, size_t n) {
                 REALM_ASSERT(!ec || ec == error::operation_aborted);
@@ -822,10 +820,12 @@ TEST(Util_Network_SSL_StressTest)
     };
 
     Stats stats_1, stats_2;
-    std::thread thread_1{[&] { thread(1, ssl_stream_1, original_1.get(), original_2.get(),
-                                      stats_1); }};
-    std::thread thread_2{[&] { thread(2, ssl_stream_2, original_2.get(), original_1.get(),
-                                      stats_2); }};
+    std::thread thread_1{[&] {
+        thread(1, ssl_stream_1, original_1.get(), original_2.get(), stats_1);
+    }};
+    std::thread thread_2{[&] {
+        thread(2, ssl_stream_2, original_2.get(), original_1.get(), stats_2);
+    }};
     thread_1.join();
     thread_2.join();
 
@@ -836,15 +836,11 @@ TEST(Util_Network_SSL_StressTest)
     CHECK_SYSTEM_ERROR(ssl_stream_1.read_some(&ch, 1), MiscExtErrors::end_of_input);
     CHECK_SYSTEM_ERROR(ssl_stream_2.read_some(&ch, 1), MiscExtErrors::end_of_input);
 
-    log("Cancellations: %1, %2",
-        stats_1.num_cancellations,
-        stats_2.num_cancellations);
-    log ("Reads:  %1 (%2 canceled), %3 (%4 canceled)",
-         stats_1.num_reads, stats_1.num_canceled_reads,
-         stats_2.num_reads, stats_2.num_canceled_reads);
-    log ("Writes: %1 (%2 canceled), %3 (%4 canceled)",
-         stats_1.num_writes, stats_1.num_canceled_writes,
-         stats_2.num_writes, stats_2.num_canceled_writes);
+    log("Cancellations: %1, %2", stats_1.num_cancellations, stats_2.num_cancellations);
+    log("Reads:  %1 (%2 canceled), %3 (%4 canceled)", stats_1.num_reads, stats_1.num_canceled_reads,
+        stats_2.num_reads, stats_2.num_canceled_reads);
+    log("Writes: %1 (%2 canceled), %3 (%4 canceled)", stats_1.num_writes, stats_1.num_canceled_writes,
+        stats_2.num_writes, stats_2.num_canceled_writes);
 }
 
 // The host name is contained in both the
@@ -1020,7 +1016,7 @@ TEST(Util_Network_SSL_Certificate_IP)
 #if REALM_HAVE_OPENSSL
         CHECK_NOT_EQUAL(std::error_code(), ec);
 #elif REALM_HAVE_SECURE_TRANSPORT
-         CHECK_EQUAL(std::error_code(), ec);
+        CHECK_EQUAL(std::error_code(), ec);
 #endif
     };
     auto acceptor = [&] {

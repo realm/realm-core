@@ -16,20 +16,22 @@ std::unique_ptr<T, D> as_unique_ptr(T* ptr, D&& deleter)
     return std::unique_ptr<T, D>{ptr, std::forward<D>(deleter)};
 }
 
-}
+} // namespace
 
-using key_type = std::unique_ptr<EVP_PKEY, void(*)(EVP_PKEY*)>;
+using key_type = std::unique_ptr<EVP_PKEY, void (*)(EVP_PKEY*)>;
 
 struct PKey::Impl {
     key_type key;
     bool both_parts; // true if both public and private key are loaded
 
-    Impl() : key(nullptr, nullptr)
+    Impl()
+        : key(nullptr, nullptr)
     {
     }
 };
 
-PKey::PKey(): m_impl(new Impl)
+PKey::PKey()
+    : m_impl(new Impl)
 {
     m_impl->key = nullptr;
 }
@@ -37,21 +39,19 @@ PKey::PKey(): m_impl(new Impl)
 PKey::PKey(PKey&&) = default;
 PKey& PKey::operator=(PKey&&) = default;
 
-PKey::~PKey()
-{
-}
+PKey::~PKey() {}
 
 static key_type load_public_from_bio(BIO* bio)
 {
     pem_password_cb* password_cb = nullptr; // OpenSSL will display a prompt if necessary
     void* password_cb_userdata = nullptr;
 
-    void(*rsa_free)(RSA*) = RSA_free; // silences a warning on VS2017
+    void (*rsa_free)(RSA*) = RSA_free; // silences a warning on VS2017
     auto rsa = as_unique_ptr(PEM_read_bio_RSA_PUBKEY(bio, nullptr, password_cb, password_cb_userdata), rsa_free);
     if (rsa == nullptr)
         throw CryptoError{"Not a valid RSA public key."};
 
-    void(*evp_pkey_free)(EVP_PKEY*) = EVP_PKEY_free; // silences a warning on VS2017
+    void (*evp_pkey_free)(EVP_PKEY*) = EVP_PKEY_free; // silences a warning on VS2017
     key_type key = as_unique_ptr(EVP_PKEY_new(), evp_pkey_free);
     if (EVP_PKEY_assign_RSA(key.get(), rsa.get()) == 0)
         throw CryptoError{"Error assigning RSA key."};
@@ -62,7 +62,7 @@ static key_type load_public_from_bio(BIO* bio)
 
 PKey PKey::load_public(const std::string& pemfile)
 {
-    int(*bio_free)(BIO*) = BIO_free; // silences warning on VS2017
+    int (*bio_free)(BIO*) = BIO_free; // silences warning on VS2017
     auto bio = as_unique_ptr(BIO_new_file(pemfile.c_str(), "r"), bio_free);
     if (bio == nullptr)
         throw CryptoError{std::string("Could not read PEM file: ") + pemfile};
@@ -77,10 +77,9 @@ PKey PKey::load_public(const std::string& pemfile)
 PKey PKey::load_public(BinaryData pem_buffer)
 {
     std::size_t size = pem_buffer.size();
-    int(*bio_free)(BIO*) = BIO_free; // silences a warning on VS2017
+    int (*bio_free)(BIO*) = BIO_free; // silences a warning on VS2017
     REALM_ASSERT_RELEASE(int(size) <= std::numeric_limits<int>::max());
-    auto bio = as_unique_ptr(BIO_new_mem_buf(const_cast<char*>(pem_buffer.data()), int(size)),
-                             bio_free);
+    auto bio = as_unique_ptr(BIO_new_mem_buf(const_cast<char*>(pem_buffer.data()), int(size)), bio_free);
 
     PKey result;
     result.m_impl->key = load_public_from_bio(bio.get());

@@ -18,15 +18,16 @@ std::string realm::_impl::get_lsof_output()
 
     std::string cmd = "lsof -P -p " + std::to_string(pid) + " 2>&1";
 
-    std::unique_ptr<FILE, void(*)(FILE*)> stream {popen(cmd.c_str(), "r"),
-        [](FILE* f) { pclose(f); }};
+    std::unique_ptr<FILE, void (*)(FILE*)> stream{popen(cmd.c_str(), "r"), [](FILE* f) {
+                                                      pclose(f);
+                                                  }};
     if (!stream)
         return "lsof failed";
 
     char buffer[1024];
     std::string result;
     while (fgets(buffer, 1024, stream.get()))
-           result += buffer;
+        result += buffer;
 
     return result;
 #else

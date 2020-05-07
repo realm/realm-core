@@ -510,7 +510,8 @@ bool compare_objects(const ConstObj& obj_1, const ConstObj& obj_2, const std::ve
                         // objects, just because we want to get the Column
                         // info. Instead compare just the objects
                         // themselves.
-                        bool schemas_equal = compare_schemas(*target_table_1, *target_table_2, logger, &embedded_columns);
+                        bool schemas_equal =
+                            compare_schemas(*target_table_1, *target_table_2, logger, &embedded_columns);
                         REALM_ASSERT(schemas_equal);
                     }
 

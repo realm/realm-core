@@ -477,8 +477,7 @@ bool TestList::run(Config config)
             util::TimestampStderrLogger::Config config;
             config.precision = util::TimestampStderrLogger::Precision::milliseconds;
             config.format = "%FT%T";
-            fallback_logger =
-                std::make_unique<util::TimestampStderrLogger>(std::move(config)); // Throws
+            fallback_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config)); // Throws
         }
         else {
             fallback_logger = std::make_unique<util::StderrLogger>(); // Throws

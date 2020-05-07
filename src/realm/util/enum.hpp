@@ -42,7 +42,8 @@ namespace util {
 ///
 /// The current implementation is restricted to enumeration types whose values
 /// can all be represented in a regular integer.
-template<class E, class S, bool ignore_case = false> class Enum {
+template <class E, class S, bool ignore_case = false>
+class Enum {
 public:
     using base_enum_type = E;
 
@@ -61,21 +62,17 @@ private:
     E m_value = E{};
 };
 
-template<class C, class T, class E, class S, bool ignore_case>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&,
-                                    const Enum<E, S, ignore_case>&);
+template <class C, class T, class E, class S, bool ignore_case>
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const Enum<E, S, ignore_case>&);
 
-template<class C, class T, class E, class S, bool ignore_case>
-std::basic_istream<C,T>& operator>>(std::basic_istream<C,T>&,
-                                    Enum<E, S, ignore_case>&);
+template <class C, class T, class E, class S, bool ignore_case>
+std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>&, Enum<E, S, ignore_case>&);
 
 
 struct EnumAssoc {
     const int value;
     const char* const name;
 };
-
-
 
 
 // Implementation
@@ -94,7 +91,8 @@ public:
     std::map<std::string, int> name_to_value;
 };
 
-template<class S, bool ignore_case> const EnumMapper& get_enum_mapper()
+template <class S, bool ignore_case>
+const EnumMapper& get_enum_mapper()
 {
     static EnumMapper mapper{S::map, ignore_case}; // Throws
     return mapper;
@@ -104,25 +102,25 @@ template<class S, bool ignore_case> const EnumMapper& get_enum_mapper()
 
 namespace util {
 
-template<class E, class S, bool ignore_case>
-inline Enum<E, S, ignore_case>::Enum(E value) noexcept :
-    m_value{value}
+template <class E, class S, bool ignore_case>
+inline Enum<E, S, ignore_case>::Enum(E value) noexcept
+    : m_value{value}
 {
 }
 
-template<class E, class S, bool ignore_case>
+template <class E, class S, bool ignore_case>
 inline Enum<E, S, ignore_case>::operator E() const noexcept
 {
     return m_value;
 }
 
-template<class E, class S, bool ignore_case>
+template <class E, class S, bool ignore_case>
 inline const std::string& Enum<E, S, ignore_case>::str() const
 {
     return _impl::get_enum_mapper<S, ignore_case>().val_to_name.at(m_value); // Throws
 }
 
-template<class E, class S, bool ignore_case>
+template <class E, class S, bool ignore_case>
 inline bool Enum<E, S, ignore_case>::str(const std::string*& string) const noexcept
 {
     const auto& value_to_name = _impl::get_enum_mapper<S, ignore_case>().value_to_name;
@@ -133,7 +131,7 @@ inline bool Enum<E, S, ignore_case>::str(const std::string*& string) const noexc
     return true;
 }
 
-template<class E, class S, bool ignore_case>
+template <class E, class S, bool ignore_case>
 inline bool Enum<E, S, ignore_case>::parse(const std::string& string, E& value)
 {
     int value_2;
@@ -143,9 +141,8 @@ inline bool Enum<E, S, ignore_case>::parse(const std::string& string, E& value)
     return true;
 }
 
-template<class C, class T, class E, class S, bool ignore_case>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out,
-                                           const Enum<E, S, ignore_case>& e)
+template <class C, class T, class E, class S, bool ignore_case>
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Enum<E, S, ignore_case>& e)
 {
     const std::string* string;
     if (e.str(string)) {
@@ -157,9 +154,8 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out,
     return out;
 }
 
-template<class C, class T, class E, class S, bool ignore_case>
-std::basic_istream<C,T>& operator>>(std::basic_istream<C,T>& in,
-                                    Enum<E, S, ignore_case>& e)
+template <class C, class T, class E, class S, bool ignore_case>
+std::basic_istream<C, T>& operator>>(std::basic_istream<C, T>& in, Enum<E, S, ignore_case>& e)
 {
     if (in.bad() || in.fail())
         return in;

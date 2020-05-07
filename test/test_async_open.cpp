@@ -10,7 +10,6 @@
 #include "util/compare_groups.hpp"
 
 
-
 using namespace realm;
 using namespace realm::sync;
 using namespace realm::test_util;
@@ -29,11 +28,8 @@ TEST(AsyncOpen_NonExistingRealm)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    auto progress_handler = [&](uint_fast64_t downloaded,
-                                uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                uint_fast64_t uploadable, uint_fast64_t progress,
-                                uint_fast64_t snapshot)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
+                                uint_fast64_t uploadable, uint_fast64_t progress, uint_fast64_t snapshot) {
         CHECK_EQUAL(uploaded, 0);
         CHECK_EQUAL(uploadable, 0);
         CHECK_EQUAL(downloaded, 0);
@@ -85,7 +81,7 @@ TEST(AsyncOpen_DisableStateRealms)
     DBRef sg_1 = DB::create(*history_1);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "pk_int");
         auto col_ndx = table->add_column(type_Int, "int");
         for (int i = 0; i < number_of_rows; ++i) {
@@ -99,11 +95,8 @@ TEST(AsyncOpen_DisableStateRealms)
     }
 
     uint_fast64_t state_downloadable = 0;
-    auto progress_handler = [&](uint_fast64_t downloaded,
-                                uint_fast64_t downloadable, uint_fast64_t uploaded,
-                                uint_fast64_t uploadable, uint_fast64_t progress,
-                                uint_fast64_t snapshot)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
+                                uint_fast64_t uploadable, uint_fast64_t progress, uint_fast64_t snapshot) {
         CHECK_EQUAL(uploaded, 0);
         CHECK_EQUAL(uploadable, 0);
         static_cast<void>(downloaded);
@@ -158,12 +151,12 @@ TEST(AsyncOpen_StateRealmManagement)
     // Create a large Realm.
     const int num_rows = 1000;
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef table = create_table(wt, "class_table");
         auto col_ndx_int = table->add_column(type_Int, "int");
         auto col_ndx_string = table->add_column(type_String, "string");
         for (int i = 0; i < num_rows; ++i) {
-            std::string str =  "something-" + std::to_string(i);
+            std::string str = "something-" + std::to_string(i);
             create_object(wt, *table).set(col_ndx_int, i).set(col_ndx_string, str);
         }
         session_1.nonsync_transact_notify(wt.commit());

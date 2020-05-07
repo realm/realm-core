@@ -21,23 +21,17 @@ class JSONParser {
 public:
     using InputIterator = const char*;
 
-    enum class EventType {
-        number,
-        string,
-        boolean,
-        null,
-        array_begin,
-        array_end,
-        object_begin,
-        object_end
-    };
+    enum class EventType { number, string, boolean, null, array_begin, array_end, object_begin, object_end };
 
     using Range = StringData;
 
     struct Event {
         EventType type;
         Range range;
-        Event(EventType type): type(type) {}
+        Event(EventType type)
+            : type(type)
+        {
+        }
 
         union {
             bool boolean;
@@ -59,10 +53,7 @@ public:
         StringData unescape_string(char* buffer) const noexcept;
     };
 
-    enum class Error {
-        unexpected_token = 1,
-        unexpected_end_of_stream = 2
-    };
+    enum class Error { unexpected_token = 1, unexpected_end_of_stream = 2 };
 
     JSONParser(StringData);
 
@@ -74,50 +65,51 @@ public:
     /// appropriate.
     ///
     /// This function is guaranteed to never throw, as long as f never throws.
-    template<class F>
+    template <class F>
     std::error_condition parse(F&& f) noexcept(noexcept(f(std::declval<Event>())));
 
-    class ErrorCategory: public std::error_category {
+    class ErrorCategory : public std::error_category {
     public:
         const char* name() const noexcept final;
         std::string message(int) const final;
     };
     static const ErrorCategory error_category;
+
 private:
-    enum Token: char {
+    enum Token : char {
         object_begin = '{',
-        object_end   = '}',
-        array_begin  = '[',
-        array_end    = ']',
-        colon        = ':',
-        comma        = ',',
-        dquote       = '"',
-        escape       = '\\',
-        minus        = '-',
-        space        = ' ',
-        tab          = '\t',
-        cr           = '\r',
-        lf           = '\n',
+        object_end = '}',
+        array_begin = '[',
+        array_end = ']',
+        colon = ':',
+        comma = ',',
+        dquote = '"',
+        escape = '\\',
+        minus = '-',
+        space = ' ',
+        tab = '\t',
+        cr = '\r',
+        lf = '\n',
     };
 
     InputIterator m_current;
     InputIterator m_end;
 
-    template<class F>
+    template <class F>
     std::error_condition parse_object(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_pair(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_array(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_number(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_string(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_value(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_boolean(F&& f) noexcept(noexcept(f(std::declval<Event>())));
-    template<class F>
+    template <class F>
     std::error_condition parse_null(F&& f) noexcept(noexcept(f(std::declval<Event>())));
 
     std::error_condition expect_token(char, Range& out_range) noexcept;
@@ -136,11 +128,11 @@ std::error_condition make_error_condition(JSONParser::Error e);
 } // namespace realm
 
 namespace std {
-template<>
+template <>
 struct is_error_condition_enum<realm::util::JSONParser::Error> {
     static const bool value = true;
 };
-}
+} // namespace std
 
 namespace realm {
 namespace util {
@@ -148,18 +140,19 @@ namespace util {
 /// Implementation:
 
 
-inline JSONParser::JSONParser(StringData input):
-    m_current(input.data()), m_end(input.data() + input.size())
+inline JSONParser::JSONParser(StringData input)
+    : m_current(input.data())
+    , m_end(input.data() + input.size())
 {
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     return parse_value(f);
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_object(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     Event event{EventType::object_begin};
@@ -208,7 +201,7 @@ std::error_condition JSONParser::parse_object(F&& f) noexcept(noexcept(f(std::de
     return std::error_condition{};
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_pair(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     skip_whitespace();
@@ -232,7 +225,7 @@ std::error_condition JSONParser::parse_pair(F&& f) noexcept(noexcept(f(std::decl
     return parse_value(f);
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_array(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     Event event{EventType::array_begin};
@@ -281,7 +274,7 @@ std::error_condition JSONParser::parse_array(F&& f) noexcept(noexcept(f(std::dec
     return std::error_condition{};
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_number(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     static const size_t buffer_size = 64;
@@ -328,7 +321,7 @@ std::error_condition JSONParser::parse_number(F&& f) noexcept(noexcept(f(std::de
     return f(event);
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_string(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     InputIterator p = m_current;
@@ -360,10 +353,12 @@ std::error_condition JSONParser::parse_string(F&& f) noexcept(noexcept(f(std::de
     return Error::unexpected_token;
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_boolean(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
-    auto first_nonalpha = std::find_if_not(m_current, m_end, [](auto c) { return std::isalpha(c); });
+    auto first_nonalpha = std::find_if_not(m_current, m_end, [](auto c) {
+        return std::isalpha(c);
+    });
 
     Event event{EventType::boolean};
     event.range = Range(m_current, first_nonalpha - m_current);
@@ -381,10 +376,12 @@ std::error_condition JSONParser::parse_boolean(F&& f) noexcept(noexcept(f(std::d
     return Error::unexpected_token;
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_null(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
-    auto first_nonalpha = std::find_if_not(m_current, m_end, [](auto c) { return std::isalpha(c); });
+    auto first_nonalpha = std::find_if_not(m_current, m_end, [](auto c) {
+        return std::isalpha(c);
+    });
 
     Event event{EventType::null};
     event.range = Range(m_current, first_nonalpha - m_current);
@@ -396,7 +393,7 @@ std::error_condition JSONParser::parse_null(F&& f) noexcept(noexcept(f(std::decl
     return Error::unexpected_token;
 }
 
-template<class F>
+template <class F>
 std::error_condition JSONParser::parse_value(F&& f) noexcept(noexcept(f(std::declval<Event>())))
 {
     skip_whitespace();
@@ -422,8 +419,7 @@ std::error_condition JSONParser::parse_value(F&& f) noexcept(noexcept(f(std::dec
     return parse_number(f);
 }
 
-inline
-bool JSONParser::is_whitespace(Token t) noexcept
+inline bool JSONParser::is_whitespace(Token t) noexcept
 {
     switch (t) {
         case Token::space:
@@ -436,15 +432,13 @@ bool JSONParser::is_whitespace(Token t) noexcept
     }
 }
 
-inline
-void JSONParser::skip_whitespace() noexcept
+inline void JSONParser::skip_whitespace() noexcept
 {
     while (m_current < m_end && is_whitespace(static_cast<Token>(*m_current)))
         ++m_current;
 }
 
-inline
-std::error_condition JSONParser::expect_token(char c, Range& out_range) noexcept
+inline std::error_condition JSONParser::expect_token(char c, Range& out_range) noexcept
 {
     skip_whitespace();
     if (m_current == m_end)
@@ -457,14 +451,12 @@ std::error_condition JSONParser::expect_token(char c, Range& out_range) noexcept
     return Error::unexpected_token;
 }
 
-inline
-std::error_condition JSONParser::expect_token(Token t, Range& out_range) noexcept
+inline std::error_condition JSONParser::expect_token(Token t, Range& out_range) noexcept
 {
     return expect_token(static_cast<char>(t), out_range);
 }
 
-inline
-bool JSONParser::peek_char(char& out_c) noexcept
+inline bool JSONParser::peek_char(char& out_c) noexcept
 {
     if (m_current < m_end) {
         out_c = *m_current;
@@ -473,8 +465,7 @@ bool JSONParser::peek_char(char& out_c) noexcept
     return false;
 }
 
-inline
-bool JSONParser::peek_token(Token& out_t) noexcept
+inline bool JSONParser::peek_token(Token& out_t) noexcept
 {
     if (m_current < m_end) {
         out_t = static_cast<Token>(*m_current);
@@ -483,38 +474,58 @@ bool JSONParser::peek_token(Token& out_t) noexcept
     return false;
 }
 
-inline
-StringData JSONParser::Event::escaped_string_value() const noexcept
+inline StringData JSONParser::Event::escaped_string_value() const noexcept
 {
     REALM_ASSERT(type == EventType::string);
     REALM_ASSERT(range.size() >= 2);
     return StringData(range.data() + 1, range.size() - 2);
 }
 
-template<class OS>
+template <class OS>
 OS& operator<<(OS& os, JSONParser::EventType type)
 {
     switch (type) {
-        case JSONParser::EventType::number:       os << "number"; return os;
-        case JSONParser::EventType::string:       os << "string"; return os;
-        case JSONParser::EventType::boolean:      os << "boolean"; return os;
-        case JSONParser::EventType::null:         os << "null"; return os;
-        case JSONParser::EventType::array_begin:  os << "["; return os;
-        case JSONParser::EventType::array_end:    os << "]"; return os;
-        case JSONParser::EventType::object_begin: os << "{"; return os;
-        case JSONParser::EventType::object_end:   os << "}"; return os;
+        case JSONParser::EventType::number:
+            os << "number";
+            return os;
+        case JSONParser::EventType::string:
+            os << "string";
+            return os;
+        case JSONParser::EventType::boolean:
+            os << "boolean";
+            return os;
+        case JSONParser::EventType::null:
+            os << "null";
+            return os;
+        case JSONParser::EventType::array_begin:
+            os << "[";
+            return os;
+        case JSONParser::EventType::array_end:
+            os << "]";
+            return os;
+        case JSONParser::EventType::object_begin:
+            os << "{";
+            return os;
+        case JSONParser::EventType::object_end:
+            os << "}";
+            return os;
     }
     REALM_UNREACHABLE();
 }
 
-template<class OS>
-OS& operator<<(OS& os, const JSONParser::Event& e) {
+template <class OS>
+OS& operator<<(OS& os, const JSONParser::Event& e)
+{
     os << e.type;
     switch (e.type) {
-        case JSONParser::EventType::number:       return os << "(" << e.number << ")";
-        case JSONParser::EventType::string:       return os << "(" << e.range << ")";
-        case JSONParser::EventType::boolean:      return os << "(" << e.boolean << ")";
-        default: return os;
+        case JSONParser::EventType::number:
+            return os << "(" << e.number << ")";
+        case JSONParser::EventType::string:
+            return os << "(" << e.range << ")";
+        case JSONParser::EventType::boolean:
+            return os << "(" << e.boolean << ")";
+        default:
+            return os;
     }
 }
 
@@ -522,4 +533,3 @@ OS& operator<<(OS& os, const JSONParser::Event& e) {
 } // namespace realm
 
 #endif // REALM_UTIL_JSON_PARSER_HPP
-

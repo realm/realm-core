@@ -52,12 +52,17 @@ public:
     ///
     /// This method is thread-safe.
     void write(std::ostream& os, Level at_level = Level::all) const;
+
 protected:
     /// Logger implementation. This method is thread-safe.
     void do_log(Level, std::string message) override;
+
 private:
     /// LevelThreshold implementation
-    Level get() const noexcept override final { return Level::all; }
+    Level get() const noexcept override final
+    {
+        return Level::all;
+    }
 
     struct Message {
         Level level;
@@ -76,7 +81,7 @@ inline bool TestLogger::did_log(const std::regex& rx, Level at_level,
                                 std::regex_constants::match_flag_type flags) const
 {
     std::lock_guard<std::mutex> l(m_mutex);
-    for (const auto& message: m_messages) {
+    for (const auto& message : m_messages) {
         if (at_level == Level::all || message.level == at_level) {
             if (std::regex_search(message.message, rx, flags))
                 return true;
@@ -99,7 +104,7 @@ inline bool TestLogger::did_log(Level at_level) const
 inline void TestLogger::write(std::ostream& os, Level threshold) const
 {
     std::lock_guard<std::mutex> l(m_mutex);
-    for (const auto& message: m_messages) {
+    for (const auto& message : m_messages) {
         if (message.level < threshold)
             continue;
         os << get_level_prefix(message.level);
@@ -122,4 +127,3 @@ inline void TestLogger::do_log(Level level, std::string message)
 
 
 #endif // REALM_TEST_UTIL_LOGGER_HPP
-

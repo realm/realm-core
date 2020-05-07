@@ -32,91 +32,65 @@ using std::string;
 
 namespace _impl {
 
-template<typename SocketType>
-class Statsd: public StatsCollectorBase {
-    protected:
-    inline
-    Statsd(string const& prefix, string const& hostname, int port);
+template <typename SocketType>
+class Statsd : public StatsCollectorBase {
+protected:
+    inline Statsd(string const& prefix, string const& hostname, int port);
 
-    inline
-    Statsd(std::vector<string> const& endpoints, string const& prefix);
+    inline Statsd(std::vector<string> const& endpoints, string const& prefix);
 
     // modifiers
-    public:
+public:
+    inline void add_endpoint(string const& endpoint);
 
-    inline
-    void add_endpoint(string const& endpoint);
+    inline void add_endpoint(string const& hostname, int port);
 
-    inline
-    void add_endpoint(string const& hostname, int port);
+    inline void add_endpoints(std::vector<string> const& endpoints);
 
-    inline
-    void add_endpoints(std::vector<string> const& endpoints);
+    inline void prefix(string const& prefix);
 
-    inline
-    void prefix(string const& prefix);
-
-    inline
-    void prefix(string&& prefix);
+    inline void prefix(string&& prefix);
 
     // main API
-    void decrement(const char* metric, int value = 1,
-                   float sample_rate = 1.0,
-                   const char* eol = "\n") final;
+    void decrement(const char* metric, int value = 1, float sample_rate = 1.0, const char* eol = "\n") final;
 
-    void gauge(const char* metric, double value,
-               float sample_rate = 1.0,
-               const char* eol = "\n") final;
+    void gauge(const char* metric, double value, float sample_rate = 1.0, const char* eol = "\n") final;
 
-    void gauge_relative(const char* metric, double amount,
-                        float sample_rate = 1.0,
-                        const char* eol = "\n") final;
+    void gauge_relative(const char* metric, double amount, float sample_rate = 1.0, const char* eol = "\n") final;
 
-    void histogram(const char* metric, double value,
-                   float sample_rate = 1.0,
-                   const char* eol = "\n") final;
+    void histogram(const char* metric, double value, float sample_rate = 1.0, const char* eol = "\n") final;
 
-    void increment(const char* metric, int value = 1,
-                   float sample_rate = 1.0,
-                   const char* eol = "\n") final;
+    void increment(const char* metric, int value = 1, float sample_rate = 1.0, const char* eol = "\n") final;
 
-    void timing(const char* metric, double value,
-                   float sample_rate = 1.0,
-                   const char* eol = "\n") final;
+    void timing(const char* metric, double value, float sample_rate = 1.0, const char* eol = "\n") final;
 
-    private:
+private:
     // internal methods
-    inline
-    void report(const char* metric, const char* metric_type,
-                string const& value, float sample_rate,
-                string const& eol = "\n");
+    inline void report(const char* metric, const char* metric_type, string const& value, float sample_rate,
+                       string const& eol = "\n");
 
-    private:
+private:
     // properties
     utils::IOServiceRunner m_io_service;
-    utils::Random<0, 1>    m_random;
-    string                 m_prefix;
+    utils::Random<0, 1> m_random;
+    string m_prefix;
 
-    protected:
+protected:
     SocketType m_socket;
 };
 
 // ctors
 
-template<typename SocketType>
-inline
-Statsd<SocketType>::Statsd(string const& prefix,
-                           string const& hostname, int port)
+template <typename SocketType>
+inline Statsd<SocketType>::Statsd(string const& prefix, string const& hostname, int port)
     : m_io_service()
     , m_socket(m_io_service(), hostname, port)
 {
     this->prefix(prefix);
 }
 
-template<typename SocketType>
-inline
-Statsd<SocketType>::Statsd(std::vector<string> const& endpoints,
-                           string const& prefix)
+template <typename SocketType>
+inline Statsd<SocketType>::Statsd(std::vector<string> const& endpoints, string const& prefix)
     : m_io_service()
     , m_socket(m_io_service(), endpoints)
 {
@@ -126,47 +100,41 @@ Statsd<SocketType>::Statsd(std::vector<string> const& endpoints,
 
 // modifiers
 
-template<typename SocketType>
-inline
-void Statsd<SocketType>::add_endpoint(string const& endpoint) {
+template <typename SocketType>
+inline void Statsd<SocketType>::add_endpoint(string const& endpoint)
+{
     m_socket.add_endpoint(endpoint);
 }
 
-template<typename SocketType>
-inline
-void Statsd<SocketType>::add_endpoint(string const& hostname, int port)
+template <typename SocketType>
+inline void Statsd<SocketType>::add_endpoint(string const& hostname, int port)
 {
     m_socket.add_endpoint(hostname, port);
 }
 
-template<typename SocketType>
-inline
-void Statsd<SocketType>::add_endpoints(
-        std::vector<string> const& endpoints)
+template <typename SocketType>
+inline void Statsd<SocketType>::add_endpoints(std::vector<string> const& endpoints)
 {
     m_socket.add_endpoints(endpoints);
 }
-template<typename SocketType>
-inline
-void Statsd<SocketType>::decrement(const char* metric, int value,
-                                   float sample_rate,
-                                   const char* eol)
+template <typename SocketType>
+inline void Statsd<SocketType>::decrement(const char* metric, int value, float sample_rate, const char* eol)
 {
     increment(metric, value * -1, sample_rate, eol);
 }
 
-template<typename SocketType>
-inline
-void Statsd<SocketType>::prefix(string const& prefix) {
+template <typename SocketType>
+inline void Statsd<SocketType>::prefix(string const& prefix)
+{
     if (!prefix.empty()) {
         m_prefix = prefix;
         m_prefix += '.';
     }
 }
 
-template<typename SocketType>
-inline
-void Statsd<SocketType>::prefix(string&& prefix) {
+template <typename SocketType>
+inline void Statsd<SocketType>::prefix(string&& prefix)
+{
     m_prefix = std::move(prefix);
     if (!m_prefix.empty()) {
         m_prefix += '.';
@@ -175,18 +143,14 @@ void Statsd<SocketType>::prefix(string&& prefix) {
 
 // main API
 
-template<typename SocketType>
-void Statsd<SocketType>::gauge(const char* metric, double value,
-                               float sample_rate, const char* eol)
+template <typename SocketType>
+void Statsd<SocketType>::gauge(const char* metric, double value, float sample_rate, const char* eol)
 {
     report(metric, "g", utils::to_string(value), sample_rate, eol);
 }
 
-template<typename SocketType>
-void Statsd<SocketType>::gauge_relative(const char* metric,
-                                       double amount,
-                                       float sample_rate,
-                                       const char* eol)
+template <typename SocketType>
+void Statsd<SocketType>::gauge_relative(const char* metric, double amount, float sample_rate, const char* eol)
 {
     std::string str;
 
@@ -200,35 +164,28 @@ void Statsd<SocketType>::gauge_relative(const char* metric,
     report(metric, "g", str, sample_rate, eol);
 }
 
-template<typename SocketType>
-void Statsd<SocketType>::histogram(const char* metric, double value,
-                                   float sample_rate,
-                                   const char* eol)
+template <typename SocketType>
+void Statsd<SocketType>::histogram(const char* metric, double value, float sample_rate, const char* eol)
 {
     report(metric, "h", utils::to_string(value), sample_rate, eol);
 }
 
-template<typename SocketType>
-void Statsd<SocketType>::increment(const char* metric, int value,
-                                   float sample_rate,
-                                   const char* eol)
+template <typename SocketType>
+void Statsd<SocketType>::increment(const char* metric, int value, float sample_rate, const char* eol)
 {
     report(metric, "c", utils::to_string(value), sample_rate, eol);
 }
 
-template<typename SocketType>
-void Statsd<SocketType>::timing(const char* metric, double value,
-                                   float sample_rate,
-                                   const char* eol)
+template <typename SocketType>
+void Statsd<SocketType>::timing(const char* metric, double value, float sample_rate, const char* eol)
 {
     report(metric, "ms", utils::to_string(value), sample_rate, eol);
 }
 
 // internal methods
 
-template<typename SocketType>
-void Statsd<SocketType>::report(const char* metric, const char* metric_type,
-                                string const& value, float sample_rate,
+template <typename SocketType>
+void Statsd<SocketType>::report(const char* metric, const char* metric_type, string const& value, float sample_rate,
                                 string const& eol)
 {
     if (sample_rate == 0.0f || (sample_rate != 1.0f && m_random() > sample_rate))
@@ -260,13 +217,10 @@ void Statsd<SocketType>::report(const char* metric, const char* metric_type,
  * - Supports delivery failure detection, with automatic back-off.
  */
 class UnbufferedStatsd : public _impl::Statsd<utils::UDPSocket> {
-    public:
+public:
     // ctors & dtors
-    UnbufferedStatsd(string const& prefix = {},
-                     string const& hostname = "localhost",
-                     int port = 8125);
-    UnbufferedStatsd(std::vector<string> const& endpoints,
-                     string const& prefix = {});
+    UnbufferedStatsd(string const& prefix = {}, string const& hostname = "localhost", int port = 8125);
+    UnbufferedStatsd(std::vector<string> const& endpoints, string const& prefix = {});
     UnbufferedStatsd(UnbufferedStatsd const&) = delete;
 };
 
@@ -291,14 +245,11 @@ class UnbufferedStatsd : public _impl::Statsd<utils::UDPSocket> {
  *   efficient sending/receiving.
  */
 class BufferedStatsd : public _impl::Statsd<utils::BufferedUDPSocket> {
-    public:
+public:
     // ctors & dtors
-    BufferedStatsd(string const& prefix = {},
-                   string const& hostname = "localhost",
-                   int port = 8125,
+    BufferedStatsd(string const& prefix = {}, string const& hostname = "localhost", int port = 8125,
                    std::size_t mtu = MTU_InternetSafe);
-    BufferedStatsd(std::vector<string> const& endpoints,
-                   string const& prefix = {},
+    BufferedStatsd(std::vector<string> const& endpoints, string const& prefix = {},
                    std::size_t mtu = MTU_InternetSafe);
     BufferedStatsd(BufferedStatsd const&) = delete;
 

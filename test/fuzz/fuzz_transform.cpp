@@ -30,15 +30,21 @@ using namespace realm::test_util::unit_test;
 
 
 struct FileSource {
-    struct EndOfStream: std::runtime_error {
-        EndOfStream(): std::runtime_error("end of stream") {}
+    struct EndOfStream : std::runtime_error {
+        EndOfStream()
+            : std::runtime_error("end of stream")
+        {
+        }
     };
 
     std::ifstream& m_in;
-    FileSource(std::ifstream& in): m_in(in) {}
+    FileSource(std::ifstream& in)
+        : m_in(in)
+    {
+    }
 
     // Emulate realm::test_util::Random interface
-    
+
     unsigned int get_byte()
     {
         // std::ifstream is buffered, so in theory this should be reasonably fast.
@@ -50,7 +56,7 @@ struct FileSource {
         return b;
     }
 
-    template<class T>
+    template <class T>
     T draw_float()
     {
         using I = std::conditional_t<std::is_same<T, float>::value, uint32_t, uint64_t>;
@@ -58,7 +64,7 @@ struct FileSource {
         return T(r0) / std::numeric_limits<T>::max();
     }
 
-    template<class T>
+    template <class T>
     T draw_int()
     {
         union {
@@ -71,7 +77,7 @@ struct FileSource {
         return result.i;
     }
 
-    template<class T>
+    template <class T>
     T draw_int(T min, T max)
     {
         // FIXME: Assuming benign over-/underflow.
@@ -80,13 +86,13 @@ struct FileSource {
         return n + min;
     }
 
-    template<class T>
+    template <class T>
     T draw_int_max(T max)
     {
         return draw_int<T>(T{}, max);
     }
 
-    template<class T>
+    template <class T>
     T draw_int_mod(T mod)
     {
         return draw_int_max<T>(mod - 1);
@@ -122,7 +128,7 @@ TEST(Fuzz_Transform)
     bool trace = trace_p && (StringData{trace_p} != "no");
 
     try {
-        FuzzTester<FileSource> fuzzer{source, trace}; 
+        FuzzTester<FileSource> fuzzer{source, trace};
         while (true) { // Will eventually terminate with an exception
             fuzzer.round(test_context, pseudo_pid);
         }
@@ -135,7 +141,11 @@ TEST(Fuzz_Transform)
 int main(int argc, char* argv[])
 {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s <INPUT> <N>\n(where <INPUT> is the path to a file containing a sequence of bytes indicating operations to be replayed, and <N> is a number unique to the process being started in order to prevent collisions with parallel fuzzers.)\n", argv[0]);
+        fprintf(stderr,
+                "Usage: %s <INPUT> <N>\n(where <INPUT> is the path to a file containing a sequence of bytes "
+                "indicating operations to be replayed, and <N> is a number unique to the process being started in "
+                "order to prevent collisions with parallel fuzzers.)\n",
+                argv[0]);
         exit(1);
     }
 
@@ -152,4 +162,3 @@ int main(int argc, char* argv[])
     REALM_ASSERT_RELEASE(success == true);
     return 0;
 }
-

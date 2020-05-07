@@ -25,7 +25,8 @@ IOServiceRunner::IOServiceRunner(int thread_count)
     run(thread_count);
 }
 
-IOServiceRunner::~IOServiceRunner() {
+IOServiceRunner::~IOServiceRunner()
+{
     // release work from threads
     m_io_service.stop();
 
@@ -34,13 +35,17 @@ IOServiceRunner::~IOServiceRunner() {
         thread.join();
 }
 
-asio::io_service& IOServiceRunner::operator()() {
+asio::io_service& IOServiceRunner::operator()()
+{
     return m_io_service;
 }
 
-void IOServiceRunner::run(int thread_count) {
+void IOServiceRunner::run(int thread_count)
+{
     for (int i = 0; i < thread_count; ++i)
-        m_threads.emplace_back([&]() { m_io_service.run(); });
+        m_threads.emplace_back([&]() {
+            m_io_service.run();
+        });
 }
 
 } // namespace utils

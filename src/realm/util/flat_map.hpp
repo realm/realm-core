@@ -4,7 +4,7 @@
 #define REALM_UTIL_FLAT_MAP_HPP
 
 #include <vector>
-#include <utility> // std::pair
+#include <utility>   // std::pair
 #include <algorithm> // std::lower_bound etc.
 #include <type_traits>
 
@@ -13,7 +13,7 @@
 namespace realm {
 namespace util {
 
-template <class K, class V, class Container = std::vector<std::pair<K,V>>, class Cmp = std::less<>>
+template <class K, class V, class Container = std::vector<std::pair<K, V>>, class Cmp = std::less<>>
 struct FlatMap {
     using value_type = std::pair<K, V>;
     using key_type = K;
@@ -47,17 +47,38 @@ struct FlatMap {
 
     using iterator = typename Container::iterator;
     using const_iterator = typename Container::const_iterator;
-    iterator begin() noexcept { return m_data.begin(); }
-    iterator end()   noexcept { return m_data.end(); }
-    const_iterator begin() const noexcept { return m_data.begin(); }
-    const_iterator end()   const noexcept { return m_data.end(); }
+    iterator begin() noexcept
+    {
+        return m_data.begin();
+    }
+    iterator end() noexcept
+    {
+        return m_data.end();
+    }
+    const_iterator begin() const noexcept
+    {
+        return m_data.begin();
+    }
+    const_iterator end() const noexcept
+    {
+        return m_data.end();
+    }
 
 
-    bool empty() const noexcept { return m_data.empty(); }
-    size_t size() const noexcept { return m_data.size(); }
-    void clear() noexcept { m_data.clear(); }
+    bool empty() const noexcept
+    {
+        return m_data.empty();
+    }
+    size_t size() const noexcept
+    {
+        return m_data.size();
+    }
+    void clear() noexcept
+    {
+        m_data.clear();
+    }
 
-    std::pair<iterator,bool> insert(value_type value)
+    std::pair<iterator, bool> insert(value_type value)
     {
         auto it = lower_bound(value.first);
         if (it != end() && it->first == value.first) {
@@ -67,7 +88,7 @@ struct FlatMap {
     }
 
     template <class P>
-    std::pair<iterator,bool> insert(P pair)
+    std::pair<iterator, bool> insert(P pair)
     {
         return insert(value_type{std::get<0>(pair), std::get<1>(pair)});
     }
@@ -81,7 +102,7 @@ struct FlatMap {
     }
 
     template <class... Args>
-    std::pair<iterator,bool> emplace(Args&&... args)
+    std::pair<iterator, bool> emplace(Args&&... args)
     {
         value_type value{std::forward<Args>(args)...};
         return insert(std::move(value));
@@ -99,7 +120,8 @@ struct FlatMap {
         return m_data.erase(pos);
     }
 
-    iterator erase(const_iterator first, const_iterator last) noexcept(std::is_nothrow_move_assignable<value_type>::value)
+    iterator erase(const_iterator first,
+                   const_iterator last) noexcept(std::is_nothrow_move_assignable<value_type>::value)
     {
         return m_data.erase(first, last);
     }

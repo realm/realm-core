@@ -29,7 +29,7 @@ void ClientHistoryImpl::set_initial_state_realm_history_numbers(version_type cur
 {
     REALM_ASSERT(current_version == s_initial_version + 1);
     ensure_updated(current_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();             // Throws
 
     version_type client_version = m_sync_history_base_version + m_sync_history_size;
     REALM_ASSERT(client_version == current_version); // For now
@@ -55,14 +55,14 @@ void ClientHistoryImpl::make_final_async_open_adjustements(SaltedFileIdent clien
     auto wt = m_shared_group->start_write(); // Throws
     version_type local_version = wt->get_version();
     ensure_updated(local_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     REALM_ASSERT(m_group->get_sync_file_id() == 0);
 
     Array& root = m_arrays->root;
-    m_group->set_sync_file_id(client_file_ident.ident); // Throws
+    m_group->set_sync_file_id(client_file_ident.ident);                                       // Throws
     root.set(s_client_file_ident_salt_iip, RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
-    root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes)); // Throws
+    root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes));    // Throws
 
     wt->commit(); // Throws
 }
@@ -71,7 +71,7 @@ void ClientHistoryImpl::make_final_async_open_adjustements(SaltedFileIdent clien
 void ClientHistoryImpl::set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident)
 {
     ensure_updated(current_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();             // Throws
 
     Array& root = m_arrays->root;
     m_group->set_sync_file_id(client_file_ident.ident); // Throws
@@ -114,7 +114,7 @@ void ClientHistoryImpl::set_client_reset_adjustments(version_type current_versio
                                                      BinaryData uploadable_changeset)
 {
     ensure_updated(current_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();             // Throws
 
     version_type client_version = m_sync_history_base_version + m_sync_history_size;
     REALM_ASSERT(client_version == current_version); // For now
@@ -288,10 +288,10 @@ auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version
             changeset = BinaryData(buffer.data(), buffer.size());
         }
 
-        entry.origin_timestamp  = sync::generate_changeset_timestamp();
+        entry.origin_timestamp = sync::generate_changeset_timestamp();
         entry.origin_file_ident = 0; // Of local origin
-        entry.remote_version    = m_progress_download.server_version;
-        entry.changeset         = changeset;
+        entry.remote_version = m_progress_download.server_version;
+        entry.changeset = changeset;
 
         // uploadable_bytes is updated at every local Realm change. The total
         // number of uploadable bytes must be persisted in the Realm, since the
@@ -299,8 +299,7 @@ auto ClientHistoryImpl::prepare_changeset(const char* data, size_t size, version
         // history wasn't trimmed, it would be expensive to traverse the entire
         // history at every access to uploadable bytes.
         Array& root = m_arrays->root;
-        std::uint_fast64_t uploadable_bytes =
-            root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
+        std::uint_fast64_t uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
         uploadable_bytes += entry.changeset.size();
         root.set(s_progress_uploadable_bytes_iip, RefOrTagged::make_tagged(uploadable_bytes));
     }
@@ -352,8 +351,8 @@ void ClientHistoryImpl::get_status(version_type& current_client_version, SaltedF
     }
 
     current_client_version = current_client_version_2;
-    client_file_ident      = client_file_ident_2;
-    progress               = progress_2;
+    client_file_ident = client_file_ident_2;
+    progress = progress_2;
 
     REALM_ASSERT(current_client_version >= s_initial_version + 0);
     if (current_client_version == s_initial_version + 0)
@@ -369,8 +368,8 @@ void ClientHistoryImpl::set_client_file_ident(SaltedFileIdent client_file_ident,
     TransactionRef wt = m_shared_group->start_write(); // Throws
     version_type local_version = wt->get_version();
     ensure_updated(local_version); // Throws
-    prepare_for_write(); // Throws
-    TableInfoCache table_info_cache {*wt};
+    prepare_for_write();           // Throws
+    TableInfoCache table_info_cache{*wt};
 
     Array& root = m_arrays->root;
     wt->set_sync_file_id(client_file_ident.ident);
@@ -396,14 +395,13 @@ void ClientHistoryImpl::set_client_file_ident(SaltedFileIdent client_file_ident,
 
 
 // Overriding member function in realm::sync::ClientHistoryBase
-void ClientHistoryImpl::set_sync_progress(const SyncProgress& progress,
-                                          const std::uint_fast64_t* downloadable_bytes,
+void ClientHistoryImpl::set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                           VersionInfo& version_info)
 {
     TransactionRef wt = m_shared_group->start_write(); // Throws
     version_type local_version = wt->get_version();
     ensure_updated(local_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     if (m_changeset_cooker) {
         ensure_cooked_history(); // Throws
@@ -418,13 +416,12 @@ void ClientHistoryImpl::set_sync_progress(const SyncProgress& progress,
     // not uploaded to the server.
     version_type new_version = wt->commit(); // Throws
     version_info.realm_version = new_version;
-    version_info.sync_version  = {new_version, 0};
+    version_info.sync_version = {new_version, 0};
 }
 
 
 // Overriding member function in realm::sync::ClientHistoryBase
-void ClientHistoryImpl::find_uploadable_changesets(UploadCursor& upload_progress,
-                                                   version_type end_version,
+void ClientHistoryImpl::find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
                                                    std::vector<UploadChangeset>& uploadable_changesets,
                                                    version_type& locked_server_version) const
 {
@@ -437,15 +434,14 @@ void ClientHistoryImpl::find_uploadable_changesets(UploadCursor& upload_progress
     std::size_t accum_byte_size = 0;
 
     version_type begin_version_2 = upload_progress.client_version;
-    version_type end_version_2   = end_version;
+    version_type end_version_2 = end_version;
     clamp_sync_version_range(begin_version_2, end_version_2);
     version_type last_integrated_upstream_version = upload_progress.last_integrated_server_version;
 
     while (accum_byte_size < accum_byte_size_soft_limit) {
         HistoryEntry entry;
-        version_type version = find_sync_history_entry(begin_version_2,
-                                                       end_version_2, entry,
-                                                       last_integrated_upstream_version);
+        version_type version =
+            find_sync_history_entry(begin_version_2, end_version_2, entry, last_integrated_upstream_version);
 
         if (version == 0) {
             begin_version_2 = end_version_2;
@@ -455,10 +451,10 @@ void ClientHistoryImpl::find_uploadable_changesets(UploadCursor& upload_progress
 
         UploadChangeset uc;
         std::size_t size = entry.changeset.copy_to(uc.buffer);
-        uc.origin_timestamp  = entry.origin_timestamp;
+        uc.origin_timestamp = entry.origin_timestamp;
         uc.origin_file_ident = entry.origin_file_ident;
-        uc.progress          = UploadCursor{version, entry.remote_version};
-        uc.changeset         = BinaryData{uc.buffer.get(), size};
+        uc.progress = UploadCursor{version, entry.remote_version};
+        uc.changeset = BinaryData{uc.buffer.get(), size};
         uploadable_changesets.push_back(std::move(uc)); // Throws
 
         accum_byte_size += size;
@@ -516,7 +512,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
     version_type local_version = old_version.version;
 
     ensure_updated(local_version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();           // Throws
 
     if (m_changeset_cooker) {
         ensure_cooked_history(); // Throws
@@ -571,13 +567,11 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
 
             if (m_changeset_cooker) {
                 cooked_changeset_buffer.clear();
-                bool produced =
-                    m_changeset_cooker->cook_changeset(*transact, transformed_changeset.data(),
-                                                       transformed_changeset.size(),
-                                                       cooked_changeset_buffer); // Throws
+                bool produced = m_changeset_cooker->cook_changeset(*transact, transformed_changeset.data(),
+                                                                   transformed_changeset.size(),
+                                                                   cooked_changeset_buffer); // Throws
                 if (produced) {
-                    BinaryData cooked_changeset(cooked_changeset_buffer.data(),
-                                                cooked_changeset_buffer.size());
+                    BinaryData cooked_changeset(cooked_changeset_buffer.data(), cooked_changeset_buffer.size());
                     save_cooked_changeset(cooked_changeset, changesets[i].version); // Throws
                 }
             }
@@ -598,8 +592,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
             if (util::int_add_with_overflow_detect(size_2, transformed_changeset.size()))
                 throw util::overflow_error{"Changeset size overflow"};
             assembled_transformed_changeset.resize(size_2); // Throws
-            std::copy(transformed_changeset.data(),
-                      transformed_changeset.data() + transformed_changeset.size(),
+            std::copy(transformed_changeset.data(), transformed_changeset.data() + transformed_changeset.size(),
                       assembled_transformed_changeset.data() + size_1);
         }
     }
@@ -632,11 +625,10 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
     // received from the server.
     const sync::Changeset& last_changeset = changesets.back();
     HistoryEntry entry;
-    entry.origin_timestamp  = last_changeset.origin_timestamp;
+    entry.origin_timestamp = last_changeset.origin_timestamp;
     entry.origin_file_ident = last_changeset.origin_file_ident;
-    entry.remote_version    = last_changeset.version;
-    entry.changeset         = BinaryData(assembled_transformed_changeset.data(),
-                                         assembled_transformed_changeset.size());
+    entry.remote_version = last_changeset.version;
+    entry.changeset = BinaryData(assembled_transformed_changeset.data(), assembled_transformed_changeset.size());
 
     // m_changeset_from_server is picked up by prepare_changeset(), which then
     // calls add_sync_history_entry(). prepare_changeset() is called as a result
@@ -653,8 +645,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
     ensure_updated(new_version); // Throws
     REALM_ASSERT(m_ct_history->size() == m_ct_history_size);
     REALM_ASSERT(m_changesets->size() == m_sync_history_size);
-    REALM_ASSERT(m_ct_history_base_version + m_ct_history_size ==
-                 m_sync_history_base_version + m_sync_history_size);
+    REALM_ASSERT(m_ct_history_base_version + m_ct_history_size == m_sync_history_base_version + m_sync_history_size);
 #endif // REALM_DEBUG
 
     if (transact_reporter) {
@@ -663,7 +654,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
     }
 
     version_info.realm_version = new_version;
-    version_info.sync_version  = {new_version, 0};
+    version_info.sync_version = {new_version, 0};
     return true;
 }
 
@@ -688,14 +679,10 @@ void ClientHistoryImpl::get_upload_download_bytes(std::uint_fast64_t& downloaded
 
     if (m_arrays) {
         const Array& root = m_arrays->root;
-        downloaded_bytes =
-            root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int();
-        downloadable_bytes =
-            root.get_as_ref_or_tagged(s_progress_downloadable_bytes_iip).get_as_int();
-        uploadable_bytes =
-            root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
-        uploaded_bytes =
-            root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int();
+        downloaded_bytes = root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int();
+        downloadable_bytes = root.get_as_ref_or_tagged(s_progress_downloadable_bytes_iip).get_as_int();
+        uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
+        uploaded_bytes = root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int();
     }
 }
 
@@ -766,9 +753,9 @@ auto ClientHistoryImpl::set_cooked_progress(CookedProgress progress) -> version_
     TransactionRef wt = m_shared_group->start_write(); // Throws
     auto version = wt->get_version();
     ensure_updated(version); // Throws
-    prepare_for_write(); // Throws
+    prepare_for_write();     // Throws
 
-    ensure_cooked_history(); // Throws
+    ensure_cooked_history();          // Throws
     update_cooked_progress(progress); // Throws
 
     // Note: This transaction produces an empty changeset. Empty changesets
@@ -781,7 +768,7 @@ auto ClientHistoryImpl::set_cooked_progress(CookedProgress progress) -> version_
 auto ClientHistoryImpl::get_upload_anchor_of_current_transact(const Transaction& tr) const -> UploadCursor
 {
     REALM_ASSERT(tr.get_transact_stage() != DB::transact_Ready);
-    version_type current_version =  tr.get_version();
+    version_type current_version = tr.get_version();
     ensure_updated(current_version); // Throws
     UploadCursor upload_anchor;
     upload_anchor.client_version = current_version;
@@ -803,8 +790,7 @@ auto ClientHistoryImpl::find_history_entry(version_type begin_version, version_t
                                            HistoryEntry& entry) const noexcept -> version_type
 {
     version_type last_integrated_server_version;
-    return find_sync_history_entry(begin_version, end_version, entry,
-                                   last_integrated_server_version);
+    return find_sync_history_entry(begin_version, end_version, entry, last_integrated_server_version);
 }
 
 
@@ -841,14 +827,15 @@ void ClientHistoryImpl::set_reciprocal_transform(version_type version, BinaryDat
 
 
 auto ClientHistoryImpl::find_sync_history_entry(version_type begin_version, version_type end_version,
-                                              HistoryEntry& entry, version_type& last_integrated_server_version) const
-    noexcept -> version_type
+                                                HistoryEntry& entry,
+                                                version_type& last_integrated_server_version) const noexcept
+    -> version_type
 {
     REALM_ASSERT(m_changesets);
     REALM_ASSERT(m_origin_file_idents);
 
     if (begin_version == 0)
-        begin_version = s_initial_version+0;
+        begin_version = s_initial_version + 0;
 
     REALM_ASSERT(begin_version <= end_version);
     REALM_ASSERT(begin_version >= m_sync_history_base_version);
@@ -886,8 +873,7 @@ void ClientHistoryImpl::do_get_cooked_changeset(std::int_fast64_t index, util::A
     do {
         BinaryData chunk = m_ch_changesets->get_at(i, offset);
         buffer.append(chunk.data(), chunk.size()); // Throws
-    }
-    while (offset != 0);
+    } while (offset != 0);
 
     server_version = version_type(m_ch_server_versions->get(i));
 }
@@ -907,7 +893,7 @@ std::uint_fast64_t ClientHistoryImpl::sum_of_history_entry_sizes(version_type be
     REALM_ASSERT(end_version <= m_sync_history_base_version + m_sync_history_size);
 
     version_type begin_version_2 = begin_version;
-    version_type end_version_2   = end_version;
+    version_type end_version_2 = end_version;
     clamp_sync_version_range(begin_version_2, end_version_2);
 
     std::uint_fast64_t sum_of_sizes = 0;
@@ -1009,47 +995,47 @@ void ClientHistoryImpl::prepare_for_write()
             ref_type ref = mem.get_ref();
             _impl::DeepArrayRefDestroyGuard ardg{ref, alloc};
             schema_versions.set_as_ref(s_sv_schema_versions_iip, ref); // Throws
-            ardg.release(); // Ownership transferred to parent array
+            ardg.release();                                            // Ownership transferred to parent array
         }
         { // `sv_library_versions` column
             MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc);
             ref_type ref = mem.get_ref();
             _impl::DeepArrayRefDestroyGuard ardg{ref, alloc};
             schema_versions.set_as_ref(s_sv_library_versions_iip, ref); // Throws
-            ardg.release(); // Ownership transferred to parent array
+            ardg.release();                                             // Ownership transferred to parent array
         }
         { // `sv_snapshot_versions` column
             MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
             ref_type ref = mem.get_ref();
-           _impl::DeepArrayRefDestroyGuard ardg{ref, alloc};
+            _impl::DeepArrayRefDestroyGuard ardg{ref, alloc};
             schema_versions.set_as_ref(s_sv_snapshot_versions_iip, ref); // Throws
-            ardg.release(); // Ownership transferred to parent array
+            ardg.release();                                              // Ownership transferred to parent array
         }
         { // `sv_timestamps` column
             MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
             ref_type ref = mem.get_ref();
-           _impl::DeepArrayRefDestroyGuard ardg{ref, alloc};
+            _impl::DeepArrayRefDestroyGuard ardg{ref, alloc};
             schema_versions.set_as_ref(s_sv_timestamps_iip, ref); // Throws
-            ardg.release(); // Ownership transferred to parent array
+            ardg.release();                                       // Ownership transferred to parent array
         }
         version_type snapshot_version = m_shared_group->get_version_of_latest_snapshot();
-        record_current_schema_version(schema_versions, snapshot_version); // Throws
+        record_current_schema_version(schema_versions, snapshot_version);          // Throws
         arrays->root.set_as_ref(s_schema_versions_iip, schema_versions.get_ref()); // Throws
         adg.release(); // Ownership transferred to parent array
     }
     _impl::GroupFriend::prepare_history_parent(*m_group, arrays->root, Replication::hist_SyncClient,
-                                              get_client_history_schema_version(), 0); // Throws
+                                               get_client_history_schema_version(), 0); // Throws
     // Note: gf::prepare_history_parent() also ensures the the root array has a
     // slot for the history ref.
     arrays->root.update_parent(); // Throws
     dg_1.release();
-    m_arrays                  = std::move(arrays);
-    m_ct_history              = std::move(ct_history);
-    m_changesets              = std::move(changesets);
-    m_reciprocal_transforms   = std::move(reciprocal_transforms);
-    m_remote_versions         = std::move(remote_versions);
-    m_origin_file_idents      = std::move(origin_file_idents);
-    m_origin_timestamps       = std::move(origin_timestamps);
+    m_arrays = std::move(arrays);
+    m_ct_history = std::move(ct_history);
+    m_changesets = std::move(changesets);
+    m_reciprocal_transforms = std::move(reciprocal_transforms);
+    m_remote_versions = std::move(remote_versions);
+    m_origin_file_idents = std::move(origin_file_idents);
+    m_origin_timestamps = std::move(origin_timestamps);
 }
 
 
@@ -1071,11 +1057,11 @@ void ClientHistoryImpl::add_ct_history_entry(BinaryData changeset)
 
 void ClientHistoryImpl::add_sync_history_entry(HistoryEntry entry)
 {
-    REALM_ASSERT(m_changesets->size()            == m_sync_history_size);
+    REALM_ASSERT(m_changesets->size() == m_sync_history_size);
     REALM_ASSERT(m_reciprocal_transforms->size() == m_sync_history_size);
-    REALM_ASSERT(m_remote_versions->size()       == m_sync_history_size);
-    REALM_ASSERT(m_origin_file_idents->size()    == m_sync_history_size);
-    REALM_ASSERT(m_origin_timestamps->size()     == m_sync_history_size);
+    REALM_ASSERT(m_remote_versions->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_file_idents->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_timestamps->size() == m_sync_history_size);
 
     // FIXME: BinaryColumn::set() currently interprets BinaryData(0,0) as
     // null. It should probably be changed such that BinaryData(0,0) is always
@@ -1116,12 +1102,10 @@ void ClientHistoryImpl::update_sync_progress(const SyncProgress& progress,
     REALM_ASSERT(progress.upload.last_integrated_server_version >=
                  version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int()));
 
-    auto uploaded_bytes =
-        std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int());
+    auto uploaded_bytes = std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int());
     auto previous_upload_client_version =
         version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int());
-    uploaded_bytes += sum_of_history_entry_sizes(previous_upload_client_version,
-                                                 progress.upload.client_version);
+    uploaded_bytes += sum_of_history_entry_sizes(previous_upload_client_version, progress.upload.client_version);
 
     root.set(s_progress_download_server_version_iip,
              RefOrTagged::make_tagged(progress.download.server_version)); // Throws
@@ -1208,8 +1192,7 @@ void ClientHistoryImpl::trim_ct_history()
 void ClientHistoryImpl::trim_sync_history()
 {
     version_type begin = m_sync_history_base_version;
-    version_type end = std::max(m_progress_download.last_integrated_client_version,
-                                s_initial_version + 0);
+    version_type end = std::max(m_progress_download.last_integrated_client_version, s_initial_version + 0);
     // Note: At this point, `end` corresponds to C in the description above.
 
     // `end` (`m_progress_download.last_integrated_client_version`) will precede
@@ -1258,11 +1241,11 @@ void ClientHistoryImpl::trim_sync_history()
 
 void ClientHistoryImpl::do_trim_sync_history(std::size_t n)
 {
-    REALM_ASSERT(m_changesets->size()            == m_sync_history_size);
+    REALM_ASSERT(m_changesets->size() == m_sync_history_size);
     REALM_ASSERT(m_reciprocal_transforms->size() == m_sync_history_size);
-    REALM_ASSERT(m_remote_versions->size()       == m_sync_history_size);
-    REALM_ASSERT(m_origin_file_idents->size()    == m_sync_history_size);
-    REALM_ASSERT(m_origin_timestamps->size()     == m_sync_history_size);
+    REALM_ASSERT(m_remote_versions->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_file_idents->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_timestamps->size() == m_sync_history_size);
     REALM_ASSERT(n <= m_sync_history_size);
 
     if (n > 0) {
@@ -1319,15 +1302,14 @@ void ClientHistoryImpl::ensure_cooked_history()
     throw sync::InconsistentUseOfCookedHistory("Cannot switch to using a changeset cooker "
                                                "after synchronization has commenced");
 
-instantiate:
-    {
-        bool context_flag = false;
-        std::size_t size = s_cooked_history_size;
-        m_arrays->cooked_history.create(Array::type_HasRefs, context_flag, size); // Throws
-        _impl::ShallowArrayDestroyGuard adg{&m_arrays->cooked_history};
-        m_arrays->cooked_history.update_parent(); // Throws
-        adg.release(); // Ref ownership transferred to parent array
-    }
+instantiate : {
+    bool context_flag = false;
+    std::size_t size = s_cooked_history_size;
+    m_arrays->cooked_history.create(Array::type_HasRefs, context_flag, size); // Throws
+    _impl::ShallowArrayDestroyGuard adg{&m_arrays->cooked_history};
+    m_arrays->cooked_history.update_parent(); // Throws
+    adg.release();                            // Ref ownership transferred to parent array
+}
 
     Allocator& alloc = m_arrays->cooked_history.get_alloc();
 
@@ -1385,7 +1367,7 @@ void ClientHistoryImpl::update_cooked_progress(CookedProgress progress)
         REALM_ASSERT(m_cooked_history_size > 0);
         if (progress.changeset_index >= end) {
             new_base_server_version = version_type(m_ch_server_versions->get(m_cooked_history_size - 1));
-            m_ch_changesets->clear(); // Throws
+            m_ch_changesets->clear();      // Throws
             m_ch_server_versions->clear(); // Throws
             m_cooked_history_size = 0;
         }
@@ -1423,8 +1405,7 @@ void ClientHistoryImpl::update_cooked_progress(CookedProgress progress)
     }
 }
 
-void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transaction& group,
-                                                                      TableInfoCache&,
+void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transaction& group, TableInfoCache&,
                                                                       file_ident_type client_file_ident)
 {
     // Must be in write transaction!
@@ -1438,12 +1419,11 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
     };
 
     auto promote_primary_key = [&](Instruction::PrimaryKey& pk) {
-        mpark::visit(util::overloaded {
-            [&](GlobalKey& key) {
-                promote_global_key(key);
-            },
-            [](auto&&) {}
-        }, pk);
+        mpark::visit(util::overloaded{[&](GlobalKey& key) {
+                                          promote_global_key(key);
+                                      },
+                                      [](auto&&) {}},
+                     pk);
     };
 
     auto get_table_for_class = [&](StringData class_name) -> ConstTableRef {
@@ -1533,8 +1513,8 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
         std::size_t root_size = 23;
 
         // Slots in root array of history compartment
-        std::size_t remote_versions_iip                =  2;
-        std::size_t progress_upload_client_version_iip =  9;
+        std::size_t remote_versions_iip = 2;
+        std::size_t progress_upload_client_version_iip = 9;
         std::size_t progress_upload_server_version_iip = 10;
 
         if (root.size() != root_size)
@@ -1573,29 +1553,29 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
         const std::size_t root_size = 23;
 
         // Slots in root array of history compartment
-        std::size_t changesets_iip                          =  0;
-        std::size_t reciprocal_transforms_iip               =  1;
-        std::size_t remote_versions_iip                     =  2;
-        std::size_t origin_file_idents_iip                  =  3;
-        std::size_t origin_timestamps_iip                   =  4;
-        std::size_t progress_download_server_version_iip    =  5;
-        std::size_t progress_download_client_version_iip    =  6;
-        std::size_t progress_latest_server_version_iip      =  7;
-        std::size_t progress_latest_server_version_salt_iip =  8;
-        std::size_t progress_upload_client_version_iip      =  9;
-        std::size_t progress_upload_server_version_iip      = 10;
-        std::size_t client_file_ident_iip                   = 11;
-        std::size_t client_file_ident_salt_iip              = 12;
-        std::size_t timestamp_threshold_iip                 = 13;
-        std::size_t progress_downloaded_bytes_iip           = 14;
-        std::size_t progress_downloadable_bytes_iip         = 15;
-        std::size_t progress_uploaded_bytes_iip             = 16;
-        std::size_t progress_uploadable_bytes_iip           = 17;
-        std::size_t cooked_changesets_iip                   = 18;
-        std::size_t cooked_base_index_iip                   = 19;
-        std::size_t cooked_intrachangeset_progress_iip      = 20;
-        std::size_t ct_history_iip                          = 21;
-        std::size_t object_id_history_state_iip             = 22;
+        std::size_t changesets_iip = 0;
+        std::size_t reciprocal_transforms_iip = 1;
+        std::size_t remote_versions_iip = 2;
+        std::size_t origin_file_idents_iip = 3;
+        std::size_t origin_timestamps_iip = 4;
+        std::size_t progress_download_server_version_iip = 5;
+        std::size_t progress_download_client_version_iip = 6;
+        std::size_t progress_latest_server_version_iip = 7;
+        std::size_t progress_latest_server_version_salt_iip = 8;
+        std::size_t progress_upload_client_version_iip = 9;
+        std::size_t progress_upload_server_version_iip = 10;
+        std::size_t client_file_ident_iip = 11;
+        std::size_t client_file_ident_salt_iip = 12;
+        std::size_t timestamp_threshold_iip = 13;
+        std::size_t progress_downloaded_bytes_iip = 14;
+        std::size_t progress_downloadable_bytes_iip = 15;
+        std::size_t progress_uploaded_bytes_iip = 16;
+        std::size_t progress_uploadable_bytes_iip = 17;
+        std::size_t cooked_changesets_iip = 18;
+        std::size_t cooked_base_index_iip = 19;
+        std::size_t cooked_intrachangeset_progress_iip = 20;
+        std::size_t ct_history_iip = 21;
+        std::size_t object_id_history_state_iip = 22;
 
         if (root.size() != root_size)
             throw std::runtime_error{"Unexpected size of history root array"};
@@ -1654,17 +1634,17 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
     // Add schema versions table
     {
         // Sizes of fixed-size arrays
-        std::size_t root_size             = 24;
-        std::size_t schema_versions_size  =  4;
+        std::size_t root_size = 24;
+        std::size_t schema_versions_size = 4;
 
         // Slots in root array of history compartment
         std::size_t schema_versions_iip = 23;
 
         // Slots in root array of `schema_versions` table
-        std::size_t sv_schema_versions_iip   = 0;
-        std::size_t sv_library_versions_iip  = 1;
+        std::size_t sv_schema_versions_iip = 0;
+        std::size_t sv_library_versions_iip = 1;
         std::size_t sv_snapshot_versions_iip = 2;
-        std::size_t sv_timestamps_iip        = 3;
+        std::size_t sv_timestamps_iip = 3;
 
         root.add(0); // Throws
         if (root.size() != root_size)
@@ -1683,7 +1663,7 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
             sv_schema_versions.add(value); // Throws
             ref_type ref = sv_schema_versions.get_ref();
             schema_versions.set_as_ref(sv_schema_versions_iip, ref); // Throws
-            adg_2.release(); // Ownership transferred to parent array
+            adg_2.release();                                         // Ownership transferred to parent array
         }
         { // sv_library_versions
             Array sv_library_versions{alloc};
@@ -1695,53 +1675,53 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
             // library version, snapshot number, and timestamp are unknown, and
             // the values stored for `snapshot_version` and `timestamp` has no
             // meaning.
-            std::int_fast64_t value = 0; // Null ref
+            std::int_fast64_t value = 0;    // Null ref
             sv_library_versions.add(value); // Throws
             ref_type ref = sv_library_versions.get_ref();
             schema_versions.set_as_ref(sv_library_versions_iip, ref); // Throws
-            adg_2.release(); // Ownership transferred to parent array
+            adg_2.release();                                          // Ownership transferred to parent array
         }
         { // sv_snapshot_versions
             Array sv_snapshot_versions{alloc};
             sv_snapshot_versions.create(Array::type_Normal);
             _impl::ShallowArrayDestroyGuard adg_2{&sv_snapshot_versions};
-            std::int_fast64_t value = 0; // Dummy
+            std::int_fast64_t value = 0;     // Dummy
             sv_snapshot_versions.add(value); // Throws
             ref_type ref = sv_snapshot_versions.get_ref();
             schema_versions.set_as_ref(sv_snapshot_versions_iip, ref); // Throws
-            adg_2.release(); // Ownership transferred to parent array
+            adg_2.release();                                           // Ownership transferred to parent array
         }
         { // sv_timestamps
             Array sv_timestamps{alloc};
             sv_timestamps.create(Array::type_Normal);
             _impl::ShallowArrayDestroyGuard adg_2{&sv_timestamps};
             std::int_fast64_t value = 0; // Dummy
-            sv_timestamps.add(value); // Throws
+            sv_timestamps.add(value);    // Throws
             ref_type ref = sv_timestamps.get_ref();
             schema_versions.set_as_ref(sv_timestamps_iip, ref); // Throws
-            adg_2.release(); // Ownership transferred to parent array
+            adg_2.release();                                    // Ownership transferred to parent array
         }
         root.set_as_ref(schema_versions_iip, schema_versions.get_ref()); // Throws
-        adg.release(); // Ownership transferred to parent array
+        adg.release();                                                   // Ownership transferred to parent array
     }
 
     // Move cooked history stuff to subarray
     {
         // Sizes of fixed-size arrays
-        std::size_t old_root_size       = 24;
-        std::size_t new_root_size       = 21;
-        std::size_t cooked_history_size =  4;
+        std::size_t old_root_size = 24;
+        std::size_t new_root_size = 21;
+        std::size_t cooked_history_size = 4;
 
         // Slots in root array of history compartment
-        std::size_t cooked_history_iip                 = 19; // Being created
-        std::size_t cooked_base_index_iip              = 19; // Being removed
+        std::size_t cooked_history_iip = 19;                 // Being created
+        std::size_t cooked_base_index_iip = 19;              // Being removed
         std::size_t cooked_intrachangeset_progress_iip = 20; // Being removed
-        std::size_t cooked_changesets_iip              = 21; // Being removed
+        std::size_t cooked_changesets_iip = 21;              // Being removed
 
         // Slots in root array of `cooked_history` substructure
-        std::size_t ch_base_index_iip              = 0;
+        std::size_t ch_base_index_iip = 0;
         std::size_t ch_intrachangeset_progress_iip = 1;
-        std::size_t ch_changesets_iip              = 2;
+        std::size_t ch_changesets_iip = 2;
 
         if (root.size() != old_root_size)
             throw std::runtime_error{"Unexpected size of history root array"};
@@ -1756,15 +1736,14 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
         // 22. Remove three of them, and nullify the remaining one
         {
             std::size_t begin = 19;
-            std::size_t end   = 19 + 3;
+            std::size_t end = 19 + 3;
             root.erase(begin, end); // Throws
         }
         root.set(19, 0); // Throws
 
         DeepArrayRefDestroyGuard changesets_adg{changesets_ref, alloc};
 
-        bool instantiate = (base_index != 0 || intrachangeset_progress != 0 ||
-                            changesets_ref != 0);
+        bool instantiate = (base_index != 0 || intrachangeset_progress != 0 || changesets_ref != 0);
         if (instantiate) {
             if (changesets_ref == 0) {
                 BinaryColumn tmp(alloc);
@@ -1780,7 +1759,7 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
             cooked_history.set(ch_base_index_iip, RefOrTagged::make_tagged(base_index)); // Throws
             cooked_history.set(ch_intrachangeset_progress_iip,
                                RefOrTagged::make_tagged(intrachangeset_progress)); // Throws
-            cooked_history.set_as_ref(ch_changesets_iip, changesets_ref); // Throws
+            cooked_history.set_as_ref(ch_changesets_iip, changesets_ref);          // Throws
             changesets_adg.release();
             root.set_as_ref(cooked_history_iip, cooked_history.get_ref()); // Throws
             adg.release();
@@ -1854,13 +1833,12 @@ void ClientHistoryImpl::record_current_schema_version()
     Array schema_versions{alloc};
     schema_versions.set_parent(&root, s_schema_versions_iip);
     schema_versions.init_from_parent();
-    version_type snapshot_version  = m_shared_group->get_version_of_latest_snapshot();
+    version_type snapshot_version = m_shared_group->get_version_of_latest_snapshot();
     record_current_schema_version(schema_versions, snapshot_version); // Throws
 }
 
 
-void ClientHistoryImpl::record_current_schema_version(Array& schema_versions,
-                                                      version_type snapshot_version)
+void ClientHistoryImpl::record_current_schema_version(Array& schema_versions, version_type snapshot_version)
 {
     static_assert(s_schema_versions_size == 4, "");
     REALM_ASSERT(schema_versions.size() == s_schema_versions_size);
@@ -1886,8 +1864,8 @@ void ClientHistoryImpl::record_current_schema_version(Array& schema_versions,
         using uchar = unsigned char;
         for (std::size_t i = 0; i < size; ++i)
             value.set(i, std::int_fast64_t(uchar(library_version[i]))); // Throws
-        sv_library_versions.add(std::int_fast64_t(value.get_ref())); // Throws
-        adg.release(); // Ownership transferred to parent array
+        sv_library_versions.add(std::int_fast64_t(value.get_ref()));    // Throws
+        adg.release();                                                  // Ownership transferred to parent array
     }
     {
         Array sv_snapshot_versions{alloc};
@@ -1920,7 +1898,6 @@ void ClientHistoryImpl::migrate_from_history_schema_version_2_to_10()
     size_t top_object_id_history_state = 18; // s_top_object_id_history_state was 18 in version 2
     object_id_history.set_parent(&top, top_object_id_history_state);
     object_id_history.upgrade(m_group);
-
 }
 
 bool ClientHistoryImpl::was_migrated_from_schema_version_earlier_than(int schema_version) const noexcept
@@ -1991,9 +1968,9 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
             ref_type ref_2 = root.get_as_ref(s_reciprocal_transforms_iip);
             m_reciprocal_transforms->init_from_ref(ref_2); // Throws
         }
-        m_remote_versions->init_from_parent(); // Throws
+        m_remote_versions->init_from_parent();    // Throws
         m_origin_file_idents->init_from_parent(); // Throws
-        m_origin_timestamps->init_from_parent(); // Throws
+        m_origin_timestamps->init_from_parent();  // Throws
     }
     else {
         REALM_ASSERT(!m_ct_history);
@@ -2038,22 +2015,20 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
             origin_file_idents.reset(new IntegerBpTree(alloc)); // Throws
             origin_file_idents->set_parent(&arrays->root, s_origin_file_idents_iip);
             origin_file_idents->init_from_parent();
-
         }
         std::unique_ptr<IntegerBpTree> origin_timestamps;
         {
             origin_timestamps.reset(new IntegerBpTree(alloc)); // Throws
             origin_timestamps->set_parent(&arrays->root, s_origin_timestamps_iip);
             origin_timestamps->init_from_parent();
-
         }
-        m_arrays                  = std::move(arrays);
-        m_ct_history              = std::move(ct_history);
-        m_changesets              = std::move(changesets);
-        m_reciprocal_transforms   = std::move(reciprocal_transforms);
-        m_remote_versions         = std::move(remote_versions);
-        m_origin_file_idents      = std::move(origin_file_idents);
-        m_origin_timestamps       = std::move(origin_timestamps);
+        m_arrays = std::move(arrays);
+        m_ct_history = std::move(ct_history);
+        m_changesets = std::move(changesets);
+        m_reciprocal_transforms = std::move(reciprocal_transforms);
+        m_remote_versions = std::move(remote_versions);
+        m_origin_file_idents = std::move(origin_file_idents);
+        m_origin_timestamps = std::move(origin_timestamps);
     }
 
     m_ct_history_size = m_ct_history->size();
@@ -2062,9 +2037,9 @@ void ClientHistoryImpl::update_from_ref_and_version(ref_type ref, version_type v
     m_sync_history_size = m_changesets->size();
     m_sync_history_base_version = version - m_sync_history_size;
     REALM_ASSERT(m_reciprocal_transforms->size() == m_sync_history_size);
-    REALM_ASSERT(m_remote_versions->size()       == m_sync_history_size);
-    REALM_ASSERT(m_origin_file_idents->size()    == m_sync_history_size);
-    REALM_ASSERT(m_origin_timestamps->size()     == m_sync_history_size);
+    REALM_ASSERT(m_remote_versions->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_file_idents->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_timestamps->size() == m_sync_history_size);
 
     const Array& root = m_arrays->root;
     m_progress_download.server_version =
@@ -2197,22 +2172,20 @@ void ClientHistoryImpl::verify() const
     m_origin_file_idents->verify();
     m_origin_timestamps->verify();
     REALM_ASSERT(m_arrays->root.size() == s_root_size);
-    REALM_ASSERT(m_ct_history->size()            == m_ct_history_size);
-    REALM_ASSERT(m_changesets->size()            == m_sync_history_size);
+    REALM_ASSERT(m_ct_history->size() == m_ct_history_size);
+    REALM_ASSERT(m_changesets->size() == m_sync_history_size);
     REALM_ASSERT(m_reciprocal_transforms->size() == m_sync_history_size);
-    REALM_ASSERT(m_remote_versions->size()       == m_sync_history_size);
-    REALM_ASSERT(m_origin_file_idents->size()    == m_sync_history_size);
-    REALM_ASSERT(m_origin_timestamps->size()     == m_sync_history_size);
+    REALM_ASSERT(m_remote_versions->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_file_idents->size() == m_sync_history_size);
+    REALM_ASSERT(m_origin_timestamps->size() == m_sync_history_size);
 
     version_type progress_download_server_version =
         version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int());
     version_type progress_download_client_version =
         version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int());
     REALM_ASSERT(progress_download_server_version == m_progress_download.server_version);
-    REALM_ASSERT(progress_download_client_version ==
-                 m_progress_download.last_integrated_client_version);
-    REALM_ASSERT(progress_download_client_version <=
-                 m_sync_history_base_version + m_sync_history_size);
+    REALM_ASSERT(progress_download_client_version == m_progress_download.last_integrated_client_version);
+    REALM_ASSERT(progress_download_client_version <= m_sync_history_base_version + m_sync_history_size);
     version_type remote_version_of_last_entry = 0;
     if (m_sync_history_size > 0)
         remote_version_of_last_entry = m_remote_versions->get(m_sync_history_size - 1);

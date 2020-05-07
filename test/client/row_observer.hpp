@@ -51,11 +51,10 @@ public:
     /// set is allowed to be empty initially, and can be changed or cleared at
     /// any time. Must be ordered according to increasing row index. New row
     /// indexes will be added to the set as new rows are added to the table.
-    RowObserver(StringData table_name, TableKey& table_ndx,
-                std::set<ObjKey>& new_rows):
-        m_table_name{table_name},
-        m_table_ndx{table_ndx},
-        m_new_rows{new_rows}
+    RowObserver(StringData table_name, TableKey& table_ndx, std::set<ObjKey>& new_rows)
+        : m_table_name{table_name}
+        , m_table_ndx{table_ndx}
+        , m_new_rows{new_rows}
     {
     }
 

@@ -23,29 +23,25 @@ namespace dogless {
 
 // ctors and dtors
 
-UnbufferedStatsd::UnbufferedStatsd(string const& prefix,
-                                   string const& hostname, int port)
+UnbufferedStatsd::UnbufferedStatsd(string const& prefix, string const& hostname, int port)
     : Statsd(prefix, hostname, port)
-{}
+{
+}
 
-UnbufferedStatsd::UnbufferedStatsd(
-        std::vector<string> const& endpoints,
-        string const& prefix)
+UnbufferedStatsd::UnbufferedStatsd(std::vector<string> const& endpoints, string const& prefix)
     : Statsd(endpoints, prefix)
-{}
+{
+}
 
 // ctors and dtors
 
-BufferedStatsd::BufferedStatsd(string const& prefix,
-                               string const& hostname, int port,
-                               std::size_t mtu)
+BufferedStatsd::BufferedStatsd(string const& prefix, string const& hostname, int port, std::size_t mtu)
     : Statsd(prefix, hostname, port)
 {
     m_socket.mtu(mtu);
 }
 
-BufferedStatsd::BufferedStatsd(std::vector<string> const& endpoints,
-                               string const& prefix, std::size_t mtu)
+BufferedStatsd::BufferedStatsd(std::vector<string> const& endpoints, string const& prefix, std::size_t mtu)
     : Statsd(endpoints, prefix)
 {
     m_socket.mtu(mtu);
@@ -53,27 +49,32 @@ BufferedStatsd::BufferedStatsd(std::vector<string> const& endpoints,
 
 // accessors
 
-int BufferedStatsd::loop_interval() const noexcept {
+int BufferedStatsd::loop_interval() const noexcept
+{
     return m_socket.loop_interval();
 }
 
-std::size_t BufferedStatsd::mtu() const noexcept {
+std::size_t BufferedStatsd::mtu() const noexcept
+{
     return m_socket.mtu();
 }
 
 // modifiers
 
-void BufferedStatsd::loop_interval(int interval) noexcept {
+void BufferedStatsd::loop_interval(int interval) noexcept
+{
     m_socket.loop_interval(interval);
 }
 
-void BufferedStatsd::mtu(std::size_t mtu) noexcept {
+void BufferedStatsd::mtu(std::size_t mtu) noexcept
+{
     m_socket.mtu(mtu);
 }
 
 // main API
 
-void BufferedStatsd::flush() {
+void BufferedStatsd::flush()
+{
     m_socket.flush();
 }
 

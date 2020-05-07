@@ -7,16 +7,16 @@
 #include <realm/util/network_ssl.hpp>
 
 #if REALM_HAVE_OPENSSL
-#  ifdef _WIN32
-#    include <Windows.h>
-#  else
-#    include <pthread.h>
-#  endif
-#  include <openssl/conf.h>
-#  include <openssl/x509v3.h>
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <pthread.h>
+#endif
+#include <openssl/conf.h>
+#include <openssl/x509v3.h>
 #elif REALM_HAVE_SECURE_TRANSPORT
-#  include <fstream>
-#  include <vector>
+#include <fstream>
+#include <vector>
 #endif
 
 using namespace realm;
@@ -30,7 +30,7 @@ namespace {
 #ifdef REALM_INCLUDE_CERTS
 
 const char* root_certs[] = {
-    #include <realm/noinst/root_certs.hpp>
+#include <realm/noinst/root_certs.hpp>
 };
 
 bool verify_certificate_from_root_cert(const char* root_cert, X509* server_cert)
@@ -75,8 +75,7 @@ bool verify_certificate_from_root_certs(X509* server_cert, util::Logger* logger)
         bool verified = verify_certificate_from_root_cert(root_cert, server_cert);
         if (verified) {
             if (logger)
-                logger->debug("Server SSL certificate verified using root certificate(%1):\n%2",
-                              i, root_cert);
+                logger->debug("Server SSL certificate verified using root certificate(%1):\n%2", i, root_cert);
             return true;
         }
     }
@@ -121,21 +120,21 @@ OpensslInit::OpensslInit()
     std::size_t n = CRYPTO_num_locks();
     mutexes.reset(new std::mutex[n]); // Throws
     CRYPTO_set_locking_callback(&openssl_locking_func);
-/*
-#if !defined(SSL_OP_NO_COMPRESSION) && (OPENSSL_VERSION_NUMBER >= 0x00908000L)
-    null_compression_methods_ = sk_SSL_COMP_new_null();
-#endif
-*/
+    /*
+    #if !defined(SSL_OP_NO_COMPRESSION) && (OPENSSL_VERSION_NUMBER >= 0x00908000L)
+        null_compression_methods_ = sk_SSL_COMP_new_null();
+    #endif
+    */
 }
 
 
 OpensslInit::~OpensslInit()
 {
-/*
-#if !defined(SSL_OP_NO_COMPRESSION) && (OPENSSL_VERSION_NUMBER >= 0x00908000L)
-    sk_SSL_COMP_free(null_compression_methods_);
-#endif
-*/
+    /*
+    #if !defined(SSL_OP_NO_COMPRESSION) && (OPENSSL_VERSION_NUMBER >= 0x00908000L)
+        sk_SSL_COMP_free(null_compression_methods_);
+    #endif
+    */
     CRYPTO_set_locking_callback(0);
     ERR_free_strings();
 #if OPENSSL_VERSION_NUMBER < 0x10000000L
@@ -187,8 +186,7 @@ bool ErrorCategory::equivalent(const std::error_code& ec, int condition) const n
                 // FIXME: Why use string comparison here? Seems like it would
                 // suffice to compare the underlying numerical error codes.
                 std::string message = ec.message();
-                return ((message == "certificate verify failed" ||
-                         message == "sslv3 alert bad certificate" ||
+                return ((message == "certificate verify failed" || message == "sslv3 alert bad certificate" ||
                          message == "sslv3 alert certificate expired" ||
                          message == "sslv3 alert certificate revoked"));
             }
@@ -241,14 +239,14 @@ const char* SecureTransportErrorCategory::name() const noexcept
 std::string SecureTransportErrorCategory::message(int value) const
 {
 #if REALM_HAVE_SECURE_TRANSPORT
-#  if __has_builtin(__builtin_available)
+#if __has_builtin(__builtin_available)
     if (__builtin_available(iOS 11.3, macOS 10.3, tvOS 11.3, watchOS 4.3, *)) {
         auto status = OSStatus(value);
         void* reserved = nullptr;
         if (auto message = adoptCF(SecCopyErrorMessageString(status, reserved)))
             return cfstring_to_std_string(message.get());
     }
-#  endif // __has_builtin(__builtin_available)
+#endif // __has_builtin(__builtin_available)
 #endif // REALM_HAVE_SECURE_TRANSPORT
 
     return std::string("Unknown SecureTransport error (") + util::to_string(value) + ")"; // Throws
@@ -317,19 +315,19 @@ void Context::ssl_init()
 
 void Context::ssl_destroy() noexcept
 {
-/*
-    if (handle_->default_passwd_callback_userdata) {
-        detail::password_callback_base* callback = static_cast<detail::password_callback_base*>(handle_->default_passwd_callback_userdata);
-        delete callback;
-        handle_->default_passwd_callback_userdata = nullptr;
-    }
+    /*
+        if (handle_->default_passwd_callback_userdata) {
+            detail::password_callback_base* callback =
+       static_cast<detail::password_callback_base*>(handle_->default_passwd_callback_userdata); delete callback;
+            handle_->default_passwd_callback_userdata = nullptr;
+        }
 
-    if (SSL_CTX_get_app_data(handle_)) {
-        detail::verify_callback_base* callback = static_cast<detail::verify_callback_base*>(SSL_CTX_get_app_data(handle_));
-        delete callback;
-        SSL_CTX_set_app_data(handle_, nullptr);
-    }
-*/
+        if (SSL_CTX_get_app_data(handle_)) {
+            detail::verify_callback_base* callback =
+       static_cast<detail::verify_callback_base*>(SSL_CTX_get_app_data(handle_)); delete callback;
+            SSL_CTX_set_app_data(handle_, nullptr);
+        }
+    */
     SSL_CTX_free(m_ssl_ctx);
 }
 
@@ -417,17 +415,17 @@ public:
 
     BioMethod()
     {
-        bio_method = new BIO_METHOD {
-            BIO_TYPE_SOCKET,         // int type
-            nullptr,                 // const char* name
-            &Stream::bio_write,      // int (*bwrite)(BIO*, const char*, int)
-            &Stream::bio_read,       // int (*bread)(BIO*, char*, int)
-            &Stream::bio_puts,       // int (*bputs)(BIO*, const char*)
-            nullptr,                 // int (*bgets)(BIO*, char*, int)
-            &Stream::bio_ctrl,       // long (*ctrl)(BIO*, int, long, void*)
-            &Stream::bio_create,     // int (*create)(BIO*)
-            &Stream::bio_destroy,    // int (*destroy)(BIO*)
-            nullptr                  // long (*callback_ctrl)(BIO*, int, bio_info_cb*)
+        bio_method = new BIO_METHOD{
+            BIO_TYPE_SOCKET,      // int type
+            nullptr,              // const char* name
+            &Stream::bio_write,   // int (*bwrite)(BIO*, const char*, int)
+            &Stream::bio_read,    // int (*bread)(BIO*, char*, int)
+            &Stream::bio_puts,    // int (*bputs)(BIO*, const char*)
+            nullptr,              // int (*bgets)(BIO*, char*, int)
+            &Stream::bio_ctrl,    // long (*ctrl)(BIO*, int, long, void*)
+            &Stream::bio_create,  // int (*create)(BIO*)
+            &Stream::bio_destroy, // int (*destroy)(BIO*)
+            nullptr               // long (*callback_ctrl)(BIO*, int, bio_info_cb*)
         };
     }
 
@@ -453,8 +451,7 @@ bool check_common_name(X509* server_cert, const std::string& host_name)
 {
     // Find the position of the Common Name field in the Subject field of the certificate
     int common_name_loc = -1;
-    common_name_loc = X509_NAME_get_index_by_NID(X509_get_subject_name(server_cert),
-                                                 NID_commonName, -1);
+    common_name_loc = X509_NAME_get_index_by_NID(X509_get_subject_name(server_cert), NID_commonName, -1);
     if (common_name_loc < 0)
         return false;
 
@@ -485,12 +482,11 @@ bool check_common_name(X509* server_cert, const std::string& host_name)
 // for OpenSSL versions before 1.0.2.
 bool check_san(X509* server_cert, const std::string& host_name)
 {
-    STACK_OF(GENERAL_NAME) *san_names;
+    STACK_OF(GENERAL_NAME) * san_names;
 
     // Try to extract the names within the SAN extension from the certificate
-    san_names = static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(server_cert,
-                                                                      NID_subject_alt_name,
-                                                                      nullptr, nullptr));
+    san_names =
+        static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(server_cert, NID_subject_alt_name, nullptr, nullptr));
     if (!san_names)
         return false;
 
@@ -507,8 +503,7 @@ bool check_san(X509* server_cert, const std::string& host_name)
             char* dns_name = static_cast<char*>(ASN1_STRING_data(current_name->d.dNSName));
 
             // Make sure there isn't an embedded NUL character in the DNS name
-            if (static_cast<std::size_t>(ASN1_STRING_length(current_name->d.dNSName)) !=
-                std::strlen(dns_name))
+            if (static_cast<std::size_t>(ASN1_STRING_length(current_name->d.dNSName)) != std::strlen(dns_name))
                 break;
 
             if (host_name == dns_name) {
@@ -594,14 +589,14 @@ void Stream::ssl_set_host_name(const std::string& host_name, std::error_code& ec
     // Enable Server Name Indication (SNI) extension
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
     {
-#  ifndef _WIN32
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wold-style-cast"
-#  endif
+#ifndef _WIN32
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#endif
         int ret = SSL_set_tlsext_host_name(m_ssl, host_name.c_str());
-#  ifndef _WIN32
-#    pragma GCC diagnostic pop
-#  endif
+#ifndef _WIN32
+#pragma GCC diagnostic pop
+#endif
         if (ret == 0) {
             ec = std::error_code(int(ERR_get_error()), openssl_error_category);
             return;
@@ -629,8 +624,7 @@ void Stream::ssl_set_host_name(const std::string& host_name, std::error_code& ec
 #endif
 }
 
-void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>& callback,
-                                     std::error_code&)
+void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>& callback, std::error_code&)
 {
     m_ssl_verify_callback = &callback;
 
@@ -646,8 +640,8 @@ void Stream::ssl_use_included_certificates(std::error_code&)
 }
 
 #ifndef _WIN32
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
 
 int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* ctx)
@@ -679,7 +673,7 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
 
                 logger->debug("Verifying server SSL certificate using root certificates, "
                               "host name = %1, server port = %2, certificate =\n%3",
-                              host_name, server_port, StringData {pem_data, pem_size});
+                              host_name, server_port, StringData{pem_data, pem_size});
             }
             BIO_free(bio);
         }
@@ -688,7 +682,8 @@ int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* c
     bool valid = verify_certificate_from_root_certs(server_cert, logger);
     if (!valid && logger) {
         logger->error("server SSL certificate rejected using root certificates, "
-                      "host name = %1, server port = %2", host_name, server_port);
+                      "host name = %1, server port = %2",
+                      host_name, server_port);
     }
 
     return int(valid);
@@ -732,15 +727,14 @@ int Stream::verify_callback_using_delegate(int preverify_ok, X509_STORE_CTX* ctx
     // callback the opportunity of throwing. The right solution seems to be to
     // carry an exception across the OpenSSL C-layer using the exception object
     // transportation mechanism offered by C++.
-    bool valid = callback(host_name, server_port, pem_data, pem_size,
-                          preverify_ok, depth); // Throws
+    bool valid = callback(host_name, server_port, pem_data, pem_size, preverify_ok, depth); // Throws
 
     BIO_free(bio);
     return int(valid);
 }
 
 #ifndef _WIN32
-#  pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
 #endif
 
 void Stream::ssl_init()
@@ -863,9 +857,9 @@ int Stream::bio_create(BIO* bio) noexcept
     BIO_set_shutdown(bio, 0);
 #else
     // In alignment with `crypto/bio/bss_sock.c` of OpenSSL.
-    bio->init  = 1;
-    bio->num   = 0;
-    bio->ptr   = nullptr;
+    bio->init = 1;
+    bio->num = 0;
+    bio->ptr = nullptr;
     bio->flags = 0;
 #endif
     return 1;
@@ -880,9 +874,7 @@ int Stream::bio_destroy(BIO*) noexcept
 
 #elif REALM_HAVE_SECURE_TRANSPORT
 
-void Context::ssl_init()
-{
-}
+void Context::ssl_init() {}
 
 void Context::ssl_destroy() noexcept
 {
@@ -899,8 +891,8 @@ void Context::ssl_destroy() noexcept
 // imported into that keychain.
 util::CFPtr<CFArrayRef> Context::load_pem_file(const std::string& path, SecKeychainRef keychain, std::error_code& ec)
 {
-    using util::CFPtr;
     using util::adoptCF;
+    using util::CFPtr;
 
     std::ifstream file(path);
     if (!file) {
@@ -920,8 +912,8 @@ util::CFPtr<CFArrayRef> Context::load_pem_file(const std::string& path, SecKeych
     if (!keychain) {
         if (auto certificate = adoptCF(SecCertificateCreateWithData(NULL, contentsCF.get()))) {
             auto ref = certificate.get();
-            return adoptCF(CFArrayCreate(nullptr, const_cast<const void**>(reinterpret_cast<void**>(&ref)),
-                                         1, &kCFTypeArrayCallBacks));
+            return adoptCF(CFArrayCreate(nullptr, const_cast<const void**>(reinterpret_cast<void**>(&ref)), 1,
+                                         &kCFTypeArrayCallBacks));
         }
 
         // SecCertificateCreateWithData doesn't tell us why it failed, so just
@@ -941,8 +933,8 @@ util::CFPtr<CFArrayRef> Context::load_pem_file(const std::string& path, SecKeych
 
     SecExternalFormat format = kSecFormatUnknown;
     SecExternalItemType itemType = kSecItemTypeUnknown;
-    if (OSStatus status = SecItemImport(contentsCF.get(), pathCF.get(), &format, &itemType, 0,
-                                        &params, keychain, &items)) {
+    if (OSStatus status =
+            SecItemImport(contentsCF.get(), pathCF.get(), &format, &itemType, 0, &params, keychain, &items)) {
         ec = std::error_code(status, secure_transport_error_category);
         return util::CFPtr<CFArrayRef>();
     }
@@ -998,8 +990,8 @@ std::error_code Context::open_temporary_keychain_if_needed()
 
     SecKeychainRef keychain = nullptr;
     std::string password = "";
-    if (OSStatus status = SecKeychainCreate(path.data(), UInt32(password.size()), password.data(),
-                                            false, nullptr, &keychain))
+    if (OSStatus status =
+            SecKeychainCreate(path.data(), UInt32(password.size()), password.data(), false, nullptr, &keychain))
         return std::error_code(status, secure_transport_error_category);
 
     m_keychain = adoptCF(keychain);
@@ -1096,9 +1088,7 @@ void Context::ssl_use_private_key_file(const std::string& path, std::error_code&
 #endif
 }
 
-void Context::ssl_use_default_verify(std::error_code&)
-{
-}
+void Context::ssl_use_default_verify(std::error_code&) {}
 
 void Context::ssl_use_verify_file(const std::string& path, std::error_code& ec)
 {
@@ -1110,7 +1100,8 @@ void Context::ssl_use_verify_file(const std::string& path, std::error_code& ec)
 
     if (m_trust_anchors && CFArrayGetCount(m_trust_anchors.get())) {
         const void* leaf_certificate = CFArrayGetValueAtIndex(m_trust_anchors.get(), 0);
-        m_pinned_certificate = adoptCF(SecCertificateCopyData(static_cast<SecCertificateRef>(const_cast<void*>(leaf_certificate))));
+        m_pinned_certificate =
+            adoptCF(SecCertificateCopyData(static_cast<SecCertificateRef>(const_cast<void*>(leaf_certificate))));
     }
     else {
         m_pinned_certificate.reset();
@@ -1181,9 +1172,7 @@ void Stream::ssl_set_host_name(const std::string& host_name, std::error_code& ec
         ec = std::error_code(status, secure_transport_error_category);
 }
 
-void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>&, std::error_code&)
-{
-}
+void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>&, std::error_code&) {}
 
 void Stream::ssl_handshake(std::error_code& ec, Want& want) noexcept
 {
@@ -1230,8 +1219,8 @@ OSStatus Stream::verify_peer() noexcept
             auto peerTrust = util::adoptCF(peerTrustRef);
 
             if (m_ssl_context.m_trust_anchors) {
-                if (OSStatus status = SecTrustSetAnchorCertificates(peerTrust.get(),
-                                                                    m_ssl_context.m_trust_anchors.get())) {
+                if (OSStatus status =
+                        SecTrustSetAnchorCertificates(peerTrust.get(), m_ssl_context.m_trust_anchors.get())) {
                     return status;
                 }
                 if (OSStatus status = SecTrustSetAnchorCertificatesOnly(peerTrust.get(), true)) {
@@ -1334,7 +1323,6 @@ std::size_t Stream::ssl_write(const char* data, std::size_t size, std::error_cod
         ec = MiscExtErrors::premature_end_of_input;
     }
     return n;
-
 }
 
 std::pair<OSStatus, std::size_t> Stream::do_ssl_write(const char* data, std::size_t size) noexcept
@@ -1354,8 +1342,7 @@ std::pair<OSStatus, std::size_t> Stream::do_ssl_write(const char* data, std::siz
         if (REALM_LIKELY(result == errSSLWouldBlock)) {
             m_num_partially_written_bytes += processed;
         }
-        else if (result == errSSLClosedGraceful || result == errSSLClosedAbort ||
-                 result == errSSLClosedNoNotify) {
+        else if (result == errSSLClosedGraceful || result == errSSLClosedAbort || result == errSSLClosedNoNotify) {
             result = errSecIO;
             m_last_error = error::broken_pipe;
         }
@@ -1433,8 +1420,7 @@ OSStatus Stream::tcp_read(void* data, std::size_t* length) noexcept
     return noErr;
 }
 
-OSStatus Stream::tcp_write(SSLConnectionRef connection, const void* data,
-                           std::size_t* length) noexcept
+OSStatus Stream::tcp_write(SSLConnectionRef connection, const void* data, std::size_t* length) noexcept
 {
     return static_cast<Stream*>(const_cast<void*>(connection))->tcp_write(data, length);
 }
@@ -1473,59 +1459,37 @@ void Context::ssl_init()
 }
 
 
-void Context::ssl_destroy() noexcept
-{
-}
+void Context::ssl_destroy() noexcept {}
 
 
-void Stream::ssl_init()
-{
-}
+void Stream::ssl_init() {}
 
 
-void Stream::ssl_destroy() noexcept
-{
-}
+void Stream::ssl_destroy() noexcept {}
 
 
-void Context::ssl_use_certificate_chain_file(const std::string&, std::error_code&)
-{
-}
+void Context::ssl_use_certificate_chain_file(const std::string&, std::error_code&) {}
 
 
-void Context::ssl_use_private_key_file(const std::string&, std::error_code&)
-{
-}
+void Context::ssl_use_private_key_file(const std::string&, std::error_code&) {}
 
 
-void Context::ssl_use_default_verify(std::error_code&)
-{
-}
+void Context::ssl_use_default_verify(std::error_code&) {}
 
 
-void Context::ssl_use_verify_file(const std::string&, std::error_code&)
-{
-}
+void Context::ssl_use_verify_file(const std::string&, std::error_code&) {}
 
 
-void Stream::ssl_set_verify_mode(VerifyMode, std::error_code&)
-{
-}
+void Stream::ssl_set_verify_mode(VerifyMode, std::error_code&) {}
 
 
-void Stream::ssl_set_host_name(const std::string&, std::error_code&)
-{
-}
+void Stream::ssl_set_host_name(const std::string&, std::error_code&) {}
 
 
-void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>&, std::error_code&)
-{
-}
+void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>&, std::error_code&) {}
 
 
-void Stream::ssl_handshake(std::error_code&, Want&) noexcept
-{
-}
+void Stream::ssl_handshake(std::error_code&, Want&) noexcept {}
 
 
 std::size_t Stream::ssl_read(char*, std::size_t, std::error_code&, Want&) noexcept

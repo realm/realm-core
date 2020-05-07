@@ -16,9 +16,9 @@ static constexpr bool core_version_at_least(int major, int minor, int patch)
 {
     // FIXME: Also compare the 'extra' component of the version. To do this, we
     // need the C++20 constexpr version of std::equal().
-    return (REALM_VERSION_MAJOR > major)
-        || (REALM_VERSION_MAJOR == major && ((REALM_VERSION_MINOR > minor)
-            || (REALM_VERSION_MINOR == minor && REALM_VERSION_PATCH >= patch)));
+    return (REALM_VERSION_MAJOR > major) ||
+           (REALM_VERSION_MAJOR == major &&
+            ((REALM_VERSION_MINOR > minor) || (REALM_VERSION_MINOR == minor && REALM_VERSION_PATCH >= patch)));
 }
 
 static_assert(core_version_at_least(5, 6, 0), "Vacuum is only supported on Core version >= 5.6.0");
@@ -27,7 +27,11 @@ struct Vacuum::VacuumFile {
     util::Logger& logger;
 
     explicit VacuumFile(util::Logger& logger, const Options& options, const std::string& path)
-        : logger {logger}, m_options(options), m_path(path) {}
+        : logger{logger}
+        , m_options(options)
+        , m_path(path)
+    {
+    }
     virtual ~VacuumFile() {}
 
     const Options& m_options;
@@ -70,7 +74,8 @@ struct PlainVacuumFile : Vacuum::VacuumFile {
     {
         if (!m_options.no_file_compaction) {
             if (m_options.bump_realm_version)
-                throw std::runtime_error("Option 'bump_realm_version' not supported for the plain Realm: '" + m_path + "'");
+                throw std::runtime_error("Option 'bump_realm_version' not supported for the plain Realm: '" + m_path +
+                                         "'");
             if (!m_sg->compact())
                 throw VacuumError{std::string{"Another process is using '" + m_path + "'. Aborting vacuum."}};
         }
@@ -111,7 +116,8 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
     {
         if (!m_options.no_file_compaction) {
             if (m_options.bump_realm_version)
-                throw std::runtime_error("Option 'bump_realm_version' not supported for the client Realm: '" + m_path + "'");
+                throw std::runtime_error("Option 'bump_realm_version' not supported for the client Realm: '" +
+                                         m_path + "'");
             if (!m_sg->compact())
                 throw VacuumError{std::string{"Another process is using '" + m_path + "'. Aborting vacuum."}};
         }
@@ -125,11 +131,10 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
 
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    explicit ServerHistoryContext(bool enable_compaction, bool ignore_clients,
-                                  std::chrono::seconds time_to_live) :
-        m_enable_compaction{enable_compaction},
-        m_ignore_clients{ignore_clients},
-        m_time_to_live{time_to_live}
+    explicit ServerHistoryContext(bool enable_compaction, bool ignore_clients, std::chrono::seconds time_to_live)
+        : m_enable_compaction{enable_compaction}
+        , m_ignore_clients{ignore_clients}
+        , m_time_to_live{time_to_live}
     {
     }
 
@@ -147,8 +152,8 @@ public:
                                std::chrono::seconds& compaction_interval) noexcept override final
     {
         if (m_enable_compaction) {
-            ignore_clients      = m_ignore_clients;
-            time_to_live        = m_time_to_live;
+            ignore_clients = m_ignore_clients;
+            time_to_live = m_time_to_live;
             compaction_interval = std::chrono::seconds::max();
             return true;
         }
@@ -163,10 +168,9 @@ private:
 };
 
 struct SyncServerVacuumFile : Vacuum::VacuumFile, _impl::ServerHistory::DummyCompactionControl {
-    SyncServerVacuumFile(util::Logger& logger, const Vacuum::Options& options,
-                         const std::string& path) :
-        VacuumFile(logger, options, path),
-        m_context{!options.no_log_compaction, options.ignore_clients, options.server_history_ttl}
+    SyncServerVacuumFile(util::Logger& logger, const Vacuum::Options& options, const std::string& path)
+        : VacuumFile(logger, options, path)
+        , m_context{!options.no_log_compaction, options.ignore_clients, options.server_history_ttl}
     {
         auto server_history = std::make_unique<ServerHistory>(path, m_context, *this);
         m_server_history = server_history.get();
@@ -226,35 +230,47 @@ Replication::HistoryType detect_history_type(const std::string& file, const char
     History::version_type version;
     int history_type;
     int history_schema_version;
-    GroupFriend::get_version_and_history_info(GroupFriend::get_alloc(group), top_ref, version,
-                                              history_type, history_schema_version);
+    GroupFriend::get_version_and_history_info(GroupFriend::get_alloc(group), top_ref, version, history_type,
+                                              history_schema_version);
     switch (history_type) {
         case Replication::hist_None:
             if (version == 1)
                 throw VacuumError{std::string{"Auto detection of history is not allowed for a Realm "
-                    "with History type None and version = 1: " + file}};
+                                              "with History type None and version = 1: " +
+                                              file}};
             else
                 return Replication::hist_None;
-        case Replication::hist_InRealm: return Replication::hist_InRealm;
-        case Replication::hist_SyncClient: return Replication::hist_SyncClient;
-        case Replication::hist_SyncServer: return Replication::hist_SyncServer;
-        case Replication::hist_OutOfRealm: return Replication::hist_OutOfRealm;
+        case Replication::hist_InRealm:
+            return Replication::hist_InRealm;
+        case Replication::hist_SyncClient:
+            return Replication::hist_SyncClient;
+        case Replication::hist_SyncServer:
+            return Replication::hist_SyncServer;
+        case Replication::hist_OutOfRealm:
+            return Replication::hist_OutOfRealm;
         default:
             throw VacuumError{std::string{"Unknown history type: "} + file};
     }
 }
 
-std::unique_ptr<Vacuum::VacuumFile> make_vacuum_file(util::Logger& logger,
-                                                     const Vacuum::Options& options,
-                                                     Replication::HistoryType type,
-                                                     const std::string& realm_path)
+std::unique_ptr<Vacuum::VacuumFile> make_vacuum_file(util::Logger& logger, const Vacuum::Options& options,
+                                                     Replication::HistoryType type, const std::string& realm_path)
 {
     switch (type) {
-        case Replication::hist_None:       return std::make_unique<PlainVacuumFile>(logger, options, realm_path);
-        case Replication::hist_InRealm:    return std::make_unique<PlainVacuumFile>(logger, options, realm_path); break;
-        case Replication::hist_SyncClient: return std::make_unique<SyncClientVacuumFile>(logger, options, realm_path); break;
-        case Replication::hist_SyncServer: return std::make_unique<SyncServerVacuumFile>(logger, options, realm_path); break;
-        case Replication::hist_OutOfRealm: return std::make_unique<PlainVacuumFile>(logger, options, realm_path); break;
+        case Replication::hist_None:
+            return std::make_unique<PlainVacuumFile>(logger, options, realm_path);
+        case Replication::hist_InRealm:
+            return std::make_unique<PlainVacuumFile>(logger, options, realm_path);
+            break;
+        case Replication::hist_SyncClient:
+            return std::make_unique<SyncClientVacuumFile>(logger, options, realm_path);
+            break;
+        case Replication::hist_SyncServer:
+            return std::make_unique<SyncServerVacuumFile>(logger, options, realm_path);
+            break;
+        case Replication::hist_OutOfRealm:
+            return std::make_unique<PlainVacuumFile>(logger, options, realm_path);
+            break;
     }
     REALM_TERMINATE("Invalid history type.");
     return nullptr;
@@ -282,7 +298,7 @@ Vacuum::Results Vacuum::vacuum(const std::string& path)
         m_options.history_type ? *m_options.history_type : detect_history_type(path, encryption_key); // Throws
     auto vacuum_file = make_vacuum_file(logger, m_options, history_type, path);
     results.type_description = vacuum_file->get_type_description(); // Throws
-    vacuum_file->vacuum(results); // Throws
+    vacuum_file->vacuum(results);                                   // Throws
     steady_clock::time_point t_1 = steady_clock::now();
     results.time = std::chrono::duration_cast<std::chrono::microseconds>(t_1 - t_0);
     return results;
@@ -305,6 +321,6 @@ Vacuum::Results Vacuum::dry_run(const std::string& path)
         m_options.history_type ? *m_options.history_type : detect_history_type(path, encryption_key); // Throws
     auto vacuum_file = make_vacuum_file(logger, m_options, history_type, path);
     results.type_description = vacuum_file->get_type_description(); // Throws
-    vacuum_file->dry_run(results); // Throws
+    vacuum_file->dry_run(results);                                  // Throws
     return results;
 }

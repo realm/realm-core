@@ -105,22 +105,21 @@ constexpr int get_server_history_schema_version() noexcept
 }
 
 
-class ServerHistory :
-        public sync::ClientReplicationBase,
-        public _impl::History,
-        public std::enable_shared_from_this<ServerHistory> {
+class ServerHistory : public sync::ClientReplicationBase,
+                      public _impl::History,
+                      public std::enable_shared_from_this<ServerHistory> {
 public:
-    using file_ident_type        = sync::file_ident_type;
-    using version_type           = sync::version_type;
-    using salt_type              = sync::salt_type;
-    using timestamp_type         = sync::timestamp_type;
-    using SaltedFileIdent        = sync::SaltedFileIdent;
-    using SaltedVersion          = sync::SaltedVersion;
-    using DownloadCursor         = sync::DownloadCursor;
-    using UploadCursor           = sync::UploadCursor;
-    using SyncProgress           = sync::SyncProgress;
-    using HistoryEntry           = sync::HistoryEntry;
-    using IntegrationError       = sync::ClientReplicationBase::IntegrationError;
+    using file_ident_type = sync::file_ident_type;
+    using version_type = sync::version_type;
+    using salt_type = sync::salt_type;
+    using timestamp_type = sync::timestamp_type;
+    using SaltedFileIdent = sync::SaltedFileIdent;
+    using SaltedVersion = sync::SaltedVersion;
+    using DownloadCursor = sync::DownloadCursor;
+    using UploadCursor = sync::UploadCursor;
+    using SyncProgress = sync::SyncProgress;
+    using HistoryEntry = sync::HistoryEntry;
+    using IntegrationError = sync::ClientReplicationBase::IntegrationError;
 
     enum class BootstrapError {
         no_error = 0,
@@ -135,8 +134,7 @@ public:
     };
 
     struct HistoryEntryHandler {
-        virtual void handle(version_type server_version, const HistoryEntry&,
-                            std::size_t original_size) = 0;
+        virtual void handle(version_type server_version, const HistoryEntry&, std::size_t original_size) = 0;
         virtual ~HistoryEntryHandler() {}
     };
 
@@ -144,11 +142,11 @@ public:
     //
     // CAUTION: The values of these are fixed by the history schema.
     enum class ClientType {
-        upstream  = 0, // Reachable via upstream server
-        self      = 6, // The file itself
-        indirect  = 1, // Client of subserver
-        legacy    = 5, // Precise type is unknown
-        regular   = 2, // Direct regular client
+        upstream = 0,  // Reachable via upstream server
+        self = 6,      // The file itself
+        indirect = 1,  // Client of subserver
+        legacy = 5,    // Precise type is unknown
+        regular = 2,   // Direct regular client
         subserver = 4, // Direct subserver
     };
 
@@ -160,11 +158,7 @@ public:
 
     using FileIdentAllocSlots = std::vector<FileIdentAllocSlot>;
 
-    enum class ExtendedIntegrationError {
-        client_file_expired,
-        bad_origin_file_ident,
-        bad_changeset
-    };
+    enum class ExtendedIntegrationError { client_file_expired, bad_origin_file_ident, bad_changeset };
 
     struct IntegratableChangeset {
         file_ident_type client_file_ident; // Identifier of sending client's file
@@ -237,8 +231,7 @@ public:
     /// partial view, and \a partial_progress_reference_version is set to the
     /// last sync version of the reference file that has been integrated into
     /// the partial view. Otherwise both are set to zero.
-    void get_status(sync::VersionInfo&, bool& has_upstream_status,
-                    file_ident_type& partial_file_ident,
+    void get_status(sync::VersionInfo&, bool& has_upstream_status, file_ident_type& partial_file_ident,
                     version_type& partial_progress_reference_version) const;
 
     /// For testing purposes
@@ -273,12 +266,9 @@ public:
     /// \param upload_progress Will be set to the position in the client-side
     /// history corresponding to the last client version that has been
     /// integrated on the server side.
-    BootstrapError bootstrap_client_session(SaltedFileIdent client_file_ident,
-                                            DownloadCursor download_progress,
-                                            SaltedVersion server_version,
-                                            ClientType client_type,
-                                            UploadCursor& upload_progress,
-                                            version_type& locked_server_version,
+    BootstrapError bootstrap_client_session(SaltedFileIdent client_file_ident, DownloadCursor download_progress,
+                                            SaltedVersion server_version, ClientType client_type,
+                                            UploadCursor& upload_progress, version_type& locked_server_version,
                                             util::Logger&) const;
 
     /// Allocate new file identifiers.
@@ -320,10 +310,8 @@ public:
     ///
     /// This function must be called only on histories with upstream sync
     /// status, or files that are initialized as partial views.
-    bool register_received_file_identifier(file_ident_type received_file_ident,
-                                           file_ident_type proxy_file_ident,
-                                           ClientType client_type,
-                                           salt_type& file_ident_salt,
+    bool register_received_file_identifier(file_ident_type received_file_ident, file_ident_type proxy_file_ident,
+                                           ClientType client_type, salt_type& file_ident_salt,
                                            sync::VersionInfo& version_info);
 
     /// FIXME: Fully document this function.
@@ -341,16 +329,12 @@ public:
     ///
     /// \return True when, and only when a new Realm version (snapshot) was
     /// created.
-    bool integrate_client_changesets(const IntegratableChangesets&,
-                                     sync::VersionInfo& version_info,
-                                     bool& backup_whole_realm,
-                                     IntegrationResult& result, util::Logger&);
+    bool integrate_client_changesets(const IntegratableChangesets&, sync::VersionInfo& version_info,
+                                     bool& backup_whole_realm, IntegrationResult& result, util::Logger&);
 
     /// EXPLAIN BACKUP incremental
-    auto integrate_backup_idents_and_changeset(version_type expected_realm_version,
-                                               salt_type server_version_salt,
-                                               const FileIdentAllocSlots&,
-                                               const std::vector<IntegratableChangeset>&,
+    auto integrate_backup_idents_and_changeset(version_type expected_realm_version, salt_type server_version_salt,
+                                               const FileIdentAllocSlots&, const std::vector<IntegratableChangeset>&,
                                                util::Logger&) -> IntegratedBackup;
 
     /// \brief Scan through the history for changesets to be downloaded.
@@ -401,11 +385,9 @@ public:
     /// \return False if the client file entry of the specified client file has
     /// expired. Otherwise true.
     bool fetch_download_info(file_ident_type client_file_ident, DownloadCursor& download_progress,
-                             version_type end_version, UploadCursor& upload_progress,
-                             HistoryEntryHandler&,
+                             version_type end_version, UploadCursor& upload_progress, HistoryEntryHandler&,
                              std::uint_fast64_t& cumulative_byte_size_current,
-                             std::uint_fast64_t& cumulative_byte_size_total,
-                             bool disable_download_compaction,
+                             std::uint_fast64_t& cumulative_byte_size_total, bool disable_download_compaction,
                              std::size_t accum_byte_size_soft_limit = 0x20000) const;
 
     /// The application must call this function before using the history as an
@@ -427,7 +409,8 @@ public:
     /// left unmodified.
     ///
     /// \return True if, and only if the handler retured true.
-    template<class H> bool transact(H handler, sync::VersionInfo&);
+    template <class H>
+    bool transact(H handler, sync::VersionInfo&);
 
     util::metered::vector<sync::Changeset> get_parsed_changesets(version_type begin, version_type end) const;
 
@@ -495,13 +478,12 @@ public:
     // Overriding member functions in sync::ClientHistoryBase
     void get_status(version_type&, SaltedFileIdent&, SyncProgress&) const override;
     void set_client_file_ident(SaltedFileIdent, bool) override;
-    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*,
-                           sync::VersionInfo&) override;
+    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*, sync::VersionInfo&) override;
     void find_uploadable_changesets(UploadCursor&, version_type, std::vector<UploadChangeset>&,
                                     version_type&) const override;
-    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*,
-                                     const RemoteChangeset*, std::size_t, sync::VersionInfo&,
-                                     IntegrationError&, util::Logger&, SyncTransactReporter*) override;
+    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*, const RemoteChangeset*,
+                                     std::size_t, sync::VersionInfo&, IntegrationError&, util::Logger&,
+                                     SyncTransactReporter*) override;
 
     // Overriding member functions in _impl::History
     void update_from_ref_and_version(ref_type ref, version_type) override;
@@ -532,66 +514,66 @@ private:
     class DiscardAccessorsGuard;
 
     // Sizes of fixed-size arrays
-    static constexpr int s_root_size            = 11;
-    static constexpr int s_client_files_size    =  8;
-    static constexpr int s_sync_history_size    =  6;
-    static constexpr int s_upstream_status_size =  8;
-    static constexpr int s_partial_sync_size    =  5;
-    static constexpr int s_schema_versions_size =  4;
+    static constexpr int s_root_size = 11;
+    static constexpr int s_client_files_size = 8;
+    static constexpr int s_sync_history_size = 6;
+    static constexpr int s_upstream_status_size = 8;
+    static constexpr int s_partial_sync_size = 5;
+    static constexpr int s_schema_versions_size = 4;
 
     // Slots in root array of history compartment
-    static constexpr int s_client_files_iip              =  0; // table ref
-    static constexpr int s_history_base_version_iip      =  1; // version
-    static constexpr int s_base_version_salt_iip         =  2; // salt
-    static constexpr int s_sync_history_iip              =  3; // table ref
-    static constexpr int s_ct_history_iip                =  4; // column ref
-    static constexpr int s_object_id_history_state_iip   =  5; // ref
-    static constexpr int s_upstream_status_iip           =  6; // optional array ref
-    static constexpr int s_partial_sync_iip              =  7; // optional array ref
-    static constexpr int s_compacted_until_version_iip   =  8; // version
-    static constexpr int s_last_compaction_timestamp_iip =  9; // UNIX timestamp (in seconds)
-    static constexpr int s_schema_versions_iip           = 10; // ref
+    static constexpr int s_client_files_iip = 0;              // table ref
+    static constexpr int s_history_base_version_iip = 1;      // version
+    static constexpr int s_base_version_salt_iip = 2;         // salt
+    static constexpr int s_sync_history_iip = 3;              // table ref
+    static constexpr int s_ct_history_iip = 4;                // column ref
+    static constexpr int s_object_id_history_state_iip = 5;   // ref
+    static constexpr int s_upstream_status_iip = 6;           // optional array ref
+    static constexpr int s_partial_sync_iip = 7;              // optional array ref
+    static constexpr int s_compacted_until_version_iip = 8;   // version
+    static constexpr int s_last_compaction_timestamp_iip = 9; // UNIX timestamp (in seconds)
+    static constexpr int s_schema_versions_iip = 10;          // ref
 
     // Slots in root array of `client_files` table
-    static constexpr int s_cf_ident_salts_iip            = 0; // column ref
-    static constexpr int s_cf_client_versions_iip        = 1; // column ref
-    static constexpr int s_cf_rh_base_versions_iip       = 2; // column ref
-    static constexpr int s_cf_recip_hist_refs_iip        = 3; // column ref
-    static constexpr int s_cf_proxy_files_iip            = 4; // column ref
-    static constexpr int s_cf_client_types_iip           = 5; // column ref
-    static constexpr int s_cf_last_seen_timestamps_iip   = 6; // column ref (UNIX timestamps in seconds)
+    static constexpr int s_cf_ident_salts_iip = 0;            // column ref
+    static constexpr int s_cf_client_versions_iip = 1;        // column ref
+    static constexpr int s_cf_rh_base_versions_iip = 2;       // column ref
+    static constexpr int s_cf_recip_hist_refs_iip = 3;        // column ref
+    static constexpr int s_cf_proxy_files_iip = 4;            // column ref
+    static constexpr int s_cf_client_types_iip = 5;           // column ref
+    static constexpr int s_cf_last_seen_timestamps_iip = 6;   // column ref (UNIX timestamps in seconds)
     static constexpr int s_cf_locked_server_versions_iip = 7; // column ref
 
     // Slots in root array of `sync_history` table
-    static constexpr int s_sh_version_salts_iip     = 0; // column ref
-    static constexpr int s_sh_origin_files_iip      = 1; // column ref
-    static constexpr int s_sh_client_versions_iip   = 2; // column ref
-    static constexpr int s_sh_timestamps_iip        = 3; // column ref
-    static constexpr int s_sh_changesets_iip        = 4; // column ref
-    static constexpr int s_sh_cumul_byte_sizes_iip  = 5; // column_ref
+    static constexpr int s_sh_version_salts_iip = 0;    // column ref
+    static constexpr int s_sh_origin_files_iip = 1;     // column ref
+    static constexpr int s_sh_client_versions_iip = 2;  // column ref
+    static constexpr int s_sh_timestamps_iip = 3;       // column ref
+    static constexpr int s_sh_changesets_iip = 4;       // column ref
+    static constexpr int s_sh_cumul_byte_sizes_iip = 5; // column_ref
 
     // Slots in `upstream_status` array
-    static constexpr int s_us_client_file_ident_iip                   = 0; // file ident
-    static constexpr int s_us_client_file_ident_salt_iip              = 1; // salt
-    static constexpr int s_us_progress_latest_server_version_iip      = 2; // version
+    static constexpr int s_us_client_file_ident_iip = 0;                   // file ident
+    static constexpr int s_us_client_file_ident_salt_iip = 1;              // salt
+    static constexpr int s_us_progress_latest_server_version_iip = 2;      // version
     static constexpr int s_us_progress_latest_server_version_salt_iip = 3; // salt
-    static constexpr int s_us_progress_download_server_version_iip    = 4; // version
-    static constexpr int s_us_progress_download_client_version_iip    = 5; // version
-    static constexpr int s_us_progress_upload_client_version_iip      = 6; // version
-    static constexpr int s_us_progress_upload_server_version_iip      = 7; // version
+    static constexpr int s_us_progress_download_server_version_iip = 4;    // version
+    static constexpr int s_us_progress_download_client_version_iip = 5;    // version
+    static constexpr int s_us_progress_upload_client_version_iip = 6;      // version
+    static constexpr int s_us_progress_upload_server_version_iip = 7;      // version
 
     // Slots in `partial_sync` array
-    static constexpr int s_ps_partial_file_ident_iip              = 0; // file ident
-    static constexpr int s_ps_partial_file_ident_salt_iip         = 1; // salt
-    static constexpr int s_ps_progress_partial_version_iip        = 2; // version
-    static constexpr int s_ps_progress_reference_version_iip      = 3; // version
+    static constexpr int s_ps_partial_file_ident_iip = 0;              // file ident
+    static constexpr int s_ps_partial_file_ident_salt_iip = 1;         // salt
+    static constexpr int s_ps_progress_partial_version_iip = 2;        // version
+    static constexpr int s_ps_progress_reference_version_iip = 3;      // version
     static constexpr int s_ps_progress_reference_version_salt_iip = 4; // salt
 
     // Slots in root array of `schema_versions` table
-    static constexpr int s_sv_schema_versions_iip   = 0; // integer
-    static constexpr int s_sv_library_versions_iip  = 1; // ref
+    static constexpr int s_sv_schema_versions_iip = 0;   // integer
+    static constexpr int s_sv_library_versions_iip = 1;  // ref
     static constexpr int s_sv_snapshot_versions_iip = 2; // integer (version_type)
-    static constexpr int s_sv_timestamps_iip        = 3; // integer (seconds since epoch)
+    static constexpr int s_sv_timestamps_iip = 3;        // integer (seconds since epoch)
 
     struct Accessors {
         Array root;
@@ -627,6 +609,7 @@ private:
         void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
         void init_from_ref(ref_type ref);
         void create();
+
     private:
         void init_children();
     };
@@ -726,20 +709,16 @@ private:
 
     SaltedFileIdent allocate_file_ident(file_ident_type proxy_file_ident, ClientType);
     void register_assigned_file_ident(file_ident_type file_ident);
-    bool try_register_file_ident(file_ident_type file_ident, file_ident_type proxy_file_ident,
-                                 ClientType, salt_type& file_ident_salt);
-    salt_type register_client_file_by_index(std::size_t file_index,
-                                            file_ident_type proxy_file_ident, ClientType);
+    bool try_register_file_ident(file_ident_type file_ident, file_ident_type proxy_file_ident, ClientType,
+                                 salt_type& file_ident_salt);
+    salt_type register_client_file_by_index(std::size_t file_index, file_ident_type proxy_file_ident, ClientType);
     bool ensure_upstream_file_ident(file_ident_type file_ident);
     void add_client_file(salt_type file_ident_salt, file_ident_type proxy_file_ident, ClientType);
     void save_upstream_sync_progress(const SyncProgress&);
 
-    BootstrapError do_bootstrap_client_session(SaltedFileIdent client_file_ident,
-                                               DownloadCursor download_progress,
-                                               SaltedVersion server_version,
-                                               ClientType client_type,
-                                               UploadCursor& upload_progress,
-                                               version_type& locked_server_version,
+    BootstrapError do_bootstrap_client_session(SaltedFileIdent client_file_ident, DownloadCursor download_progress,
+                                               SaltedVersion server_version, ClientType client_type,
+                                               UploadCursor& upload_progress, version_type& locked_server_version,
                                                util::Logger& logger) const noexcept;
 
     /// Behaviour is undefined if `last_integrated_local_version` of any
@@ -769,11 +748,9 @@ private:
     ///
     /// FIXME: Bad changesets should not cause exceptions to be thrown. Use
     /// std::error_code instead.
-    bool integrate_remote_changesets(file_ident_type remote_file_ident,
-                                     UploadCursor upload_progress,
-                                     version_type locked_server_version,
-                                     const RemoteChangeset* changesets, std::size_t num_changesets,
-                                     sync::TableInfoCache&, sync::Transformer::Reporter*,
+    bool integrate_remote_changesets(file_ident_type remote_file_ident, UploadCursor upload_progress,
+                                     version_type locked_server_version, const RemoteChangeset* changesets,
+                                     std::size_t num_changesets, sync::TableInfoCache&, sync::Transformer::Reporter*,
                                      IntegrationReporter*, util::Logger&);
 
     bool update_upload_progress(version_type orig_client_version, ReciprocalHistory& recip_hist,
@@ -783,13 +760,12 @@ private:
     // or history compartment).
     bool do_compact_history(util::Logger& logger, bool force);
 
-    void fixup_state_and_changesets_for_assigned_file_ident(Transaction&, sync::TableInfoCache& table_info_cache, file_ident_type);
+    void fixup_state_and_changesets_for_assigned_file_ident(Transaction&, sync::TableInfoCache& table_info_cache,
+                                                            file_ident_type);
 
     void record_current_schema_version();
-    static void record_current_schema_version(Array& schema_versions,
-                                              version_type snapshot_version);
+    static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
 };
-
 
 
 class ServerHistory::IntegrationReporter : public sync::Transformer::Reporter {
@@ -797,7 +773,6 @@ public:
     virtual void on_integration_session_begin() = 0;
     virtual void on_changeset_integrated(std::size_t changeset_size) = 0;
 };
-
 
 
 class ServerHistory::Context {
@@ -846,15 +821,13 @@ protected:
 };
 
 
-
 class ServerHistory::CompactionControl {
 public:
     struct LastClientAccessesEntry {
         file_ident_type client_file_ident;
         std::time_t last_seen_timestamp;
     };
-    using LastClientAccessesRange =
-        std::pair<const LastClientAccessesEntry*, const LastClientAccessesEntry*>;
+    using LastClientAccessesRange = std::pair<const LastClientAccessesEntry*, const LastClientAccessesEntry*>;
 
     /// Each invocation may clobber the result returned during the previous
     /// invocation.
@@ -882,10 +855,6 @@ std::ostream& operator<<(std::ostream& os, const ServerHistory::HistoryContents&
 bool operator==(const ServerHistory::HistoryContents&, const ServerHistory::HistoryContents&);
 
 
-
-
-
-
 // Implementation
 
 constexpr bool ServerHistory::is_direct_client(ClientType client_type) noexcept
@@ -903,27 +872,25 @@ constexpr bool ServerHistory::is_direct_client(ClientType client_type) noexcept
     return false;
 }
 
-inline ServerHistory::IntegratableChangeset::IntegratableChangeset(file_ident_type cfi,
-                                                                   timestamp_type ot,
-                                                                   file_ident_type ofi,
-                                                                   UploadCursor uc,
-                                                                   BinaryData c) noexcept :
-    client_file_ident{cfi},
-    origin_timestamp{ot},
-    origin_file_ident{ofi},
-    upload_cursor(uc),
-    changeset(c.data(), c.size())
+inline ServerHistory::IntegratableChangeset::IntegratableChangeset(file_ident_type cfi, timestamp_type ot,
+                                                                   file_ident_type ofi, UploadCursor uc,
+                                                                   BinaryData c) noexcept
+    : client_file_ident{cfi}
+    , origin_timestamp{ot}
+    , origin_file_ident{ofi}
+    , upload_cursor(uc)
+    , changeset(c.data(), c.size())
 {
 }
 
 inline ServerHistory::ServerHistory(const std::string& realm_path, Context& context,
-        CompactionControl& compaction_control) :
-    sync::ClientReplicationBase{realm_path}, // Throws
-    m_context{context},
-    m_compaction_control{compaction_control}
+                                    CompactionControl& compaction_control)
+    : sync::ClientReplicationBase{realm_path} // Throws
+    , m_context{context}
+    , m_compaction_control{compaction_control}
 {
-    m_enable_compaction = context.get_compaction_params(m_compaction_ignore_clients,
-                                                        m_compaction_ttl, m_compaction_interval);
+    m_enable_compaction =
+        context.get_compaction_params(m_compaction_ignore_clients, m_compaction_ttl, m_compaction_interval);
 
     // The synchronization protocol specification requires that server version
     // salts are nonzero positive integers that fit in 63 bits.
@@ -932,39 +899,40 @@ inline ServerHistory::ServerHistory(const std::string& realm_path, Context& cont
         std::uniform_int_distribution<std::int_fast64_t>(1, 0x0'7FFF'FFFF'FFFF'FFFF)(random);
 }
 
-template<class H> bool ServerHistory::transact(H handler, sync::VersionInfo& version_info)
+template <class H>
+bool ServerHistory::transact(H handler, sync::VersionInfo& version_info)
 {
-    auto wt = m_shared_group->start_write(); // Throws
-    if (handler(*wt)) { // Throws
+    auto wt = m_shared_group->start_write();       // Throws
+    if (handler(*wt)) {                            // Throws
         version_info.realm_version = wt->commit(); // Throws
-        version_info.sync_version  = get_salted_server_version();
+        version_info.sync_version = get_salted_server_version();
         return true;
     }
     return false;
 }
 
-inline ServerHistory::Accessors::Accessors(Allocator& alloc) noexcept:
-    root{alloc},
-    client_files{alloc},
-    sync_history{alloc},
-    upstream_status{alloc},
-    partial_sync{alloc},
-    schema_versions{alloc},
-    cf_ident_salts{alloc},
-    cf_client_versions{alloc},
-    cf_rh_base_versions{alloc},
-    cf_recip_hist_refs{alloc},
-    cf_proxy_files{alloc},
-    cf_client_types{alloc},
-    cf_last_seen_timestamps{alloc},
-    cf_locked_server_versions{alloc},
-    sh_version_salts{alloc},
-    sh_origin_files{alloc},
-    sh_client_versions{alloc},
-    sh_timestamps{alloc},
-    sh_changesets{alloc},
-    sh_cumul_byte_sizes{alloc},
-    ct_history{alloc}
+inline ServerHistory::Accessors::Accessors(Allocator& alloc) noexcept
+    : root{alloc}
+    , client_files{alloc}
+    , sync_history{alloc}
+    , upstream_status{alloc}
+    , partial_sync{alloc}
+    , schema_versions{alloc}
+    , cf_ident_salts{alloc}
+    , cf_client_versions{alloc}
+    , cf_rh_base_versions{alloc}
+    , cf_recip_hist_refs{alloc}
+    , cf_proxy_files{alloc}
+    , cf_client_types{alloc}
+    , cf_last_seen_timestamps{alloc}
+    , cf_locked_server_versions{alloc}
+    , sh_version_salts{alloc}
+    , sh_origin_files{alloc}
+    , sh_client_versions{alloc}
+    , sh_timestamps{alloc}
+    , sh_changesets{alloc}
+    , sh_cumul_byte_sizes{alloc}
+    , ct_history{alloc}
 {
     client_files.set_parent(&root, s_client_files_iip);
     sync_history.set_parent(&root, s_sync_history_iip);
@@ -1018,13 +986,12 @@ inline auto ServerHistory::get_salted_server_version() const noexcept -> SaltedV
     return SaltedVersion{version, m_server_version_salt};
 }
 
-inline auto ServerHistory::find_history_entry(file_ident_type remote_file_ident,
-                                              version_type begin_version, version_type end_version,
-                                              HistoryEntry& entry) const noexcept -> version_type
+inline auto ServerHistory::find_history_entry(file_ident_type remote_file_ident, version_type begin_version,
+                                              version_type end_version, HistoryEntry& entry) const noexcept
+    -> version_type
 {
     version_type last_integrated_remote_version; // Dummy
-    return find_history_entry(remote_file_ident, begin_version, end_version, entry,
-                              last_integrated_remote_version);
+    return find_history_entry(remote_file_ident, begin_version, end_version, entry, last_integrated_remote_version);
 }
 
 } // namespace _impl

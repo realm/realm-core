@@ -17,7 +17,8 @@ ConstTableRef TableInfoCache::TableInfo::get_table(const Transaction& t) const
     return t.get_table(key);
 }
 
-TableInfoCache::TableInfoCache(const Transaction& t) : m_transaction(t)
+TableInfoCache::TableInfoCache(const Transaction& t)
+    : m_transaction(t)
 {
 }
 
@@ -276,7 +277,7 @@ ObjKey row_for_primary_key(const Table& table, PrimaryKey key)
 
         REALM_TERMINATE("row_for_primary_key missing primary key type support");
     }
-    
+
     if (auto global_key = mpark::get_if<GlobalKey>(&key)) {
         return table.get_objkey(*global_key);
     }
@@ -325,16 +326,17 @@ using namespace realm;
 
 namespace {
 
-class MigrationError: public std::exception {
+class MigrationError : public std::exception {
 public:
-    MigrationError(const char* message):
-        m_message{message}
+    MigrationError(const char* message)
+        : m_message{message}
     {
     }
     const char* what() const noexcept override
     {
         return m_message;
     }
+
 private:
     const char* m_message;
 };

@@ -11,12 +11,11 @@ namespace util {
 util::File::SizeType get_file_size(const std::string& path);
 
 
-
 // Implementation
 
 inline util::File::SizeType get_file_size(const std::string& path)
 {
-    util::File file{path}; // Throws
+    util::File file{path};  // Throws
     return file.get_size(); // Throws
 }
 

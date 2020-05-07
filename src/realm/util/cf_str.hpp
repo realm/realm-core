@@ -32,7 +32,7 @@ inline std::string cfstring_to_std_string(CFStringRef cf_str)
 {
     std::string ret;
     // If the CFString happens to store UTF-8 we can read its data directly
-    if (const char *utf8 = CFStringGetCStringPtr(cf_str, kCFStringEncodingUTF8)) {
+    if (const char* utf8 = CFStringGetCStringPtr(cf_str, kCFStringEncodingUTF8)) {
         ret = utf8;
         return ret;
     }
@@ -46,8 +46,8 @@ inline std::string cfstring_to_std_string(CFStringRef cf_str)
     return ret;
 }
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_PLATFORM_APPLE
 

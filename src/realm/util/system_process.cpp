@@ -11,16 +11,16 @@
 #include <realm/util/features.h>
 
 #if !(defined _WIN32) && !REALM_WATCHOS && !REALM_TVOS
-#  include <signal.h>
-#  include <sys/wait.h>
-#  include <unistd.h>
-#  include <fcntl.h>
-#  include <poll.h>
-#  define HAVE_SUPPORT_FOR_SPAWN 1
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
+#define HAVE_SUPPORT_FOR_SPAWN 1
 #endif
 
 #ifdef _WIN32
-#  include <windows.h>
+#include <windows.h>
 #else
 extern char** environ;
 #endif
@@ -90,16 +90,14 @@ inline void checked_close(int fd) noexcept
 
 class CloseGuard {
 public:
-    CloseGuard() noexcept
-    {
-    }
-    explicit CloseGuard(int fd) noexcept :
-        m_fd{fd}
+    CloseGuard() noexcept {}
+    explicit CloseGuard(int fd) noexcept
+        : m_fd{fd}
     {
         REALM_ASSERT(fd != -1);
     }
-    CloseGuard(CloseGuard&& cg) noexcept :
-        m_fd{cg.release()}
+    CloseGuard(CloseGuard&& cg) noexcept
+        : m_fd{cg.release()}
     {
     }
     ~CloseGuard() noexcept
@@ -124,6 +122,7 @@ public:
         m_fd = -1;
         return fd;
     }
+
 private:
     int m_fd = -1;
 };
@@ -177,8 +176,8 @@ std::size_t write_some(int fd, const char* data, std::size_t size, std::error_co
 std::size_t read(int fd, char* buffer, std::size_t size, std::error_code& ec) noexcept
 {
     char* begin = buffer;
-    char* end   = buffer + size;
-    char* curr  = begin;
+    char* end = buffer + size;
+    char* curr = begin;
     for (;;) {
         if (curr == end) {
             ec = std::error_code(); // Success
@@ -201,8 +200,8 @@ std::size_t read(int fd, char* buffer, std::size_t size, std::error_code& ec) no
 std::size_t write(int fd, const char* data, std::size_t size, std::error_code& ec) noexcept
 {
     const char* begin = data;
-    const char* end   = data + size;
-    const char* curr  = begin;
+    const char* end = data + size;
+    const char* curr = begin;
     for (;;) {
         if (curr == end) {
             ec = std::error_code(); // Success
@@ -222,7 +221,7 @@ std::size_t write(int fd, const char* data, std::size_t size, std::error_code& e
 }
 
 
-::pid_t spawn(const char* path, char* const argv[], char *const envp[])
+::pid_t spawn(const char* path, char* const argv[], char* const envp[])
 {
     ::pid_t child_pid = ::fork();
     if (REALM_UNLIKELY(child_pid == -1)) {
@@ -232,7 +231,7 @@ std::size_t write(int fd, const char* data, std::size_t size, std::error_code& e
     }
     if (child_pid == 0) {
         // Child
-        // FIXME: Consider using fexecve() when available                         
+        // FIXME: Consider using fexecve() when available
         ::execve(path, argv, envp);
         ::exit(127);
     }
@@ -271,7 +270,7 @@ public:
 void parent_death_guard_thread(CloseGuard stop_pipe_read, CloseGuard death_pipe_read) noexcept
 {
     pollfd pollfd_slots[2];
-    pollfd& stop_pipe_slot  = pollfd_slots[0];
+    pollfd& stop_pipe_slot = pollfd_slots[0];
     pollfd& death_pipe_slot = pollfd_slots[1];
     stop_pipe_slot = pollfd(); // Clear slot
     stop_pipe_slot.fd = stop_pipe_read;
@@ -297,8 +296,8 @@ void parent_death_guard_thread(CloseGuard stop_pipe_read, CloseGuard death_pipe_
 }
 
 
-#define SIG_CASE(sig) \
-    case SIG ## sig: \
+#define SIG_CASE(sig)                                                                                                \
+    case SIG##sig:                                                                                                   \
         return "SIG" #sig
 
 const char* get_signal_name(int sig)
@@ -315,9 +314,9 @@ const char* get_signal_name(int sig)
         SIG_CASE(INT);
         SIG_CASE(KILL);
         SIG_CASE(PIPE);
-#  ifdef SIGPOLL
+#ifdef SIGPOLL
         SIG_CASE(POLL);
-#  endif
+#endif
         SIG_CASE(QUIT);
         SIG_CASE(SEGV);
         SIG_CASE(STOP);
@@ -354,8 +353,8 @@ auto sys_proc::copy_local_environment() -> Environment
         const char* j_2 = std::strchr(j_1, '=');
         if (!j_2)
             throw std::runtime_error{"Environment entry without `=`"};
-        std::string name{j_1, j_2}; // Throws
-        std::string value{j_2 + 1}; // Throws
+        std::string name{j_1, j_2};              // Throws
+        std::string value{j_2 + 1};              // Throws
         env[std::move(name)] = std::move(value); // Throws
     }
 
@@ -376,8 +375,8 @@ auto sys_proc::copy_local_environment() -> Environment
             if (!j_2)
                 throw std::runtime_error{"Environment entry without `=`"};
             i += std::strlen(i);
-            std::string name{j_1, j_2}; // Throws
-            std::string value{j_2 + 1, i}; // Throws
+            std::string name{j_1, j_2};              // Throws
+            std::string value{j_2 + 1, i};           // Throws
             env[std::move(name)] = std::move(value); // Throws
         }
         FreeEnvironmentStringsA(env_2);
@@ -397,12 +396,11 @@ auto sys_proc::copy_local_environment() -> Environment
 
 class sys_proc::ChildHandle::Impl {
 public:
-    Impl(::pid_t pid, CloseGuard death_pipe_write, CloseGuard logger_pipe_read,
-         Logger* logger) noexcept :
-        m_pid{pid},
-        m_death_pipe_write{std::move(death_pipe_write)},
-        m_logger_pipe_read{std::move(logger_pipe_read)},
-        m_logger{logger}
+    Impl(::pid_t pid, CloseGuard death_pipe_write, CloseGuard logger_pipe_read, Logger* logger) noexcept
+        : m_pid{pid}
+        , m_death_pipe_write{std::move(death_pipe_write)}
+        , m_logger_pipe_read{std::move(logger_pipe_read)}
+        , m_logger{logger}
     {
     }
 
@@ -514,8 +512,8 @@ sys_proc::ChildHandle::~ChildHandle() noexcept
 }
 
 
-sys_proc::ChildHandle::ChildHandle(Impl* impl) noexcept :
-    m_impl{impl}
+sys_proc::ChildHandle::ChildHandle(Impl* impl) noexcept
+    : m_impl{impl}
 {
 }
 
@@ -532,8 +530,8 @@ bool sys_proc::is_spawn_supported() noexcept
 
 #if HAVE_SUPPORT_FOR_SPAWN
 
-auto sys_proc::spawn(const std::string& path, const std::vector<std::string>& args,
-                     const Environment& env, const SpawnConfig& config) -> ChildHandle
+auto sys_proc::spawn(const std::string& path, const std::vector<std::string>& args, const Environment& env,
+                     const SpawnConfig& config) -> ChildHandle
 {
     Environment env_2;
     const Environment* env_3 = nullptr;
@@ -592,7 +590,7 @@ auto sys_proc::spawn(const std::string& path, const std::vector<std::string>& ar
             env_2 = env; // Throws (copy)
             env_3 = &env_2;
         }
-        env_2["REALM_PARENT_LOGGER_PIPE"]  = std::move(str_1); // Throws
+        env_2["REALM_PARENT_LOGGER_PIPE"] = std::move(str_1);  // Throws
         env_2["REALM_PARENT_LOGGER_LEVEL"] = std::move(str_2); // Throws
     }
 
@@ -604,8 +602,7 @@ auto sys_proc::spawn(const std::string& path, const std::vector<std::string>& ar
     std::size_t num_args = args.size();
     std::size_t num_vars = env_3->size();
     std::size_t num_offsets = num_args + num_vars;
-    std::unique_ptr<std::size_t[]> offsets =
-        std::make_unique<std::size_t[]>(num_offsets); // Throws
+    std::unique_ptr<std::size_t[]> offsets = std::make_unique<std::size_t[]>(num_offsets); // Throws
     std::size_t i = 0;
     for (const std::string& arg : args) {
         offsets[i] = buffer.size();
@@ -613,13 +610,13 @@ auto sys_proc::spawn(const std::string& path, const std::vector<std::string>& ar
         ++i;
     }
     for (const auto& entry : *env_3) {
-        const std::string& name  = entry.first;
+        const std::string& name = entry.first;
         const std::string& value = entry.second;
         if (name.find('=') != std::string::npos)
             throw std::runtime_error{"Bad environment variable name"};
         offsets[i] = buffer.size();
-        buffer.append(name.data(), name.size()); // Throws
-        buffer.append("=", 1); // Throws
+        buffer.append(name.data(), name.size());       // Throws
+        buffer.append("=", 1);                         // Throws
         buffer.append(value.data(), value.size() + 1); // Throws
         ++i;
     }
@@ -634,20 +631,19 @@ auto sys_proc::spawn(const std::string& path, const std::vector<std::string>& ar
     for (std::size_t i = 0; i < num_vars; ++i)
         envp[i] = buffer.data() + offsets[num_args + i];
 
-    std::unique_ptr<char[]> mem = std::make_unique<char[]>(sizeof (ChildHandle::Impl)); // Throws
+    std::unique_ptr<char[]> mem = std::make_unique<char[]>(sizeof(ChildHandle::Impl)); // Throws
 
     ::pid_t pid = ::spawn(argv[0], argv, envp); // Throws
 
-    ChildHandle::Impl* impl =
-        new (mem.release()) ChildHandle::Impl(pid, std::move(death_pipe_write),
-                                              std::move(logger_pipe_read), config.logger);
+    ChildHandle::Impl* impl = new (mem.release())
+        ChildHandle::Impl(pid, std::move(death_pipe_write), std::move(logger_pipe_read), config.logger);
     return {impl};
 }
 
 #else // !HAVE_SUPPORT_FOR_SPAWN
 
-auto sys_proc::spawn(const std::string&, const std::vector<std::string>&,
-                     const Environment&, const SpawnConfig&) -> ChildHandle
+auto sys_proc::spawn(const std::string&, const std::vector<std::string>&, const Environment&, const SpawnConfig&)
+    -> ChildHandle
 {
     throw std::runtime_error("Not supported on this platform");
 }
@@ -687,8 +683,7 @@ sys_proc::ParentDeathGuard::ParentDeathGuard()
     set_cloexec_flag(stop_pipe_write); // Throws
 
     // Spawn off the guard thread
-    auto func = [stop_pipe_read = std::move(stop_pipe_read),
-                 death_pipe_read = std::move(death_pipe_read)]() mutable {
+    auto func = [stop_pipe_read = std::move(stop_pipe_read), death_pipe_read = std::move(death_pipe_read)]() mutable {
         parent_death_guard_thread(std::move(stop_pipe_read), std::move(death_pipe_read));
     };
     m_thread = std::thread{std::move(func)}; // Throws
@@ -711,14 +706,10 @@ sys_proc::ParentDeathGuard::~ParentDeathGuard() noexcept
 
 #else // !HAVE_SUPPORT_FOR_SPAWN
 
-sys_proc::ParentDeathGuard::ParentDeathGuard()
-{
-}
+sys_proc::ParentDeathGuard::ParentDeathGuard() {}
 
 
-sys_proc::ParentDeathGuard::~ParentDeathGuard() noexcept
-{
-}
+sys_proc::ParentDeathGuard::~ParentDeathGuard() noexcept {}
 
 #endif // !HAVE_SUPPORT_FOR_SPAWN
 
@@ -792,13 +783,9 @@ sys_proc::ParentLogger::ParentLogger()
 }
 
 
-sys_proc::ParentLogger::~ParentLogger() noexcept
-{
-}
+sys_proc::ParentLogger::~ParentLogger() noexcept {}
 
 
-void sys_proc::ParentLogger::do_log(Level, std::string)
-{
-}
+void sys_proc::ParentLogger::do_log(Level, std::string) {}
 
 #endif // !HAVE_SUPPORT_FOR_SPAWN

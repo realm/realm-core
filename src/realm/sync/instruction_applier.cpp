@@ -42,28 +42,28 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
     auto table_name = get_table_name(instr);
 
     mpark::visit(util::overloaded{[&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-                                    if (spec.type == Instruction::Payload::Type::GlobalKey) {
-                                        log("sync::create_table(group, \"%1\");", table_name);
-                                        sync::create_table(m_transaction, table_name);
-                                    }
-                                    else {
-                                        if (!is_valid_key_type(spec.type)) {
-                                            bad_transaction_log("Invalid primary key type");
-                                        }
-                                        DataType pk_type = get_data_type(spec.type);
-                                        StringData pk_field = get_string(spec.field);
-                                        bool nullable = spec.nullable;
-                                        log("sync::create_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);",
-                                            table_name, pk_type, pk_field, nullable);
-                                        sync::create_table_with_primary_key(m_transaction, table_name, pk_type,
-                                                                            pk_field, nullable);
-                                    }
-                                },
-                                [&](const Instruction::AddTable::EmbeddedTable&) {
-                                    log("group.add_embedded_table(\"%1\");", table_name);
-                                    m_transaction.add_embedded_table(table_name);
-                                }},
-               instr.type);
+                                      if (spec.type == Instruction::Payload::Type::GlobalKey) {
+                                          log("sync::create_table(group, \"%1\");", table_name);
+                                          sync::create_table(m_transaction, table_name);
+                                      }
+                                      else {
+                                          if (!is_valid_key_type(spec.type)) {
+                                              bad_transaction_log("Invalid primary key type");
+                                          }
+                                          DataType pk_type = get_data_type(spec.type);
+                                          StringData pk_field = get_string(spec.field);
+                                          bool nullable = spec.nullable;
+                                          log("sync::create_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);",
+                                              table_name, pk_type, pk_field, nullable);
+                                          sync::create_table_with_primary_key(m_transaction, table_name, pk_type,
+                                                                              pk_field, nullable);
+                                      }
+                                  },
+                                  [&](const Instruction::AddTable::EmbeddedTable&) {
+                                      log("group.add_embedded_table(\"%1\");", table_name);
+                                      m_transaction.add_embedded_table(table_name);
+                                  }},
+                 instr.type);
 
     m_table_info_cache.clear();
 }

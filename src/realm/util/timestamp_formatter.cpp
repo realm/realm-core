@@ -9,10 +9,10 @@ using namespace realm;
 using util::TimestampFormatter;
 
 
-TimestampFormatter::TimestampFormatter(Config config) :
-    m_utc_time{config.utc_time},
-    m_precision{config.precision},
-    m_format_segments{make_format_segments(config)} // Throws
+TimestampFormatter::TimestampFormatter(Config config)
+    : m_utc_time{config.utc_time}
+    , m_precision{config.precision}
+    , m_format_segments{make_format_segments(config)} // Throws
 {
     m_out.imbue(std::locale::classic());
     m_out.fill('0');

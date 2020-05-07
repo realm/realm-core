@@ -42,16 +42,16 @@ struct MakeServerHistory {
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
-    class WrapServerHistory :
-        public HistoryContext,
-        public _impl::ServerHistory::DummyCompactionControl,
-        public _impl::ServerHistory {
+    class WrapServerHistory : public HistoryContext,
+                              public _impl::ServerHistory::DummyCompactionControl,
+                              public _impl::ServerHistory {
     public:
-        explicit WrapServerHistory(const std::string& realm_path) :
-            _impl::ServerHistory{realm_path, *this, *this}
+        explicit WrapServerHistory(const std::string& realm_path)
+            : _impl::ServerHistory{realm_path, *this, *this}
         {
         }
     };
@@ -228,7 +228,7 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         DBRef sg_2 = DB::create(*history_2);
 
         WriteTransaction wt{sg_2};
-        TableInfoCache table_info_cache {wt};
+        TableInfoCache table_info_cache{wt};
         InstructionApplier applier{wt, table_info_cache};
         applier.apply(result, &test_context.logger);
         wt.commit();
@@ -275,8 +275,9 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
     }
 }
 
-TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory) {
-    #if REALM_EXERCISE_OBJECT_ID_COLLISION
+TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
+{
+#if REALM_EXERCISE_OBJECT_ID_COLLISION
 
     // This number corresponds to the mask used to calculate "optimistic"
     // object IDs. See `GlobalKeyProvider::get_optimistic_local_id_hashed`.
@@ -334,6 +335,5 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory) {
         }
     }
 
-    #endif // REALM_EXERCISE_ID_COLLISION
+#endif // REALM_EXERCISE_ID_COLLISION
 }
-

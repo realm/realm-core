@@ -3,7 +3,7 @@
 
 namespace {
 
-class ErrorCategoryImpl: public std::error_category {
+class ErrorCategoryImpl : public std::error_category {
 public:
     const char* name() const noexcept override final
     {

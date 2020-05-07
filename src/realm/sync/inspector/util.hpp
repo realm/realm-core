@@ -15,14 +15,14 @@ void do_print_changeset(const sync::Changeset& changeset);
 
 void print_changeset(const std::string& path, bool hex = false);
 
-class IntegrationReporter: public _impl::ServerHistory::IntegrationReporter {
+class IntegrationReporter : public _impl::ServerHistory::IntegrationReporter {
 public:
     void on_integration_session_begin() override;
     void on_changeset_integrated(std::size_t changeset_size) override;
     void on_changesets_merged(long num_merges) override;
 };
 
-class ServerHistoryContext: public _impl::ServerHistory::Context {
+class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
     ServerHistoryContext();
 
@@ -32,6 +32,7 @@ public:
     sync::Transformer& get_transformer() override;
     util::Buffer<char>& get_transform_buffer() override;
     IntegrationReporter& get_integration_reporter() override;
+
 private:
     std::mt19937_64 m_random;
     std::unique_ptr<sync::Transformer> m_transformer;

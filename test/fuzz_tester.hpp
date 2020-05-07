@@ -36,7 +36,10 @@ namespace test_util {
 
 template <class L>
 struct StreamableLambda {
-    StreamableLambda(L&& l) : m_lambda(std::move(l)) {}
+    StreamableLambda(L&& l)
+        : m_lambda(std::move(l))
+    {
+    }
     L m_lambda;
 };
 
@@ -56,9 +59,9 @@ OS& operator<<(OS& os, StreamableLambda<L>&& sl)
 template <class Source>
 class FuzzTester {
 public:
-    FuzzTester(Source& source, bool trace):
-        m_source(source),
-        m_trace(trace)
+    FuzzTester(Source& source, bool trace)
+        : m_source(source)
+        , m_trace(trace)
     {
     }
 
@@ -69,68 +72,68 @@ private:
     static const int num_modifications_per_round = 256;
     static const int num_clients = 4;
 
-    static const int modify_weight   = 100;
-    static const int upload_weight   = 100;
+    static const int modify_weight = 100;
+    static const int upload_weight = 100;
     static const int download_weight = 100;
 
 
     static constexpr double group_to_table_level_transition_chance()
     {
-        return 7.0/8;
+        return 7.0 / 8;
     }
 
     static constexpr double table_to_array_level_transition_chance()
     {
-        return 7.0/8;
+        return 7.0 / 8;
     }
 
-    static const int rename_table_weight       =   0; // Rename table is destructive; not supported.
-    static const int add_table_weight          = 100;
-    static const int erase_table_weight        =  10;
+    static const int rename_table_weight = 0; // Rename table is destructive; not supported.
+    static const int add_table_weight = 100;
+    static const int erase_table_weight = 10;
 
-    static const int insert_column_weight      =  10;
-    static const int insert_link_column_weight =   5;
-    static const int insert_array_column_weight =  5;
-    static const int erase_column_weight       =   1;
+    static const int insert_column_weight = 10;
+    static const int insert_link_column_weight = 5;
+    static const int insert_array_column_weight = 5;
+    static const int erase_column_weight = 1;
 
-    static const int update_row_weight         =  80;
-    static const int insert_row_weight         = 100;
-    static const int erase_row_weight          =  80;
+    static const int update_row_weight = 80;
+    static const int insert_row_weight = 100;
+    static const int erase_row_weight = 80;
 
-    static const int set_link_weight           =  80;
-    static const int insert_link_weight        = 100;
-    static const int remove_link_weight        =  70;
-    static const int move_link_weight          =  50;
-    static const int swap_links_weight         =  50;
-    static const int clear_link_list_weight    =   1;
+    static const int set_link_weight = 80;
+    static const int insert_link_weight = 100;
+    static const int remove_link_weight = 70;
+    static const int move_link_weight = 50;
+    static const int swap_links_weight = 50;
+    static const int clear_link_list_weight = 1;
 
-    static const int array_set_weight          =  80;
-    static const int array_insert_weight       = 100;
-    static const int array_remove_weight       =  70;
-    static const int array_move_weight         =  50;
-    static const int array_swap_weight         =   0;
-    static const int array_clear_weight        =   1;
+    static const int array_set_weight = 80;
+    static const int array_insert_weight = 100;
+    static const int array_remove_weight = 70;
+    static const int array_move_weight = 50;
+    static const int array_swap_weight = 0;
+    static const int array_clear_weight = 1;
 
 
-    template<class T>
+    template <class T>
     T draw_int(T min, T max)
     {
         return m_source.template draw_int<T>(min, max);
     }
 
-    template<class T>
+    template <class T>
     T draw_int_mod(T mod)
     {
         return m_source.template draw_int_mod<T>(mod);
     }
 
-    template<class T>
+    template <class T>
     T draw_int_max(T max)
     {
         return m_source.template draw_int_max<T>(max);
     }
 
-    template<class T>
+    template <class T>
     T draw_float()
     {
         return m_source.template draw_float<T>();
@@ -178,16 +181,14 @@ private:
     auto trace_selected_int_array(Peer& client)
     {
         return make_streamable_lambda([&](std::ostream& os) {
-            os << "static_cast<Lst<int64_t>*>(" << trace_client(client) <<
-                  "->selected_array.get())";
+            os << "static_cast<Lst<int64_t>*>(" << trace_client(client) << "->selected_array.get())";
         });
     }
 
     auto trace_selected_string_array(Peer& client)
     {
         return make_streamable_lambda([&](std::ostream& os) {
-            os << "static_cast<Lst<StringData>*>(" << trace_client(client) <<
-                  "->selected_array.get())";
+            os << "static_cast<Lst<StringData>*>(" << trace_client(client) << "->selected_array.get())";
         });
     }
 
@@ -203,22 +204,25 @@ private:
             // Every other table has a PK column.
             bool is_string_pk = (table_name[6] == 'B');
             if (m_trace) {
-                std::cerr << "sync::create_table_with_primary_key(*"<<trace_client(client)<<"->"
-                    "group, \""<<table_name<<"\",";
+                std::cerr << "sync::create_table_with_primary_key(*" << trace_client(client)
+                          << "->"
+                             "group, \""
+                          << table_name << "\",";
                 if (is_string_pk)
                     std::cerr << "type_String";
                 else
                     std::cerr << "type_Int";
                 std::cerr << ", \"pk\");\n";
             }
-            sync::create_table_with_primary_key(*client.group, table_name,
-                                                is_string_pk ? type_String : type_Int,
+            sync::create_table_with_primary_key(*client.group, table_name, is_string_pk ? type_String : type_Int,
                                                 "pk");
         }
         else {
             if (m_trace) {
-                std::cerr << "sync::create_table(*"<<trace_client(client)<<"->"
-                    "group, \""<<table_name<<"\");\n";
+                std::cerr << "sync::create_table(*" << trace_client(client)
+                          << "->"
+                             "group, \""
+                          << table_name << "\");\n";
             }
             sync::create_table(*client.group, table_name);
         }
@@ -230,20 +234,23 @@ private:
         size_t table_ndx = draw_int_mod(num_tables);
         TableRef table = get_class(client, table_ndx);
         if (m_trace) {
-            std::cerr << "sync::erase_table(*"<<trace_client(client)<<"->"
-                "group, \""<<table->get_name()<<"\");\n";
+            std::cerr << "sync::erase_table(*" << trace_client(client)
+                      << "->"
+                         "group, \""
+                      << table->get_name() << "\");\n";
         }
-        sync::TableInfoCache table_info_cache {*client.group};
+        sync::TableInfoCache table_info_cache{*client.group};
         sync::erase_table(*client.group, table_info_cache, table->get_name());
     }
 
     void clear_group(Peer& client)
     {
         if (m_trace) {
-            std::cerr <<trace_client(client)<<"->"
-                "group->clear();\n";
+            std::cerr << trace_client(client)
+                      << "->"
+                         "group->clear();\n";
         }
-//        client.group->clear();
+        //        client.group->clear();
     }
 
     void insert_column(Peer& client)
@@ -251,9 +258,9 @@ private:
         // It is currently an error to request multiple columns with the same name
         // but with different types / nullability (there is no non-destructive way
         // to merge them).
-        const char*    column_names[] = { "a",      "b",      "c",         "d"         };
-        const DataType column_types[] = { type_Int, type_Int, type_String, type_String };
-        const bool  column_nullable[] = { false,    true,     false,       true        };
+        const char* column_names[] = {"a", "b", "c", "d"};
+        const DataType column_types[] = {type_Int, type_Int, type_String, type_String};
+        const bool column_nullable[] = {false, true, false, true};
 
         size_t which = draw_int_mod(4);
         const char* name = column_names[which];
@@ -276,8 +283,8 @@ private:
                 REALM_TERMINATE("Missing trace support for column type.");
             }
 
-            std::cerr <<trace_selected_table(client)<<"->add_column("<<
-                type_name << ", \"" << name << "\", " << nullable << ");\n";
+            std::cerr << trace_selected_table(client) << "->add_column(" << type_name << ", \"" << name << "\", "
+                      << nullable << ");\n";
         }
 
         ColKey col_key = table->add_column(type, name, nullable);
@@ -288,8 +295,8 @@ private:
     {
         REALM_ASSERT(count_classes(client) > 1);
 
-        const char*    column_names[] = { "e",       "f"           };
-        const DataType column_types[] = { type_Link, type_LinkList };
+        const char* column_names[] = {"e", "f"};
+        const DataType column_types[] = {type_Link, type_LinkList};
 
         size_t which = draw_int_max(1);
         const char* name = column_names[which];
@@ -317,8 +324,8 @@ private:
             else {
                 REALM_TERMINATE("Missing trace support for column type.");
             }
-            std::cerr << trace_selected_table(client)<<"->add_column_link("<<
-                type_name << ", \"" << name << "\", *client_"<<client.local_file_ident<<"->group->get_table(\"A\"));\n";
+            std::cerr << trace_selected_table(client) << "->add_column_link(" << type_name << ", \"" << name
+                      << "\", *client_" << client.local_file_ident << "->group->get_table(\"A\"));\n";
         }
 
         ColKey col_key = table->add_column_link(type, name, *link_target_table);
@@ -334,8 +341,8 @@ private:
     {
         REALM_ASSERT(count_classes(client) >= 1);
 
-        const    char* column_names[] = { "g",     "h"          };
-        const DataType column_types[] = { type_Int, type_String };
+        const char* column_names[] = {"g", "h"};
+        const DataType column_types[] = {type_Int, type_String};
 
         size_t which = draw_int_max(1);
         const char* name = column_names[which];
@@ -357,8 +364,8 @@ private:
             else {
                 REALM_TERMINATE("Missing trace support for column type.");
             }
-            std::cerr << trace_selected_table(client)<<"->add_column_list("<<
-                type_name << ", \"" << name << "\", " << nullable << ");\n";
+            std::cerr << trace_selected_table(client) << "->add_column_list(" << type_name << ", \"" << name << "\", "
+                      << nullable << ");\n";
         }
 
         ColKey col_key = table->add_column(type, name, nullable);
@@ -383,8 +390,8 @@ private:
             if (nullable && value % 7 == 0) {
                 bool is_default = (value % 21 == 0);
                 if (m_trace) {
-                    std::cerr << trace_selected_table(client) <<
-                        "->get_object("<<row_key<<").set_null("<<col_key<<", "<<is_default<<");\n";
+                    std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").set_null("
+                              << col_key << ", " << is_default << ");\n";
                 }
                 client.selected_table->get_object(row_key).set_null(col_key, is_default);
                 return;
@@ -392,17 +399,16 @@ private:
             else {
                 if (value % 3 == 0 && (!nullable || !obj.is_null(col_key))) {
                     if (m_trace) {
-                        std::cerr << trace_selected_table(client) <<
-                            "->get_object("<<row_key<<").add_int("<<col_key<<", "<<value<<");\n";
+                        std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").add_int("
+                                  << col_key << ", " << value << ");\n";
                     }
                     obj.add_int(col_key, value);
                 }
                 else {
                     bool is_default = (value % 13 == 0);
                     if (m_trace) {
-                        std::cerr << trace_selected_table(client) <<
-                            "->get_object("<<row_key<<").set("<<col_key<<", "<<
-                            value<<", "<<is_default<<");\n";
+                        std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").set(" << col_key
+                                  << ", " << value << ", " << is_default << ");\n";
                     }
                     obj.set(col_key, value, is_default);
                 }
@@ -416,8 +422,8 @@ private:
             if (nullable && ival % 7 == 0) {
                 bool is_default = (ival % 21 == 0);
                 if (m_trace) {
-                    std::cerr << trace_selected_table(client) <<
-                    "->get_object("<<row_key<<").set_null("<<col_key<<", "<<is_default<<");\n";
+                    std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").set_null("
+                              << col_key << ", " << is_default << ");\n";
                 }
                 client.selected_table->get_object(row_key).set_null(col_key, is_default);
                 return;
@@ -429,9 +435,8 @@ private:
 
                 bool is_default = (ival % 13 == 0);
                 if (m_trace) {
-                    std::cerr << trace_selected_table(client) <<
-                        "->get_object("<<row_key<<").set("<<col_key<<", \""<<
-                        value<<"\", "<<is_default<<");\n";
+                    std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").set(" << col_key
+                              << ", \"" << value << "\", " << is_default << ");\n";
                 }
                 obj.set(col_key, value, is_default);
                 return;
@@ -443,16 +448,16 @@ private:
             size_t value = draw_int_mod(target_table->size() + 1);
             if (value == target_table->size()) {
                 if (m_trace) {
-                    std::cerr << trace_selected_table(client) <<
-                        "->get_object("<<row_key<<").set_null("<<col_key<<";\n";
+                    std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").set_null("
+                              << col_key << ";\n";
                 }
                 obj.set_null(col_key);
             }
             else {
                 ObjKey target_key = (target_table->begin() + value)->get_key();
                 if (m_trace) {
-                    std::cerr << trace_selected_table(client) <<
-                        "->get_object("<<row_key<<").set("<<col_key<<", "<<target_key<<");\n";
+                    std::cerr << trace_selected_table(client) << "->get_object(" << row_key << ").set(" << col_key
+                              << ", " << target_key << ");\n";
                 }
                 obj.set(col_key, target_key);
             }
@@ -467,8 +472,10 @@ private:
 
         if (!pk_col_key) {
             if (m_trace) {
-                std::cerr << "sync::create_object(*"<<trace_client(client)<<"->"
-                    "group, *"<<trace_selected_table(client)<<");\n";
+                std::cerr << "sync::create_object(*" << trace_client(client)
+                          << "->"
+                             "group, *"
+                          << trace_selected_table(client) << ");\n";
             }
             sync::create_object(*client.group, *client.selected_table);
         }
@@ -485,13 +492,15 @@ private:
                 pk_int = draw_int_max(10); // Low number to ensure some collisions
             }
             if (m_trace) {
-                std::cerr << "sync::create_object_with_primary_key(*"<<trace_client(client)<<"->"
-                    "group, *"<<trace_selected_table(client)<<", ";
+                std::cerr << "sync::create_object_with_primary_key(*" << trace_client(client)
+                          << "->"
+                             "group, *"
+                          << trace_selected_table(client) << ", ";
                 if (is_string_pk)
                     std::cerr << "\"" << pk_string << "\"";
                 else
                     std::cerr << pk_int;
-                std::cerr<<");\n";
+                std::cerr << ");\n";
             }
             if (is_string_pk)
                 sync::create_object_with_primary_key(*client.group, *client.selected_table, pk_string);
@@ -506,8 +515,7 @@ private:
         size_t row_ndx = draw_int_mod(num_rows);
         ObjKey row_key = (client.selected_table->begin() + row_ndx)->get_key();
         if (m_trace) {
-            std::cerr << trace_selected_table(client) <<
-                "->remove_object("<<row_key<<");\n";
+            std::cerr << trace_selected_table(client) << "->remove_object(" << row_key << ");\n";
         }
         client.selected_table->remove_object(row_key);
     }
@@ -515,15 +523,14 @@ private:
     void set_link(Peer& client)
     {
         size_t num_links = client.selected_link_list->size();
-        size_t link_ndx = draw_int_max(num_links-1);
+        size_t link_ndx = draw_int_max(num_links - 1);
         auto target_table = client.selected_link_list->get_target_table();
         size_t num_target_rows = target_table->size();
         REALM_ASSERT(num_target_rows > 0);
         size_t target_row_ndx = draw_int_mod(num_target_rows);
         ObjKey target_row_key = (target_table->begin() + target_row_ndx)->get_key();
         if (m_trace) {
-            std::cerr << trace_selected_link_list(client) <<
-                "->set("<<link_ndx<<", "<<target_row_key<<");\n";
+            std::cerr << trace_selected_link_list(client) << "->set(" << link_ndx << ", " << target_row_key << ");\n";
         }
         client.selected_link_list->set(link_ndx, target_row_key);
     }
@@ -538,8 +545,8 @@ private:
         size_t target_row_ndx = draw_int_mod(num_target_rows);
         ObjKey target_row_key = (target_table->begin() + target_row_ndx)->get_key();
         if (m_trace) {
-            std::cerr << trace_selected_link_list(client) <<
-                "->insert("<<link_ndx<<", "<<target_row_key<<");\n";
+            std::cerr << trace_selected_link_list(client) << "->insert(" << link_ndx << ", " << target_row_key
+                      << ");\n";
         }
         client.selected_link_list->insert(link_ndx, target_row_key);
     }
@@ -549,8 +556,7 @@ private:
         size_t num_links = client.selected_link_list->size();
         size_t link_ndx = draw_int_mod(num_links);
         if (m_trace) {
-            std::cerr << trace_selected_link_list(client) <<
-                "->remove("<<link_ndx<<");\n";
+            std::cerr << trace_selected_link_list(client) << "->remove(" << link_ndx << ");\n";
         }
         client.selected_link_list->remove(link_ndx);
     }
@@ -561,14 +567,14 @@ private:
         size_t from_link_ndx, to_link_ndx;
         for (;;) {
             from_link_ndx = draw_int_mod(num_links);
-            to_link_ndx   = draw_int_mod(num_links);
+            to_link_ndx = draw_int_mod(num_links);
             if (from_link_ndx != to_link_ndx)
                 break;
         }
 
         if (m_trace) {
-            std::cerr << trace_selected_link_list(client) <<
-                "->move("<<from_link_ndx<<", "<<to_link_ndx<<");\n";
+            std::cerr << trace_selected_link_list(client) << "->move(" << from_link_ndx << ", " << to_link_ndx
+                      << ");\n";
         }
         client.selected_link_list->move(from_link_ndx, to_link_ndx);
     }
@@ -576,8 +582,7 @@ private:
     void clear_link_list(Peer& client)
     {
         if (m_trace) {
-            std::cerr << trace_selected_link_list(client) <<
-                "->clear();\n";
+            std::cerr << trace_selected_link_list(client) << "->clear();\n";
         }
         client.selected_link_list->clear();
     }
@@ -586,20 +591,18 @@ private:
     {
         size_t num_elements = client.selected_array->size();
         DataType type = client.selected_array->get_table()->get_column_type(client.selected_array->get_col_key());
-        size_t ndx = draw_int_max(num_elements-1);
+        size_t ndx = draw_int_max(num_elements - 1);
         if (type == type_Int) {
             int_fast64_t value = draw_int_max(1000);
             if (m_trace) {
-                std::cerr << trace_selected_int_array(client) <<
-                    "->set("<<ndx<<", "<<value<<");\n";
+                std::cerr << trace_selected_int_array(client) << "->set(" << ndx << ", " << value << ");\n";
             }
             static_cast<Lst<int64_t>*>(client.selected_array.get())->set(ndx, value);
         }
         else {
             StringData value = "abc";
             if (m_trace) {
-                std::cerr << trace_selected_string_array(client) <<
-                    "->set("<<ndx<<", "<<value<<");\n";
+                std::cerr << trace_selected_string_array(client) << "->set(" << ndx << ", " << value << ");\n";
             }
             static_cast<Lst<StringData>*>(client.selected_array.get())->set(ndx, value);
         }
@@ -612,15 +615,13 @@ private:
         size_t ndx = draw_int_max(num_elements);
         if (type == type_Int) {
             if (m_trace) {
-                std::cerr << trace_selected_int_array(client) <<
-                    "->insert("<<ndx<<", 0);\n";
+                std::cerr << trace_selected_int_array(client) << "->insert(" << ndx << ", 0);\n";
             }
             static_cast<Lst<int64_t>*>(client.selected_array.get())->insert(ndx, 0);
         }
         else if (type == type_String) {
             if (m_trace) {
-                std::cerr << trace_selected_string_array(client) <<
-                    "->insert("<<ndx<<", \"\");\n";
+                std::cerr << trace_selected_string_array(client) << "->insert(" << ndx << ", \"\");\n";
             }
             static_cast<Lst<StringData>*>(client.selected_array.get())->insert(ndx, "");
         }
@@ -629,12 +630,14 @@ private:
     void array_remove(Peer& client)
     {
         size_t num_elements = client.selected_array->size();
-        size_t ndx = draw_int_max(num_elements-1);
+        size_t ndx = draw_int_max(num_elements - 1);
         if (m_trace) {
-            std::cerr << "client_"<<client.local_file_ident<<"->"
-                "selected_array->remove("<<ndx<<", "<<ndx+1<<");\n";
+            std::cerr << "client_" << client.local_file_ident
+                      << "->"
+                         "selected_array->remove("
+                      << ndx << ", " << ndx + 1 << ");\n";
         }
-        client.selected_array->remove(ndx, ndx+1);
+        client.selected_array->remove(ndx, ndx + 1);
     }
 
     void array_move(Peer& client)
@@ -643,14 +646,13 @@ private:
         size_t from_ndx, to_ndx;
         for (;;) {
             from_ndx = draw_int_mod(num_elements);
-            to_ndx   = draw_int_mod(num_elements);
+            to_ndx = draw_int_mod(num_elements);
             if (from_ndx != to_ndx)
                 break;
         }
 
         if (m_trace) {
-            std::cerr << trace_selected_array(client) <<
-                "->move_row("<<from_ndx<<", "<<to_ndx<<");\n";
+            std::cerr << trace_selected_array(client) << "->move_row(" << from_ndx << ", " << to_ndx << ");\n";
         }
         client.selected_array->move(from_ndx, to_ndx);
     }
@@ -658,8 +660,7 @@ private:
     void array_clear(Peer& client)
     {
         if (m_trace) {
-            std::cerr << trace_selected_array(client) <<
-                "->clear();\n";
+            std::cerr << trace_selected_array(client) << "->clear();\n";
         }
         client.selected_array->clear();
     }
@@ -682,58 +683,57 @@ private:
     void get_group_level_modify_actions(size_t num_classes, std::vector<action_type>& actions)
     {
         if (num_classes >= 1)
-            actions.push_back(std::make_pair(rename_table_weight+0, &FuzzTester<Source>::rename_table));
+            actions.push_back(std::make_pair(rename_table_weight + 0, &FuzzTester<Source>::rename_table));
         if (true)
-            actions.push_back(std::make_pair(add_table_weight+0, &FuzzTester<Source>::add_table));
+            actions.push_back(std::make_pair(add_table_weight + 0, &FuzzTester<Source>::add_table));
         if (num_classes >= 1)
-            actions.push_back(std::make_pair(erase_table_weight+0, &FuzzTester<Source>::erase_table));
+            actions.push_back(std::make_pair(erase_table_weight + 0, &FuzzTester<Source>::erase_table));
     }
 
-    void get_table_level_modify_actions(size_t num_classes, size_t num_cols, size_t num_rows, std::vector<action_type>& actions)
+    void get_table_level_modify_actions(size_t num_classes, size_t num_cols, size_t num_rows,
+                                        std::vector<action_type>& actions)
     {
         if (true)
-            actions.push_back(std::make_pair(insert_column_weight+0, &FuzzTester<Source>::insert_column));
+            actions.push_back(std::make_pair(insert_column_weight + 0, &FuzzTester<Source>::insert_column));
         if (num_classes > 1)
-            actions.push_back(std::make_pair(insert_link_column_weight+0, &FuzzTester<Source>::insert_link_column));
+            actions.push_back(std::make_pair(insert_link_column_weight + 0, &FuzzTester<Source>::insert_link_column));
         if (num_classes >= 1)
-            actions.push_back(std::make_pair(insert_array_column_weight+0, &FuzzTester<Source>::insert_array_column));
+            actions.push_back(
+                std::make_pair(insert_array_column_weight + 0, &FuzzTester<Source>::insert_array_column));
         if (num_rows >= 1 && !m_unstructured_columns.empty())
-            actions.push_back(std::make_pair(update_row_weight+0, &FuzzTester<Source>::update_row));
+            actions.push_back(std::make_pair(update_row_weight + 0, &FuzzTester<Source>::update_row));
         if (num_cols >= 1)
-            actions.push_back(std::make_pair(insert_row_weight+0, &FuzzTester<Source>::insert_row));
+            actions.push_back(std::make_pair(insert_row_weight + 0, &FuzzTester<Source>::insert_row));
         if (num_rows >= 1)
-            actions.push_back(std::make_pair(erase_row_weight+0,
-                                             &FuzzTester<Source>::move_last_row_over));
+            actions.push_back(std::make_pair(erase_row_weight + 0, &FuzzTester<Source>::move_last_row_over));
     }
 
     void get_link_list_level_modify_actions(size_t num_links, std::vector<action_type>& actions)
     {
         if (num_links >= 1)
-            actions.push_back(std::make_pair(set_link_weight+0, &FuzzTester<Source>::set_link));
+            actions.push_back(std::make_pair(set_link_weight + 0, &FuzzTester<Source>::set_link));
         if (true)
-            actions.push_back(std::make_pair(insert_link_weight+0, &FuzzTester<Source>::insert_link));
+            actions.push_back(std::make_pair(insert_link_weight + 0, &FuzzTester<Source>::insert_link));
         if (num_links >= 1)
-            actions.push_back(std::make_pair(remove_link_weight+0, &FuzzTester<Source>::remove_link));
+            actions.push_back(std::make_pair(remove_link_weight + 0, &FuzzTester<Source>::remove_link));
         if (num_links >= 2)
-            actions.push_back(std::make_pair(move_link_weight+0, &FuzzTester<Source>::move_link));
+            actions.push_back(std::make_pair(move_link_weight + 0, &FuzzTester<Source>::move_link));
         if (true)
-            actions.push_back(std::make_pair(clear_link_list_weight+0,
-                                             &FuzzTester<Source>::clear_link_list));
+            actions.push_back(std::make_pair(clear_link_list_weight + 0, &FuzzTester<Source>::clear_link_list));
     }
 
     void get_array_level_modify_actions(size_t num_elements, std::vector<action_type>& actions)
     {
         if (num_elements >= 1)
-            actions.push_back(std::make_pair(array_set_weight+0, &FuzzTester<Source>::array_set));
+            actions.push_back(std::make_pair(array_set_weight + 0, &FuzzTester<Source>::array_set));
         if (true)
-            actions.push_back(std::make_pair(array_insert_weight+0, &FuzzTester<Source>::array_insert));
+            actions.push_back(std::make_pair(array_insert_weight + 0, &FuzzTester<Source>::array_insert));
         if (num_elements >= 1)
-            actions.push_back(std::make_pair(array_remove_weight+0, &FuzzTester<Source>::array_remove));
+            actions.push_back(std::make_pair(array_remove_weight + 0, &FuzzTester<Source>::array_remove));
         // if (num_elements >= 2)
         //     actions.push_back(std::make_pair(array_move_weight+0, &FuzzTester<Source>::array_move));
         if (true)
-            actions.push_back(std::make_pair(array_clear_weight+0,
-                                             &FuzzTester<Source>::array_clear));
+            actions.push_back(std::make_pair(array_clear_weight + 0, &FuzzTester<Source>::array_clear));
     }
 
     size_t count_classes(Peer& client)
@@ -775,11 +775,12 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
         using file_ident_type = Peer::file_ident_type;
         file_ident_type client_file_ident = 2 + i;
         if (m_trace) {
-            std::cerr << "std::unique_ptr<Peer> client_"<<client_file_ident<<" = "
-                "Peer::create_client(test_context, "<<client_file_ident<<");\n";
+            std::cerr << "std::unique_ptr<Peer> client_" << client_file_ident
+                      << " = "
+                         "Peer::create_client(test_context, "
+                      << client_file_ident << ");\n";
         }
-        clients[i] = Peer::create_client(test_context, client_file_ident,
-                                         changeset_dump_dir_gen.get(), path_add_on);
+        clients[i] = Peer::create_client(test_context, client_file_ident, changeset_dump_dir_gen.get(), path_add_on);
     }
     int pending_modifications = num_modifications_per_round;
     std::vector<int> pending_uploads(num_clients);   // One entry per client
@@ -794,7 +795,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
         }
         else {
             client_indexes.clear();
-            for (int i=0; i<num_clients; ++i) {
+            for (int i = 0; i < num_clients; ++i) {
                 if (pending_uploads[i] > 0 || pending_downloads[i] > 0)
                     client_indexes.push_back(i);
             }
@@ -812,12 +813,14 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                 time = draw_int(1, 5);
             }
             if (m_trace) {
-                std::cerr << "client_"<<client.local_file_ident<<"->"
-                    "history.advance_time("<<time<<");\n";
+                std::cerr << "client_" << client.local_file_ident
+                          << "->"
+                             "history.advance_time("
+                          << time << ");\n";
             }
             client.history.advance_time(time);
         }
-        bool can_upload   = pending_uploads[client_index]   > 0;
+        bool can_upload = pending_uploads[client_index] > 0;
         bool can_download = pending_downloads[client_index] > 0;
         long long accum_weights = 0;
         if (can_modify)
@@ -832,13 +835,14 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
             if (rest_weight < modify_weight) {
                 actions.clear();
                 if (m_trace) {
-                    std::cerr << "client_"<<client.local_file_ident<<"->"
-                        "start_transaction();\n";
+                    std::cerr << "client_" << client.local_file_ident
+                              << "->"
+                                 "start_transaction();\n";
                 }
                 client.start_transaction();
                 size_t num_classes = count_classes(client);
-                bool group_level = num_classes == 0 || draw_float<double>() >=
-                    group_to_table_level_transition_chance();
+                bool group_level =
+                    num_classes == 0 || draw_float<double>() >= group_to_table_level_transition_chance();
                 if (group_level) {
                     get_group_level_modify_actions(num_classes, actions);
                 }
@@ -847,9 +851,10 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                     TableRef table = get_class(client, draw_int_mod<size_t>(num_classes));
 
                     if (m_trace && table != client.selected_table) {
-                        std::cerr << trace_selected_table(client) <<
-                            " = " << trace_client(client) <<"->"
-                            "group->get_table(\""<<table->get_name()<<"\");\n";
+                        std::cerr << trace_selected_table(client) << " = " << trace_client(client)
+                                  << "->"
+                                     "group->get_table(\""
+                                  << table->get_name() << "\");\n";
                     }
                     client.selected_table = table;
                     m_unstructured_columns.clear();
@@ -877,8 +882,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                     size_t num_cols = table->get_column_count();
                     size_t num_rows = table->size();
                     bool table_level = num_rows == 0 || (m_link_list_columns.empty() && m_array_columns.empty()) ||
-                        draw_float<double>() >=
-                        table_to_array_level_transition_chance();
+                                       draw_float<double>() >= table_to_array_level_transition_chance();
                     if (table_level) {
                         get_table_level_modify_actions(num_classes, num_cols, num_rows, actions);
                     }
@@ -904,20 +908,19 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                             if (type == type_Int) {
                                 LstPtr<int64_t> array = table->get_object(row_key).get_list_ptr<int64_t>(col_key);
                                 if (m_trace) {
-                                    std::cerr << trace_selected_array(client) <<
-                                        " = " << trace_selected_table(client) <<
-                                        "->get_object("<<row_key<<
-                                        ").get_list_ptr<int64_t>("<<col_key<<");\n";
+                                    std::cerr << trace_selected_array(client) << " = " << trace_selected_table(client)
+                                              << "->get_object(" << row_key << ").get_list_ptr<int64_t>(" << col_key
+                                              << ");\n";
                                 }
                                 client.selected_array = std::move(array);
                             }
                             else if (type == type_String) {
-                                LstPtr<StringData> array = table->get_object(row_key).get_list_ptr<StringData>(col_key);
+                                LstPtr<StringData> array =
+                                    table->get_object(row_key).get_list_ptr<StringData>(col_key);
                                 if (m_trace) {
-                                    std::cerr << trace_selected_array(client) <<
-                                        " = " << trace_selected_table(client) <<
-                                        "->get_object("<<row_key<<
-                                        ").get_list_ptr<StringData>("<<col_key<<");\n";
+                                    std::cerr << trace_selected_array(client) << " = " << trace_selected_table(client)
+                                              << "->get_object(" << row_key << ").get_list_ptr<StringData>("
+                                              << col_key << ");\n";
                                 }
                                 client.selected_array = std::move(array);
                             }
@@ -930,10 +933,8 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                         else {
                             LnkLstPtr link_list = table->get_object(row_key).get_linklist_ptr(col_key);
                             if (m_trace) {
-                                std::cerr << trace_selected_link_list(client) <<
-                                    " = " << trace_selected_table(client) <<
-                                    "->get_object("<<row_key<<
-                                    ").get_linklist_ptr("<<col_key<<");\n";
+                                std::cerr << trace_selected_link_list(client) << " = " << trace_selected_table(client)
+                                          << "->get_object(" << row_key << ").get_linklist_ptr(" << col_key << ");\n";
                             }
                             client.selected_link_list = std::move(link_list);
                             size_t num_links = link_list->size();
@@ -957,8 +958,9 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                 REALM_ASSERT(action_func);
                 (this->*action_func)(client);
                 if (m_trace) {
-                    std::cerr << "client_"<<client.local_file_ident<<"->"
-                        "commit();";
+                    std::cerr << "client_" << client.local_file_ident
+                              << "->"
+                                 "commit();";
                 }
                 auto produced_version = client.commit();
                 if (m_trace) {
@@ -974,10 +976,10 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
             if (rest_weight < upload_weight) {
                 if (m_trace) {
                     std::cerr << "server->integrate_next_changeset_from"
-                        "(*client_"<<client.local_file_ident<<");\n";
+                                 "(*client_"
+                              << client.local_file_ident << ");\n";
                 }
-                bool identical_initial_schema_creating_transaction =
-                    server->integrate_next_changeset_from(client);
+                bool identical_initial_schema_creating_transaction = server->integrate_next_changeset_from(client);
                 --pending_uploads[client_index];
                 for (int i = 0; i < num_clients; ++i) {
                     if (i != client_index)
@@ -985,7 +987,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                 }
                 if (m_trace && identical_initial_schema_creating_transaction) {
                     std::cerr << "// Special handling of identical initial "
-                        "schema-creating transaction occured\n";
+                                 "schema-creating transaction occured\n";
                 }
                 continue;
             }
@@ -994,8 +996,9 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
         if (can_download) {
             if (rest_weight < download_weight) {
                 if (m_trace) {
-                    std::cerr << "client_"<<client.local_file_ident<<"->"
-                        "integrate_next_changeset_from(*server);\n";
+                    std::cerr << "client_" << client.local_file_ident
+                              << "->"
+                                 "integrate_next_changeset_from(*server);\n";
                 }
                 client.integrate_next_changeset_from(*server);
                 --pending_downloads[client_index];
@@ -1019,4 +1022,3 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
 } // namespace realm
 
 #endif // REALM_TEST_FUZZ_TESTER_HPP
-

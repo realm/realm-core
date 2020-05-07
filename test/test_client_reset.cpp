@@ -17,15 +17,15 @@ using namespace realm::fixtures;
 namespace {
 
 using ConnectionState = Session::ConnectionState;
-using ErrorInfo       = Session::ErrorInfo;
+using ErrorInfo = Session::ErrorInfo;
 
 TEST(ClientReset_NoLocalChanges)
 {
-    TEST_DIR(dir_1);  // The original server dir.
-    TEST_DIR(dir_2);  // The backup dir.
+    TEST_DIR(dir_1);                // The original server dir.
+    TEST_DIR(dir_2);                // The backup dir.
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
-    TEST_DIR(metadata_dir); // The metadata directory used by the resetting client.
+    TEST_DIR(metadata_dir);         // The metadata directory used by the resetting client.
 
     util::Logger& logger = test_context.logger;
 
@@ -90,7 +90,7 @@ TEST(ClientReset_NoLocalChanges)
     {
         std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
         DBRef sg = DB::create(*history);
-        ReadTransaction rt {sg};
+        ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         ConstTableRef table = group.get_table("class_table");
         auto col = table->get_column_key("int");
@@ -129,7 +129,7 @@ TEST(ClientReset_NoLocalChanges)
         {
             std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
             DBRef sg = DB::create(*history);
-            ReadTransaction rt {sg};
+            ReadTransaction rt{sg};
             const Group& group = rt.get_group();
             ConstTableRef table = group.get_table("class_table");
             CHECK_EQUAL(table->size(), 2);
@@ -138,9 +138,8 @@ TEST(ClientReset_NoLocalChanges)
             auto sync_transact_callback = [&](VersionID old_version, VersionID new_version) {
                 logger.debug("sync_transact_callback, old_version.version = %1, "
                              "old_version.index = %2, new_version.version = %3, "
-                             "new_version.index = %4", old_version.version,
-                             old_version.index, new_version.version,
-                             new_version.index);
+                             "new_version.index = %4",
+                             old_version.version, old_version.index, new_version.version, new_version.index);
                 CHECK_LESS(old_version.version, new_version.version);
                 sync_transact_callback_called = true;
             };
@@ -163,7 +162,7 @@ TEST(ClientReset_NoLocalChanges)
     {
         std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
         DBRef sg = DB::create(*history);
-        ReadTransaction rt {sg};
+        ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         ConstTableRef table = group.get_table("class_table");
         auto col = table->get_column_key("int");
@@ -178,7 +177,7 @@ TEST(ClientReset_InitialLocalChanges)
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1); // The writer.
     SHARED_GROUP_TEST_PATH(path_2); // The resetting client.
-    TEST_DIR(metadata_dir); // The metadata directory used by the resetting client.
+    TEST_DIR(metadata_dir);         // The metadata directory used by the resetting client.
 
     const std::string server_path = "/data";
 
@@ -484,7 +483,8 @@ TEST(ClientReset_ThreeClients)
                 auto col = table_2->get_column_key("array_string");
                 GlobalKey oid("aaa");
                 ObjKey row_ndx = sync::row_for_object_id(table_info_cache, *table_2, oid);
-                Obj obj = row_ndx ? table_2->get_object(row_ndx) : create_object_with_primary_key(wt, *table_2, "aaa");
+                Obj obj =
+                    row_ndx ? table_2->get_object(row_ndx) : create_object_with_primary_key(wt, *table_2, "aaa");
                 auto list_string = obj.get_list<String>(col);
                 list_string.add("c");
                 list_string.add("d");
@@ -638,7 +638,7 @@ TEST(ClientReset_ThreeClients)
         session_1.wait_for_download_complete_or_client_stopped();
         session_2.wait_for_download_complete_or_client_stopped();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds {1000});
+        std::this_thread::sleep_for(std::chrono::milliseconds{1000});
 
         // A third client makes async open
         {
@@ -691,7 +691,8 @@ TEST(ClientReset_StateRealmCompactableServerVersion)
     for (size_t i = 0; i < 2; ++i) {
 
         if (i > 0) {
-            version_type compactable_server_version_2 = fixture.get_server().get_state_realm_compactable_server_version(server_path);
+            version_type compactable_server_version_2 =
+                fixture.get_server().get_state_realm_compactable_server_version(server_path);
             logger.debug("compactable_server_version = %1", compactable_server_version_2);
             CHECK_LESS_EQUAL(compactable_server_version, compactable_server_version_2);
             compactable_server_version = compactable_server_version_2;
@@ -728,13 +729,14 @@ TEST(ClientReset_StateRealmCompactableServerVersion)
         }
 
         {
-            version_type compactable_server_version_2 = fixture.get_server().get_state_realm_compactable_server_version(server_path);
+            version_type compactable_server_version_2 =
+                fixture.get_server().get_state_realm_compactable_server_version(server_path);
             logger.info("compactable_server_version = %1", compactable_server_version_2);
             CHECK_LESS_EQUAL(compactable_server_version, compactable_server_version_2);
             compactable_server_version = compactable_server_version_2;
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds {100});
+        std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
 }
 

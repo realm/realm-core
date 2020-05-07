@@ -24,7 +24,7 @@ struct AccessControl {
     ///
     /// NOTE: This method is thread-safe.
     util::Optional<AccessToken> verify_access_token(StringData access_token,
-        AccessToken::ParseError* error = nullptr) const;
+                                                    AccessToken::ParseError* error = nullptr) const;
 
     //@{
     /// Check whether user has the requested permission for the given

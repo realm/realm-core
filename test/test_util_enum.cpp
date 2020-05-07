@@ -39,15 +39,13 @@ namespace {
 
 enum class Color { orange, purple, brown };
 
-struct ColorSpec { static EnumAssoc map[]; };
+struct ColorSpec {
+    static EnumAssoc map[];
+};
 using ColorEnum = Enum<Color, ColorSpec>;
 
 EnumAssoc ColorSpec::map[] = {
-    { int(Color::orange), "orange" },
-    { int(Color::purple), "purple" },
-    { int(Color::brown),  "brown"  },
-    { 0, 0 }
-};
+    {int(Color::orange), "orange"}, {int(Color::purple), "purple"}, {int(Color::brown), "brown"}, {0, 0}};
 
 TEST(Util_Enum_Basics)
 {

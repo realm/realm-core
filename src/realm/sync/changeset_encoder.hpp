@@ -9,7 +9,7 @@
 namespace realm {
 namespace sync {
 
-struct ChangesetEncoder: InstructionHandler {
+struct ChangesetEncoder : InstructionHandler {
     using Buffer = util::AppendBuffer<char, MeteredAllocator>;
 
     Buffer release() noexcept;
@@ -31,19 +31,21 @@ struct ChangesetEncoder: InstructionHandler {
     void encode_single(const Changeset& log);
 
 protected:
-    template<class E> static void encode(E& encoder, const Instruction&);
+    template <class E>
+    static void encode(E& encoder, const Instruction&);
 
     StringData get_string(StringBufferRange) const noexcept;
 
 private:
-    template<class... Args>
+    template <class... Args>
     void append(Instruction::Type t, Args&&...);
     template <class... Args>
     void append_path_instr(Instruction::Type t, const Instruction::PathInstruction&, Args&&...);
     void append_string(StringBufferRange); // does not intern the string
     void append_bytes(const void*, size_t);
 
-    template<class T> void append_int(T);
+    template <class T>
+    void append_int(T);
     void append_value(const Instruction::PrimaryKey&);
     void append_value(const Instruction::Payload&);
     void append_value(const Instruction::Payload::Link&);
@@ -84,7 +86,8 @@ inline void ChangesetEncoder::operator()(const Instruction& instr)
     encode(*this, instr); // Throws
 }
 
-template<class E> inline void ChangesetEncoder::encode(E& encoder, const Instruction& instr)
+template <class E>
+inline void ChangesetEncoder::encode(E& encoder, const Instruction& instr)
 {
     instr.visit(encoder); // Throws
 }

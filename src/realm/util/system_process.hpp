@@ -85,8 +85,8 @@ private:
 
     ChildHandle(Impl*) noexcept;
 
-    friend ChildHandle spawn(const std::string&, const std::vector<std::string>&,
-                             const Environment&, const SpawnConfig&);
+    friend ChildHandle spawn(const std::string&, const std::vector<std::string>&, const Environment&,
+                             const SpawnConfig&);
 };
 
 
@@ -97,10 +97,9 @@ bool is_spawn_supported() noexcept;
 
 //@{
 /// Spawn a child process.
-ChildHandle spawn(const std::string& path, const std::vector<std::string>& args = {},
-                  const Environment& = {});
-ChildHandle spawn(const std::string& path, const std::vector<std::string>& args,
-                  const Environment&, const SpawnConfig&);
+ChildHandle spawn(const std::string& path, const std::vector<std::string>& args = {}, const Environment& = {});
+ChildHandle spawn(const std::string& path, const std::vector<std::string>& args, const Environment&,
+                  const SpawnConfig&);
 //@}
 
 
@@ -163,8 +162,6 @@ private:
 };
 
 
-
-
 // Implementation
 
 inline ExitInfo::operator bool() const noexcept
@@ -172,8 +169,7 @@ inline ExitInfo::operator bool() const noexcept
     return (killed_by_signal == 0 && status == 0);
 }
 
-inline ChildHandle spawn(const std::string& path, const std::vector<std::string>& args,
-                         const Environment& env)
+inline ChildHandle spawn(const std::string& path, const std::vector<std::string>& args, const Environment& env)
 {
     return spawn(path, args, env, SpawnConfig{}); // Throws
 }

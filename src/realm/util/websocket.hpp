@@ -15,10 +15,8 @@ namespace realm {
 namespace util {
 namespace websocket {
 
-using WriteCompletionHandler =
-    std::function<void(std::error_code, size_t num_bytes_transferred)>;
-using ReadCompletionHandler =
-    std::function<void(std::error_code, size_t num_bytes_transferred)>;
+using WriteCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
+using ReadCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
 
 class Config {
 public:
@@ -90,14 +88,7 @@ public:
 };
 
 
-enum class Opcode {
-    continuation =  0,
-    text         =  1,
-    binary       =  2,
-    close        =  8,
-    ping         =  9,
-    pong         = 10
-};
+enum class Opcode { continuation = 0, text = 1, binary = 2, close = 8, ping = 9, pong = 10 };
 
 
 class Socket {
@@ -117,10 +108,8 @@ public:
     /// When the server responds with a valid HTTP response, the callback
     /// function websocket_handshake_completion_handler() is called. Messages
     /// can only be sent and received after the handshake has completed.
-    void initiate_client_handshake(const std::string& request_uri,
-                                   const std::string& host,
-                                   const std::string& sec_websocket_protocol,
-                                   HTTPHeaders headers = HTTPHeaders{});
+    void initiate_client_handshake(const std::string& request_uri, const std::string& host,
+                                   const std::string& sec_websocket_protocol, HTTPHeaders headers = HTTPHeaders{});
 
     /// initiate_server_handshake() starts the Socket in server mode. It will
     /// wait for a HTTP request from a client and respond with a HTTP response.
@@ -196,8 +185,7 @@ util::Optional<std::string> read_sec_websocket_protocol(const HTTPRequest& reque
 /// make_http_response() takes \a request as a WebSocket handshake request,
 /// validates it, and makes a HTTP response. If the request is invalid, the
 /// return value is None, and ec is set to Error::bad_request_header_*.
-util::Optional<HTTPResponse> make_http_response(const HTTPRequest& request,
-                                                const std::string& sec_websocket_protocol,
+util::Optional<HTTPResponse> make_http_response(const HTTPRequest& request, const std::string& sec_websocket_protocol,
                                                 std::error_code& ec);
 
 enum class Error {
@@ -236,7 +224,8 @@ std::error_code make_error_code(Error) noexcept;
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::util::websocket::Error> {
+template <>
+struct is_error_code_enum<realm::util::websocket::Error> {
     static const bool value = true;
 };
 

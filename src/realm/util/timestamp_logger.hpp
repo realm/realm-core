@@ -12,7 +12,7 @@ namespace util {
 class TimestampStderrLogger : public RootLogger {
 public:
     using Precision = TimestampFormatter::Precision;
-    using Config    = TimestampFormatter::Config;
+    using Config = TimestampFormatter::Config;
 
     explicit TimestampStderrLogger(Config = {});
 

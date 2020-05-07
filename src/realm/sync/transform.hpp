@@ -73,7 +73,6 @@ public:
 };
 
 
-
 /// The interface between the sync history and the operational transformer
 /// (Transformer) for the purpose of transforming changesets received from a
 /// particular *remote peer*.
@@ -120,7 +119,6 @@ public:
 
     virtual ~TransformHistory() noexcept {}
 };
-
 
 
 class TransformError; // Exception
@@ -176,12 +174,9 @@ public:
     ///
     /// FIXME: Consider using std::error_code instead of throwing
     /// TransformError.
-    virtual void transform_remote_changesets(TransformHistory&,
-                                             file_ident_type local_file_ident,
-                                             version_type current_local_version,
-                                             Changeset* changesets,
-                                             std::size_t num_changesets,
-                                             Reporter* = nullptr,
+    virtual void transform_remote_changesets(TransformHistory&, file_ident_type local_file_ident,
+                                             version_type current_local_version, Changeset* changesets,
+                                             std::size_t num_changesets, Reporter* = nullptr,
                                              util::Logger* = nullptr) = 0;
 
     virtual ~Transformer() noexcept {}
@@ -205,22 +200,19 @@ public:
 
     TransformerImpl();
 
-    void transform_remote_changesets(TransformHistory&, file_ident_type, version_type, Changeset*,
-                                     std::size_t, Reporter*, util::Logger*) override;
+    void transform_remote_changesets(TransformHistory&, file_ident_type, version_type, Changeset*, std::size_t,
+                                     Reporter*, util::Logger*) override;
 
     struct Side;
     struct MajorSide;
     struct MinorSide;
 
 protected:
-    virtual void merge_changesets(file_ident_type local_file_ident,
-                                  Changeset* their_changesets,
+    virtual void merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
                                   std::size_t their_size,
                                   // our_changesets is a pointer-pointer because these changesets
                                   // are held by the reciprocal transform cache.
-                                  Changeset** our_changesets,
-                                  std::size_t our_size,
-                                  Reporter* reporter,
+                                  Changeset** our_changesets, std::size_t our_size, Reporter* reporter,
                                   util::Logger* logger);
 
 private:
@@ -228,13 +220,11 @@ private:
 
     TransactLogParser m_changeset_parser;
 
-    Changeset& get_reciprocal_transform(TransformHistory&, file_ident_type local_file_ident,
-                                        version_type version, const HistoryEntry&);
+    Changeset& get_reciprocal_transform(TransformHistory&, file_ident_type local_file_ident, version_type version,
+                                        const HistoryEntry&);
     void flush_reciprocal_transform_cache(TransformHistory&);
 
-    static size_t emit_changesets(const Changeset*,
-                                  size_t num_changesets,
-                                  util::Buffer<char>& output_buffer);
+    static size_t emit_changesets(const Changeset*, size_t num_changesets, util::Buffer<char>& output_buffer);
 
     struct Discriminant;
     struct Transformer;
@@ -290,10 +280,8 @@ public:
     std::size_t original_changeset_size = 0;
 
     RemoteChangeset() {}
-    RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d, timestamp_type ot,
-                    file_ident_type fi);
+    RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d, timestamp_type ot, file_ident_type fi);
 };
-
 
 
 class Transformer::Reporter {
@@ -302,30 +290,26 @@ public:
 };
 
 
-
 void parse_remote_changeset(const Transformer::RemoteChangeset&, Changeset&);
-
-
 
 
 // Implementation
 
-class TransformError: public std::runtime_error {
+class TransformError : public std::runtime_error {
 public:
-    TransformError(const std::string& message):
-        std::runtime_error(message)
+    TransformError(const std::string& message)
+        : std::runtime_error(message)
     {
     }
 };
 
-inline Transformer::RemoteChangeset::RemoteChangeset(version_type rv, version_type lv,
-                                                     ChunkedBinaryData d, timestamp_type ot,
-                                                     file_ident_type fi):
-    remote_version(rv),
-    last_integrated_local_version(lv),
-    data(d),
-    origin_timestamp(ot),
-    origin_file_ident(fi)
+inline Transformer::RemoteChangeset::RemoteChangeset(version_type rv, version_type lv, ChunkedBinaryData d,
+                                                     timestamp_type ot, file_ident_type fi)
+    : remote_version(rv)
+    , last_integrated_local_version(lv)
+    , data(d)
+    , origin_timestamp(ot)
+    , origin_file_ident(fi)
 {
 }
 

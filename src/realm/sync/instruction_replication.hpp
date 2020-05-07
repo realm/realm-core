@@ -28,7 +28,7 @@ namespace realm {
 namespace sync {
 
 
-class SyncReplication: public TrivialReplication {
+class SyncReplication : public TrivialReplication {
 public:
     explicit SyncReplication(const std::string& realm_path);
     void set_short_circuit(bool) noexcept;
@@ -77,22 +77,17 @@ public:
     void erase_column(const Table*, ColKey col_key) override;
     void rename_column(const Table*, ColKey col_key, StringData name) override;
 
-    void set_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value,
-                 _impl::Instruction variant) override;
+    void set_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value, _impl::Instruction variant) override;
     void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value) override;
     void set_bool(const Table*, ColKey col_key, ObjKey key, bool value, _impl::Instruction variant) override;
     void set_float(const Table*, ColKey col_key, ObjKey key, float value, _impl::Instruction variant) override;
     void set_double(const Table*, ColKey col_key, ObjKey key, double value, _impl::Instruction variant) override;
-    void set_string(const Table*, ColKey col_key, ObjKey key, StringData value,
-                    _impl::Instruction variant) override;
-    void set_binary(const Table*, ColKey col_key, ObjKey key, BinaryData value,
-                    _impl::Instruction variant) override;
+    void set_string(const Table*, ColKey col_key, ObjKey key, StringData value, _impl::Instruction variant) override;
+    void set_binary(const Table*, ColKey col_key, ObjKey key, BinaryData value, _impl::Instruction variant) override;
     void set_timestamp(const Table*, ColKey col_key, ObjKey key, Timestamp value,
                        _impl::Instruction variant) override;
-    void set_object_id(const Table*, ColKey col_key, ObjKey key, ObjectId value,
-                       _impl::Instruction variant) override;
-    void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value,
-                       _impl::Instruction variant) override;
+    void set_object_id(const Table*, ColKey col_key, ObjKey key, ObjectId value, _impl::Instruction variant) override;
+    void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value, _impl::Instruction variant) override;
     void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, _impl::Instruction variant) override;
     void set_null(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant) override;
     void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData) override;
@@ -151,6 +146,7 @@ public:
 protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
+
 private:
     bool m_short_circuit = false;
 
@@ -172,8 +168,7 @@ private:
     Instruction::Payload::Type get_payload_type(DataType) const;
 
     template <class T>
-    void set(const Table*, ColKey col_key, ObjKey row_ndx, T payload,
-             _impl::Instruction variant);
+    void set(const Table*, ColKey col_key, ObjKey row_ndx, T payload, _impl::Instruction variant);
     template <class T>
     void list_set(const ConstLstBase& Lst, size_t ndx, T payload);
     template <class T>
@@ -228,7 +223,8 @@ inline void SyncReplication::emit(T instruction)
 // Temporarily short-circuit replication
 class TempShortCircuitReplication {
 public:
-    TempShortCircuitReplication(SyncReplication& bridge): m_bridge(bridge)
+    TempShortCircuitReplication(SyncReplication& bridge)
+        : m_bridge(bridge)
     {
         m_was_short_circuited = bridge.is_short_circuited();
         bridge.set_short_circuit(true);
@@ -243,6 +239,7 @@ public:
     {
         return m_was_short_circuited;
     }
+
 private:
     SyncReplication& m_bridge;
     bool m_was_short_circuited;

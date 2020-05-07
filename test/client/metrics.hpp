@@ -20,7 +20,7 @@
 #define REALM_TEST_CLIENT_METRICS_HPP
 
 #if REALM_HAVE_DOGLESS
-#  include <dogless.hpp>
+#include <dogless.hpp>
 #endif
 
 
@@ -49,15 +49,12 @@ private:
 };
 
 
-
-
 // Implementation
 
 #if REALM_HAVE_DOGLESS
 
-inline Metrics::Metrics(const std::string& prefix, const std::string statsd_address,
-                        int statsd_port) :
-    m_dogless(prefix, statsd_address, statsd_port) // Throws
+inline Metrics::Metrics(const std::string& prefix, const std::string statsd_address, int statsd_port)
+    : m_dogless(prefix, statsd_address, statsd_port) // Throws
 {
     m_dogless.loop_interval(1);
 }
@@ -79,21 +76,13 @@ inline void Metrics::gauge(const char* metric, double value)
 
 #else // !REALM_HAVE_DOGLESS
 
-inline Metrics::Metrics(const std::string&, const std::string, int)
-{
-}
+inline Metrics::Metrics(const std::string&, const std::string, int) {}
 
-inline void Metrics::increment(const char*, int)
-{
-}
+inline void Metrics::increment(const char*, int) {}
 
-inline void Metrics::timing(const char*, double)
-{
-}
+inline void Metrics::timing(const char*, double) {}
 
-inline void Metrics::gauge(const char*, double)
-{
-}
+inline void Metrics::gauge(const char*, double) {}
 
 #endif // !REALM_HAVE_DOGLESS
 

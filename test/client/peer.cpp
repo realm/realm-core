@@ -22,13 +22,13 @@ using version_type = sync::version_type;
 
 namespace {
 
-std::string g_blob_class_name        = "Blob";
-std::string g_ptime_class_name       = "PropagationTime";
+std::string g_blob_class_name = "Blob";
+std::string g_ptime_class_name = "PropagationTime";
 std::string g_result_sets_class_name = "__ResultSets";
 
 std::string& class_to_table_name(const std::string& class_name, std::string& buffer)
 {
-    buffer.assign("class_"); // Throws
+    buffer.assign("class_");   // Throws
     buffer.append(class_name); // Throws
     return buffer;
 }
@@ -97,9 +97,9 @@ Peer::Error map_error(std::error_code ec) noexcept
         }
         return Peer::Error::network_other;
     }
-    bool is_ssl_related = (category == util::network::ssl::error_category ||
-                           category == util::network::openssl_error_category ||
-                           category == util::network::secure_transport_error_category);
+    bool is_ssl_related =
+        (category == util::network::ssl::error_category || category == util::network::openssl_error_category ||
+         category == util::network::secure_transport_error_category);
     if (is_ssl_related)
         return Peer::Error::ssl;
     if (std::strcmp(category_name, "realm::util::websocket::Error") == 0) {
@@ -238,16 +238,16 @@ std::shared_ptr<sync::ClientReplication::ChangesetCooker> g_trivial_cooker =
 } // unnamed namespace
 
 
-Peer::Peer(Context& context, std::string http_request_path, std::string realm_path,
-           util::Logger& logger, std::int_fast64_t originator_ident, bool verify_ssl_cert,
+Peer::Peer(Context& context, std::string http_request_path, std::string realm_path, util::Logger& logger,
+           std::int_fast64_t originator_ident, bool verify_ssl_cert,
            util::Optional<std::string> ssl_trust_certificate_path,
-           util::Optional<sync::Session::Config::ClientReset> client_reset_config,
-           bool use_trivial_cooker, std::function<void(bool is_fatal)> on_sync_error) :
-    m_context{context},
-    m_realm_path{std::move(realm_path)},
-    m_logger{logger},
-    m_originator_ident{originator_ident},
-    m_on_sync_error{std::move(on_sync_error)}
+           util::Optional<sync::Session::Config::ClientReset> client_reset_config, bool use_trivial_cooker,
+           std::function<void(bool is_fatal)> on_sync_error)
+    : m_context{context}
+    , m_realm_path{std::move(realm_path)}
+    , m_logger{logger}
+    , m_originator_ident{originator_ident}
+    , m_on_sync_error{std::move(on_sync_error)}
 {
     using ErrorInfo = sync::Session::ErrorInfo;
     auto listener = [this](ConnectionState state, const ErrorInfo* error_info) {
@@ -338,9 +338,9 @@ void Peer::perform_transaction(BinaryData blob, TransactSpec& spec)
         WriteTransaction wt{m_shared_group};
         if (spec.num_blobs > 0) {
             TableRef table = do_ensure_blob_class(wt, table_name);
-            ColKey col_key_blob  = table->get_column_key("blob");
+            ColKey col_key_blob = table->get_column_key("blob");
             ColKey col_key_label = table->get_column_key("label");
-            ColKey col_key_kind  = table->get_column_key("kind");
+            ColKey col_key_kind = table->get_column_key("kind");
             ColKey col_key_level = table->get_column_key("level");
             int num_add = 0;
             if (!!spec.replace_blobs) {
@@ -429,8 +429,7 @@ void Peer::ensure_query_class(const std::string& class_name)
             queryable->add_column(type_Int, "level");
         }
         else if (queryable->get_column_type(level_ndx) != type_Int) {
-            m_logger.error("Wrong data type for property 'level' in queryable class '%1'",
-                           class_name);
+            m_logger.error("Wrong data type for property 'level' in queryable class '%1'", class_name);
             return;
         }
         ColKey text_ndx = queryable->get_column_key("text");
@@ -438,8 +437,7 @@ void Peer::ensure_query_class(const std::string& class_name)
             queryable->add_column(type_String, "text");
         }
         else if (queryable->get_column_type(text_ndx) != type_String) {
-            m_logger.error("Wrong data type for property 'text' in queryable class '%1'",
-                           class_name);
+            m_logger.error("Wrong data type for property 'text' in queryable class '%1'", class_name);
             return;
         }
         new_version = wt.commit();
@@ -449,8 +447,7 @@ void Peer::ensure_query_class(const std::string& class_name)
 }
 
 
-void Peer::generate_queryable(const std::string& class_name, int n, LevelDistr level_distr,
-                              const std::string& text)
+void Peer::generate_queryable(const std::string& class_name, int n, LevelDistr level_distr, const std::string& text)
 {
     open_realm();
     std::string buffer;
@@ -504,8 +501,7 @@ void Peer::add_query(const std::string& class_name, const std::string& query)
             m_logger.error("Query target class '%1' not found", class_name);
             return;
         }
-        const std::string& result_sets_table_name =
-            class_to_table_name(g_result_sets_class_name, buffer);
+        const std::string& result_sets_table_name = class_to_table_name(g_result_sets_class_name, buffer);
         TableRef result_sets = wt.get_table(result_sets_table_name);
         if (!result_sets) {
             result_sets = sync::create_table(wt, result_sets_table_name);
@@ -516,16 +512,14 @@ void Peer::add_query(const std::string& class_name, const std::string& query)
             result_sets->add_column(type_String, "error_message");
             result_sets->add_column(type_Int, "query_parse_counter");
         }
-        const std::string& matches_column_name =
-            class_to_matches_column_name(class_name, buffer);
+        const std::string& matches_column_name = class_to_matches_column_name(class_name, buffer);
         ColKey col_ndx_matches = result_sets->get_column_key(matches_column_name);
         if (!col_ndx_matches) {
             result_sets->add_column_link(type_LinkList, matches_column_name, *queryable);
         }
         else {
             if (result_sets->get_column_type(col_ndx_matches) != type_LinkList) {
-                m_logger.error("Matches column '%1' of result sets table has wrong type",
-                               matches_column_name);
+                m_logger.error("Matches column '%1' of result sets table has wrong type", matches_column_name);
                 return;
             }
             if (result_sets->get_link_target(col_ndx_matches) != queryable) {
@@ -533,9 +527,11 @@ void Peer::add_query(const std::string& class_name, const std::string& query)
                                matches_column_name);
             }
         }
-        ColKey col_ndx_query            = result_sets->get_column_key("query");
+        ColKey col_ndx_query = result_sets->get_column_key("query");
         ColKey col_ndx_matches_property = result_sets->get_column_key("matches_property");
-        sync::create_object(wt, *result_sets).set(col_ndx_query, query).set(col_ndx_matches_property, matches_column_name);
+        sync::create_object(wt, *result_sets)
+            .set(col_ndx_query, query)
+            .set(col_ndx_matches_property, matches_column_name);
         new_version = wt.commit();
     }
     if (m_session_is_bound)
@@ -547,8 +543,7 @@ void Peer::dump_result_sets()
 {
     open_realm();
     std::string buffer;
-    const std::string& result_sets_table_name =
-        class_to_table_name(g_result_sets_class_name, buffer);
+    const std::string& result_sets_table_name = class_to_table_name(g_result_sets_class_name, buffer);
     ReadTransaction wt{m_shared_group};
     ConstTableRef result_sets = wt.get_table(result_sets_table_name);
     if (!result_sets) {
@@ -557,8 +552,7 @@ void Peer::dump_result_sets()
     }
     ColKey col_ndx_oid = result_sets->get_column_key("!OID");
     if (!col_ndx_oid) {
-        m_logger.error("dump_result_sets(): Column '!OID' not found in table '%1'",
-                       result_sets_table_name);
+        m_logger.error("dump_result_sets(): Column '!OID' not found in table '%1'", result_sets_table_name);
         return;
     }
     ColKey col_ndx_matches_property = result_sets->get_column_key("matches_property");
@@ -569,13 +563,13 @@ void Peer::dump_result_sets()
     }
     if (result_sets->get_column_type(col_ndx_matches_property) != type_String) {
         m_logger.error("dump_result_sets(): Wrong data type for column 'matches_property' "
-                       "in table '%1'", result_sets_table_name);
+                       "in table '%1'",
+                       result_sets_table_name);
         return;
     }
     ColKey col_ndx_query = result_sets->get_column_key("query");
     if (!col_ndx_query) {
-        m_logger.error("dump_result_sets(): Column 'query' not found in table '%1'",
-                       result_sets_table_name);
+        m_logger.error("dump_result_sets(): Column 'query' not found in table '%1'", result_sets_table_name);
         return;
     }
     if (result_sets->get_column_type(col_ndx_query) != type_String) {
@@ -585,8 +579,7 @@ void Peer::dump_result_sets()
     }
     ColKey col_ndx_status = result_sets->get_column_key("status");
     if (!col_ndx_status) {
-        m_logger.error("dump_result_sets(): Column 'status' not found in table '%1'",
-                       result_sets_table_name);
+        m_logger.error("dump_result_sets(): Column 'status' not found in table '%1'", result_sets_table_name);
         return;
     }
     if (result_sets->get_column_type(col_ndx_status) != type_Int) {
@@ -596,13 +589,13 @@ void Peer::dump_result_sets()
     }
     ColKey col_ndx_error_message = result_sets->get_column_key("error_message");
     if (!col_ndx_error_message) {
-        m_logger.error("dump_result_sets(): Column 'error_message' not found in table '%1'",
-                       result_sets_table_name);
+        m_logger.error("dump_result_sets(): Column 'error_message' not found in table '%1'", result_sets_table_name);
         return;
     }
     if (result_sets->get_column_type(col_ndx_error_message) != type_String) {
         m_logger.error("dump_result_sets(): Wrong data type for column 'error_message' "
-                       "in table '%1'", result_sets_table_name);
+                       "in table '%1'",
+                       result_sets_table_name);
         return;
     }
 
@@ -611,14 +604,15 @@ void Peer::dump_result_sets()
         ColKey col_ndx_matches = result_sets->get_column_key(col_name_matches);
         if (!col_ndx_matches) {
             m_logger.error("dump_result_sets(): No matches column '%1' in result sets table "
-                           "'%1'", col_name_matches, result_sets_table_name);
+                           "'%1'",
+                           col_name_matches, result_sets_table_name);
             std::cout << "-------------------------------------\n";
             continue;
         }
         if (result_sets->get_column_type(col_ndx_matches) != type_LinkList) {
             m_logger.error("dump_result_sets(): Wrong data type for matches column '%1' "
-                           "in result sets table '%1'", col_name_matches,
-                           result_sets_table_name);
+                           "in result sets table '%1'",
+                           col_name_matches, result_sets_table_name);
             return;
         }
         LnkLst link_list = result_set.get_linklist(col_ndx_matches);
@@ -626,16 +620,23 @@ void Peer::dump_result_sets()
         std::int_fast64_t status = result_set.get<int64_t>(col_ndx_status);
         auto id = result_set.get_key().value;
         std::cout << "\n"
-            "RESULT SET (ID = "<<id<<"):\n"
-            "-------------------------------------\n"
-            "Table:  " << target_table.get_name() << "\n"
-            "Query:  " << result_set.get<StringData>(col_ndx_query) << "\n"
-            "Status: " << get_result_set_status_text(int(status)) << "\n";
+                     "RESULT SET (ID = "
+                  << id
+                  << "):\n"
+                     "-------------------------------------\n"
+                     "Table:  "
+                  << target_table.get_name()
+                  << "\n"
+                     "Query:  "
+                  << result_set.get<StringData>(col_ndx_query)
+                  << "\n"
+                     "Status: "
+                  << get_result_set_status_text(int(status)) << "\n";
         if (status < 0) { // Query parsing failed
             StringData error_message = result_set.get<StringData>(col_ndx_error_message);
             std::cout << error_message; // Already contains line terminators
             // FIXME: Current parser implementation fails to add final newline
-            if (error_message.size() != 0 && error_message[error_message.size()-1] != '\n')
+            if (error_message.size() != 0 && error_message[error_message.size() - 1] != '\n')
                 std::cout << "\n";
         }
         else if (status > 0) { // Initialized
@@ -706,7 +707,7 @@ void Peer::receive(VersionID)
         ConstTableRef table = m_receive_group->get_table(table_name);
         ColKey col_client_id = table->get_column_key("client_id");
         ColKey col_timestamp = table->get_column_key("timestamp");
-        for (ObjKey row_key: new_rows) {
+        for (ObjKey row_key : new_rows) {
             ConstObj obj = table->get_object(row_key);
             std::int_fast64_t originator_ident = obj.get<int64_t>(col_client_id);
             if (originator_ident != m_originator_ident)
@@ -751,8 +752,7 @@ void Peer::refresh_access_token()
         if (ec == util::error::operation_aborted)
             return;
         if (ec) {
-            m_logger.error("Failed to refresh access token: %1 (error_code=%2)",
-                           ec.message(), ec);
+            m_logger.error("Failed to refresh access token: %1 (error_code=%2)", ec.message(), ec);
             if (m_on_sync_error) {
                 bool is_fatal = true;
                 m_on_sync_error(is_fatal);
@@ -784,8 +784,8 @@ TableRef Peer::do_ensure_blob_class(WriteTransaction& wt, StringData table_name)
         table = sync::create_table(wt, table_name);
         table->add_column(type_Binary, "blob");
         table->add_column(type_String, "label");
-        table->add_column(type_Int,    "kind");
-        table->add_column(type_Int,    "level");
+        table->add_column(type_Int, "kind");
+        table->add_column(type_Int, "level");
     }
     return table;
 }
@@ -816,7 +816,7 @@ void Peer::Context::init_metrics_gauges(bool report_propagation_times)
     metrics.gauge("client.fatal_errors", 0);
     bool aggregate = false;
     if (report_roundtrip_times) {
-        metrics.gauge("client.roundtrip_times.n",   0);
+        metrics.gauge("client.roundtrip_times.n", 0);
         metrics.gauge("client.roundtrip_times.f50", 0);
         metrics.gauge("client.roundtrip_times.f90", 0);
         metrics.gauge("client.roundtrip_times.f99", 0);
@@ -824,7 +824,7 @@ void Peer::Context::init_metrics_gauges(bool report_propagation_times)
         aggregate = true;
     }
     if (report_propagation_times) {
-        metrics.gauge("client.propagation_times.n",   0);
+        metrics.gauge("client.propagation_times.n", 0);
         metrics.gauge("client.propagation_times.f50", 0);
         metrics.gauge("client.propagation_times.f90", 0);
         metrics.gauge("client.propagation_times.f99", 0);
@@ -843,8 +843,7 @@ void Peer::Context::on_new_session()
 }
 
 
-void Peer::Context::on_session_connection_state_change(ConnectionState old_state,
-                                                       ConnectionState new_state)
+void Peer::Context::on_session_connection_state_change(ConnectionState old_state, ConnectionState new_state)
 {
     int n;
     switch (old_state) {

@@ -35,10 +35,8 @@ struct Configuration {
     std::string dashboard_stats_endpoint = "localhost:28125";
     sync::milliseconds_type http_request_timeout = sync::Server::default_http_request_timeout;
     sync::milliseconds_type http_response_timeout = sync::Server::default_http_response_timeout;
-    sync::milliseconds_type connection_reaper_timeout =
-        sync::Server::default_connection_reaper_timeout;
-    sync::milliseconds_type connection_reaper_interval =
-        sync::Server::default_connection_reaper_interval;
+    sync::milliseconds_type connection_reaper_timeout = sync::Server::default_connection_reaper_timeout;
+    sync::milliseconds_type connection_reaper_interval = sync::Server::default_connection_reaper_interval;
     sync::milliseconds_type soft_close_timeout = sync::Server::default_soft_close_timeout;
     bool disable_history_compaction = false;
     std::chrono::seconds history_ttl = std::chrono::seconds::max();
@@ -124,8 +122,7 @@ private:
 /// files are not started until after this function has completed sucessfully.
 void prepare_server_workdir(const config::Configuration&, util::Logger&, Metrics&);
 
-Server::ClientFileBlacklists load_client_file_blacklists(const config::Configuration&,
-                                                         util::Logger&);
+Server::ClientFileBlacklists load_client_file_blacklists(const config::Configuration&, util::Logger&);
 
 } // namespace sync
 } // namespace realm

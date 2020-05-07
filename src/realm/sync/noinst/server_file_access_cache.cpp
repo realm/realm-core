@@ -49,7 +49,7 @@ void ServerFileAccessCache::poll_core_metrics()
                     constexpr const char* query_metrics_prefix = "core.query";
 
                     std::string encoded_path;
-                    auto get_encoded_path = [&encoded_path, &slot] () {
+                    auto get_encoded_path = [&encoded_path, &slot]() {
                         if (encoded_path.empty()) {
                             encoded_path = sync::Metrics::percent_encode(slot->virt_path);
                         }
@@ -62,17 +62,19 @@ void ServerFileAccessCache::poll_core_metrics()
                             REALM_ASSERT(query_info_list);
                             for (auto& query_info : *query_info_list) {
                                 std::stringstream out;
-                                std::string desc = sync::Metrics::percent_encode(query_info.get_table_name() + ";" ) +
-                                    sync::Metrics::percent_encode(query_info.get_description());
+                                std::string desc = sync::Metrics::percent_encode(query_info.get_table_name() + ";") +
+                                                   sync::Metrics::percent_encode(query_info.get_description());
                                 double seconds = double(query_info.get_query_time_nanoseconds()) / 1e9;
-                                out << query_metrics_prefix << ",path=" << get_encoded_path() << ",description=" << desc;
+                                out << query_metrics_prefix << ",path=" << get_encoded_path()
+                                    << ",description=" << desc;
                                 std::string key = out.str();
                                 m_metrics->timing(key.c_str(), seconds);
                             }
                         }
                     }
                     if (metrics->num_transaction_metrics() > 0) {
-                        // if users opt out of core transaction metrics, don't emit them, but still consume them from core.
+                        // if users opt out of core transaction metrics, don't emit them, but still consume them from
+                        // core.
                         auto transaction_info_list = metrics->take_transactions();
                         if (!m_metrics->will_exclude(sync::MetricsOptions::Core_Transaction)) {
                             REALM_ASSERT(transaction_info_list);
@@ -85,36 +87,39 @@ void ServerFileAccessCache::poll_core_metrics()
 
                             std::stringstream stream;
                             for (auto& transaction_info : *transaction_info_list) {
-                                const realm::metrics::TransactionInfo::TransactionType transaction_type
-                                    = transaction_info.get_transaction_type();
-                                if ((!write_transaction_metrics_enabled && transaction_type
-                                     == realm::metrics::TransactionInfo::TransactionType::write_transaction) ||
-                                    (!read_transaction_metrics_enabled && transaction_type
-                                     == realm::metrics::TransactionInfo::TransactionType::read_transaction)) {
+                                const realm::metrics::TransactionInfo::TransactionType transaction_type =
+                                    transaction_info.get_transaction_type();
+                                if ((!write_transaction_metrics_enabled &&
+                                     transaction_type ==
+                                         realm::metrics::TransactionInfo::TransactionType::write_transaction) ||
+                                    (!read_transaction_metrics_enabled &&
+                                     transaction_type ==
+                                         realm::metrics::TransactionInfo::TransactionType::read_transaction)) {
                                     continue; // user opts out
                                 }
                                 std::string transaction_type_string = "read";
                                 get_encoded_path(); // ensure `encoded_path` is populated
-                                if (transaction_type == realm::metrics::TransactionInfo::TransactionType::write_transaction) {
+                                if (transaction_type ==
+                                    realm::metrics::TransactionInfo::TransactionType::write_transaction) {
 
                                     transaction_type_string = "write";
                                     stream.str({});
-                                    stream << transaction_metrics_prefix <<  ".write.time,path=" << encoded_path;
-                                    m_metrics->timing(stream.str().c_str(), double(transaction_info.get_write_time_nanoseconds()) / 1e9);
+                                    stream << transaction_metrics_prefix << ".write.time,path=" << encoded_path;
+                                    m_metrics->timing(stream.str().c_str(),
+                                                      double(transaction_info.get_write_time_nanoseconds()) / 1e9);
 
                                     stream.str({});
                                     stream << transaction_metrics_prefix << ".fsync.time,path=" << encoded_path;
-                                    m_metrics->timing(stream.str().c_str(), double(transaction_info.get_fsync_time_nanoseconds()) / 1e9);
+                                    m_metrics->timing(stream.str().c_str(),
+                                                      double(transaction_info.get_fsync_time_nanoseconds()) / 1e9);
 
                                     stream.str({});
                                     stream << transaction_metrics_prefix << ".disk_size,path=" << encoded_path;
-                                    m_metrics->gauge(stream.str().c_str(),
-                                                     double(transaction_info.get_disk_size()));
+                                    m_metrics->gauge(stream.str().c_str(), double(transaction_info.get_disk_size()));
 
                                     stream.str({});
                                     stream << transaction_metrics_prefix << ".free_space,path=" << encoded_path;
-                                    m_metrics->gauge(stream.str().c_str(),
-                                                     double(transaction_info.get_free_space()));
+                                    m_metrics->gauge(stream.str().c_str(), double(transaction_info.get_free_space()));
 
                                     stream.str({});
                                     stream << transaction_metrics_prefix << ".objects.count,path=" << encoded_path;
@@ -127,9 +132,12 @@ void ServerFileAccessCache::poll_core_metrics()
                                                      double(transaction_info.get_num_available_versions()));
                                 }
                                 stream.str({});
-                                stream << transaction_metrics_prefix << ".total.time,type="
-                                    "" << transaction_type_string << ",path=" << encoded_path;
-                                m_metrics->timing(stream.str().c_str(), double(transaction_info.get_transaction_time_nanoseconds()) / 1e9);
+                                stream << transaction_metrics_prefix
+                                       << ".total.time,type="
+                                          ""
+                                       << transaction_type_string << ",path=" << encoded_path;
+                                m_metrics->timing(stream.str().c_str(),
+                                                  double(transaction_info.get_transaction_time_nanoseconds()) / 1e9);
                             }
                         }
                     }
@@ -146,7 +154,7 @@ void ServerFileAccessCache::Slot::proper_close()
 {
     if (is_open()) {
         m_cache.m_logger.detail("Closing Realm file: %1", realm_path); // Throws
-        m_cache.poll_core_metrics(); // Throws
+        m_cache.poll_core_metrics();                                   // Throws
         do_close();
     }
 }

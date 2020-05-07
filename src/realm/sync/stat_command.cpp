@@ -19,19 +19,19 @@
 
 using namespace realm;
 
-using sync::version_type;
 using sync::file_ident_type;
 using sync::salt_type;
+using sync::version_type;
 
+using sync::DownloadCursor;
 using sync::SaltedFileIdent;
 using sync::SaltedVersion;
-using sync::DownloadCursor;
 using sync::UploadCursor;
 
 
 namespace {
 
-template<class T>
+template <class T>
 std::string format_num_something(T num, const char* singular_form, const char* plural_form,
                                  std::locale loc = std::locale{})
 {
@@ -71,7 +71,7 @@ std::string format_num_rows(std::size_t num)
 
 std::string format_byte_size(double size, std::locale loc = std::locale{})
 {
-    const char* binary_prefixes[] = { "", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi" };
+    const char* binary_prefixes[] = {"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi"};
     int num_binary_prefixes = sizeof binary_prefixes / sizeof *binary_prefixes;
     int binary_prefix_index = 0;
     double size_2 = size;
@@ -172,29 +172,29 @@ struct ClientHistoryInfo {
 };
 
 
-void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref,
-                                   version_type snapshot_version, ClientHistoryInfo& info)
+void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref, version_type snapshot_version,
+                                   ClientHistoryInfo& info)
 {
     // Sizes of fixed-size arrays
     std::size_t root_size = 23;
 
     // Slots in history root array
-    std::size_t changesets_iip                          =  0;
-    std::size_t reciprocal_transforms_iip               =  1;
-    std::size_t remote_versions_iip                     =  2;
-    std::size_t origin_file_idents_iip                  =  3;
-    std::size_t origin_timestamps_iip                   =  4;
-    std::size_t progress_download_server_version_iip    =  5;
-    std::size_t progress_download_client_version_iip    =  6;
-    std::size_t progress_latest_server_version_iip      =  7;
-    std::size_t progress_latest_server_version_salt_iip =  8;
-    std::size_t progress_upload_client_version_iip      =  9;
-    std::size_t client_file_ident_iip                   = 11;
-    std::size_t client_file_ident_salt_iip              = 12;
-    std::size_t cooked_changesets_iip                   = 18;
-    std::size_t cooked_base_index_iip                   = 19;
-    std::size_t cooked_intrachangeset_progress_iip      = 20;
-    std::size_t ct_history_iip                          = 21;
+    std::size_t changesets_iip = 0;
+    std::size_t reciprocal_transforms_iip = 1;
+    std::size_t remote_versions_iip = 2;
+    std::size_t origin_file_idents_iip = 3;
+    std::size_t origin_timestamps_iip = 4;
+    std::size_t progress_download_server_version_iip = 5;
+    std::size_t progress_download_client_version_iip = 6;
+    std::size_t progress_latest_server_version_iip = 7;
+    std::size_t progress_latest_server_version_salt_iip = 8;
+    std::size_t progress_upload_client_version_iip = 9;
+    std::size_t client_file_ident_iip = 11;
+    std::size_t client_file_ident_salt_iip = 12;
+    std::size_t cooked_changesets_iip = 18;
+    std::size_t cooked_base_index_iip = 19;
+    std::size_t cooked_intrachangeset_progress_iip = 20;
+    std::size_t ct_history_iip = 21;
 
     Array root{alloc};
     root.init_from_ref(history_root_ref);
@@ -236,8 +236,7 @@ void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref,
     if (client_file_ident != 0) {
         ClientHistoryInfo::ServerBinding sb;
         sb.client_file_ident.ident = client_file_ident;
-        sb.client_file_ident.salt =
-            salt_type(root.get_as_ref_or_tagged(client_file_ident_salt_iip).get_as_int());
+        sb.client_file_ident.salt = salt_type(root.get_as_ref_or_tagged(client_file_ident_salt_iip).get_as_int());
         sb.latest_server_version.version =
             version_type(root.get_as_ref_or_tagged(progress_latest_server_version_iip).get_as_int());
         sb.latest_server_version.salt =
@@ -253,8 +252,7 @@ void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref,
     }
     {
         ref_type ref = root.get_as_ref(cooked_changesets_iip);
-        std::int_fast64_t changeset_index =
-            root.get_as_ref_or_tagged(cooked_base_index_iip).get_as_int();
+        std::int_fast64_t changeset_index = root.get_as_ref_or_tagged(cooked_base_index_iip).get_as_int();
         std::int_fast64_t intrachangeset_progress =
             root.get_as_ref_or_tagged(cooked_intrachangeset_progress_iip).get_as_int();
         if (ref != 0 || changeset_index != 0 || intrachangeset_progress != 0) {
@@ -273,43 +271,43 @@ void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref,
 }
 
 
-void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref,
-                                   version_type snapshot_version, ClientHistoryInfo& info)
+void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref, version_type snapshot_version,
+                                   ClientHistoryInfo& info)
 {
     // Sizes of fixed-size arrays
-    std::size_t root_size            = 21;
+    std::size_t root_size = 21;
     std::size_t cooked_history_size = 5;
-    std::size_t schema_versions_size =  4;
+    std::size_t schema_versions_size = 4;
 
     // Slots in root array of history compartment
-    std::size_t ct_history_iip                          =  0;
-    std::size_t client_file_ident_iip                   =  1;
-    std::size_t client_file_ident_salt_iip              =  2;
-    std::size_t progress_latest_server_version_iip      =  3;
-    std::size_t progress_latest_server_version_salt_iip =  4;
-    std::size_t progress_download_server_version_iip    =  5;
-    std::size_t progress_download_client_version_iip    =  6;
-    std::size_t progress_upload_client_version_iip      =  7;
-    std::size_t progress_upload_server_version_iip      =  8;
-    std::size_t changesets_iip                          = 13;
-    std::size_t reciprocal_transforms_iip               = 14;
-    std::size_t remote_versions_iip                     = 15;
-    std::size_t origin_file_idents_iip                  = 16;
-    std::size_t origin_timestamps_iip                   = 17;
-    std::size_t cooked_history_iip                      = 19;
-    std::size_t schema_versions_iip                     = 20;
+    std::size_t ct_history_iip = 0;
+    std::size_t client_file_ident_iip = 1;
+    std::size_t client_file_ident_salt_iip = 2;
+    std::size_t progress_latest_server_version_iip = 3;
+    std::size_t progress_latest_server_version_salt_iip = 4;
+    std::size_t progress_download_server_version_iip = 5;
+    std::size_t progress_download_client_version_iip = 6;
+    std::size_t progress_upload_client_version_iip = 7;
+    std::size_t progress_upload_server_version_iip = 8;
+    std::size_t changesets_iip = 13;
+    std::size_t reciprocal_transforms_iip = 14;
+    std::size_t remote_versions_iip = 15;
+    std::size_t origin_file_idents_iip = 16;
+    std::size_t origin_timestamps_iip = 17;
+    std::size_t cooked_history_iip = 19;
+    std::size_t schema_versions_iip = 20;
 
     // Slots in root array of `cooked_history` table
-    std::size_t ch_base_index_iip              = 0;
+    std::size_t ch_base_index_iip = 0;
     std::size_t ch_intrachangeset_progress_iip = 1;
     std::size_t ch_base_server_version_iip = 2;
     std::size_t ch_changesets_iip = 3;
 
     // Slots in root array of `schema_versions` table
-    std::size_t sv_schema_versions_iip   = 0;
-    std::size_t sv_library_versions_iip  = 1;
+    std::size_t sv_schema_versions_iip = 0;
+    std::size_t sv_library_versions_iip = 1;
     std::size_t sv_snapshot_versions_iip = 2;
-    std::size_t sv_timestamps_iip        = 3;
+    std::size_t sv_timestamps_iip = 3;
 
     Array root{alloc};
     root.init_from_ref(history_root_ref);
@@ -351,8 +349,7 @@ void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref,
     if (client_file_ident != 0) {
         ClientHistoryInfo::ServerBinding sb;
         sb.client_file_ident.ident = client_file_ident;
-        sb.client_file_ident.salt =
-            salt_type(root.get_as_ref_or_tagged(client_file_ident_salt_iip).get_as_int());
+        sb.client_file_ident.salt = salt_type(root.get_as_ref_or_tagged(client_file_ident_salt_iip).get_as_int());
         sb.latest_server_version.version =
             version_type(root.get_as_ref_or_tagged(progress_latest_server_version_iip).get_as_int());
         sb.latest_server_version.salt =
@@ -478,77 +475,76 @@ struct ServerHistoryInfo {
 };
 
 
-void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root_ref,
-                                         int schema_version, version_type snapshot_version,
-                                         ServerHistoryInfo& info)
+void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root_ref, int schema_version,
+                                         version_type snapshot_version, ServerHistoryInfo& info)
 {
     // Sizes of fixed-size arrays
-    std::size_t root_size            = 11;
-    std::size_t sync_history_size    =  6;
-    std::size_t client_files_size    =  8;
-    std::size_t upstream_status_size =  8;
-    std::size_t partial_sync_size    =  5;
-    std::size_t schema_versions_size =  4;
+    std::size_t root_size = 11;
+    std::size_t sync_history_size = 6;
+    std::size_t client_files_size = 8;
+    std::size_t upstream_status_size = 8;
+    std::size_t partial_sync_size = 5;
+    std::size_t schema_versions_size = 4;
     if (schema_version < 8) {
-        root_size         = 10;
-        client_files_size =  6;
+        root_size = 10;
+        client_files_size = 6;
     }
     else if (schema_version < 10) {
         client_files_size = 7;
     }
 
     // Slots in root array of history compartment
-    std::size_t client_files_iip            =  0;
-    std::size_t history_base_version_iip    =  1;
-    std::size_t base_version_salt_iip       =  2;
-    std::size_t sync_history_iip            =  3;
-    std::size_t ct_history_iip              =  4;
-    std::size_t upstream_status_iip         =  6;
-    std::size_t partial_sync_iip            =  7;
-    std::size_t compacted_until_version_iip =  8;
-    std::size_t last_compaction_at_iip      =  9;
-    std::size_t schema_versions_iip         = 10;
+    std::size_t client_files_iip = 0;
+    std::size_t history_base_version_iip = 1;
+    std::size_t base_version_salt_iip = 2;
+    std::size_t sync_history_iip = 3;
+    std::size_t ct_history_iip = 4;
+    std::size_t upstream_status_iip = 6;
+    std::size_t partial_sync_iip = 7;
+    std::size_t compacted_until_version_iip = 8;
+    std::size_t last_compaction_at_iip = 9;
+    std::size_t schema_versions_iip = 10;
 
     // Slots in root array of `sync_history`
     std::size_t sh_version_salts_iip = 0;
 
     // Slots in root array of `client_files`
-    std::size_t cf_ident_salts_iip            = 0;
-    std::size_t cf_client_versions_iip        = 1;
-    std::size_t cf_rh_base_versions_iip       = 2;
-    std::size_t cf_recip_hist_refs_iip        = 3;
-    std::size_t cf_proxy_files_iip            = 4;
-    std::size_t cf_client_types_iip           = 5;
-    std::size_t cf_last_seen_timestamps_iip   = 6;
+    std::size_t cf_ident_salts_iip = 0;
+    std::size_t cf_client_versions_iip = 1;
+    std::size_t cf_rh_base_versions_iip = 2;
+    std::size_t cf_recip_hist_refs_iip = 3;
+    std::size_t cf_proxy_files_iip = 4;
+    std::size_t cf_client_types_iip = 5;
+    std::size_t cf_last_seen_timestamps_iip = 6;
     std::size_t cf_locked_server_versions_iip = 7;
     if (schema_version < 10) {
-        cf_client_types_iip           = std::size_t(-1);
-        cf_last_seen_timestamps_iip   = 5;
+        cf_client_types_iip = std::size_t(-1);
+        cf_last_seen_timestamps_iip = 5;
         cf_locked_server_versions_iip = 6;
     }
 
     // Slots in root array of `upstream_status`
-    std::size_t us_client_file_ident_iip                   = 0;
-    std::size_t us_client_file_ident_salt_iip              = 1;
-    std::size_t us_progress_latest_server_version_iip      = 2;
+    std::size_t us_client_file_ident_iip = 0;
+    std::size_t us_client_file_ident_salt_iip = 1;
+    std::size_t us_progress_latest_server_version_iip = 2;
     std::size_t us_progress_latest_server_version_salt_iip = 3;
-    std::size_t us_progress_download_server_version_iip    = 4;
-    std::size_t us_progress_download_client_version_iip    = 5;
-    std::size_t us_progress_upload_client_version_iip      = 6;
-    std::size_t us_progress_upload_server_version_iip      = 7;
+    std::size_t us_progress_download_server_version_iip = 4;
+    std::size_t us_progress_download_client_version_iip = 5;
+    std::size_t us_progress_upload_client_version_iip = 6;
+    std::size_t us_progress_upload_server_version_iip = 7;
 
     // Slots in root array of `partial_sync`
-    std::size_t ps_partial_file_ident_iip              = 0;
-    std::size_t ps_partial_file_ident_salt_iip         = 1;
-    std::size_t ps_progress_partial_version_iip        = 2;
-    std::size_t ps_progress_reference_version_iip      = 3;
+    std::size_t ps_partial_file_ident_iip = 0;
+    std::size_t ps_partial_file_ident_salt_iip = 1;
+    std::size_t ps_progress_partial_version_iip = 2;
+    std::size_t ps_progress_reference_version_iip = 3;
     std::size_t ps_progress_reference_version_salt_iip = 4;
 
     // Slots in root array of `schema_versions` table
-    std::size_t sv_schema_versions_iip   = 0;
-    std::size_t sv_library_versions_iip  = 1;
+    std::size_t sv_schema_versions_iip = 0;
+    std::size_t sv_library_versions_iip = 1;
     std::size_t sv_snapshot_versions_iip = 2;
-    std::size_t sv_timestamps_iip        = 3;
+    std::size_t sv_timestamps_iip = 3;
 
     Array root{alloc};
     root.init_from_ref(history_root_ref);
@@ -579,17 +575,13 @@ void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root
         IntegerBpTree sh_version_salts{alloc};
         sh_version_salts.init_from_ref(ref_2);
         std::size_t sync_history_size = sh_version_salts.size();
-        sh.base_version.version =
-            version_type(root.get_as_ref_or_tagged(history_base_version_iip).get_as_int());
-        sh.base_version.salt =
-            salt_type(root.get_as_ref_or_tagged(base_version_salt_iip).get_as_int());
+        sh.base_version.version = version_type(root.get_as_ref_or_tagged(history_base_version_iip).get_as_int());
+        sh.base_version.salt = salt_type(root.get_as_ref_or_tagged(base_version_salt_iip).get_as_int());
         sh.curr_version = version_type(sh.base_version.version + sync_history_size);
         sh.size = sync_history_size;
         sh.aggr_size = get_aggregate_size({ref_1}, alloc);
-        sh.compacted_until =
-            version_type(root.get_as_ref_or_tagged(compacted_until_version_iip).get_as_int());
-        sh.last_compaction_at =
-            std::time_t(root.get_as_ref_or_tagged(last_compaction_at_iip).get_as_int());
+        sh.compacted_until = version_type(root.get_as_ref_or_tagged(compacted_until_version_iip).get_as_int());
+        sh.last_compaction_at = std::time_t(root.get_as_ref_or_tagged(last_compaction_at_iip).get_as_int());
         info.sync_history = std::move(sh);
     }
     {
@@ -616,8 +608,7 @@ void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root
         cf_ident_salts.init_from_ref(ref_1);
         std::size_t num_client_files = cf_ident_salts.size();
         cf.size = num_client_files;
-        cf.aggr_size =
-            get_aggregate_size({ref_1, ref_2, ref_3, ref_5, ref_6, ref_7, ref_8}, alloc);
+        cf.aggr_size = get_aggregate_size({ref_1, ref_2, ref_3, ref_5, ref_6, ref_7, ref_8}, alloc);
         cf.recip_hist_aggr_size = get_aggregate_size({ref_4}, alloc);
         info.client_files = std::move(cf);
     }
@@ -627,16 +618,11 @@ void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root
         partial_sync.init_from_ref(ref);
         if (partial_sync.size() != partial_sync_size)
             throw std::runtime_error{"Unexpected size of `partial_sync` root array"};
-        ps.partial_file_ident.ident =
-            file_ident_type(partial_sync.get(ps_partial_file_ident_iip));
-        ps.partial_file_ident.salt =
-            salt_type(partial_sync.get(ps_partial_file_ident_salt_iip));
-        ps.partial_version =
-            version_type(partial_sync.get(ps_progress_partial_version_iip));
-        ps.reference_version.version =
-            version_type(partial_sync.get(ps_progress_reference_version_iip));
-        ps.reference_version.salt =
-            salt_type(partial_sync.get(ps_progress_reference_version_salt_iip));
+        ps.partial_file_ident.ident = file_ident_type(partial_sync.get(ps_partial_file_ident_iip));
+        ps.partial_file_ident.salt = salt_type(partial_sync.get(ps_partial_file_ident_salt_iip));
+        ps.partial_version = version_type(partial_sync.get(ps_progress_partial_version_iip));
+        ps.reference_version.version = version_type(partial_sync.get(ps_progress_reference_version_iip));
+        ps.reference_version.salt = salt_type(partial_sync.get(ps_progress_reference_version_salt_iip));
         info.partial_sync = std::move(ps);
     }
     if (schema_version >= 8) {
@@ -703,8 +689,8 @@ int main(int argc, char* argv[])
         const char* prog = argv[0];
         --argc;
         ++argv;
-        bool error   = false;
-        bool help    = false;
+        bool error = false;
+        bool help = false;
         bool version = false;
         int argc_2 = 0;
         int i = 0;
@@ -750,8 +736,7 @@ int main(int argc, char* argv[])
                 version = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Bad or missing value for option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -765,23 +750,23 @@ int main(int argc, char* argv[])
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<"  PATH\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
-                "                       encryption key to be used for accessing the specified\n"
-                "                       Realm file.\n"
-                "  -H, --show-history   Show detailed breakdown of contents of history\n"
-                "                       compartment.\n"
-                "  -c, --show-columns   Show column-level schema information for each table.\n"
-                "  -q, --show-queries   List the queries in the `___ResultSets` table.\n"
-                "  -V, --verify         Perform group-level verification (no-op unless built in\n"
-                "                       debug mode).\n"
-                "  -v, --version        Show the version of the Realm Sync release that this\n"
-                "                       command belongs to.\n";
+            std::cerr << "Synopsis: " << prog
+                      << "  PATH\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
+                         "                       encryption key to be used for accessing the specified\n"
+                         "                       Realm file.\n"
+                         "  -H, --show-history   Show detailed breakdown of contents of history\n"
+                         "                       compartment.\n"
+                         "  -c, --show-columns   Show column-level schema information for each table.\n"
+                         "  -q, --show-queries   List the queries in the `___ResultSets` table.\n"
+                         "  -V, --verify         Perform group-level verification (no-op unless built in\n"
+                         "                       debug mode).\n"
+                         "  -v, --version        Show the version of the Realm Sync release that this\n"
+                         "                       command belongs to.\n";
             return EXIT_SUCCESS;
         }
 
@@ -797,9 +782,9 @@ int main(int argc, char* argv[])
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }
@@ -835,8 +820,10 @@ int main(int argc, char* argv[])
     int history_schema_version;
     gf::get_version_and_history_info(alloc, top_ref, version, history_type, history_schema_version);
     std::cout << "Snapshot number: " << version << "\n";
-    std::cout << "History type: " << history_type_to_string(history_type) << " "
-        "(" << history_type << ")\n";
+    std::cout << "History type: " << history_type_to_string(history_type)
+              << " "
+                 "("
+              << history_type << ")\n";
     std::cout << "History schema version: " << history_schema_version << "\n";
     Array top{alloc};
     top.init_from_ref(top_ref);
@@ -848,8 +835,10 @@ int main(int argc, char* argv[])
     {
         MemStats stats;
         top.stats(stats);
-        std::cout << "- Snapshot size: " << format_byte_size(double(stats.allocated)) << " "
-            "(top_ref = " << top_ref << ")\n";
+        std::cout << "- Snapshot size: " << format_byte_size(double(stats.allocated))
+                  << " "
+                     "(top_ref = "
+                  << top_ref << ")\n";
     }
     {
         ref_type history_ref = 0;
@@ -857,8 +846,10 @@ int main(int argc, char* argv[])
             REALM_ASSERT(top.size() >= 9);
             history_ref = top.get_as_ref(8);
         }
-        std::cout << "  - History size: " << format_aggregate_size({history_ref}, alloc) << " "
-            "(history_ref = " << history_ref << ")\n";
+        std::cout << "  - History size: " << format_aggregate_size({history_ref}, alloc)
+                  << " "
+                     "(history_ref = "
+                  << history_ref << ")\n";
         if (show_history) {
             if (history_type == Replication::hist_None) {
                 // No-op
@@ -873,48 +864,71 @@ int main(int argc, char* argv[])
                 }
                 else {
                     std::cerr << "ERROR: Detailed breakdown of client-side history compartment is "
-                        "unavailable for history schema version "<<history_schema_version<<"\n";
+                                 "unavailable for history schema version "
+                              << history_schema_version << "\n";
                     return EXIT_FAILURE;
                 }
                 std::cout << "    - Continuous transactions history:\n";
                 {
                     const ClientHistoryInfo::ContinuousTransactionsHistory& cth = info.ct_history;
                     std::cout << "      - Base version: " << cth.base_version << "\n";
-                    std::cout << "      - Current version: " << cth.curr_version << " "
-                        "(hard-linked to snapshot number)\n";
-                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size)) << " "
-                        "(" << format_num_entries(cth.size) << ")\n";
+                    std::cout << "      - Current version: " << cth.curr_version
+                              << " "
+                                 "(hard-linked to snapshot number)\n";
+                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size))
+                              << " "
+                                 "("
+                              << format_num_entries(cth.size) << ")\n";
                 }
                 std::cout << "    - Synchronization history:\n";
                 {
                     const ClientHistoryInfo::SynchronizationHistory& sh = info.sync_history;
                     std::cout << "      - Base version: " << sh.base_version << "\n";
-                    std::cout << "      - Current version: " << sh.curr_version << " "
-                        "(hard-linked to snapshot number)\n";
+                    std::cout << "      - Current version: " << sh.curr_version
+                              << " "
+                                 "(hard-linked to snapshot number)\n";
                     std::cout << "      - Main history size: "
-                        "" << format_byte_size(double(sh.main_aggr_size)) << " "
-                        "(" << format_num_history_entries(sh.size) << ")\n";
+                                 ""
+                              << format_byte_size(double(sh.main_aggr_size))
+                              << " "
+                                 "("
+                              << format_num_history_entries(sh.size) << ")\n";
                     std::cout << "      - Reciprocal history size: "
-                        "" << format_byte_size(double(sh.recip_aggr_size)) << "\n";
+                                 ""
+                              << format_byte_size(double(sh.recip_aggr_size)) << "\n";
                 }
                 std::cout << "    - Binding to server-side file:";
                 if (info.server_binding) {
                     const ClientHistoryInfo::ServerBinding& sb = *info.server_binding;
                     std::cout << "\n"
-                        "      - Client file identifier: " << sb.client_file_ident.ident << " "
-                        "(salt=" << sb.client_file_ident.salt << ")\n"
-                        "      - Latest known server version: "
-                        "" << sb.latest_server_version.version << " "
-                        "(salt=" << sb.latest_server_version.salt << ")\n"
-                        "      - Synchronization progress:\n"
-                        "        - Download (server version): "
-                        "" << sb.download_progress.server_version << " "
-                        "(last_integrated_client_version="
-                        "" << sb.download_progress.last_integrated_client_version << ")\n"
-                        "        - Upload (client version): " << sb.upload_progress.client_version;
+                                 "      - Client file identifier: "
+                              << sb.client_file_ident.ident
+                              << " "
+                                 "(salt="
+                              << sb.client_file_ident.salt
+                              << ")\n"
+                                 "      - Latest known server version: "
+                                 ""
+                              << sb.latest_server_version.version
+                              << " "
+                                 "(salt="
+                              << sb.latest_server_version.salt
+                              << ")\n"
+                                 "      - Synchronization progress:\n"
+                                 "        - Download (server version): "
+                                 ""
+                              << sb.download_progress.server_version
+                              << " "
+                                 "(last_integrated_client_version="
+                                 ""
+                              << sb.download_progress.last_integrated_client_version
+                              << ")\n"
+                                 "        - Upload (client version): "
+                              << sb.upload_progress.client_version;
                     if (!sb.defective_upload_progress) {
                         std::cout << " (last_integrated_server_version="
-                            "" << sb.upload_progress.last_integrated_server_version << ")";
+                                     ""
+                                  << sb.upload_progress.last_integrated_server_version << ")";
                     }
                     std::cout << "\n";
                 }
@@ -949,11 +963,15 @@ int main(int argc, char* argv[])
                 if (info.schema_versions) {
                     std::cout << "\n";
                     for (const ClientHistoryInfo::SchemaVersion& entry : *info.schema_versions) {
-                        std::cout << "      - Version: "<<entry.schema_version;
+                        std::cout << "      - Version: " << entry.schema_version;
                         if (!entry.details_are_unknown) {
-                            std::cout << " (sync_library_version=" << entry.library_version << ", "
-                                "snapshot_number=" << entry.snapshot_version << ", "
-                                "timestamp=" << format_timestamp(entry.timestamp) << ")";
+                            std::cout << " (sync_library_version=" << entry.library_version
+                                      << ", "
+                                         "snapshot_number="
+                                      << entry.snapshot_version
+                                      << ", "
+                                         "timestamp="
+                                      << format_timestamp(entry.timestamp) << ")";
                         }
                         else {
                             std::cout << " (details are unknown)";
@@ -968,31 +986,38 @@ int main(int argc, char* argv[])
             else if (history_type == Replication::hist_SyncServer) {
                 ServerHistoryInfo info;
                 if (history_schema_version >= 6 && history_schema_version <= 10) {
-                    extract_server_history_info_6_to_10(alloc, history_ref, history_schema_version,
-                                                        version, info);
+                    extract_server_history_info_6_to_10(alloc, history_ref, history_schema_version, version, info);
                 }
                 else {
                     std::cerr << "ERROR: Detailed breakdown of server-side history compartment is "
-                        "unavailable for history schema version "<<history_schema_version<<"\n";
+                                 "unavailable for history schema version "
+                              << history_schema_version << "\n";
                     return EXIT_FAILURE;
                 }
                 std::cout << "    - Continuous transactions history:\n";
                 {
                     const ServerHistoryInfo::ContinuousTransactionsHistory& cth = info.ct_history;
                     std::cout << "      - Base version: " << cth.base_version << "\n";
-                    std::cout << "      - Current version: " << cth.curr_version << " "
-                        "(hard-linked to snapshot number)\n";
-                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size)) << " "
-                        "(" << format_num_entries(cth.size) << ")\n";
+                    std::cout << "      - Current version: " << cth.curr_version
+                              << " "
+                                 "(hard-linked to snapshot number)\n";
+                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size))
+                              << " "
+                                 "("
+                              << format_num_entries(cth.size) << ")\n";
                 }
                 std::cout << "    - Synchronization history:\n";
                 {
                     const ServerHistoryInfo::SynchronizationHistory& sh = info.sync_history;
-                    std::cout << "      - Base version: " << sh.base_version.version << " "
-                        "(salt=" << sh.base_version.salt << ")\n";
+                    std::cout << "      - Base version: " << sh.base_version.version
+                              << " "
+                                 "(salt="
+                              << sh.base_version.salt << ")\n";
                     std::cout << "      - Current version: " << sh.curr_version << "\n";
-                    std::cout << "      - Size: " << format_byte_size(double(sh.aggr_size)) << " "
-                        "(" << format_num_history_entries(sh.size) << ")\n";
+                    std::cout << "      - Size: " << format_byte_size(double(sh.aggr_size))
+                              << " "
+                                 "("
+                              << format_num_history_entries(sh.size) << ")\n";
                     std::cout << "      - Compacted until: " << sh.compacted_until << "\n";
                     std::cout << "      - Last compaction at: ";
                     if (sh.compacted_until > 0) {
@@ -1006,23 +1031,38 @@ int main(int argc, char* argv[])
                 std::cout << "    - Client files registry:\n";
                 {
                     const ServerHistoryInfo::ClientFiles& cf = info.client_files;
-                    std::cout << "      - Size: " << format_byte_size(double(cf.aggr_size)) << " "
-                        "(" << format_num_client_files(cf.size) << ")\n";
+                    std::cout << "      - Size: " << format_byte_size(double(cf.aggr_size))
+                              << " "
+                                 "("
+                              << format_num_client_files(cf.size) << ")\n";
                     std::cout << "      - Reciprocal history size: "
-                        "" << format_byte_size(double(cf.recip_hist_aggr_size)) << " "
-                        "(" << format_byte_size(double(cf.recip_hist_aggr_size)/cf.size) << " "
-                        "per client file)\n";
+                                 ""
+                              << format_byte_size(double(cf.recip_hist_aggr_size))
+                              << " "
+                                 "("
+                              << format_byte_size(double(cf.recip_hist_aggr_size) / cf.size)
+                              << " "
+                                 "per client file)\n";
                 }
                 std::cout << "    - Binding to reference file (partial sync):";
                 if (info.partial_sync) {
                     const ServerHistoryInfo::PartialSync& ps = *info.partial_sync;
                     std::cout << "\n"
-                        "      - Partial file identifier: "
-                        "" << ps.partial_file_ident.ident << " "
-                        "(salt=" << ps.partial_file_ident.salt << ")\n"
-                        "      - Partial version: " << ps.partial_version << "\n"
-                        "      - Reference version: " << ps.reference_version.version << " "
-                        "(salt=" << ps.reference_version.salt << ")\n";
+                                 "      - Partial file identifier: "
+                                 ""
+                              << ps.partial_file_ident.ident
+                              << " "
+                                 "(salt="
+                              << ps.partial_file_ident.salt
+                              << ")\n"
+                                 "      - Partial version: "
+                              << ps.partial_version
+                              << "\n"
+                                 "      - Reference version: "
+                              << ps.reference_version.version
+                              << " "
+                                 "(salt="
+                              << ps.reference_version.salt << ")\n";
                 }
                 else {
                     std::cout << " None\n";
@@ -1031,11 +1071,15 @@ int main(int argc, char* argv[])
                 if (info.schema_versions) {
                     std::cout << "\n";
                     for (const ServerHistoryInfo::SchemaVersion& entry : *info.schema_versions) {
-                        std::cout << "      - Version: "<<entry.schema_version;
+                        std::cout << "      - Version: " << entry.schema_version;
                         if (!entry.details_are_unknown) {
-                            std::cout << " (sync_library_version=" << entry.library_version << ", "
-                                "snapshot_number=" << entry.snapshot_version << ", "
-                                "timestamp=" << format_timestamp(entry.timestamp) << ")";
+                            std::cout << " (sync_library_version=" << entry.library_version
+                                      << ", "
+                                         "snapshot_number="
+                                      << entry.snapshot_version
+                                      << ", "
+                                         "timestamp="
+                                      << format_timestamp(entry.timestamp) << ")";
                         }
                         else {
                             std::cout << " (details are unknown)";
@@ -1049,7 +1093,7 @@ int main(int argc, char* argv[])
             }
             else {
                 std::cerr << "ERROR: Detailed breakdown of history compartment is unavailable "
-                    "for this type of history compartment\n";
+                             "for this type of history compartment\n";
                 return EXIT_FAILURE;
             }
         }
@@ -1074,8 +1118,11 @@ int main(int argc, char* argv[])
             num_entries = free_positions.size();
         }
         std::cout << "  - Free-space registry size: "
-            "" << format_aggregate_size({ref_1, ref_2, ref_3}, alloc) << " "
-            "(" << format_num_entries(num_entries) << ")\n";
+                     ""
+                  << format_aggregate_size({ref_1, ref_2, ref_3}, alloc)
+                  << " "
+                     "("
+                  << format_num_entries(num_entries) << ")\n";
     }
     Array tables{alloc};
     tables.init_from_ref(top.get_as_ref(1));
@@ -1098,9 +1145,13 @@ int main(int argc, char* argv[])
     for (std::size_t i = 0; i < num_tables; ++i) {
         ConstTableRef table = group.get_table(table_keys[i]);
         StringData table_name = group.get_table_name(table_keys[i]);
-        std::cout << "    - Table: " << quoted(table_name) << ": "
-            "" << format_aggregate_size({tables.get_as_ref(i)}, alloc) << " "
-            "(" << format_num_rows(table->size()) << ")\n";
+        std::cout << "    - Table: " << quoted(table_name)
+                  << ": "
+                     ""
+                  << format_aggregate_size({tables.get_as_ref(i)}, alloc)
+                  << " "
+                     "("
+                  << format_num_rows(table->size()) << ")\n";
         if (show_columns) {
             auto col_keys = table->get_column_keys();
             for (auto col : col_keys) {
@@ -1139,15 +1190,18 @@ int main(int argc, char* argv[])
                 StringData matches_property = obj.get<String>(matches_property_col_key);
                 ColKey matches_col_key = table->get_column_key(matches_property);
                 if (!matches_col_key) {
-                    std::cerr << "ERROR: Matches column '"<<matches_property<<"' missing in "
-                        "'class___ResultSets'\n";
+                    std::cerr << "ERROR: Matches column '" << matches_property
+                              << "' missing in "
+                                 "'class___ResultSets'\n";
                     return EXIT_FAILURE;
                 }
                 ConstTableRef target_table = table->get_link_target(matches_col_key);
                 StringData query = obj.get<String>(query_col_key);
                 std::int_fast64_t status = obj.get<Int>(status_col_key);
-                std::cout << "      - Query: " << quoted(target_table->get_name()) << ": "
-                    "" << query << " (status=" << status;
+                std::cout << "      - Query: " << quoted(target_table->get_name())
+                          << ": "
+                             ""
+                          << query << " (status=" << status;
                 if (matches_count_col_key) {
                     std::int_fast64_t matches_count = obj.get<Int>(matches_count_col_key);
                     std::cout << ", matches_count=" << matches_count;

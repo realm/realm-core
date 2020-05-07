@@ -63,8 +63,7 @@ public:
 
     /// The mere creation of the slot is guaranteed to not involve any access to
     /// the file system.
-    Slot(ClientFileAccessCache&, std::string realm_path,
-         Optional<std::array<char, 64>> encryption_key = none,
+    Slot(ClientFileAccessCache&, std::string realm_path, Optional<std::array<char, 64>> encryption_key = none,
          std::shared_ptr<sync::ClientReplication::ChangesetCooker> = nullptr) noexcept;
 
     /// Closes the file if it is open (as if by calling close()).
@@ -114,10 +113,10 @@ private:
 
 
 inline ClientFileAccessCache::ClientFileAccessCache(long max_open_files, bool disable_sync_to_disk,
-                                                    util::Logger& logger) :
-    m_max_open_files{max_open_files},
-    m_disable_sync_to_disk{disable_sync_to_disk},
-    m_logger{logger}
+                                                    util::Logger& logger)
+    : m_max_open_files{max_open_files}
+    , m_disable_sync_to_disk{disable_sync_to_disk}
+    , m_logger{logger}
 {
     REALM_ASSERT(m_max_open_files >= 1);
 }
@@ -166,11 +165,11 @@ inline void ClientFileAccessCache::insert(Slot& slot) noexcept
 
 inline ClientFileAccessCache::Slot::Slot(ClientFileAccessCache& cache, std::string rp,
                                          Optional<std::array<char, 64>> ek,
-                                         std::shared_ptr<sync::ClientReplication::ChangesetCooker> cc) noexcept:
-    realm_path{std::move(rp)},
-    m_cache{cache},
-    m_encryption_key{std::move(ek)},
-    m_changeset_cooker{std::move(cc)}
+                                         std::shared_ptr<sync::ClientReplication::ChangesetCooker> cc) noexcept
+    : realm_path{std::move(rp)}
+    , m_cache{cache}
+    , m_encryption_key{std::move(ek)}
+    , m_changeset_cooker{std::move(cc)}
 {
 }
 
@@ -219,10 +218,9 @@ inline void ClientFileAccessCache::Slot::do_close() noexcept
     m_history.reset();
 }
 
-inline ClientFileAccessCache::Slot::RefPair::RefPair(sync::ClientReplication& h,
-                                                     DB& sg) noexcept:
-    history(h),
-    shared_group(sg)
+inline ClientFileAccessCache::Slot::RefPair::RefPair(sync::ClientReplication& h, DB& sg) noexcept
+    : history(h)
+    , shared_group(sg)
 {
 }
 

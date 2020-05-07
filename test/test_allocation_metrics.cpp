@@ -44,12 +44,14 @@ TEST(AllocationMetric_Tenants)
 {
     std::vector<std::unique_ptr<AllocationMetricsContext>> tenants;
     tenants.resize(10);
-    std::generate(tenants.begin(), tenants.end(), []() { return std::make_unique<AllocationMetricsContext>(); });
+    std::generate(tenants.begin(), tenants.end(), []() {
+        return std::make_unique<AllocationMetricsContext>();
+    });
 
     std::vector<std::thread> threads;
     threads.reserve(10);
     for (size_t i = 0; i < 10; ++i) {
-        threads.emplace_back([i=i, &tenants] {
+        threads.emplace_back([i = i, &tenants] {
             AllocationMetricsContextScope tenant_scope{*tenants[i]};
             AllocationMetricNameScope scope{test_component};
             util::metered::vector<char> memory;

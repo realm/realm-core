@@ -60,8 +60,8 @@ public:
     Peer(Context&, std::string http_request_path, std::string realm_path, util::Logger&,
          std::int_fast64_t originator_ident, bool verify_ssl_cert,
          util::Optional<std::string> ssl_trust_certificate_path,
-         util::Optional<sync::Session::Config::ClientReset> client_reset_config,
-         bool use_trivial_cooker, std::function<void(bool is_fatal)> on_sync_error);
+         util::Optional<sync::Session::Config::ClientReset> client_reset_config, bool use_trivial_cooker,
+         std::function<void(bool is_fatal)> on_sync_error);
 
     sync::Session& get_session() noexcept;
 
@@ -69,8 +69,7 @@ public:
 
     /// If a refresh token is specified (nonempty), the access token will be
     /// periodically refreshed.
-    void bind(const std::string& server_url, const std::string& access_token,
-              const std::string& refresh_token);
+    void bind(const std::string& server_url, const std::string& access_token, const std::string& refresh_token);
 
     struct TransactSpec {
         int num_blobs = 0;
@@ -149,8 +148,8 @@ public:
     const bool report_roundtrip_times;
     const bool reset_on_reconnect;
 
-    Context(sync::Client&, sync::auth::Client&, util::network::Service&, std::mt19937_64&,
-            Metrics&, bool dstd, bool rrt, bool ror) noexcept;
+    Context(sync::Client&, sync::auth::Client&, util::network::Service&, std::mt19937_64&, Metrics&, bool dstd,
+            bool rrt, bool ror) noexcept;
 
     void init_metrics_gauges(bool report_propagation_time);
     void on_new_session();
@@ -182,7 +181,6 @@ private:
     void sched_metrics_aggregation_flush();
     void metrics_aggregation_flush();
 };
-
 
 
 // Implementation
@@ -217,16 +215,15 @@ inline sync::Session& Peer::get_session() noexcept
 }
 
 inline Peer::Context::Context(sync::Client& c, sync::auth::Client& a, util::network::Service& tps,
-                              std::mt19937_64& tpr, Metrics& m, bool dstd, bool rrt,
-                              bool ror) noexcept :
-    client{c},
-    auth{a},
-    test_proc_service{tps},
-    test_proc_random{tpr},
-    metrics{m},
-    disable_sync_to_disk{dstd},
-    report_roundtrip_times{rrt},
-    reset_on_reconnect{ror}
+                              std::mt19937_64& tpr, Metrics& m, bool dstd, bool rrt, bool ror) noexcept
+    : client{c}
+    , auth{a}
+    , test_proc_service{tps}
+    , test_proc_random{tpr}
+    , metrics{m}
+    , disable_sync_to_disk{dstd}
+    , report_roundtrip_times{rrt}
+    , reset_on_reconnect{ror}
 {
 }
 

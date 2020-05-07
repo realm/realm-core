@@ -102,8 +102,7 @@ private:
     LstBase& get_list(const Instruction::PathInstruction&, const char* instr = "(unspecified)");
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
-    ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&,
-                          const char* instr = "(unspecified)") const;
+    ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&, const char* instr = "(unspecified)") const;
     util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&, const char* instr = "(unspecified)");
 
 

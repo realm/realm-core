@@ -13,13 +13,13 @@ namespace MetricsOptions {
 typedef uint64_t OptionType;
 
 // Any changes in these values must be mirrored in src/node/sync-server/src/index.ts:RealmMetricsExclusions
-constexpr OptionType Core_Query             = 0b0000'0001;
-constexpr OptionType Core_Transaction_Read  = 0b0000'0010;
+constexpr OptionType Core_Query = 0b0000'0001;
+constexpr OptionType Core_Transaction_Read = 0b0000'0010;
 constexpr OptionType Core_Transaction_Write = 0b0000'0100;
 
 // Combinations for convenience
-constexpr OptionType Core_Transaction       = Core_Transaction_Read | Core_Transaction_Write;
-constexpr OptionType Core_All               = Core_Query | Core_Transaction;
+constexpr OptionType Core_Transaction = Core_Transaction_Read | Core_Transaction_Write;
+constexpr OptionType Core_All = Core_Query | Core_Transaction;
 
 } // end namespace MetricsOptions
 
@@ -28,6 +28,7 @@ struct MetricsExclusion {
     MetricsExclusion();
     // return true only if all the `options` specified are present in the exclusion
     bool will_exclude(MetricsOptions::OptionType options);
+
 private:
     MetricsOptions::OptionType m_mask;
 };
@@ -85,8 +86,7 @@ public:
 };
 
 
-std::unique_ptr<Metrics> make_buffered_statsd_metrics(const std::string& endpoint,
-                                                      const std::string& prefix,
+std::unique_ptr<Metrics> make_buffered_statsd_metrics(const std::string& endpoint, const std::string& prefix,
                                                       const MetricsExclusion& exclusions);
 
 

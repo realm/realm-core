@@ -61,11 +61,10 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-
 TEST(Array_Example)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
-    auto server   = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
@@ -90,10 +89,10 @@ TEST(Array_Example)
         array.add(124);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     client_2->transaction([](Peer& p) {
-        //sync::create_object(*p.group, *p.table("foobar"));
+        // sync::create_object(*p.group, *p.table("foobar"));
         auto bar = p.table("class_foobar")->get_column_key("bar");
 
         auto foo = p.table("class_foobar")->get_column_key("foo");
@@ -104,7 +103,7 @@ TEST(Array_Example)
         array.add(457);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     {
@@ -122,7 +121,7 @@ TEST(Array_Example)
         auto bar = p.table("class_foobar")->get_column_key("bar");
         auto array = p.table("class_foobar")->begin()->get_list<int64_t>(bar);
 
-        for(size_t i=0; i<array.size(); i++)
+        for (size_t i = 0; i < array.size(); i++)
             values1.push_back(array.get(i));
     });
 
@@ -130,11 +129,9 @@ TEST(Array_Example)
         auto bar = p.table("class_foobar")->get_column_key("bar");
         auto array = p.table("class_foobar")->begin()->get_list<int64_t>(bar);
 
-        for(size_t i=0; i<array.size(); i++)
+        for (size_t i = 0; i < array.size(); i++)
             values2.push_back(array.get(i));
-
     });
 
-    CHECK(values1==values2);
-
+    CHECK(values1 == values2);
 }

@@ -18,40 +18,42 @@ using namespace realm;
 
 void usage(char* prog)
 {
-    std::cerr <<
-        "Synopsis: " << prog << " [-i INPUT_KEY_FILE][-o OUTPUT_KEY_FILE][-l LIST_FILE_PATH][-f FILE][-j JOBS][-v][-h]\n"
-        "Transform Realm file encryption state.\n"
-        "Both the input and output keys are optional.\n"
-        "When a key is omitted, it means no encryption is used in that direction.\n"
-        "\n"
-        "Options:\n"
-        "  -h, --help                   Display usage\n"
-        "  -i, --input_key_file         The path to a file containing the 64 byte encryption key to be used for reading\n"
-        "  -o, --output_key_file        The path to a file containing the 64 byte encryption key to be used for writing\n"
-        "  -l, --list_file              The path to a file containing a list of realm files to operate on\n"
-        "  -f, --file                   The path to a single Realm file to operate on\n"
-        "  -n, --input_key_env          The name of the environment variable containing the Base64-encoding of\n"
-        "                               the 64 byte encryption key to be used for reading\n"
-        "  -t, --output_key_env         The name of the environment variable containing the Base64 encoding of\n"
-        "                               the 64 byte encryption key to be used for writing\n"
-        "  -t, --jobs                   Number of parallel jobs\n"
-        "  -v, --verbose                Turn on verbose output. WARNING: The keys will be visible on the console!\n"
-        "\n";
+    std::cerr
+        << "Synopsis: " << prog
+        << " [-i INPUT_KEY_FILE][-o OUTPUT_KEY_FILE][-l LIST_FILE_PATH][-f FILE][-j JOBS][-v][-h]\n"
+           "Transform Realm file encryption state.\n"
+           "Both the input and output keys are optional.\n"
+           "When a key is omitted, it means no encryption is used in that direction.\n"
+           "\n"
+           "Options:\n"
+           "  -h, --help                   Display usage\n"
+           "  -i, --input_key_file         The path to a file containing the 64 byte encryption key to be used for "
+           "reading\n"
+           "  -o, --output_key_file        The path to a file containing the 64 byte encryption key to be used for "
+           "writing\n"
+           "  -l, --list_file              The path to a file containing a list of realm files to operate on\n"
+           "  -f, --file                   The path to a single Realm file to operate on\n"
+           "  -n, --input_key_env          The name of the environment variable containing the Base64-encoding of\n"
+           "                               the 64 byte encryption key to be used for reading\n"
+           "  -t, --output_key_env         The name of the environment variable containing the Base64 encoding of\n"
+           "                               the 64 byte encryption key to be used for writing\n"
+           "  -t, --jobs                   Number of parallel jobs\n"
+           "  -v, --verbose                Turn on verbose output. WARNING: The keys will be visible on the "
+           "console!\n"
+           "\n";
 }
 
 const char* optstring = "hi:o:l:f:vn:t:j:";
 
-struct option longopts[] = {
-    { "help", no_argument, nullptr, 'h' },
-    { "input_key_file", optional_argument, nullptr, 'i' },
-    { "output_key_file", optional_argument, nullptr, 'o' },
-    { "list_file", optional_argument, nullptr, 'l' },
-    { "file", optional_argument, nullptr, 'f' },
-    { "verbose", no_argument, nullptr, 'v'},
-    { "input_key_env", optional_argument, nullptr, 'n' },
-    { "output_key_env", optional_argument, nullptr, 't' },
-    { "jobs", optional_argument, nullptr, 'j'}
-};
+struct option longopts[] = {{"help", no_argument, nullptr, 'h'},
+                            {"input_key_file", optional_argument, nullptr, 'i'},
+                            {"output_key_file", optional_argument, nullptr, 'o'},
+                            {"list_file", optional_argument, nullptr, 'l'},
+                            {"file", optional_argument, nullptr, 'f'},
+                            {"verbose", no_argument, nullptr, 'v'},
+                            {"input_key_env", optional_argument, nullptr, 'n'},
+                            {"output_key_env", optional_argument, nullptr, 't'},
+                            {"jobs", optional_argument, nullptr, 'j'}};
 
 struct EncryptionCLIArgs {
     std::string input_key_file;
@@ -69,7 +71,7 @@ EncryptionCLIArgs parse_arguments(int argc, char* argv[])
     EncryptionCLIArgs config{};
 
     int ch;
-    while ( (ch = getopt_long(argc, argv, optstring, longopts, nullptr)) != -1 ) {
+    while ((ch = getopt_long(argc, argv, optstring, longopts, nullptr)) != -1) {
         switch (ch) {
             case 'h':
                 usage(argv[0]);
@@ -78,8 +80,8 @@ EncryptionCLIArgs parse_arguments(int argc, char* argv[])
                 config.input_key_file = std::string(optarg);
                 break;
             case 'o':
-                 config.output_key_file = std::string(optarg);
-                 break;
+                config.output_key_file = std::string(optarg);
+                break;
             case 'l':
                 config.list_file = std::string(optarg);
                 break;
@@ -202,9 +204,15 @@ int main(int argc, char* argv[])
 
     if (config.verbose) {
         std::cout << "config.target_path = " << config.target_path << "\n";
-        std::cout << "config.type = " << (config.type == encryption_transformer::Configuration::TransformType::File ? "Single File" : "File Containing Paths") << "\n";
-        std::cout << "input key: " << (config.input_key ? std::string(config.input_key->data(), 64) : "none") << std::endl;
-        std::cout << "output key: " << (config.output_key ? std::string(config.output_key->data(), 64) : "none") << std::endl;
+        std::cout << "config.type = "
+                  << (config.type == encryption_transformer::Configuration::TransformType::File
+                          ? "Single File"
+                          : "File Containing Paths")
+                  << "\n";
+        std::cout << "input key: " << (config.input_key ? std::string(config.input_key->data(), 64) : "none")
+                  << std::endl;
+        std::cout << "output key: " << (config.output_key ? std::string(config.output_key->data(), 64) : "none")
+                  << std::endl;
     }
 
     size_t result = encryption_transformer::encrypt_transform(config);

@@ -4,10 +4,10 @@
 #include <realm/util/parent_dir.hpp>
 
 #if defined(_MSC_VER) && _MSC_VER >= 1900 // compiling with at least Visual Studio 2015
-#  include <filesystem>
-#  define HAVE_STD_FILESYSTEM 1
+#include <filesystem>
+#define HAVE_STD_FILESYSTEM 1
 #else
-#  define HAVE_STD_FILESYSTEM 0
+#define HAVE_STD_FILESYSTEM 0
 #endif
 
 using namespace realm;

@@ -16,7 +16,8 @@ namespace util {
 ///
 /// \tparam R The type of the runnable object. This type must satisfy the
 /// requirements of the Runnable concept. See ThreadExecGuardWithParent.
-template<class R> class ThreadExecGuard {
+template <class R>
+class ThreadExecGuard {
 public:
     explicit ThreadExecGuard(R& runnable);
 
@@ -78,7 +79,8 @@ private:
 ///  - `run()` will stop executing within a reasonable amount of time after
 ///    `stop()` has been called.
 ///
-template<class R, class P> class ThreadExecGuardWithParent {
+template <class R, class P>
+class ThreadExecGuardWithParent {
 public:
     explicit ThreadExecGuardWithParent(R& runnable, P& parent);
 
@@ -124,57 +126,63 @@ private:
 };
 
 
-template<class R> ThreadExecGuard<R> make_thread_exec_guard(R& runnable);
+template <class R>
+ThreadExecGuard<R> make_thread_exec_guard(R& runnable);
 
-template<class R, class P>
+template <class R, class P>
 ThreadExecGuardWithParent<R, P> make_thread_exec_guard(R& runnable, P& parent);
-
-
 
 
 // Implementation
 
-template<class R> inline ThreadExecGuard<R>::ThreadExecGuard(R& runnable) :
-    m_state{std::make_unique<State>(runnable)} // Throws
+template <class R>
+inline ThreadExecGuard<R>::ThreadExecGuard(R& runnable)
+    : m_state{std::make_unique<State>(runnable)} // Throws
 {
 }
 
-template<class R> inline void ThreadExecGuard<R>::start()
+template <class R>
+inline void ThreadExecGuard<R>::start()
 {
     const std::string* thread_name = nullptr;
     m_state->start(thread_name); // Throws
 }
 
-template<class R> inline void ThreadExecGuard<R>::start(const std::string& thread_name)
+template <class R>
+inline void ThreadExecGuard<R>::start(const std::string& thread_name)
 {
     m_state->start(&thread_name); // Throws
 }
 
-template<class R> inline void ThreadExecGuard<R>::start_with_signals_blocked()
+template <class R>
+inline void ThreadExecGuard<R>::start_with_signals_blocked()
 {
     SignalBlocker sb;
     const std::string* thread_name = nullptr;
     m_state->start(thread_name); // Throws
 }
 
-template<class R>
+template <class R>
 inline void ThreadExecGuard<R>::start_with_signals_blocked(const std::string& thread_name)
 {
     SignalBlocker sb;
     m_state->start(&thread_name); // Throws
 }
 
-template<class R> inline void ThreadExecGuard<R>::stop_and_rethrow()
+template <class R>
+inline void ThreadExecGuard<R>::stop_and_rethrow()
 {
     m_state->stop_and_rethrow(); // Throws
 }
 
-template<class R> inline ThreadExecGuard<R>::State::State(R& r) noexcept :
-    runnable{r}
+template <class R>
+inline ThreadExecGuard<R>::State::State(R& r) noexcept
+    : runnable{r}
 {
 }
 
-template<class R> inline ThreadExecGuard<R>::State::~State() noexcept
+template <class R>
+inline ThreadExecGuard<R>::State::~State() noexcept
 {
     if (thread.joinable()) {
         runnable.stop();
@@ -182,7 +190,8 @@ template<class R> inline ThreadExecGuard<R>::State::~State() noexcept
     }
 }
 
-template<class R> inline void ThreadExecGuard<R>::State::start(const std::string* thread_name)
+template <class R>
+inline void ThreadExecGuard<R>::State::start(const std::string* thread_name)
 {
     bool set_thread_name = false;
     std::string thread_name_2;
@@ -190,11 +199,11 @@ template<class R> inline void ThreadExecGuard<R>::State::start(const std::string
         set_thread_name = true;
         thread_name_2 = *thread_name; // Throws (copy)
     }
-    auto run = [this, set_thread_name, thread_name=std::move(thread_name_2)]() noexcept {
+    auto run = [this, set_thread_name, thread_name = std::move(thread_name_2)]() noexcept {
         try {
             if (set_thread_name)
                 util::Thread::set_name(thread_name); // Throws
-            runnable.run(); // Throws
+            runnable.run();                          // Throws
         }
         catch (...) {
             exception = std::current_exception();
@@ -203,7 +212,8 @@ template<class R> inline void ThreadExecGuard<R>::State::start(const std::string
     thread.start(std::move(run)); // Throws
 }
 
-template<class R> inline void ThreadExecGuard<R>::State::stop_and_rethrow()
+template <class R>
+inline void ThreadExecGuard<R>::State::stop_and_rethrow()
 {
     if (thread.joinable()) {
         runnable.stop();
@@ -213,51 +223,55 @@ template<class R> inline void ThreadExecGuard<R>::State::stop_and_rethrow()
     }
 }
 
-template<class R, class P>
-inline ThreadExecGuardWithParent<R, P>::ThreadExecGuardWithParent(R& runnable, P& parent) :
-    m_state{std::make_unique<State>(runnable, parent)} // Throws
+template <class R, class P>
+inline ThreadExecGuardWithParent<R, P>::ThreadExecGuardWithParent(R& runnable, P& parent)
+    : m_state{std::make_unique<State>(runnable, parent)} // Throws
 {
 }
 
-template<class R, class P> inline void ThreadExecGuardWithParent<R, P>::start()
+template <class R, class P>
+inline void ThreadExecGuardWithParent<R, P>::start()
 {
     const std::string* thread_name = nullptr;
     m_state->start(thread_name); // Throws
 }
 
-template<class R, class P>
+template <class R, class P>
 inline void ThreadExecGuardWithParent<R, P>::start(const std::string& thread_name)
 {
     m_state->start(&thread_name); // Throws
 }
 
-template<class R, class P> inline void ThreadExecGuardWithParent<R, P>::start_with_signals_blocked()
+template <class R, class P>
+inline void ThreadExecGuardWithParent<R, P>::start_with_signals_blocked()
 {
     SignalBlocker sb;
     const std::string* thread_name = nullptr;
     m_state->start(thread_name); // Throws
 }
 
-template<class R, class P>
+template <class R, class P>
 inline void ThreadExecGuardWithParent<R, P>::start_with_signals_blocked(const std::string& thread_name)
 {
     SignalBlocker sb;
     m_state->start(&thread_name); // Throws
 }
 
-template<class R, class P> inline void ThreadExecGuardWithParent<R, P>::stop_and_rethrow()
+template <class R, class P>
+inline void ThreadExecGuardWithParent<R, P>::stop_and_rethrow()
 {
     m_state->stop_and_rethrow(); // Throws
 }
 
-template<class R, class P>
-inline ThreadExecGuardWithParent<R, P>::State::State(R& r, P& p) noexcept :
-    runnable{r},
-    parent{p}
+template <class R, class P>
+inline ThreadExecGuardWithParent<R, P>::State::State(R& r, P& p) noexcept
+    : runnable{r}
+    , parent{p}
 {
 }
 
-template<class R, class P> inline ThreadExecGuardWithParent<R, P>::State::~State() noexcept
+template <class R, class P>
+inline ThreadExecGuardWithParent<R, P>::State::~State() noexcept
 {
     if (thread.joinable()) {
         runnable.stop();
@@ -265,7 +279,7 @@ template<class R, class P> inline ThreadExecGuardWithParent<R, P>::State::~State
     }
 }
 
-template<class R, class P>
+template <class R, class P>
 inline void ThreadExecGuardWithParent<R, P>::State::start(const std::string* thread_name)
 {
     bool set_thread_name = false;
@@ -274,11 +288,11 @@ inline void ThreadExecGuardWithParent<R, P>::State::start(const std::string* thr
         set_thread_name = true;
         thread_name_2 = *thread_name; // Throws (copy)
     }
-    auto run = [this, set_thread_name, thread_name=std::move(thread_name_2)]() noexcept {
+    auto run = [this, set_thread_name, thread_name = std::move(thread_name_2)]() noexcept {
         try {
             if (set_thread_name)
                 util::Thread::set_name(thread_name); // Throws
-            runnable.run(); // Throws
+            runnable.run();                          // Throws
         }
         catch (...) {
             exception = std::current_exception();
@@ -288,7 +302,8 @@ inline void ThreadExecGuardWithParent<R, P>::State::start(const std::string* thr
     thread.start(std::move(run)); // Throws
 }
 
-template<class R, class P> inline void ThreadExecGuardWithParent<R, P>::State::stop_and_rethrow()
+template <class R, class P>
+inline void ThreadExecGuardWithParent<R, P>::State::stop_and_rethrow()
 {
     if (thread.joinable()) {
         runnable.stop();
@@ -298,12 +313,13 @@ template<class R, class P> inline void ThreadExecGuardWithParent<R, P>::State::s
     }
 }
 
-template<class R> inline ThreadExecGuard<R> make_thread_exec_guard(R& runnable)
+template <class R>
+inline ThreadExecGuard<R> make_thread_exec_guard(R& runnable)
 {
     return ThreadExecGuard<R>{runnable}; // Throws
 }
 
-template<class R, class P>
+template <class R, class P>
 inline ThreadExecGuardWithParent<R, P> make_thread_exec_guard(R& runnable, P& parent)
 {
     return ThreadExecGuardWithParent<R, P>{runnable, parent}; // Throws

@@ -8,9 +8,14 @@
 using version_type = realm::sync::ClientHistory::version_type;
 
 const std::string token =
-    "eyJpZGVudGl0eSI6InNvbWVvbmUiLCJhY2Nlc3MiOiBbImRvd25sb2FkIiwgInVwbG9hZCJdLCJ0aW1lc3RhbXAiOjEyMywiZXhwaXJlcyI6bnVsbCwiYXBwX2lkIjogImlvLnJlYWxtLkV4YW1wbGUifQo="
+    "eyJpZGVudGl0eSI6InNvbWVvbmUiLCJhY2Nlc3MiOiBbImRvd25sb2FkIiwgInVwbG9hZCJdLCJ0aW1lc3RhbXAiOjEyMywiZXhwaXJlcyI6bnVs"
+    "bCwiYXBwX2lkIjogImlvLnJlYWxtLkV4YW1wbGUifQo="
     ":"
-    "F5AsGuW9QgkLJlCo2X1Sn/cBAESDZIoOethiTMdB5Ko7blpDNcG5gjJcC3mOUekOETwSTY0vK+qBF96a+Rvlw8XD3dlrL8Cex8ofmDRYhJQcB3EG3lb9HHhET7iIWfXbojhyinwE3ZHLPl3D0WwCbTHA4H6QY70qY88bJzziSRBR2pCCLAKMSfWBbdnQ98V/ASOKY4HZc8s7bl5021w6Zl3Stq63igrdst923Bt8NstHIerbpZDis8yPyJpc3CkQ9gfNLwlRHBC68f8yhVbR7JlCzfdSOT4o6+vqq54MbTNFHt9VJ5vZSuxrvBmafNkwFpMlnyuqDCkQL9OykoJjog==";
+    "F5AsGuW9QgkLJlCo2X1Sn/"
+    "cBAESDZIoOethiTMdB5Ko7blpDNcG5gjJcC3mOUekOETwSTY0vK+qBF96a+"
+    "Rvlw8XD3dlrL8Cex8ofmDRYhJQcB3EG3lb9HHhET7iIWfXbojhyinwE3ZHLPl3D0WwCbTHA4H6QY70qY88bJzziSRBR2pCCLAKMSfWBbdnQ98V/"
+    "ASOKY4HZc8s7bl5021w6Zl3Stq63igrdst923Bt8NstHIerbpZDis8yPyJpc3CkQ9gfNLwlRHBC68f8yhVbR7JlCzfdSOT4o6+"
+    "vqq54MbTNFHt9VJ5vZSuxrvBmafNkwFpMlnyuqDCkQL9OykoJjog==";
 
 void error_handler(std::error_code /*ec*/, bool /*is_fatal*/, const std::string& detailed_message)
 {
@@ -18,13 +23,15 @@ void error_handler(std::error_code /*ec*/, bool /*is_fatal*/, const std::string&
     std::exit(1);
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     realm::sync::Client::Config cfg;
     cfg.reconnect_mode = realm::sync::Client::ReconnectMode::never;
     realm::sync::Client client(cfg);
 
-    std::thread client_thread([&client] {client.run();});
+    std::thread client_thread([&client] {
+        client.run();
+    });
 
     for (int argno = 1; argno < argc; argno++) {
         std::string realmfile = argv[argno];
@@ -60,8 +67,8 @@ int main(int argc, char **argv)
             realm::TableRef table = t.get_table("mytable");
 
             for (int i = 0; i < 10; i++) {
-                    table->set_int(0, i, i * 2 + 0);
-                    table->set_int(1, i, i * 2 + 1);
+                table->set_int(0, i, i * 2 + 0);
+                table->set_int(1, i, i * 2 + 1);
             }
 
             version_type new_version = t.commit();

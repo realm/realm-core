@@ -47,7 +47,8 @@ public:
     // FIXME: Use std::timespec in C++17.
     string_view_type format(std::time_t time, long nanoseconds);
 
-    template<class B> string_view_type format(std::chrono::time_point<B>);
+    template <class B>
+    string_view_type format(std::chrono::time_point<B>);
 
 private:
     using memory_output_stream_type = util::MemoryOutputStream;
@@ -63,12 +64,9 @@ private:
 };
 
 
-
-
-
 // Implementation
 
-template<class B>
+template <class B>
 inline auto TimestampFormatter::format(std::chrono::time_point<B> time) -> string_view_type
 {
     using clock_type = B;
@@ -79,8 +77,7 @@ inline auto TimestampFormatter::format(std::chrono::time_point<B> time) -> strin
         --time_2;
         time_3 = clock_type::from_time_t(time_2);
     }
-    long nanoseconds =
-        int(std::chrono::duration_cast<std::chrono::nanoseconds>(time - time_3).count());
+    long nanoseconds = int(std::chrono::duration_cast<std::chrono::nanoseconds>(time - time_3).count());
     REALM_ASSERT(nanoseconds >= 0 && nanoseconds < 1000000000);
     return format(time_2, nanoseconds); // Throws
 }

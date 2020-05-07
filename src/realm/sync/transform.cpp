@@ -54,8 +54,8 @@ namespace {
 #define TERM_RESET "\x1b[39;49;22m"
 #endif
 #endif
-                                                                             \
-#define REALM_MERGE_ASSERT(condition) \
+
+#define REALM_MERGE_ASSERT(condition)                                                                                \
     (REALM_LIKELY(condition) ? static_cast<void>(0) : throw sync::TransformError{"Assertion failed: " #condition})
 
 
@@ -153,13 +153,15 @@ struct TransformerImpl::Side {
     {
         if (auto str = mpark::get_if<InternString>(&other_key)) {
             return adopt_string(other_side, *str);
-        } else {
+        }
+        else {
             // Non-string keys do not need to be adopted.
             return other_key;
         }
     }
 
-    void adopt_path(Instruction::PathInstruction& instr, const Side& other_side, const Instruction::PathInstruction& other)
+    void adopt_path(Instruction::PathInstruction& instr, const Side& other_side,
+                    const Instruction::PathInstruction& other)
     {
         instr.table = adopt_string(other_side, other.table);
         instr.object = adopt_key(other_side, other.object);
@@ -167,14 +169,15 @@ struct TransformerImpl::Side {
         instr.path.m_path.clear();
         instr.path.m_path.reserve(other.path.size());
         for (auto& element : other.path.m_path) {
-            mpark::visit(util::overloaded {
-                [&](uint32_t index) {
-                    instr.path.m_path.push_back(index);
-                },
-                [&](InternString str) {
-                    instr.path.m_path.push_back(adopt_string(other_side, str));
-                },
-            }, element);
+            mpark::visit(util::overloaded{
+                             [&](uint32_t index) {
+                                 instr.path.m_path.push_back(index);
+                             },
+                             [&](InternString str) {
+                                 instr.path.m_path.push_back(adopt_string(other_side, str));
+                             },
+                         },
+                         element);
         }
     }
 
@@ -914,21 +917,23 @@ struct MergeUtils {
         return left_key == right_key;
     }
 
-    bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const noexcept
+    bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
+        noexcept
     {
-        return mpark::visit(util::overloaded {
-            [&](uint32_t lhs, uint32_t rhs) {
-                return lhs == rhs;
-            },
-            [&](InternString lhs, InternString rhs) {
-                return same_string(lhs, rhs);
-            },
-            [&](auto&&, auto&&) {
-                // FIXME: Paths contain incompatible element types. Should we raise an
-                // error here?
-                return false;
-            },
-        }, left, right);
+        return mpark::visit(util::overloaded{
+                                [&](uint32_t lhs, uint32_t rhs) {
+                                    return lhs == rhs;
+                                },
+                                [&](InternString lhs, InternString rhs) {
+                                    return same_string(lhs, rhs);
+                                },
+                                [&](auto&&, auto&&) {
+                                    // FIXME: Paths contain incompatible element types. Should we raise an
+                                    // error here?
+                                    return false;
+                                },
+                            },
+                            left, right);
     }
 
     bool same_path(const Instruction::Path& left, const Instruction::Path& right) const noexcept
@@ -992,7 +997,7 @@ struct MergeUtils {
         if (left.size() == right.size()) {
             if (left.size() == 0)
                 return true;
-            
+
             for (size_t i = 0; i < left.size() - 1; ++i) {
                 if (!same_path_element(left[i], right[i])) {
                     return false;
@@ -1003,7 +1008,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_container(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const noexcept
+    bool same_container(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
+        noexcept
     {
         return same_field(left, right) && same_container(left.path, right.path);
     }
@@ -1081,7 +1087,8 @@ struct MergeUtils {
     // True if the left side is an instruction that touches a container within
     // right's path. Equivalent to is_prefix_of, except the last element (the
     // index) is not considered.
-    bool is_container_prefix_of(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
+    bool is_container_prefix_of(const Instruction::PathInstruction& left,
+                                const Instruction::PathInstruction& right) const
     {
         if (left.path.size() != 0 && left.path.size() < right.path.size() && same_field(left, right)) {
             for (size_t i = 0; i < left.path.size() - 1; ++i) {
@@ -1134,7 +1141,8 @@ struct MergeUtils {
     //
     // Note that this will only be used in the context of array indices, because
     // those are the only path components that are modified during OT.
-    uint32_t& corresponding_index_in_path(const Instruction::PathInstruction& left, Instruction::PathInstruction& right) const
+    uint32_t& corresponding_index_in_path(const Instruction::PathInstruction& left,
+                                          Instruction::PathInstruction& right) const
     {
         REALM_ASSERT(left.path.size() != 0);
         REALM_ASSERT(left.path.size() < right.path.size());
@@ -1146,7 +1154,8 @@ struct MergeUtils {
         return mpark::get<uint32_t>(right.path[index]);
     }
 
-    uint32_t& corresponding_index_in_path(const Instruction::PathInstruction&, const Instruction::TableInstruction&) const
+    uint32_t& corresponding_index_in_path(const Instruction::PathInstruction&,
+                                          const Instruction::TableInstruction&) const
     {
         // A path instruction can never have a shorter path than something that
         // isn't a PathInstruction.
@@ -1241,11 +1250,11 @@ struct MergeBase : MergeUtils {
     struct MergeNested<A> {                                                                                          \
         template <class B, class OuterSide, class InnerSide>                                                         \
         struct DoMerge : MergeUtils {                                                                                \
-            A& outer;                                                                                          \
-            B& inner;                                                                                          \
+            A& outer;                                                                                                \
+            B& inner;                                                                                                \
             OuterSide& outer_side;                                                                                   \
             InnerSide& inner_side;                                                                                   \
-            DoMerge(A& outer, B& inner, OuterSide& outer_side, InnerSide& inner_side)                    \
+            DoMerge(A& outer, B& inner, OuterSide& outer_side, InnerSide& inner_side)                                \
                 : MergeUtils(outer_side, inner_side)                                                                 \
                 , outer(outer)                                                                                       \
                 , inner(inner)                                                                                       \
@@ -1256,7 +1265,7 @@ struct MergeBase : MergeUtils {
             void do_merge();                                                                                         \
         };                                                                                                           \
         template <class B, class OuterSide, class InnerSide>                                                         \
-        static inline void merge(A& outer, B& inner, OuterSide& outer_side, InnerSide& inner_side)       \
+        static inline void merge(A& outer, B& inner, OuterSide& outer_side, InnerSide& inner_side)                   \
         {                                                                                                            \
             DoMerge<B, OuterSide, InnerSide> do_merge{outer, inner, outer_side, inner_side};                         \
             do_merge.do_merge();                                                                                     \
@@ -1269,7 +1278,7 @@ struct MergeBase : MergeUtils {
     template <>                                                                                                      \
     struct MergeNested<A> {                                                                                          \
         template <class B, class OuterSide, class InnerSide>                                                         \
-        static inline void merge(const A&, const B&, const OuterSide&, const InnerSide&)                                         \
+        static inline void merge(const A&, const B&, const OuterSide&, const InnerSide&)                             \
         { /* Do nothing */                                                                                           \
         }                                                                                                            \
     }
@@ -1624,7 +1633,6 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Set)
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Set);
 
 
-
 /// AddInteger rules
 
 DEFINE_NESTED_MERGE_NOOP(Instruction::AddInteger);
@@ -1861,7 +1869,7 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayMove)
             // operation. Note that the timestamps are never equal.
             if (left_side.timestamp() < right_side.timestamp()) {
                 right.index() = left.ndx_2; // <---
-                left_side.discard();      // --->
+                left_side.discard();        // --->
                 if (right.index() == right.ndx_2) {
                     right_side.discard(); // <---
                 }
@@ -1931,14 +1939,14 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
             // use the previously applied MOVE operation to transform the received
             // REMOVE operation on the right side.
             left.index() = right.ndx_2; // --->
-            right_side.discard();   // <---
+            right_side.discard();       // <---
         }
         else {
             // Left removal vs right removal
             if (left.index() > right.index()) {
                 left.index() -= 1; // --->
             }
-            else {                // left.index() < right.index()
+            else {                  // left.index() < right.index()
                 right.index() -= 1; // <---
             }
             // Left removal vs right insertion
@@ -2152,13 +2160,9 @@ TransformerImpl::TransformerImpl()
 {
 }
 
-void TransformerImpl::merge_changesets(file_ident_type local_file_ident,
-                                         Changeset* their_changesets,
-                                         size_t their_size,
-                                         Changeset** our_changesets,
-                                         size_t our_size,
-                                         Reporter* reporter,
-                                         util::Logger* logger)
+void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
+                                       size_t their_size, Changeset** our_changesets, size_t our_size,
+                                       Reporter* reporter, util::Logger* logger)
 {
     REALM_ASSERT(their_size != 0);
     REALM_ASSERT(our_size != 0);

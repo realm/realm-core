@@ -43,7 +43,8 @@ inline std::error_code make_error_code(MiscExtErrors err)
 
 namespace std {
 
-template<> class is_error_code_enum<realm::util::MiscExtErrors> {
+template <>
+class is_error_code_enum<realm::util::MiscExtErrors> {
 public:
     static const bool value = true;
 };

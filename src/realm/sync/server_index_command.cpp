@@ -15,18 +15,16 @@
 using namespace realm;
 
 using SteadyClock = std::conditional<std::chrono::high_resolution_clock::is_steady,
-                                     std::chrono::high_resolution_clock,
-                                     std::chrono::steady_clock>::type;
+                                     std::chrono::high_resolution_clock, std::chrono::steady_clock>::type;
 using SteadyTimePoint = SteadyClock::time_point;
 
 SteadyTimePoint steady_clock_now() noexcept
 {
     return SteadyClock::now();
 }
-using milliseconds_type  = std::int_fast64_t;
+using milliseconds_type = std::int_fast64_t;
 
-milliseconds_type steady_duration(SteadyTimePoint start_time,
-                                  SteadyTimePoint end_time = steady_clock_now()) noexcept
+milliseconds_type steady_duration(SteadyTimePoint start_time, SteadyTimePoint end_time = steady_clock_now()) noexcept
 {
     auto duration = end_time - start_time;
     auto millis_duration = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
@@ -47,7 +45,8 @@ void change_indices(WriteTransaction& wt, const std::vector<IndexChange>& change
     Group& g = wt.get_group();
     for (size_t i = 0; i < changes.size(); ++i) {
         SteadyTimePoint inner_start = steady_clock_now();
-        std::cout << (changes[i].add ? "adding" : "removing") << " index on " << changes[i].table_name << "." << changes[i].column_name << std::endl;
+        std::cout << (changes[i].add ? "adding" : "removing") << " index on " << changes[i].table_name << "."
+                  << changes[i].column_name << std::endl;
 
         auto table_ndx = g.find_table(changes[i].table_name);
         if (!table_ndx) {
@@ -57,12 +56,14 @@ void change_indices(WriteTransaction& wt, const std::vector<IndexChange>& change
         TableRef table = g.get_table(table_ndx);
         auto col_ndx = table->get_column_key(changes[i].column_name);
         if (!col_ndx) {
-            std::cout << "No column called: " << changes[i].column_name << " on table: " << changes[i].table_name << std::endl;
+            std::cout << "No column called: " << changes[i].column_name << " on table: " << changes[i].table_name
+                      << std::endl;
             return;
         }
         bool has_index = table->has_search_index(col_ndx);
         if (has_index == changes[i].add) {
-            std::cout << "\t nothing to do, column " << (has_index ? "already has an index" : "does not have an index") << std::endl;
+            std::cout << "\t nothing to do, column "
+                      << (has_index ? "already has an index" : "does not have an index") << std::endl;
         }
         if (dry_run) {
             continue;
@@ -70,13 +71,15 @@ void change_indices(WriteTransaction& wt, const std::vector<IndexChange>& change
 
         if (changes[i].add) {
             table->add_search_index(col_ndx);
-        } else {
+        }
+        else {
             table->remove_search_index(col_ndx);
         }
 
         SteadyTimePoint inner_end = steady_clock_now();
         milliseconds_type inner_time = steady_duration(inner_start, inner_end);
-        std::cout << (changes[i].add ? "addition" : "removal") << " took " << inner_time << " milliseconds" << std::endl;
+        std::cout << (changes[i].add ? "addition" : "removal") << " took " << inner_time << " milliseconds"
+                  << std::endl;
         timings.push_back(inner_time);
     }
     std::cout << "total time: " << steady_duration(total_start, steady_clock_now()) << " ms" << std::endl;
@@ -90,7 +93,8 @@ void change_indices(WriteTransaction& wt, const std::vector<IndexChange>& change
     }
     if (dry_run) {
         std::cout << "not committing, this is a dry run" << std::endl;
-    } else {
+    }
+    else {
         wt.commit();
     }
 }
@@ -108,8 +112,8 @@ int main(int argc, char* argv[])
         const char* prog = argv[0];
         --argc;
         ++argv;
-        bool error   = false;
-        bool help    = false;
+        bool error = false;
+        bool help = false;
         bool version = false;
         int argc_2 = 0;
         int i = 0;
@@ -171,8 +175,7 @@ int main(int argc, char* argv[])
                 version = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Bad or missing value for option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -186,21 +189,21 @@ int main(int argc, char* argv[])
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<"  PATH [-a table.column] [-r table.column] [-d]"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
-                "                       encryption key to be used for accessing the specified\n"
-                "                       Realm file.\n"
-                "  -a, --add            Add an index to the specified table.column\n"
-                "  -r, --remove         Remove an index on the specified table.column\n"
-                "  -d, --dry-run        No changes will be applied, checks that all table.column\n"
-                "                       args exist\n"
-                "  -v, --version        Show the version of the Realm Sync release that this\n"
-                "                       command belongs to.\n";
+            std::cerr << "Synopsis: " << prog
+                      << "  PATH [-a table.column] [-r table.column] [-d]"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
+                         "                       encryption key to be used for accessing the specified\n"
+                         "                       Realm file.\n"
+                         "  -a, --add            Add an index to the specified table.column\n"
+                         "  -r, --remove         Remove an index on the specified table.column\n"
+                         "  -d, --dry-run        No changes will be applied, checks that all table.column\n"
+                         "                       args exist\n"
+                         "  -v, --version        Show the version of the Realm Sync release that this\n"
+                         "                       command belongs to.\n";
             return EXIT_SUCCESS;
         }
 
@@ -216,9 +219,9 @@ int main(int argc, char* argv[])
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }
@@ -239,13 +242,14 @@ int main(int argc, char* argv[])
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
     HistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     _impl::ServerHistory hist{path, history_context, compaction_control}; // Throws
-    auto sg = DB::create(hist, options); // Throws
-    WriteTransaction wt{sg}; // Throws
+    auto sg = DB::create(hist, options);                                  // Throws
+    WriteTransaction wt{sg};                                              // Throws
     change_indices(wt, changes, is_dry_run);
 }

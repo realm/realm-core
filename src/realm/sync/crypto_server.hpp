@@ -11,8 +11,11 @@
 namespace realm {
 namespace sync {
 
-struct CryptoError: std::runtime_error {
-    CryptoError(std::string message) : std::runtime_error(std::move(message)) {}
+struct CryptoError : std::runtime_error {
+    CryptoError(std::string message)
+        : std::runtime_error(std::move(message))
+    {
+    }
 };
 
 /// This class represents a public/private keypair, or more commonly a single public

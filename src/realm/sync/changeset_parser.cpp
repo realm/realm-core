@@ -15,9 +15,11 @@ struct ChangesetParser::State {
     _impl::NoCopyInputStream& m_input;
     InstructionHandler& m_handler;
 
-    explicit State(_impl::NoCopyInputStream& input, InstructionHandler& handler):
-        m_input(input), m_handler(handler)
-    {}
+    explicit State(_impl::NoCopyInputStream& input, InstructionHandler& handler)
+        : m_input(input)
+        , m_handler(handler)
+    {
+    }
 
     // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.
     // Each instruction are assumed to be contiguous in memory.
@@ -50,14 +52,14 @@ struct ChangesetParser::State {
     Instruction::Path read_path();
     bool read_char(char& c) noexcept;
     void read_bytes(char* data, size_t size); // Throws
-    bool read_bool(); // Throws
-    float read_float(); // Throws
-    double read_double(); // Throws
-    InternString read_intern_string(); // Throws
-    GlobalKey read_global_key(); // Throws
-    Timestamp read_timestamp(); // Throws
-    ObjectId read_object_id(); // Throws
-    Decimal128 read_decimal(); // Throws
+    bool read_bool();                         // Throws
+    float read_float();                       // Throws
+    double read_double();                     // Throws
+    InternString read_intern_string();        // Throws
+    GlobalKey read_global_key();              // Throws
+    Timestamp read_timestamp();               // Throws
+    ObjectId read_object_id();                // Throws
+    Decimal128 read_decimal();                // Throws
 
     void read_path_instr(Instruction::PathInstruction& instr);
 
@@ -72,12 +74,14 @@ struct ChangesetParser::State {
     BinaryData read_buffer(size_t size);
 
     REALM_NORETURN void parser_error(const char* complaint); // Throws
-    REALM_NORETURN void parser_error() { parser_error("Bad input"); } // Throws
+    REALM_NORETURN void parser_error()
+    {
+        parser_error("Bad input");
+    } // Throws
 };
 
 
-void ChangesetParser::parse(_impl::NoCopyInputStream& input,
-                            InstructionHandler& handler)
+void ChangesetParser::parse(_impl::NoCopyInputStream& input, InstructionHandler& handler)
 {
     State state{input, handler};
 
@@ -91,18 +95,30 @@ Instruction::Payload::Type ChangesetParser::State::read_payload_type()
     auto type = Instruction::Payload::Type(read_int());
     // Validate the type.
     switch (type) {
-        case Type::ObjectValue: [[fallthrough]];
-        case Type::GlobalKey: [[fallthrough]];
-        case Type::Null: [[fallthrough]];
-        case Type::Int: [[fallthrough]];
-        case Type::Bool: [[fallthrough]];
-        case Type::String: [[fallthrough]];
-        case Type::Binary: [[fallthrough]];
-        case Type::Timestamp: [[fallthrough]];
-        case Type::Float: [[fallthrough]];
-        case Type::Double: [[fallthrough]];
-        case Type::Decimal: [[fallthrough]];
-        case Type::Link: [[fallthrough]];
+        case Type::ObjectValue:
+            [[fallthrough]];
+        case Type::GlobalKey:
+            [[fallthrough]];
+        case Type::Null:
+            [[fallthrough]];
+        case Type::Int:
+            [[fallthrough]];
+        case Type::Bool:
+            [[fallthrough]];
+        case Type::String:
+            [[fallthrough]];
+        case Type::Binary:
+            [[fallthrough]];
+        case Type::Timestamp:
+            [[fallthrough]];
+        case Type::Float:
+            [[fallthrough]];
+        case Type::Double:
+            [[fallthrough]];
+        case Type::Decimal:
+            [[fallthrough]];
+        case Type::Link:
+            [[fallthrough]];
         case Type::ObjectId:
             return type;
     }
@@ -163,7 +179,8 @@ Instruction::Payload ChangesetParser::State::read_payload()
             return payload;
         }
 
-        case Type::Null: [[fallthrough]];
+        case Type::Null:
+            [[fallthrough]];
         case Type::ObjectValue:
             return payload;
     }
@@ -176,12 +193,18 @@ Instruction::PrimaryKey ChangesetParser::State::read_object_key()
     using Type = Instruction::Payload::Type;
     Type type = read_payload_type();
     switch (type) {
-        case Type::Null: return mpark::monostate{};
-        case Type::Int: return read_int();
-        case Type::String: return read_intern_string();
-        case Type::GlobalKey: return read_global_key();
-        case Type::ObjectId: return read_object_id();
-        default: break;
+        case Type::Null:
+            return mpark::monostate{};
+        case Type::Int:
+            return read_int();
+        case Type::String:
+            return read_intern_string();
+        case Type::GlobalKey:
+            return read_global_key();
+        case Type::ObjectId:
+            return read_object_id();
+        default:
+            break;
     }
     parser_error("Unsupported object key type");
 }
@@ -190,9 +213,7 @@ Instruction::Payload::Link ChangesetParser::State::read_link()
 {
     auto target_class = read_intern_string();
     auto key = read_object_key();
-    return Instruction::Payload::Link {
-        target_class, key
-    };
+    return Instruction::Payload::Link{target_class, key};
 }
 
 Instruction::Path ChangesetParser::State::read_path()
@@ -209,7 +230,8 @@ Instruction::Path ChangesetParser::State::read_path()
         if (element >= 0) {
             // Integer path element
             path.m_path.emplace_back(uint32_t(element));
-        } else {
+        }
+        else {
             // String path element
             path.m_path.emplace_back(read_intern_string());
         }
@@ -253,7 +275,8 @@ void ChangesetParser::State::parse_one()
                 }
                 spec.nullable = read_bool();
                 instr.type = spec;
-            } else {
+            }
+            else {
                 instr.type = Instruction::AddTable::EmbeddedTable{};
             }
             m_handler(instr);
@@ -284,10 +307,12 @@ void ChangesetParser::State::parse_one()
             read_path_instr(instr);
             instr.value = read_payload();
 
-            // If the last path element is a string, we are setting a field. Otherwise, we are setting an array element.
+            // If the last path element is a string, we are setting a field. Otherwise, we are setting an array
+            // element.
             if (!instr.is_array_set()) {
                 instr.is_default = read_bool();
-            } else {
+            }
+            else {
                 instr.prior_size = read_int<uint32_t>();
             }
             m_handler(instr);
@@ -375,7 +400,8 @@ bool ChangesetParser::State::next_input_buffer() noexcept
     return m_input.next_block(m_input_begin, m_input_end);
 }
 
-template<class T> T ChangesetParser::State::read_int()
+template <class T>
+T ChangesetParser::State::read_int()
 {
     T value = 0;
     if (REALM_LIKELY(_impl::decode_int(*this, value)))
@@ -450,7 +476,7 @@ GlobalKey ChangesetParser::State::read_global_key()
 
 Timestamp ChangesetParser::State::read_timestamp()
 {
-    int64_t seconds = read_int<int64_t>(); // Throws
+    int64_t seconds = read_int<int64_t>();     // Throws
     int64_t nanoseconds = read_int<int64_t>(); // Throws
     if (nanoseconds > std::numeric_limits<int32_t>::max())
         parser_error("timestamp out of range");
@@ -518,8 +544,11 @@ void ChangesetParser::State::parser_error(const char* complaints)
 }
 
 namespace {
-struct InstructionBuilder: InstructionHandler {
-    explicit InstructionBuilder(Changeset& log): m_log(log) {}
+struct InstructionBuilder : InstructionHandler {
+    explicit InstructionBuilder(Changeset& log)
+        : m_log(log)
+    {
+    }
     Changeset& m_log;
 
     void operator()(const Instruction& instr) final

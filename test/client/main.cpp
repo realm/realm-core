@@ -22,8 +22,8 @@
 #include <iomanip>
 
 #ifndef _WIN32
-#  include <unistd.h>
-#  include <sys/wait.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #endif
 
 #include <realm/util/terminate.hpp>
@@ -80,37 +80,34 @@ enum class AuthMethod { none, anon, user };
 enum class AbortOnError { fatal, always, never };
 enum class PropagationTimeThreshold { start, reconnect };
 
-struct AuthMethodSpec { static util::EnumAssoc map[]; };
-util::EnumAssoc AuthMethodSpec::map[] = {
-    { int(AuthMethod::none), "none" },
-    { int(AuthMethod::anon), "anon" },
-    { int(AuthMethod::user), "user" },
-    { 0, nullptr }
+struct AuthMethodSpec {
+    static util::EnumAssoc map[];
 };
+util::EnumAssoc AuthMethodSpec::map[] = {
+    {int(AuthMethod::none), "none"}, {int(AuthMethod::anon), "anon"}, {int(AuthMethod::user), "user"}, {0, nullptr}};
 using AuthMethodEnum = util::Enum<AuthMethod, AuthMethodSpec>;
 
-struct AbortOnErrorSpec { static util::EnumAssoc map[]; };
-util::EnumAssoc AbortOnErrorSpec::map[] = {
-    { int(AbortOnError::fatal),  "fatal"  },
-    { int(AbortOnError::always), "always" },
-    { int(AbortOnError::never),  "never"  },
-    { 0, nullptr }
+struct AbortOnErrorSpec {
+    static util::EnumAssoc map[];
 };
+util::EnumAssoc AbortOnErrorSpec::map[] = {{int(AbortOnError::fatal), "fatal"},
+                                           {int(AbortOnError::always), "always"},
+                                           {int(AbortOnError::never), "never"},
+                                           {0, nullptr}};
 using AbortOnErrorEnum = util::Enum<AbortOnError, AbortOnErrorSpec>;
 
-struct PropagationTimeThresholdSpec { static util::EnumAssoc map[]; };
-util::EnumAssoc PropagationTimeThresholdSpec::map[] = {
-    { int(PropagationTimeThreshold::start),     "start" },
-    { int(PropagationTimeThreshold::reconnect), "reconnect"  },
-    { 0, nullptr }
+struct PropagationTimeThresholdSpec {
+    static util::EnumAssoc map[];
 };
-using PropagationTimeThresholdEnum =
-    util::Enum<PropagationTimeThreshold, PropagationTimeThresholdSpec>;
+util::EnumAssoc PropagationTimeThresholdSpec::map[] = {{int(PropagationTimeThreshold::start), "start"},
+                                                       {int(PropagationTimeThreshold::reconnect), "reconnect"},
+                                                       {0, nullptr}};
+using PropagationTimeThresholdEnum = util::Enum<PropagationTimeThreshold, PropagationTimeThresholdSpec>;
 
 
 struct PhaseSpec {
     int num_transacts = 0;
-    milliseconds_type transact_period = 1000; // Time in milliseconds between transactions
+    milliseconds_type transact_period = 1000;  // Time in milliseconds between transactions
     milliseconds_type max_transact_period = 0; // Max time in milliseconds between transactions
     int num_blobs = 1;
     std::size_t blob_size = 0;
@@ -123,7 +120,8 @@ struct PhaseSpec {
 };
 
 
-template<class T> std::uniform_int_distribution<T> make_distr(T min, T max)
+template <class T>
+std::uniform_int_distribution<T> make_distr(T min, T max)
 {
     return std::uniform_int_distribution<T>{min, std::max(min, max)};
 }
@@ -131,9 +129,9 @@ template<class T> std::uniform_int_distribution<T> make_distr(T min, T max)
 
 class ThresholdOverrideLogger : public util::RootLogger {
 public:
-    ThresholdOverrideLogger(util::Logger& base_logger) :
-        util::RootLogger{},
-        m_base_logger{base_logger}
+    ThresholdOverrideLogger(util::Logger& base_logger)
+        : util::RootLogger{}
+        , m_base_logger{base_logger}
     {
     }
 
@@ -162,13 +160,13 @@ private:
     util::Mutex m_mutex;
     util::CondVar m_cond;
 
-    bool m_stop = false; // Protected by `m_mutex`
+    bool m_stop = false;             // Protected by `m_mutex`
     bool m_end_of_test_proc = false; // Protected by `m_mutex`
 };
 
-inline MainEventLoop::MainEventLoop(sync::Client& client, bool interactive) :
-    m_client{client},
-    m_interactive{interactive}
+inline MainEventLoop::MainEventLoop(sync::Client& client, bool interactive)
+    : m_client{client}
+    , m_interactive{interactive}
 {
     if (m_interactive)
         std::cout << "Type `help` to get a list of available commands.\n";
@@ -185,11 +183,10 @@ void MainEventLoop::run()
                     return;
             }
             if (command == "help") {
-                std::cout <<
-                    "Available commands:\n"
-                    "  help       Show available commands.\n"
-                    "  quit       Quit interactive mode.\n"
-                    "  reconnect  Cancel reconnect delay.\n";
+                std::cout << "Available commands:\n"
+                             "  help       Show available commands.\n"
+                             "  quit       Quit interactive mode.\n"
+                             "  reconnect  Cancel reconnect delay.\n";
             }
             else if (command == "quit") {
                 break;
@@ -232,8 +229,8 @@ struct PeerControl {
     util::network::DeadlineTimer transact_timer;
 };
 
-inline PeerControl::PeerControl(util::network::Service& service) :
-    transact_timer{service}
+inline PeerControl::PeerControl(util::network::Service& service)
+    : transact_timer{service}
 {
 }
 
@@ -250,10 +247,10 @@ struct PeerControlFuncs {
     std::function<void(int)> on_end_of_schedule;
     std::function<void(int)> initiate_wait_for_upload_completion;
     std::function<void(int)> on_upload_completion;
-    std::function<void()>    on_upload_completion_for_all;
+    std::function<void()> on_upload_completion_for_all;
     std::function<void(int)> initiate_wait_for_download_completion;
     std::function<void(int)> on_download_completion;
-    std::function<void()>    on_download_completion_for_all;
+    std::function<void()> on_download_completion_for_all;
 };
 
 } // unnamed namespace
@@ -291,7 +288,7 @@ int main(int argc, char* argv[])
     bool follow = false;
     bool interactive = false;
     int num_peers = 1;
-    int num_growths = 1; // Number of growth steps
+    int num_growths = 1;                           // Number of growth steps
     milliseconds_type time_between_growths = 1000; // Time in milliseconds between growth steps
     std::string query_class = "Queryable";
     std::vector<std::string> ensure_query_classes;
@@ -302,15 +299,15 @@ int main(int argc, char* argv[])
     std::vector<std::tuple<std::string, int, int, int, std::string>> generate_queryables;
     std::vector<std::pair<std::string, std::string>> add_queries;
     bool dump_result_sets = false;
-    milliseconds_type start_delay = 0; // Time in milliseconds to delay start of test process
+    milliseconds_type start_delay = 0;     // Time in milliseconds to delay start of test process
     milliseconds_type max_start_delay = 0; // Max time in milliseconds to delay start of test process
     bool connection_per_session = false;
     bool disable_sync_to_disk = false;
     bool dry_run = false;
-    milliseconds_type time_between_pings     = 600000; // 10 minutes
-    milliseconds_type pong_timeout           = 600000; // 10 minutes
-    milliseconds_type connect_timeout        = 600000; // 10 minutes
-    milliseconds_type connection_linger_time =  30000; // 30 seconds
+    milliseconds_type time_between_pings = 600000;    // 10 minutes
+    milliseconds_type pong_timeout = 600000;          // 10 minutes
+    milliseconds_type connect_timeout = 600000;       // 10 minutes
+    milliseconds_type connection_linger_time = 30000; // 30 seconds
     bool tcp_no_delay = false;
     bool verify_ssl_cert = false;
     std::string ssl_trust_cert = "";
@@ -329,12 +326,12 @@ int main(int argc, char* argv[])
         --argc;
         ++argv;
         bool error = false;
-        bool help  = false;
+        bool help = false;
         int argc_2 = 0;
         int i = 0;
         char* arg = nullptr;
         auto get_string_value = [&](std::string& var) {
-            if (i+1 < argc) {
+            if (i + 1 < argc) {
                 var = argv[++i];
                 return true;
             }
@@ -357,7 +354,9 @@ int main(int argc, char* argv[])
             return false;
         };
         auto get_parsed_value = [&](auto& var) {
-            return get_parsed_value_with_check(var, [](auto) { return true; });
+            return get_parsed_value_with_check(var, [](auto) {
+                return true;
+            });
         };
         for (; i < argc; ++i) {
             arg = argv[i];
@@ -417,22 +416,30 @@ int main(int argc, char* argv[])
             }
             else if (std::strcmp(arg, "-n") == 0 || std::strcmp(arg, "--num-transacts") == 0) {
                 auto& var = phases.back().num_transacts;
-                if (get_parsed_value_with_check(var, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(var, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-t") == 0 || std::strcmp(arg, "--transact-period") == 0) {
                 auto& var = phases.back().transact_period;
-                if (get_parsed_value_with_check(var, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(var, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-m") == 0 || std::strcmp(arg, "--max-transact-period") == 0) {
                 auto& var = phases.back().max_transact_period;
-                if (get_parsed_value_with_check(var, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(var, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-B") == 0 || std::strcmp(arg, "--num-blobs") == 0) {
                 auto& var = phases.back().num_blobs;
-                if (get_parsed_value_with_check(var, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(var, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-s") == 0 || std::strcmp(arg, "--blob-size") == 0) {
@@ -512,7 +519,9 @@ int main(int argc, char* argv[])
                 continue;
             }
             else if (std::strcmp(arg, "-W") == 0 || std::strcmp(arg, "--num-download-waits") == 0) {
-                if (get_parsed_value_with_check(num_download_waits, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(num_download_waits, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-i") == 0 || std::strcmp(arg, "--interactive") == 0) {
@@ -524,16 +533,21 @@ int main(int argc, char* argv[])
                 continue;
             }
             else if (std::strcmp(arg, "-N") == 0 || std::strcmp(arg, "--num-peers") == 0) {
-                if (get_parsed_value_with_check(num_peers, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(num_peers, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-g") == 0 || std::strcmp(arg, "--num-growths") == 0) {
-                if (get_parsed_value_with_check(num_growths, [](auto v) { return v >= 1; }))
+                if (get_parsed_value_with_check(num_growths, [](auto v) {
+                        return v >= 1;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-G") == 0 || std::strcmp(arg, "--time-between-growths") == 0) {
-                if (get_parsed_value_with_check(time_between_growths,
-                                                [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(time_between_growths, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-C") == 0 || std::strcmp(arg, "--query-class") == 0) {
@@ -559,8 +573,8 @@ int main(int argc, char* argv[])
             else if (std::strcmp(arg, "-Q") == 0 || std::strcmp(arg, "--generate-queryable") == 0) {
                 int n = 0;
                 if (get_parsed_value(n)) {
-                    generate_queryables.emplace_back(query_class, n, queryable_level,
-                                                     max_queryable_level, queryable_text);
+                    generate_queryables.emplace_back(query_class, n, queryable_level, max_queryable_level,
+                                                     queryable_text);
                     continue;
                 }
             }
@@ -576,11 +590,15 @@ int main(int argc, char* argv[])
                 continue;
             }
             else if (std::strcmp(arg, "--start-delay") == 0) {
-                if (get_parsed_value_with_check(start_delay, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(start_delay, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "--max-start-delay") == 0) {
-                if (get_parsed_value_with_check(max_start_delay, [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(max_start_delay, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-c") == 0 || std::strcmp(arg, "--connection-per-session") == 0) {
@@ -596,23 +614,27 @@ int main(int argc, char* argv[])
                 continue;
             }
             else if (std::strcmp(arg, "-I") == 0 || std::strcmp(arg, "--time-between-pings") == 0) {
-                if (get_parsed_value_with_check(time_between_pings,
-                                                [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(time_between_pings, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-O") == 0 || std::strcmp(arg, "--pong-timeout") == 0) {
-                if (get_parsed_value_with_check(pong_timeout,
-                                                [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(pong_timeout, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-U") == 0 || std::strcmp(arg, "--connect-timeout") == 0) {
-                if (get_parsed_value_with_check(connect_timeout,
-                                                [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(connect_timeout, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-L") == 0 || std::strcmp(arg, "--connection-linger-time") == 0) {
-                if (get_parsed_value_with_check(connection_linger_time,
-                                                [](auto v) { return v >= 0; }))
+                if (get_parsed_value_with_check(connection_linger_time, [](auto v) {
+                        return v >= 0;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-o") == 0 || std::strcmp(arg, "--tcp-no-delay") == 0) {
@@ -636,7 +658,9 @@ int main(int argc, char* argv[])
                     continue;
             }
             else if (std::strcmp(arg, "--statsd-port") == 0) {
-                if (get_parsed_value_with_check(statsd_port, [](auto v) { return v <= 0xFFFF; }))
+                if (get_parsed_value_with_check(statsd_port, [](auto v) {
+                        return v <= 0xFFFF;
+                    }))
                     continue;
             }
             else if (std::strcmp(arg, "-v") == 0 || std::strcmp(arg, "--report-roundtrip-times") == 0) {
@@ -660,13 +684,11 @@ int main(int argc, char* argv[])
                 continue;
             }
             else {
-                std::cerr <<
-                    "ERROR: Unknown option: "<<arg<<"\n";
+                std::cerr << "ERROR: Unknown option: " << arg << "\n";
                 error = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Bad or missing value for option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -680,303 +702,301 @@ int main(int argc, char* argv[])
             if (phase.num_transacts > 0 && phase.send_ptime_requests)
                 send_ptime_requests = true;
         }
-        bool bad_combinations = ((total_num_transacts > 0 && dry_run) ||
-                                 (receive_ptime_requests && dry_run) ||
+        bool bad_combinations = ((total_num_transacts > 0 && dry_run) || (receive_ptime_requests && dry_run) ||
                                  (send_ptime_requests && receive_ptime_requests));
         if (bad_combinations)
             error = true;
 
         if (auth_method != AuthMethod::none && !app_id_specified) {
-            std::cerr <<
-                "ERROR: Need Stitch application identifier (`--app-id`)\n";
+            std::cerr << "ERROR: Need Stitch application identifier (`--app-id`)\n";
             error = true;
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<"  PATH  [URL]\n"
-                "\n"
-                "PATH is the local file-system path of a client-side Realm file, and URL is\n"
-                "a reference to the corresponding server-side file. If the URL is not specified,\n"
-                "no synchronization is done.\n"
-                "\n"
-                "Certain substitution parameters, if found in PATH, URL, username (`--username`),\n"
-                "or subscription queries (`--add-query`), will be replaced as follows:\n"
-                "  @N    The numer of the curresponding peer (one-based) with leading zeroes.\n"
-                "  @I    The index of the curresponding peer (zero-based) without leading zeroes.\n"
-                "  @H    The host name as returned by the `hostname` command.\n"
-                "  @@    The character `@`.\n"
-                "Substitutions can either be specified on short form, `@X` (only when length of\n"
-                "name is 1), or on long form, `@{X}`.\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  --app-id             The Stitch application identifier (e.g. `foo-rfhxk`).\n"
-                "                       This will be used to construct HTTP request paths. See\n"
-                "                       also `--request-base-path`.\n"
-                "  -l, --log-level      Set the log level of the testing process. Valid values\n"
-                "                       are `all`, `trace`, `debug`, `detail`, `info`, `warn`,\n"
-                "                       `error`, `fatal`, and `off`. It is `info` by default.\n"
-                "  -k, --sync-log-level  Set the log level of the synchronization process. Valid\n"
-                "                       values are the same as for `--log-level`. It is `warn`\n"
-                "                       by default.\n"
-                "  -E, --abort-on-error  Specify when to abort on a synchronization error. Valid\n"
-                "                       values are `fatal`, `always`, and `never`. It is `fatal`\n"
-                "                       by default.\n"
-                "  -K, --log-timestamps  Include timestamps in the log output.\n"
-                "  --auth-method        The authentication method. Can be `none`, `anon`, or\n"
-                "                       `user`. Is `none` by default. When `none`, no access\n"
-                "                       token is obtained. Instead, the access token can be\n"
-                "                       specified directly using `--access-token` or\n"
-                "                       `--access-token-path`. When `anon`, the anonymous\n"
-                "                       authentication scheme is attempted. When `user`, the\n"
-                "                       username and password scheme is attempted. In this case,\n"
-                "                       the username and password can be specified using\n"
-                "                       `--username` and `--password`.\n"
-                "  -A, --access-token   Specify the access token to be passed to the server when\n"
-                "                       authetication method is `none` (see `--auth-method`). If\n"
-                "                       no access token is specified, the client will use a hard\n"
-                "                       coded default access token, which has administrator\n"
-                "                       rights and is signed with the default private key.\n"
-                "  -P, --access-token-path  Specify the file containing the access token to be\n"
-                "                       passed to the server (see also `--access-token`).\n"
-                "  -u, --username       Specify the username to be used when the authetication\n"
-                "                       method is `user` (see `--auth-method`). The specified\n"
-                "                       username is subject to parameter substitutions (`@N`\n"
-                "                       etc.).\n"
-                "  -p, --password       The password associated with the specified username\n"
-                "                       (`--username`).\n"
-                "  --request-base-path  Set the base path for constructing HTTP request paths.\n"
-                "                       The default is `/api/client/v2.0`.\n"
-                "  -n, --num-transacts  Set the number of transactions to perform per local\n"
-                "                       Realm file in the current phase of the testing schedule\n"
-                "                       (0 by default). Must be zero if dry run (`--dry-run`) is\n"
-                "                       enabled. Each transaction can add (or replace) blobs\n"
-                "                       (see `--num-blobs`) and send changeset propagation time\n"
-                "                       measurement requests (see `--send-ptime-requests`). See\n"
-                "                       `--next-phase` for an explanation of the structure of\n"
-                "                       the testing schedule.\n"
-                "  -t, --transact-period  Time in milliseconds between transactions performed in\n"
-                "                       the current phase of the testing schedule (default is\n"
-                "                       1'000). See also `--next-phase`.\n"
-                "  -m, --max-transact-period  Maximum time in milliseconds between transactions\n"
-                "                       performed in the current phase of the testing schedule\n"
-                "                       (default is 0). If larger than `--transact-period`, the\n"
-                "                       timeout will be selected randomly between\n"
-                "                       `--transact-period` and `--max-transact-period`.\n"
-                "  -B, --num-blobs      Set the number of blobs to be added (or replaced) in\n"
-                "                       each transaction of the current phase of the testing\n"
-                "                       schedule (1 by default). Can be zero. Each blob is an\n"
-                "                       object of class `Blob` (see `--ensure-blob-class`). The\n"
-                "                       values of the properties of the blob objects are\n"
-                "                       controlled by `--blob-size`, `--blob-label`,\n"
-                "                       `--blob-kind`, `--blob-level`, and `--max-blob-level`.\n"
-                "                       See also `--replace-blobs`. See `--next-phase` for an\n"
-                "                       explanation of the structure of the testing schedule.\n"
-                "  -s, --blob-size      Set the size of the blobs that are added during each\n"
-                "                       transaction (0 by default). The individual byte values\n"
-                "                       will be randomized. The specified value applies to the\n"
-                "                       current phase of the testing schedule (see\n"
-                "                       `--next-phase`).\n"
-                "  --blob-label         The string value to be used for the `label` property of\n"
-                "                       new blobs (objects of class `Blob`). The default value\n"
-                "                       is the empty string. The specified value applies to the\n"
-                "                       current phase of the testing schedule (see\n"
-                "                       `--next-phase`).\n"
-                "  --blob-kind          The integer value to be used for the `kind` property of\n"
-                "                       new blobs (objects of class `Blob`). The default value\n"
-                "                       is zero. The specified value applies to the current\n"
-                "                       phase of the testing schedule (see `--next-phase`).\n"
-                "  -z, --blob-level     The integer value for the `level` property of new blobs\n"
-                "                       (objects of class `Blob`) will be drawn randomly from a\n"
-                "                       rectangular distribution between `--blob-level` and\n"
-                "                       `--max-blob-level` if the latter is greater than, or\n"
-                "                       equal to the former, otherwise the value of that\n"
-                "                       property will be what is specified by `--blob-level`.\n"
-                "                       The default value for this option is zero. The specified\n"
-                "                       value applies to the current phase of the testing\n"
-                "                       schedule (see `--next-phase`).\n"
-                "  -Z, --max-blob-level  See `--blob-level`. The default value for this option\n"
-                "                       is zero. The specified value applies to the current\n"
-                "                       phase of the testing schedule (see `--next-phase`).\n"
-                "  -a, --replace-blobs  Replace existing blobs instead of always adding new\n"
-                "                       ones. New ones will be added until the total preexisting\n"
-                "                       number is greater than, or equal to `--num-blobs`. This\n"
-                "                       option applies to the current phase of the testing\n"
-                "                       schedule (see `--next-phase`).\n"
-                "  --next-phase         Introduce a new phase into the testing schedule. The\n"
-                "                       testing schedule has one phase initially, and each\n"
-                "                       occurrence of `--next-phase` adds a new phase to the\n"
-                "                       schedule. Each phase has zero or more transactions\n"
-                "                       (`--num-transacts`) spaced out in time\n"
-                "                       (`--transact-period`). The testing schedule runs\n"
-                "                       independently for each peer. Options `--num-transacts`,\n"
-                "                       `--transact-period`, `--max-transact-period`,\n"
-                "                       `--num-blobs`, `--blob-size`, `--blob-label`,\n"
-                "                       `--blob-kind`, `--blob-level`, `--max-blob-level`,\n"
-                "                       `--replace-blobs`, and `--send-ptime-requests` apply to\n"
-                "                       the last introduced phase at that point on the command\n"
-                "                       line. When a new phase is introuced, its paramters are\n"
-                "                       copied from the previous phase, but the parameters can\n"
-                "                       then be altered with the mentioned options.\n"
-                "  -S, --send-ptime-requests  Send a changeset propagation time measurement\n"
-                "                       requests in each transaction (see `--num-transacts`).\n"
-                "                       Cannot be combined with with `--receive-ptime-requests`.\n"
-                "                       Each request consists of a new object of class\n"
-                "                       `PropagationTime` (see `--ensure-ptime-class`). See also\n"
-                "                       `--receive-ptime-requests`. This option applies to the\n"
-                "                       current phase of the testing schedule (see\n"
-                "                       `--next-phase`).\n"
-                "  -R, --receive-ptime-requests  Listen for changeset propagation time\n"
-                "                       measurement requests. Cannot be combined with\n"
-                "                       `--send-ptime-requests`, nor with `--dry-run`.\n"
-                "  -F, --ptime-request-threshold  Specifies which incoming changeset propagation\n"
-                "                       time measurement requests are to be ignored. The value\n"
-                "                       can be either `start` or `reconnect`. If it is `start`\n"
-                "                       (the default), then incoming requests are ignored if\n"
-                "                       they were initiated before the peer was started. If it\n"
-                "                       is `reconnect`, then incoming requests are ignored if\n"
-                "                       they were initiated before the connection to the server\n"
-                "                       was last established.\n"
-                "  -X, --originator-ident  The originator identifier of changeset\n"
-                "                       propagation time measurement requests (default is 0).\n"
-                "                       Used when seding such reqeusts. When recieving such\n"
-                "                       requests, those that carry a different identifier\n"
-                "                       will be ignored. To avoid relying on perfect\n"
-                "                       cross-host time synchronisation, set this identifier\n"
-                "                       to different values on different hosts.\n"
-                "  -y, --ensure-ptime-class  If it does not already exist, create the class\n"
-                "                       `PropagationTime` with properties `originator` and\n"
-                "                       `timestamp`, both of type `integer` for the purpose of\n"
-                "                       changeset propagation time measurements (see\n"
-                "                       `--send-ptime-requests` and `--receive-ptime-requests`).\n"
-                "                       The class will be created before any queries are added.\n"
-                "  -Y, --ensure-blob-class  If it does not already exist, create the class\n"
-                "                       `Blob` with properties `blob`, `label`, `kind`, and\n"
-                "                       `level` of types `binary`, `string`, `integer`, and\n"
-                "                       `integer` respectively. The class will be created before\n"
-                "                       any queries are added.\n"
-                "  -w, --download-first  Wait for download completion before initiating the\n"
-                "                       testing process.\n"
-                "  -W, --num-download-waits  Set the number of times to repeat the wait for\n"
-                "                       download completion on each peer, that is, after the\n"
-                "                       initiation of the testing process. The default number\n"
-                "                       is 1.\n"
-                "  -i, --interactive    Enter into interactive mode after upload and download\n"
-                "                       completion. In this mode, commands are read from STDIN.\n"
-                "                       Type `help` to see the list of available commands.\n"
-                "  -f, --follow         Keep the session(s) open after upload and download\n"
-                "                       completion, or after exit from interactive mode if\n"
-                "                       `--interactive` was specified.\n"
-                "  -N, --num-peers      Set the number of local Realm files to be\n"
-                "                       synchronized against the specified server-side Realm\n"
-                "                       (1 by default). When this is more than one, PATH must\n"
-                "                       contain the substitution parameter `@N`.\n"
-                "  -g, --num-growths    The number of steps to use for growing the number of\n"
-                "                       peers from zero to whatever is specified by\n"
-                "                       `--num-peers`. The default number of steps is 1.\n"
-                "  -G, --time-between-growths  The time in milliseconds between growth steps\n"
-                "                       (see `--num-growths`). The default value is 1'000.\n"
-                "  -C, --query-class    Set the name of the class to be targeted by subsequent\n"
-                "                       `--ensure-query-class`, `--generate-queryable`, and\n"
-                "                       `--add-query` options. The default name is `Queryable`.\n"
-                "  -e, --ensure-query-class  Create the class specified by `--query-class` if it\n"
-                "                       does not already exist. Then, add properties `level` and\n"
-                "                       `text` with types `integer` and `string` if they do not\n"
-                "                       already exist. Several tables can be created by\n"
-                "                       including this option multiple times.\n"
-                "  -j, --queryable-level  The integer value for the `level` property of objects\n"
-                "                       generated by subsequent `--generate-queryable` options\n"
-                "                       will be drawn randomly from a rectangular distribution\n"
-                "                       between `--queryable-level` and `--max-queryable-level`\n"
-                "                       if the latter is greater than, or equal to the former,\n"
-                "                       otherwise the value of that property will be what is\n"
-                "                       specified by `--queryable-level`. The default value for\n"
-                "                       this option is zero.\n"
-                "  -J, --max-queryable-level  See `--queryable-level`. The default value for\n"
-                "                       this option is zero.\n"
-                "  -b, --queryable-text  The value of the `text` property to use for\n"
-                "                       subsequent `--generate-queryable` options. The default\n"
-                "                       value is `Foo`.\n"
-                "  -Q, --generate-queryable  Add the specified number of objects to the class\n"
-                "                       specified by `--query-class`, which will be assumed to\n"
-                "                       have the shema created by `--ensure-query-class`.\n"
-                "                       Property values are specifed using `--queryable-level`,\n"
-                "                       `--max-queryable-level`, and `--queryable-text`. Each\n"
-                "                       occurrence of this option will add objects separately.\n"
-                "  -q, --add-query      Add another subscription query. The class name is\n"
-                "                       specified using `--query-class`. Each occurrence of this\n"
-                "                       option will add a separate query. If combined with\n"
-                "                       `--download-first`, the queries will be added after\n"
-                "                       everything is downloaded from the server. The specified\n"
-                "                       query string is subject to parameter substitutions (`@N`\n"
-                "                       etc.).\n"
-                "  -r, --dump-result-sets  Dump the result sets of all the previously submitted\n"
-                "                       subscription queries.\n"
-                "  --start-delay        Time in milliseconds to delay the start of the testing\n"
-                "                       process (default is 0).\n"
-                "  --max-start-delay    Maximum time in milliseconds to delay the start of the\n"
-                "                       testing process (default is 0). If larger than\n"
-                "                       `--start-delay`, the delay will be selected randomly\n"
-                "                       between `--start-delay` and `--max-start-delay`\n"
-                "                       (rectangular distribution).\n"
-                "  -c, --connection-per-session  Establish a separate network connection per\n"
-                "                       sync session. Note that there is one sync session\n"
-                "                       per local Realm file to be synchronized\n"
-                "                       (`--num-peers`).\n"
-                "  -d, --disable-sync-to-disk  Disable sync to disk (msync(), fsync()).\n"
-                "  -D, --dry-run        Do not access the local file system. Sessions will\n"
-                "                       act as if initiated on behalf of an empty (or\n"
-                "                       nonexisting) local Realm file. Received DOWNLOAD\n"
-                "                       messages will be accepted, but otherwise ignored.\n"
-                "                       No UPLOAD messages will be generated. Requires that\n"
-                "                       the number of transactions (`--num-transacts`) is\n"
-                "                       zero. Cannot be combined with\n"
-                "                       `--receive-ptime-requests`.\n"
-                "  -I, --time-between-pings  Time in milliseconds beteeen PING messages\n"
-                "                       (heartbeat). The default value is 600'000 (10 minutes).\n"
-                "  -O, --pong-timeout   Maximum time in milliseconds to allow for a PONG message\n"
-                "                       to be received after the corresponding PING message was\n"
-                "                       sent. The default value is 600'000 (10 minutes).\n"
-                "  -U, --connect-timeout  Maximum time in milliseconds to allow for a connection\n"
-                "                       to become fully established. This includes the time to\n"
-                "                       resolve the network address, the TCP connect operation,\n"
-                "                       the SSL handshake, and the WebSocket handshake. The\n"
-                "                       default is 600'000 (10 minutes).\n"
-                "  -L, --connection-linger-time  Time in milliseconds to keep a connection\n"
-                "                       open after all sessions have been abandoned or\n"
-                "                       suspended by errors. The default is 30'000 (30 seconds).\n"
-                "  -o, --tcp-no-delay   Set the `TCP_NODELAY` option on all TCP/IP sockets.\n"
-                "                       This disables the Nagle algorithm.\n"
-                "  -V, --verify-ssl-cert  Verify the servers SSL certificate.\n"
-                "  -T, --ssl-trust-cert  Path of a trust certificate used for verification.\n"
-                "  -M, --metrics-prefix  Prefix for metrics labels (`realm` by default). The\n"
-                "                       effective prefix is what you specify plus a dot (`.`).\n"
-                "  --statsd-address     Host name of StatsD server (`localhost` by\n"
-                "                       default).\n"
-                "  --statsd-port        Port number of StatsD server (8125 by default).\n"
-                "  -v, --report-roundtrip-times\n"
-                "                       Report heartbeat roundtrip times to StatsD server.\n"
-                "  -H, --halt-on-crash  Execute the test client as a child process, and if that\n"
-                "                       child process crashes (exits with nonzero status or is\n"
-                "                       killed by a signal), make the parent sleep\n"
-                "                       indefinitely.\n"
-                "  -x, --allow-core-dump  If supported by the platform, set the maximum size of\n"
-                "                       core files to 'unlimited', thereby allowing for core\n"
-                "                       files to be created when the process is killed.\n"
-                "  --disable-upload-compaction\n"
-                "                       Disable compaction during upload.\n"
-                "  --use-trivial-cooker  Associate a trivial changeset cooker with each\n"
-                "                       synchronization session. This causes a cooked history to\n"
-                "                       be produced in the corresponding Realm files.\n";
+            std::cerr << "Synopsis: " << prog
+                      << "  PATH  [URL]\n"
+                         "\n"
+                         "PATH is the local file-system path of a client-side Realm file, and URL is\n"
+                         "a reference to the corresponding server-side file. If the URL is not specified,\n"
+                         "no synchronization is done.\n"
+                         "\n"
+                         "Certain substitution parameters, if found in PATH, URL, username (`--username`),\n"
+                         "or subscription queries (`--add-query`), will be replaced as follows:\n"
+                         "  @N    The numer of the curresponding peer (one-based) with leading zeroes.\n"
+                         "  @I    The index of the curresponding peer (zero-based) without leading zeroes.\n"
+                         "  @H    The host name as returned by the `hostname` command.\n"
+                         "  @@    The character `@`.\n"
+                         "Substitutions can either be specified on short form, `@X` (only when length of\n"
+                         "name is 1), or on long form, `@{X}`.\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  --app-id             The Stitch application identifier (e.g. `foo-rfhxk`).\n"
+                         "                       This will be used to construct HTTP request paths. See\n"
+                         "                       also `--request-base-path`.\n"
+                         "  -l, --log-level      Set the log level of the testing process. Valid values\n"
+                         "                       are `all`, `trace`, `debug`, `detail`, `info`, `warn`,\n"
+                         "                       `error`, `fatal`, and `off`. It is `info` by default.\n"
+                         "  -k, --sync-log-level  Set the log level of the synchronization process. Valid\n"
+                         "                       values are the same as for `--log-level`. It is `warn`\n"
+                         "                       by default.\n"
+                         "  -E, --abort-on-error  Specify when to abort on a synchronization error. Valid\n"
+                         "                       values are `fatal`, `always`, and `never`. It is `fatal`\n"
+                         "                       by default.\n"
+                         "  -K, --log-timestamps  Include timestamps in the log output.\n"
+                         "  --auth-method        The authentication method. Can be `none`, `anon`, or\n"
+                         "                       `user`. Is `none` by default. When `none`, no access\n"
+                         "                       token is obtained. Instead, the access token can be\n"
+                         "                       specified directly using `--access-token` or\n"
+                         "                       `--access-token-path`. When `anon`, the anonymous\n"
+                         "                       authentication scheme is attempted. When `user`, the\n"
+                         "                       username and password scheme is attempted. In this case,\n"
+                         "                       the username and password can be specified using\n"
+                         "                       `--username` and `--password`.\n"
+                         "  -A, --access-token   Specify the access token to be passed to the server when\n"
+                         "                       authetication method is `none` (see `--auth-method`). If\n"
+                         "                       no access token is specified, the client will use a hard\n"
+                         "                       coded default access token, which has administrator\n"
+                         "                       rights and is signed with the default private key.\n"
+                         "  -P, --access-token-path  Specify the file containing the access token to be\n"
+                         "                       passed to the server (see also `--access-token`).\n"
+                         "  -u, --username       Specify the username to be used when the authetication\n"
+                         "                       method is `user` (see `--auth-method`). The specified\n"
+                         "                       username is subject to parameter substitutions (`@N`\n"
+                         "                       etc.).\n"
+                         "  -p, --password       The password associated with the specified username\n"
+                         "                       (`--username`).\n"
+                         "  --request-base-path  Set the base path for constructing HTTP request paths.\n"
+                         "                       The default is `/api/client/v2.0`.\n"
+                         "  -n, --num-transacts  Set the number of transactions to perform per local\n"
+                         "                       Realm file in the current phase of the testing schedule\n"
+                         "                       (0 by default). Must be zero if dry run (`--dry-run`) is\n"
+                         "                       enabled. Each transaction can add (or replace) blobs\n"
+                         "                       (see `--num-blobs`) and send changeset propagation time\n"
+                         "                       measurement requests (see `--send-ptime-requests`). See\n"
+                         "                       `--next-phase` for an explanation of the structure of\n"
+                         "                       the testing schedule.\n"
+                         "  -t, --transact-period  Time in milliseconds between transactions performed in\n"
+                         "                       the current phase of the testing schedule (default is\n"
+                         "                       1'000). See also `--next-phase`.\n"
+                         "  -m, --max-transact-period  Maximum time in milliseconds between transactions\n"
+                         "                       performed in the current phase of the testing schedule\n"
+                         "                       (default is 0). If larger than `--transact-period`, the\n"
+                         "                       timeout will be selected randomly between\n"
+                         "                       `--transact-period` and `--max-transact-period`.\n"
+                         "  -B, --num-blobs      Set the number of blobs to be added (or replaced) in\n"
+                         "                       each transaction of the current phase of the testing\n"
+                         "                       schedule (1 by default). Can be zero. Each blob is an\n"
+                         "                       object of class `Blob` (see `--ensure-blob-class`). The\n"
+                         "                       values of the properties of the blob objects are\n"
+                         "                       controlled by `--blob-size`, `--blob-label`,\n"
+                         "                       `--blob-kind`, `--blob-level`, and `--max-blob-level`.\n"
+                         "                       See also `--replace-blobs`. See `--next-phase` for an\n"
+                         "                       explanation of the structure of the testing schedule.\n"
+                         "  -s, --blob-size      Set the size of the blobs that are added during each\n"
+                         "                       transaction (0 by default). The individual byte values\n"
+                         "                       will be randomized. The specified value applies to the\n"
+                         "                       current phase of the testing schedule (see\n"
+                         "                       `--next-phase`).\n"
+                         "  --blob-label         The string value to be used for the `label` property of\n"
+                         "                       new blobs (objects of class `Blob`). The default value\n"
+                         "                       is the empty string. The specified value applies to the\n"
+                         "                       current phase of the testing schedule (see\n"
+                         "                       `--next-phase`).\n"
+                         "  --blob-kind          The integer value to be used for the `kind` property of\n"
+                         "                       new blobs (objects of class `Blob`). The default value\n"
+                         "                       is zero. The specified value applies to the current\n"
+                         "                       phase of the testing schedule (see `--next-phase`).\n"
+                         "  -z, --blob-level     The integer value for the `level` property of new blobs\n"
+                         "                       (objects of class `Blob`) will be drawn randomly from a\n"
+                         "                       rectangular distribution between `--blob-level` and\n"
+                         "                       `--max-blob-level` if the latter is greater than, or\n"
+                         "                       equal to the former, otherwise the value of that\n"
+                         "                       property will be what is specified by `--blob-level`.\n"
+                         "                       The default value for this option is zero. The specified\n"
+                         "                       value applies to the current phase of the testing\n"
+                         "                       schedule (see `--next-phase`).\n"
+                         "  -Z, --max-blob-level  See `--blob-level`. The default value for this option\n"
+                         "                       is zero. The specified value applies to the current\n"
+                         "                       phase of the testing schedule (see `--next-phase`).\n"
+                         "  -a, --replace-blobs  Replace existing blobs instead of always adding new\n"
+                         "                       ones. New ones will be added until the total preexisting\n"
+                         "                       number is greater than, or equal to `--num-blobs`. This\n"
+                         "                       option applies to the current phase of the testing\n"
+                         "                       schedule (see `--next-phase`).\n"
+                         "  --next-phase         Introduce a new phase into the testing schedule. The\n"
+                         "                       testing schedule has one phase initially, and each\n"
+                         "                       occurrence of `--next-phase` adds a new phase to the\n"
+                         "                       schedule. Each phase has zero or more transactions\n"
+                         "                       (`--num-transacts`) spaced out in time\n"
+                         "                       (`--transact-period`). The testing schedule runs\n"
+                         "                       independently for each peer. Options `--num-transacts`,\n"
+                         "                       `--transact-period`, `--max-transact-period`,\n"
+                         "                       `--num-blobs`, `--blob-size`, `--blob-label`,\n"
+                         "                       `--blob-kind`, `--blob-level`, `--max-blob-level`,\n"
+                         "                       `--replace-blobs`, and `--send-ptime-requests` apply to\n"
+                         "                       the last introduced phase at that point on the command\n"
+                         "                       line. When a new phase is introuced, its paramters are\n"
+                         "                       copied from the previous phase, but the parameters can\n"
+                         "                       then be altered with the mentioned options.\n"
+                         "  -S, --send-ptime-requests  Send a changeset propagation time measurement\n"
+                         "                       requests in each transaction (see `--num-transacts`).\n"
+                         "                       Cannot be combined with with `--receive-ptime-requests`.\n"
+                         "                       Each request consists of a new object of class\n"
+                         "                       `PropagationTime` (see `--ensure-ptime-class`). See also\n"
+                         "                       `--receive-ptime-requests`. This option applies to the\n"
+                         "                       current phase of the testing schedule (see\n"
+                         "                       `--next-phase`).\n"
+                         "  -R, --receive-ptime-requests  Listen for changeset propagation time\n"
+                         "                       measurement requests. Cannot be combined with\n"
+                         "                       `--send-ptime-requests`, nor with `--dry-run`.\n"
+                         "  -F, --ptime-request-threshold  Specifies which incoming changeset propagation\n"
+                         "                       time measurement requests are to be ignored. The value\n"
+                         "                       can be either `start` or `reconnect`. If it is `start`\n"
+                         "                       (the default), then incoming requests are ignored if\n"
+                         "                       they were initiated before the peer was started. If it\n"
+                         "                       is `reconnect`, then incoming requests are ignored if\n"
+                         "                       they were initiated before the connection to the server\n"
+                         "                       was last established.\n"
+                         "  -X, --originator-ident  The originator identifier of changeset\n"
+                         "                       propagation time measurement requests (default is 0).\n"
+                         "                       Used when seding such reqeusts. When recieving such\n"
+                         "                       requests, those that carry a different identifier\n"
+                         "                       will be ignored. To avoid relying on perfect\n"
+                         "                       cross-host time synchronisation, set this identifier\n"
+                         "                       to different values on different hosts.\n"
+                         "  -y, --ensure-ptime-class  If it does not already exist, create the class\n"
+                         "                       `PropagationTime` with properties `originator` and\n"
+                         "                       `timestamp`, both of type `integer` for the purpose of\n"
+                         "                       changeset propagation time measurements (see\n"
+                         "                       `--send-ptime-requests` and `--receive-ptime-requests`).\n"
+                         "                       The class will be created before any queries are added.\n"
+                         "  -Y, --ensure-blob-class  If it does not already exist, create the class\n"
+                         "                       `Blob` with properties `blob`, `label`, `kind`, and\n"
+                         "                       `level` of types `binary`, `string`, `integer`, and\n"
+                         "                       `integer` respectively. The class will be created before\n"
+                         "                       any queries are added.\n"
+                         "  -w, --download-first  Wait for download completion before initiating the\n"
+                         "                       testing process.\n"
+                         "  -W, --num-download-waits  Set the number of times to repeat the wait for\n"
+                         "                       download completion on each peer, that is, after the\n"
+                         "                       initiation of the testing process. The default number\n"
+                         "                       is 1.\n"
+                         "  -i, --interactive    Enter into interactive mode after upload and download\n"
+                         "                       completion. In this mode, commands are read from STDIN.\n"
+                         "                       Type `help` to see the list of available commands.\n"
+                         "  -f, --follow         Keep the session(s) open after upload and download\n"
+                         "                       completion, or after exit from interactive mode if\n"
+                         "                       `--interactive` was specified.\n"
+                         "  -N, --num-peers      Set the number of local Realm files to be\n"
+                         "                       synchronized against the specified server-side Realm\n"
+                         "                       (1 by default). When this is more than one, PATH must\n"
+                         "                       contain the substitution parameter `@N`.\n"
+                         "  -g, --num-growths    The number of steps to use for growing the number of\n"
+                         "                       peers from zero to whatever is specified by\n"
+                         "                       `--num-peers`. The default number of steps is 1.\n"
+                         "  -G, --time-between-growths  The time in milliseconds between growth steps\n"
+                         "                       (see `--num-growths`). The default value is 1'000.\n"
+                         "  -C, --query-class    Set the name of the class to be targeted by subsequent\n"
+                         "                       `--ensure-query-class`, `--generate-queryable`, and\n"
+                         "                       `--add-query` options. The default name is `Queryable`.\n"
+                         "  -e, --ensure-query-class  Create the class specified by `--query-class` if it\n"
+                         "                       does not already exist. Then, add properties `level` and\n"
+                         "                       `text` with types `integer` and `string` if they do not\n"
+                         "                       already exist. Several tables can be created by\n"
+                         "                       including this option multiple times.\n"
+                         "  -j, --queryable-level  The integer value for the `level` property of objects\n"
+                         "                       generated by subsequent `--generate-queryable` options\n"
+                         "                       will be drawn randomly from a rectangular distribution\n"
+                         "                       between `--queryable-level` and `--max-queryable-level`\n"
+                         "                       if the latter is greater than, or equal to the former,\n"
+                         "                       otherwise the value of that property will be what is\n"
+                         "                       specified by `--queryable-level`. The default value for\n"
+                         "                       this option is zero.\n"
+                         "  -J, --max-queryable-level  See `--queryable-level`. The default value for\n"
+                         "                       this option is zero.\n"
+                         "  -b, --queryable-text  The value of the `text` property to use for\n"
+                         "                       subsequent `--generate-queryable` options. The default\n"
+                         "                       value is `Foo`.\n"
+                         "  -Q, --generate-queryable  Add the specified number of objects to the class\n"
+                         "                       specified by `--query-class`, which will be assumed to\n"
+                         "                       have the shema created by `--ensure-query-class`.\n"
+                         "                       Property values are specifed using `--queryable-level`,\n"
+                         "                       `--max-queryable-level`, and `--queryable-text`. Each\n"
+                         "                       occurrence of this option will add objects separately.\n"
+                         "  -q, --add-query      Add another subscription query. The class name is\n"
+                         "                       specified using `--query-class`. Each occurrence of this\n"
+                         "                       option will add a separate query. If combined with\n"
+                         "                       `--download-first`, the queries will be added after\n"
+                         "                       everything is downloaded from the server. The specified\n"
+                         "                       query string is subject to parameter substitutions (`@N`\n"
+                         "                       etc.).\n"
+                         "  -r, --dump-result-sets  Dump the result sets of all the previously submitted\n"
+                         "                       subscription queries.\n"
+                         "  --start-delay        Time in milliseconds to delay the start of the testing\n"
+                         "                       process (default is 0).\n"
+                         "  --max-start-delay    Maximum time in milliseconds to delay the start of the\n"
+                         "                       testing process (default is 0). If larger than\n"
+                         "                       `--start-delay`, the delay will be selected randomly\n"
+                         "                       between `--start-delay` and `--max-start-delay`\n"
+                         "                       (rectangular distribution).\n"
+                         "  -c, --connection-per-session  Establish a separate network connection per\n"
+                         "                       sync session. Note that there is one sync session\n"
+                         "                       per local Realm file to be synchronized\n"
+                         "                       (`--num-peers`).\n"
+                         "  -d, --disable-sync-to-disk  Disable sync to disk (msync(), fsync()).\n"
+                         "  -D, --dry-run        Do not access the local file system. Sessions will\n"
+                         "                       act as if initiated on behalf of an empty (or\n"
+                         "                       nonexisting) local Realm file. Received DOWNLOAD\n"
+                         "                       messages will be accepted, but otherwise ignored.\n"
+                         "                       No UPLOAD messages will be generated. Requires that\n"
+                         "                       the number of transactions (`--num-transacts`) is\n"
+                         "                       zero. Cannot be combined with\n"
+                         "                       `--receive-ptime-requests`.\n"
+                         "  -I, --time-between-pings  Time in milliseconds beteeen PING messages\n"
+                         "                       (heartbeat). The default value is 600'000 (10 minutes).\n"
+                         "  -O, --pong-timeout   Maximum time in milliseconds to allow for a PONG message\n"
+                         "                       to be received after the corresponding PING message was\n"
+                         "                       sent. The default value is 600'000 (10 minutes).\n"
+                         "  -U, --connect-timeout  Maximum time in milliseconds to allow for a connection\n"
+                         "                       to become fully established. This includes the time to\n"
+                         "                       resolve the network address, the TCP connect operation,\n"
+                         "                       the SSL handshake, and the WebSocket handshake. The\n"
+                         "                       default is 600'000 (10 minutes).\n"
+                         "  -L, --connection-linger-time  Time in milliseconds to keep a connection\n"
+                         "                       open after all sessions have been abandoned or\n"
+                         "                       suspended by errors. The default is 30'000 (30 seconds).\n"
+                         "  -o, --tcp-no-delay   Set the `TCP_NODELAY` option on all TCP/IP sockets.\n"
+                         "                       This disables the Nagle algorithm.\n"
+                         "  -V, --verify-ssl-cert  Verify the servers SSL certificate.\n"
+                         "  -T, --ssl-trust-cert  Path of a trust certificate used for verification.\n"
+                         "  -M, --metrics-prefix  Prefix for metrics labels (`realm` by default). The\n"
+                         "                       effective prefix is what you specify plus a dot (`.`).\n"
+                         "  --statsd-address     Host name of StatsD server (`localhost` by\n"
+                         "                       default).\n"
+                         "  --statsd-port        Port number of StatsD server (8125 by default).\n"
+                         "  -v, --report-roundtrip-times\n"
+                         "                       Report heartbeat roundtrip times to StatsD server.\n"
+                         "  -H, --halt-on-crash  Execute the test client as a child process, and if that\n"
+                         "                       child process crashes (exits with nonzero status or is\n"
+                         "                       killed by a signal), make the parent sleep\n"
+                         "                       indefinitely.\n"
+                         "  -x, --allow-core-dump  If supported by the platform, set the maximum size of\n"
+                         "                       core files to 'unlimited', thereby allowing for core\n"
+                         "                       files to be created when the process is killed.\n"
+                         "  --disable-upload-compaction\n"
+                         "                       Disable compaction during upload.\n"
+                         "  --use-trivial-cooker  Associate a trivial changeset cooker with each\n"
+                         "                       synchronization session. This causes a cooked history to\n"
+                         "                       be produced in the corresponding Realm files.\n";
             return EXIT_SUCCESS;
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
 
@@ -1000,10 +1020,8 @@ int main(int argc, char* argv[])
     if (client_reset_metadata_dir != "") {
         sync::Session::Config::ClientReset client_reset_config_2;
         client_reset_config_2.metadata_dir = client_reset_metadata_dir;
-        client_reset_config_2.recover_local_changes =
-            !disable_client_reset_recover_local_changes;
-        client_reset_config_2.require_recent_state_realm =
-            !disable_client_reset_require_recent_state_realm;
+        client_reset_config_2.recover_local_changes = !disable_client_reset_recover_local_changes;
+        client_reset_config_2.require_recent_state_realm = !disable_client_reset_require_recent_state_realm;
         client_reset_config = client_reset_config_2;
     }
 
@@ -1013,7 +1031,7 @@ int main(int argc, char* argv[])
         if (child_pid == -1) {
             int err = errno;
             std::error_code ec = util::make_basic_system_error_code(err);
-            std::cerr << "fork() failed with "<<ec.value()<<": "<<ec.message()<<"\n";
+            std::cerr << "fork() failed with " << ec.value() << ": " << ec.message() << "\n";
             return EXIT_FAILURE;
         }
         if (child_pid != 0) {
@@ -1023,19 +1041,19 @@ int main(int argc, char* argv[])
                 if (pid == -1) {
                     int err = errno;
                     std::error_code ec = util::make_basic_system_error_code(err);
-                    std::cerr << "wait() failed with "<<ec.value()<<": "<<ec.message()<<"\n";
+                    std::cerr << "wait() failed with " << ec.value() << ": " << ec.message() << "\n";
                     return EXIT_FAILURE;
                 }
                 REALM_ASSERT(pid == child_pid);
                 if (WIFEXITED(status)) {
                     if (WEXITSTATUS(status) != 0) {
-                        std::cerr << "Exit with nonzero status ("<<WEXITSTATUS(status)<<")\n";
+                        std::cerr << "Exit with nonzero status (" << WEXITSTATUS(status) << ")\n";
                         break;
                     }
                     return EXIT_SUCCESS;
                 }
                 if (WIFSIGNALED(status)) {
-                    std::cerr << "Killed by signal: "<<strsignal(WTERMSIG(status))<<"\n";
+                    std::cerr << "Killed by signal: " << strsignal(WTERMSIG(status)) << "\n";
                     break;
                 }
                 // Stopped or continued -> wait for next status change
@@ -1082,7 +1100,7 @@ int main(int argc, char* argv[])
     config.logger = &sync_logger;
     config.one_connection_per_session = connection_per_session;
     config.dry_run = dry_run;
-    config.ping_keepalive_period  = time_between_pings;
+    config.ping_keepalive_period = time_between_pings;
     config.pong_keepalive_timeout = pong_timeout;
     config.connect_timeout = connect_timeout;
     config.connection_linger_time = connection_linger_time;
@@ -1183,11 +1201,11 @@ int main(int argc, char* argv[])
         if (!substituter.parse(realm_path, realm_path_template, logger))
             return EXIT_FAILURE;
         if (num_peers > 1) {
-            bool good_template = (realm_path_template.refers_to("N") ||
-                                  realm_path_template.refers_to("I"));
+            bool good_template = (realm_path_template.refers_to("N") || realm_path_template.refers_to("I"));
             if (!good_template) {
                 logger.error("Substitution parameter `N` or `I` must be used in Realm "
-                             "path template '%1'", realm_path);
+                             "path template '%1'",
+                             realm_path);
                 return EXIT_FAILURE;
             }
         }
@@ -1219,22 +1237,18 @@ int main(int argc, char* argv[])
 
     // Create peers
     bool reset_on_reconnect = (ptime_request_threshold == PropagationTimeThreshold::reconnect);
-    Peer::Context context(client, auth, test_proc_service, test_proc_random, metrics,
-                          disable_sync_to_disk, report_roundtrip_times, reset_on_reconnect);
+    Peer::Context context(client, auth, test_proc_service, test_proc_random, metrics, disable_sync_to_disk,
+                          report_roundtrip_times, reset_on_reconnect);
     context_ptr = &context;
     std::unique_ptr<std::unique_ptr<util::Logger>[]> peer_logger_owners =
         std::make_unique<std::unique_ptr<util::Logger>[]>(num_peers);
-    std::unique_ptr<util::Logger*[]> peer_loggers =
-        std::make_unique<util::Logger*[]>(num_peers);
-    std::unique_ptr<std::unique_ptr<Peer>[]> peers =
-        std::make_unique<std::unique_ptr<Peer>[]>(num_peers);
+    std::unique_ptr<util::Logger*[]> peer_loggers = std::make_unique<util::Logger*[]>(num_peers);
+    std::unique_ptr<std::unique_ptr<Peer>[]> peers = std::make_unique<std::unique_ptr<Peer>[]>(num_peers);
     if (num_peers == 1) {
         peer_loggers[0] = &logger;
-        peers[0] = std::make_unique<Peer>(context, sync_request_path,
-                                          peer_params[0].realm_path, logger,
-                                          originator_ident, verify_ssl_cert,
-                                          ssl_trust_certificate_path, client_reset_config,
-                                          use_trivial_cooker, on_sync_error);
+        peers[0] = std::make_unique<Peer>(context, sync_request_path, peer_params[0].realm_path, logger,
+                                          originator_ident, verify_ssl_cert, ssl_trust_certificate_path,
+                                          client_reset_config, use_trivial_cooker, on_sync_error);
     }
     else if (num_peers >= 2) {
         std::ostringstream out;
@@ -1242,16 +1256,13 @@ int main(int argc, char* argv[])
         out.fill('0');
         for (int i = 0; i < num_peers; ++i) {
             out.str(std::string{});
-            out << "Peer[" << std::setw(max_peer_number_width) << (i+1) << "]: ";
+            out << "Peer[" << std::setw(max_peer_number_width) << (i + 1) << "]: ";
             std::string logger_prefix = out.str();
-            peer_logger_owners[i] =
-                std::make_unique<util::PrefixLogger>(std::move(logger_prefix), logger);
+            peer_logger_owners[i] = std::make_unique<util::PrefixLogger>(std::move(logger_prefix), logger);
             peer_loggers[i] = peer_logger_owners[i].get();
-            peers[i] = std::make_unique<Peer>(context, sync_request_path,
-                                              peer_params[i].realm_path, *peer_loggers[i],
-                                              originator_ident, verify_ssl_cert,
-                                              ssl_trust_certificate_path, client_reset_config,
-                                              use_trivial_cooker, on_sync_error);
+            peers[i] = std::make_unique<Peer>(context, sync_request_path, peer_params[i].realm_path, *peer_loggers[i],
+                                              originator_ident, verify_ssl_cert, ssl_trust_certificate_path,
+                                              client_reset_config, use_trivial_cooker, on_sync_error);
         }
     }
     if (receive_ptime_requests) {
@@ -1273,8 +1284,8 @@ int main(int argc, char* argv[])
         for (const PhaseSpec& phase : phases) {
             if (phase.num_transacts > 0) {
                 logger.info("Phase %1: num_transacts=%2, transact_period=%3, "
-                            "max_transact_period=%4, send_ptime_requests=%5", phase_ndx + 1,
-                            phase.num_transacts, phase.transact_period, phase.max_transact_period,
+                            "max_transact_period=%4, send_ptime_requests=%5",
+                            phase_ndx + 1, phase.num_transacts, phase.transact_period, phase.max_transact_period,
                             phase.send_ptime_requests);
             }
             ++phase_ndx;
@@ -1286,7 +1297,8 @@ int main(int argc, char* argv[])
     // Bootstrap peers
     if (num_growths > 1) {
         logger.info("Growing number of peers from 0 to %1 in %2 steps with %3 milliseconds "
-                    "between steps", num_peers, num_growths, time_between_growths);
+                    "between steps",
+                    num_peers, num_growths, time_between_growths);
     }
     std::unique_ptr<char[]> blob_owner;
     {
@@ -1301,7 +1313,9 @@ int main(int argc, char* argv[])
             blob_owner = std::make_unique<char[]>(max_blob_size);
             char* begin = &blob_owner[0];
             char* end = begin + max_blob_size;
-            std::generate(begin, end, [&] { return char(uchar(distr(test_proc_random))); });
+            std::generate(begin, end, [&] {
+                return char(uchar(distr(test_proc_random)));
+            });
         }
     }
 
@@ -1315,13 +1329,11 @@ int main(int argc, char* argv[])
         if (have_server_url) {
             if (auth_method != AuthMethod::none) {
                 peer_loggers[i]->detail("Logging in");
-                auto handler = [i, &peer_control_funcs](std::error_code ec,
-                                                        std::string access_token,
+                auto handler = [i, &peer_control_funcs](std::error_code ec, std::string access_token,
                                                         std::string refresh_token) {
                     if (REALM_UNLIKELY(ec == util::error::operation_aborted))
                         return;
-                    peer_control_funcs.logged_in(i, ec, std::move(access_token),
-                                                 std::move(refresh_token));
+                    peer_control_funcs.logged_in(i, ec, std::move(access_token), std::move(refresh_token));
                 };
                 switch (auth_method) {
                     case AuthMethod::none:
@@ -1355,8 +1367,7 @@ int main(int argc, char* argv[])
             on_sync_error(is_fatal);
             return;
         }
-        auto func = [i, &peers, &peer_params, &peer_control_funcs,
-                     access_token = std::move(access_token),
+        auto func = [i, &peers, &peer_params, &peer_control_funcs, access_token = std::move(access_token),
                      refresh_token = std::move(refresh_token)] {
             peers[i]->bind(peer_params[i].server_url, access_token, refresh_token);
             peer_control_funcs.on_bound(i);
@@ -1388,13 +1399,13 @@ int main(int argc, char* argv[])
             peers[i]->ensure_blob_class();
         if (ensure_ptime_class)
             peers[i]->ensure_ptime_class();
-        for (const std::string& class_name: ensure_query_classes)
+        for (const std::string& class_name : ensure_query_classes)
             peers[i]->ensure_query_class(class_name);
         for (const auto& entry : generate_queryables) {
-            const std::string& class_name     = std::get<0>(entry);
-            int n                             = std::get<1>(entry);
-            int queryable_level               = std::get<2>(entry);
-            int max_queryable_level           = std::get<3>(entry);
+            const std::string& class_name = std::get<0>(entry);
+            int n = std::get<1>(entry);
+            int queryable_level = std::get<2>(entry);
+            int max_queryable_level = std::get<3>(entry);
             const std::string& queryable_text = std::get<4>(entry);
             auto level_distr = make_distr(queryable_level, max_queryable_level);
             peers[i]->generate_queryable(class_name, n, level_distr, queryable_text);
@@ -1402,7 +1413,7 @@ int main(int argc, char* argv[])
         std::size_t num_queries = add_queries.size();
         for (std::size_t j = 0; j < num_queries; ++j) {
             const std::string& class_name = add_queries[j].first;
-            const std::string& query      = peer_params[i].queries[j];
+            const std::string& query = peer_params[i].queries[j];
             peers[i]->add_query(class_name, query);
         }
         peer_control_funcs.launch_phase(i);
@@ -1444,16 +1455,15 @@ int main(int argc, char* argv[])
     peer_control_funcs.perform_transaction = [&](int i) {
         REALM_ASSERT(peer_controls[i]->phase_ndx < int(phases.size()));
         const PhaseSpec& phase = phases[peer_controls[i]->phase_ndx];
-        peer_loggers[i]->detail("Performing transaction (%1/%2) of phase (%3/%4)",
-                                peer_controls[i]->transact_ndx + 1, phase.num_transacts,
-                                peer_controls[i]->phase_ndx + 1, phases.size());
+        peer_loggers[i]->detail("Performing transaction (%1/%2) of phase (%3/%4)", peer_controls[i]->transact_ndx + 1,
+                                phase.num_transacts, peer_controls[i]->phase_ndx + 1, phases.size());
         BinaryData blob{&blob_owner[0], phase.blob_size};
         Peer::TransactSpec transact;
-        transact.num_blobs          = phase.num_blobs;
-        transact.blob_label         = phase.blob_label;
-        transact.blob_kind          = phase.blob_kind;
-        transact.blob_level_distr   = make_distr(phase.blob_level, phase.max_blob_level);
-        transact.replace_blobs      = phase.replace_blobs;
+        transact.num_blobs = phase.num_blobs;
+        transact.blob_label = phase.blob_label;
+        transact.blob_kind = phase.blob_kind;
+        transact.blob_level_distr = make_distr(phase.blob_level, phase.max_blob_level);
+        transact.replace_blobs = phase.replace_blobs;
         transact.send_ptime_request = phase.send_ptime_requests;
         peers[i]->perform_transaction(blob, transact);
         if (++peer_controls[i]->transact_ndx < phase.num_transacts) {
@@ -1563,8 +1573,7 @@ int main(int argc, char* argv[])
         REALM_ASSERT(num_growths > 0);
         int new_num_peers = int(std::round(double(growth_ndx + 1) / num_growths * num_peers));
         if (num_growths > 1) {
-            logger.detail("Growing number of peers to %1 (step %2/%3)", new_num_peers,
-                          growth_ndx + 1, num_growths);
+            logger.detail("Growing number of peers to %1 (step %2/%3)", new_num_peers, growth_ndx + 1, num_growths);
         }
         for (int i = current_num_peers; i < new_num_peers; ++i) {
             peer_control_funcs.initiate_bind(i);

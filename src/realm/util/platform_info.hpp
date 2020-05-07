@@ -26,8 +26,6 @@ struct PlatformInfo {
 void get_platform_info(PlatformInfo&);
 
 
-
-
 // Implementation
 
 inline std::string get_platform_info()

@@ -28,18 +28,18 @@ namespace _impl {
 
 class ClientProtocol {
 public:
-    using file_ident_type    = sync::file_ident_type;
-    using version_type       = sync::version_type;
-    using salt_type          = sync::salt_type;
-    using timestamp_type     = sync::timestamp_type;
+    using file_ident_type = sync::file_ident_type;
+    using version_type = sync::version_type;
+    using salt_type = sync::salt_type;
+    using timestamp_type = sync::timestamp_type;
     using session_ident_type = sync::session_ident_type;
     using request_ident_type = sync::request_ident_type;
-    using milliseconds_type  = sync::milliseconds_type;
-    using SaltedFileIdent    = sync::SaltedFileIdent;
-    using SaltedVersion      = sync::SaltedVersion;
-    using DownloadCursor     = sync::DownloadCursor;
-    using UploadCursor       = sync::UploadCursor;
-    using SyncProgress       = sync::SyncProgress;
+    using milliseconds_type = sync::milliseconds_type;
+    using SaltedFileIdent = sync::SaltedFileIdent;
+    using SaltedVersion = sync::SaltedVersion;
+    using DownloadCursor = sync::DownloadCursor;
+    using UploadCursor = sync::UploadCursor;
+    using SyncProgress = sync::SyncProgress;
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using RemoteChangeset = sync::Transformer::RemoteChangeset;
@@ -47,14 +47,14 @@ public:
 
     // FIXME: No need to explicitly assign numbers to these
     enum class Error {
-        unknown_message             = 101, // Unknown type of input message
-        bad_syntax                  = 102, // Bad syntax in input message head
-        limits_exceeded             = 103, // Limits exceeded in input message
+        unknown_message = 101,             // Unknown type of input message
+        bad_syntax = 102,                  // Bad syntax in input message head
+        limits_exceeded = 103,             // Limits exceeded in input message
         bad_changeset_header_syntax = 108, // Bad syntax in changeset header (DOWNLOAD)
-        bad_changeset_size          = 109, // Bad changeset size in changeset header (DOWNLOAD)
-        bad_server_version          = 111, // Bad server version in changeset header (DOWNLOAD)
-        bad_error_code              = 114, ///< Bad error code (ERROR)
-        bad_decompression           = 115, // Error in decompression (DOWNLOAD)
+        bad_changeset_size = 109,          // Bad changeset size in changeset header (DOWNLOAD)
+        bad_server_version = 111,          // Bad server version in changeset header (DOWNLOAD)
+        bad_error_code = 114,              ///< Bad error code (ERROR)
+        bad_decompression = 115,           // Error in decompression (DOWNLOAD)
     };
 
 
@@ -64,21 +64,17 @@ public:
                            const std::string& server_path, const std::string& signed_user_token,
                            bool need_client_file_ident, bool is_subserver);
 
-    void make_refresh_message(OutputBuffer&, session_ident_type session_ident,
-                              const std::string& signed_user_token);
+    void make_refresh_message(OutputBuffer&, session_ident_type session_ident, const std::string& signed_user_token);
 
-    void make_ident_message(OutputBuffer&, session_ident_type session_ident,
-                            SaltedFileIdent client_file_ident,
+    void make_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                             const SyncProgress& progress);
 
     void make_client_version_request_message(OutputBuffer&, session_ident_type session_ident,
                                              SaltedFileIdent client_file_ident);
 
-    void make_state_request_message(int protocol_version, OutputBuffer&,
-                                    session_ident_type session_ident,
-                                    SaltedVersion partial_transfer_server_version,
-                                    std::uint_fast64_t offset, bool need_recent,
-                                    std::int_fast32_t min_file_format_version,
+    void make_state_request_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                                    SaltedVersion partial_transfer_server_version, std::uint_fast64_t offset,
+                                    bool need_recent, std::int_fast32_t min_file_format_version,
                                     std::int_fast32_t max_file_format_version,
                                     std::int_fast32_t min_history_schema_version,
                                     std::int_fast32_t max_history_schema_version);
@@ -87,19 +83,14 @@ public:
     public:
         util::Logger& logger;
 
-        UploadMessageBuilder(util::Logger& logger,
-                             OutputBuffer& body_buffer,
-                             std::vector<char>& compression_buffer,
+        UploadMessageBuilder(util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
                              _impl::compression::CompressMemoryArena& compress_memory_arena);
 
-        void add_changeset(version_type client_version, version_type server_version,
-                           timestamp_type origin_timestamp,
+        void add_changeset(version_type client_version, version_type server_version, timestamp_type origin_timestamp,
                            file_ident_type origin_file_ident, ChunkedBinaryData changeset);
 
-        void make_upload_message(int protocol_version, OutputBuffer&,
-                                 session_ident_type session_ident,
-                                 version_type progress_client_version,
-                                 version_type progress_server_version,
+        void make_upload_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                                 version_type progress_client_version, version_type progress_server_version,
                                  version_type locked_server_version);
 
     private:
@@ -113,8 +104,7 @@ public:
 
     void make_unbind_message(OutputBuffer&, session_ident_type session_ident);
 
-    void make_mark_message(OutputBuffer&, session_ident_type session_ident,
-                           request_ident_type request_ident);
+    void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
 
     void make_alloc_message(OutputBuffer&, session_ident_type session_ident);
 
@@ -139,7 +129,7 @@ public:
         char newline = 0;
         in >> timestamp >> newline;
         std::size_t expected_size = std::size_t(in.tellg());
-        bool good_syntax = (in && newline == '\n' && expected_size  == size);
+        bool good_syntax = (in && newline == '\n' && expected_size == size);
         if (!good_syntax)
             goto bad_syntax;
 
@@ -147,8 +137,7 @@ public:
         return;
 
     bad_syntax:
-        logger.error("Bad syntax in input message '%1'",
-                     StringData(data, size));
+        logger.error("Bad syntax in input message '%1'", StringData(data, size));
         connection.handle_protocol_error(Error::bad_syntax); // Throws
         return;
     }
@@ -156,7 +145,7 @@ public:
     // parse_message_received takes a (WebSocket) message and parses it.
     // The result of the parsing is handled by an object of type Connection.
     // Typically, Connection would be the Connection class from client.cpp
-    template<class Connection>
+    template <class Connection>
     void parse_message_received(Connection& connection, const char* data, std::size_t size)
     {
         util::Logger& logger = connection.logger;
@@ -178,20 +167,17 @@ public:
             int is_body_compressed;
             std::size_t uncompressed_body_size, compressed_body_size;
             char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, sp_8, sp_9, sp_10, sp_11, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> download_server_version >> sp_3 >>
-                download_client_version >> sp_4 >> latest_server_version >> sp_5 >>
-                latest_server_version_salt >> sp_6 >> upload_client_version >> sp_7 >>
-                upload_server_version >> sp_8 >> downloadable_bytes >> sp_9 >>
-                is_body_compressed >> sp_10 >> uncompressed_body_size >> sp_11 >>
-                compressed_body_size >> newline; // Throws
+            in >> sp_1 >> session_ident >> sp_2 >> download_server_version >> sp_3 >> download_client_version >>
+                sp_4 >> latest_server_version >> sp_5 >> latest_server_version_salt >> sp_6 >>
+                upload_client_version >> sp_7 >> upload_server_version >> sp_8 >> downloadable_bytes >> sp_9 >>
+                is_body_compressed >> sp_10 >> uncompressed_body_size >> sp_11 >> compressed_body_size >>
+                newline; // Throws
             header_size = std::size_t(in.tellg());
-            std::size_t body_size = (is_body_compressed ? compressed_body_size :
-                                     uncompressed_body_size);
+            std::size_t body_size = (is_body_compressed ? compressed_body_size : uncompressed_body_size);
             std::size_t expected_size = header_size + body_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                sp_5 == ' ' && sp_6 == ' ' && sp_7 == ' ' && sp_8 == ' ' &&
-                                sp_9 == ' ' && sp_10 == ' ' && sp_11 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
+                                sp_6 == ' ' && sp_7 == ' ' && sp_8 == ' ' && sp_9 == ' ' && sp_10 == ' ' &&
+                                sp_11 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
             if (uncompressed_body_size > s_max_body_size)
@@ -204,9 +190,8 @@ public:
             // if is_body_compressed == true, we must decompress the received body.
             if (is_body_compressed) {
                 uncompressed_body_buffer.reset(new char[uncompressed_body_size]);
-                std::error_code ec = _impl::compression::decompress(body.data(),  compressed_body_size,
-                                                                   uncompressed_body_buffer.get(),
-                                                                   uncompressed_body_size);
+                std::error_code ec = _impl::compression::decompress(
+                    body.data(), compressed_body_size, uncompressed_body_buffer.get(), uncompressed_body_size);
 
                 if (ec) {
                     logger.error("compression::inflate: %1", ec.message());
@@ -240,12 +225,11 @@ public:
                 std::size_t original_changeset_size, changeset_size;
                 char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6;
 
-                in >> server_version >> sp_1 >> client_version >> sp_2 >> origin_timestamp >>
-                    sp_3 >> origin_file_ident >> sp_4 >> original_changeset_size >>
-                    sp_5 >> changeset_size >> sp_6;
+                in >> server_version >> sp_1 >> client_version >> sp_2 >> origin_timestamp >> sp_3 >>
+                    origin_file_ident >> sp_4 >> original_changeset_size >> sp_5 >> changeset_size >> sp_6;
 
-                bool good_syntax = in && sp_1 == ' ' && sp_2 == ' ' &&
-                    sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' && sp_6 == ' ';
+                bool good_syntax =
+                    in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' && sp_6 == ' ';
 
                 if (!good_syntax) {
                     logger.error("Bad changeset header syntax");
@@ -269,16 +253,15 @@ public:
                     return;
                 }
 
-                BinaryData changeset_data(uncompressed_body.data() + std::size_t(in.tellg()),
-                                          changeset_size);
+                BinaryData changeset_data(uncompressed_body.data() + std::size_t(in.tellg()), changeset_size);
                 in.seekg(position);
 
                 if (logger.would_log(util::Logger::Level::trace)) {
                     logger.trace("Received: DOWNLOAD CHANGESET(server_version=%1, "
                                  "client_version=%2, origin_timestamp=%3, origin_file_ident=%4, "
                                  "original_changeset_size=%5, changeset_size=%6)",
-                                 server_version, client_version, origin_timestamp,
-                                 origin_file_ident, original_changeset_size,
+                                 server_version, client_version, origin_timestamp, origin_file_ident,
+                                 original_changeset_size,
                                  changeset_size); // Throws
                     logger.trace("Changeset: %1",
                                  clamped_hex_dump(changeset_data)); // Throws
@@ -292,20 +275,16 @@ public:
 #endif
                 }
 
-                RemoteChangeset changeset_2(server_version, client_version,
-                                            changeset_data, origin_timestamp,
+                RemoteChangeset changeset_2(server_version, client_version, changeset_data, origin_timestamp,
                                             origin_file_ident);
                 changeset_2.original_changeset_size = original_changeset_size;
                 received_changesets.push_back(changeset_2); // Throws
             }
 
             SyncProgress progress;
-            progress.latest_server_version =
-                SaltedVersion{latest_server_version, latest_server_version_salt};
-            progress.download =
-                DownloadCursor{download_server_version, download_client_version};
-            progress.upload =
-                UploadCursor{upload_client_version, upload_server_version};
+            progress.latest_server_version = SaltedVersion{latest_server_version, latest_server_version_salt};
+            progress.download = DownloadCursor{download_server_version, download_client_version};
+            progress.upload = UploadCursor{upload_client_version, upload_server_version};
             connection.receive_download_message(session_ident, progress, downloadable_bytes,
                                                 received_changesets); // Throws
             return;
@@ -318,7 +297,7 @@ public:
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
             bool good_syntax = (in && sp1 == ' ' && newline == '\n' && expected_size == size);
-            if (!good_syntax){
+            if (!good_syntax) {
                 goto bad_syntax;
             }
 
@@ -344,12 +323,12 @@ public:
             bool try_again;
             session_ident_type session_ident;
             char sp_1, sp_2, sp_3, sp_4, newline;
-            in >> sp_1 >> error_code >> sp_2 >> message_size >> sp_3 >> try_again >> sp_4 >>
-                session_ident >> newline; // Throws
+            in >> sp_1 >> error_code >> sp_2 >> message_size >> sp_3 >> try_again >> sp_4 >> session_ident >>
+                newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size + message_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                newline == '\n' && expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && newline == '\n' &&
+                                expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
@@ -371,8 +350,7 @@ public:
             in >> sp_1 >> session_ident >> sp_2 >> request_ident >> newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
@@ -386,8 +364,7 @@ public:
             in >> sp_1 >> session_ident >> sp_2 >> file_ident >> newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
@@ -399,12 +376,12 @@ public:
             file_ident_type client_file_ident;
             salt_type client_file_ident_salt;
             char sp_1, sp_2, sp_3, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident >> sp_3 >>
-                client_file_ident_salt >> newline; // Throws
+            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident >> sp_3 >> client_file_ident_salt >>
+                newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' &&
-                                newline == '\n' && expected_size == size);
+            bool good_syntax =
+                (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
@@ -419,8 +396,7 @@ public:
             in >> sp_1 >> session_ident >> sp_2 >> client_version >> newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
@@ -436,41 +412,31 @@ public:
             std::uint_fast64_t max_offset;
             std::size_t chunk_size;
             char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> server_version >> sp_3 >>
-                server_version_salt >> sp_4 >> begin_offset >> sp_5 >> end_offset >> sp_6 >>
-                max_offset >> sp_7 >> chunk_size >> newline; // Throws
+            in >> sp_1 >> session_ident >> sp_2 >> server_version >> sp_3 >> server_version_salt >> sp_4 >>
+                begin_offset >> sp_5 >> end_offset >> sp_6 >> max_offset >> sp_7 >> chunk_size >> newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size + chunk_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                sp_5 == ' ' && sp_6 == ' ' && sp_7 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
+                                sp_6 == ' ' && sp_7 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
-            BinaryData chunk {data + header_size, chunk_size};
+            BinaryData chunk{data + header_size, chunk_size};
 
-            connection.receive_state_message(session_ident,
-                                             server_version,
-                                             server_version_salt,
-                                             begin_offset,
-                                             end_offset,
-                                             max_offset,
-                                             chunk);
+            connection.receive_state_message(session_ident, server_version, server_version_salt, begin_offset,
+                                             end_offset, max_offset, chunk);
             return;
         }
 
-        logger.error("Unknown input message type '%1'",
-                     StringData(data, size));
+        logger.error("Unknown input message type '%1'", StringData(data, size));
         connection.handle_protocol_error(Error::unknown_message);
         return;
     bad_syntax:
-        logger.error("Bad syntax in input message '%1'",
-                     StringData(data, size));
+        logger.error("Bad syntax in input message '%1'", StringData(data, size));
         connection.handle_protocol_error(Error::bad_syntax);
         return;
     limits_exceeded:
-        logger.error("Limits exceeded in input message '%1'",
-                     StringData(data, header_size));
+        logger.error("Limits exceeded in input message '%1'", StringData(data, header_size));
         connection.handle_protocol_error(Error::limits_exceeded);
         return;
     }
@@ -490,27 +456,27 @@ private:
 
 class ServerProtocol {
 public:
-    using file_ident_type    = sync::file_ident_type;
-    using version_type       = sync::version_type;
-    using salt_type          = sync::salt_type;
-    using timestamp_type     = sync::timestamp_type;
+    using file_ident_type = sync::file_ident_type;
+    using version_type = sync::version_type;
+    using salt_type = sync::salt_type;
+    using timestamp_type = sync::timestamp_type;
     using session_ident_type = sync::session_ident_type;
     using request_ident_type = sync::request_ident_type;
-    using SaltedFileIdent    = sync::SaltedFileIdent;
-    using SaltedVersion      = sync::SaltedVersion;
-    using milliseconds_type  = sync::milliseconds_type;
-    using UploadCursor       = sync::UploadCursor;
+    using SaltedFileIdent = sync::SaltedFileIdent;
+    using SaltedVersion = sync::SaltedVersion;
+    using milliseconds_type = sync::milliseconds_type;
+    using UploadCursor = sync::UploadCursor;
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
     // FIXME: No need to explicitly assign numbers to these
     enum class Error {
-        unknown_message             = 101, // Unknown type of input message
-        bad_syntax                  = 102, // Bad syntax in input message head
-        limits_exceeded             = 103, // Limits exceeded in input message
-        bad_decompression           = 104, // Error in decompression (UPLOAD)
+        unknown_message = 101,             // Unknown type of input message
+        bad_syntax = 102,                  // Bad syntax in input message head
+        limits_exceeded = 103,             // Limits exceeded in input message
+        bad_decompression = 104,           // Error in decompression (UPLOAD)
         bad_changeset_header_syntax = 105, // Bad syntax in changeset header (UPLOAD)
-        bad_changeset_size          = 106, // Changeset size doesn't fit in message (UPLOAD)
+        bad_changeset_size = 106,          // Changeset size doesn't fit in message (UPLOAD)
     };
 
     // Messages sent by the server to the client
@@ -518,16 +484,13 @@ public:
     void make_ident_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
                             file_ident_type client_file_ident, salt_type client_file_ident_salt);
 
-    void make_client_version_message(OutputBuffer&, session_ident_type session_ident,
-                                     version_type client_version);
+    void make_client_version_message(OutputBuffer&, session_ident_type session_ident, version_type client_version);
 
-    void make_state_message(OutputBuffer&, session_ident_type session_ident,
-                            SaltedVersion server_version, std::uint_fast64_t begin_offset,
-                            std::uint_fast64_t end_offset, std::uint_fast64_t max_offset,
-                            BinaryData chunk);
+    void make_state_message(OutputBuffer&, session_ident_type session_ident, SaltedVersion server_version,
+                            std::uint_fast64_t begin_offset, std::uint_fast64_t end_offset,
+                            std::uint_fast64_t max_offset, BinaryData chunk);
 
-    void make_alloc_message(OutputBuffer&, session_ident_type session_ident,
-                            file_ident_type file_ident);
+    void make_alloc_message(OutputBuffer&, session_ident_type session_ident, file_ident_type file_ident);
 
     void make_unbound_message(OutputBuffer&, session_ident_type session_ident);
 
@@ -539,27 +502,18 @@ public:
         std::size_t original_size;
     };
 
-    void make_download_message(int protocol_version, OutputBuffer&,
-                               session_ident_type session_ident,
-                               version_type download_server_version,
-                               version_type download_client_version,
-                               version_type latest_server_version,
-                               salt_type latest_server_version_salt,
-                               version_type upload_client_version,
-                               version_type upload_server_version,
-                               std::uint_fast64_t downloadable_bytes,
-                               std::size_t num_changesets, const char* body,
-                               std::size_t uncompressed_body_size,
-                               std::size_t compressed_body_size,
-                               bool body_is_compressed,
-                               util::Logger&);
+    void make_download_message(int protocol_version, OutputBuffer&, session_ident_type session_ident,
+                               version_type download_server_version, version_type download_client_version,
+                               version_type latest_server_version, salt_type latest_server_version_salt,
+                               version_type upload_client_version, version_type upload_server_version,
+                               std::uint_fast64_t downloadable_bytes, std::size_t num_changesets, const char* body,
+                               std::size_t uncompressed_body_size, std::size_t compressed_body_size,
+                               bool body_is_compressed, util::Logger&);
 
-    void make_mark_message(OutputBuffer&, session_ident_type session_ident,
-                           request_ident_type request_ident);
+    void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
 
-    void make_error_message(int protocol_version, OutputBuffer&, sync::ProtocolError error_code,
-                            const char* message, std::size_t message_size, bool try_again,
-                            session_ident_type session_ident);
+    void make_error_message(int protocol_version, OutputBuffer&, sync::ProtocolError error_code, const char* message,
+                            std::size_t message_size, bool try_again, session_ident_type session_ident);
 
     void make_pong(OutputBuffer&, milliseconds_type timestamp);
 
@@ -590,8 +544,7 @@ public:
         return;
 
     bad_syntax:
-        logger.error("Bad syntax in PING message '%1'",
-                     StringData(data, size));
+        logger.error("Bad syntax in PING message '%1'", StringData(data, size));
         connection.handle_protocol_error(Error::bad_syntax);
         return;
     }
@@ -608,7 +561,7 @@ public:
     // parse_message_received takes a (WebSocket) message and parses it.
     // The result of the parsing is handled by an object of type Connection.
     // Typically, Connection would be the Connection class from server.cpp
-    template<class Connection>
+    template <class Connection>
     void parse_message_received(Connection& connection, const char* data, std::size_t size)
     {
         util::Logger& logger = connection.logger;
@@ -630,17 +583,15 @@ public:
             version_type progress_client_version, progress_server_version;
             version_type locked_server_version;
             char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> is_body_compressed >> sp_3 >>
-                uncompressed_body_size >> sp_4 >> compressed_body_size;
-                in >> sp_5 >> progress_client_version >> sp_6 >> progress_server_version >> sp_7 >>
-                    locked_server_version;
+            in >> sp_1 >> session_ident >> sp_2 >> is_body_compressed >> sp_3 >> uncompressed_body_size >> sp_4 >>
+                compressed_body_size;
+            in >> sp_5 >> progress_client_version >> sp_6 >> progress_server_version >> sp_7 >> locked_server_version;
             in >> newline;
             header_size = std::size_t(in.tellg());
             std::size_t body_size = (is_body_compressed ? compressed_body_size : uncompressed_body_size);
             std::size_t expected_size = header_size + body_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                sp_5 == ' ' && sp_6 == ' ' && sp_7 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
+                                sp_6 == ' ' && sp_7 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
             if (uncompressed_body_size > s_max_body_size)
@@ -652,9 +603,8 @@ public:
             // if is_body_compressed == true, we must decompress the received body.
             if (is_body_compressed) {
                 uncompressed_body_buffer.reset(new char[uncompressed_body_size]);
-                std::error_code ec = _impl::compression::decompress(body.data(),  compressed_body_size,
-                                                                    uncompressed_body_buffer.get(),
-                                                                    uncompressed_body_size);
+                std::error_code ec = _impl::compression::decompress(
+                    body.data(), compressed_body_size, uncompressed_body_buffer.get(), uncompressed_body_size);
 
                 if (ec) {
                     logger.error("compression::inflate: %1", ec.message());
@@ -671,8 +621,8 @@ public:
             logger.debug("Upload message compression: is_body_compressed = %1, "
                          "compressed_body_size=%2, uncompressed_body_size=%3, "
                          "progress_client_version=%4, progress_server_version=%5, "
-                         "locked_server_version=%6", is_body_compressed, compressed_body_size,
-                         uncompressed_body_size, progress_client_version,
+                         "locked_server_version=%6",
+                         is_body_compressed, compressed_body_size, uncompressed_body_size, progress_client_version,
                          progress_server_version, locked_server_version); // Throws
 
             util::MemoryInputStream in;
@@ -691,12 +641,10 @@ public:
                 std::size_t changeset_size;
                 char sp_1, sp_2, sp_3, sp_4, sp_5;
 
-                in >> client_version >> sp_1 >> server_version >> sp_2 >>
-                    origin_timestamp >> sp_3 >> origin_file_ident >> sp_4 >>
-                    changeset_size >> sp_5;
+                in >> client_version >> sp_1 >> server_version >> sp_2 >> origin_timestamp >> sp_3 >>
+                    origin_file_ident >> sp_4 >> changeset_size >> sp_5;
 
-                bool good_syntax = in && sp_1 == ' ' && sp_2 == ' ' &&
-                    sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ';
+                bool good_syntax = in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ';
 
                 if (!good_syntax) {
                     logger.error("Bad changeset header syntax");
@@ -713,32 +661,26 @@ public:
                     return;
                 }
 
-                BinaryData changeset_data(uncompressed_body.data() +
-                                          std::size_t(in.tellg()), changeset_size);
+                BinaryData changeset_data(uncompressed_body.data() + std::size_t(in.tellg()), changeset_size);
                 in.seekg(position);
 
                 if (logger.would_log(util::Logger::Level::trace)) {
-                    logger.trace(
-                        "Received: UPLOAD CHANGESET(client_version=%1, server_version=%2, "
-                        "origin_timestamp=%3, origin_file_ident=%4, changeset_size=%5)",
-                        client_version, server_version, origin_timestamp, origin_file_ident,
-                        changeset_size); // Throws
+                    logger.trace("Received: UPLOAD CHANGESET(client_version=%1, server_version=%2, "
+                                 "origin_timestamp=%3, origin_file_ident=%4, changeset_size=%5)",
+                                 client_version, server_version, origin_timestamp, origin_file_ident,
+                                 changeset_size); // Throws
                     logger.trace("Changeset: %1",
                                  clamped_hex_dump(changeset_data)); // Throws
                 }
 
-                UploadChangeset upload_changeset {
-                    UploadCursor{client_version, server_version},
-                    origin_timestamp,
-                    origin_file_ident,
-                    changeset_data
-                };
+                UploadChangeset upload_changeset{UploadCursor{client_version, server_version}, origin_timestamp,
+                                                 origin_file_ident, changeset_data};
 
                 upload_changesets.push_back(upload_changeset); // Throws
             }
 
-            connection.receive_upload_message(session_ident, progress_client_version,
-                                              progress_server_version, locked_server_version,
+            connection.receive_upload_message(session_ident, progress_client_version, progress_server_version,
+                                              locked_server_version,
                                               upload_changesets); // Throws
             return;
         }
@@ -749,15 +691,14 @@ public:
             in >> sp_1 >> session_ident >> sp_2 >> request_ident >> newline;
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
             connection.receive_mark_message(session_ident, request_ident); // Throws
             return;
         }
-        if(message_type == "ping") {
+        if (message_type == "ping") {
             milliseconds_type timestamp, rtt;
 
             char sp_1 = 0, sp_2 = 0, newline = 0;
@@ -778,14 +719,12 @@ public:
             bool need_client_file_ident;
             bool is_subserver;
             char sp_1, sp_2, sp_3, sp_4, sp_5, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> path_size >> sp_3 >>
-                signed_user_token_size >> sp_4 >> need_client_file_ident >> sp_5 >>
-                is_subserver >> newline;
+            in >> sp_1 >> session_ident >> sp_2 >> path_size >> sp_3 >> signed_user_token_size >> sp_4 >>
+                need_client_file_ident >> sp_5 >> is_subserver >> newline;
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size + path_size + signed_user_token_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                sp_5 == ' ' && newline == '\n' && expected_size == size &&
-                                path_size != 0);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
+                                newline == '\n' && expected_size == size && path_size != 0);
             if (!good_syntax)
                 goto bad_syntax;
             if (path_size > s_max_path_size)
@@ -797,8 +736,7 @@ public:
             std::string signed_user_token(data + header_size + path_size,
                                           signed_user_token_size); // Throws
 
-            connection.receive_bind_message(session_ident, std::move(path),
-                                            std::move(signed_user_token),
+            connection.receive_bind_message(session_ident, std::move(path), std::move(signed_user_token),
                                             need_client_file_ident, is_subserver); // Throws
             return;
         }
@@ -809,8 +747,7 @@ public:
             in >> sp_1 >> session_ident >> sp_2 >> signed_user_token_size >> newline;
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size + signed_user_token_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' &&
-                                expected_size == size);
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
             if (signed_user_token_size > s_max_signed_user_token_size)
@@ -828,22 +765,20 @@ public:
             version_type scan_server_version, scan_client_version, latest_server_version;
             salt_type latest_server_version_salt;
             char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, sp_8, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident >> sp_3 >>
-                client_file_ident_salt >> sp_4 >> scan_server_version >> sp_5 >>
-                scan_client_version >> sp_6 >> latest_server_version >> sp_7 >>
+            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident >> sp_3 >> client_file_ident_salt >> sp_4 >>
+                scan_server_version >> sp_5 >> scan_client_version >> sp_6 >> latest_server_version >> sp_7 >>
                 latest_server_version_salt >> newline;
             sp_8 = ' ';
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                sp_5 == ' ' && sp_6 == ' ' && sp_7 == ' ' && sp_8 == ' ' &&
-                                newline == '\n' && expected_size == size);
+            bool good_syntax =
+                (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' && sp_6 == ' ' &&
+                 sp_7 == ' ' && sp_8 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
-            connection.receive_ident_message(session_ident, client_file_ident,
-                                             client_file_ident_salt, scan_server_version,
-                                             scan_client_version, latest_server_version,
+            connection.receive_ident_message(session_ident, client_file_ident, client_file_ident_salt,
+                                             scan_server_version, scan_client_version, latest_server_version,
                                              latest_server_version_salt); // Throws
             return;
         }
@@ -864,12 +799,12 @@ public:
             session_ident_type session_ident;
             SaltedFileIdent client_file_ident;
             char sp_1, sp_2, sp_3, newline;
-            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident.ident >> sp_3 >>
-                client_file_ident.salt >> newline; // Throws
+            in >> sp_1 >> session_ident >> sp_2 >> client_file_ident.ident >> sp_3 >> client_file_ident.salt >>
+                newline; // Throws
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' &&
-                                newline == '\n' && expected_size == size);
+            bool good_syntax =
+                (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && newline == '\n' && expected_size == size);
             if (!good_syntax)
                 goto bad_syntax;
 
@@ -887,28 +822,22 @@ public:
             std::int_fast32_t min_history_schema_version;
             std::int_fast32_t max_history_schema_version;
             char sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7, sp_8, sp_9, newline;
-            in >> sp_1 >> session_ident >> sp_2 >>
-                partial_transferred_server_version.version >> sp_3 >>
-                partial_transferred_server_version.salt >> sp_4 >> offset >> sp_5 >>
-                need_recent;
+            in >> sp_1 >> session_ident >> sp_2 >> partial_transferred_server_version.version >> sp_3 >>
+                partial_transferred_server_version.salt >> sp_4 >> offset >> sp_5 >> need_recent;
             in >> sp_6 >> min_file_format_version >> sp_7 >> max_file_format_version >> sp_8 >>
                 min_history_schema_version >> sp_9 >> max_history_schema_version;
             in >> newline;
             header_size = std::size_t(in.tellg());
             std::size_t expected_size = header_size;
-            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' &&
-                                sp_5 == ' ' && sp_6 == ' ' && sp_7 == ' ' && sp_8 == ' ' &&
-                                sp_9 == ' ' && newline == '\n' && expected_size == size &&
-                                (need_recent == 0 || need_recent == 1));
+            bool good_syntax = (in && sp_1 == ' ' && sp_2 == ' ' && sp_3 == ' ' && sp_4 == ' ' && sp_5 == ' ' &&
+                                sp_6 == ' ' && sp_7 == ' ' && sp_8 == ' ' && sp_9 == ' ' && newline == '\n' &&
+                                expected_size == size && (need_recent == 0 || need_recent == 1));
             if (!good_syntax)
                 goto bad_syntax;
 
-            connection.receive_state_request_message(session_ident,
-                                                     partial_transferred_server_version,
-                                                     offset, bool(need_recent),
-                                                     min_file_format_version,
-                                                     max_file_format_version,
-                                                     min_history_schema_version,
+            connection.receive_state_request_message(session_ident, partial_transferred_server_version, offset,
+                                                     bool(need_recent), min_file_format_version,
+                                                     max_file_format_version, min_history_schema_version,
                                                      max_history_schema_version); // Throws
             return;
         }
@@ -936,27 +865,25 @@ public:
         return;
 
     bad_syntax:
-        logger.error("Bad syntax in input message '%1'",
-                     StringData(data, size));
+        logger.error("Bad syntax in input message '%1'", StringData(data, size));
         connection.handle_protocol_error(Error::bad_syntax); // Throws
         return;
     limits_exceeded:
-        logger.error("Limits exceeded in input message '%1'",
-                     StringData(data, header_size));
+        logger.error("Limits exceeded in input message '%1'", StringData(data, header_size));
         connection.handle_protocol_error(Error::limits_exceeded); // Throws
         return;
     }
 
-    void insert_single_changeset_download_message(OutputBuffer&, const ChangesetInfo&,
-                                                  util::Logger&);
+    void insert_single_changeset_download_message(OutputBuffer&, const ChangesetInfo&, util::Logger&);
 
 private:
-    static constexpr std::size_t s_max_head_size              =  256;
+    static constexpr std::size_t s_max_head_size = 256;
     static constexpr std::size_t s_max_signed_user_token_size = 2048;
-    static constexpr std::size_t s_max_client_info_size       = 1024;
-    static constexpr std::size_t s_max_path_size              = 1024;
-    static constexpr std::size_t s_max_changeset_size         = std::numeric_limits<std::size_t>::max(); // FIXME: What is a reasonable value here?
-    static constexpr std::size_t s_max_body_size              = std::numeric_limits<std::size_t>::max();
+    static constexpr std::size_t s_max_client_info_size = 1024;
+    static constexpr std::size_t s_max_path_size = 1024;
+    static constexpr std::size_t s_max_changeset_size =
+        std::numeric_limits<std::size_t>::max(); // FIXME: What is a reasonable value here?
+    static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();
 };
 
 // make_authorization_header() makes the value of the Authorization header used in the

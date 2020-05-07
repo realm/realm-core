@@ -29,7 +29,7 @@ util::Uri::Uri(const std::string& str)
     // Scheme
     {
         const char* c = ":/?#";
-        const char* p = std::find_first_of(b, e, c, c+4);
+        const char* p = std::find_first_of(b, e, c, c + 4);
         if (p != e && *p == ':') {
             m_scheme.assign(b, ++p); // Throws
             b = p;
@@ -37,9 +37,9 @@ util::Uri::Uri(const std::string& str)
     }
 
     // Authority
-    if (2 <= e-b && b[0] == '/' && b[1] == '/') {
+    if (2 <= e - b && b[0] == '/' && b[1] == '/') {
         const char* c = "/?#";
-        const char* p = std::find_first_of(b+2, e, c, c+3);
+        const char* p = std::find_first_of(b + 2, e, c, c + 3);
         m_auth.assign(b, p); // Throws
         b = p;
     }
@@ -47,7 +47,7 @@ util::Uri::Uri(const std::string& str)
     // Path
     {
         const char* c = "?#";
-        const char* p = std::find_first_of(b, e, c, c+2);
+        const char* p = std::find_first_of(b, e, c, c + 2);
         m_path.assign(b, p); // Throws
         b = p;
     }
@@ -69,9 +69,9 @@ void util::Uri::set_scheme(const std::string& val)
     if (!val.empty()) {
         if (val.back() != ':')
             throw util::invalid_argument("URI scheme part must have a trailing ':'");
-        if (val.substr(0, val.size()-1).find_first_of(":/?#") != std::string::npos) {
+        if (val.substr(0, val.size() - 1).find_first_of(":/?#") != std::string::npos) {
             throw util::invalid_argument("URI scheme part must not contain '/', '?' or '#', "
-                                        "nor may it contain more than one ':'");
+                                         "nor may it contain more than one ':'");
         }
     }
     m_scheme = val;
@@ -146,7 +146,7 @@ bool util::Uri::get_auth(std::string& userinfo, std::string& host, std::string& 
     size_type i = 2;
     size_type j = m_auth.find('@', i);
     if (j != std::string::npos) {
-        userinfo_2 = m_auth.substr(i, j-i); // Throws
+        userinfo_2 = m_auth.substr(i, j - i); // Throws
         i = j + 1;
     }
     size_type k = m_auth.substr(i).rfind(':');
@@ -155,13 +155,13 @@ bool util::Uri::get_auth(std::string& userinfo, std::string& host, std::string& 
     }
     else {
         k = i + k;
-        port_2 = m_auth.substr(k+1); // Throws
+        port_2 = m_auth.substr(k + 1); // Throws
     }
-    host_2 = m_auth.substr(i, k-i); // Throws
+    host_2 = m_auth.substr(i, k - i); // Throws
 
     userinfo = std::move(userinfo_2);
-    host     = std::move(host_2);
-    port     = std::move(port_2);
+    host = std::move(host_2);
+    port = std::move(port_2);
     return true;
 }
 

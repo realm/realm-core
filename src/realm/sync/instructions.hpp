@@ -471,7 +471,10 @@ struct Set : PathInstruction {
         uint32_t prior_size; // For "ArraySet"
     };
 
-    Set() : prior_size(0) {}
+    Set()
+        : prior_size(0)
+    {
+    }
 
     bool is_array_set() const noexcept
     {
@@ -582,9 +585,9 @@ struct Instruction {
 
     mpark::variant<Vector
 #define REALM_INSTRUCTION_VARIANT_ALTERNATIVE(X) , X
-                     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_INSTRUCTION_VARIANT_ALTERNATIVE)
+                       REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_INSTRUCTION_VARIANT_ALTERNATIVE)
 #undef REALM_INSTRUCTION_VARIANT_ALTERNATIVE
-                 >
+                   >
         m_instr;
 
     Type type() const noexcept;
@@ -839,9 +842,9 @@ inline decltype(auto) Instruction::visit(F&& lambda)
         REALM_TERMINATE("visiting instruction vector");
     }
 #define REALM_VISIT_VARIANT(X)                                                                                       \
-    else if (mpark::holds_alternative<Instruction::X>(m_instr))                                                        \
+    else if (mpark::holds_alternative<Instruction::X>(m_instr))                                                      \
     {                                                                                                                \
-        return lambda(mpark::get<Instruction::X>(m_instr));                                                            \
+        return lambda(mpark::get<Instruction::X>(m_instr));                                                          \
     }
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_VISIT_VARIANT)
 #undef REALM_VISIT_VARIANT
@@ -859,9 +862,9 @@ inline decltype(auto) Instruction::visit(F&& lambda) const
         REALM_TERMINATE("visiting instruction vector");
     }
 #define REALM_VISIT_VARIANT(X)                                                                                       \
-    else if (mpark::holds_alternative<Instruction::X>(m_instr))                                                        \
+    else if (mpark::holds_alternative<Instruction::X>(m_instr))                                                      \
     {                                                                                                                \
-        return lambda(mpark::get<Instruction::X>(m_instr));                                                            \
+        return lambda(mpark::get<Instruction::X>(m_instr));                                                          \
     }
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_VISIT_VARIANT)
 #undef REALM_VISIT_VARIANT

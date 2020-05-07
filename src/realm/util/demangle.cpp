@@ -7,8 +7,8 @@
 #include <realm/util/backtrace.hpp>
 
 #if REALM_HAVE_AT_LEAST_GCC(3, 2)
-#  define REALM_HAVE_CXXABI_DEMANGLE
-#  include <cxxabi.h>
+#define REALM_HAVE_CXXABI_DEMANGLE
+#include <cxxabi.h>
 #endif
 
 
@@ -20,8 +20,7 @@ std::string realm::util::demangle(const std::string& mangled_name)
 {
 #ifdef REALM_HAVE_CXXABI_DEMANGLE
     int status = 0;
-    char* unmangled_name =
-        abi::__cxa_demangle(mangled_name.c_str(), nullptr, nullptr, &status);
+    char* unmangled_name = abi::__cxa_demangle(mangled_name.c_str(), nullptr, nullptr, &status);
     switch (status) {
         case 0:
             REALM_ASSERT(unmangled_name);
@@ -32,7 +31,7 @@ std::string realm::util::demangle(const std::string& mangled_name)
     }
     REALM_ASSERT(!unmangled_name);
     return mangled_name; // Throws
-  demangled:
+demangled:
     class Free {
     public:
         void operator()(char* p) const

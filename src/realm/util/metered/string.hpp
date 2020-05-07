@@ -14,4 +14,3 @@ using string = std::basic_string<char, std::char_traits<char>, MeteredSTLAllocat
 } // namespace realm
 
 #endif // REALM_UTIL_METERED_STRING_HPP
-

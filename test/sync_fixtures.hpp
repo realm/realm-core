@@ -34,16 +34,15 @@ const char g_test_server_key_path[] = "test_pubkey.pem";
 // The two are concatenated with a ':'.
 // This token does not contain a "path" field, and therefore grants access to
 // all Realms.
-const char g_signed_test_user_token[] =
-    "ewogICAgImlkZW50aXR5IjogInRlc3QiLAogICAgImFjY2VzcyI6IFsiZG93bmxvYWQiLCAidXBs"
-    "b2FkIl0sCiAgICAidGltZXN0YW1wIjogMTQ1NTUzMDYxNCwKICAgICJleHBpcmVzIjogbnVsbCwK"
-    "ICAgICJhcHBfaWQiOiAiaW8ucmVhbG0uVGVzdCIKfQo="
-    ":"
-    "kPQwXUUFFVoDkmw02ouA1g7OlXcZ/IJPpqwJs9lIi1azpyuakBWgQ8VhnInCXh90CQXYhnteZlMw"
-    "HYUZgt3/ED1jLu+nK2HlRKsmsOuAI20jMnHGGIZkql4/Ck9PEsvZ3huHGk5Jv9vpFp/dtnl1JXK2"
-    "9XjdO8+1hU4boeJuKpTMDTPwGI9dxa8sTtvMMN7AVoPkKb1uqHZVsb5uRGE86Cyv58cvuj/EvZ1A"
-    "yOCt5NGJwjTxydPgfX3QPcNMwDTHCRWYuoi2oTCINQHy8ebzXVLT1iy3adV4rM5bJukCnpLqHGlZ"
-    "MIslk07zKdoj3igMIT47W9QwIuCw8x5f5cRIAg==";
+const char g_signed_test_user_token[] = "ewogICAgImlkZW50aXR5IjogInRlc3QiLAogICAgImFjY2VzcyI6IFsiZG93bmxvYWQiLCAidXBs"
+                                        "b2FkIl0sCiAgICAidGltZXN0YW1wIjogMTQ1NTUzMDYxNCwKICAgICJleHBpcmVzIjogbnVsbCwK"
+                                        "ICAgICJhcHBfaWQiOiAiaW8ucmVhbG0uVGVzdCIKfQo="
+                                        ":"
+                                        "kPQwXUUFFVoDkmw02ouA1g7OlXcZ/IJPpqwJs9lIi1azpyuakBWgQ8VhnInCXh90CQXYhnteZlMw"
+                                        "HYUZgt3/ED1jLu+nK2HlRKsmsOuAI20jMnHGGIZkql4/Ck9PEsvZ3huHGk5Jv9vpFp/dtnl1JXK2"
+                                        "9XjdO8+1hU4boeJuKpTMDTPwGI9dxa8sTtvMMN7AVoPkKb1uqHZVsb5uRGE86Cyv58cvuj/EvZ1A"
+                                        "yOCt5NGJwjTxydPgfX3QPcNMwDTHCRWYuoi2oTCINQHy8ebzXVLT1iy3adV4rM5bJukCnpLqHGlZ"
+                                        "MIslk07zKdoj3igMIT47W9QwIuCw8x5f5cRIAg==";
 
 const char g_unsigned_test_user_token[] =
     "ewogICAgImlkZW50aXR5IjogInRlc3QiLAogICAgImFjY2VzcyI6IFsiZG93bmxvYWQiLCAidXBs"
@@ -59,16 +58,15 @@ const char g_unsigned_test_user_token[] =
 //    "expires": null,
 //    "app_id": "io.realm.Test"
 //}
-const char g_user_0_token[] =
-    "ewogICAgImlkZW50aXR5IjogInVzZXJfMCIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW"
-    "1lc3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6"
-    "ICJpby5yZWFsbS5UZXN0Igp9Cg=="
-    ":"
-    "YC3MVU7lmF6uRbd72nJ8AWBI9/BmdLTutlAMy7+tkh0X08do3SDi3Kq++93b2+FWG8IOrVQge+"
-    "gvSMbaBEYgmV0QD7OL9Y29kjk8Ty7bvdFd2KoeQRb9IfSJXS0yd9d4OI0K/TfmGMjCh3j2gWkp"
-    "V5PTWg/V+T5oRfXXwUMIkSCAeCnd23YTr3NucdvkTcyjz0isW+E4uUcHePQA3Qeq0+/qPFrv4a"
-    "LGagtbYYnx2rCHZ8zZ1khMpKu/chF1kOit+eZqYB4Jgui5gXK3iSIWCwBlMOhofsNA9h5qmIFp"
-    "2SWQOk4s4bi962vJxIerIbYrsX4yzviz+yDX0UZRAStIjw==";
+const char g_user_0_token[] = "ewogICAgImlkZW50aXR5IjogInVzZXJfMCIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW"
+                              "1lc3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6"
+                              "ICJpby5yZWFsbS5UZXN0Igp9Cg=="
+                              ":"
+                              "YC3MVU7lmF6uRbd72nJ8AWBI9/BmdLTutlAMy7+tkh0X08do3SDi3Kq++93b2+FWG8IOrVQge+"
+                              "gvSMbaBEYgmV0QD7OL9Y29kjk8Ty7bvdFd2KoeQRb9IfSJXS0yd9d4OI0K/TfmGMjCh3j2gWkp"
+                              "V5PTWg/V+T5oRfXXwUMIkSCAeCnd23YTr3NucdvkTcyjz0isW+E4uUcHePQA3Qeq0+/qPFrv4a"
+                              "LGagtbYYnx2rCHZ8zZ1khMpKu/chF1kOit+eZqYB4Jgui5gXK3iSIWCwBlMOhofsNA9h5qmIFp"
+                              "2SWQOk4s4bi962vJxIerIbYrsX4yzviz+yDX0UZRAStIjw==";
 
 
 // Token for user_1.
@@ -79,16 +77,15 @@ const char g_user_0_token[] =
 //    "expires": null,
 //    "app_id": "io.realm.Test"
 //}
-const char g_user_1_token[] =
-    "ewogICAgImlkZW50aXR5IjogInVzZXJfMSIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW"
-    "1lc3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6"
-    "ICJpby5yZWFsbS5UZXN0Igp9Cg=="
-    ":"
-    "iqFfuBuUx2i8nogJ2+ixA/vVUpAGaELIWktDlFyF5ZoE5xo+Jd+ElpK8Kiq7PQMd3ZwxwBBhMZ"
-    "M+PkgfLFcTA4hutZ5aCkbzB+DIuUCR7z0iDq4+rutIyQdvd9ujCOWYQXeE0F5TtSVWqf8baDG/"
-    "HXDGx6sASy+2PwUoZrllJbRPeclGQAsKZ6jq46ahH8mmvjKX0GCJHED4i20ZEr2VgeTPZ+9gYo"
-    "okj3RIbEzHF3SNLvae1ENY8O/mB5g+Hf71E6fnU/AuFTpbJlom0Lm72C7wgk88HjIqjfpo0L4l"
-    "9r54Q2rkIffdAbMRCrIqrT81AMZuTIGDkRbMLDLtsUifgQ==";
+const char g_user_1_token[] = "ewogICAgImlkZW50aXR5IjogInVzZXJfMSIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW"
+                              "1lc3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6"
+                              "ICJpby5yZWFsbS5UZXN0Igp9Cg=="
+                              ":"
+                              "iqFfuBuUx2i8nogJ2+ixA/vVUpAGaELIWktDlFyF5ZoE5xo+Jd+ElpK8Kiq7PQMd3ZwxwBBhMZ"
+                              "M+PkgfLFcTA4hutZ5aCkbzB+DIuUCR7z0iDq4+rutIyQdvd9ujCOWYQXeE0F5TtSVWqf8baDG/"
+                              "HXDGx6sASy+2PwUoZrllJbRPeclGQAsKZ6jq46ahH8mmvjKX0GCJHED4i20ZEr2VgeTPZ+9gYo"
+                              "okj3RIbEzHF3SNLvae1ENY8O/mB5g+Hf71E6fnU/AuFTpbJlom0Lm72C7wgk88HjIqjfpo0L4l"
+                              "9r54Q2rkIffdAbMRCrIqrT81AMZuTIGDkRbMLDLtsUifgQ==";
 
 
 // Token for user_2.
@@ -99,16 +96,15 @@ const char g_user_1_token[] =
 //    "expires": null,
 //    "app_id": "io.realm.Test"
 // }
-const char g_user_2_token[] =
-    "ewogICAgImlkZW50aXR5IjogInVzZXJfMiIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW"
-    "1lc3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6"
-    "ICJpby5yZWFsbS5UZXN0Igp9Cg=="
-    ":"
-    "q68rj8I66E10+EQ8+OuaSeD2U1zu1mWpRgLpt+fAX4JPYZssfUsOq7adY2IJRcBEYAwS4LjkgM"
-    "QGU9hwQ0PTLZzoYQQXqGfqsNHF/LvNv1P1DwGkf6fp5jsRcx+IauhmKiCKdg+SItaTuaZ1Duxs"
-    "9sMrL7NIa59fQDtefltNlbNBDMJDUFlNRdSQj4FEdhAkeNu9Qv2xMqDHKhcAZhvBcPxMYVno9E"
-    "69lEkxM0mIfoy5IFg81YRaB1gbSkhPs2HVo++j1jbtFRIv/cEA+PqeeHN+fDiMHQRRNtYRbJPh"
-    "hExS3rsZhsQSZPiU0urVw4fBFn9X5NuHuUJQO7vSdqJbwQ==";
+const char g_user_2_token[] = "ewogICAgImlkZW50aXR5IjogInVzZXJfMiIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW"
+                              "1lc3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6"
+                              "ICJpby5yZWFsbS5UZXN0Igp9Cg=="
+                              ":"
+                              "q68rj8I66E10+EQ8+OuaSeD2U1zu1mWpRgLpt+fAX4JPYZssfUsOq7adY2IJRcBEYAwS4LjkgM"
+                              "QGU9hwQ0PTLZzoYQQXqGfqsNHF/LvNv1P1DwGkf6fp5jsRcx+IauhmKiCKdg+SItaTuaZ1Duxs"
+                              "9sMrL7NIa59fQDtefltNlbNBDMJDUFlNRdSQj4FEdhAkeNu9Qv2xMqDHKhcAZhvBcPxMYVno9E"
+                              "69lEkxM0mIfoy5IFg81YRaB1gbSkhPs2HVo++j1jbtFRIv/cEA+PqeeHN+fDiMHQRRNtYRbJPh"
+                              "hExS3rsZhsQSZPiU0urVw4fBFn9X5NuHuUJQO7vSdqJbwQ==";
 
 
 // {
@@ -120,17 +116,16 @@ const char g_user_2_token[] =
 //     "path": "/test",
 //     "access": ["download", "upload", "manage"]
 // }
-const char g_user_0_path_test_token[] =
-    "ewogICAgImlkZW50aXR5IjogInVzZXJfMCIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW1l"
-    "c3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6ICJp"
-    "by5yZWFsbS5UZXN0IiwKICAgICJwYXRoIjogIi90ZXN0IiwKICAgICJhY2Nlc3MiOiBbImRvd25s"
-    "b2FkIiwgInVwbG9hZCIsICJtYW5hZ2UiXQp9Cg=="
-    ":"
-    "E3hiuWjFFDUExrz5osiXFoDVSoX0168kdBNVBSEre/mYbr1s0A+mlvEH24ibklC8bh9K3BBtwjVQ"
-    "v+vvFGThmZggbWDl/SAeeIP0MpQJR4FFAqkiB93Ax1Gi9b1i25lD5lGXc9CVsSNpWMV1LRD9I6Y9"
-    "N70ENUd7vBuz0y4+y6k0A1HtaB6pzVx90kTtFaOVCz/UiMxsZOMKdRoNibIpmFU5Q5eP4UTsrZq/"
-    "4rVOisRWno3eA01IQvz/ECtnt13KBc6rEzRzpA5tWMmwJpoykEpAUUFnx8N6LAqObeij/3c5iLwp"
-    "1l5pFAzmTmbqeWbeCtLPyLM+baEo65kbPP5nPg==";
+const char g_user_0_path_test_token[] = "ewogICAgImlkZW50aXR5IjogInVzZXJfMCIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW1l"
+                                        "c3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6ICJp"
+                                        "by5yZWFsbS5UZXN0IiwKICAgICJwYXRoIjogIi90ZXN0IiwKICAgICJhY2Nlc3MiOiBbImRvd25s"
+                                        "b2FkIiwgInVwbG9hZCIsICJtYW5hZ2UiXQp9Cg=="
+                                        ":"
+                                        "E3hiuWjFFDUExrz5osiXFoDVSoX0168kdBNVBSEre/mYbr1s0A+mlvEH24ibklC8bh9K3BBtwjVQ"
+                                        "v+vvFGThmZggbWDl/SAeeIP0MpQJR4FFAqkiB93Ax1Gi9b1i25lD5lGXc9CVsSNpWMV1LRD9I6Y9"
+                                        "N70ENUd7vBuz0y4+y6k0A1HtaB6pzVx90kTtFaOVCz/UiMxsZOMKdRoNibIpmFU5Q5eP4UTsrZq/"
+                                        "4rVOisRWno3eA01IQvz/ECtnt13KBc6rEzRzpA5tWMmwJpoykEpAUUFnx8N6LAqObeij/3c5iLwp"
+                                        "1l5pFAzmTmbqeWbeCtLPyLM+baEo65kbPP5nPg==";
 
 
 // {
@@ -142,17 +137,16 @@ const char g_user_0_path_test_token[] =
 //     "path": "/test",
 //     "access": ["download", "upload", "manage"]
 // }
-const char g_user_1_path_test_token[] =
-    "ewogICAgImlkZW50aXR5IjogInVzZXJfMSIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW1l"
-    "c3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6ICJp"
-    "by5yZWFsbS5UZXN0IiwKICAgICJwYXRoIjogIi90ZXN0IiwKICAgICJhY2Nlc3MiOiBbImRvd25s"
-    "b2FkIiwgInVwbG9hZCIsICJtYW5hZ2UiXQp9Cg=="
-    ":"
-    "3QsZ3qKFwtf8FisKy3vrOImtFt7gOnuKQl92/Ckmjq6ux9OFG74d6sj6UrvXPce4lgeqPbT4qTNd"
-    "WgrXh8vBqS/R34a9v2dhV5Ys9xkQuEp04+FMswwx3hFbsxNOPaMVwtFHDzEgQus3ZP5rnpFUj/xZ"
-    "Rh6IKIQ5EksIZTGnQscBdSM/n1Qlpa7SPx94SrtIwZvPO+OcqJj367PdnS+Ii0TvGj6WFIz44gJT"
-    "GX03+qMqSdAuW/91xX013efiG+nYKKPMT4Z6+pQkyJ9C9eyvXXiJigXlBXb8wxrWBzpGoaPcWYYj"
-    "q9wI3gXQ9i7DT+cH7gbDFWnweiorMvmAPkocSw==";
+const char g_user_1_path_test_token[] = "ewogICAgImlkZW50aXR5IjogInVzZXJfMSIsCiAgICAiYWRtaW4iOiBmYWxzZSwKICAgICJ0aW1l"
+                                        "c3RhbXAiOiAxNDU1NTMwNjE0LAogICAgImV4cGlyZXMiOiBudWxsLAogICAgImFwcF9pZCI6ICJp"
+                                        "by5yZWFsbS5UZXN0IiwKICAgICJwYXRoIjogIi90ZXN0IiwKICAgICJhY2Nlc3MiOiBbImRvd25s"
+                                        "b2FkIiwgInVwbG9hZCIsICJtYW5hZ2UiXQp9Cg=="
+                                        ":"
+                                        "3QsZ3qKFwtf8FisKy3vrOImtFt7gOnuKQl92/Ckmjq6ux9OFG74d6sj6UrvXPce4lgeqPbT4qTNd"
+                                        "WgrXh8vBqS/R34a9v2dhV5Ys9xkQuEp04+FMswwx3hFbsxNOPaMVwtFHDzEgQus3ZP5rnpFUj/xZ"
+                                        "Rh6IKIQ5EksIZTGnQscBdSM/n1Qlpa7SPx94SrtIwZvPO+OcqJj367PdnS+Ii0TvGj6WFIz44gJT"
+                                        "GX03+qMqSdAuW/91xX013efiG+nYKKPMT4Z6+pQkyJ9C9eyvXXiJigXlBXb8wxrWBzpGoaPcWYYj"
+                                        "q9wI3gXQ9i7DT+cH7gbDFWnweiorMvmAPkocSw==";
 
 
 // Generated from test_token_readonly.json
@@ -244,22 +238,20 @@ const char g_signed_test_user_token_sync_label_custom[] =
     "69RzxOGLyh97goWFtx+8Xp+fz82slRCxlFas8SIkxdj0vfIHcr8BnhhDgbsXDBPvbW55fDnwTlzA"
     "1TvQPRWX12PXn0jJKSTFyC73RO26oorfQewTeA==";
 
-const std::string developer_token =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE0OTI2MTEzMDN9.cf2s0bUM/da"
-    "Hq/yp7PG6csktIgObeVeUvmObD8JOUCwC2uA3rMLGjEHPKxxmvZJtSoQq49PkhTpvCSk1ewKR"
-    "R67U9J/AE1czBQPiit4FgTj/oujXIpNVio9t5oeSd3XqNg66HZhi5F+wsMOJ2hmxL9S+OBjQU"
-    "yUchEPksKubiFKUPEktdmjewNp2VmdnPNjAdqmIhRyeHSQhl494lOlK/gyae2RUh2wWO1j9K0"
-    "o24nd0VIr4+61UD/aMDsF70vXEkqPxboB83yu51CpkmqFJ0xklA9f9M1uKUgsOwX07Uf4plRE"
-    "tYb1QxmoPdnQH3VPvVt4i0Yko/dMgpnuSJj30gQ==";
+const std::string developer_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE0OTI2MTEzMDN9.cf2s0bUM/da"
+                                    "Hq/yp7PG6csktIgObeVeUvmObD8JOUCwC2uA3rMLGjEHPKxxmvZJtSoQq49PkhTpvCSk1ewKR"
+                                    "R67U9J/AE1czBQPiit4FgTj/oujXIpNVio9t5oeSd3XqNg66HZhi5F+wsMOJ2hmxL9S+OBjQU"
+                                    "yUchEPksKubiFKUPEktdmjewNp2VmdnPNjAdqmIhRyeHSQhl494lOlK/gyae2RUh2wWO1j9K0"
+                                    "o24nd0VIr4+61UD/aMDsF70vXEkqPxboB83yu51CpkmqFJ0xklA9f9M1uKUgsOwX07Uf4plRE"
+                                    "tYb1QxmoPdnQH3VPvVt4i0Yko/dMgpnuSJj30gQ==";
 
-const std::string enterprise_token =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJBZGFwdGVyIjp0cnVlLCJCYWNrdXAiOnRyd"
-    "WUsIkxvYWRCYWxhbmNpbmciOnRydWUsIk5vdGlmaWVyIjp0cnVlLCJTeW5jIjp0cnVlLCJpYXQ"
-    "iOjE1MDc4MzM4MDJ9.SJn2ScgPXXJgRrXzKg-7HlCcwGQ5pQVLPXHiyJhRN54f4dAFsVDjyoqf"
-    "yV2TO6CibP9UytIaztnnqjFrYq47YsZas9IlkZ6xv3wZRUF4Op_OcCdmuY9kAuGG-fNqBKWaM_"
-    "woDzrFBigo1os7_FqFU1aC1Jmnh1NZjEPTP5euwWNF92BGcfAdHBkJU86MLvvXLHzGnedkm4Y5"
-    "Sh5GlHz_UkC7OHflJoXbMUIUi9NMbqH3BbtvCwKHE1Vs-XShNFqbrAJTG6PJxJxIOXfSvgbnxe"
-    "N3gpm69p-9cfM9O4TjNPoYZy4cPR5UG6NSJ4XDuSg7Wz8kdn9l3IzMiwi-a6Oofw";
+const std::string enterprise_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJBZGFwdGVyIjp0cnVlLCJCYWNrdXAiOnRyd"
+                                     "WUsIkxvYWRCYWxhbmNpbmciOnRydWUsIk5vdGlmaWVyIjp0cnVlLCJTeW5jIjp0cnVlLCJpYXQ"
+                                     "iOjE1MDc4MzM4MDJ9.SJn2ScgPXXJgRrXzKg-7HlCcwGQ5pQVLPXHiyJhRN54f4dAFsVDjyoqf"
+                                     "yV2TO6CibP9UytIaztnnqjFrYq47YsZas9IlkZ6xv3wZRUF4Op_OcCdmuY9kAuGG-fNqBKWaM_"
+                                     "woDzrFBigo1os7_FqFU1aC1Jmnh1NZjEPTP5euwWNF92BGcfAdHBkJU86MLvvXLHzGnedkm4Y5"
+                                     "Sh5GlHz_UkC7OHflJoXbMUIUi9NMbqH3BbtvCwKHE1Vs-XShNFqbrAJTG6PJxJxIOXfSvgbnxe"
+                                     "N3gpm69p-9cfM9O4TjNPoYZy4cPR5UG6NSJ4XDuSg7Wz8kdn9l3IzMiwi-a6Oofw";
 
 const StringData g_partial_sync_result_sets_table_name = "class___ResultSets";
 
@@ -277,8 +269,9 @@ public:
     {
     }
 
-    template<class R, class P> FakeClock(std::chrono::duration<R, P> initial_value) noexcept :
-        m_now(std::chrono::duration_cast<time_point::duration>(initial_value).count())
+    template <class R, class P>
+    FakeClock(std::chrono::duration<R, P> initial_value) noexcept
+        : m_now(std::chrono::duration_cast<time_point::duration>(initial_value).count())
     {
     }
 
@@ -299,19 +292,16 @@ private:
 // is used to retrieve the result afterwards.
 class HTTPRequestClient {
 public:
-    using WriteCompletionHandler =
-        std::function<void(std::error_code, size_t num_bytes_transferred)>;
-    using ReadCompletionHandler =
-        std::function<void(std::error_code, size_t num_bytes_transferred)>;
+    using WriteCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
+    using ReadCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
 
     util::PrefixLogger logger;
 
-    HTTPRequestClient(util::Logger& logger, const util::network::Endpoint& endpoint,
-                      const util::HTTPRequest& request):
-        logger{"HTTP client: ", logger},
-        m_endpoint{endpoint},
-        m_http_client{*this, logger},
-        m_request{request}
+    HTTPRequestClient(util::Logger& logger, const util::network::Endpoint& endpoint, const util::HTTPRequest& request)
+        : logger{"HTTP client: ", logger}
+        , m_endpoint{endpoint}
+        , m_http_client{*this, logger}
+        , m_request{request}
     {
     }
 
@@ -335,8 +325,7 @@ public:
         m_socket.async_write(data, size, handler);
     }
 
-    void async_read_until(char* buffer, size_t size, char delim,
-            ReadCompletionHandler handler)
+    void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler)
     {
         m_socket.async_read_until(buffer, size, delim, m_read_ahead_buffer, handler);
     }
@@ -362,22 +351,20 @@ private:
                 handle_tcp_connect(ec);
         };
         m_socket.async_connect(m_endpoint, std::move(handler));
-        logger.info("Connecting to endpoint '%1:%2'", m_endpoint.address(),
-               m_endpoint.port());
+        logger.info("Connecting to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
     }
 
     void handle_tcp_connect(std::error_code ec)
     {
         if (ec) {
-            logger.debug("Failed to connect to endpoint '%1:%2': %3", m_endpoint.address(),
-                   m_endpoint.port(), ec.message());
+            logger.debug("Failed to connect to endpoint '%1:%2': %3", m_endpoint.address(), m_endpoint.port(),
+                         ec.message());
             stop();
             return;
         }
 
         m_socket.set_option(util::network::SocketBase::no_delay(true));
-        logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(),
-                   m_endpoint.port());
+        logger.debug("Connected to endpoint '%1:%2'", m_endpoint.address(), m_endpoint.port());
 
 
         initiate_http_request();
@@ -427,9 +414,9 @@ public:
         sync::Metrics* server_metrics = nullptr;
 
         // These values will disable the heartbeats by default.
-        milliseconds_type client_ping_period  = 100000000; // do not send pings
+        milliseconds_type client_ping_period = 100000000;  // do not send pings
         milliseconds_type client_pong_timeout = 100000000; // do not expect pongs
-        milliseconds_type server_connection_reaper_timeout  = 100000000;
+        milliseconds_type server_connection_reaper_timeout = 100000000;
         milliseconds_type server_connection_reaper_interval = 100000000;
 
         long client_max_open_files = 64;
@@ -441,9 +428,9 @@ public:
         std::string server_ssl_certificate_key_path = get_test_resource_path() + "test_sync_key.pem";
 
         bool disable_download_compaction = false;
-        bool disable_upload_compaction   = false;
+        bool disable_upload_compaction = false;
 
-	bool disable_history_compaction  = false;
+        bool disable_history_compaction = false;
         std::chrono::seconds history_ttl = std::chrono::seconds::max();
         std::chrono::seconds history_compaction_interval = std::chrono::seconds{3600};
         const Clock* history_compaction_clock = nullptr;
@@ -476,12 +463,12 @@ public:
 
 
     MultiClientServerFixture(int num_clients, int num_servers, std::string server_dir,
-                             unit_test::TestContext& test_context, Config config = {}) :
-        m_logger{config.logger ? *config.logger : test_context.logger},
-        m_num_servers{num_servers},
-        m_num_clients{num_clients},
-        m_enable_server_ssl{config.enable_server_ssl},
-        m_test_context{test_context}
+                             unit_test::TestContext& test_context, Config config = {})
+        : m_logger{config.logger ? *config.logger : test_context.logger}
+        , m_num_servers{num_servers}
+        , m_num_clients{num_clients}
+        , m_enable_server_ssl{config.enable_server_ssl}
+        , m_test_context{test_context}
     {
         REALM_ASSERT(num_servers >= 1);
 
@@ -493,9 +480,8 @@ public:
         }
         else {
             for (int i = 0; i < num_servers; ++i) {
-                std::string prefix = "Server["+std::to_string(i+1)+"]: ";
-                m_server_loggers[i] =
-                    std::make_unique<util::PrefixLogger>(std::move(prefix), m_logger);
+                std::string prefix = "Server[" + std::to_string(i + 1) + "]: ";
+                m_server_loggers[i] = std::make_unique<util::PrefixLogger>(std::move(prefix), m_logger);
             }
         }
 
@@ -504,9 +490,8 @@ public:
         }
         else {
             for (int i = 0; i < num_clients; ++i) {
-                std::string prefix = "Client["+std::to_string(i+1)+"]: ";
-                m_client_loggers[i] =
-                    std::make_unique<util::PrefixLogger>(std::move(prefix), m_logger);
+                std::string prefix = "Client[" + std::to_string(i + 1) + "]: ";
+                m_client_loggers[i] = std::make_unique<util::PrefixLogger>(std::move(prefix), m_logger);
             }
         }
 
@@ -517,7 +502,7 @@ public:
         for (int i = 0; i < num_servers; ++i) {
             std::string dir_name = "server";
             if (num_servers > 1) {
-                dir_name += "-" + std::to_string(i+1);
+                dir_name += "-" + std::to_string(i + 1);
             }
             std::string dir = util::File::resolve(dir_name, server_dir);
             util::try_make_dir(dir);
@@ -546,10 +531,8 @@ public:
             config_2.client_file_blacklists = config.client_file_blacklists;
             config_2.max_protocol_version = config.server_max_protocol_version;
             config_2.disable_download_for = std::move(config.server_disable_download_for);
-            config_2.session_bootstrap_callback =
-                std::move(config.server_session_bootstrap_callback);
-            m_servers[i] = std::make_unique<Server>(std::move(dir), std::move(public_key),
-                                                    std::move(config_2));
+            config_2.session_bootstrap_callback = std::move(config.server_session_bootstrap_callback);
+            m_servers[i] = std::make_unique<Server>(std::move(dir), std::move(public_key), std::move(config_2));
             m_servers[i]->start(listen_address, listen_port);
             m_server_ports[i] = m_servers[i]->listen_endpoint().port();
         }
@@ -598,8 +581,7 @@ public:
         }
     }
 
-    using ErrorHandler = void(std::error_code ec, bool is_fatal,
-                              const std::string& detailed_message);
+    using ErrorHandler = void(std::error_code ec, bool is_fatal, const std::string& detailed_message);
 
     // Set an error handler to be used for all sessions of the specified client
     // (\a handler will be copied for each session). Must be called before
@@ -607,9 +589,8 @@ public:
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
-        auto handler_2 = [handler=std::move(handler)](ConnectionState state,
-                                                      const ErrorInfo* error_info) {
+        using ErrorInfo = Session::ErrorInfo;
+        auto handler_2 = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -636,9 +617,13 @@ public:
     void start()
     {
         for (int i = 0; i < m_num_servers; ++i)
-            m_server_threads[i].start([this, i] { run_server(i); });
+            m_server_threads[i].start([this, i] {
+                run_server(i);
+            });
         for (int i = 0; i < m_num_clients; ++i)
-            m_client_threads[i].start([this, i] { run_client(i); });
+            m_client_threads[i].start([this, i] {
+                run_client(i);
+            });
     }
 
     void stop()
@@ -671,15 +656,15 @@ public:
         }
         else {
             using ConnectionState = Session::ConnectionState;
-            using ErrorInfo       = Session::ErrorInfo;
+            using ErrorInfo = Session::ErrorInfo;
             auto fallback_listener = [this](ConnectionState state, const ErrorInfo* error) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
                 Logger& logger = test_context.logger;
-                logger.error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code,
-                             error->detailed_message, error->is_fatal);
+                logger.error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code, error->detailed_message,
+                             error->is_fatal);
                 bool client_error_occurred = true;
                 CHECK_NOT(client_error_occurred);
                 stop();
@@ -694,28 +679,24 @@ public:
                       ProtocolEnvelope protocol = ProtocolEnvelope::realm)
     {
         std::string server_address = "localhost";
-        port_type   server_port    = m_server_ports[server_index];
-        session.bind(std::move(server_address), std::move(server_path),
-                     std::move(signed_user_token), server_port, protocol);
+        port_type server_port = m_server_ports[server_index];
+        session.bind(std::move(server_address), std::move(server_path), std::move(signed_user_token), server_port,
+                     protocol);
     }
 
-    Session make_bound_session(int client_index, std::string path,
-                               int server_index, std::string server_path,
+    Session make_bound_session(int client_index, std::string path, int server_index, std::string server_path,
                                Session::Config config = {})
     {
-        return make_bound_session(client_index, std::move(path), server_index,
-                                  std::move(server_path), g_signed_test_user_token,
-                                  std::move(config));
+        return make_bound_session(client_index, std::move(path), server_index, std::move(server_path),
+                                  g_signed_test_user_token, std::move(config));
     }
 
-    Session make_bound_session(int client_index, std::string path,
-                               int server_index, std::string server_path,
-                               std::string signed_user_token,
-                               Session::Config config = {})
+    Session make_bound_session(int client_index, std::string path, int server_index, std::string server_path,
+                               std::string signed_user_token, Session::Config config = {})
     {
         Session session = make_session(client_index, std::move(path), std::move(config));
-        bind_session(session, server_index, std::move(server_path),
-                     std::move(signed_user_token), config.protocol_envelope);
+        bind_session(session, server_index, std::move(server_path), std::move(signed_user_token),
+                     config.protocol_envelope);
         return session;
     }
 
@@ -776,8 +757,7 @@ public:
 
     using HTTPStatus = util::HTTPStatus;
 
-    HTTPStatus send_http_compact_request(int server_index,
-                                         std::string signed_user_token = g_signed_test_user_token)
+    HTTPStatus send_http_compact_request(int server_index, std::string signed_user_token = g_signed_test_user_token)
     {
         util::HTTPRequest request;
         request.method = HTTPMethod::Post;
@@ -858,7 +838,7 @@ private:
         if (CHECK_NOTHROW(do_run_server()))
             return;
         stop();
-        m_server_loggers[i]->error("Exception was throw from server[%1]'s event loop", i+1);
+        m_server_loggers[i]->error("Exception was throw from server[%1]'s event loop", i + 1);
     }
 
     void run_client(int i)
@@ -880,18 +860,17 @@ private:
         if (CHECK_NOTHROW(do_run_client()))
             return;
         stop();
-        m_server_loggers[i]->error("Exception was throw from client[%1]'s event loop", i+1);
+        m_server_loggers[i]->error("Exception was throw from client[%1]'s event loop", i + 1);
     }
 };
 
 
-class ClientServerFixture: public MultiClientServerFixture {
+class ClientServerFixture : public MultiClientServerFixture {
 public:
     using Config = MultiClientServerFixture::Config;
 
-    ClientServerFixture(std::string server_dir, unit_test::TestContext& test_context,
-                        Config config = {}):
-        MultiClientServerFixture{1, 1, std::move(server_dir), test_context, std::move(config)}
+    ClientServerFixture(std::string server_dir, unit_test::TestContext& test_context, Config config = {})
+        : MultiClientServerFixture{1, 1, std::move(server_dir), test_context, std::move(config)}
     {
     }
 
@@ -934,26 +913,21 @@ public:
                       std::string signed_user_token = g_signed_test_user_token,
                       ProtocolEnvelope protocol = ProtocolEnvelope::realm)
     {
-        MultiClientServerFixture::bind_session(session, 0, std::move(server_path),
-                std::move(signed_user_token), protocol);
+        MultiClientServerFixture::bind_session(session, 0, std::move(server_path), std::move(signed_user_token),
+                                               protocol);
     }
 
-    Session make_bound_session(std::string path, std::string server_path,
-                               Session::Config config = {})
+    Session make_bound_session(std::string path, std::string server_path, Session::Config config = {})
     {
-        return MultiClientServerFixture::make_bound_session(0, std::move(path),
-                                                            0, std::move(server_path),
+        return MultiClientServerFixture::make_bound_session(0, std::move(path), 0, std::move(server_path),
                                                             std::move(config));
     }
 
-    Session make_bound_session(std::string path, std::string server_path,
-                               std::string signed_user_token,
+    Session make_bound_session(std::string path, std::string server_path, std::string signed_user_token,
                                Session::Config config = {})
     {
-        return MultiClientServerFixture::make_bound_session(0, std::move(path),
-                                                            0, std::move(server_path),
-                                                            std::move(signed_user_token),
-                                                            std::move(config));
+        return MultiClientServerFixture::make_bound_session(0, std::move(path), 0, std::move(server_path),
+                                                            std::move(signed_user_token), std::move(config));
     }
 
     void cancel_reconnect_delay()
@@ -995,7 +969,6 @@ public:
 };
 
 
-
 class RealmFixture {
 public:
     using ErrorHandler = MultiClientServerFixture::ErrorHandler;
@@ -1004,10 +977,9 @@ public:
         std::function<ErrorHandler> error_handler;
     };
 
-    RealmFixture(ClientServerFixture&, const std::string& real_path, const std::string& virt_path,
-                 Config = {});
-    RealmFixture(MultiClientServerFixture&, int client_index, int server_index,
-                 const std::string& real_path, const std::string& virt_path, Config = {});
+    RealmFixture(ClientServerFixture&, const std::string& real_path, const std::string& virt_path, Config = {});
+    RealmFixture(MultiClientServerFixture&, int client_index, int server_index, const std::string& real_path,
+                 const std::string& virt_path, Config = {});
     ~RealmFixture() noexcept;
 
     void empty_transact();
@@ -1033,13 +1005,14 @@ private:
     struct SelfRef {
         util::Mutex mutex;
         RealmFixture* ref = nullptr;
-        SelfRef(RealmFixture* r) : ref{r}
+        SelfRef(RealmFixture* r)
+            : ref{r}
         {
         }
     };
 
     const std::shared_ptr<SelfRef> m_self_ref;
-   _impl::ClientHistoryImpl m_history;
+    _impl::ClientHistoryImpl m_history;
     DBRef m_shared_group;
     sync::Session m_session;
 
@@ -1047,13 +1020,12 @@ private:
 };
 
 
-inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture,
-                                  const std::string& real_path, const std::string& virt_path,
-                                  Config config) :
-    m_self_ref{std::make_shared<SelfRef>(this)}, // Throws
-    m_history{real_path}, // Throws
-    m_shared_group{DB::create(m_history)}, // Throws
-    m_session{client_server_fixture.make_session(real_path, std::move(config))} // Throws
+inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
+                                  const std::string& virt_path, Config config)
+    : m_self_ref{std::make_shared<SelfRef>(this)}                                 // Throws
+    , m_history{real_path}                                                        // Throws
+    , m_shared_group{DB::create(m_history)}                                       // Throws
+    , m_session{client_server_fixture.make_session(real_path, std::move(config))} // Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
@@ -1061,15 +1033,12 @@ inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture,
 }
 
 
-inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture,
-                                  int client_index, int server_index,
-                                  const std::string& real_path, const std::string& virt_path,
-                                  Config config) :
-    m_self_ref{std::make_shared<SelfRef>(this)}, // Throws
-    m_history{real_path}, // Throws
-    m_shared_group{DB::create(m_history)}, // Throws
-    m_session{client_server_fixture.make_session(client_index, real_path,
-                                                 std::move(config))} // Throws
+inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture, int client_index, int server_index,
+                                  const std::string& real_path, const std::string& virt_path, Config config)
+    : m_self_ref{std::make_shared<SelfRef>(this)}                                               // Throws
+    , m_history{real_path}                                                                      // Throws
+    , m_shared_group{DB::create(m_history)}                                                     // Throws
+    , m_session{client_server_fixture.make_session(client_index, real_path, std::move(config))} // Throws
 {
     if (config.error_handler)
         setup_error_handler(std::move(config.error_handler));
@@ -1084,7 +1053,9 @@ inline RealmFixture::~RealmFixture() noexcept
 
 inline void RealmFixture::empty_transact()
 {
-    transact([](Transaction&) { return true; });
+    transact([](Transaction&) {
+        return true;
+    });
 }
 
 inline void RealmFixture::nonempty_transact()
@@ -1102,9 +1073,9 @@ inline void RealmFixture::nonempty_transact()
 inline bool RealmFixture::transact(TransactFunc transact_func)
 {
     auto tr = m_shared_group->start_write(); // Throws
-    if (!transact_func(*tr)) // Throws
+    if (!transact_func(*tr))                 // Throws
         return false;
-    version_type new_version = tr->commit(); // Throws
+    version_type new_version = tr->commit();        // Throws
     m_session.nonsync_transact_notify(new_version); // Throws
     return true;
 }
@@ -1136,7 +1107,7 @@ inline void RealmFixture::async_wait_for_download_completion(WaitOperCompletionH
 
 inline version_type RealmFixture::get_last_integrated_server_version() const
 {
-    version_type current_client_version = 0; // Dummy
+    version_type current_client_version = 0;    // Dummy
     SaltedFileIdent client_file_ident = {0, 0}; // Dummy
     SyncProgress progress;
     m_history.get_status(current_client_version, client_file_ident, progress);
@@ -1146,9 +1117,8 @@ inline version_type RealmFixture::get_last_integrated_server_version() const
 inline void RealmFixture::setup_error_handler(std::function<ErrorHandler> handler)
 {
     using ConnectionState = Session::ConnectionState;
-    using ErrorInfo       = Session::ErrorInfo;
-    auto listener = [handler = std::move(handler)](ConnectionState state,
-                                                   const ErrorInfo* error_info) {
+    using ErrorInfo = Session::ErrorInfo;
+    auto listener = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
@@ -1168,7 +1138,7 @@ inline bool init(Transaction& tr, int account_identifier, std::int_fast64_t init
 {
     TableRef account = sync::create_table(tr, "class_Account");
     ColKey col_ndx_identifier = account->add_column(type_Int, "identifier");
-    ColKey col_ndx_balance    = account->add_column(type_Int, "balance");
+    ColKey col_ndx_balance = account->add_column(type_Int, "balance");
     account->create_object().set(col_ndx_identifier, account_identifier).set(col_ndx_balance, initial_balance);
     return true;
 }
@@ -1178,7 +1148,7 @@ inline bool credit(Transaction& tr, int account_identifier, std::int_fast64_t am
 {
     TableRef account = tr.get_table("class_Account");
     ColKey col_ndx_identifier = account->get_column_key("identifier");
-    ColKey col_ndx_balance    = account->get_column_key("balance");
+    ColKey col_ndx_balance = account->get_column_key("balance");
     ObjKey obj_key = account->find_first_int(col_ndx_identifier, account_identifier);
     Obj obj = account->get_object(obj_key);
     auto balance = obj.get<Int>(col_ndx_balance);
@@ -1191,7 +1161,6 @@ inline bool credit(Transaction& tr, int account_identifier, std::int_fast64_t am
 }
 
 } // namespace accounting
-
 
 
 inline TableRef find_or_create_result_sets_table(Transaction& g)
@@ -1208,15 +1177,14 @@ inline TableRef find_or_create_result_sets_table(Transaction& g)
     return result_sets;
 }
 
-inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table,
-                                          StringData query)
+inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table, StringData query)
 {
     TableRef result_sets = find_or_create_result_sets_table(g);
     // Find a match column for the table, or add one.
     ColKey matches_col;
     for (ColKey col_key : result_sets->get_column_keys()) {
-        if (result_sets->get_column_type(col_key) == type_LinkList
-            && result_sets->get_link_target(col_key) == table) {
+        if (result_sets->get_column_type(col_key) == type_LinkList &&
+            result_sets->get_link_target(col_key) == table) {
             matches_col = col_key;
         }
     }

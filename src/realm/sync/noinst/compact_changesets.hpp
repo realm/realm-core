@@ -33,11 +33,9 @@ namespace _impl {
 ///
 /// This function is thread-safe, as long as its arguments are not modified by
 /// other threads.
-void compact_changesets(realm::sync::Changeset* changesets,
-                        size_t num_changesets);
+void compact_changesets(realm::sync::Changeset* changesets, size_t num_changesets);
 
 } // namespace _impl
 } // namespace realm
 
 #endif // REALM_NOINST_COMPACT_CHANGESETS_HPP
-

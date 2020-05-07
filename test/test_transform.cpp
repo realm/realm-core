@@ -64,7 +64,6 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-
 TEST(Transform_OneClient)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
@@ -75,7 +74,7 @@ TEST(Transform_OneClient)
         TableRef t = sync::create_table(tr, "class_foo");
         t->add_column(type_Int, "i");
     });
-    synchronize(server.get(), { client.get() });
+    synchronize(server.get(), {client.get()});
 
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client(client->shared_group);
@@ -86,7 +85,7 @@ TEST(Transform_OneClient)
 TEST(Transform_TwoClients)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
-    auto server   = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
@@ -98,7 +97,7 @@ TEST(Transform_TwoClients)
     client_1->create_schema(create_schema);
     client_2->create_schema(create_schema);
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     {
@@ -114,7 +113,7 @@ TEST(Transform_TwoClients)
 TEST(Transform_AddTableInOrder)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
-    auto server   = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
@@ -128,7 +127,7 @@ TEST(Transform_AddTableInOrder)
         sync::create_table(tr, "class_bar");
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     {
@@ -144,7 +143,7 @@ TEST(Transform_AddTableInOrder)
 TEST(Transform_AddTableOutOfOrder)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
-    auto server   = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
@@ -158,7 +157,7 @@ TEST(Transform_AddTableOutOfOrder)
         sync::create_table(tr, "class_foo");
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     {
@@ -174,7 +173,7 @@ TEST(Transform_AddTableOutOfOrder)
 TEST(Transform_AddColumnsInOrder)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
-    auto server   = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
@@ -194,7 +193,7 @@ TEST(Transform_AddColumnsInOrder)
         bar->add_column(type_String, "bar_col");
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     {
@@ -210,7 +209,7 @@ TEST(Transform_AddColumnsInOrder)
 TEST(Transform_AddColumnsOutOfOrder)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
-    auto server   = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
@@ -230,7 +229,7 @@ TEST(Transform_AddColumnsOutOfOrder)
         bar->add_column(type_String, "bar_col");
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
@@ -935,7 +934,7 @@ TEST(Transform_EraseSelectedLinkView)
         LnkLst link_list = (origin->begin() + 1)->get_linklist("ll");
         auto target_table_it = link_list.get_target_table()->begin();
         link_list.set(0, target_table_it[2].get_key()); // Select the link list of the 2nd row
-        origin->remove_object(origin->begin() + 0); // Move that link list
+        origin->remove_object(origin->begin() + 0);     // Move that link list
         if (link_list.size() > 1) {
             link_list.set(1, target_table_it[3].get_key()); // Now modify it again
         }
@@ -992,7 +991,7 @@ TEST(Transform_Randomized)
             randomized.round(test_context);
         }
         if (trace)
-            std::cerr << "Round "<<(major_round+1)<<"\n";
+            std::cerr << "Round " << (major_round + 1) << "\n";
     }
 }
 
@@ -1020,7 +1019,9 @@ void integrate_changesets(Peer* peer_to, Peer* peer_from)
 /// Client_2 integates the change sets from the server. This is the second slow process.
 /// The function returns the tuple of durations (duration_server, duration_client_1, duration_client_2).
 /// Durations are measured in milliseconds.
-std::tuple<double, double, double> timer_two_clients(TestContext& test_context, const std::string path_add_on, int nrows_1, int nrows_2, bool same_table, bool fill_rows, bool one_change_set)
+std::tuple<double, double, double> timer_two_clients(TestContext& test_context, const std::string path_add_on,
+                                                     int nrows_1, int nrows_2, bool same_table, bool fill_rows,
+                                                     bool one_change_set)
 {
     std::string table_name_1 = "class_table_name_1";
     std::string table_name_2 = same_table ? table_name_1 : "class_table_name_2";
@@ -1055,7 +1056,7 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
             client_1->commit();
     }
     if (one_change_set)
-            client_1->commit();
+        client_1->commit();
 
     integrate_changesets(server.get(), client_1.get());
 
@@ -1078,14 +1079,16 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
     auto time_start_server = std::chrono::high_resolution_clock::now();
     integrate_changesets(server.get(), client_2.get());
     auto time_end_server = std::chrono::high_resolution_clock::now();
-    auto duration_server = std::chrono::duration_cast<std::chrono::milliseconds>(time_end_server - time_start_server).count();
+    auto duration_server =
+        std::chrono::duration_cast<std::chrono::milliseconds>(time_end_server - time_start_server).count();
 
     // Timing client_1 integrating change sets from the server.
     // This integration never suffers from the quadratic problem.
     auto time_start_client_1 = std::chrono::high_resolution_clock::now();
     integrate_changesets(client_1.get(), server.get());
     auto time_end_client_1 = std::chrono::high_resolution_clock::now();
-    auto duration_client_1 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end_client_1 - time_start_client_1).count();
+    auto duration_client_1 =
+        std::chrono::duration_cast<std::chrono::milliseconds>(time_end_client_1 - time_start_client_1).count();
 
     // Timing client_1 integrating instructions from the server.
     // This integration can suffer from the quadratic problem.
@@ -1094,7 +1097,8 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
     auto time_start_client_2 = std::chrono::high_resolution_clock::now();
     integrate_changesets(client_2.get(), server.get());
     auto time_end_client_2 = std::chrono::high_resolution_clock::now();
-    auto duration_client_2 = std::chrono::duration_cast<std::chrono::milliseconds>(time_end_client_2 - time_start_client_2).count();
+    auto duration_client_2 =
+        std::chrono::duration_cast<std::chrono::milliseconds>(time_end_client_2 - time_start_client_2).count();
 
 
     // Check that the server and clients are synchronized
@@ -1179,12 +1183,9 @@ double timer_multi_clients(TestContext& test_context, const std::string path_add
 /// The funtions returns the time it take the server to integrate the incoming
 /// \a n_change_sets_client change sets.
 /// The incoming change sets are causally independent of the ones residing on the server.
-double timer_integrate_change_sets(TestContext& test_context,
-                                   const std::string path_add_on,
-                                   uint_fast64_t n_change_sets_server,
-                                   uint_fast64_t n_instr_server,
-                                   uint_fast64_t n_change_sets_client,
-                                   uint_fast64_t n_instr_client)
+double timer_integrate_change_sets(TestContext& test_context, const std::string path_add_on,
+                                   uint_fast64_t n_change_sets_server, uint_fast64_t n_instr_server,
+                                   uint_fast64_t n_change_sets_client, uint_fast64_t n_instr_client)
 {
     std::string table_name = "class_table_name";
 
@@ -1222,18 +1223,16 @@ double timer_integrate_change_sets(TestContext& test_context,
     auto time_start_server = std::chrono::high_resolution_clock::now();
     integrate_changesets(server.get(), client_2.get());
     auto time_end_server = std::chrono::high_resolution_clock::now();
-    auto duration_server = std::chrono::duration_cast<std::chrono::milliseconds>(time_end_server - time_start_server).count();
+    auto duration_server =
+        std::chrono::duration_cast<std::chrono::milliseconds>(time_end_server - time_start_server).count();
 
     return double(duration_server);
 }
 
 
-void run_timer_two_clients(TestContext& test_context,
-                           std::string title,
-                           bool same_table,
-                           bool fill_rows,
+void run_timer_two_clients(TestContext& test_context, std::string title, bool same_table, bool fill_rows,
                            bool one_change_set,
-                           int max_single, // The maximum number of rows
+                           int max_single,  // The maximum number of rows
                            int max_product, // The maximum of a product of rows
                            std::ostream& out)
 {
@@ -1247,8 +1246,8 @@ void run_timer_two_clients(TestContext& test_context,
             double duration_server, duration_client_1, duration_client_2;
             std::tie(duration_server, duration_client_1, duration_client_2) =
                 timer_two_clients(test_context, path_add_on, nrows_1, nrows_2, same_table, fill_rows, one_change_set);
-            out << nrows_1 << "\t" << nrows_2 << "\t" << duration_server << "\t" << duration_client_1 <<
-            "\t" << duration_client_2 << std::endl;
+            out << nrows_1 << "\t" << nrows_2 << "\t" << duration_server << "\t" << duration_client_1 << "\t"
+                << duration_client_2 << std::endl;
         }
     }
 
@@ -1323,17 +1322,16 @@ void run_timer_many_clients_same_table_empty_rows(TestContext& test_context, std
 }
 
 
-void report_integrate_change_sets(TestContext& test_context,
-                                  uint_fast64_t n_change_sets_server,
-                                  uint_fast64_t n_instr_server,
-                                  uint_fast64_t n_change_sets_client,
-                                  uint_fast64_t n_instr_client,
-                                  std::ostream& out)
+void report_integrate_change_sets(TestContext& test_context, uint_fast64_t n_change_sets_server,
+                                  uint_fast64_t n_instr_server, uint_fast64_t n_change_sets_client,
+                                  uint_fast64_t n_instr_client, std::ostream& out)
 {
     std::string path_add_on = "integrate_change_sets_" + std::to_string(n_change_sets_server) + "_" +
-    std::to_string(n_instr_server) + "_" + std::to_string(n_change_sets_client) + "_" + std::to_string(n_instr_client);
+                              std::to_string(n_instr_server) + "_" + std::to_string(n_change_sets_client) + "_" +
+                              std::to_string(n_instr_client);
 
-    double duration = timer_integrate_change_sets(test_context, path_add_on, n_change_sets_server, n_instr_server, n_change_sets_client, n_instr_client);
+    double duration = timer_integrate_change_sets(test_context, path_add_on, n_change_sets_server, n_instr_server,
+                                                  n_change_sets_client, n_instr_client);
 
     uint_fast64_t n_merges = n_change_sets_server * n_instr_server * n_change_sets_client * n_instr_client;
 
@@ -1355,18 +1353,22 @@ void run_timer_integrate_change_sets(TestContext& test_context, std::ostream& ou
     uint_fast64_t n_change_sets_client = 1;
     uint_fast64_t n_instr_client = 1;
 
-//    for (n_change_sets_client = 1; n_change_sets_client < 1e6; n_change_sets_client *= 10)
-//        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client, n_instr_client, out);
+    //    for (n_change_sets_client = 1; n_change_sets_client < 1e6; n_change_sets_client *= 10)
+    //        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client,
+    //        n_instr_client, out);
 
-//    for (n_instr_client = 1; n_change_sets_client * n_instr_client <= 1e7; n_instr_client *= 10)
-//        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client, n_instr_client, out);
+    //    for (n_instr_client = 1; n_change_sets_client * n_instr_client <= 1e7; n_instr_client *= 10)
+    //        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client,
+    //        n_instr_client, out);
 
-//    for (n_change_sets_server = 1; n_change_sets_server < 1e5; n_change_sets_server *= 2)
-    //        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client, n_instr_client, out);
+    //    for (n_change_sets_server = 1; n_change_sets_server < 1e5; n_change_sets_server *= 2)
+    //        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client,
+    //        n_instr_client, out);
 
     for (n_instr_server = 100; n_instr_server <= uint_fast64_t(1e8); n_instr_server *= 10) {
         n_instr_client = uint_fast64_t(1e8) / n_instr_server;
-        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client, n_instr_client, out);
+        report_integrate_change_sets(test_context, n_change_sets_server, n_instr_server, n_change_sets_client,
+                                     n_instr_client, out);
     }
 
     out << std::endl << std::endl;
@@ -1375,7 +1377,7 @@ void run_timer_integrate_change_sets(TestContext& test_context, std::ostream& ou
 
 void run_all_timers(TestContext& test_context, const std::string path)
 {
-    std::ofstream out {path, std::ios_base::app};
+    std::ofstream out{path, std::ios_base::app};
 
     run_timer_two_clients_different_tables_empty_rows_one_change_set(test_context, out);
     run_timer_two_clients_different_tables_empty_rows_many_change_sets(test_context, out);
@@ -1482,7 +1484,8 @@ TEST(Transform_ArrayInsert_EraseObject)
 }
 
 
-TEST(Transform_ArrayClearVsArrayClear_TimestampBased) {
+TEST(Transform_ArrayClearVsArrayClear_TimestampBased)
+{
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
     auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
@@ -1539,7 +1542,8 @@ TEST(Transform_ArrayClearVsArrayClear_TimestampBased) {
     CHECK_EQUAL(ints[1], 6);
 }
 
-TEST(Transform_CreateEraseCreateSequencePreservesObject) {
+TEST(Transform_CreateEraseCreateSequencePreservesObject)
+{
     // If two clients independently create an object, then erase the object, and
     // then recreate it, we want to preserve the object creation with the higher
     // timestamp.
@@ -1776,7 +1780,6 @@ TEST(Transform_AddIntegerSurvivesSetDefault_NoRegularSets)
             auto obj = *table->begin();
             const bool is_default = true;
             obj.set("int", 10, is_default);
-            
         });
 
         // At t3, add something based on the default value.

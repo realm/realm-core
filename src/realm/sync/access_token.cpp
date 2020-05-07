@@ -222,18 +222,19 @@ private:
 
 } // unnamed namespace
 
-bool AccessToken::parseJWT(StringData signed_token, AccessToken& token, ParseError& error, Verifier* verifier){
+bool AccessToken::parseJWT(StringData signed_token, AccessToken& token, ParseError& error, Verifier* verifier)
+{
     const char* signed_token_begin = signed_token.data();
-    const char* signed_token_end   = signed_token_begin + signed_token.size();
+    const char* signed_token_end = signed_token_begin + signed_token.size();
 
     auto sep1 = std::find(signed_token_begin, signed_token_end, '.');
-    if(sep1 == signed_token_end) {
+    if (sep1 == signed_token_end) {
         error = ParseError::invalid_jwt;
         return false;
     }
     std::size_t sep_pos = sep1 - signed_token_begin;
     auto sep2 = std::find(sep1 + 1, signed_token_end, '.');
-    if(sep2 == signed_token_end) {
+    if (sep2 == signed_token_end) {
         error = ParseError::invalid_jwt;
         return false;
     }
@@ -253,10 +254,8 @@ bool AccessToken::parseJWT(StringData signed_token, AccessToken& token, ParseErr
 
         // Verify signature
         BinaryData signature{signature_buffer.data(), *num_bytes_signature};
-        bool verified = verifier->verify(
-            BinaryData{signed_token.data(), sep2_pos},
-            signature
-        ); // Throws
+        bool verified = verifier->verify(BinaryData{signed_token.data(), sep2_pos},
+                                         signature); // Throws
         if (!verified) {
             error = ParseError::invalid_signature;
             return false;
@@ -264,7 +263,7 @@ bool AccessToken::parseJWT(StringData signed_token, AccessToken& token, ParseErr
     }
 
     Optional<std::vector<char>> payload_vec = base64_decode_to_vector(StringData{sep1 + 1, sep2_pos - sep_pos - 1});
-    if(!payload_vec){
+    if (!payload_vec) {
         error = ParseError::invalid_base64;
         return false;
     }
@@ -285,11 +284,10 @@ bool AccessToken::parseJWT(StringData signed_token, AccessToken& token, ParseErr
     return true;
 }
 
-bool AccessToken::parse(StringData signed_token, AccessToken& token, ParseError& error,
-                        Verifier* verifier)
+bool AccessToken::parse(StringData signed_token, AccessToken& token, ParseError& error, Verifier* verifier)
 {
     const char* signed_token_begin = signed_token.data();
-    const char* signed_token_end   = signed_token_begin + signed_token.size();
+    const char* signed_token_end = signed_token_begin + signed_token.size();
 
     auto sep = std::find(signed_token_begin, signed_token_end, ':');
     StringData token_base64;
@@ -297,13 +295,13 @@ bool AccessToken::parse(StringData signed_token, AccessToken& token, ParseError&
     if (sep != signed_token_end) {
         std::size_t sep_pos = sep - signed_token_begin;
         std::size_t sig_len = signed_token.size() - sep_pos - 1;
-        token_base64     = StringData{signed_token.data(), sep_pos};
+        token_base64 = StringData{signed_token.data(), sep_pos};
         signature_base64 = StringData{signed_token.data() + sep_pos + 1, sig_len};
     }
     else {
         // Could be that we have a JWT instead of the old format
         auto jwtSep = std::find(signed_token_begin, signed_token_end, '.');
-        if(jwtSep != signed_token_end) {
+        if (jwtSep != signed_token_end) {
             return parseJWT(signed_token, token, error, verifier);
         }
 
@@ -317,8 +315,7 @@ bool AccessToken::parse(StringData signed_token, AccessToken& token, ParseError&
     token_buffer.resize(base64_decoded_size(token_base64.size())); // Throws
     StringData token_2;
     {
-        Optional<std::size_t> num_bytes =
-            base64_decode(token_base64, token_buffer.data(), token_buffer.size());
+        Optional<std::size_t> num_bytes = base64_decode(token_base64, token_buffer.data(), token_buffer.size());
         if (!num_bytes) {
             error = ParseError::invalid_base64;
             return false;
@@ -330,8 +327,7 @@ bool AccessToken::parse(StringData signed_token, AccessToken& token, ParseError&
     if (verifier) {
         std::vector<char> buffer;
         buffer.resize(base64_decoded_size(signature_base64.size()));
-        Optional<std::size_t> num_bytes =
-            base64_decode(signature_base64, buffer.data(), buffer.size());
+        Optional<std::size_t> num_bytes = base64_decode(signature_base64, buffer.data(), buffer.size());
         if (!num_bytes) {
             error = ParseError::invalid_base64;
             return false;

@@ -74,8 +74,7 @@ int main(int argc, char* argv[])
     sync::ServerWorkdirLock workdir_lock{lockfile_path}; // Throws
 
     std::unique_ptr<sync::Metrics> metrics =
-        sync::make_buffered_statsd_metrics(config.dashboard_stats_endpoint,
-                                           config.metrics_prefix,
+        sync::make_buffered_statsd_metrics(config.dashboard_stats_endpoint, config.metrics_prefix,
                                            config.metrics_exclusions); // Throws
 
     // This performs prechecking and migration from legacy format if needed.
@@ -124,8 +123,10 @@ int main(int argc, char* argv[])
         server.reset(new sync::Server(config.user_data_dir, std::move(pkey), config_2)); // Throws
     }
     catch (util::File::AccessError& e) {
-        std::cerr << "Error while opening root directory `" << *config.root_dir << "': "
-            "" << e.what() << '\n';
+        std::cerr << "Error while opening root directory `" << *config.root_dir
+                  << "': "
+                     ""
+                  << e.what() << '\n';
         std::exit(EXIT_FAILURE);
     }
 

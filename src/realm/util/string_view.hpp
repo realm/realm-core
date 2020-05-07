@@ -15,20 +15,21 @@
 namespace realm {
 namespace util {
 
-template<class C, class T = std::char_traits<C>> class BasicStringView {
+template <class C, class T = std::char_traits<C>>
+class BasicStringView {
 public:
-    using value_type             = C;
-    using traits_type            = T;
-    using pointer                = C*;
-    using const_pointer          = const C*;
-    using reference              = C&;
-    using const_reference        = const C&;
-    using iterator               = const_pointer;
-    using const_iterator         = const_pointer;
-    using reverse_iterator       = std::reverse_iterator<iterator>;
+    using value_type = C;
+    using traits_type = T;
+    using pointer = C*;
+    using const_pointer = const C*;
+    using reference = C&;
+    using const_reference = const C&;
+    using iterator = const_pointer;
+    using const_iterator = const_pointer;
+    using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-    using size_type              = std::size_t;
-    using difference_type        = std::ptrdiff_t;
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
 
     static constexpr size_type npos = size_type(-1);
 
@@ -72,139 +73,142 @@ private:
     std::size_t m_size = 0;
 };
 
-template<class C, class T> bool operator==(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
-template<class C, class T> bool operator!=(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
-template<class C, class T> bool operator< (BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
-template<class C, class T> bool operator> (BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
-template<class C, class T> bool operator<=(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
-template<class C, class T> bool operator>=(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator==(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator!=(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator<(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator>(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator<=(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator>=(BasicStringView<C, T>, BasicStringView<C, T>) noexcept;
 
-template<class C, class T>
+template <class C, class T>
 bool operator==(std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
-template<class C, class T>
+template <class C, class T>
 bool operator!=(std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
-template<class C, class T>
-bool operator< (std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
-template<class C, class T>
-bool operator> (std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
-template<class C, class T>
+template <class C, class T>
+bool operator<(std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
+bool operator>(std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
+template <class C, class T>
 bool operator<=(std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
-template<class C, class T>
+template <class C, class T>
 bool operator>=(std::decay_t<BasicStringView<C, T>>, BasicStringView<C, T>) noexcept;
 
-template<class C, class T>
+template <class C, class T>
 bool operator==(BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
-template<class C, class T>
+template <class C, class T>
 bool operator!=(BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
-template<class C, class T>
-bool operator< (BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
-template<class C, class T>
-bool operator> (BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
-template<class C, class T>
+template <class C, class T>
+bool operator<(BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
+template <class C, class T>
+bool operator>(BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
+template <class C, class T>
 bool operator<=(BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
-template<class C, class T>
+template <class C, class T>
 bool operator>=(BasicStringView<C, T>, std::decay_t<BasicStringView<C, T>>) noexcept;
 
 
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, BasicStringView<C, T>);
 
 
 using StringView = BasicStringView<char>;
 
 
-
-
-
 // Implementation
 
-template<class C, class T>
+template <class C, class T>
 inline BasicStringView<C, T>::BasicStringView() noexcept
 {
 }
 
-template<class C, class T>
-inline BasicStringView<C, T>::BasicStringView(const std::basic_string<C, T>& str) noexcept :
-    m_data{str.data()},
-    m_size{str.size()}
+template <class C, class T>
+inline BasicStringView<C, T>::BasicStringView(const std::basic_string<C, T>& str) noexcept
+    : m_data{str.data()}
+    , m_size{str.size()}
 {
 }
 
-template<class C, class T>
-inline BasicStringView<C, T>::BasicStringView(const char* data, size_type size) noexcept :
-    m_data{data},
-    m_size{size}
+template <class C, class T>
+inline BasicStringView<C, T>::BasicStringView(const char* data, size_type size) noexcept
+    : m_data{data}
+    , m_size{size}
 {
 }
 
-template<class C, class T>
-inline BasicStringView<C, T>::BasicStringView(const char* c_str) noexcept :
-    m_data{c_str},
-    m_size{T::length(c_str)}
+template <class C, class T>
+inline BasicStringView<C, T>::BasicStringView(const char* c_str) noexcept
+    : m_data{c_str}
+    , m_size{T::length(c_str)}
 {
 }
 
-template<class C, class T>
+template <class C, class T>
 inline BasicStringView<C, T>::operator std::basic_string<C, T>() const
 {
     return {m_data, m_size}; // Throws
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::begin() const noexcept -> const_iterator
 {
     return m_data;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::end() const noexcept -> const_iterator
 {
     return m_data + m_size;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::cbegin() const noexcept -> const_iterator
 {
     return begin();
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::cend() const noexcept -> const_iterator
 {
     return end();
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::rbegin() const noexcept -> const_reverse_iterator
 {
     return const_reverse_iterator{end()};
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::rend() const noexcept -> const_reverse_iterator
 {
     return const_reverse_iterator{begin()};
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::crbegin() const noexcept -> const_reverse_iterator
 {
     return rbegin();
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::crend() const noexcept -> const_reverse_iterator
 {
     return rend();
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::operator[](size_type i) const noexcept -> const_reference
 {
     return m_data[i];
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::at(size_type i) const -> const_reference
 {
     if (REALM_LIKELY(i < m_size))
@@ -212,37 +216,37 @@ inline auto BasicStringView<C, T>::at(size_type i) const -> const_reference
     throw std::out_of_range("index");
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::front() const noexcept -> const_reference
 {
     return m_data[0];
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::back() const noexcept -> const_reference
 {
     return m_data[m_size - 1];
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::data() const noexcept -> const_pointer
 {
     return m_data;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::size() const noexcept -> size_type
 {
     return m_size;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool BasicStringView<C, T>::empty() const noexcept
 {
     return (size() == 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline BasicStringView<C, T> BasicStringView<C, T>::substr(size_type i, size_type n) const
 {
     if (REALM_LIKELY(i <= m_size)) {
@@ -252,7 +256,7 @@ inline BasicStringView<C, T> BasicStringView<C, T>::substr(size_type i, size_typ
     throw std::out_of_range("index");
 }
 
-template<class C, class T>
+template <class C, class T>
 inline int BasicStringView<C, T>::compare(BasicStringView other) const noexcept
 {
     size_type n = std::min(m_size, other.m_size);
@@ -266,9 +270,8 @@ inline int BasicStringView<C, T>::compare(BasicStringView other) const noexcept
     return 0;
 }
 
-template<class C, class T>
-inline auto BasicStringView<C, T>::find(BasicStringView<C, T> v, size_type i) const noexcept ->
-    size_type
+template <class C, class T>
+inline auto BasicStringView<C, T>::find(BasicStringView<C, T> v, size_type i) const noexcept -> size_type
 {
     if (REALM_LIKELY(!v.empty())) {
         if (REALM_LIKELY(i < m_size)) {
@@ -281,7 +284,7 @@ inline auto BasicStringView<C, T>::find(BasicStringView<C, T> v, size_type i) co
     return i;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::find(C ch, size_type i) const noexcept -> size_type
 {
     if (REALM_LIKELY(i < m_size)) {
@@ -292,9 +295,8 @@ inline auto BasicStringView<C, T>::find(C ch, size_type i) const noexcept -> siz
     return npos;
 }
 
-template<class C, class T>
-inline auto BasicStringView<C, T>::find_first_of(BasicStringView<C, T> v,
-                                                 size_type i) const noexcept -> size_type
+template <class C, class T>
+inline auto BasicStringView<C, T>::find_first_of(BasicStringView<C, T> v, size_type i) const noexcept -> size_type
 {
     for (size_type j = i; j < m_size; ++j) {
         if (REALM_LIKELY(v.find(m_data[j]) == npos))
@@ -304,7 +306,7 @@ inline auto BasicStringView<C, T>::find_first_of(BasicStringView<C, T> v,
     return npos;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::find_first_of(C ch, size_type i) const noexcept -> size_type
 {
     for (size_type j = i; j < m_size; ++j) {
@@ -314,9 +316,8 @@ inline auto BasicStringView<C, T>::find_first_of(C ch, size_type i) const noexce
     return npos;
 }
 
-template<class C, class T>
-inline auto BasicStringView<C, T>::find_first_not_of(BasicStringView<C, T> v,
-                                                     size_type i) const noexcept -> size_type
+template <class C, class T>
+inline auto BasicStringView<C, T>::find_first_not_of(BasicStringView<C, T> v, size_type i) const noexcept -> size_type
 {
     for (size_type j = i; j < m_size; ++j) {
         if (REALM_UNLIKELY(v.find(m_data[j]) == npos))
@@ -325,7 +326,7 @@ inline auto BasicStringView<C, T>::find_first_not_of(BasicStringView<C, T> v,
     return npos;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline auto BasicStringView<C, T>::find_first_not_of(C ch, size_type i) const noexcept -> size_type
 {
     for (size_type j = i; j < m_size; ++j) {
@@ -335,117 +336,116 @@ inline auto BasicStringView<C, T>::find_first_not_of(C ch, size_type i) const no
     return npos;
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator==(BasicStringView<C, T> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) == 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator!=(BasicStringView<C, T> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) != 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator<(BasicStringView<C, T> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) < 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator>(BasicStringView<C, T> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) > 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator<=(BasicStringView<C, T> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) <= 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator>=(BasicStringView<C, T> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) >= 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator==(std::decay_t<BasicStringView<C, T>> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) == 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator!=(std::decay_t<BasicStringView<C, T>> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) != 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator<(std::decay_t<BasicStringView<C, T>> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) < 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator>(std::decay_t<BasicStringView<C, T>> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) > 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator<=(std::decay_t<BasicStringView<C, T>> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) <= 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator>=(std::decay_t<BasicStringView<C, T>> lhs, BasicStringView<C, T> rhs) noexcept
 {
     return (lhs.compare(rhs) >= 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator==(BasicStringView<C, T> lhs, std::decay_t<BasicStringView<C, T>> rhs) noexcept
 {
     return (lhs.compare(rhs) == 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator!=(BasicStringView<C, T> lhs, std::decay_t<BasicStringView<C, T>> rhs) noexcept
 {
     return (lhs.compare(rhs) != 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator<(BasicStringView<C, T> lhs, std::decay_t<BasicStringView<C, T>> rhs) noexcept
 {
     return (lhs.compare(rhs) < 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator>(BasicStringView<C, T> lhs, std::decay_t<BasicStringView<C, T>> rhs) noexcept
 {
     return (lhs.compare(rhs) > 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator<=(BasicStringView<C, T> lhs, std::decay_t<BasicStringView<C, T>> rhs) noexcept
 {
     return (lhs.compare(rhs) <= 0);
 }
 
-template<class C, class T>
+template <class C, class T>
 inline bool operator>=(BasicStringView<C, T> lhs, std::decay_t<BasicStringView<C, T>> rhs) noexcept
 {
     return (lhs.compare(rhs) >= 0);
 }
 
-template<class C, class T>
-inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out,
-                                            BasicStringView<C, T> view)
+template <class C, class T>
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, BasicStringView<C, T> view)
 {
     typename std::basic_ostream<C, T>::sentry sentry{out};
     if (REALM_LIKELY(sentry))

@@ -46,7 +46,8 @@ bool verify_populated(DBRef& sg)
         StringData sd = o.get<String>(str_col_ndx);
         int64_t length = o.get<Int>(int_col_ndx);
         std::string expected(length, 'a');
-        if (sd != expected) return false;
+        if (sd != expected)
+            return false;
     }
     return true;
 }
@@ -155,7 +156,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         {
             WriteTransaction wt{reference_sg};
             TableRef persons = create_table(wt, "class_persons");
-            col_ndx_person_name  = persons->add_column(type_String, "name");
+            col_ndx_person_name = persons->add_column(type_String, "name");
             col_ndx_person_age = persons->add_column(type_Int, "age");
             create_object(wt, *persons).set_all("Adam", 28);
             create_object(wt, *persons).set_all("Frank", 30);
@@ -185,8 +186,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
             CHECK(people);
             TableRef result_sets = wt.get_table(table_name_result_sets);
             col_ndx_result_set_query = result_sets->get_column_key("query");
-            col_ndx_result_set_matches_property =
-                    result_sets->get_column_key("matches_property");
+            col_ndx_result_set_matches_property = result_sets->get_column_key("matches_property");
             // 0 = uninitialized, 1 = initialized, -1 = query parsing failed
             result_sets->add_column_link(type_LinkList, "people", *people);
             Obj res = create_object(wt, *result_sets);
@@ -200,13 +200,13 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         partial_session.wait_for_upload_complete_or_client_stopped();
         partial_session.wait_for_download_complete_or_client_stopped();
         {
-            WriteTransaction wt {partial_sg};
+            WriteTransaction wt{partial_sg};
             TableRef persons = wt.get_table("class_persons");
             CHECK(persons);
             CHECK_EQUAL(persons->size(), 1);
             // This check invalidated by lack of state in partial views.
-            //StringData name = persons->get_object(0).get<String>(col_ndx_person_name);
-            //CHECK_EQUAL(name, "Bobby");
+            // StringData name = persons->get_object(0).get<String>(col_ndx_person_name);
+            // CHECK_EQUAL(name, "Bobby");
 
             TableRef result_sets = wt.get_table(g_partial_sync_result_sets_table_name);
             CHECK(result_sets);
@@ -220,13 +220,13 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         partial_session.wait_for_upload_complete_or_client_stopped();
         partial_session.wait_for_download_complete_or_client_stopped();
         {
-            ReadTransaction rt {partial_sg};
+            ReadTransaction rt{partial_sg};
             ConstTableRef persons = rt.get_table("class_persons");
             CHECK(persons);
             CHECK_EQUAL(persons->size(), 1);
             // This check invalidated by lack of state in partial views.
-            //StringData name = persons->get_object(0).get<String>(col_ndx_person_name);
-            //CHECK_EQUAL(name, "Frank");
+            // StringData name = persons->get_object(0).get<String>(col_ndx_person_name);
+            // CHECK_EQUAL(name, "Frank");
         }
 
         partial_session.detach();
@@ -239,7 +239,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
     config.input_key = key1;
     config.output_key = key2;
 
-    util::File target_list(file_list_path,  util::File::mode_Write);
+    util::File target_list(file_list_path, util::File::mode_Write);
     std::string list = partial_server_path + "\n" + reference_server_path + "\n";
     target_list.write(list.data(), list.size());
     target_list.close();
@@ -250,8 +250,15 @@ TEST_IF(EncryptTransform_ServerHistory, false)
 
     class ServerHistoryContext : public _impl::ServerHistory::Context {
     public:
-        bool owner_is_sync_server() const noexcept override { return true; }
-        std::mt19937_64& server_history_get_random() noexcept override { return m_random; }
+        bool owner_is_sync_server() const noexcept override
+        {
+            return true;
+        }
+        std::mt19937_64& server_history_get_random() noexcept override
+        {
+            return m_random;
+        }
+
     private:
         std::mt19937_64 m_random;
     };
@@ -265,7 +272,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
 
         auto server_partial_sg = DB::create(server_history, options);
         {
-            ReadTransaction rt {server_partial_sg};
+            ReadTransaction rt{server_partial_sg};
             ConstTableRef persons = rt.get_table("class_persons");
             CHECK(persons);
             CHECK_EQUAL(persons->size(), 1);
@@ -286,7 +293,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
 
         auto server_reference_sg = DB::create(server_history, options);
         {
-            ReadTransaction rt {server_reference_sg};
+            ReadTransaction rt{server_reference_sg};
             ConstTableRef persons = rt.get_table("class_persons");
             CHECK(persons);
             CHECK_EQUAL(persons->size(), 4);

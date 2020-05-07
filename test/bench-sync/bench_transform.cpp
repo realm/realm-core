@@ -52,7 +52,7 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
                 peer.commit();
             }
 
-            for (size_t j = 0; j < num_transactions-1; ++j) {
+            for (size_t j = 0; j < num_transactions - 1; ++j) {
                 peer.start_transaction();
                 TableRef t = peer.table("class_t");
                 sync::create_object(*peer.group, *t).set(col_ndx, 123);
@@ -65,10 +65,10 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
             }
         };
 
-        //Timer t_preface{Timer::type_RealTime};
+        // Timer t_preface{Timer::type_RealTime};
         make_transactions(*origin);
         make_transactions(*client);
-        //results.submit(ident_preface.c_str(), t_preface.get_elapsed_time());
+        // results.submit(ident_preface.c_str(), t_preface.get_elapsed_time());
 
         // Upload everything to the server (fast, no conflicts)
         size_t outstanding = server->count_outstanding_changesets_from(*origin);
@@ -87,10 +87,9 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
         // }
         client->integrate_next_changesets_from(*server, outstanding);
         results.submit(ident.c_str(), t.get_elapsed_time());
-
     }
 
-    //results.finish(ident_preface, ident_preface);
+    // results.finish(ident_preface, ident_preface);
     results.finish(ident, ident);
 }
 
@@ -130,10 +129,10 @@ void transform_instructions(TestContext& test_context, BenchmarkResults& results
             return peer.commit();
         };
 
-        //Timer t_preface{Timer::type_RealTime};
+        // Timer t_preface{Timer::type_RealTime};
         make_instructions(*server);
         make_instructions(*client);
-        //results.submit(ident_preface.c_str(), t_preface.get_elapsed_time());
+        // results.submit(ident_preface.c_str(), t_preface.get_elapsed_time());
 
         size_t outstanding = server->count_outstanding_changesets_from(*client);
         REALM_ASSERT(outstanding != 0);
@@ -142,10 +141,9 @@ void transform_instructions(TestContext& test_context, BenchmarkResults& results
             server->integrate_next_changeset_from(*client);
         }
         results.submit(ident.c_str(), t.get_elapsed_time());
-
     }
 
-    //results.finish(ident_preface, ident_preface);
+    // results.finish(ident_preface, ident_preface);
     results.finish(ident, ident);
 }
 
@@ -181,10 +179,10 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
             return peer.commit();
         };
 
-        //Timer t_preface{Time::type_RealTime};
+        // Timer t_preface{Time::type_RealTime};
         make_instructions(*server);
         make_instructions(*client);
-        //results.submit(ident_preface.c_str(), t_preface.get_elapsed_time());
+        // results.submit(ident_preface.c_str(), t_preface.get_elapsed_time());
 
         size_t outstanding = server->count_outstanding_changesets_from(*client);
         REALM_ASSERT(outstanding != 0);
@@ -433,4 +431,3 @@ int main(int argc, char** argv)
     return test_all(argc, argv, nullptr);
 }
 #endif // REALM_IOS
-

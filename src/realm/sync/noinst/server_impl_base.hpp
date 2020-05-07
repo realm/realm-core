@@ -20,8 +20,7 @@ constexpr int ServerImplBase::get_oldest_supported_protocol_version() noexcept
 }
 
 static_assert(ServerImplBase::get_oldest_supported_protocol_version() >= 1, "");
-static_assert(ServerImplBase::get_oldest_supported_protocol_version() <=
-              sync::get_current_protocol_version(), "");
+static_assert(ServerImplBase::get_oldest_supported_protocol_version() <= sync::get_current_protocol_version(), "");
 
 } // namespace _impl
 } // namespace realm

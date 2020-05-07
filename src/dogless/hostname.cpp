@@ -20,7 +20,8 @@
 
 namespace dogless {
 
-std::string hostname_prefix(std::string const& prefix) {
+std::string hostname_prefix(std::string const& prefix)
+{
     return prefix + "." + asio::ip::host_name();
 }
 

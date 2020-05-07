@@ -15,4 +15,3 @@ using deque = std::deque<T, Alloc>;
 } // namespace realm
 
 #endif // REALM_UTIL_METERED_DEQUE_HPP
-

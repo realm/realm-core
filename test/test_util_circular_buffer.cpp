@@ -357,10 +357,10 @@ TEST(Util_CircularBuffer_BeginEnd)
     std::vector<int> vector{1, 2, 3};
     CircularBuffer<int> buffer{1, 2, 3};
     const CircularBuffer<int>& cbuffer = buffer;
-    CHECK(std::equal(vector.begin(),  vector.end(),  buffer.begin(),   buffer.end()));
-    CHECK(std::equal(vector.begin(),  vector.end(),  cbuffer.begin(),  cbuffer.end()));
-    CHECK(std::equal(vector.begin(),  vector.end(),  buffer.cbegin(),  buffer.cend()));
-    CHECK(std::equal(vector.rbegin(), vector.rend(), buffer.rbegin(),  buffer.rend()));
+    CHECK(std::equal(vector.begin(), vector.end(), buffer.begin(), buffer.end()));
+    CHECK(std::equal(vector.begin(), vector.end(), cbuffer.begin(), cbuffer.end()));
+    CHECK(std::equal(vector.begin(), vector.end(), buffer.cbegin(), buffer.cend()));
+    CHECK(std::equal(vector.rbegin(), vector.rend(), buffer.rbegin(), buffer.rend()));
     CHECK(std::equal(vector.rbegin(), vector.rend(), cbuffer.rbegin(), cbuffer.rend()));
     CHECK(std::equal(vector.rbegin(), vector.rend(), buffer.crbegin(), buffer.crend()));
 }
@@ -371,7 +371,9 @@ TEST(Util_CircularBuffer_ConstructFromSize)
     CircularBuffer<int> buffer(3);
     CHECK_EQUAL(3, buffer.size());
     CHECK_EQUAL(3, buffer.capacity());
-    CHECK(std::all_of(buffer.begin(), buffer.end(), [](int value) { return (value == 0); }));
+    CHECK(std::all_of(buffer.begin(), buffer.end(), [](int value) {
+        return (value == 0);
+    }));
 }
 
 TEST(Util_CircularBuffer_ConstructFromSizeAndValue)
@@ -379,7 +381,9 @@ TEST(Util_CircularBuffer_ConstructFromSizeAndValue)
     CircularBuffer<int> buffer(3, 7);
     CHECK_EQUAL(3, buffer.size());
     CHECK_EQUAL(3, buffer.capacity());
-    CHECK(std::all_of(buffer.begin(), buffer.end(), [](int value) { return (value == 7); }));
+    CHECK(std::all_of(buffer.begin(), buffer.end(), [](int value) {
+        return (value == 7);
+    }));
 }
 
 
@@ -389,7 +393,9 @@ TEST(Util_CircularBuffer_AssignFromSizeAndValue)
     buffer.assign(3, 7);
     CHECK_EQUAL(3, buffer.size());
     CHECK_EQUAL(3, buffer.capacity());
-    CHECK(std::all_of(buffer.begin(), buffer.end(), [](int value) { return (value == 7); }));
+    CHECK(std::all_of(buffer.begin(), buffer.end(), [](int value) {
+        return (value == 7);
+    }));
 }
 
 
@@ -468,34 +474,34 @@ TEST(Util_CircularBuffer_IteratorEquality)
 {
     CircularBuffer<int> buffer;
     CircularBuffer<int>& cbuffer = buffer;
-    CHECK(buffer.begin()  == buffer.end());
+    CHECK(buffer.begin() == buffer.end());
     CHECK(buffer.cbegin() == buffer.cend());
-    CHECK(buffer.begin()  == buffer.cend());
+    CHECK(buffer.begin() == buffer.cend());
     CHECK(buffer.cbegin() == buffer.end());
     CHECK(cbuffer.begin() == cbuffer.end());
-    CHECK(buffer.begin()  == cbuffer.end());
+    CHECK(buffer.begin() == cbuffer.end());
     CHECK(cbuffer.begin() == buffer.end());
-    CHECK_NOT(buffer.begin()  != buffer.end());
+    CHECK_NOT(buffer.begin() != buffer.end());
     CHECK_NOT(buffer.cbegin() != buffer.cend());
-    CHECK_NOT(buffer.begin()  != buffer.cend());
+    CHECK_NOT(buffer.begin() != buffer.cend());
     CHECK_NOT(buffer.cbegin() != buffer.end());
     CHECK_NOT(cbuffer.begin() != cbuffer.end());
-    CHECK_NOT(buffer.begin()  != cbuffer.end());
+    CHECK_NOT(buffer.begin() != cbuffer.end());
     CHECK_NOT(cbuffer.begin() != buffer.end());
     buffer.push_back(0);
-    CHECK_NOT(buffer.begin()  == buffer.end());
+    CHECK_NOT(buffer.begin() == buffer.end());
     CHECK_NOT(buffer.cbegin() == buffer.cend());
-    CHECK_NOT(buffer.begin()  == buffer.cend());
+    CHECK_NOT(buffer.begin() == buffer.cend());
     CHECK_NOT(buffer.cbegin() == buffer.end());
     CHECK_NOT(cbuffer.begin() == cbuffer.end());
-    CHECK_NOT(buffer.begin()  == cbuffer.end());
+    CHECK_NOT(buffer.begin() == cbuffer.end());
     CHECK_NOT(cbuffer.begin() == buffer.end());
-    CHECK(buffer.begin()  != buffer.end());
+    CHECK(buffer.begin() != buffer.end());
     CHECK(buffer.cbegin() != buffer.cend());
-    CHECK(buffer.begin()  != buffer.cend());
+    CHECK(buffer.begin() != buffer.cend());
     CHECK(buffer.cbegin() != buffer.end());
     CHECK(cbuffer.begin() != cbuffer.end());
-    CHECK(buffer.begin()  != cbuffer.end());
+    CHECK(buffer.begin() != cbuffer.end());
     CHECK(cbuffer.begin() != buffer.end());
 }
 
@@ -590,13 +596,13 @@ TEST(Util_CircularBuffer_ExceptionSafetyInConstructFromIteratorPair)
 
     class X {
     public:
-        X(Context& context) :
-            m_context{context}
+        X(Context& context)
+            : m_context{context}
         {
             ++m_context.num_instances;
         }
-        X(const X& x) :
-            m_context{x.m_context}
+        X(const X& x)
+            : m_context{x.m_context}
         {
             if (++m_context.num_copy_ops == 2)
                 throw std::bad_alloc{};
@@ -606,19 +612,20 @@ TEST(Util_CircularBuffer_ExceptionSafetyInConstructFromIteratorPair)
         {
             --m_context.num_instances;
         }
+
     private:
         Context& m_context;
     };
 
     class Iter {
     public:
-        using difference_type   = std::ptrdiff_t;
-        using value_type        = X;
-        using pointer           = X*;
-        using reference         = X&;
+        using difference_type = std::ptrdiff_t;
+        using value_type = X;
+        using pointer = X*;
+        using reference = X&;
         using iterator_category = std::input_iterator_tag;
-        Iter(pointer ptr) :
-            m_ptr{ptr}
+        Iter(pointer ptr)
+            : m_ptr{ptr}
         {
         }
         reference operator*() const
@@ -648,13 +655,14 @@ TEST(Util_CircularBuffer_ExceptionSafetyInConstructFromIteratorPair)
         {
             return (m_ptr != i.m_ptr);
         }
+
     private:
         pointer m_ptr = nullptr;
     };
 
     Context context;
     {
-        std::aligned_storage<sizeof (X), alignof (X)>::type mem[3];
+        std::aligned_storage<sizeof(X), alignof(X)>::type mem[3];
         X* init = new (&mem[0]) X{context};
         new (&mem[1]) X{context};
         new (&mem[2]) X{context};
@@ -662,8 +670,7 @@ TEST(Util_CircularBuffer_ExceptionSafetyInConstructFromIteratorPair)
         try {
             CircularBuffer<X>(i_1, i_2);
         }
-        catch (std::bad_alloc&)
-        {
+        catch (std::bad_alloc&) {
         }
         init[0].~X();
         init[1].~X();

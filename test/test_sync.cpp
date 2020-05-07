@@ -88,6 +88,7 @@ public:
     {
         return m_random;
     }
+
 private:
     std::mt19937_64 m_random;
 };
@@ -109,7 +110,7 @@ TEST(Sync_BadVirtualPath)
     int nerrors = 0;
 
     using ConnectionState = Session::ConnectionState;
-    using ErrorInfo       = Session::ErrorInfo;
+    using ErrorInfo = Session::ErrorInfo;
     auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
             return;
@@ -625,15 +626,14 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         ClientServerFixture fixture(dir, test_context);
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            CHECK(ec == sync::ProtocolError::token_expired
-                  || ec == sync::ProtocolError::bad_authentication
-                  || ec == sync::ProtocolError::permission_denied);
+            CHECK(ec == sync::ProtocolError::token_expired || ec == sync::ProtocolError::bad_authentication ||
+                  ec == sync::ProtocolError::permission_denied);
             did_fail = true;
             fixture.stop();
         };
@@ -1083,15 +1083,14 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
         fixture.start();
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset ||
-                  ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1147,15 +1146,14 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
         fixture.start();
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset ||
-                  ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1213,15 +1211,14 @@ TEST(Sync_DetectSchemaMismatch_Links)
         fixture.start();
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset ||
-                  ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1277,15 +1274,14 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         fixture.start();
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset ||
-                  ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1327,7 +1323,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
     SHARED_GROUP_TEST_PATH(path_2);
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1); DBRef sg_2 = DB::create(*history_2);
+    DBRef sg_1 = DB::create(*history_1);
+    DBRef sg_2 = DB::create(*history_2);
 
     {
         TEST_DIR(dir);
@@ -1336,15 +1333,14 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         fixture.start();
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset ||
-                  ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1386,7 +1382,8 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
     SHARED_GROUP_TEST_PATH(path_2);
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1); DBRef sg_2 = DB::create(*history_2);
+    DBRef sg_1 = DB::create(*history_1);
+    DBRef sg_2 = DB::create(*history_2);
 
     {
         TEST_DIR(dir);
@@ -1397,15 +1394,14 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
         bool error_did_occur = false;
 
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset ||
-                  ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             error_did_occur = true;
@@ -1454,7 +1450,8 @@ TEST(Sync_LateBind)
     SHARED_GROUP_TEST_PATH(path_2);
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1); DBRef sg_2 = DB::create(*history_2);
+    DBRef sg_1 = DB::create(*history_1);
+    DBRef sg_2 = DB::create(*history_2);
 
     {
         TEST_DIR(dir);
@@ -1640,7 +1637,7 @@ TEST(Sync_AbandonUnboundSessions)
 }
 
 
-#if 0 // FIXME: Disabled because substring operations are not yet supported in Core 6.
+#if 0  // FIXME: Disabled because substring operations are not yet supported in Core 6.
 
 // This test illustrates that our instruction set and merge rules
 // do not have higher order convergence. The final merge result depends
@@ -1973,7 +1970,7 @@ TEST(Sync_Randomized)
     DBRef client_shared_groups[num_clients];
     for (size_t i = 0; i < num_clients; ++i) {
         std::ostringstream out;
-        out << ".client_"<<i<<".realm";
+        out << ".client_" << i << ".realm";
         std::string suffix = out.str();
         std::string test_path = get_test_path(test_context, suffix);
         client_path_guards[i].reset(new DBTestPathGuard(test_path));
@@ -2000,7 +1997,9 @@ TEST(Sync_Randomized)
 
     ThreadWrapper client_program_threads[num_clients];
     for (size_t i = 0; i < num_clients; ++i)
-        client_program_threads[i].start([=] { run_client_test_program(i); });
+        client_program_threads[i].start([=] {
+            run_client_test_program(i);
+        });
 
     for (size_t i = 0; i < num_clients; ++i)
         CHECK(!client_program_threads[i].join());
@@ -2072,7 +2071,8 @@ TEST(Sync_FailingReadsOnClientSide)
     SHARED_GROUP_TEST_PATH(path_2);
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1); DBRef sg_2 = DB::create(*history_2);
+    DBRef sg_1 = DB::create(*history_1);
+    DBRef sg_2 = DB::create(*history_2);
 
     {
         TEST_DIR(dir);
@@ -2312,24 +2312,24 @@ namespace {
 
 class RequestWithContentLength {
 public:
-    RequestWithContentLength(test_util::unit_test::TestContext& test_context,
-                                     util::network::Service& service,
-                                     const util::network::Endpoint& endpoint,
-                                     const std::string& content_length,
-                                     const std::string& expected_response_line):
-        test_context {test_context},
-        m_socket {service},
-        m_endpoint {endpoint},
-        m_content_length {content_length},
-        m_expected_response_line {expected_response_line}
+    RequestWithContentLength(test_util::unit_test::TestContext& test_context, util::network::Service& service,
+                             const util::network::Endpoint& endpoint, const std::string& content_length,
+                             const std::string& expected_response_line)
+        : test_context{test_context}
+        , m_socket{service}
+        , m_endpoint{endpoint}
+        , m_content_length{content_length}
+        , m_expected_response_line{expected_response_line}
     {
-        m_request =
-            "POST /does-not-exist-1234 HTTP/1.1\r\n"
-            "Content-Length: " + m_content_length + "\r\n"
-            "\r\n";
+        m_request = "POST /does-not-exist-1234 HTTP/1.1\r\n"
+                    "Content-Length: " +
+                    m_content_length +
+                    "\r\n"
+                    "\r\n";
     }
 
-    void write_completion_handler(std::error_code ec, size_t nbytes) {
+    void write_completion_handler(std::error_code ec, size_t nbytes)
+    {
         CHECK_NOT(ec);
         CHECK_EQUAL(m_request.size(), nbytes);
         auto handler = [&](std::error_code ec, size_t nbytes) {
@@ -2338,9 +2338,10 @@ public:
         m_socket.async_read_until(m_buffer, m_buf_size, '\n', m_read_ahead_buffer, handler);
     }
 
-    void read_completion_handler(std::error_code ec, size_t nbytes) {
+    void read_completion_handler(std::error_code ec, size_t nbytes)
+    {
         CHECK_NOT(ec);
-        std::string response_line {m_buffer, nbytes};
+        std::string response_line{m_buffer, nbytes};
         CHECK_EQUAL(response_line, m_expected_response_line);
     }
 
@@ -2398,17 +2399,13 @@ TEST(Sync_HTTP_ContentLength)
 
     util::network::Service service;
 
-    RequestWithContentLength req_0(test_context, service, endpoint, "0",
-                                   "HTTP/1.1 404 Not Found\r\n");
+    RequestWithContentLength req_0(test_context, service, endpoint, "0", "HTTP/1.1 404 Not Found\r\n");
 
-    RequestWithContentLength req_1(test_context, service, endpoint, "",
-                                   "HTTP/1.1 404 Not Found\r\n");
+    RequestWithContentLength req_1(test_context, service, endpoint, "", "HTTP/1.1 404 Not Found\r\n");
 
-    RequestWithContentLength req_2(test_context, service, endpoint, "abc",
-                                   "HTTP/1.1 400 Bad Request\r\n");
+    RequestWithContentLength req_2(test_context, service, endpoint, "abc", "HTTP/1.1 400 Bad Request\r\n");
 
-    RequestWithContentLength req_3(test_context, service, endpoint, "5abc",
-                                       "HTTP/1.1 400 Bad Request\r\n");
+    RequestWithContentLength req_3(test_context, service, endpoint, "5abc", "HTTP/1.1 400 Bad Request\r\n");
 
     req_0.start();
     req_1.start();
@@ -2477,8 +2474,7 @@ TEST(Sync_HttpApi)
         util::HTTPRequest request;
         request.method = HTTPMethod::Get;
         request.path = "/api/x";
-        request.headers["Authorization"] =
-            _impl::make_authorization_header(g_signed_test_user_token);
+        request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
         const util::HTTPResponse& response = client.get_response();
@@ -2490,8 +2486,7 @@ TEST(Sync_HttpApi)
         util::HTTPRequest request;
         request.method = HTTPMethod::Get;
         request.path = "/api/info";
-        request.headers["Authorization"] =
-            _impl::make_authorization_header(g_signed_test_user_token);
+        request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
         const util::HTTPResponse& response = client.get_response();
@@ -2499,8 +2494,7 @@ TEST(Sync_HttpApi)
         CHECK(response.body);
         const char* prefix = "Realm sync server\n\n";
         size_t prefix_len = strlen(prefix);
-        CHECK(response.body->length() >= prefix_len &&
-              response.body->substr(0, prefix_len) == prefix);
+        CHECK(response.body->length() >= prefix_len && response.body->substr(0, prefix_len) == prefix);
     }
 
     // url = /api/info with non-admin access token
@@ -2508,8 +2502,7 @@ TEST(Sync_HttpApi)
         util::HTTPRequest request;
         request.method = HTTPMethod::Get;
         request.path = "/api/info";
-        request.headers["Authorization"] =
-            _impl::make_authorization_header(g_user_0_token);
+        request.headers["Authorization"] = _impl::make_authorization_header(g_user_0_token);
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
         const util::HTTPResponse& response = client.get_response();
@@ -2554,8 +2547,7 @@ TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
         util::HTTPRequest request;
         request.method = HTTPMethod::Get;
         request.path = "/api/info";
-        request.headers["X-Alternative-Name"] =
-            _impl::make_authorization_header(g_signed_test_user_token);
+        request.headers["X-Alternative-Name"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
         const util::HTTPResponse& response = client.get_response();
@@ -2563,8 +2555,7 @@ TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
         CHECK(response.body);
         const char* prefix = "Realm sync server\n\n";
         size_t prefix_len = strlen(prefix);
-        CHECK(response.body->length() >= prefix_len &&
-              response.body->substr(0, prefix_len) == prefix);
+        CHECK(response.body->length() >= prefix_len && response.body->substr(0, prefix_len) == prefix);
     }
 
     // Incorrect authorization header.
@@ -2572,8 +2563,7 @@ TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
         util::HTTPRequest request;
         request.method = HTTPMethod::Get;
         request.path = "/api/info";
-        request.headers["Authorization"] =
-            _impl::make_authorization_header(g_signed_test_user_token);
+        request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
         const util::HTTPResponse& response = client.get_response();
@@ -2633,7 +2623,7 @@ TEST(Sync_HttpApiCompact)
 
         for (int i = 0; i < number_of_objects; ++i) {
             std::string pk_str = std::to_string(counter) + "_" + std::to_string(i);
-            StringData pk {pk_str};
+            StringData pk{pk_str};
             Obj obj = sync::create_object_with_primary_key(wt, *table, pk);
             obj.set(table->get_column_key("i"), i);
         }
@@ -2642,7 +2632,7 @@ TEST(Sync_HttpApiCompact)
     size_t counter = 0;
 
     for (size_t i = 0; i < 1; ++i) {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         insert_objects(wt, counter, 400);
         version_type new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
@@ -2650,7 +2640,7 @@ TEST(Sync_HttpApiCompact)
     }
 
     for (size_t i = 0; i < 5; ++i) {
-        WriteTransaction wt {sg_2};
+        WriteTransaction wt{sg_2};
         insert_objects(wt, counter, 300);
         version_type new_version = wt.commit();
         session_2.nonsync_transact_notify(new_version);
@@ -2669,8 +2659,7 @@ TEST(Sync_HttpApiCompact)
     size_t size_before_2 = util::File{server_realm_file_2}.get_size();
 
     // Send a HTTP request to the server to compact all Realms.
-    CHECK_EQUAL(util::HTTPStatus::Ok,
-                fixture.send_http_compact_request());
+    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
 
     size_t size_after_1 = util::File{server_realm_file_1}.get_size();
     size_t size_after_2 = util::File{server_realm_file_2}.get_size();
@@ -2700,7 +2689,7 @@ TEST(Sync_HttpApiCompact)
     // changes.
 
     for (size_t i = 0; i < 2; ++i) {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         insert_objects(wt, counter, 700);
         version_type new_version = wt.commit();
         session_1.nonsync_transact_notify(new_version);
@@ -2708,7 +2697,7 @@ TEST(Sync_HttpApiCompact)
     }
 
     for (size_t i = 0; i < 5; ++i) {
-        WriteTransaction wt {sg_2};
+        WriteTransaction wt{sg_2};
         insert_objects(wt, counter, 300);
         version_type new_version = wt.commit();
         session_2.nonsync_transact_notify(new_version);
@@ -2722,8 +2711,7 @@ TEST(Sync_HttpApiCompact)
     size_before_2 = util::File{server_realm_file_2}.get_size();
 
     // Send a HTTP request to the server to compact all Realms.
-    CHECK_EQUAL(util::HTTPStatus::Ok,
-                fixture.send_http_compact_request());
+    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
 
     size_after_1 = util::File{server_realm_file_1}.get_size();
     size_after_2 = util::File{server_realm_file_2}.get_size();
@@ -2786,8 +2774,7 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     CHECK(util::File::exists(server_realm_file_management));
 
     // Send a HTTP request to delete the Realm without Authorization
-    CHECK_EQUAL(util::HTTPStatus::Forbidden,
-                fixture.send_http_delete_request(server_path, ""));
+    CHECK_EQUAL(util::HTTPStatus::Forbidden, fixture.send_http_delete_request(server_path, ""));
 
     // The server realm is still there
     CHECK(util::File::exists(server_realm_file));
@@ -2795,8 +2782,7 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     CHECK(util::File::exists(server_realm_file_management));
 
     // Send a HTTP request to delete the Realm without Authorization
-    CHECK_EQUAL(util::HTTPStatus::Forbidden,
-                fixture.send_http_delete_request(server_path, ""));
+    CHECK_EQUAL(util::HTTPStatus::Forbidden, fixture.send_http_delete_request(server_path, ""));
 
     // The server realm is still there
     CHECK(util::File::exists(server_realm_file));
@@ -2814,8 +2800,7 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     CHECK(util::File::exists(server_realm_file_management));
 
     // Send a HTTP request to delete the Realm with admin Authorization
-    CHECK_EQUAL(util::HTTPStatus::Ok,
-                fixture.send_http_delete_request(server_path));
+    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_delete_request(server_path));
 
     // The realm is deleted
     CHECK(!util::File::exists(server_realm_file));
@@ -2903,8 +2888,7 @@ TEST(Sync_RealmDeletionEmptyDir)
     CHECK(util::File::exists(server_realm_file_management));
 
     // Send a HTTP request to delete the Realm with admin Authorization
-    CHECK_EQUAL(util::HTTPStatus::Ok,
-                fixture.send_http_delete_request(server_path));
+    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_delete_request(server_path));
 
     // server_u_dir should still exist.
     CHECK(util::File::exists(server_u_dir));
@@ -3248,7 +3232,7 @@ TEST(Sync_MultipleServers)
     TEST_DIR(dir_2);
     auto get_file_path = [&](int server_index, int realm_index, int file_index) {
         std::ostringstream out;
-        out << server_index<<"_"<<realm_index<<"_"<<file_index<<".realm";
+        out << server_index << "_" << realm_index << "_" << file_index << ".realm";
         return util::File::resolve(out.str(), dir_2);
     };
 
@@ -3314,7 +3298,9 @@ TEST(Sync_MultipleServers)
         for (int i = 0; i < num_servers; ++i) {
             for (int j = 0; j < num_realms_per_server; ++j) {
                 for (int k = 0; k < num_files_per_realm; ++k)
-                    threads[i][j][k].start([=] { run(i,j,k); });
+                    threads[i][j][k].start([=] {
+                        run(i, j, k);
+                    });
             }
         }
         for (size_t i = 0; i < num_servers; ++i) {
@@ -3331,7 +3317,9 @@ TEST(Sync_MultipleServers)
         for (int i = 0; i < num_servers; ++i) {
             for (int j = 0; j < num_realms_per_server; ++j) {
                 for (int k = 0; k < num_files_per_realm; ++k)
-                    threads[i][j][k].start([=] { finish_download(i,j,k); });
+                    threads[i][j][k].start([=] {
+                        finish_download(i, j, k);
+                    });
             }
         }
         for (size_t i = 0; i < num_servers; ++i) {
@@ -3347,7 +3335,7 @@ TEST(Sync_MultipleServers)
     for (int i = 0; i < num_files_per_realm; ++i) {
         for (int j = 0; j < num_sessions_per_file; ++j) {
             for (int k = 0; k < num_transacts_per_session; ++k)
-                expected_rows.emplace(i,j,k);
+                expected_rows.emplace(i, j, k);
         }
     }
     for (size_t i = 0; i < num_servers; ++i) {
@@ -3363,10 +3351,10 @@ TEST(Sync_MultipleServers)
                 if (CHECK(table)) {
                     std::set<std::tuple<int, int, int>> rows;
                     for (ConstObj obj : *table) {
-                        int server_index   = int(obj.get<int64_t>("server_index"));
-                        int realm_index    = int(obj.get<int64_t>("realm_index"));
-                        int file_index     = int(obj.get<int64_t>("file_index"));
-                        int session_index  = int(obj.get<int64_t>("session_index"));
+                        int server_index = int(obj.get<int64_t>("server_index"));
+                        int realm_index = int(obj.get<int64_t>("realm_index"));
+                        int file_index = int(obj.get<int64_t>("file_index"));
+                        int session_index = int(obj.get<int64_t>("session_index"));
                         int transact_index = int(obj.get<int64_t>("transact_index"));
                         CHECK_EQUAL(i, server_index);
                         CHECK_EQUAL(j, realm_index);
@@ -3376,7 +3364,7 @@ TEST(Sync_MultipleServers)
                 }
             }
             for (int k = 1; k < num_files_per_realm; ++k) {
-                std::string path = get_file_path(int(i),int(j),k);
+                std::string path = get_file_path(int(i), int(j), k);
                 std::unique_ptr<Replication> history = make_client_replication(path);
                 DBRef sg = DB::create(*history);
                 ReadTransaction rt(sg);
@@ -3393,7 +3381,8 @@ TEST_IF(Sync_ReadOnlyClient, false)
     SHARED_GROUP_TEST_PATH(path_2);
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1); DBRef sg_2 = DB::create(*history_2);
+    DBRef sg_1 = DB::create(*history_1);
+    DBRef sg_2 = DB::create(*history_2);
 
     TEST_DIR(server_dir);
     MultiClientServerFixture fixture(2, 1, server_dir, test_context);
@@ -3419,8 +3408,7 @@ TEST_IF(Sync_ReadOnlyClient, false)
 
     // Check that the stuff was received on the read-only client
     {
-        Session session_2 =
-            fixture.make_bound_session(1, path_2, 0, "/test", g_signed_test_user_token_readonly);
+        Session session_2 = fixture.make_bound_session(1, path_2, 0, "/test", g_signed_test_user_token_readonly);
         session_2.wait_for_download_complete_or_client_stopped();
         {
             ReadTransaction rt(sg_2);
@@ -3464,7 +3452,7 @@ TEST_IF(Sync_ClientFileIdentSpoofing, false)
     SHARED_GROUP_TEST_PATH(client_path);
 
     int num_clients = 3;
-    MultiClientServerFixture fixture {num_clients, 1, server_dir, test_context};
+    MultiClientServerFixture fixture{num_clients, 1, server_dir, test_context};
     fixture.start();
 
     {
@@ -3502,7 +3490,7 @@ TEST_IF(Sync_ClientFileIdentSpoofing, false)
         std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
         DBRef shared_group = DB::create(*history);
         bool fix_up_object_ids = true;
-        history->set_client_file_ident({client_file_ident_spoofed, client_file_ident.salt},fix_up_object_ids);
+        history->set_client_file_ident({client_file_ident_spoofed, client_file_ident.salt}, fix_up_object_ids);
     }
 
     {
@@ -3535,7 +3523,8 @@ TEST_IF(Sync_ClientFileIdentSpoofing, false)
         std::unique_ptr<ClientReplication> history = make_client_replication(client_path);
         DBRef shared_group = DB::create(*history);
         bool fix_up_object_ids = true;
-        history->set_client_file_ident({client_file_ident_spoofed, client_file_ident_salt_spoofed}, fix_up_object_ids);
+        history->set_client_file_ident({client_file_ident_spoofed, client_file_ident_salt_spoofed},
+                                       fix_up_object_ids);
     }
 
     {
@@ -3560,7 +3549,8 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 
     util::Logger& logger = test_context.logger;
 
-    logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1", number_of_transactions);
+    logger.info("Sync_SingleClientUploadForever_CreateObjects test. Number of transactions = %1",
+                number_of_transactions);
 
     TEST_DIR(server_dir);
     SHARED_GROUP_TEST_PATH(path);
@@ -3576,7 +3566,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
     ColKey col_time;
 
     {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = sync::create_table(wt, "class_table");
         col_int = tr->add_column(type_Int, "integer column");
         col_str = tr->add_column(type_String, "string column");
@@ -3590,7 +3580,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
     session.wait_for_upload_complete_or_client_stopped();
 
     for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = wt.get_table("class_table");
         auto obj = sync::create_object(wt, *tr);
         int_fast32_t number = i;
@@ -3599,7 +3589,7 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
         StringData str_data = StringData(str);
         obj.set(col_str, str_data);
         obj.set(col_dbl, double(number));
-        obj.set(col_time, Timestamp {123, 456});
+        obj.set(col_time, Timestamp{123, 456});
         version_type version = wt.commit();
         auto before_upload = std::chrono::steady_clock::now();
         session.nonsync_transact_notify(version);
@@ -3608,7 +3598,8 @@ TEST(Sync_SingleClientUploadForever_CreateObjects)
 
         // We only log the duration every 1000 transactions. The duration is for a single changeset.
         if (i % 1000 == 0) {
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
+            auto duration =
+                std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
             logger.info("Duration of single changeset upload(%1) = %2 ms", i, duration);
         }
     }
@@ -3624,7 +3615,8 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 
     util::Logger& logger = test_context.logger;
 
-    logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1", number_of_transactions);
+    logger.info("Sync_SingleClientUploadForever_MutateObject test. Number of transactions = %1",
+                number_of_transactions);
 
     TEST_DIR(server_dir);
     SHARED_GROUP_TEST_PATH(path);
@@ -3642,7 +3634,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
     ObjKey obj_key;
 
     {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = sync::create_table(wt, "class_table");
         col_int = tr->add_column(type_Int, "integer column");
         col_str = tr->add_column(type_String, "string column");
@@ -3657,7 +3649,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
     session.wait_for_upload_complete_or_client_stopped();
 
     for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = wt.get_table("class_table");
         int_fast32_t number = i;
         auto obj = tr->get_object(obj_key);
@@ -3666,7 +3658,7 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
         StringData str_data = StringData(str);
         obj.set(col_str, str_data);
         obj.set(col_dbl, double(number));
-        obj.set(col_time, Timestamp {123, 456});
+        obj.set(col_time, Timestamp{123, 456});
         version_type version = wt.commit();
         auto before_upload = std::chrono::steady_clock::now();
         session.nonsync_transact_notify(version);
@@ -3675,7 +3667,8 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 
         // We only log the duration every 1000 transactions. The duration is for a single changeset.
         if (i % 1000 == 0) {
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
+            auto duration =
+                std::chrono::duration_cast<std::chrono::milliseconds>(after_upload - before_upload).count();
             logger.info("Duration of single changeset upload(%1) = %2 ms", i, duration);
         }
     }
@@ -3686,10 +3679,10 @@ TEST(Sync_SingleClientUploadForever_MutateObject)
 // The test might be moved to a performance test directory later.
 TEST(Sync_LargeUploadDownloadPerformance)
 {
-    int_fast32_t number_of_transactions = 2; // Set to low number in ordinary testing.
+    int_fast32_t number_of_transactions = 2;         // Set to low number in ordinary testing.
     int_fast32_t number_of_rows_per_transaction = 5; // Set to low number in ordinary testing.
-    int number_of_download_clients = 1; // Set to low number in ordinary testing
-    bool print_durations = false; // Set to false in ordinary testing.
+    int number_of_download_clients = 1;              // Set to low number in ordinary testing
+    bool print_durations = false;                    // Set to false in ordinary testing.
 
     if (print_durations) {
         std::cerr << "Number of transactions = " << number_of_transactions << std::endl;
@@ -3711,7 +3704,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     auto start_data_creation = std::chrono::steady_clock::now();
     {
         {
-            WriteTransaction wt {sg_upload};
+            WriteTransaction wt{sg_upload};
             TableRef tr = sync::create_table(wt, "class_table");
             tr->add_column(type_Int, "integer column");
             tr->add_column(type_String, "string column");
@@ -3721,7 +3714,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
         }
 
         for (int_fast32_t i = 0; i < number_of_transactions; ++i) {
-            WriteTransaction wt {sg_upload};
+            WriteTransaction wt{sg_upload};
             TableRef tr = wt.get_table("class_table");
             for (int_fast32_t j = 0; j < number_of_rows_per_transaction; ++j) {
                 Obj obj = sync::create_object(wt, *tr);
@@ -3731,13 +3724,14 @@ TEST(Sync_LargeUploadDownloadPerformance)
                 StringData str_data = StringData(str);
                 obj.set("string column", str_data);
                 obj.set("double column", double(number));
-                obj.set("timestamp column", Timestamp {123, 456});
+                obj.set("timestamp column", Timestamp{123, 456});
             }
             wt.commit();
         }
     }
     auto end_data_creation = std::chrono::steady_clock::now();
-    auto duration_data_creation = std::chrono::duration_cast<std::chrono::milliseconds>(end_data_creation - start_data_creation).count();
+    auto duration_data_creation =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_data_creation - start_data_creation).count();
     if (print_durations)
         std::cerr << "Duration of data creation = " << duration_data_creation << " ms" << std::endl;
 
@@ -3749,7 +3743,8 @@ TEST(Sync_LargeUploadDownloadPerformance)
     session_upload.wait_for_upload_complete_or_client_stopped();
 
     auto end_session_upload = std::chrono::steady_clock::now();
-    auto duration_upload = std::chrono::duration_cast<std::chrono::milliseconds>(end_session_upload - start_session_upload).count();
+    auto duration_upload =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_session_upload - start_session_upload).count();
     if (print_durations)
         std::cerr << "Duration of uploading = " << duration_upload << " ms" << std::endl;
 
@@ -3777,7 +3772,8 @@ TEST(Sync_LargeUploadDownloadPerformance)
 
 
     auto end_session_download = std::chrono::steady_clock::now();
-    auto duration_download = std::chrono::duration_cast<std::chrono::milliseconds>(end_session_download - start_sesion_download).count();
+    auto duration_download =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_session_download - start_sesion_download).count();
     if (print_durations)
         std::cerr << "Duration of downloading = " << duration_download << " ms" << std::endl;
 
@@ -3834,7 +3830,7 @@ TEST_IF(Sync_4GB_Messages, false)
     BinaryData bd_c(str_c.data(), single_object_data_size);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
 
         TableRef tr = sync::create_table(wt, "class_simple_data");
         auto col_key = tr->add_column(type_Binary, "binary column");
@@ -3901,7 +3897,7 @@ TEST(Sync_RefreshRightAfterBind)
     fixture.bind_session(session, "/test");
     for (int i = 0; i < 50; ++i) {
         session.refresh(g_signed_test_user_token_readonly);
-        std::this_thread::sleep_for(std::chrono::milliseconds {1});
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
     session.wait_for_download_complete_or_client_stopped();
     fixture.stop();
@@ -3927,8 +3923,7 @@ TEST(Sync_Permissions)
     // make it easier to deal with session-level errors without disrupting other
     // sessions.
     MultiClientServerFixture fixture{2, 1, server_dir, test_context};
-    fixture.set_client_side_error_handler(0, [&](std::error_code, bool,
-                                                 const std::string& message) {
+    fixture.set_client_side_error_handler(0, [&](std::error_code, bool, const std::string& message) {
         CHECK_EQUAL("", message);
         did_see_error_for_valid = true;
     });
@@ -3939,8 +3934,7 @@ TEST(Sync_Permissions)
     });
     fixture.start();
 
-    Session session_valid =
-        fixture.make_bound_session(0, path_valid, 0, "/valid", g_signed_test_user_token_for_path);
+    Session session_valid = fixture.make_bound_session(0, path_valid, 0, "/valid", g_signed_test_user_token_for_path);
     Session session_invalid =
         fixture.make_bound_session(1, path_invalid, 0, "/invalid", g_signed_test_user_token_for_path);
 
@@ -3974,7 +3968,7 @@ TEST(Sync_ManySessions)
 
     std::vector<std::string> paths;
     for (int i = 0; i < num_sessions; ++i) {
-        std::string path = std::string(client_dir)+"/"+std::to_string(i)+".realm";
+        std::string path = std::string(client_dir) + "/" + std::to_string(i) + ".realm";
         paths.emplace_back(std::move(path));
     }
 
@@ -4088,8 +4082,7 @@ TEST(Sync_MultiplexIdent)
     session_config_a1.protocol_envelope = ProtocolEnvelope::realms;
     session_config_a1.multiplex_ident = "a";
     session_config_a1.verify_servers_ssl_certificate = true;
-    session_config_a1.ssl_verify_callback = [&](const std::string server_address,
-                                                Session::port_type server_port,
+    session_config_a1.ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                                 const char*, size_t, int, int depth) {
         CHECK_EQUAL(server_address, actual_server_address);
         CHECK_EQUAL(server_port, actual_server_port);
@@ -4110,8 +4103,7 @@ TEST(Sync_MultiplexIdent)
     session_config_a2.protocol_envelope = ProtocolEnvelope::realms;
     session_config_a2.multiplex_ident = "a";
     session_config_a2.verify_servers_ssl_certificate = true;
-    session_config_a2.ssl_verify_callback = [&](const std::string server_address,
-                                                Session::port_type server_port,
+    session_config_a2.ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                                 const char*, size_t, int, int depth) {
         CHECK_EQUAL(server_address, actual_server_address);
         CHECK_EQUAL(server_port, actual_server_port);
@@ -4132,8 +4124,7 @@ TEST(Sync_MultiplexIdent)
     session_config_b1.protocol_envelope = ProtocolEnvelope::realms;
     session_config_b1.multiplex_ident = "b";
     session_config_b1.verify_servers_ssl_certificate = true;
-    session_config_b1.ssl_verify_callback = [&](const std::string server_address,
-                                                Session::port_type server_port,
+    session_config_b1.ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
                                                 const char*, size_t, int, int depth) {
         CHECK_EQUAL(server_address, actual_server_address);
         CHECK_EQUAL(server_port, actual_server_port);
@@ -4219,9 +4210,7 @@ TEST(Sync_SSL_Certificate_2)
     };
     fixture.set_client_side_error_handler(std::move(error_handler));
 
-    Session session = fixture.make_bound_session(path, "/test",
-                                                 g_signed_test_user_token,
-                                                 session_config);
+    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     CHECK(did_fail);
@@ -4252,9 +4241,7 @@ TEST(Sync_SSL_Certificate_3)
     session_config.verify_servers_ssl_certificate = false;
     session_config.ssl_trust_certificate_path = ca_dir + "/certs/dns-chain.crt.pem";
 
-    Session session = fixture.make_bound_session(path, "/test",
-                                                 g_signed_test_user_token,
-                                                 session_config);
+    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
 }
@@ -4302,9 +4289,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_1)
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     Session::port_type server_port_ssl;
-    auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
-                                  const char*, size_t, int, int) {
-
+    auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port, const char*,
+                                   size_t, int, int) {
         CHECK_EQUAL(server_address, "localhost");
         server_port_ssl = server_port;
         return true;
@@ -4323,14 +4309,11 @@ TEST(Sync_SSL_Certificate_Verify_Callback_1)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(path, "/test",
-                                                 g_signed_test_user_token,
-                                                 session_config);
+    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
 
-    Session::port_type server_port_actual =
-        fixture.get_server().listen_endpoint().port();
+    Session::port_type server_port_actual = fixture.get_server().listen_endpoint().port();
     CHECK_EQUAL(server_port_ssl, server_port_actual);
 }
 
@@ -4346,12 +4329,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     Session::port_type server_port_ssl;
-    auto ssl_verify_callback = [&](const std::string server_address,
-                                   Session::port_type server_port,
-                                   const char* pem_data ,
-                                   size_t pem_size,
-                                   int preverify_ok,
-                                   int depth) {
+    auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
+                                   const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
         CHECK_EQUAL(server_address, "localhost");
         server_port_ssl = server_port;
         CHECK_EQUAL(preverify_ok, 0);
@@ -4359,9 +4338,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
         CHECK_EQUAL(pem_size, 2082);
         std::string pem(pem_data, pem_size);
 
-        std::string expected =
-            "-----BEGIN CERTIFICATE-----\n"
-            "MIIF0zCCA7ugAwIBAgIBBjANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
+        std::string expected = "-----BEGIN CERTIFICATE-----\n"
+                               "MIIF0zCCA7ugAwIBAgIBBjANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
 
         CHECK_EQUAL(expected, pem.substr(0, expected.size()));
 
@@ -4388,14 +4366,11 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(path, "/test",
-                                                 g_signed_test_user_token,
-                                                 session_config);
+    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
     CHECK(did_fail);
-    Session::port_type server_port_actual =
-        fixture.get_server().listen_endpoint().port();
+    Session::port_type server_port_actual = fixture.get_server().listen_endpoint().port();
     CHECK_EQUAL(server_port_ssl, server_port_actual);
 }
 
@@ -4409,12 +4384,8 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
     std::string ca_dir = get_test_resource_path() + "../certificate-authority";
 
     Session::port_type server_port_ssl = 0;
-    auto ssl_verify_callback = [&](const std::string server_address,
-                                   Session::port_type server_port,
-                                   const char* pem_data ,
-                                   size_t pem_size,
-                                   int preverify_ok,
-                                   int depth) {
+    auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
+                                   const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
         CHECK_EQUAL(server_address, "localhost");
         server_port_ssl = server_port;
 
@@ -4447,13 +4418,10 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session = fixture.make_bound_session(path, "/test",
-                                                 g_signed_test_user_token,
-                                                 session_config);
+    Session session = fixture.make_bound_session(path, "/test", g_signed_test_user_token, session_config);
     fixture.start();
     session.wait_for_download_complete_or_client_stopped();
-    Session::port_type server_port_actual =
-        fixture.get_server().listen_endpoint().port();
+    Session::port_type server_port_actual = fixture.get_server().listen_endpoint().port();
     CHECK_EQUAL(server_port_ssl, server_port_actual);
 }
 
@@ -4481,16 +4449,12 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
         client.run();
     });
 
-    auto ssl_verify_callback = [&](const std::string server_address,
-                                   Session::port_type server_port,
-                                  const char* pem_data,
-                                  size_t pem_size,
-                                  int preverify_ok,
-                                  int depth) {
-        StringData pem {pem_data, pem_size};
+    auto ssl_verify_callback = [&](const std::string server_address, Session::port_type server_port,
+                                   const char* pem_data, size_t pem_size, int preverify_ok, int depth) {
+        StringData pem{pem_data, pem_size};
         logger.info("server_address = %1, server_port = %2, pem =\n%3\n, "
-                    " preverify_ok = %4, depth = %5", server_address,
-                    server_port, pem, preverify_ok, depth);
+                    " preverify_ok = %4, depth = %5",
+                    server_address, server_port, pem, preverify_ok, depth);
         if (depth == 0)
             client.stop();
         return true;
@@ -4546,8 +4510,7 @@ TEST_IF(Sync_DisabledSession, false)
 
     int errors_seen = 0;
 
-    auto client_error_handler = [&](std::error_code ec, bool, const std::string&)
-    {
+    auto client_error_handler = [&](std::error_code ec, bool, const std::string&) {
         errors_seen++;
         CHECK_EQUAL(ProtocolError::disabled_session, ec);
         fixture.get_client(0).stop();
@@ -4611,11 +4574,8 @@ TEST(Sync_UploadDownloadProgress_1)
 
         Session session = fixture.make_session(path);
 
-        auto progress_handler = [&](uint_fast64_t downloaded,
-                uint_fast64_t downloadable, uint_fast64_t uploaded,
-                uint_fast64_t uploadable, uint_fast64_t progress,
-                uint_fast64_t snapshot)
-        {
+        auto progress_handler = [&](uint_fast64_t downloaded, uint_fast64_t downloadable, uint_fast64_t uploaded,
+                                    uint_fast64_t uploadable, uint_fast64_t progress, uint_fast64_t snapshot) {
             downloaded_bytes = downloaded;
             downloadable_bytes = downloadable;
             uploaded_bytes = uploaded;
@@ -4647,7 +4607,7 @@ TEST(Sync_UploadDownloadProgress_1)
 
         uint_fast64_t commit_version;
         {
-            WriteTransaction wt {sg};
+            WriteTransaction wt{sg};
             TableRef tr = sync::create_table(wt, "class_table");
             tr->add_column(type_Int, "integer column");
             commit_version = wt.commit();
@@ -4665,7 +4625,7 @@ TEST(Sync_UploadDownloadProgress_1)
         CHECK_GREATER_EQUAL(snapshot_version, commit_version);
 
         {
-            WriteTransaction wt {sg};
+            WriteTransaction wt{sg};
             TableRef tr = wt.get_table("class_table");
             sync::create_object(wt, *tr).set("integer column", 42);
             commit_version = wt.commit();
@@ -4713,13 +4673,9 @@ TEST(Sync_UploadDownloadProgress_1)
 
         int number_of_handler_calls = 0;
 
-        auto progress_handler = [&](uint_fast64_t downloaded_bytes,
-                                    uint_fast64_t downloadable_bytes,
-                                    uint_fast64_t uploaded_bytes,
-                                    uint_fast64_t uploadable_bytes,
-                                    uint_fast64_t progress_version,
-                                    uint_fast64_t snapshot_version)
-        {
+        auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                    uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                    uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
             CHECK_EQUAL(downloaded_bytes, 0);
             CHECK_EQUAL(downloadable_bytes, 0);
             CHECK_NOT_EQUAL(uploaded_bytes, 0);
@@ -4738,8 +4694,7 @@ TEST(Sync_UploadDownloadProgress_1)
         session.set_progress_handler(progress_handler);
         std::string server_address = "no server";
         Session::port_type server_port = 8000;
-        session.bind(server_address, "/test", g_signed_test_user_token,
-                 server_port, ProtocolEnvelope::realm);
+        session.bind(server_address, "/test", g_signed_test_user_token, server_port, ProtocolEnvelope::realm);
         cond_var.wait(lock, [&] {
             return cond_var_signaled;
         });
@@ -4782,13 +4737,9 @@ TEST(Sync_UploadDownloadProgress_2)
     uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version,
-                                  uint_fast64_t snapshot_version)
-    {
+    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -4806,13 +4757,9 @@ TEST(Sync_UploadDownloadProgress_2)
     uint_fast64_t progress_version_2 = 123;
     uint_fast64_t snapshot_version_2 = 0;
 
-    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version,
-                                  uint_fast64_t snapshot_version)
-    {
+    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -4847,7 +4794,7 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_2, 0);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = sync::create_table(wt, "class_table");
         tr->add_column(type_Int, "integer column");
         version_type version = wt.commit();
@@ -4875,7 +4822,7 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_2, 1);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = wt.get_table("class_table");
         sync::create_object(wt, *tr).set("integer column", 42);
         version_type version = wt.commit();
@@ -4883,7 +4830,7 @@ TEST(Sync_UploadDownloadProgress_2)
     }
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = wt.get_table("class_table");
         sync::create_object(wt, *tr).set("integer column", 44);
         version_type version = wt.commit();
@@ -4891,7 +4838,7 @@ TEST(Sync_UploadDownloadProgress_2)
     }
 
     {
-        WriteTransaction wt {sg_2};
+        WriteTransaction wt{sg_2};
         TableRef tr = wt.get_table("class_table");
         sync::create_object(wt, *tr).set("integer column", 43);
         version_type version = wt.commit();
@@ -4919,7 +4866,7 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_GREATER(snapshot_version_2, 3);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = wt.get_table("class_table");
         tr->begin()->set("integer column", 101);
         version_type version = wt.commit();
@@ -4927,7 +4874,7 @@ TEST(Sync_UploadDownloadProgress_2)
     }
 
     {
-        WriteTransaction wt {sg_2};
+        WriteTransaction wt{sg_2};
         TableRef tr = wt.get_table("class_table");
         tr->begin()->set("integer column", 102);
         version_type version = wt.commit();
@@ -5009,7 +4956,7 @@ TEST(Sync_UploadDownloadProgress_3)
     DBRef sg = DB::create(*history);
 
     {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = sync::create_table(wt, "class_table");
         tr->add_column(type_Int, "integer column");
         wt.commit();
@@ -5049,13 +4996,9 @@ TEST(Sync_UploadDownloadProgress_3)
     uint_fast64_t progress_version_1 = 123;
     uint_fast64_t snapshot_version_1 = 0;
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes,
-                                uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes,
-                                uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version,
-                                uint_fast64_t snapshot_version)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -5089,8 +5032,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     session.set_progress_handler(progress_handler);
 
-    session.bind(server_address, "/test", g_signed_test_user_token,
-                 server_port, ProtocolEnvelope::realm);
+    session.bind(server_address, "/test", g_signed_test_user_token, server_port, ProtocolEnvelope::realm);
 
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
@@ -5112,7 +5054,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     uint_fast64_t commited_version;
     {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = wt.get_table("class_table");
         sync::create_object(wt, *tr).set("integer column", 42);
         commited_version = wt.commit();
@@ -5155,7 +5097,7 @@ TEST(Sync_UploadDownloadProgress_4)
     DBRef sg_1 = DB::create(*history_1);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = sync::create_table(wt, "class_table");
         auto col = tr->add_column(type_Binary, "binary column");
         sync::create_object(wt, *tr);
@@ -5166,7 +5108,7 @@ TEST(Sync_UploadDownloadProgress_4)
     }
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = wt.get_table("class_table");
         auto col = tr->get_column_key("binary column");
         sync::create_object(wt, *tr);
@@ -5185,13 +5127,9 @@ TEST(Sync_UploadDownloadProgress_4)
 
     int entry_1 = 0;
 
-    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version,
-                                  uint_fast64_t snapshot_version)
-    {
+    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_NOT_EQUAL(uploadable_bytes, 0);
@@ -5221,13 +5159,9 @@ TEST(Sync_UploadDownloadProgress_4)
 
     int entry_2 = 0;
 
-    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t progress_version,
-                                  uint_fast64_t snapshot_version)
-    {
+    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         CHECK_EQUAL(uploaded_bytes, 0);
         CHECK_EQUAL(uploadable_bytes, 0);
 
@@ -5281,13 +5215,9 @@ TEST(Sync_UploadDownloadProgress_5)
 
     Session session = fixture.make_session(path);
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes,
-                                uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes,
-                                uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version,
-                                uint_fast64_t snapshot_version)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -5362,17 +5292,13 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session {new Session {client, path, session_config}};
+    std::unique_ptr<Session> session{new Session{client, path, session_config}};
 
     util::Mutex mutex;
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes,
-                                uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes,
-                                uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version,
-                                uint_fast64_t snapshot_version)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         CHECK_EQUAL(downloaded_bytes, 0);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -5568,14 +5494,8 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     // of the changeset exceeds 16 MB. A single set_binary operation does not
     // accept a binary larger than 16 MB.
     size_t binary_sizes[] = {
-        static_cast<size_t>(8e6),
-        static_cast<size_t>(9e6),
-        static_cast<size_t>(7e6),
-        static_cast<size_t>(11e6),
-        static_cast<size_t>(6e6),
-        static_cast<size_t>(12e6),
-        static_cast<size_t>(5e6),
-        static_cast<size_t>(13e6),
+        static_cast<size_t>(8e6), static_cast<size_t>(9e6),  static_cast<size_t>(7e6), static_cast<size_t>(11e6),
+        static_cast<size_t>(6e6), static_cast<size_t>(12e6), static_cast<size_t>(5e6), static_cast<size_t>(13e6),
     };
 
     SHARED_GROUP_TEST_PATH(path_1);
@@ -5644,31 +5564,23 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     std::uint_fast64_t uploaded_bytes_1 = 0;
     std::uint_fast64_t uploadable_bytes_1 = 0;
 
-    auto progress_handler_1 = [&](std::uint_fast64_t downloaded_bytes,
-                                  std::uint_fast64_t downloadable_bytes,
-                                  std::uint_fast64_t uploaded_bytes,
-                                  std::uint_fast64_t uploadable_bytes,
-                                  std::uint_fast64_t,
-                                  std::uint_fast64_t)
-    {
+    auto progress_handler_1 = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
+                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
+                                  std::uint_fast64_t, std::uint_fast64_t) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
         uploadable_bytes_1 = uploadable_bytes;
     };
 
-    std::uint_fast64_t downloaded_bytes_2   = 0;
+    std::uint_fast64_t downloaded_bytes_2 = 0;
     std::uint_fast64_t downloadable_bytes_2 = 0;
-    std::uint_fast64_t uploaded_bytes_2     = 0;
-    std::uint_fast64_t uploadable_bytes_2   = 0;
+    std::uint_fast64_t uploaded_bytes_2 = 0;
+    std::uint_fast64_t uploadable_bytes_2 = 0;
 
-    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t,
-                                  uint_fast64_t)
-    {
+    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes, uint_fast64_t,
+                                  uint_fast64_t) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -5717,14 +5629,12 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     {
         ConstObj obj = *table->begin();
         ChunkedBinaryData cb{obj.get<BinaryData>("column name")};
-        CHECK((cb.size() == binary_sizes[0] && cb[0] == 'a') ||
-              (cb.size() == binary_sizes[4] && cb[0] == 'e'));
+        CHECK((cb.size() == binary_sizes[0] && cb[0] == 'a') || (cb.size() == binary_sizes[4] && cb[0] == 'e'));
     }
     {
         ConstObj obj = *(table->begin() + 7);
         ChunkedBinaryData cb{obj.get<BinaryData>("column name")};
-        CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') ||
-              (cb.size() == binary_sizes[7] && cb[0] == 'h'));
+        CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') || (cb.size() == binary_sizes[7] && cb[0] == 'h'));
     }
 
     CHECK_EQUAL(downloadable_bytes_1, downloaded_bytes_1);
@@ -5750,14 +5660,8 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     // accept a binary larger than 16MB. Only one changeset is larger than
     // 16 MB in this test.
     size_t binary_sizes[] = {
-        static_cast<size_t>(8e6),
-        static_cast<size_t>(9e6),
-        static_cast<size_t>(7e4),
-        static_cast<size_t>(11e4),
-        static_cast<size_t>(6e4),
-        static_cast<size_t>(12e4),
-        static_cast<size_t>(5e4),
-        static_cast<size_t>(13e4),
+        static_cast<size_t>(8e6), static_cast<size_t>(9e6),  static_cast<size_t>(7e4), static_cast<size_t>(11e4),
+        static_cast<size_t>(6e4), static_cast<size_t>(12e4), static_cast<size_t>(5e4), static_cast<size_t>(13e4),
     };
 
     SHARED_GROUP_TEST_PATH(path_1);
@@ -5826,13 +5730,9 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     uint_fast64_t uploaded_bytes_1 = 0;
     uint_fast64_t uploadable_bytes_1 = 0;
 
-    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* progress_version */,
-                                  uint_fast64_t /* snapshot_version */)
-    {
+    auto progress_handler_1 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t /* progress_version */, uint_fast64_t /* snapshot_version */) {
         downloaded_bytes_1 = downloaded_bytes;
         downloadable_bytes_1 = downloadable_bytes;
         uploaded_bytes_1 = uploaded_bytes;
@@ -5844,13 +5744,9 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     uint_fast64_t uploaded_bytes_2 = 0;
     uint_fast64_t uploadable_bytes_2 = 0;
 
-    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes,
-                                  uint_fast64_t downloadable_bytes,
-                                  uint_fast64_t uploaded_bytes,
-                                  uint_fast64_t uploadable_bytes,
-                                  uint_fast64_t /* progress_version */,
-                                  uint_fast64_t /* snapshot_version */)
-    {
+    auto progress_handler_2 = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                  uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                  uint_fast64_t /* progress_version */, uint_fast64_t /* snapshot_version */) {
         downloaded_bytes_2 = downloaded_bytes;
         downloadable_bytes_2 = downloadable_bytes;
         uploaded_bytes_2 = uploaded_bytes;
@@ -5899,14 +5795,12 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     {
         ConstObj obj = *table->begin();
         ChunkedBinaryData cb(obj.get<BinaryData>("column name"));
-        CHECK((cb.size() == binary_sizes[0] && cb[0] == 'a') ||
-              (cb.size() == binary_sizes[4] && cb[0] == 'e'));
+        CHECK((cb.size() == binary_sizes[0] && cb[0] == 'a') || (cb.size() == binary_sizes[4] && cb[0] == 'e'));
     }
     {
         ConstObj obj = *(table->begin() + 7);
         ChunkedBinaryData cb(obj.get<BinaryData>("column name"));
-        CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') ||
-              (cb.size() == binary_sizes[7] && cb[0] == 'h'));
+        CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') || (cb.size() == binary_sizes[7] && cb[0] == 'h'));
     }
 
     CHECK_EQUAL(downloadable_bytes_1, downloaded_bytes_1);
@@ -6017,7 +5911,7 @@ TEST(Sync_PingTimesOut)
         SHARED_GROUP_TEST_PATH(path);
 
         ClientServerFixture::Config config;
-        config.client_ping_period = 0; // send ping immediately
+        config.client_ping_period = 0;  // send ping immediately
         config.client_pong_timeout = 0; // time out immediately
         ClientServerFixture fixture(dir, test_context, config);
 
@@ -6044,7 +5938,7 @@ TEST(Sync_ReconnectAfterPingTimeout)
     SHARED_GROUP_TEST_PATH(path);
 
     ClientServerFixture::Config config;
-    config.client_ping_period = 0; // send ping immediately
+    config.client_ping_period = 0;  // send ping immediately
     config.client_pong_timeout = 0; // time out immediately
 
     ClientServerFixture fixture(dir, test_context, config);
@@ -6086,7 +5980,7 @@ TEST(Sync_UrgentPingIsSent)
         Session session = fixture.make_session(path);
         fixture.bind_session(session, "/test");
         session.wait_for_download_complete_or_client_stopped(); // ensure connection established
-        session.cancel_reconnect_delay(); // send an urgent ping
+        session.cancel_reconnect_delay();                       // send an urgent ping
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK(did_fail);
@@ -6106,9 +6000,10 @@ TEST(Sync_ServerDiscardDeadConnections)
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
         using syserr = util::error::basic_system_errors;
-        bool valid_error = (util::MiscExtErrors::end_of_input ==  ec) ||
-                           (util::MiscExtErrors::premature_end_of_input ==  ec) ||
-                           (make_basic_system_error_code(syserr::connection_reset) == ec) || // FIXME: this is the error on Windows. is it correct?
+        bool valid_error = (util::MiscExtErrors::end_of_input == ec) ||
+                           (util::MiscExtErrors::premature_end_of_input == ec) ||
+                           (make_basic_system_error_code(syserr::connection_reset) ==
+                            ec) || // FIXME: this is the error on Windows. is it correct?
                            (make_basic_system_error_code(syserr::connection_aborted) == ec);
         CHECK(valid_error);
         bowl.add_stone();
@@ -6119,7 +6014,7 @@ TEST(Sync_ServerDiscardDeadConnections)
     Session session = fixture.make_session(path);
     fixture.bind_session(session, "/test");
     session.wait_for_download_complete_or_client_stopped(); // ensure connection established
-    fixture.set_server_connection_reaper_timeout(0); // all connections will now be considered dead
+    fixture.set_server_connection_reaper_timeout(0);        // all connections will now be considered dead
     bowl.get_stone();
 }
 
@@ -6141,20 +6036,20 @@ TEST_IF(Sync_EncryptClientRealmFiles, REALM_ENABLE_ENCRYPTION)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-/* TODO: add an error callback for when the encryption key is wrong
-    // attempt to open a session at the same path with a different encryption key
-    {
-        std::array<char, 64> wrong_key;
-        wrong_key.fill(99);
+    /* TODO: add an error callback for when the encryption key is wrong
+        // attempt to open a session at the same path with a different encryption key
+        {
+            std::array<char, 64> wrong_key;
+            wrong_key.fill(99);
 
-        Session::Config config;
-        config.encryption_key = wrong_key;
+            Session::Config config;
+            config.encryption_key = wrong_key;
 
-        Session session = fixture.make_session(path, config);
-        fixture.bind_session(session, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-*/
+            Session session = fixture.make_session(path, config);
+            fixture.bind_session(session, "/test");
+            session.wait_for_download_complete_or_client_stopped();
+        }
+    */
 
     // attempt to open a session at the same path with the same encryption key
     {
@@ -6201,8 +6096,7 @@ TEST(Sync_Quadratic_Merge)
 
     int num_clients = 2;
     int num_servers = 1;
-    MultiClientServerFixture fixture {num_clients, num_servers, server_dir,
-        test_context};
+    MultiClientServerFixture fixture{num_clients, num_servers, server_dir, test_context};
     fixture.start();
 
     Session session_1 = fixture.make_session(0, client_path_1);
@@ -6232,7 +6126,7 @@ TEST(Sync_BatchedUploadMessages)
     Session session = fixture.make_session(path);
 
     {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = sync::create_table(wt, "class_foo");
         tr->add_column(type_Int, "integer column");
         wt.commit();
@@ -6241,19 +6135,15 @@ TEST(Sync_BatchedUploadMessages)
     // Create a lot of changesets. We will attempt to check that
     // they are uploaded in a few upload messages.
     for (int i = 0; i < 400; ++i) {
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         TableRef tr = wt.get_table("class_foo");
         sync::create_object(wt, *tr).set("integer column", i);
         wt.commit();
     }
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes,
-                                uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes,
-                                uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version,
-                                uint_fast64_t snapshot_version)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         CHECK_GREATER(uploadable_bytes, 1000);
 
         // This is the important check. If the changesets were not batched,
@@ -6296,7 +6186,7 @@ TEST(Sync_UploadLogCompactionEnabled)
     // Create a changeset with lots of overwrites of the
     // same fields.
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = sync::create_table(wt, "class_foo");
         tr->add_column(type_Int, "integer column");
         Obj obj0 = sync::create_object(wt, *tr);
@@ -6311,13 +6201,9 @@ TEST(Sync_UploadLogCompactionEnabled)
     fixture.bind_session(session_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](uint_fast64_t downloaded_bytes,
-                                uint_fast64_t downloadable_bytes,
-                                uint_fast64_t uploaded_bytes,
-                                uint_fast64_t uploadable_bytes,
-                                uint_fast64_t progress_version,
-                                uint_fast64_t snapshot_version)
-    {
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
@@ -6353,7 +6239,7 @@ TEST(Sync_UploadLogCompactionDisabled)
     SHARED_GROUP_TEST_PATH(path_2);
 
     ClientServerFixture::Config config;
-    config.disable_upload_compaction  = true;
+    config.disable_upload_compaction = true;
     config.disable_history_compaction = true;
     ClientServerFixture fixture{server_dir, test_context, config};
     fixture.start();
@@ -6366,7 +6252,7 @@ TEST(Sync_UploadLogCompactionDisabled)
     // Create a changeset with lots of overwrites of the
     // same fields.
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
         TableRef tr = sync::create_table(wt, "class_foo");
         auto col_int = tr->add_column(type_Int, "integer column");
         Obj obj0 = sync::create_object(wt, *tr);
@@ -6381,13 +6267,9 @@ TEST(Sync_UploadLogCompactionDisabled)
     Session session_1 = fixture.make_bound_session(path_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](std::uint_fast64_t downloaded_bytes,
-                                std::uint_fast64_t downloadable_bytes,
-                                std::uint_fast64_t uploaded_bytes,
-                                std::uint_fast64_t uploadable_bytes,
-                                std::uint_fast64_t progress_version,
-                                std::uint_fast64_t snapshot_version)
-    {
+    auto progress_handler = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
+                                std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
+                                std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version) {
         CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
@@ -6432,7 +6314,7 @@ TEST(Sync_ServerHasMoved)
 
     ThreadWrapper client_thread;
     client_thread.start([&] {
-            client.run();
+        client.run();
     });
 
     // when connecting to the C++ server, use URL prefix:
@@ -6466,11 +6348,11 @@ TEST(Sync_ServerHasMoved)
 
         ThreadWrapper server_thread;
         server_thread.start([&] {
-                server.run();
+            server.run();
         });
 
-        session.bind(server_config.listen_address, "/url", g_signed_test_user_token,
-                server.listen_endpoint().port(), sync::ProtocolEnvelope::realm);
+        session.bind(server_config.listen_address, "/url", g_signed_test_user_token, server.listen_endpoint().port(),
+                     sync::ProtocolEnvelope::realm);
 
         wait();
 
@@ -6492,7 +6374,7 @@ TEST(Sync_ServerHasMoved)
 
         ThreadWrapper server_thread;
         server_thread.start([&] {
-                server.run();
+            server.run();
         });
 
         session.override_server(server_config.listen_address, server.listen_endpoint().port());
@@ -6608,7 +6490,7 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
     DBRef sg_2 = DB::create(*history_2);
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
 
         TableRef table_target = create_table(wt, "class_target");
         ColKey col_ndx = table_target->add_column(type_Int, "value");
@@ -6711,7 +6593,7 @@ TEST(Sync_ConnectionStateChange)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
     using ConnectionState = Session::ConnectionState;
-    using ErrorInfo       = Session::ErrorInfo;
+    using ErrorInfo = Session::ErrorInfo;
     std::vector<ConnectionState> states_1, states_2;
     {
         ClientServerFixture fixture(dir, test_context);
@@ -6745,11 +6627,8 @@ TEST(Sync_ConnectionStateChange)
         bowl_1.get_stone();
         bowl_2.get_stone();
     }
-    std::vector<ConnectionState> reference{
-        ConnectionState::connecting,
-        ConnectionState::connected,
-        ConnectionState::disconnected
-    };
+    std::vector<ConnectionState> reference{ConnectionState::connecting, ConnectionState::connected,
+                                           ConnectionState::disconnected};
     CHECK(states_1 == reference);
     CHECK(states_2 == reference);
 }
@@ -6876,7 +6755,8 @@ TEST(Sync_ServerSideModify_Randomize)
                 table->add_column(type_Int, "i");
             }
             if (i % 2 == 0)
-                sync::create_object(wt, *table);;
+                sync::create_object(wt, *table);
+            ;
             Obj obj = *(table->begin() + random.draw_int_mod(table->size()));
             obj.set<int64_t>("i", random.draw_int_max(0x0'7FFF'FFFF'FFFF'FFFF));
             version_type new_version = wt.commit();
@@ -6951,8 +6831,9 @@ TEST_IF(Sync_SSL_Certificates, false)
         auto listener = [&](Session::ConnectionState state, const Session::ErrorInfo* error_info) {
             if (state == Session::ConnectionState::disconnected) {
                 CHECK(error_info);
-                client_logger.debug("State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
-                                    error_info->error_code, error_info->is_fatal, error_info->detailed_message);
+                client_logger.debug(
+                    "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
+                    error_info->error_code, error_info->is_fatal, error_info->detailed_message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
                 client.stop();
@@ -7058,25 +6939,19 @@ TEST(Sync_BadChangeset)
 
 namespace issue2104 {
 
-class IntegrationReporter: public _impl::ServerHistory::IntegrationReporter {
+class IntegrationReporter : public _impl::ServerHistory::IntegrationReporter {
 public:
-    void on_integration_session_begin() override
-    {
-    }
+    void on_integration_session_begin() override {}
 
-    void on_changeset_integrated(std::size_t) override
-    {
-    }
+    void on_changeset_integrated(std::size_t) override {}
 
-    void on_changesets_merged(long) override
-    {
-    }
+    void on_changesets_merged(long) override {}
 };
 
-class ServerHistoryContext: public _impl::ServerHistory::Context {
+class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContext():
-        m_transformer {make_transformer()}
+    ServerHistoryContext()
+        : m_transformer{make_transformer()}
     {
     }
 
@@ -7133,155 +7008,154 @@ TEST_IF(Sync_Issue2104, false)
     std::string realm_path_copy = File::resolve("issue_2104.realm", dir);
     util::File::copy(realm_path, realm_path_copy);
 
-    std::string changeset_hex =
-        "3F 00 07 41 42 43 44 61 74 61 3F 01 02 69 64 3F 02 09 41 6C 69 67 6E 6D 65 6E 74 3F "
-        "03 12 42 65 68 61 76 69 6F 72 4F 63 63 75 72 72 65 6E 63 65 3F 04 0D 42 65 68 61 76 "
-        "69 6F 72 50 68 61 73 65 3F 05 09 43 6F 6C 6C 65 63 74 6F 72 3F 06 09 43 72 69 74 65 "
-        "72 69 6F 6E 3F 07 07 46 65 61 74 75 72 65 3F 08 12 49 6E 73 74 72 75 63 74 69 6F 6E "
-        "61 6C 54 72 69 61 6C 3F 09 14 4D 65 61 73 75 72 65 6D 65 6E 74 50 72 6F 63 65 64 75 "
-        "72 65 3F 0A 07 4D 65 73 73 61 67 65 3F 0B 04 4E 6F 74 65 3F 0C 16 4F 6E 62 6F 61 72 "
-        "64 69 6E 67 54 6F 75 72 50 72 6F 67 72 65 73 73 3F 0D 05 50 68 61 73 65 3F 0E 07 50 "
-        "72 6F 67 72 61 6D 3F 0F 0C 50 72 6F 67 72 61 6D 47 72 6F 75 70 3F 10 0A 50 72 6F 67 "
-        "72 61 6D 52 75 6E 3F 11 0F 50 72 6F 67 72 61 6D 54 65 6D 70 6C 61 74 65 3F 12 0B 52 "
-        "65 61 6C 6D 53 74 72 69 6E 67 3F 13 0B 53 65 73 73 69 6F 6E 4E 6F 74 65 3F 14 07 53 "
-        "74 75 64 65 6E 74 3F 15 06 54 61 72 67 65 74 3F 16 0E 54 61 72 67 65 74 54 65 6D 70 "
-        "6C 61 74 65 3F 17 04 54 61 73 6B 3F 18 05 54 6F 6B 65 6E 3F 19 04 55 73 65 72 3F 1A "
-        "07 5F 5F 43 6C 61 73 73 3F 1B 04 6E 61 6D 65 3F 1C 0C 5F 5F 50 65 72 6D 69 73 73 69 "
-        "6F 6E 3F 1D 07 5F 5F 52 65 61 6C 6D 3F 1E 06 5F 5F 52 6F 6C 65 3F 1F 06 5F 5F 55 73 "
-        "65 72 3F 20 09 63 72 65 61 74 65 64 41 74 3F 21 0A 6D 6F 64 69 66 69 65 64 41 74 3F "
-        "22 09 63 72 65 61 74 65 64 42 79 3F 23 0A 6D 6F 64 69 66 69 65 64 42 79 3F 24 07 70 "
-        "72 6F 67 72 61 6D 3F 25 04 64 61 74 65 3F 26 0A 61 6E 74 65 63 65 64 65 6E 74 3F 27 "
-        "08 62 65 68 61 76 69 6F 72 3F 28 0B 63 6F 6E 73 65 71 75 65 6E 63 65 3F 29 07 73 65 "
-        "74 74 69 6E 67 3F 2A 04 6E 6F 74 65 3F 2B 08 63 61 74 65 67 6F 72 79 3F 2C 05 6C 65 "
-        "76 65 6C 3F 2D 0A 6F 63 63 75 72 72 65 64 41 74 3F 2E 05 70 68 61 73 65 3F 2F 08 64 "
-        "75 72 61 74 69 6F 6E 3F 30 07 6D 61 72 6B 52 61 77 3F 31 09 73 68 6F 72 74 4E 61 6D "
-        "65 3F 32 0A 64 65 66 69 6E 69 74 69 6F 6E 3F 33 06 74 61 72 67 65 74 3F 34 08 74 65 "
-        "6D 70 6C 61 74 65 3F 35 0D 6C 61 62 65 6C 4F 76 65 72 72 69 64 65 3F 36 08 62 61 73 "
-        "65 6C 69 6E 65 3F 37 13 63 6F 6C 6C 65 63 74 69 6F 6E 46 72 65 71 75 65 6E 63 79 3F "
-        "38 0E 61 64 64 69 74 69 6F 6E 61 6C 49 6E 66 6F 3F 39 0D 64 61 79 73 54 6F 49 6E 63 "
-        "6C 75 64 65 3F 3A 0D 64 61 79 73 54 6F 45 78 63 6C 75 64 65 3F 3B 07 74 79 70 65 52 "
-        "61 77 3F 3C 09 66 72 65 71 75 65 6E 63 79 3F 3D 08 69 6E 74 65 72 76 61 6C 3F 3E 0E "
-        "70 6F 69 6E 74 73 41 6E 61 6C 79 7A 65 64 3F 3F 0D 6D 69 6E 50 65 72 63 65 6E 74 61 "
-        "67 65 3F C0 00 04 63 6F 64 65 3F C1 00 06 74 65 61 6D 49 64 3F C2 00 03 75 72 6C 3F "
-        "C3 00 07 73 65 63 74 69 6F 6E 3F C4 00 11 63 72 69 74 65 72 69 6F 6E 44 65 66 61 75 "
-        "6C 74 73 3F C5 00 04 74 61 73 6B 3F C6 00 09 72 65 73 75 6C 74 52 61 77 3F C7 00 09 "
-        "70 72 6F 6D 70 74 52 61 77 3F C8 00 04 74 65 78 74 3F C9 00 0A 70 72 6F 67 72 61 6D "
-        "52 75 6E 3F CA 00 09 72 65 63 69 70 69 65 6E 74 3F CB 00 04 62 6F 64 79 3F CC 00 06 "
-        "61 63 74 69 76 65 3F CD 00 0D 62 65 68 61 76 69 6F 72 50 68 61 73 65 3F CE 00 03 64 "
-        "61 79 3F CF 00 06 74 6F 75 72 49 64 3F D0 00 08 63 6F 6D 70 6C 65 74 65 3F D1 00 05 "
-        "73 74 61 72 74 3F D2 00 03 65 6E 64 3F D3 00 05 74 69 74 6C 65 3F D4 00 12 70 72 6F "
-        "67 72 61 6D 44 65 73 63 72 69 70 74 69 6F 6E 3F D5 00 09 63 72 69 74 65 72 69 6F 6E "
-        "3F D6 00 0E 63 72 69 74 65 72 69 6F 6E 52 75 6C 65 73 3F D7 00 03 73 74 6F 3F D8 00 "
-        "03 6C 74 6F 3F D9 00 18 72 65 69 6E 66 6F 72 63 65 6D 65 6E 74 53 63 68 65 64 75 6C "
-        "65 52 61 77 3F DA 00 0D 72 65 69 6E 66 6F 72 63 65 6D 65 6E 74 3F DB 00 11 72 65 69 "
-        "6E 66 6F 72 63 65 6D 65 6E 74 54 79 70 65 3F DC 00 16 64 69 73 63 72 69 6D 69 6E 61 "
-        "74 69 76 65 53 74 69 6D 75 6C 75 73 3F DD 00 07 74 61 72 67 65 74 73 3F DE 00 05 74 "
-        "61 73 6B 73 3F DF 00 0A 74 61 73 6B 53 74 61 74 65 73 3F E0 00 0C 74 6F 74 61 6C 49 "
-        "54 43 6F 75 6E 74 3F E1 00 0A 73 61 6D 70 6C 65 54 69 6D 65 3F E2 00 10 64 65 66 61 "
-        "75 6C 74 52 65 73 75 6C 74 52 61 77 3F E3 00 0F 76 61 72 69 61 62 6C 65 49 54 43 6F "
-        "75 6E 74 3F E4 00 09 65 72 72 6F 72 6C 65 73 73 3F E5 00 0C 6D 69 6E 41 74 74 65 6D "
-        "70 74 65 64 3F E6 00 10 64 65 66 61 75 6C 74 4D 65 74 68 6F 64 52 61 77 3F E7 00 0A "
-        "73 65 74 74 69 6E 67 52 61 77 3F E8 00 07 73 74 75 64 65 6E 74 3F E9 00 0F 6D 61 73 "
-        "74 65 72 65 64 54 61 72 67 65 74 73 3F EA 00 0D 66 75 74 75 72 65 54 61 72 67 65 74 "
-        "73 3F EB 00 05 67 72 6F 75 70 3F EC 00 06 6C 6F 63 6B 65 64 3F ED 00 0E 6C 61 73 74 "
-        "44 65 63 69 73 69 6F 6E 41 74 3F EE 00 08 61 72 63 68 69 76 65 64 3F EF 00 0E 64 61 "
-        "74 65 73 54 6F 49 6E 63 6C 75 64 65 3F F0 00 0E 64 61 74 65 73 54 6F 45 78 63 6C 75 "
-        "64 65 3F F1 00 09 64 72 61 77 65 72 52 61 77 3F F2 00 0B 63 6F 6D 70 6C 65 74 65 64 "
-        "41 74 3F F3 00 03 49 54 73 3F F4 00 0C 64 69 73 70 6C 61 79 4F 72 64 65 72 3F F5 00 "
-        "0F 63 6F 72 72 65 63 74 4F 76 65 72 72 69 64 65 3F F6 00 11 61 74 74 65 6D 70 74 65 "
-        "64 4F 76 65 72 72 69 64 65 3F F7 00 09 6D 65 74 68 6F 64 52 61 77 3F F8 00 08 73 74 "
-        "61 74 65 52 61 77 3F F9 00 0C 70 6F 69 6E 74 54 79 70 65 52 61 77 3F FA 00 09 61 6C "
-        "69 67 6E 6D 65 6E 74 3F FB 00 08 65 78 61 6D 70 6C 65 73 3F FC 00 0E 67 65 6E 65 72 "
-        "61 6C 69 7A 61 74 69 6F 6E 3F FD 00 09 6D 61 74 65 72 69 61 6C 73 3F FE 00 09 6F 62 "
-        "6A 65 63 74 69 76 65 3F FF 00 0F 72 65 63 6F 6D 6D 65 6E 64 61 74 69 6F 6E 73 3F 80 "
-        "01 08 73 74 69 6D 75 6C 75 73 3F 81 01 0B 74 61 72 67 65 74 4E 6F 74 65 73 3F 82 01 "
-        "11 74 65 61 63 68 69 6E 67 50 72 6F 63 65 64 75 72 65 3F 83 01 0A 76 62 6D 61 70 70 "
-        "54 61 67 73 3F 84 01 08 61 66 6C 73 54 61 67 73 3F 85 01 09 6E 79 73 6C 73 54 61 67 "
-        "73 3F 86 01 06 64 6F 6D 61 69 6E 3F 87 01 04 67 6F 61 6C 3F 88 01 07 73 75 62 6A 65 "
-        "63 74 3F 89 01 0B 6A 6F 62 43 61 74 65 67 6F 72 79 3F 8A 01 13 70 72 6F 6D 70 74 69 "
-        "6E 67 50 72 6F 63 65 64 75 72 65 73 3F 8B 01 10 70 72 65 73 63 68 6F 6F 6C 4D 61 73 "
-        "74 65 72 79 3F 8C 01 0C 61 62 6C 6C 73 4D 61 73 74 65 72 79 3F 8D 01 0D 64 61 74 61 "
-        "52 65 63 6F 72 64 69 6E 67 3F 8E 01 0F 65 72 72 6F 72 43 6F 72 72 65 63 74 69 6F 6E "
-        "3F 8F 01 0B 73 74 72 69 6E 67 56 61 6C 75 65 3F 90 01 06 63 6C 69 65 6E 74 3F 91 01 "
-        "09 74 68 65 72 61 70 69 73 74 3F 92 01 0B 72 65 69 6E 66 6F 72 63 65 72 73 3F 93 01 "
-        "05 6E 6F 74 65 73 3F 94 01 0F 74 61 72 67 65 74 42 65 68 61 76 69 6F 72 73 3F 95 01 "
-        "08 67 6F 61 6C 73 4D 65 74 3F 96 01 0D 74 79 70 65 4F 66 53 65 72 76 69 63 65 3F 97 "
-        "01 0D 70 65 6F 70 6C 65 50 72 65 73 65 6E 74 3F 98 01 08 6C 61 74 69 74 75 64 65 3F "
-        "99 01 09 6C 6F 6E 67 69 74 75 64 65 3F 9A 01 06 61 6C 65 72 74 73 3F 9B 01 03 65 69 "
-        "6E 3F 9C 01 03 64 6F 62 3F 9D 01 0F 70 72 69 6D 61 72 79 47 75 61 72 64 69 61 6E 3F "
-        "9E 01 11 73 65 63 6F 6E 64 61 72 79 47 75 61 72 64 69 61 6E 3F 9F 01 08 69 6D 61 67 "
-        "65 55 72 6C 3F A0 01 0B 64 65 61 63 74 69 76 61 74 65 64 3F A1 01 11 74 61 72 67 65 "
-        "74 44 65 73 63 72 69 70 74 69 6F 6E 3F A2 01 08 6D 61 73 74 65 72 65 64 3F A3 01 0F "
-        "74 61 73 6B 44 65 73 63 72 69 70 74 69 6F 6E 3F A4 01 09 65 78 70 69 72 65 73 41 74 "
-        "3F A5 01 0C 63 6F 6C 6C 65 63 74 6F 72 49 64 73 3F A6 01 08 73 74 75 64 65 6E 74 73 "
-        "3F A7 01 12 6F 6E 62 6F 61 72 64 69 6E 67 50 72 6F 67 72 65 73 73 3F A8 01 05 65 6D "
-        "61 69 6C 3F A9 01 05 70 68 6F 6E 65 3F AA 01 07 72 6F 6C 65 52 61 77 3F AB 01 08 73 "
-        "65 74 74 69 6E 67 73 3F AC 01 0B 70 65 72 6D 69 73 73 69 6F 6E 73 3F AD 01 04 72 6F "
-        "6C 65 3F AE 01 07 63 61 6E 52 65 61 64 3F AF 01 09 63 61 6E 55 70 64 61 74 65 3F B0 "
-        "01 09 63 61 6E 44 65 6C 65 74 65 3F B1 01 11 63 61 6E 53 65 74 50 65 72 6D 69 73 73 "
-        "69 6F 6E 73 3F B2 01 08 63 61 6E 51 75 65 72 79 3F B3 01 09 63 61 6E 43 72 65 61 74 "
-        "65 3F B4 01 0F 63 61 6E 4D 6F 64 69 66 79 53 63 68 65 6D 61 3F B5 01 07 6D 65 6D 62 "
-        "65 72 73 02 00 01 01 02 00 02 02 01 01 02 00 02 03 01 01 02 00 02 04 01 01 02 00 02 "
-        "05 01 01 02 01 02 06 01 01 02 01 02 07 01 01 02 00 02 08 01 01 02 00 02 09 01 01 02 "
-        "00 02 0A 01 01 02 00 02 0B 01 01 02 00 02 0C 01 01 02 00 02 0D 01 01 02 00 02 0E 01 "
-        "01 02 00 02 0F 01 01 02 00 02 10 01 01 02 00 02 11 01 01 02 00 02 12 00 02 13 01 01 "
-        "02 00 02 14 01 01 02 00 02 15 01 01 02 00 02 16 01 01 02 00 02 17 01 01 02 00 02 18 "
-        "01 01 02 00 02 19 01 01 02 00 02 1A 01 1B 02 00 02 1C 00 02 1D 01 01 00 00 02 1E 01 "
-        "1B 02 00 02 1F 01 01 02 00 00 00 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 "
-        "0C 00 19 0B 24 0C 00 0E 0B 25 08 00 00 0B 26 02 00 01 0B 27 02 00 01 0B 28 02 00 01 "
-        "0B 29 02 00 01 0B 2A 02 00 01 00 02 0B 20 08 00 00 0B 21 08 00 00 0B 2B 02 00 01 0B "
-        "2C 02 00 01 00 03 0B 20 08 00 00 0B 21 08 00 00 0B 2D 08 00 00 0B 22 0C 00 19 0B 23 "
-        "0C 00 19 0B 2E 0C 00 04 0B 2F 0A 00 01 0B 30 02 00 00 00 04 0B 20 08 00 00 0B 21 08 "
-        "00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B 1B 02 00 01 0B 31 02 00 01 0B 32 02 00 01 0B "
-        "33 02 00 01 0B 24 0C 00 0E 0B 34 0C 00 11 0B 35 02 00 01 0B 36 02 00 01 0B 37 02 00 "
-        "01 0B 38 02 00 01 0B 39 08 02 00 0B 3A 08 02 00 0B 3B 02 00 00 00 05 0B 2F 0C 00 04 "
-        "0B 3C 0C 00 04 0B 3D 0C 00 10 00 06 0B 3E 00 00 00 0B 3F 0A 00 00 00 07 0B C0 00 02 "
-        "00 00 0B C1 00 02 00 01 0B C2 00 02 00 01 0B C3 00 02 00 01 0B C4 00 0D 00 06 00 08 "
-        "0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B C5 00 0C 00 17 0B 33 "
-        "0C 00 15 0B C6 00 02 00 00 0B C7 00 02 00 00 00 09 0B C8 00 02 00 01 00 0A 0B 20 08 "
-        "00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B C9 00 0C 00 10 0B 24 0C 00 0E "
-        "0B CA 00 0C 00 19 0B CB 00 02 00 00 0B CC 00 01 00 00 0B 3B 02 00 00 00 0B 0B 20 08 "
-        "00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B CD 00 0C 00 04 0B CE 00 08 00 "
-        "00 0B CB 00 02 00 00 0B CC 00 01 00 00 00 0C 0B CF 00 02 00 00 0B D0 00 01 00 00 00 "
-        "0D 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B 24 0C 00 0E 0B D1 "
-        "00 08 00 00 0B D2 00 08 00 01 0B D3 00 02 00 01 0B D4 00 02 00 01 0B 32 02 00 01 0B "
-        "D5 00 02 00 01 0B D6 00 0D 00 06 0B D7 00 02 00 01 0B D8 00 02 00 01 0B 36 02 00 01 "
-        "0B 37 02 00 01 0B 35 02 00 01 0B 38 02 00 01 0B C7 00 02 00 00 0B D9 00 02 00 00 0B "
-        "DA 00 00 00 01 0B DB 00 02 00 01 0B DC 00 02 00 01 0B DD 00 0D 00 15 0B DE 00 0D 00 "
-        "17 0B DF 00 0D 00 12 0B E0 00 00 00 01 0B E1 00 0A 00 01 0B E2 00 02 00 00 0B E3 00 "
-        "01 00 00 0B E4 00 01 00 00 0B E5 00 00 00 00 0B E6 00 02 00 00 0B E7 00 02 00 00 00 "
-        "0E 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B E8 00 0C 00 14 0B "
-        "E9 00 0D 00 15 0B EA 00 0D 00 15 0B EB 00 0C 00 0F 0B EC 00 01 00 00 0B ED 00 08 00 "
-        "01 0B EE 00 01 00 00 0B 34 0C 00 11 0B EF 00 08 02 00 0B F0 00 08 02 00 0B F1 00 02 "
-        "00 00 00 0F 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 00 10 0B 20 "
-        "08 00 00 0B 21 08 00 00 0B F2 00 08 00 01 0B 22 0C 00 19 0B 23 0C 00 19 0B F3 00 0D "
-        "00 08 0B CC 00 01 00 00 0B F4 00 00 00 01 0B F5 00 00 00 01 0B F6 00 00 00 01 0B F7 "
-        "00 02 00 00 0B F8 00 02 00 00 0B F9 00 02 00 00 0B 2E 0C 00 0D 0B 2A 02 00 01 0B EE "
-        "00 01 00 00 00 11 0B 20 08 00 00 0B 21 08 00 00 0B FA 00 0C 00 02 0B 36 02 00 01 0B "
-        "FB 00 02 00 01 0B EA 00 0D 00 16 0B FC 00 02 00 01 0B FD 00 02 00 01 0B 1B 02 00 01 "
-        "0B FE 00 02 00 01 0B FF 00 02 00 01 0B 80 01 02 00 01 0B 81 01 02 00 01 0B 82 01 02 "
-        "00 01 0B 32 02 00 01 0B 83 01 02 00 01 0B 84 01 02 00 01 0B 85 01 02 00 01 0B 86 01 "
-        "02 00 01 0B 87 01 02 00 01 0B 88 01 02 00 01 0B 89 01 02 00 01 0B D8 00 02 00 01 0B "
-        "8A 01 02 00 01 0B 8B 01 02 00 01 0B 8C 01 02 00 01 0B 8D 01 02 00 01 0B 8E 01 02 00 "
-        "01 0B D5 00 0D 00 06 00 12 0B 8F 01 02 00 00 00 13 0B 20 08 00 00 0B 21 08 00 00 0B "
-        "22 0C 00 19 0B 23 0C 00 19 0B 90 01 0C 00 14 0B 91 01 02 00 01 0B 92 01 02 00 01 0B "
-        "93 01 02 00 01 0B 94 01 02 00 01 0B 95 01 02 00 01 0B 96 01 02 00 01 0B 97 01 02 00 "
-        "01 0B D1 00 08 00 01 0B D2 00 08 00 01 0B 98 01 0A 00 01 0B 99 01 0A 00 01 00 14 0B "
-        "20 08 00 00 0B 21 08 00 00 0B 1B 02 00 01 0B 9A 01 02 00 01 0B 9B 01 02 00 01 0B 9C "
-        "01 08 00 01 0B 9D 01 0C 00 19 0B 9E 01 0C 00 19 0B 9F 01 02 00 01 0B A0 01 01 00 00 "
-        "00 15 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B A1 01 02 00 01 "
-        "0B A2 01 08 00 01 00 16 0B 20 08 00 00 0B 21 08 00 00 0B A1 01 02 00 01 00 17 0B 20 "
-        "08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B A3 01 02 00 01 0B F8 00 02 "
-        "00 00 00 18 0B A4 01 08 00 00 0B CB 00 02 00 01 00 19 0B 20 08 00 00 0B 21 08 00 00 "
-        "0B A5 01 02 02 00 0B A6 01 0D 00 14 0B A7 01 0D 00 0C 0B 1B 02 00 01 0B A8 01 02 00 "
-        "01 0B A9 01 02 00 01 0B 9F 01 02 00 01 0B AA 01 02 00 00 0B AB 01 02 02 00 00 1A 0B "
-        "AC 01 0D 00 1C 00 1C 0B AD 01 0C 00 1E 0B AE 01 01 00 00 0B AF 01 01 00 00 0B B0 01 "
-        "01 00 00 0B B1 01 01 00 00 0B B2 01 01 00 00 0B B3 01 01 00 00 0B B4 01 01 00 00 00 "
-        "1D 0B AC 01 0D 00 1C 00 1E 0B B5 01 0D 00 1F 00 1F 0B AD 01 0C 00 1E";
+    std::string changeset_hex = "3F 00 07 41 42 43 44 61 74 61 3F 01 02 69 64 3F 02 09 41 6C 69 67 6E 6D 65 6E 74 3F "
+                                "03 12 42 65 68 61 76 69 6F 72 4F 63 63 75 72 72 65 6E 63 65 3F 04 0D 42 65 68 61 76 "
+                                "69 6F 72 50 68 61 73 65 3F 05 09 43 6F 6C 6C 65 63 74 6F 72 3F 06 09 43 72 69 74 65 "
+                                "72 69 6F 6E 3F 07 07 46 65 61 74 75 72 65 3F 08 12 49 6E 73 74 72 75 63 74 69 6F 6E "
+                                "61 6C 54 72 69 61 6C 3F 09 14 4D 65 61 73 75 72 65 6D 65 6E 74 50 72 6F 63 65 64 75 "
+                                "72 65 3F 0A 07 4D 65 73 73 61 67 65 3F 0B 04 4E 6F 74 65 3F 0C 16 4F 6E 62 6F 61 72 "
+                                "64 69 6E 67 54 6F 75 72 50 72 6F 67 72 65 73 73 3F 0D 05 50 68 61 73 65 3F 0E 07 50 "
+                                "72 6F 67 72 61 6D 3F 0F 0C 50 72 6F 67 72 61 6D 47 72 6F 75 70 3F 10 0A 50 72 6F 67 "
+                                "72 61 6D 52 75 6E 3F 11 0F 50 72 6F 67 72 61 6D 54 65 6D 70 6C 61 74 65 3F 12 0B 52 "
+                                "65 61 6C 6D 53 74 72 69 6E 67 3F 13 0B 53 65 73 73 69 6F 6E 4E 6F 74 65 3F 14 07 53 "
+                                "74 75 64 65 6E 74 3F 15 06 54 61 72 67 65 74 3F 16 0E 54 61 72 67 65 74 54 65 6D 70 "
+                                "6C 61 74 65 3F 17 04 54 61 73 6B 3F 18 05 54 6F 6B 65 6E 3F 19 04 55 73 65 72 3F 1A "
+                                "07 5F 5F 43 6C 61 73 73 3F 1B 04 6E 61 6D 65 3F 1C 0C 5F 5F 50 65 72 6D 69 73 73 69 "
+                                "6F 6E 3F 1D 07 5F 5F 52 65 61 6C 6D 3F 1E 06 5F 5F 52 6F 6C 65 3F 1F 06 5F 5F 55 73 "
+                                "65 72 3F 20 09 63 72 65 61 74 65 64 41 74 3F 21 0A 6D 6F 64 69 66 69 65 64 41 74 3F "
+                                "22 09 63 72 65 61 74 65 64 42 79 3F 23 0A 6D 6F 64 69 66 69 65 64 42 79 3F 24 07 70 "
+                                "72 6F 67 72 61 6D 3F 25 04 64 61 74 65 3F 26 0A 61 6E 74 65 63 65 64 65 6E 74 3F 27 "
+                                "08 62 65 68 61 76 69 6F 72 3F 28 0B 63 6F 6E 73 65 71 75 65 6E 63 65 3F 29 07 73 65 "
+                                "74 74 69 6E 67 3F 2A 04 6E 6F 74 65 3F 2B 08 63 61 74 65 67 6F 72 79 3F 2C 05 6C 65 "
+                                "76 65 6C 3F 2D 0A 6F 63 63 75 72 72 65 64 41 74 3F 2E 05 70 68 61 73 65 3F 2F 08 64 "
+                                "75 72 61 74 69 6F 6E 3F 30 07 6D 61 72 6B 52 61 77 3F 31 09 73 68 6F 72 74 4E 61 6D "
+                                "65 3F 32 0A 64 65 66 69 6E 69 74 69 6F 6E 3F 33 06 74 61 72 67 65 74 3F 34 08 74 65 "
+                                "6D 70 6C 61 74 65 3F 35 0D 6C 61 62 65 6C 4F 76 65 72 72 69 64 65 3F 36 08 62 61 73 "
+                                "65 6C 69 6E 65 3F 37 13 63 6F 6C 6C 65 63 74 69 6F 6E 46 72 65 71 75 65 6E 63 79 3F "
+                                "38 0E 61 64 64 69 74 69 6F 6E 61 6C 49 6E 66 6F 3F 39 0D 64 61 79 73 54 6F 49 6E 63 "
+                                "6C 75 64 65 3F 3A 0D 64 61 79 73 54 6F 45 78 63 6C 75 64 65 3F 3B 07 74 79 70 65 52 "
+                                "61 77 3F 3C 09 66 72 65 71 75 65 6E 63 79 3F 3D 08 69 6E 74 65 72 76 61 6C 3F 3E 0E "
+                                "70 6F 69 6E 74 73 41 6E 61 6C 79 7A 65 64 3F 3F 0D 6D 69 6E 50 65 72 63 65 6E 74 61 "
+                                "67 65 3F C0 00 04 63 6F 64 65 3F C1 00 06 74 65 61 6D 49 64 3F C2 00 03 75 72 6C 3F "
+                                "C3 00 07 73 65 63 74 69 6F 6E 3F C4 00 11 63 72 69 74 65 72 69 6F 6E 44 65 66 61 75 "
+                                "6C 74 73 3F C5 00 04 74 61 73 6B 3F C6 00 09 72 65 73 75 6C 74 52 61 77 3F C7 00 09 "
+                                "70 72 6F 6D 70 74 52 61 77 3F C8 00 04 74 65 78 74 3F C9 00 0A 70 72 6F 67 72 61 6D "
+                                "52 75 6E 3F CA 00 09 72 65 63 69 70 69 65 6E 74 3F CB 00 04 62 6F 64 79 3F CC 00 06 "
+                                "61 63 74 69 76 65 3F CD 00 0D 62 65 68 61 76 69 6F 72 50 68 61 73 65 3F CE 00 03 64 "
+                                "61 79 3F CF 00 06 74 6F 75 72 49 64 3F D0 00 08 63 6F 6D 70 6C 65 74 65 3F D1 00 05 "
+                                "73 74 61 72 74 3F D2 00 03 65 6E 64 3F D3 00 05 74 69 74 6C 65 3F D4 00 12 70 72 6F "
+                                "67 72 61 6D 44 65 73 63 72 69 70 74 69 6F 6E 3F D5 00 09 63 72 69 74 65 72 69 6F 6E "
+                                "3F D6 00 0E 63 72 69 74 65 72 69 6F 6E 52 75 6C 65 73 3F D7 00 03 73 74 6F 3F D8 00 "
+                                "03 6C 74 6F 3F D9 00 18 72 65 69 6E 66 6F 72 63 65 6D 65 6E 74 53 63 68 65 64 75 6C "
+                                "65 52 61 77 3F DA 00 0D 72 65 69 6E 66 6F 72 63 65 6D 65 6E 74 3F DB 00 11 72 65 69 "
+                                "6E 66 6F 72 63 65 6D 65 6E 74 54 79 70 65 3F DC 00 16 64 69 73 63 72 69 6D 69 6E 61 "
+                                "74 69 76 65 53 74 69 6D 75 6C 75 73 3F DD 00 07 74 61 72 67 65 74 73 3F DE 00 05 74 "
+                                "61 73 6B 73 3F DF 00 0A 74 61 73 6B 53 74 61 74 65 73 3F E0 00 0C 74 6F 74 61 6C 49 "
+                                "54 43 6F 75 6E 74 3F E1 00 0A 73 61 6D 70 6C 65 54 69 6D 65 3F E2 00 10 64 65 66 61 "
+                                "75 6C 74 52 65 73 75 6C 74 52 61 77 3F E3 00 0F 76 61 72 69 61 62 6C 65 49 54 43 6F "
+                                "75 6E 74 3F E4 00 09 65 72 72 6F 72 6C 65 73 73 3F E5 00 0C 6D 69 6E 41 74 74 65 6D "
+                                "70 74 65 64 3F E6 00 10 64 65 66 61 75 6C 74 4D 65 74 68 6F 64 52 61 77 3F E7 00 0A "
+                                "73 65 74 74 69 6E 67 52 61 77 3F E8 00 07 73 74 75 64 65 6E 74 3F E9 00 0F 6D 61 73 "
+                                "74 65 72 65 64 54 61 72 67 65 74 73 3F EA 00 0D 66 75 74 75 72 65 54 61 72 67 65 74 "
+                                "73 3F EB 00 05 67 72 6F 75 70 3F EC 00 06 6C 6F 63 6B 65 64 3F ED 00 0E 6C 61 73 74 "
+                                "44 65 63 69 73 69 6F 6E 41 74 3F EE 00 08 61 72 63 68 69 76 65 64 3F EF 00 0E 64 61 "
+                                "74 65 73 54 6F 49 6E 63 6C 75 64 65 3F F0 00 0E 64 61 74 65 73 54 6F 45 78 63 6C 75 "
+                                "64 65 3F F1 00 09 64 72 61 77 65 72 52 61 77 3F F2 00 0B 63 6F 6D 70 6C 65 74 65 64 "
+                                "41 74 3F F3 00 03 49 54 73 3F F4 00 0C 64 69 73 70 6C 61 79 4F 72 64 65 72 3F F5 00 "
+                                "0F 63 6F 72 72 65 63 74 4F 76 65 72 72 69 64 65 3F F6 00 11 61 74 74 65 6D 70 74 65 "
+                                "64 4F 76 65 72 72 69 64 65 3F F7 00 09 6D 65 74 68 6F 64 52 61 77 3F F8 00 08 73 74 "
+                                "61 74 65 52 61 77 3F F9 00 0C 70 6F 69 6E 74 54 79 70 65 52 61 77 3F FA 00 09 61 6C "
+                                "69 67 6E 6D 65 6E 74 3F FB 00 08 65 78 61 6D 70 6C 65 73 3F FC 00 0E 67 65 6E 65 72 "
+                                "61 6C 69 7A 61 74 69 6F 6E 3F FD 00 09 6D 61 74 65 72 69 61 6C 73 3F FE 00 09 6F 62 "
+                                "6A 65 63 74 69 76 65 3F FF 00 0F 72 65 63 6F 6D 6D 65 6E 64 61 74 69 6F 6E 73 3F 80 "
+                                "01 08 73 74 69 6D 75 6C 75 73 3F 81 01 0B 74 61 72 67 65 74 4E 6F 74 65 73 3F 82 01 "
+                                "11 74 65 61 63 68 69 6E 67 50 72 6F 63 65 64 75 72 65 3F 83 01 0A 76 62 6D 61 70 70 "
+                                "54 61 67 73 3F 84 01 08 61 66 6C 73 54 61 67 73 3F 85 01 09 6E 79 73 6C 73 54 61 67 "
+                                "73 3F 86 01 06 64 6F 6D 61 69 6E 3F 87 01 04 67 6F 61 6C 3F 88 01 07 73 75 62 6A 65 "
+                                "63 74 3F 89 01 0B 6A 6F 62 43 61 74 65 67 6F 72 79 3F 8A 01 13 70 72 6F 6D 70 74 69 "
+                                "6E 67 50 72 6F 63 65 64 75 72 65 73 3F 8B 01 10 70 72 65 73 63 68 6F 6F 6C 4D 61 73 "
+                                "74 65 72 79 3F 8C 01 0C 61 62 6C 6C 73 4D 61 73 74 65 72 79 3F 8D 01 0D 64 61 74 61 "
+                                "52 65 63 6F 72 64 69 6E 67 3F 8E 01 0F 65 72 72 6F 72 43 6F 72 72 65 63 74 69 6F 6E "
+                                "3F 8F 01 0B 73 74 72 69 6E 67 56 61 6C 75 65 3F 90 01 06 63 6C 69 65 6E 74 3F 91 01 "
+                                "09 74 68 65 72 61 70 69 73 74 3F 92 01 0B 72 65 69 6E 66 6F 72 63 65 72 73 3F 93 01 "
+                                "05 6E 6F 74 65 73 3F 94 01 0F 74 61 72 67 65 74 42 65 68 61 76 69 6F 72 73 3F 95 01 "
+                                "08 67 6F 61 6C 73 4D 65 74 3F 96 01 0D 74 79 70 65 4F 66 53 65 72 76 69 63 65 3F 97 "
+                                "01 0D 70 65 6F 70 6C 65 50 72 65 73 65 6E 74 3F 98 01 08 6C 61 74 69 74 75 64 65 3F "
+                                "99 01 09 6C 6F 6E 67 69 74 75 64 65 3F 9A 01 06 61 6C 65 72 74 73 3F 9B 01 03 65 69 "
+                                "6E 3F 9C 01 03 64 6F 62 3F 9D 01 0F 70 72 69 6D 61 72 79 47 75 61 72 64 69 61 6E 3F "
+                                "9E 01 11 73 65 63 6F 6E 64 61 72 79 47 75 61 72 64 69 61 6E 3F 9F 01 08 69 6D 61 67 "
+                                "65 55 72 6C 3F A0 01 0B 64 65 61 63 74 69 76 61 74 65 64 3F A1 01 11 74 61 72 67 65 "
+                                "74 44 65 73 63 72 69 70 74 69 6F 6E 3F A2 01 08 6D 61 73 74 65 72 65 64 3F A3 01 0F "
+                                "74 61 73 6B 44 65 73 63 72 69 70 74 69 6F 6E 3F A4 01 09 65 78 70 69 72 65 73 41 74 "
+                                "3F A5 01 0C 63 6F 6C 6C 65 63 74 6F 72 49 64 73 3F A6 01 08 73 74 75 64 65 6E 74 73 "
+                                "3F A7 01 12 6F 6E 62 6F 61 72 64 69 6E 67 50 72 6F 67 72 65 73 73 3F A8 01 05 65 6D "
+                                "61 69 6C 3F A9 01 05 70 68 6F 6E 65 3F AA 01 07 72 6F 6C 65 52 61 77 3F AB 01 08 73 "
+                                "65 74 74 69 6E 67 73 3F AC 01 0B 70 65 72 6D 69 73 73 69 6F 6E 73 3F AD 01 04 72 6F "
+                                "6C 65 3F AE 01 07 63 61 6E 52 65 61 64 3F AF 01 09 63 61 6E 55 70 64 61 74 65 3F B0 "
+                                "01 09 63 61 6E 44 65 6C 65 74 65 3F B1 01 11 63 61 6E 53 65 74 50 65 72 6D 69 73 73 "
+                                "69 6F 6E 73 3F B2 01 08 63 61 6E 51 75 65 72 79 3F B3 01 09 63 61 6E 43 72 65 61 74 "
+                                "65 3F B4 01 0F 63 61 6E 4D 6F 64 69 66 79 53 63 68 65 6D 61 3F B5 01 07 6D 65 6D 62 "
+                                "65 72 73 02 00 01 01 02 00 02 02 01 01 02 00 02 03 01 01 02 00 02 04 01 01 02 00 02 "
+                                "05 01 01 02 01 02 06 01 01 02 01 02 07 01 01 02 00 02 08 01 01 02 00 02 09 01 01 02 "
+                                "00 02 0A 01 01 02 00 02 0B 01 01 02 00 02 0C 01 01 02 00 02 0D 01 01 02 00 02 0E 01 "
+                                "01 02 00 02 0F 01 01 02 00 02 10 01 01 02 00 02 11 01 01 02 00 02 12 00 02 13 01 01 "
+                                "02 00 02 14 01 01 02 00 02 15 01 01 02 00 02 16 01 01 02 00 02 17 01 01 02 00 02 18 "
+                                "01 01 02 00 02 19 01 01 02 00 02 1A 01 1B 02 00 02 1C 00 02 1D 01 01 00 00 02 1E 01 "
+                                "1B 02 00 02 1F 01 01 02 00 00 00 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 "
+                                "0C 00 19 0B 24 0C 00 0E 0B 25 08 00 00 0B 26 02 00 01 0B 27 02 00 01 0B 28 02 00 01 "
+                                "0B 29 02 00 01 0B 2A 02 00 01 00 02 0B 20 08 00 00 0B 21 08 00 00 0B 2B 02 00 01 0B "
+                                "2C 02 00 01 00 03 0B 20 08 00 00 0B 21 08 00 00 0B 2D 08 00 00 0B 22 0C 00 19 0B 23 "
+                                "0C 00 19 0B 2E 0C 00 04 0B 2F 0A 00 01 0B 30 02 00 00 00 04 0B 20 08 00 00 0B 21 08 "
+                                "00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B 1B 02 00 01 0B 31 02 00 01 0B 32 02 00 01 0B "
+                                "33 02 00 01 0B 24 0C 00 0E 0B 34 0C 00 11 0B 35 02 00 01 0B 36 02 00 01 0B 37 02 00 "
+                                "01 0B 38 02 00 01 0B 39 08 02 00 0B 3A 08 02 00 0B 3B 02 00 00 00 05 0B 2F 0C 00 04 "
+                                "0B 3C 0C 00 04 0B 3D 0C 00 10 00 06 0B 3E 00 00 00 0B 3F 0A 00 00 00 07 0B C0 00 02 "
+                                "00 00 0B C1 00 02 00 01 0B C2 00 02 00 01 0B C3 00 02 00 01 0B C4 00 0D 00 06 00 08 "
+                                "0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B C5 00 0C 00 17 0B 33 "
+                                "0C 00 15 0B C6 00 02 00 00 0B C7 00 02 00 00 00 09 0B C8 00 02 00 01 00 0A 0B 20 08 "
+                                "00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B C9 00 0C 00 10 0B 24 0C 00 0E "
+                                "0B CA 00 0C 00 19 0B CB 00 02 00 00 0B CC 00 01 00 00 0B 3B 02 00 00 00 0B 0B 20 08 "
+                                "00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B CD 00 0C 00 04 0B CE 00 08 00 "
+                                "00 0B CB 00 02 00 00 0B CC 00 01 00 00 00 0C 0B CF 00 02 00 00 0B D0 00 01 00 00 00 "
+                                "0D 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B 24 0C 00 0E 0B D1 "
+                                "00 08 00 00 0B D2 00 08 00 01 0B D3 00 02 00 01 0B D4 00 02 00 01 0B 32 02 00 01 0B "
+                                "D5 00 02 00 01 0B D6 00 0D 00 06 0B D7 00 02 00 01 0B D8 00 02 00 01 0B 36 02 00 01 "
+                                "0B 37 02 00 01 0B 35 02 00 01 0B 38 02 00 01 0B C7 00 02 00 00 0B D9 00 02 00 00 0B "
+                                "DA 00 00 00 01 0B DB 00 02 00 01 0B DC 00 02 00 01 0B DD 00 0D 00 15 0B DE 00 0D 00 "
+                                "17 0B DF 00 0D 00 12 0B E0 00 00 00 01 0B E1 00 0A 00 01 0B E2 00 02 00 00 0B E3 00 "
+                                "01 00 00 0B E4 00 01 00 00 0B E5 00 00 00 00 0B E6 00 02 00 00 0B E7 00 02 00 00 00 "
+                                "0E 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B E8 00 0C 00 14 0B "
+                                "E9 00 0D 00 15 0B EA 00 0D 00 15 0B EB 00 0C 00 0F 0B EC 00 01 00 00 0B ED 00 08 00 "
+                                "01 0B EE 00 01 00 00 0B 34 0C 00 11 0B EF 00 08 02 00 0B F0 00 08 02 00 0B F1 00 02 "
+                                "00 00 00 0F 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 00 10 0B 20 "
+                                "08 00 00 0B 21 08 00 00 0B F2 00 08 00 01 0B 22 0C 00 19 0B 23 0C 00 19 0B F3 00 0D "
+                                "00 08 0B CC 00 01 00 00 0B F4 00 00 00 01 0B F5 00 00 00 01 0B F6 00 00 00 01 0B F7 "
+                                "00 02 00 00 0B F8 00 02 00 00 0B F9 00 02 00 00 0B 2E 0C 00 0D 0B 2A 02 00 01 0B EE "
+                                "00 01 00 00 00 11 0B 20 08 00 00 0B 21 08 00 00 0B FA 00 0C 00 02 0B 36 02 00 01 0B "
+                                "FB 00 02 00 01 0B EA 00 0D 00 16 0B FC 00 02 00 01 0B FD 00 02 00 01 0B 1B 02 00 01 "
+                                "0B FE 00 02 00 01 0B FF 00 02 00 01 0B 80 01 02 00 01 0B 81 01 02 00 01 0B 82 01 02 "
+                                "00 01 0B 32 02 00 01 0B 83 01 02 00 01 0B 84 01 02 00 01 0B 85 01 02 00 01 0B 86 01 "
+                                "02 00 01 0B 87 01 02 00 01 0B 88 01 02 00 01 0B 89 01 02 00 01 0B D8 00 02 00 01 0B "
+                                "8A 01 02 00 01 0B 8B 01 02 00 01 0B 8C 01 02 00 01 0B 8D 01 02 00 01 0B 8E 01 02 00 "
+                                "01 0B D5 00 0D 00 06 00 12 0B 8F 01 02 00 00 00 13 0B 20 08 00 00 0B 21 08 00 00 0B "
+                                "22 0C 00 19 0B 23 0C 00 19 0B 90 01 0C 00 14 0B 91 01 02 00 01 0B 92 01 02 00 01 0B "
+                                "93 01 02 00 01 0B 94 01 02 00 01 0B 95 01 02 00 01 0B 96 01 02 00 01 0B 97 01 02 00 "
+                                "01 0B D1 00 08 00 01 0B D2 00 08 00 01 0B 98 01 0A 00 01 0B 99 01 0A 00 01 00 14 0B "
+                                "20 08 00 00 0B 21 08 00 00 0B 1B 02 00 01 0B 9A 01 02 00 01 0B 9B 01 02 00 01 0B 9C "
+                                "01 08 00 01 0B 9D 01 0C 00 19 0B 9E 01 0C 00 19 0B 9F 01 02 00 01 0B A0 01 01 00 00 "
+                                "00 15 0B 20 08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B A1 01 02 00 01 "
+                                "0B A2 01 08 00 01 00 16 0B 20 08 00 00 0B 21 08 00 00 0B A1 01 02 00 01 00 17 0B 20 "
+                                "08 00 00 0B 21 08 00 00 0B 22 0C 00 19 0B 23 0C 00 19 0B A3 01 02 00 01 0B F8 00 02 "
+                                "00 00 00 18 0B A4 01 08 00 00 0B CB 00 02 00 01 00 19 0B 20 08 00 00 0B 21 08 00 00 "
+                                "0B A5 01 02 02 00 0B A6 01 0D 00 14 0B A7 01 0D 00 0C 0B 1B 02 00 01 0B A8 01 02 00 "
+                                "01 0B A9 01 02 00 01 0B 9F 01 02 00 01 0B AA 01 02 00 00 0B AB 01 02 02 00 00 1A 0B "
+                                "AC 01 0D 00 1C 00 1C 0B AD 01 0C 00 1E 0B AE 01 01 00 00 0B AF 01 01 00 00 0B B0 01 "
+                                "01 00 00 0B B1 01 01 00 00 0B B2 01 01 00 00 0B B3 01 01 00 00 0B B4 01 01 00 00 00 "
+                                "1D 0B AC 01 0D 00 1C 00 1E 0B B5 01 0D 00 1F 00 1F 0B AD 01 0C 00 1E";
 
     std::vector<char> changeset_vec;
     {
-        std::istringstream in {changeset_hex};
+        std::istringstream in{changeset_hex};
         int n;
         in >> std::hex >> n;
         while (in) {
@@ -7291,7 +7165,7 @@ TEST_IF(Sync_Issue2104, false)
         }
     }
 
-    BinaryData changeset_bin {changeset_vec.data(), changeset_vec.size()};
+    BinaryData changeset_bin{changeset_vec.data(), changeset_vec.size()};
 
     file_ident_type client_file_ident = 51;
     timestamp_type origin_timestamp = 103573722140;
@@ -7300,27 +7174,21 @@ TEST_IF(Sync_Issue2104, false)
     version_type last_integrated_server_version = 0;
     UploadCursor upload_cursor{client_version, last_integrated_server_version};
 
-    _impl::ServerHistory::IntegratableChangeset integratable_changeset {
-        client_file_ident,
-        origin_timestamp,
-        origin_file_ident,
-        upload_cursor,
-        changeset_bin
-    };
+    _impl::ServerHistory::IntegratableChangeset integratable_changeset{
+        client_file_ident, origin_timestamp, origin_file_ident, upload_cursor, changeset_bin};
 
     _impl::ServerHistory::IntegratableChangesets integratable_changesets;
     integratable_changesets[client_file_ident].changesets.push_back(integratable_changeset);
 
     issue2104::ServerHistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history {realm_path_copy, history_context, compaction_control};
+    _impl::ServerHistory history{realm_path_copy, history_context, compaction_control};
     DBRef sg = DB::create(history);
 
     VersionInfo version_info;
     bool backup_whole_realm;
     _impl::ServerHistory::IntegrationResult result;
-    history.integrate_client_changesets(integratable_changesets,
-                                        version_info, backup_whole_realm, result, logger);
+    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result, logger);
 }
 
 
@@ -7341,12 +7209,10 @@ TEST(Sync_ConcurrentHttpDeleteAndHttpCompact)
             fixture.wait_for_session_terminations_or_client_stopped();
         }
         auto run_delete = [&] {
-            CHECK_EQUAL(util::HTTPStatus::Ok,
-                        fixture.send_http_delete_request(virt_path));
+            CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_delete_request(virt_path));
         };
         auto run_compact = [&] {
-            CHECK_EQUAL(util::HTTPStatus::Ok,
-                        fixture.send_http_compact_request());
+            CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
         };
         ThreadWrapper delete_thread;
         ThreadWrapper compact_thread;
@@ -7441,8 +7307,7 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
     }
 
     // Send a HTTP request to the server to compact all Realms.
-    CHECK_EQUAL(util::HTTPStatus::Ok,
-                fixture.send_http_compact_request());
+    CHECK_EQUAL(util::HTTPStatus::Ok, fixture.send_http_compact_request());
 
     {
         Session session = fixture.make_bound_session(path_2, "/test");
@@ -7479,7 +7344,7 @@ TEST(Sync_RowForGlobalKey)
         ReadTransaction rt(sg);
         ConstTableRef table = rt.get_table("class_foo");
         CHECK(table);
-        TableInfoCache cache {rt};
+        TableInfoCache cache{rt};
 
         // Default constructed GlobalKey
         {
@@ -7490,14 +7355,14 @@ TEST(Sync_RowForGlobalKey)
 
         // GlobalKey with small lo and hi values
         {
-            GlobalKey object_id {12, 24};
+            GlobalKey object_id{12, 24};
             auto row_ndx = row_for_object_id(cache, *table, object_id);
             CHECK_NOT(row_ndx);
         }
 
         // GlobalKey with lo and hi values past the 32 bit limit.
         {
-            GlobalKey object_id {uint_fast64_t(1) << 50, uint_fast64_t(1) << 52};
+            GlobalKey object_id{uint_fast64_t(1) << 50, uint_fast64_t(1) << 52};
             auto row_ndx = row_for_object_id(cache, *table, object_id);
             CHECK_NOT(row_ndx);
         }
@@ -7529,8 +7394,7 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 
         TableRef table_source = create_table(wt, "class_source");
         TableRef table_target = create_table(wt, "class_target");
-        auto col_key = table_source->add_column_link(type_LinkList, "target_link",
-                                                *table_target);
+        auto col_key = table_source->add_column_link(type_LinkList, "target_link", *table_target);
 
         auto k0 = create_object(wt, *table_target).get_key();
         auto k1 = create_object(wt, *table_target).get_key();
@@ -7644,7 +7508,7 @@ TEST(Sync_ClientFileBlacklisting)
         ClientServerFixture fixture(server_dir, test_context, config);
         fixture.start();
         using ConnectionState = Session::ConnectionState;
-        using ErrorInfo       = Session::ErrorInfo;
+        using ErrorInfo = Session::ErrorInfo;
         auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
                 return;
@@ -7687,7 +7551,7 @@ TEST(Sync_CreateObjects_EraseObjects)
     fixture.bind_session(session_2, "/test");
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
 
         TableRef table = create_table(wt, "class_persons");
         create_object(wt, *table);
@@ -7699,7 +7563,7 @@ TEST(Sync_CreateObjects_EraseObjects)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        WriteTransaction wt {sg_1};
+        WriteTransaction wt{sg_1};
 
         TableRef table = wt.get_table("class_persons");
         CHECK_EQUAL(table->size(), 2);
@@ -7761,10 +7625,10 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
 
     // Launch a client with `simulate_integration_error` set to true, and make
     // it download that changeset. Then check that it fails at least two times.
-    bool failed_once  = false;
+    bool failed_once = false;
     bool failed_twice = false;
     using ConnectionState = Session::ConnectionState;
-    using ErrorInfo       = Session::ErrorInfo;
+    using ErrorInfo = Session::ErrorInfo;
     auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
             return;

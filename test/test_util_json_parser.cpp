@@ -6,26 +6,23 @@
 using namespace realm;
 using namespace realm::util;
 
-static const char g_basic_object[] =
-"{\n"
-"    \"access\": [\"download\", \"upload\"],\n"
-"    \"timestamp\": 1455530614,\n"
-"    \"expires\": null,\n"
-"    \"app_id\": \"io.realm.Test\"\n"
-"}";
+static const char g_basic_object[] = "{\n"
+                                     "    \"access\": [\"download\", \"upload\"],\n"
+                                     "    \"timestamp\": 1455530614,\n"
+                                     "    \"expires\": null,\n"
+                                     "    \"app_id\": \"io.realm.Test\"\n"
+                                     "}";
 
 using ET = JSONParser::EventType;
 
 namespace {
-static const char g_events_test[] = "   {\"a\":\"b\",\t\"b\"    :[],\"c\": {\"d\":null,\"e\":123.13,\"f\": -199,\"g\":-2.3e9},\"h\":\"\\u00f8\"}";
+static const char g_events_test[] =
+    "   {\"a\":\"b\",\t\"b\"    :[],\"c\": {\"d\":null,\"e\":123.13,\"f\": -199,\"g\":-2.3e9},\"h\":\"\\u00f8\"}";
 static const JSONParser::EventType g_expected_events[] = {
-    ET::object_begin, ET::string, ET::string, ET::string, ET::array_begin, ET::array_end,
-    ET::string, ET::object_begin, ET::string, ET::null, ET::string, ET::number, ET::string,
-    ET::number, ET::string, ET::number, ET::object_end, ET::string,
-    ET::string, ET::object_end
-};
+    ET::object_begin, ET::string, ET::string,     ET::string, ET::array_begin, ET::array_end, ET::string,
+    ET::object_begin, ET::string, ET::null,       ET::string, ET::number,      ET::string,    ET::number,
+    ET::string,       ET::number, ET::object_end, ET::string, ET::string,      ET::object_end};
 } // anonymous namespace
-
 
 
 TEST(JSONParser_Basic)
@@ -146,25 +143,21 @@ TEST(JSONParser_UnescapeString)
     CHECK_EQUAL(unescaped, "Hello,\\ World.\n8°Cø");
 
     static const char* escaped[] = {
-        "\"\\u0abg\"", // invalid sequence
-        "\"\\u0041\"", // ASCII 'A'
-        "\"\\u05d0\"", // Hebrew 'alef'
-        "\"\\u2f08\"", // Kangxi (Chinese) 'man'
-        "\"\\u4eba\"", // CJK Unified Ideograph 'man'
-        "\"\\ufffd\"", // Replacement character
+        "\"\\u0abg\"",        // invalid sequence
+        "\"\\u0041\"",        // ASCII 'A'
+        "\"\\u05d0\"",        // Hebrew 'alef'
+        "\"\\u2f08\"",        // Kangxi (Chinese) 'man'
+        "\"\\u4eba\"",        // CJK Unified Ideograph 'man'
+        "\"\\ufffd\"",        // Replacement character
         "\"\\ud87e\\udd10\"", // Emoji 'zipper-mouth face' (surrogate pair)
     };
     static const char* expected[] = {
-        "\\u0abg",
-        "A",
-        "א",
-        "⼈",
+        "\\u0abg", "A",    "א", "⼈",
         "人", // NOTE! This character looks identical to the one above, but is a different codepoint.
-        "�",
-        "🤐",
+        "�",       "🤐",
     };
 
-    for (size_t i = 0; i != sizeof(escaped)/sizeof(escaped[0]); ++i) {
+    for (size_t i = 0; i != sizeof(escaped) / sizeof(escaped[0]); ++i) {
         event.range = escaped[i];
         unescaped = event.unescape_string(buffer.data());
         CHECK_EQUAL(unescaped, expected[i]);
@@ -175,7 +168,7 @@ TEST(JSONParser_UnescapeString)
         "\"\\udc00\"",  // low surrogate with no preceding high surrogate
     };
 
-    for (size_t i = 0; i < sizeof(invalid_surrogate_pairs)/sizeof(invalid_surrogate_pairs[0]); ++i) {
+    for (size_t i = 0; i < sizeof(invalid_surrogate_pairs) / sizeof(invalid_surrogate_pairs[0]); ++i) {
         const char* str = invalid_surrogate_pairs[i];
         event.range = str;
         unescaped = event.unescape_string(buffer.data());
@@ -195,7 +188,7 @@ TEST(JSONParser_Events)
         ++i;
         return std::error_condition{};
     });
-    CHECK_EQUAL(i, sizeof(g_expected_events)/sizeof(g_expected_events[0]));
+    CHECK_EQUAL(i, sizeof(g_expected_events) / sizeof(g_expected_events[0]));
 }
 
 TEST(JSONParser_PropagateError)
@@ -213,7 +206,9 @@ TEST(JSONParser_PropagateError)
 
 TEST(JSONParser_Whitespace)
 {
-    auto dummy_callback = [](auto&&) noexcept { return std::error_condition{}; };
+    auto dummy_callback = [](auto&&) noexcept {
+        return std::error_condition{};
+    };
     std::error_condition ec;
 
     static const char initial_whitespace[] = "  \t{}";
@@ -314,4 +309,3 @@ TEST(JSONParser_StringTermination)
     });
     CHECK(!ec);
 }
-

@@ -44,7 +44,7 @@ struct Fixture {
         sync::parse_changeset(stream, result);
 
         WriteTransaction wt{sg_2};
-        TableInfoCache table_info_cache {wt};
+        TableInfoCache table_info_cache{wt};
         InstructionApplier applier{wt, table_info_cache};
         applier.apply(result, &test_context.logger);
         wt.commit();

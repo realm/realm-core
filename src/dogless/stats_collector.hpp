@@ -27,24 +27,13 @@ public:
 
     // FIXME: Use std::string_view instead of const char*.
 
-    virtual void decrement(const char* metric, int value = 1,
-                           float sample_rate = 1.0f,
-                           const char* eol = "\n") = 0;
-    virtual void increment(const char* metric, int value = 1,
-                           float sample_rate = 1.0f,
-                           const char* eol = "\n") = 0;
-    virtual void gauge(const char* metric, double amount,
-                       float sample_rate = 1.0f,
-                       const char* eol = "\n") = 0;
-    virtual void gauge_relative(const char* metric, double amount,
-                                float sample_rate = 1.0f,
+    virtual void decrement(const char* metric, int value = 1, float sample_rate = 1.0f, const char* eol = "\n") = 0;
+    virtual void increment(const char* metric, int value = 1, float sample_rate = 1.0f, const char* eol = "\n") = 0;
+    virtual void gauge(const char* metric, double amount, float sample_rate = 1.0f, const char* eol = "\n") = 0;
+    virtual void gauge_relative(const char* metric, double amount, float sample_rate = 1.0f,
                                 const char* eol = "\n") = 0;
-    virtual void histogram(const char* metric, double value,
-                           float sample_rate = 1.0f,
-                           const char* eol = "\n") = 0;
-    virtual void timing(const char* metric, double value,
-                           float sample_rate = 1.0f,
-                           const char* eol = "\n") = 0;
+    virtual void histogram(const char* metric, double value, float sample_rate = 1.0f, const char* eol = "\n") = 0;
+    virtual void timing(const char* metric, double value, float sample_rate = 1.0f, const char* eol = "\n") = 0;
 };
 
 class TaggedStatsCollectorBase {
@@ -54,24 +43,18 @@ public:
     // FIXME: Use std::string_view instead of const char*.
     // FIXME: Use std::array_view instead of const char**.
 
-    virtual void decrement(const char* metric, int value = 1,
-                           const char** tags = nullptr, size_t num_tags = 0,
+    virtual void decrement(const char* metric, int value = 1, const char** tags = nullptr, size_t num_tags = 0,
                            float sample_rate = 1.0) = 0;
-    virtual void gauge(const char* metric, double value,
-                       const char** tags = nullptr, size_t num_tags = 0,
+    virtual void gauge(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
                        float sample_rate = 1.0) = 0;
-    virtual void histogram(const char* metric, double value,
-                           const char** tags = nullptr, size_t num_tags = 0,
+    virtual void histogram(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
                            float sample_rate = 1.0) = 0;
-    virtual void increment(const char* metric, int value = 1,
-                           const char** tags = nullptr, size_t num_tags = 0,
+    virtual void increment(const char* metric, int value = 1, const char** tags = nullptr, size_t num_tags = 0,
                            float sample_rate = 1.0) = 0;
-    virtual void timing(const char* metric, double value,
-                           const char** tags = nullptr, size_t num_tags = 0,
-                           float sample_rate = 1.0) = 0;
+    virtual void timing(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
+                        float sample_rate = 1.0) = 0;
 };
 
-}
+} // namespace dogless
 
 #endif
-

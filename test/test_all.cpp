@@ -631,7 +631,7 @@ int test_all(int argc, char* argv[], util::Logger* logger, bool disable_all_sync
             // files behind our back, and calling OPENSSL_cleanup() does not
             // seem to have any effect.
             std::cerr << "WARNING: " << n << " file descriptors were leaked\n";
-            //success = false;
+            // success = false;
         }
     }
 

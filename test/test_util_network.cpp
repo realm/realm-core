@@ -78,7 +78,9 @@ void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
         service_1.run();
     }
     else {
-        std::thread thread{[&] { service_1.run(); }};
+        std::thread thread{[&] {
+            service_1.run();
+        }};
         service_2.run();
         thread.join();
     }
@@ -104,7 +106,7 @@ void connect_socket(network::Socket& socket, std::string port)
             break;
         socket.close();
         if (++i == end)
-            throw std::runtime_error("Failed to connect to localhost:"+port);
+            throw std::runtime_error("Failed to connect to localhost:" + port);
     }
 }
 
@@ -120,15 +122,23 @@ TEST(Network_PostOperation)
 {
     network::Service service;
     int var_1 = 381, var_2 = 743;
-    service.post([&] { var_1 = 824; });
-    service.post([&] { var_2 = 216; });
+    service.post([&] {
+        var_1 = 824;
+    });
+    service.post([&] {
+        var_2 = 216;
+    });
     CHECK_EQUAL(var_1, 381);
     CHECK_EQUAL(var_2, 743);
     service.run();
     CHECK_EQUAL(var_1, 824);
     CHECK_EQUAL(var_2, 216);
-    service.post([&] { var_2 = 191; });
-    service.post([&] { var_1 = 476; });
+    service.post([&] {
+        var_2 = 191;
+    });
+    service.post([&] {
+        var_1 = 476;
+    });
     CHECK_EQUAL(var_1, 824);
     CHECK_EQUAL(var_2, 216);
     service.run();
@@ -144,7 +154,9 @@ TEST(Network_EventLoopStopAndReset_1)
     // Prestop
     int var = 381;
     service.stop();
-    service.post([&]{ var = 824; });
+    service.post([&] {
+        var = 824;
+    });
     service.run(); // Must return immediately
     CHECK_EQUAL(var, 381);
     service.run(); // Must still return immediately
@@ -152,11 +164,15 @@ TEST(Network_EventLoopStopAndReset_1)
 
     // Reset
     service.reset();
-    service.post([&]{ var = 824; });
+    service.post([&] {
+        var = 824;
+    });
     CHECK_EQUAL(var, 381);
     service.run();
     CHECK_EQUAL(var, 824);
-    service.post([&]{ var = 476; });
+    service.post([&] {
+        var = 476;
+    });
     CHECK_EQUAL(var, 824);
     service.run();
     CHECK_EQUAL(var, 476);
@@ -174,11 +190,15 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Start event loop execution in the background
     ThreadWrapper thread_1;
-    thread_1.start([&] { service.run(); });
+    thread_1.start([&] {
+        service.run();
+    });
 
     // Check that the event loop is actually running
     BowlOfStonesSemaphore bowl_1; // Empty
-    service.post([&] { bowl_1.add_stone(); });
+    service.post([&] {
+        bowl_1.add_stone();
+    });
     bowl_1.get_stone(); // Block until the stone is added
 
     // Stop the event loop
@@ -187,7 +207,9 @@ TEST(Network_EventLoopStopAndReset_2)
 
     // Check that the event loop remains in the stopped state
     int var = 381;
-    service.post([&] { var = 824; });
+    service.post([&] {
+        var = 824;
+    });
     CHECK_EQUAL(var, 381);
     service.run(); // Still stopped, so run() must return immediately
     CHECK_EQUAL(var, 381);
@@ -196,15 +218,21 @@ TEST(Network_EventLoopStopAndReset_2)
     // background
     service.reset();
     ThreadWrapper thread_2;
-    thread_2.start([&] { service.run(); });
+    thread_2.start([&] {
+        service.run();
+    });
 
     // Check that the event loop is actually running
     BowlOfStonesSemaphore bowl_2; // Empty
-    service.post([&] { bowl_2.add_stone(); });
+    service.post([&] {
+        bowl_2.add_stone();
+    });
     bowl_2.get_stone(); // Block until the stone is added
 
     // Stop the event loop by canceling the blocking operation
-    service.post([&] { acceptor.cancel(); });
+    service.post([&] {
+        acceptor.cancel();
+    });
     CHECK_NOT(thread_2.join());
 
     CHECK_EQUAL(var, 824);
@@ -259,7 +287,7 @@ TEST(Network_ReadWrite)
     network::Acceptor acceptor{service_1};
     network::Endpoint listening_endpoint = bind_acceptor(acceptor);
 
-    char data[] = { 'X', 'F', 'M' };
+    char data[] = {'X', 'F', 'M'};
 
     auto reader = [&] {
         network::Socket socket_1{service_1};
@@ -269,7 +297,7 @@ TEST(Network_ReadWrite)
         char buffer[sizeof data];
         size_t n = socket_1.read(buffer, sizeof data, rab);
         if (CHECK_EQUAL(sizeof data, n))
-            CHECK(std::equal(buffer, buffer+n, data));
+            CHECK(std::equal(buffer, buffer + n, data));
         std::error_code ec;
         n = socket_1.read(buffer, 1, rab, ec);
         CHECK_EQUAL(0, n);
@@ -295,7 +323,7 @@ TEST(Network_ReadWriteNativeHandle)
     network::Acceptor acceptor{service_1};
     network::Endpoint listening_endpoint = bind_acceptor(acceptor);
 
-    char data[] = { 'X', 'F', 'M' };
+    char data[] = {'X', 'F', 'M'};
 
     auto reader = [&] {
         network::Socket socket_1{service_1};
@@ -305,7 +333,7 @@ TEST(Network_ReadWriteNativeHandle)
         char buffer[sizeof data];
         size_t n = socket_1.read(buffer, sizeof data, rab);
         if (CHECK_EQUAL(sizeof data, n))
-            CHECK(std::equal(buffer, buffer+n, data));
+            CHECK(std::equal(buffer, buffer + n, data));
         std::error_code ec;
         n = socket_1.read(buffer, 1, rab, ec);
         CHECK_EQUAL(0, n);
@@ -323,8 +351,7 @@ TEST(Network_ReadWriteNativeHandle)
     native_handle_type sockfd = ::socket(family, SOCK_STREAM, protocol);
     CHECK_GREATER(sockfd, 0);
 
-    int endpoint_size = listening_endpoint.protocol().is_ip_v4() ?
-        sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+    int endpoint_size = listening_endpoint.protocol().is_ip_v4() ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
     int ret = ::connect(sockfd, listening_endpoint.data(), endpoint_size);
     CHECK_EQUAL(ret, 0);
 
@@ -342,8 +369,8 @@ TEST(Network_ReadWriteLargeAmount)
     network::Acceptor acceptor{service_1};
     network::Endpoint listening_endpoint = bind_acceptor(acceptor);
 
-    size_t num_bytes_per_chunk = 1048576L/2;
-    std::unique_ptr<char[]> chunk(new char [num_bytes_per_chunk]);
+    size_t num_bytes_per_chunk = 1048576L / 2;
+    std::unique_ptr<char[]> chunk(new char[num_bytes_per_chunk]);
     for (size_t i = 0; i < num_bytes_per_chunk; ++i)
         chunk[i] = char(i % 128);
     int num_chunks = 128;
@@ -400,8 +427,8 @@ TEST(Network_AsyncReadWriteLargeAmount)
     network::Acceptor acceptor{service_1};
     network::Endpoint listening_endpoint = bind_acceptor(acceptor);
 
-    size_t num_bytes_per_chunk = 1048576/2;
-    std::unique_ptr<char[]> chunk(new char [num_bytes_per_chunk]);
+    size_t num_bytes_per_chunk = 1048576 / 2;
+    std::unique_ptr<char[]> chunk(new char[num_bytes_per_chunk]);
     for (size_t i = 0; i < num_bytes_per_chunk; ++i)
         chunk[i] = char(i % 128);
     int num_chunks = 128;
@@ -473,8 +500,7 @@ TEST(Network_SocketAndAcceptorOpen)
     network::Acceptor acceptor{service_1};
     network::Resolver resolver{service_1};
     network::Resolver::Query query("localhost", "",
-                                   network::Resolver::Query::passive |
-                                   network::Resolver::Query::address_configured);
+                                   network::Resolver::Query::passive | network::Resolver::Query::address_configured);
     network::Endpoint::List endpoints = resolver.resolve(query);
     {
         auto i = endpoints.begin();
@@ -496,7 +522,9 @@ TEST(Network_SocketAndAcceptorOpen)
     acceptor.listen();
     network::Socket socket_1{service_1};
     ThreadWrapper thread;
-    thread.start([&] { acceptor.accept(socket_1); });
+    thread.start([&] {
+        acceptor.accept(socket_1);
+    });
 
     network::Service service_2;
     network::Socket socket_2{service_2};
@@ -576,7 +604,7 @@ TEST(Network_CancelAsyncReadWrite)
     CHECK(was_accepted);
     socket_1.set_option(network::SocketBase::no_delay(true));
     const size_t size = 1;
-    char data[size] = { 'a' };
+    char data[size] = {'a'};
     bool write_was_canceled = false;
     auto write_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
@@ -607,7 +635,7 @@ TEST(Network_CancelEmptyRead)
     connect_sockets(socket_1, socket_2);
     network::ReadAheadBuffer rab;
     const size_t size = 1;
-    char data[size] = { 'a' };
+    char data[size] = {'a'};
     bool write_was_canceled = false;
     auto write_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
@@ -643,7 +671,7 @@ TEST(Network_CancelEmptyWrite)
             read_was_canceled = true;
     };
     socket_2.async_read(buffer, 1, rab, read_handler);
-    char data[1] = { 'a' };
+    char data[1] = {'a'};
     bool write_was_canceled = false;
     auto write_handler = [&](std::error_code ec, size_t) {
         if (ec == error::operation_aborted)
@@ -670,7 +698,7 @@ TEST(Network_CancelReadByDestroy)
     write_sockets.reset(new std::unique_ptr<network::Socket>[num_connections]);
     read_sockets.reset(new std::unique_ptr<network::Socket>[num_connections]);
     read_ahead_buffers.reset(new std::unique_ptr<network::ReadAheadBuffer>[num_connections]);
-    char output_buffer[2] = { 'x', '\n' };
+    char output_buffer[2] = {'x', '\n'};
     std::unique_ptr<char[][2]> input_buffers(new char[num_connections][2]);
     for (int i = 0; i < num_connections; ++i) {
         write_sockets[i].reset(new network::Socket{service});
@@ -686,14 +714,13 @@ TEST(Network_CancelReadByDestroy)
                 for (int j = 0; j < num_connections; ++j)
                     read_sockets[j]->cancel();
                 read_ahead_buffers.reset(); // Destroy all input streams
-                read_sockets.reset();  // Destroy all read sockets
-                input_buffers.reset(); // Destroy all input buffers
+                read_sockets.reset();       // Destroy all read sockets
+                input_buffers.reset();      // Destroy all input buffers
                 return;
             }
             CHECK_EQUAL(error::operation_aborted, ec);
         };
-        read_sockets[i]->async_read_until(input_buffers[i], 2, '\n', *read_ahead_buffers[i],
-                                          read_handler);
+        read_sockets[i]->async_read_until(input_buffers[i], 2, '\n', *read_ahead_buffers[i], read_handler);
         auto write_handler = [&](std::error_code ec, size_t) {
             CHECK_NOT(ec);
         };
@@ -798,7 +825,7 @@ TEST(Network_SocketMixedAsyncSync)
         size_t size = socket.read(buffer.get(), buffer_size, rab, ec);
         if (CHECK_EQUAL(ec, MiscExtErrors::end_of_input)) {
             if (CHECK_EQUAL(size, strlen(message)))
-                CHECK(std::equal(buffer.get(), buffer.get()+size, message));
+                CHECK(std::equal(buffer.get(), buffer.get() + size, message));
         }
 
         CHECK_NOT(thread.join());
@@ -831,7 +858,7 @@ TEST(Network_SocketMixedAsyncSync)
         auto read_handler = [&](std::error_code ec, size_t size) {
             if (CHECK_EQUAL(ec, MiscExtErrors::end_of_input)) {
                 if (CHECK_EQUAL(size, strlen(message)))
-                    CHECK(std::equal(buffer.get(), buffer.get()+size, message));
+                    CHECK(std::equal(buffer.get(), buffer.get() + size, message));
             }
         };
         socket.async_read(buffer.get(), buffer_size, rab, read_handler);
@@ -935,16 +962,22 @@ TEST(Network_ThrowFromHandlers)
     // Check that exceptions can propagate correctly out from any type of
     // completion handler
     network::Service service;
-    struct TestException1 {};
-    service.post([] { throw TestException1(); });
+    struct TestException1 {
+    };
+    service.post([] {
+        throw TestException1();
+    });
     CHECK_THROW(service.run(), TestException1);
 
     {
         network::Acceptor acceptor{service};
         network::Endpoint ep = bind_acceptor(acceptor);
         network::Socket socket_1{service};
-        struct TestException2 {};
-        acceptor.async_accept(socket_1, [](std::error_code) { throw TestException2(); });
+        struct TestException2 {
+        };
+        acceptor.async_accept(socket_1, [](std::error_code) {
+            throw TestException2();
+        });
         network::Socket socket_2{service};
         socket_2.async_connect(ep, [](std::error_code) {});
         CHECK_THROW(service.run(), TestException2);
@@ -955,8 +988,11 @@ TEST(Network_ThrowFromHandlers)
         network::Socket socket_1{service};
         acceptor.async_accept(socket_1, [](std::error_code) {});
         network::Socket socket_2{service};
-        struct TestException3 {};
-        socket_2.async_connect(ep, [](std::error_code) { throw TestException3(); });
+        struct TestException3 {
+        };
+        socket_2.async_connect(ep, [](std::error_code) {
+            throw TestException3();
+        });
         CHECK_THROW(service.run(), TestException3);
     }
     {
@@ -964,8 +1000,11 @@ TEST(Network_ThrowFromHandlers)
         connect_sockets(socket_1, socket_2);
         network::ReadAheadBuffer rab;
         char ch_1;
-        struct TestException4 {};
-        socket_1.async_read(&ch_1, 1, rab, [](std::error_code, size_t) { throw TestException4(); });
+        struct TestException4 {
+        };
+        socket_1.async_read(&ch_1, 1, rab, [](std::error_code, size_t) {
+            throw TestException4();
+        });
         char ch_2 = 0;
         socket_2.async_write(&ch_2, 1, [](std::error_code, size_t) {});
         CHECK_THROW(service.run(), TestException4);
@@ -977,14 +1016,20 @@ TEST(Network_ThrowFromHandlers)
         char ch_1;
         socket_1.async_read(&ch_1, 1, rab, [](std::error_code, size_t) {});
         char ch_2 = 0;
-        struct TestException5 {};
-        socket_2.async_write(&ch_2, 1, [](std::error_code, size_t) { throw TestException5(); });
+        struct TestException5 {
+        };
+        socket_2.async_write(&ch_2, 1, [](std::error_code, size_t) {
+            throw TestException5();
+        });
         CHECK_THROW(service.run(), TestException5);
     }
     {
         network::DeadlineTimer timer{service};
-        struct TestException6 {};
-        timer.async_wait(std::chrono::seconds(0), [](std::error_code) { throw TestException6(); });
+        struct TestException6 {
+        };
+        timer.async_wait(std::chrono::seconds(0), [](std::error_code) {
+            throw TestException6();
+        });
         CHECK_THROW(service.run(), TestException6);
     }
 }
@@ -1004,8 +1049,12 @@ TEST(Network_HandlerDealloc)
         network::Service service;
         // By adding two post handlers that throw, one is going to be left
         // behind in `m_imm_handlers`
-        service.post([&]{ throw std::runtime_error(""); });
-        service.post([&]{ throw std::runtime_error(""); });
+        service.post([&] {
+            throw std::runtime_error("");
+        });
+        service.post([&] {
+            throw std::runtime_error("");
+        });
         CHECK_THROW(service.run(), std::runtime_error);
     }
     {
@@ -1034,7 +1083,9 @@ TEST(Network_HandlerDealloc)
         network::Endpoint listening_endpoint = bind_acceptor(acceptor);
         network::Socket socket_1{service_1};
         ThreadWrapper thread;
-        thread.start([&] { acceptor.accept(socket_1); });
+        thread.start([&] {
+            acceptor.accept(socket_1);
+        });
         network::Service service_2;
         network::Socket socket_2{service_2};
         socket_2.connect(listening_endpoint);
@@ -1043,7 +1094,7 @@ TEST(Network_HandlerDealloc)
         socket_1.set_option(network::SocketBase::no_delay(true));
         network::ReadAheadBuffer rab;
         char buffer[1];
-        char data[] = { 'X', 'F', 'M' };
+        char data[] = {'X', 'F', 'M'};
         // This leaves behind both a read and a write handler in m_poll_handlers
         socket_1.async_read(buffer, sizeof buffer, rab, [](std::error_code, size_t) {});
         socket_1.async_write(data, sizeof data, [](std::error_code, size_t) {});
@@ -1053,9 +1104,10 @@ TEST(Network_HandlerDealloc)
 
 namespace {
 
-template<int size> struct PostReallocHandler {
-    PostReallocHandler(int& v):
-        var(v)
+template <int size>
+struct PostReallocHandler {
+    PostReallocHandler(int& v)
+        : var(v)
     {
     }
     void operator()()
@@ -1096,16 +1148,17 @@ struct AsyncReadWriteRealloc {
     network::Socket read_socket{service}, write_socket{service};
     network::ReadAheadBuffer rab;
     char read_buffer[3];
-    char write_buffer[3] = { '0', '1', '2' };
+    char write_buffer[3] = {'0', '1', '2'};
     Random random{random_int<unsigned long>()}; // Seed from slow global generator
 
     const size_t num_bytes_to_write = 65536;
     size_t num_bytes_written = 0;
     size_t num_bytes_read = 0;
 
-    template<int size> struct WriteHandler {
-        WriteHandler(AsyncReadWriteRealloc& s):
-            state(s)
+    template <int size>
+    struct WriteHandler {
+        WriteHandler(AsyncReadWriteRealloc& s)
+            : state(s)
         {
         }
         void operator()(std::error_code ec, size_t n)
@@ -1144,9 +1197,10 @@ struct AsyncReadWriteRealloc {
         REALM_ASSERT(false);
     }
 
-    template<int size> struct ReadHandler {
-        ReadHandler(AsyncReadWriteRealloc& s):
-            state(s)
+    template <int size>
+    struct ReadHandler {
+        ReadHandler(AsyncReadWriteRealloc& s)
+            : state(s)
         {
         }
         void operator()(std::error_code ec, size_t n)
@@ -1202,16 +1256,12 @@ TEST(Network_AsyncReadWriteRealloc)
 
 namespace {
 
-char echo_body[] = {
-    '\xC1', '\x2C', '\xEF', '\x48', '\x8C', '\xCD', '\x41', '\xFA',
-    '\x12', '\xF9', '\xF4', '\x72', '\xDF', '\x92', '\x8E', '\x68',
-    '\xAB', '\x8F', '\x6B', '\xDF', '\x80', '\x26', '\xD1', '\x60',
-    '\x21', '\x91', '\x20', '\xC8', '\x94', '\x0C', '\xDB', '\x07',
-    '\xB0', '\x1C', '\x3A', '\xDA', '\x5E', '\x9B', '\x62', '\xDE',
-    '\x30', '\xA3', '\x7E', '\xED', '\xB4', '\x30', '\xD7', '\x43',
-    '\x3F', '\xDE', '\xF2', '\x6D', '\x9A', '\x1D', '\xAE', '\xF4',
-    '\xD5', '\xFB', '\xAC', '\xE8', '\x67', '\x37', '\xFD', '\xF3'
-};
+char echo_body[] = {'\xC1', '\x2C', '\xEF', '\x48', '\x8C', '\xCD', '\x41', '\xFA', '\x12', '\xF9', '\xF4',
+                    '\x72', '\xDF', '\x92', '\x8E', '\x68', '\xAB', '\x8F', '\x6B', '\xDF', '\x80', '\x26',
+                    '\xD1', '\x60', '\x21', '\x91', '\x20', '\xC8', '\x94', '\x0C', '\xDB', '\x07', '\xB0',
+                    '\x1C', '\x3A', '\xDA', '\x5E', '\x9B', '\x62', '\xDE', '\x30', '\xA3', '\x7E', '\xED',
+                    '\xB4', '\x30', '\xD7', '\x43', '\x3F', '\xDE', '\xF2', '\x6D', '\x9A', '\x1D', '\xAE',
+                    '\xF4', '\xD5', '\xFB', '\xAC', '\xE8', '\x67', '\x37', '\xFD', '\xF3'};
 
 void sync_server(network::Acceptor& acceptor, unit_test::TestContext& test_context)
 {
@@ -1229,10 +1279,10 @@ void sync_server(network::Acceptor& acceptor, unit_test::TestContext& test_conte
         return;
     if (!CHECK_LESS_EQUAL(n, max_header_size))
         return;
-    if (!CHECK_EQUAL(header_buffer[n-1], '\n'))
+    if (!CHECK_EQUAL(header_buffer[n - 1], '\n'))
         return;
     MemoryInputStream in;
-    in.set_buffer(header_buffer, header_buffer+(n-1));
+    in.set_buffer(header_buffer, header_buffer + (n - 1));
     in.unsetf(std::ios_base::skipws);
     std::string message_type;
     in >> message_type;
@@ -1248,7 +1298,7 @@ void sync_server(network::Acceptor& acceptor, unit_test::TestContext& test_conte
     if (!CHECK_EQUAL(m, body_size))
         return;
     MemoryOutputStream out;
-    out.set_buffer(header_buffer, header_buffer+max_header_size);
+    out.set_buffer(header_buffer, header_buffer + max_header_size);
     out << "was " << body_size << '\n';
     socket.write(header_buffer, out.size());
     socket.write(body_buffer.get(), body_size);
@@ -1270,7 +1320,7 @@ void sync_client(unsigned short listen_port, unit_test::TestContext& test_contex
     const size_t max_header_size = 32;
     char header_buffer[max_header_size];
     MemoryOutputStream out;
-    out.set_buffer(header_buffer, header_buffer+max_header_size);
+    out.set_buffer(header_buffer, header_buffer + max_header_size);
     out << "echo " << sizeof echo_body << '\n';
     socket.write(header_buffer, out.size());
     socket.write(echo_body, sizeof echo_body);
@@ -1281,10 +1331,10 @@ void sync_client(unsigned short listen_port, unit_test::TestContext& test_contex
         return;
     if (!CHECK_LESS_EQUAL(n, max_header_size))
         return;
-    if (!CHECK_EQUAL(header_buffer[n-1], '\n'))
+    if (!CHECK_EQUAL(header_buffer[n - 1], '\n'))
         return;
     MemoryInputStream in;
-    in.set_buffer(header_buffer, header_buffer+(n-1));
+    in.set_buffer(header_buffer, header_buffer + (n - 1));
     in.unsetf(std::ios_base::skipws);
     std::string message_type;
     in >> message_type;
@@ -1315,8 +1365,12 @@ TEST(Network_Sync)
     network::Endpoint::port_type listen_port = listen_endpoint.port();
 
     ThreadWrapper server_thread, client_thread;
-    server_thread.start([&] { sync_server(acceptor,   test_context); });
-    client_thread.start([&] { sync_client(listen_port, test_context); });
+    server_thread.start([&] {
+        sync_server(acceptor, test_context);
+    });
+    client_thread.start([&] {
+        sync_client(listen_port, test_context);
+    });
     client_thread.join();
     server_thread.join();
 }
@@ -1326,10 +1380,10 @@ namespace {
 
 class async_server {
 public:
-    async_server(unit_test::TestContext& test_context):
-        m_acceptor{m_service},
-        m_socket{m_service},
-        m_test_context{test_context}
+    async_server(unit_test::TestContext& test_context)
+        : m_acceptor{m_service}
+        , m_socket{m_service}
+        , m_test_context{test_context}
     {
     }
 
@@ -1369,8 +1423,7 @@ private:
         auto handler = [=](std::error_code handler_ec, size_t handler_n) {
             handle_read_header(handler_ec, handler_n);
         };
-        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer,
-                                  handler);
+        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
     }
 
     void handle_read_header(std::error_code ec, size_t n)
@@ -1380,12 +1433,12 @@ private:
         unit_test::TestContext& test_context = m_test_context;
         if (!CHECK_GREATER(n, 0))
             return;
-        if (!CHECK_LESS_EQUAL(n, s_max_header_size+0))
+        if (!CHECK_LESS_EQUAL(n, s_max_header_size + 0))
             return;
-        if (!CHECK_EQUAL(m_header_buffer[n-1], '\n'))
+        if (!CHECK_EQUAL(m_header_buffer[n - 1], '\n'))
             return;
         MemoryInputStream in;
-        in.set_buffer(m_header_buffer, m_header_buffer+(n-1));
+        in.set_buffer(m_header_buffer, m_header_buffer + (n - 1));
         in.unsetf(std::ios_base::skipws);
         std::string message_type;
         in >> message_type;
@@ -1410,7 +1463,7 @@ private:
         if (!CHECK_EQUAL(n, m_body_size))
             return;
         MemoryOutputStream out;
-        out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
+        out.set_buffer(m_header_buffer, m_header_buffer + s_max_header_size);
         out << "was " << m_body_size << '\n';
         auto handler = [=](std::error_code handler_ec, size_t) {
             handle_write_header(handler_ec);
@@ -1435,8 +1488,7 @@ private:
         auto handler = [=](std::error_code handler_ec, size_t) {
             handle_read_header_2(handler_ec);
         };
-        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer,
-                                  handler);
+        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
     }
 
     void handle_read_header_2(std::error_code ec)
@@ -1451,10 +1503,10 @@ private:
 
 class async_client {
 public:
-    async_client(unsigned short listen_port, unit_test::TestContext& test_context):
-        m_listen_port(listen_port),
-        m_socket(m_service),
-        m_test_context(test_context)
+    async_client(unsigned short listen_port, unit_test::TestContext& test_context)
+        : m_listen_port(listen_port)
+        , m_socket(m_service)
+        , m_test_context(test_context)
     {
     }
 
@@ -1470,7 +1522,7 @@ public:
         m_socket.set_option(network::SocketBase::no_delay(true));
 
         MemoryOutputStream out;
-        out.set_buffer(m_header_buffer, m_header_buffer+s_max_header_size);
+        out.set_buffer(m_header_buffer, m_header_buffer + s_max_header_size);
         out << "echo " << sizeof echo_body << '\n';
         auto handler = [=](std::error_code ec, size_t) {
             handle_write_header(ec);
@@ -1510,8 +1562,7 @@ private:
         auto handler = [=](std::error_code handler_ec, size_t handler_n) {
             handle_read_header(handler_ec, handler_n);
         };
-        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer,
-                                  handler);
+        m_socket.async_read_until(m_header_buffer, s_max_header_size, '\n', m_read_ahead_buffer, handler);
     }
 
     void handle_read_header(std::error_code ec, size_t n)
@@ -1521,12 +1572,12 @@ private:
         unit_test::TestContext& test_context = m_test_context;
         if (!CHECK_GREATER(n, 0))
             return;
-        if (!CHECK_LESS_EQUAL(n, s_max_header_size+0))
+        if (!CHECK_LESS_EQUAL(n, s_max_header_size + 0))
             return;
-        if (!CHECK_EQUAL(m_header_buffer[n-1], '\n'))
+        if (!CHECK_EQUAL(m_header_buffer[n - 1], '\n'))
             return;
         MemoryInputStream in;
-        in.set_buffer(m_header_buffer, m_header_buffer+(n-1));
+        in.set_buffer(m_header_buffer, m_header_buffer + (n - 1));
         in.unsetf(std::ios_base::skipws);
         std::string message_type;
         in >> message_type;
@@ -1566,8 +1617,12 @@ TEST(Network_Async)
     async_client client(listen_port, test_context);
 
     ThreadWrapper server_thread, client_thread;
-    server_thread.start([&] { server.run(); });
-    client_thread.start([&] { client.run(); });
+    server_thread.start([&] {
+        server.run();
+    });
+    client_thread.start([&] {
+        client.run();
+    });
     CHECK_NOT(client_thread.join());
     CHECK_NOT(server_thread.join());
 }
@@ -1580,23 +1635,31 @@ TEST(Network_HeavyAsyncPost)
     dummy_timer.async_wait(std::chrono::hours(10000), [](std::error_code) {});
 
     ThreadWrapper looper_thread;
-    looper_thread.start([&] { service.run(); });
+    looper_thread.start([&] {
+        service.run();
+    });
 
     std::vector<std::pair<int, long>> entries;
     const long num_iterations = 10000L;
     auto func = [&](int thread_index) {
         for (long i = 0; i < num_iterations; ++i)
-            service.post([&entries, thread_index, i] { entries.emplace_back(thread_index, i); });
+            service.post([&entries, thread_index, i] {
+                entries.emplace_back(thread_index, i);
+            });
     };
 
     const int num_threads = 8;
     std::unique_ptr<ThreadWrapper[]> threads(new ThreadWrapper[num_threads]);
     for (int i = 0; i < num_threads; ++i)
-        threads[i].start([&func, i] { func(i); });
+        threads[i].start([&func, i] {
+            func(i);
+        });
     for (int i = 0; i < num_threads; ++i)
         CHECK_NOT(threads[i].join());
 
-    service.post([&] { dummy_timer.cancel(); });
+    service.post([&] {
+        dummy_timer.cancel();
+    });
     CHECK_NOT(looper_thread.join());
 
     // Check that every post operation ran exactly once
@@ -1607,7 +1670,7 @@ TEST(Network_HeavyAsyncPost)
         auto i = entries.begin();
         for (int i_1 = 0; i_1 < num_threads; ++i_1) {
             for (long i_2 = 0; i_2 < num_iterations; ++i_2) {
-                int thread_index     = i->first;
+                int thread_index = i->first;
                 long iteration_index = i->second;
                 if (i_1 != thread_index || i_2 != iteration_index) {
                     every_post_operation_ran_exactly_once = false;
@@ -1661,15 +1724,17 @@ TEST(Network_RepeatedCancelAndRestartRead)
         thread.start(thread_func);
 
         const size_t write_buffer_size = 1024;
-        const char write_buffer[write_buffer_size] = { '\0' };
+        const char write_buffer[write_buffer_size] = {'\0'};
         size_t num_bytes_to_write = 0x4000000; // 64 MiB
         size_t num_bytes_written = 0;
         while (num_bytes_written < num_bytes_to_write) {
-            size_t n = std::min(random.draw_int<size_t>(1, write_buffer_size),
-                                num_bytes_to_write-num_bytes_written);
+            size_t n =
+                std::min(random.draw_int<size_t>(1, write_buffer_size), num_bytes_to_write - num_bytes_written);
             socket_1.write(write_buffer, n);
             num_bytes_written += n;
-            service_2.post([&] { socket_2.cancel(); });
+            service_2.post([&] {
+                socket_2.cancel();
+            });
         }
         socket_1.close();
 
@@ -1690,8 +1755,7 @@ TEST(Network_StressTest)
     original_2.reset(new char[original_size]);
     {
         std::mt19937_64 prng{std::random_device()()};
-        std::uniform_int_distribution<int> dist(std::numeric_limits<char>::min(),
-                                                 std::numeric_limits<char>::max());
+        std::uniform_int_distribution<int> dist(std::numeric_limits<char>::min(), std::numeric_limits<char>::max());
         log("Initializing...");
         for (size_t i = 0; i < original_size; ++i)
             original_1[i] = dist(prng);
@@ -1711,11 +1775,11 @@ TEST(Network_StressTest)
 #else
     constexpr int num_cycles = 512;
 #endif
-    auto thread = [&](int id, network::Socket& socket, const char* read_original,
-                      const char* write_original, Stats& stats) {
+    auto thread = [&](int id, network::Socket& socket, const char* read_original, const char* write_original,
+                      Stats& stats) {
         std::unique_ptr<char[]> read_buffer{new char[original_size]};
         std::mt19937_64 prng{std::random_device()()};
-        std::uniform_int_distribution<size_t> read_write_size_dist(1, 32*1024);
+        std::uniform_int_distribution<size_t> read_write_size_dist(1, 32 * 1024);
         std::uniform_int_distribution<int> delayed_read_write_dist(0, 49);
         network::Service& service = socket.get_service();
         network::DeadlineTimer cancellation_timer{service};
@@ -1753,7 +1817,7 @@ TEST(Network_StressTest)
         int num_read_cycles = 0;
         std::function<void()> read = [&] {
             if (read_begin == read_end) {
-//                log("<R%1>", id);
+                //                log("<R%1>", id);
                 CHECK(std::equal(read_original, read_original + original_size, read_buffer.get()));
                 ++num_read_cycles;
                 if (num_read_cycles == num_cycles) {
@@ -1800,7 +1864,7 @@ TEST(Network_StressTest)
         int num_write_cycles = 0;
         std::function<void()> write = [&] {
             if (write_begin == write_end) {
-//                log("<W%1>", id);
+                //                log("<W%1>", id);
                 ++num_write_cycles;
                 if (num_write_cycles == num_cycles) {
                     log("End of write %1", id);
@@ -1812,7 +1876,7 @@ TEST(Network_StressTest)
                     return;
                 }
                 write_begin = write_original;
-                write_end   = write_original + original_size;
+                write_end = write_original + original_size;
             }
             auto handler = [&](std::error_code ec, size_t n) {
                 REALM_ASSERT(!ec || ec == error::operation_aborted);
@@ -1847,10 +1911,12 @@ TEST(Network_StressTest)
     };
 
     Stats stats_1, stats_2;
-    std::thread thread_1{[&] { thread(1, socket_1, original_1.get(), original_2.get(),
-                                      stats_1); }};
-    std::thread thread_2{[&] { thread(2, socket_2, original_2.get(), original_1.get(),
-                                      stats_2); }};
+    std::thread thread_1{[&] {
+        thread(1, socket_1, original_1.get(), original_2.get(), stats_1);
+    }};
+    std::thread thread_2{[&] {
+        thread(2, socket_2, original_2.get(), original_1.get(), stats_2);
+    }};
     thread_1.join();
     thread_2.join();
 
@@ -1858,15 +1924,11 @@ TEST(Network_StressTest)
     CHECK_SYSTEM_ERROR(socket_1.read_some(&ch, 1), MiscExtErrors::end_of_input);
     CHECK_SYSTEM_ERROR(socket_2.read_some(&ch, 1), MiscExtErrors::end_of_input);
 
-    log("Cancellations: %1, %2",
-        stats_1.num_cancellations,
-        stats_2.num_cancellations);
-    log ("Reads:  %1 (%2 canceled), %3 (%4 canceled)",
-         stats_1.num_reads, stats_1.num_canceled_reads,
-         stats_2.num_reads, stats_2.num_canceled_reads);
-    log ("Writes: %1 (%2 canceled), %3 (%4 canceled)",
-         stats_1.num_writes, stats_1.num_canceled_writes,
-         stats_2.num_writes, stats_2.num_canceled_writes);
+    log("Cancellations: %1, %2", stats_1.num_cancellations, stats_2.num_cancellations);
+    log("Reads:  %1 (%2 canceled), %3 (%4 canceled)", stats_1.num_reads, stats_1.num_canceled_reads,
+        stats_2.num_reads, stats_2.num_canceled_reads);
+    log("Writes: %1 (%2 canceled), %3 (%4 canceled)", stats_1.num_writes, stats_1.num_canceled_writes,
+        stats_2.num_writes, stats_2.num_canceled_writes);
 }
 
 
@@ -1898,7 +1960,9 @@ TEST(Network_Trigger_Basics)
 
     // Check that retriggering from triggered function works
     std::function<void()> func_2;
-    network::Trigger trigger_2{service, [&] { func_2(); }};
+    network::Trigger trigger_2{service, [&] {
+                                   func_2();
+                               }};
     was_triggered = false;
     bool was_triggered_twice = false;
     func_2 = [&] {
@@ -1960,16 +2024,20 @@ TEST(Network_Trigger_ThreadSafety)
     };
     network::Trigger trigger{service, std::move(func)};
     ThreadWrapper thread;
-    thread.start([&] { service.run(); });
+    thread.start([&] {
+        service.run();
+    });
     long m = 1000000;
     for (long i = 0; i < m; ++i)
         trigger.trigger();
     flag = true;
     trigger.trigger();
-    service.post([&] { keep_alive.cancel(); });
+    service.post([&] {
+        keep_alive.cancel();
+    });
     CHECK_NOT(thread.join());
     CHECK_GREATER_EQUAL(n_1, 1);
-    CHECK_LESS_EQUAL(n_1, m+1);
+    CHECK_LESS_EQUAL(n_1, m + 1);
     CHECK_GREATER_EQUAL(n_2, 1);
     CHECK_LESS_EQUAL(n_2, 2);
 }

@@ -11,10 +11,10 @@
 #include <fcntl.h>
 
 #ifndef _WIN32
-#  include <netinet/tcp.h>
-#  include <unistd.h>
-#  include <poll.h>
-#  include <realm/util/to_string.hpp>
+#include <netinet/tcp.h>
+#include <unistd.h>
+#include <poll.h>
+#include <realm/util/to_string.hpp>
 #endif
 
 #include <realm/util/features.h>
@@ -25,34 +25,34 @@
 #include <realm/util/network.hpp>
 
 #if defined _GNU_SOURCE && !REALM_ANDROID
-#  define HAVE_LINUX_PIPE2 1
+#define HAVE_LINUX_PIPE2 1
 #else
-#  define HAVE_LINUX_PIPE2 0
+#define HAVE_LINUX_PIPE2 0
 #endif
 
 // Note: Linux specific accept4() is not available on Android.
 #if defined _GNU_SOURCE && defined SOCK_NONBLOCK && defined SOCK_CLOEXEC && !REALM_ANDROID
-#  define HAVE_LINUX_ACCEPT4 1
+#define HAVE_LINUX_ACCEPT4 1
 #else
-#  define HAVE_LINUX_ACCEPT4 0
+#define HAVE_LINUX_ACCEPT4 0
 #endif
 
 #if defined _GNU_SOURCE && defined SOCK_CLOEXEC
-#  define HAVE_LINUX_SOCK_CLOEXEC 1
+#define HAVE_LINUX_SOCK_CLOEXEC 1
 #else
-#  define HAVE_LINUX_SOCK_CLOEXEC 0
+#define HAVE_LINUX_SOCK_CLOEXEC 0
 #endif
 
 #ifndef _WIN32
 
 #if REALM_HAVE_EPOLL
-#  include <sys/epoll.h>
+#include <sys/epoll.h>
 #elif REALM_HAVE_KQUEUE
-#  include <sys/types.h>
-#  include <sys/event.h>
-#  include <sys/time.h>
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
 #else
-#  include <poll.h>
+#include <poll.h>
 #endif
 
 #endif
@@ -62,9 +62,9 @@
 // and LONG_MAX can be as small as (2**31)-1, so the largest number of
 // milliseconds we can be sure to support on those early kernels is 2147482.
 #if REALM_HAVE_EPOLL
-#  if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
-#    define EPOLL_LARGE_TIMEOUT_BUG 1
-#  endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+#define EPOLL_LARGE_TIMEOUT_BUG 1
+#endif
 #endif
 
 using namespace realm::util;
@@ -84,7 +84,7 @@ struct ProcessInitialization {
     {
         WSADATA wsaData;
         int i = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if(i != 0) {
+        if (i != 0) {
             throw std::system_error(i, std::system_category(), "WSAStartup() Winsock initialization failed");
         }
     }
@@ -98,7 +98,8 @@ struct ProcessInitialization {
 
 ProcessInitialization g_process_initialization;
 
-std::error_code make_winsock_error_code(int error_code) {
+std::error_code make_winsock_error_code(int error_code)
+{
     switch (error_code) {
         case WSAEAFNOSUPPORT:
             return make_basic_system_error_code(EAFNOSUPPORT);
@@ -150,7 +151,7 @@ std::error_code set_nonblock_flag(native_handle_type fd, bool value, std::error_
 #ifdef _WIN32
     u_long flags = value ? 1 : 0;
     int r = ioctlsocket(fd, FIONBIO, &flags);
-    if(r == SOCKET_ERROR) {
+    if (r == SOCKET_ERROR) {
         ec = make_winsock_error_code(WSAGetLastError());
         return ec;
     }
@@ -223,7 +224,7 @@ inline void checked_close(native_handle_type fd) noexcept
 {
 #ifdef _WIN32
     int status = closesocket(fd);
-    if(status == -1) {
+    if (status == -1) {
         BOOL b = CloseHandle((HANDLE)fd);
         REALM_ASSERT(b || GetLastError() != ERROR_INVALID_HANDLE);
     }
@@ -240,16 +241,14 @@ inline void checked_close(native_handle_type fd) noexcept
 
 class CloseGuard {
 public:
-    CloseGuard() noexcept
-    {
-    }
-    explicit CloseGuard(native_handle_type fd) noexcept :
-        m_fd{fd}
+    CloseGuard() noexcept {}
+    explicit CloseGuard(native_handle_type fd) noexcept
+        : m_fd{fd}
     {
         REALM_ASSERT(fd != -1);
     }
-    CloseGuard(CloseGuard&& cg) noexcept :
-        m_fd{cg.release()}
+    CloseGuard(CloseGuard&& cg) noexcept
+        : m_fd{cg.release()}
     {
     }
     ~CloseGuard() noexcept
@@ -274,6 +273,7 @@ public:
         m_fd = -1;
         return fd;
     }
+
 private:
     native_handle_type m_fd = -1;
 };
@@ -409,8 +409,8 @@ std::error_code translate_addrinfo_error(int err) noexcept
 
 struct GetaddrinfoResultOwner {
     struct addrinfo* ptr;
-    GetaddrinfoResultOwner(struct addrinfo* p) :
-        ptr{p}
+    GetaddrinfoResultOwner(struct addrinfo* p)
+        : ptr{p}
     {
     }
     ~GetaddrinfoResultOwner() noexcept
@@ -543,10 +543,10 @@ inline void Service::IoReactor::interrupt() noexcept
 
 #if REALM_HAVE_EPOLL
 
-inline Service::IoReactor::IoReactor() :
-    m_epoll_event_buffer{make_epoll_event_buffer()}, // Throws
-    m_epoll_fd{make_epoll_fd()}, // Throws
-    m_wakeup_pipe{} // Throws
+inline Service::IoReactor::IoReactor()
+    : m_epoll_event_buffer{make_epoll_event_buffer()} // Throws
+    , m_epoll_fd{make_epoll_fd()}                     // Throws
+    , m_wakeup_pipe{}                                 // Throws
 {
     epoll_event event = epoll_event(); // Clear
     event.events = EPOLLIN;
@@ -559,14 +559,12 @@ inline Service::IoReactor::IoReactor() :
 }
 
 
-inline Service::IoReactor::~IoReactor() noexcept
-{
-}
+inline Service::IoReactor::~IoReactor() noexcept {}
 
 
 inline void Service::IoReactor::register_desc(Descriptor& desc)
 {
-    epoll_event event = epoll_event(); // Clear
+    epoll_event event = epoll_event();                        // Clear
     event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET; // Enable edge triggering
     event.data.ptr = &desc;
     int ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, desc.m_fd, &event);
@@ -660,8 +658,7 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         clock::time_point sleep_start_time = clock::now();
 #endif
-        int ret = epoll_wait(m_epoll_fd, m_epoll_event_buffer.get(), s_epoll_event_buffer_size,
-                             max_wait_millis);
+        int ret = epoll_wait(m_epoll_fd, m_epoll_event_buffer.get(), s_epoll_event_buffer_size, max_wait_millis);
         if (REALM_UNLIKELY(ret == -1)) {
             int err = errno;
             if (err == EINTR)
@@ -684,13 +681,13 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
                 continue;
             }
             Descriptor& desc = *static_cast<Descriptor*>(event.data.ptr);
-            if ((event.events & (EPOLLIN|EPOLLHUP|EPOLLERR)) != 0) {
+            if ((event.events & (EPOLLIN | EPOLLHUP | EPOLLERR)) != 0) {
                 if (!desc.m_read_ready) {
                     desc.m_read_ready = true;
                     m_active_ops.push_back(desc.m_suspended_read_ops);
                 }
             }
-            if ((event.events & (EPOLLOUT|EPOLLHUP|EPOLLERR)) != 0) {
+            if ((event.events & (EPOLLOUT | EPOLLHUP | EPOLLERR)) != 0) {
                 if (!desc.m_write_ready) {
                     desc.m_write_ready = true;
                     m_active_ops.push_back(desc.m_suspended_write_ops);
@@ -712,10 +709,10 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
 #elif REALM_HAVE_KQUEUE // !REALM_HAVE_EPOLL && REALM_HAVE_KQUEUE
 
 
-inline Service::IoReactor::IoReactor() :
-    m_kevent_buffer{make_kevent_buffer()}, // Throws
-    m_kqueue_fd{make_kqueue_fd()}, // Throws
-    m_wakeup_pipe{} // Throws
+inline Service::IoReactor::IoReactor()
+    : m_kevent_buffer{make_kevent_buffer()} // Throws
+    , m_kqueue_fd{make_kqueue_fd()}         // Throws
+    , m_wakeup_pipe{}                       // Throws
 {
     struct kevent event;
     EV_SET(&event, m_wakeup_pipe.wait_fd(), EVFILT_READ, EV_ADD, 0, 0, nullptr);
@@ -727,17 +724,15 @@ inline Service::IoReactor::IoReactor() :
 }
 
 
-inline Service::IoReactor::~IoReactor() noexcept
-{
-}
+inline Service::IoReactor::~IoReactor() noexcept {}
 
 
 inline void Service::IoReactor::register_desc(Descriptor& desc)
 {
     struct kevent events[2];
     // EV_CLEAR enables edge-triggered behavior
-    EV_SET(&events[0], desc.m_fd, EVFILT_READ,  EV_ADD|EV_CLEAR, 0, 0, &desc);
-    EV_SET(&events[1], desc.m_fd, EVFILT_WRITE, EV_ADD|EV_CLEAR, 0, 0, &desc);
+    EV_SET(&events[0], desc.m_fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, &desc);
+    EV_SET(&events[1], desc.m_fd, EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, &desc);
     int ret = ::kevent(m_kqueue_fd, events, 2, nullptr, 0, nullptr);
     if (REALM_UNLIKELY(ret == -1)) {
         std::error_code ec = make_basic_system_error_code(errno);
@@ -749,7 +744,7 @@ inline void Service::IoReactor::register_desc(Descriptor& desc)
 inline void Service::IoReactor::deregister_desc(Descriptor& desc) noexcept
 {
     struct kevent events[2];
-    EV_SET(&events[0], desc.m_fd, EVFILT_READ,  EV_DELETE, 0, 0, nullptr);
+    EV_SET(&events[0], desc.m_fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
     EV_SET(&events[1], desc.m_fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
     int ret = ::kevent(m_kqueue_fd, events, 2, nullptr, 0, nullptr);
     REALM_ASSERT(ret != -1);
@@ -789,10 +784,10 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
         }
         else if (now < timeout) {
             auto diff = timeout - now;
-            auto secs  = std::chrono::duration_cast<std::chrono::seconds>(diff);
+            auto secs = std::chrono::duration_cast<std::chrono::seconds>(diff);
             auto nsecs = std::chrono::duration_cast<std::chrono::nanoseconds>(diff - secs);
             auto secs_2 = std::min(secs.count(), std::chrono::seconds::rep(max_wait_seconds));
-            max_wait_time.tv_sec  = std::time_t(secs_2);
+            max_wait_time.tv_sec = std::time_t(secs_2);
             max_wait_time.tv_nsec = long(nsecs.count());
         }
     }
@@ -800,8 +795,7 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         clock::time_point sleep_start_time = clock::now();
 #endif
-        int ret = ::kevent(m_kqueue_fd, nullptr, 0, m_kevent_buffer.get(), s_kevent_buffer_size,
-                           &max_wait_time);
+        int ret = ::kevent(m_kqueue_fd, nullptr, 0, m_kevent_buffer.get(), s_kevent_buffer_size, &max_wait_time);
         if (REALM_UNLIKELY(ret == -1)) {
             int err = errno;
             if (err == EINTR)
@@ -880,16 +874,15 @@ void Service::IoReactor::add_oper(Descriptor& desc, LendersIoOperPtr op, Want wa
     }
     REALM_ASSERT(false);
 
-  active:
+active:
     m_active_ops.push_back(std::move(op));
 
-  proceed:
+proceed:
     ++m_num_operations;
 }
 
 
-void Service::IoReactor::remove_canceled_ops(Descriptor& desc,
-                                             OperQueue<AsyncOper>& completed_ops) noexcept
+void Service::IoReactor::remove_canceled_ops(Descriptor& desc, OperQueue<AsyncOper>& completed_ops) noexcept
 {
     // Note: Canceled operations that are currently active (in m_active_ops)
     // will be removed later by advance_active_ops().
@@ -905,8 +898,8 @@ void Service::IoReactor::remove_canceled_ops(Descriptor& desc,
 }
 
 
-bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time_point now,
-                                          bool& interrupted, OperQueue<AsyncOper>& completed_ops)
+bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time_point now, bool& interrupted,
+                                          OperQueue<AsyncOper>& completed_ops)
 {
     clock::time_point now_2 = now;
     for (;;) {
@@ -961,7 +954,7 @@ void Service::IoReactor::advance_active_ops(OperQueue<AsyncOper>& completed_ops)
         }
         REALM_ASSERT(false);
 
-      still_active:
+    still_active:
         new_active_ops.push_back(std::move(op));
     }
     m_active_ops.push_back(new_active_ops);
@@ -971,8 +964,8 @@ void Service::IoReactor::advance_active_ops(OperQueue<AsyncOper>& completed_ops)
 #else // !(REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE)
 
 
-inline Service::IoReactor::IoReactor() :
-    m_wakeup_pipe{} // Throws
+inline Service::IoReactor::IoReactor()
+    : m_wakeup_pipe{} // Throws
 {
     pollfd slot = pollfd(); // Cleared slot
     slot.fd = m_wakeup_pipe.wait_fd();
@@ -1021,11 +1014,9 @@ void Service::IoReactor::add_oper(Descriptor& desc, LendersIoOperPtr op, Want wa
 
     pollfd& pollfd_slot = m_pollfd_slots[oper_slot.pollfd_slot_ndx];
     REALM_ASSERT(pollfd_slot.fd == fd);
-    REALM_ASSERT(((pollfd_slot.events & POLLRDNORM) != 0) ==
-                 !oper_slot.read_ops.empty());
-    REALM_ASSERT(((pollfd_slot.events & POLLWRNORM) != 0) ==
-                 !oper_slot.write_ops.empty());
-    REALM_ASSERT((pollfd_slot.events & ~(POLLRDNORM|POLLWRNORM)) == 0);
+    REALM_ASSERT(((pollfd_slot.events & POLLRDNORM) != 0) == !oper_slot.read_ops.empty());
+    REALM_ASSERT(((pollfd_slot.events & POLLWRNORM) != 0) == !oper_slot.write_ops.empty());
+    REALM_ASSERT((pollfd_slot.events & ~(POLLRDNORM | POLLWRNORM)) == 0);
     switch (want) {
         case Want::nothing:
             break;
@@ -1041,13 +1032,12 @@ void Service::IoReactor::add_oper(Descriptor& desc, LendersIoOperPtr op, Want wa
     REALM_ASSERT(false);
     return;
 
-  finish:
+finish:
     ++m_num_operations;
 }
 
 
-void Service::IoReactor::remove_canceled_ops(Descriptor& desc,
-                                             OperQueue<AsyncOper>& completed_ops) noexcept
+void Service::IoReactor::remove_canceled_ops(Descriptor& desc, OperQueue<AsyncOper>& completed_ops) noexcept
 {
     native_handle_type fd = desc.m_fd;
     REALM_ASSERT(fd >= 0);
@@ -1069,8 +1059,8 @@ void Service::IoReactor::remove_canceled_ops(Descriptor& desc,
 }
 
 
-bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time_point now,
-                                          bool& interrupted, OperQueue<AsyncOper>& completed_ops)
+bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time_point now, bool& interrupted,
+                                          OperQueue<AsyncOper>& completed_ops)
 {
 #ifdef _WIN32
     using nfds_type = std::size_t;
@@ -1105,8 +1095,7 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
                 }
                 else {
                     // Overflow is impossible here, due to the preceeding check
-                    auto diff_millis =
-                        std::chrono::duration_cast<std::chrono::milliseconds>(diff);
+                    auto diff_millis = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
                     // The conversion to milliseconds will round down if the
                     // tick period of `diff` is less than a millisecond, which
                     // it usually is. This is a problem, because it can lead to
@@ -1155,8 +1144,8 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
             do {
                 if (m_pollfd_slots.size() > 1) {
                     // Poll all network sockets
-                    ret = WSAPoll(LPWSAPOLLFD(&m_pollfd_slots[1]),
-                                  ULONG(m_pollfd_slots.size() - 1), socket_poll_timeout);
+                    ret = WSAPoll(LPWSAPOLLFD(&m_pollfd_slots[1]), ULONG(m_pollfd_slots.size() - 1),
+                                  socket_poll_timeout);
                     REALM_ASSERT(ret != SOCKET_ERROR);
                 }
 
@@ -1165,9 +1154,8 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
                     ret++;
                 }
 
-            }
-            while (ret == 0 && (duration_cast<milliseconds>(steady_clock::now() - started).count() <
-                                max_wait_millis));
+            } while (ret == 0 &&
+                     (duration_cast<milliseconds>(steady_clock::now() - started).count() < max_wait_millis));
 
 #else // !defined _WIN32
             int ret = ::poll(fds, nfds, max_wait_millis);
@@ -1226,8 +1214,8 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
         REALM_ASSERT((pollfd_slot.revents & POLLNVAL) == 0);
 
         // Treat errors like read and/or write-readiness
-        if ((pollfd_slot.revents & (POLLHUP|POLLERR)) != 0) {
-            REALM_ASSERT((pollfd_slot.events & (POLLRDNORM|POLLWRNORM)) != 0);
+        if ((pollfd_slot.revents & (POLLHUP | POLLERR)) != 0) {
+            REALM_ASSERT((pollfd_slot.events & (POLLRDNORM | POLLWRNORM)) != 0);
             if ((pollfd_slot.events & POLLRDNORM) != 0)
                 pollfd_slot.revents |= POLLRDNORM;
             if ((pollfd_slot.events & POLLWRNORM) != 0)
@@ -1293,8 +1281,7 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
 
     REALM_ASSERT(num_ready_descriptors == 0);
 
-    bool any_operations_completed =
-        (m_num_operations < orig_num_operations);
+    bool any_operations_completed = (m_num_operations < orig_num_operations);
     return any_operations_completed;
 }
 
@@ -1331,9 +1318,9 @@ public:
     Service& service;
     IoReactor io_reactor;
 
-    Impl(Service& s) :
-        service{s},
-        io_reactor{} // Throws
+    Impl(Service& s)
+        : service{s}
+        , io_reactor{} // Throws
     {
     }
 
@@ -1357,7 +1344,7 @@ public:
     {
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         m_event_loop_metrics_timer.emplace(service);
-        auto handler_2 = [this, handler=std::move(handler)](std::error_code ec) {
+        auto handler_2 = [this, handler = std::move(handler)](std::error_code ec) {
             REALM_ASSERT(!ec);
             clock::time_point now = clock::now();
             clock::duration elapsed_time = now - m_event_loop_metrics_start_time;
@@ -1370,7 +1357,7 @@ public:
             m_event_loop_metrics_start_time = now;
             m_handler_exec_start_time = now;
             m_handler_exec_time = clock::duration::zero();
-            handler(saturation, inefficiency); // Throws
+            handler(saturation, inefficiency);             // Throws
             report_event_loop_metrics(std::move(handler)); // Throws
         };
         m_event_loop_metrics_timer->async_wait(std::chrono::seconds{30},
@@ -1384,70 +1371,66 @@ public:
     {
         bool no_incomplete_resolve_operations;
 
-      on_handlers_executed_or_interrupted:
-        {
-            LockGuard lock{m_mutex};
-            if (m_stopped)
-                return;
-            // Note: Order of post operations must be preserved.
-            m_completed_operations.push_back(m_completed_operations_2);
-            no_incomplete_resolve_operations = (!m_resolve_in_progress &&
-                                                m_resolve_operations.empty());
+    on_handlers_executed_or_interrupted : {
+        LockGuard lock{m_mutex};
+        if (m_stopped)
+            return;
+        // Note: Order of post operations must be preserved.
+        m_completed_operations.push_back(m_completed_operations_2);
+        no_incomplete_resolve_operations = (!m_resolve_in_progress && m_resolve_operations.empty());
 
-            if (m_completed_operations.empty())
-                goto on_time_progressed;
-        }
-
-      on_operations_completed:
-        {
-#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
-            m_handler_exec_start_time = clock::now();
-#endif
-            while (LendersOperPtr op = m_completed_operations.pop_front())
-                execute(op); // Throws
-#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
-            m_handler_exec_time += clock::now() - m_handler_exec_start_time;
-#endif
-            goto on_handlers_executed_or_interrupted;
-        }
-
-      on_time_progressed:
-        {
-            clock::time_point now = clock::now();
-            if (process_timers(now))
-                goto on_operations_completed;
-
-            bool no_incomplete_operations = (io_reactor.empty() && m_wait_operations.empty() &&
-                                             no_incomplete_resolve_operations);
-            if (no_incomplete_operations) {
-                // We can only get to this point when there are no completion
-                // handlers ready to execute. It happens either because of a
-                // fall-through from on_operations_completed, or because of a
-                // jump to on_time_progressed, but that only happens if no
-                // completions handlers became ready during
-                // wait_and_process_io().
-                //
-                // We can also only get to this point when there are no
-                // asynchronous operations in progress (due to the preceeding
-                // if-condition.
-                //
-                // It is possible that an other thread has added new post
-                // operations since we checked, but there is really no point in
-                // rechecking that, as it is always possible, even after a
-                // recheck, that new post handlers get added after we decide to
-                // return, but before we actually do return. Also, if would
-                // offer no additional guarantees to the application.
-                return; // Out of work
-            }
-
-            // Blocking wait for I/O
-            bool interrupted = false;
-            if (wait_and_process_io(now, interrupted)) // Throws
-                goto on_operations_completed;
-            if (interrupted)
-                goto on_handlers_executed_or_interrupted;
+        if (m_completed_operations.empty())
             goto on_time_progressed;
+    }
+
+    on_operations_completed : {
+#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
+        m_handler_exec_start_time = clock::now();
+#endif
+        while (LendersOperPtr op = m_completed_operations.pop_front())
+            execute(op); // Throws
+#ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
+        m_handler_exec_time += clock::now() - m_handler_exec_start_time;
+#endif
+        goto on_handlers_executed_or_interrupted;
+    }
+
+    on_time_progressed : {
+        clock::time_point now = clock::now();
+        if (process_timers(now))
+            goto on_operations_completed;
+
+        bool no_incomplete_operations =
+            (io_reactor.empty() && m_wait_operations.empty() && no_incomplete_resolve_operations);
+        if (no_incomplete_operations) {
+            // We can only get to this point when there are no completion
+            // handlers ready to execute. It happens either because of a
+            // fall-through from on_operations_completed, or because of a
+            // jump to on_time_progressed, but that only happens if no
+            // completions handlers became ready during
+            // wait_and_process_io().
+            //
+            // We can also only get to this point when there are no
+            // asynchronous operations in progress (due to the preceeding
+            // if-condition.
+            //
+            // It is possible that an other thread has added new post
+            // operations since we checked, but there is really no point in
+            // rechecking that, as it is always possible, even after a
+            // recheck, that new post handlers get added after we decide to
+            // return, but before we actually do return. Also, if would
+            // offer no additional guarantees to the application.
+            return; // Out of work
         }
+
+        // Blocking wait for I/O
+        bool interrupted = false;
+        if (wait_and_process_io(now, interrupted)) // Throws
+            goto on_operations_completed;
+        if (interrupted)
+            goto on_handlers_executed_or_interrupted;
+        goto on_time_progressed;
+    }
     }
 
     void stop() noexcept
@@ -1518,7 +1501,7 @@ public:
     void recycle_post_oper(PostOperBase* op) noexcept
     {
         std::size_t size = op->m_size;
-        op->~PostOperBase(); // Dynamic dispatch
+        op->~PostOperBase();                           // Dynamic dispatch
         OwnersOperPtr op_2(new (op) UnusedOper(size)); // Does not throw
 
         // Keep the larger memory chunk (`op_2` or m_post_oper)
@@ -1567,9 +1550,11 @@ public:
 
     void cancel_incomplete_wait_oper(WaitOperBase& op) noexcept
     {
-        auto p = std::equal_range(m_wait_operations.begin(), m_wait_operations.end(),
-                                  op.m_expiration_time, WaitOperCompare{});
-        auto pred = [&op](const LendersWaitOperPtr& op_2) { return &*op_2 == &op; };
+        auto p = std::equal_range(m_wait_operations.begin(), m_wait_operations.end(), op.m_expiration_time,
+                                  WaitOperCompare{});
+        auto pred = [&op](const LendersWaitOperPtr& op_2) {
+            return &*op_2 == &op;
+        };
         auto i = std::find_if(p.first, p.second, pred);
         REALM_ASSERT(i != p.second);
         m_completed_operations.push_back(m_wait_operations.erase(i));
@@ -1593,18 +1578,17 @@ private:
         }
     };
 
-    using WaitQueue = util::PriorityQueue<LendersWaitOperPtr, std::vector<LendersWaitOperPtr>,
-                                          WaitOperCompare>;
+    using WaitQueue = util::PriorityQueue<LendersWaitOperPtr, std::vector<LendersWaitOperPtr>, WaitOperCompare>;
     WaitQueue m_wait_operations;
 
     Mutex m_mutex;
-    OwnersOperPtr m_post_oper; // Protected by `m_mutex`
+    OwnersOperPtr m_post_oper;                       // Protected by `m_mutex`
     OperQueue<ResolveOperBase> m_resolve_operations; // Protected by `m_mutex`
-    OperQueue<AsyncOper> m_completed_operations_2; // Protected by `m_mutex`
-    bool m_stopped = false; // Protected by `m_mutex`
-    bool m_stop_resolver_thread = false; // Protected by `m_mutex`
-    bool m_resolve_in_progress = false; // Protected by `m_mutex`
-    CondVar m_resolver_cond; // Protected by `m_mutex`
+    OperQueue<AsyncOper> m_completed_operations_2;   // Protected by `m_mutex`
+    bool m_stopped = false;                          // Protected by `m_mutex`
+    bool m_stop_resolver_thread = false;             // Protected by `m_mutex`
+    bool m_resolve_in_progress = false;              // Protected by `m_mutex`
+    CondVar m_resolver_cond;                         // Protected by `m_mutex`
 
     std::thread m_resolver_thread;
 
@@ -1636,9 +1620,8 @@ private:
         clock::time_point timeout;
         if (!m_wait_operations.empty())
             timeout = m_wait_operations.top()->m_expiration_time;
-        bool operations_completed =
-            io_reactor.wait_and_advance(timeout, now, interrupted,
-                                        m_completed_operations); // Throws
+        bool operations_completed = io_reactor.wait_and_advance(timeout, now, interrupted,
+                                                                m_completed_operations); // Throws
         return operations_completed;
     }
 
@@ -1668,8 +1651,7 @@ private:
                     continue;
             }
             try {
-                op->m_endpoints =
-                    resolve(op->m_query, op->m_error_code); // Throws only std::bad_alloc
+                op->m_endpoints = resolve(op->m_query, op->m_error_code); // Throws only std::bad_alloc
             }
             catch (std::bad_alloc&) {
                 op->m_error_code = make_basic_system_error_code(ENOMEM);
@@ -1687,8 +1669,8 @@ Endpoint::List Service::Impl::resolve(const Resolver::Query& query, std::error_c
 
     using addrinfo_type = struct addrinfo;
     addrinfo_type hints = addrinfo_type(); // Clear
-    hints.ai_flags    = query.m_flags;
-    hints.ai_family   = query.m_protocol.m_family;
+    hints.ai_flags = query.m_flags;
+    hints.ai_family = query.m_protocol.m_family;
     hints.ai_socktype = query.m_protocol.m_socktype;
     hints.ai_protocol = query.m_protocol.m_protocol;
 
@@ -1736,19 +1718,17 @@ Endpoint::List Service::Impl::resolve(const Resolver::Query& query, std::error_c
         bool ip_v4 = curr->ai_family == AF_INET;
         bool ip_v6 = curr->ai_family == AF_INET6;
         if (ip_v4 || ip_v6) {
-            REALM_ASSERT((ip_v4 && curr->ai_addrlen == sizeof (Endpoint::sockaddr_ip_v4_type)) ||
-                           (ip_v6 && curr->ai_addrlen == sizeof (Endpoint::sockaddr_ip_v6_type)));
+            REALM_ASSERT((ip_v4 && curr->ai_addrlen == sizeof(Endpoint::sockaddr_ip_v4_type)) ||
+                         (ip_v6 && curr->ai_addrlen == sizeof(Endpoint::sockaddr_ip_v6_type)));
             Endpoint& ep = list.m_endpoints[endpoint_ndx];
-            ep.m_protocol.m_family   = curr->ai_family;
+            ep.m_protocol.m_family = curr->ai_family;
             ep.m_protocol.m_socktype = curr->ai_socktype;
             ep.m_protocol.m_protocol = curr->ai_protocol;
             if (ip_v4) {
-                ep.m_sockaddr_union.m_ip_v4 =
-                    reinterpret_cast<Endpoint::sockaddr_ip_v4_type&>(*curr->ai_addr);
+                ep.m_sockaddr_union.m_ip_v4 = reinterpret_cast<Endpoint::sockaddr_ip_v4_type&>(*curr->ai_addr);
             }
             else {
-                ep.m_sockaddr_union.m_ip_v6 =
-                    reinterpret_cast<Endpoint::sockaddr_ip_v6_type&>(*curr->ai_addr);
+                ep.m_sockaddr_union.m_ip_v6 = reinterpret_cast<Endpoint::sockaddr_ip_v6_type&>(*curr->ai_addr);
             }
             ++endpoint_ndx;
         }
@@ -1760,15 +1740,13 @@ Endpoint::List Service::Impl::resolve(const Resolver::Query& query, std::error_c
 }
 
 
-Service::Service() :
-    m_impl{std::make_unique<Impl>(*this)} // Throws
+Service::Service()
+    : m_impl{std::make_unique<Impl>(*this)} // Throws
 {
 }
 
 
-Service::~Service() noexcept
-{
-}
+Service::~Service() noexcept {}
 
 
 void Service::run()
@@ -1819,13 +1797,14 @@ void Service::reset_trigger_exec(Impl& impl, TriggerExecOperBase& op) noexcept
 }
 
 
-void Service::Descriptor::accept(Descriptor& desc, StreamProtocol protocol, Endpoint* ep, std::error_code& ec) noexcept
+void Service::Descriptor::accept(Descriptor& desc, StreamProtocol protocol, Endpoint* ep,
+                                 std::error_code& ec) noexcept
 {
     REALM_ASSERT(is_open());
 
     union union_type {
         Endpoint::sockaddr_union_type m_sockaddr_union;
-        char m_extra_byte[sizeof (Endpoint::sockaddr_union_type) + 1];
+        char m_extra_byte[sizeof(Endpoint::sockaddr_union_type) + 1];
     };
     union_type buffer;
     struct sockaddr* addr = &buffer.m_sockaddr_union.m_base;
@@ -1871,8 +1850,8 @@ void Service::Descriptor::accept(Descriptor& desc, StreamProtocol protocol, Endp
         set_read_ready(true);
         break;
     }
-    socklen_t expected_addr_len = protocol.is_ip_v4() ?
-        sizeof (Endpoint::sockaddr_ip_v4_type) : sizeof (Endpoint::sockaddr_ip_v6_type);
+    socklen_t expected_addr_len =
+        protocol.is_ip_v4() ? sizeof(Endpoint::sockaddr_ip_v4_type) : sizeof(Endpoint::sockaddr_ip_v6_type);
     if (REALM_UNLIKELY(addr_len != expected_addr_len))
         REALM_TERMINATE("Unexpected peer address length");
 
@@ -1942,7 +1921,7 @@ std::size_t Service::Descriptor::read_some(char* buffer, std::size_t size, std::
             if (err == WSAEINTR)
                 continue;
             set_read_ready(err != WSAEWOULDBLOCK);
-            ec = make_winsock_error_code(err); //Failure
+            ec = make_winsock_error_code(err); // Failure
             return 0;
         }
 #else
@@ -2190,8 +2169,8 @@ std::error_code SocketBase::bind(const Endpoint& ep, std::error_code& ec)
     }
 
     native_handle_type sock_fd = m_desc.native_handle();
-    socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
-        sizeof (Endpoint::sockaddr_ip_v4_type) : sizeof (Endpoint::sockaddr_ip_v6_type);
+    socklen_t addr_len =
+        ep.m_protocol.is_ip_v4() ? sizeof(Endpoint::sockaddr_ip_v4_type) : sizeof(Endpoint::sockaddr_ip_v6_type);
 
     int ret = ::bind(sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
     if (REALM_UNLIKELY(check_socket_error(ret, ec)))
@@ -2206,7 +2185,7 @@ Endpoint SocketBase::local_endpoint(std::error_code& ec) const
     Endpoint ep;
     union union_type {
         Endpoint::sockaddr_union_type m_sockaddr_union;
-        char m_extra_byte[sizeof (Endpoint::sockaddr_union_type) + 1];
+        char m_extra_byte[sizeof(Endpoint::sockaddr_union_type) + 1];
     };
     native_handle_type sock_fd = m_desc.native_handle();
     union_type buffer;
@@ -2216,8 +2195,8 @@ Endpoint SocketBase::local_endpoint(std::error_code& ec) const
     if (REALM_UNLIKELY(check_socket_error(ret, ec)))
         return ep;
 
-    socklen_t expected_addr_len = m_protocol.is_ip_v4() ?
-        sizeof (Endpoint::sockaddr_ip_v4_type) : sizeof (Endpoint::sockaddr_ip_v6_type);
+    socklen_t expected_addr_len =
+        m_protocol.is_ip_v4() ? sizeof(Endpoint::sockaddr_ip_v4_type) : sizeof(Endpoint::sockaddr_ip_v6_type);
     if (addr_len != expected_addr_len)
         throw util::runtime_error("Unexpected local address length");
     ep.m_protocol = m_protocol;
@@ -2280,8 +2259,7 @@ std::error_code SocketBase::open(const StreamProtocol& prot, std::error_code& ec
 }
 
 
-std::error_code SocketBase::do_assign(const StreamProtocol& prot, native_handle_type sock_fd,
-                                       std::error_code& ec)
+std::error_code SocketBase::do_assign(const StreamProtocol& prot, native_handle_type sock_fd, std::error_code& ec)
 {
     if (REALM_UNLIKELY(is_open()))
         throw util::runtime_error("Socket is already open");
@@ -2304,8 +2282,7 @@ std::error_code SocketBase::do_assign(const StreamProtocol& prot, native_handle_
 }
 
 
-void SocketBase::get_option(opt_enum opt, void* value_data, std::size_t& value_size,
-                            std::error_code& ec) const
+void SocketBase::get_option(opt_enum opt, void* value_data, std::size_t& value_size, std::error_code& ec) const
 {
     int level = 0;
     int option_name = 0;
@@ -2313,8 +2290,7 @@ void SocketBase::get_option(opt_enum opt, void* value_data, std::size_t& value_s
 
     native_handle_type sock_fd = m_desc.native_handle();
     socklen_t option_len = socklen_t(value_size);
-    int ret = ::getsockopt(sock_fd, level, option_name, static_cast<char*>(value_data),
-                           &option_len);
+    int ret = ::getsockopt(sock_fd, level, option_name, static_cast<char*>(value_data), &option_len);
     if (REALM_UNLIKELY(check_socket_error(ret, ec)))
         return;
     value_size = std::size_t(option_len);
@@ -2322,16 +2298,14 @@ void SocketBase::get_option(opt_enum opt, void* value_data, std::size_t& value_s
 }
 
 
-void SocketBase::set_option(opt_enum opt, const void* value_data, std::size_t value_size,
-                            std::error_code& ec)
+void SocketBase::set_option(opt_enum opt, const void* value_data, std::size_t value_size, std::error_code& ec)
 {
     int level = 0;
     int option_name = 0;
     map_option(opt, level, option_name);
 
     native_handle_type sock_fd = m_desc.native_handle();
-    int ret = ::setsockopt(sock_fd, level, option_name, static_cast<const char*>(value_data),
-                           socklen_t(value_size));
+    int ret = ::setsockopt(sock_fd, level, option_name, static_cast<const char*>(value_data), socklen_t(value_size));
     if (REALM_UNLIKELY(check_socket_error(ret, ec)))
         return;
     ec = std::error_code(); // Success
@@ -2342,11 +2316,11 @@ void SocketBase::map_option(opt_enum opt, int& level, int& option_name) const
 {
     switch (opt) {
         case opt_ReuseAddr:
-            level       = SOL_SOCKET;
+            level = SOL_SOCKET;
             option_name = SO_REUSEADDR;
             return;
         case opt_Linger:
-            level       = SOL_SOCKET;
+            level = SOL_SOCKET;
 #if REALM_PLATFORM_APPLE
             // By default, SO_LINGER on Darwin uses "ticks" instead of
             // seconds for better accuracy, but we want to be cross-platform.
@@ -2356,7 +2330,7 @@ void SocketBase::map_option(opt_enum opt, int& level, int& option_name) const
 #endif // REALM_PLATFORM_APPLE
             return;
         case opt_NoDelay:
-            level       = IPPROTO_TCP;
+            level = IPPROTO_TCP;
             option_name = TCP_NODELAY; // Specified by POSIX.1-2001
             return;
     }
@@ -2376,9 +2350,8 @@ std::error_code Socket::connect(const Endpoint& ep, std::error_code& ec)
     m_desc.ensure_blocking_mode(); // Throws
 
     native_handle_type sock_fd = m_desc.native_handle();
-    socklen_t addr_len = (ep.m_protocol.is_ip_v4() ?
-                          sizeof (Endpoint::sockaddr_ip_v4_type) :
-                          sizeof (Endpoint::sockaddr_ip_v6_type));
+    socklen_t addr_len =
+        (ep.m_protocol.is_ip_v4() ? sizeof(Endpoint::sockaddr_ip_v4_type) : sizeof(Endpoint::sockaddr_ip_v6_type));
     int ret = ::connect(sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
     if (REALM_UNLIKELY(check_socket_error(ret, ec)))
         return ec;
@@ -2409,12 +2382,12 @@ bool Socket::initiate_async_connect(const Endpoint& ep, std::error_code& ec)
 
     // Initiate connect operation.
     native_handle_type sock_fd = m_desc.native_handle();
-    socklen_t addr_len = ep.m_protocol.is_ip_v4() ?
-        sizeof (Endpoint::sockaddr_ip_v4_type) : sizeof (Endpoint::sockaddr_ip_v6_type);
+    socklen_t addr_len =
+        ep.m_protocol.is_ip_v4() ? sizeof(Endpoint::sockaddr_ip_v4_type) : sizeof(Endpoint::sockaddr_ip_v6_type);
     int ret = ::connect(sock_fd, &ep.m_sockaddr_union.m_base, addr_len);
     if (ret != -1) {
         ec = std::error_code(); // Success
-        return true; // Immediate completion.
+        return true;            // Immediate completion.
     }
 
     // EINPROGRESS (and on Windows, also WSAEWOULDBLOCK) indicates that the
@@ -2426,7 +2399,7 @@ bool Socket::initiate_async_connect(const Endpoint& ep, std::error_code& ec)
 
 #ifdef _WIN32
     int err = WSAGetLastError();
-    if(err != WSAEWOULDBLOCK) {
+    if (err != WSAEWOULDBLOCK) {
         ec = make_winsock_error_code(err);
         return true; // Failure
     }
@@ -2447,8 +2420,8 @@ std::error_code Socket::finalize_async_connect(std::error_code& ec) noexcept
     native_handle_type sock_fd = m_desc.native_handle();
     int connect_errno = 0;
     socklen_t connect_errno_size = sizeof connect_errno;
-    int ret = ::getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&connect_errno),
-                           &connect_errno_size);
+    int ret =
+        ::getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&connect_errno), &connect_errno_size);
     if (REALM_UNLIKELY(check_socket_error(ret, ec)))
         return ec; // getsockopt() failed
     if (REALM_UNLIKELY(connect_errno)) {
@@ -2501,8 +2474,8 @@ bool ReadAheadBuffer::read(char*& begin, char* end, int delim, std::error_code& 
     std::size_t out_avail = end - begin;
     std::size_t n = std::min(in_avail, out_avail);
     bool delim_mode = (delim != std::char_traits<char>::eof());
-    char* i = (!delim_mode ? m_begin + n :
-               std::find(m_begin, m_begin + n, std::char_traits<char>::to_char_type(delim)));
+    char* i =
+        (!delim_mode ? m_begin + n : std::find(m_begin, m_begin + n, std::char_traits<char>::to_char_type(delim)));
     begin = std::copy(m_begin, i, begin);
     m_begin = i;
     if (begin == end) {
@@ -2574,21 +2547,21 @@ Address make_address(const char* c_str, std::error_code& ec) noexcept
     // to be set based on a combined inspection of the original string
     // representation, and the parsed address. The following code is "borrowed"
     // from ASIO:
-/*
-    *scope_id = 0;
-    if (const char* if_name = strchr(src, '%'))
-    {
-      in6_addr_type* ipv6_address = static_cast<in6_addr_type*>(dest);
-      bool is_link_local = ((ipv6_address->s6_addr[0] == 0xfe)
-          && ((ipv6_address->s6_addr[1] & 0xc0) == 0x80));
-      bool is_multicast_link_local = ((ipv6_address->s6_addr[0] == 0xff)
-          && ((ipv6_address->s6_addr[1] & 0x0f) == 0x02));
-      if (is_link_local || is_multicast_link_local)
-        *scope_id = if_nametoindex(if_name + 1);
-      if (*scope_id == 0)
-        *scope_id = atoi(if_name + 1);
-    }
-*/
+    /*
+        *scope_id = 0;
+        if (const char* if_name = strchr(src, '%'))
+        {
+          in6_addr_type* ipv6_address = static_cast<in6_addr_type*>(dest);
+          bool is_link_local = ((ipv6_address->s6_addr[0] == 0xfe)
+              && ((ipv6_address->s6_addr[1] & 0xc0) == 0x80));
+          bool is_multicast_link_local = ((ipv6_address->s6_addr[0] == 0xff)
+              && ((ipv6_address->s6_addr[1] & 0x0f) == 0x02));
+          if (is_link_local || is_multicast_link_local)
+            *scope_id = if_nametoindex(if_name + 1);
+          if (*scope_id == 0)
+            *scope_id = atoi(if_name + 1);
+        }
+    */
 }
 
 

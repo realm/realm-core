@@ -51,15 +51,10 @@ std::error_code make_error_code(Error) noexcept;
 class Client {
 public:
     using port_type = util::network::Endpoint::port_type;
-    using LoginHandler = void(std::error_code, std::string access_token,
-                              std::string refresh_token);
+    using LoginHandler = void(std::error_code, std::string access_token, std::string refresh_token);
     using RefreshHandler = void(std::error_code, std::string access_token);
-    using SSLVerifyCallback = bool(const std::string& server_address,
-                                   port_type server_port,
-                                   const char* pem_data,
-                                   std::size_t pem_size,
-                                   int preverify_ok,
-                                   int depth);
+    using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
+                                   std::size_t pem_size, int preverify_ok, int depth);
 
     class Config {
     public:
@@ -75,8 +70,7 @@ public:
 
         /// Specifies the maximum number of TCP connections the client can have
         /// to the auth server at any point in time.
-        std::int_fast64_t max_number_of_connections =
-            std::numeric_limits<std::int_fast64_t>::max();
+        std::int_fast64_t max_number_of_connections = std::numeric_limits<std::int_fast64_t>::max();
 
         /// See Client::Config::verify_servers_ssl_certificate.
         bool verify_servers_ssl_certificate = true;
@@ -96,8 +90,7 @@ public:
     /// auth_port specifies the address and port of an username/password
     /// authentication server. Typically, an instance of Realm Object Server
     /// would be running at the address.
-    Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id,
-           Config = {});
+    Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id, Config = {});
 
     /// Starts the event loop. This function is thread safe.
     void run();
@@ -183,12 +176,12 @@ private:
 };
 
 } // namespace auth
-} // namespace util
+} // namespace sync
 } // namespace realm
 
 namespace std {
 
-template<>
+template <>
 struct is_error_code_enum<realm::sync::auth::Error> {
     static const bool value = true;
 };

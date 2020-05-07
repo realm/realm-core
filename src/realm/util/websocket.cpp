@@ -20,9 +20,8 @@ bool case_insensitive_equal(StringData str1, StringData str2)
     if (str1.size() != str2.size())
         return false;
 
-    for (size_t i = 0; i <  str1.size(); ++i)
-        if (std::tolower(str1[i], std::locale::classic()) !=
-            std::tolower(str2[i], std::locale::classic()))
+    for (size_t i = 0; i < str1.size(); ++i)
+        if (std::tolower(str1[i], std::locale::classic()) != std::tolower(str2[i], std::locale::classic()))
             return false;
 
     return true;
@@ -48,7 +47,7 @@ std::string make_random_sec_websocket_key(std::mt19937_64& random)
     size_t encoded_size = base64_encode(random_bytes, 16, out_buffer, 24);
     REALM_ASSERT(encoded_size == 24);
 
-    return std::string {out_buffer, 24};
+    return std::string{out_buffer, 24};
 }
 
 // Sec-WebSocket-Accept is a header in the server's HTTP response.
@@ -90,11 +89,9 @@ util::Optional<StringData> find_http_header_value(const HTTPHeaders& headers, St
 // Upgrade: websocket
 bool validate_websocket_upgrade(const HTTPHeaders& headers)
 {
-    util::Optional<StringData> header_value_upgrade =
-        find_http_header_value(headers, "Upgrade");
+    util::Optional<StringData> header_value_upgrade = find_http_header_value(headers, "Upgrade");
 
-    return (header_value_upgrade &&
-        case_insensitive_equal(*header_value_upgrade, "websocket"));
+    return (header_value_upgrade && case_insensitive_equal(*header_value_upgrade, "websocket"));
 }
 
 // validate_websocket_connection() returns true if the HTTP \a headers
@@ -102,11 +99,9 @@ bool validate_websocket_upgrade(const HTTPHeaders& headers)
 // Connection: Upgrade
 bool validate_websocket_connection(const HTTPHeaders& headers)
 {
-    util::Optional<StringData> header_value_connection =
-        find_http_header_value(headers, "Connection");
+    util::Optional<StringData> header_value_connection = find_http_header_value(headers, "Connection");
 
-    return (header_value_connection &&
-        case_insensitive_equal(*header_value_connection, "Upgrade"));
+    return (header_value_connection && case_insensitive_equal(*header_value_connection, "Upgrade"));
 }
 
 // validate_sec_websocket_version() returns true if the
@@ -121,11 +116,9 @@ bool validate_sec_websocket_version(const HTTPHeaders& headers)
 // \param headers contains a Sec-Websocket-Key
 // header, false otherwise. If the header is found, the
 // argument sec_websocket_key is set to its value.
-bool find_sec_websocket_key(const HTTPHeaders& headers,
-                            std::string& sec_websocket_key)
+bool find_sec_websocket_key(const HTTPHeaders& headers, std::string& sec_websocket_key)
 {
-    util::Optional<StringData> header_value =
-        find_http_header_value(headers, "Sec-WebSocket-Key");
+    util::Optional<StringData> header_value = find_http_header_value(headers, "Sec-WebSocket-Key");
 
     if (!header_value)
         return false;
@@ -135,10 +128,8 @@ bool find_sec_websocket_key(const HTTPHeaders& headers,
     return true;
 }
 
-util::Optional<HTTPResponse> do_make_http_response(
-    const HTTPRequest& request,
-    const std::string& sec_websocket_protocol,
-    std::error_code& ec)
+util::Optional<HTTPResponse> do_make_http_response(const HTTPRequest& request,
+                                                   const std::string& sec_websocket_protocol, std::error_code& ec)
 {
     std::string sec_websocket_key;
 
@@ -162,8 +153,7 @@ util::Optional<HTTPResponse> do_make_http_response(
         return util::none;
     }
 
-    std::string sec_websocket_accept
-        = make_sec_websocket_accept(sec_websocket_key);
+    std::string sec_websocket_accept = make_sec_websocket_accept(sec_websocket_key);
 
     HTTPResponse response;
     response.status = HTTPStatus::SwitchingProtocols;
@@ -203,19 +193,14 @@ void mask_payload(char* masking_key, const char* payload, size_t payload_len, ch
 // The frame size can at most be payload_size + 14.
 // \param random is used to create a random masking key.
 // The return value is the size of the frame.
-size_t make_frame(bool fin,
-                  int opcode,
-                  bool mask,
-                  const char* payload,
-                  size_t payload_size,
-                  char* output,
+size_t make_frame(bool fin, int opcode, bool mask, const char* payload, size_t payload_size, char* output,
                   std::mt19937_64& random)
 {
     int index = 0; // used to keep track of position within the header.
     using uchar = unsigned char;
     output[0] = (fin ? char(uchar(128)) : 0) + opcode; // fin and opcode in the first byte.
-    output[1] = (mask ? char(uchar(128)) : 0); // First bit of the second byte is mask.
-    if (payload_size <= 125) { // The payload length is contained in the second byte.
+    output[1] = (mask ? char(uchar(128)) : 0);         // First bit of the second byte is mask.
+    if (payload_size <= 125) {                         // The payload length is contained in the second byte.
         output[1] += static_cast<char>(payload_size);
         index = 2;
     }
@@ -301,7 +286,9 @@ public:
     bool delivery_ready = false;
     websocket::Opcode delivery_opcode = websocket::Opcode::continuation;
 
-    FrameReader(util::Logger& logger, bool& is_client): logger(logger), m_is_client(is_client)
+    FrameReader(util::Logger& logger, bool& is_client)
+        : logger(logger)
+        , m_is_client(is_client)
     {
     }
 
@@ -316,7 +303,7 @@ public:
     // one stage forward.
     void next()
     {
-        switch(m_stage) {
+        switch (m_stage) {
             case Stage::init:
                 stage_init();
                 break;
@@ -367,13 +354,7 @@ private:
     // a larger message has been delivered.
     static const size_t s_message_buffer_min_size = 2048;
 
-    enum class Stage {
-        init,
-        header_beginning,
-        header_end,
-        payload,
-        delivery
-    };
+    enum class Stage { init, header_beginning, header_end, payload, delivery };
     Stage m_stage = Stage::init;
 
     void set_protocol_error()
@@ -513,8 +494,7 @@ private:
                 m_masking_key = header_buffer + 4;
         }
         else if (m_short_payload_size == 127) {
-            if (header_buffer[2] != 0 || header_buffer[3] != 0 ||
-                header_buffer[4] != 0 || header_buffer[5] != 0) {
+            if (header_buffer[2] != 0 || header_buffer[3] != 0 || header_buffer[4] != 0 || header_buffer[5] != 0) {
                 // Message should be smaller than 4GB
                 // FIXME: We should introduce a maximum size for messages.
                 protocol_error = true;
@@ -585,19 +565,16 @@ private:
 
 class WebSocket {
 public:
-
-    WebSocket(websocket::Config& config):
-        m_config(config),
-        m_logger(config.websocket_get_logger()),
-        m_frame_reader(config.websocket_get_logger(), m_is_client)
+    WebSocket(websocket::Config& config)
+        : m_config(config)
+        , m_logger(config.websocket_get_logger())
+        , m_frame_reader(config.websocket_get_logger(), m_is_client)
     {
         m_logger.debug("WebSocket::Websocket()");
     }
 
-    void initiate_client_handshake(const std::string& request_uri,
-                                   const std::string& host,
-                                   const std::string& sec_websocket_protocol,
-                                   HTTPHeaders headers)
+    void initiate_client_handshake(const std::string& request_uri, const std::string& host,
+                                   const std::string& sec_websocket_protocol, HTTPHeaders headers)
     {
         m_logger.debug("WebSocket::initiate_client_handshake()");
 
@@ -696,8 +673,8 @@ public:
         if (m_write_buffer.size() < required_size)
             m_write_buffer.resize(required_size);
 
-        size_t message_size = make_frame(fin, opcode, mask, data, size, m_write_buffer.data(),
-                                         m_config.websocket_get_random());
+        size_t message_size =
+            make_frame(fin, opcode, mask, data, size, m_write_buffer.data(), m_config.websocket_get_random());
 
         auto handler = [=](std::error_code ec, size_t) {
             // If the operation is aborted, the socket object may have been destroyed.
@@ -722,7 +699,7 @@ public:
         }
 
         auto handler = m_write_completion_handler;
-        m_write_completion_handler = std::function<void()> {};
+        m_write_completion_handler = std::function<void()>{};
         handler();
     }
 
@@ -765,7 +742,8 @@ private:
         m_stopped = true;
 
         m_logger.error("Websocket: Expected HTTP response 101 Switching Protocols, "
-                       "but received:\n%1", response);
+                       "but received:\n%1",
+                       response);
 
         int status_code = int(response.status);
         std::error_code ec;
@@ -815,7 +793,8 @@ private:
         m_stopped = true;
 
         m_logger.error("Websocket: HTTP response has invalid websocket headers."
-                       "HTTP response = \n%1", response);
+                       "HTTP response = \n%1",
+                       response);
         std::error_code ec = Error::bad_response_header_protocol_violation;
         util::StringView body;
         util::StringView* body_ptr = nullptr;
@@ -834,13 +813,13 @@ private:
         m_config.websocket_handshake_error_handler(ec, nullptr, nullptr); // Throws
     }
 
-    void error_server_request_header_protocol_violation(std::error_code ec,
-                                                        const HTTPRequest& request)
+    void error_server_request_header_protocol_violation(std::error_code ec, const HTTPRequest& request)
     {
         m_stopped = true;
 
         m_logger.error("Websocket: HTTP request has invalid websocket headers."
-                       "HTTP request = \n%1", request);
+                       "HTTP request = \n%1",
+                       request);
         m_config.websocket_handshake_error_handler(ec, &request.headers, nullptr); // Throws
     }
 
@@ -880,14 +859,11 @@ private:
     {
         m_logger.trace("WebSocket::handle_http_request_received()");
 
-        util::Optional<std::string> sec_websocket_protocol =
-            websocket::read_sec_websocket_protocol(request);
+        util::Optional<std::string> sec_websocket_protocol = websocket::read_sec_websocket_protocol(request);
 
         std::error_code ec;
-        util::Optional<HTTPResponse> response = do_make_http_response(
-            request,
-            sec_websocket_protocol ? *sec_websocket_protocol : "realm.io",
-            ec);
+        util::Optional<HTTPResponse> response =
+            do_make_http_response(request, sec_websocket_protocol ? *sec_websocket_protocol : "realm.io", ec);
 
         if (ec) {
             error_server_request_header_protocol_violation(ec, request);
@@ -922,8 +898,7 @@ private:
     // find_sec_websockey_key.
     bool find_sec_websocket_accept(const HTTPHeaders& headers)
     {
-        util::Optional<StringData> header_value =
-            find_http_header_value(headers, "Sec-WebSocket-Accept");
+        util::Optional<StringData> header_value = find_http_header_value(headers, "Sec-WebSocket-Accept");
 
         if (!header_value)
             return false;
@@ -950,19 +925,24 @@ private:
 
             switch (m_frame_reader.delivery_opcode) {
                 case websocket::Opcode::text:
-                    should_continue = m_config.websocket_text_message_received(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    should_continue = m_config.websocket_text_message_received(m_frame_reader.delivery_buffer,
+                                                                               m_frame_reader.delivery_size);
                     break;
                 case websocket::Opcode::binary:
-                    should_continue = m_config.websocket_binary_message_received(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    should_continue = m_config.websocket_binary_message_received(m_frame_reader.delivery_buffer,
+                                                                                 m_frame_reader.delivery_size);
                     break;
                 case websocket::Opcode::close:
-                    should_continue = m_config.websocket_close_message_received(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    should_continue = m_config.websocket_close_message_received(m_frame_reader.delivery_buffer,
+                                                                                m_frame_reader.delivery_size);
                     break;
                 case websocket::Opcode::ping:
-                    should_continue = m_config.websocket_ping_message_received(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    should_continue = m_config.websocket_ping_message_received(m_frame_reader.delivery_buffer,
+                                                                               m_frame_reader.delivery_size);
                     break;
                 case websocket::Opcode::pong:
-                    should_continue = m_config.websocket_pong_message_received(m_frame_reader.delivery_buffer, m_frame_reader.delivery_size);
+                    should_continue = m_config.websocket_pong_message_received(m_frame_reader.delivery_buffer,
+                                                                               m_frame_reader.delivery_size);
                     break;
                 default:
                     break;
@@ -1055,7 +1035,7 @@ const char* get_error_message(Error error_code)
 }
 
 
-class ErrorCategoryImpl: public std::error_category {
+class ErrorCategoryImpl : public std::error_category {
 public:
     const char* name() const noexcept override final
     {
@@ -1102,32 +1082,30 @@ bool websocket::Config::websocket_pong_message_received(const char*, size_t)
 }
 
 
-class websocket::Socket::Impl: public WebSocket {
+class websocket::Socket::Impl : public WebSocket {
 public:
-    Impl(Config& config): WebSocket(config) // Throws
+    Impl(Config& config)
+        : WebSocket(config) // Throws
     {
     }
 };
 
-websocket::Socket::Socket(Config& config): m_impl(new Impl {config})
+websocket::Socket::Socket(Config& config)
+    : m_impl(new Impl{config})
 {
 }
 
-websocket::Socket::Socket(Socket&& socket) noexcept: m_impl(std::move(socket.m_impl))
+websocket::Socket::Socket(Socket&& socket) noexcept
+    : m_impl(std::move(socket.m_impl))
 {
 }
 
-websocket::Socket::~Socket() noexcept
-{
-}
+websocket::Socket::~Socket() noexcept {}
 
-void websocket::Socket::initiate_client_handshake(const std::string& request_uri,
-                                                  const std::string& host,
-                                                  const std::string& sec_websocket_protocol,
-                                                  HTTPHeaders headers)
+void websocket::Socket::initiate_client_handshake(const std::string& request_uri, const std::string& host,
+                                                  const std::string& sec_websocket_protocol, HTTPHeaders headers)
 {
-    m_impl->initiate_client_handshake(request_uri, host, sec_websocket_protocol,
-                                      std::move(headers));
+    m_impl->initiate_client_handshake(request_uri, host, sec_websocket_protocol, std::move(headers));
 }
 
 void websocket::Socket::initiate_server_handshake()
@@ -1140,7 +1118,8 @@ void websocket::Socket::initiate_server_websocket_after_handshake()
     m_impl->initiate_server_websocket_after_handshake();
 }
 
-void websocket::Socket::async_write_frame(bool fin, Opcode opcode, const char* data, size_t size, std::function<void()> handler)
+void websocket::Socket::async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
+                                          std::function<void()> handler)
 {
     m_impl->async_write_frame(fin, int(opcode), data, size, handler);
 }
@@ -1175,8 +1154,7 @@ void websocket::Socket::stop() noexcept
     m_impl->stop();
 }
 
-util::Optional<std::string>
-websocket::read_sec_websocket_protocol(const HTTPRequest& request)
+util::Optional<std::string> websocket::read_sec_websocket_protocol(const HTTPRequest& request)
 {
     const HTTPHeaders& headers = request.headers;
     const StringData header = "Sec-WebSocket-Protocol";
@@ -1184,10 +1162,9 @@ websocket::read_sec_websocket_protocol(const HTTPRequest& request)
     return value ? util::Optional<std::string>(std::string(*value)) : util::none;
 }
 
-util::Optional<HTTPResponse> websocket::make_http_response(
-    const HTTPRequest& request,
-    const std::string& sec_websocket_protocol,
-    std::error_code& ec)
+util::Optional<HTTPResponse> websocket::make_http_response(const HTTPRequest& request,
+                                                           const std::string& sec_websocket_protocol,
+                                                           std::error_code& ec)
 {
     return do_make_http_response(request, sec_websocket_protocol, ec);
 }

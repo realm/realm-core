@@ -27,7 +27,7 @@ std::string encrypt::calculate_fingerprint(const util::Optional<std::array<char,
 }
 
 bool encrypt::verify_fingerprint(const std::string& fingerprint,
-                        const util::Optional<std::array<char, 64>> encryption_key)
+                                 const util::Optional<std::array<char, 64>> encryption_key)
 {
     const std::string calculated_fingerprint = calculate_fingerprint(encryption_key);
     return fingerprint == calculated_fingerprint;

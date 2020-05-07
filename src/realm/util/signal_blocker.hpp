@@ -33,7 +33,6 @@ private:
 };
 
 
-
 // Implementation
 
 inline SignalBlocker::SignalBlocker() noexcept

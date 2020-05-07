@@ -413,15 +413,17 @@ void ChangesetIndex::verify() const
     for (auto& pair : m_object_instructions) {
         for (auto& pair2 : pair.second) {
             REALM_ASSERT(&*pair2.second->self_it == pair2.second);
-            REALM_ASSERT(std::any_of(m_conflict_groups_owner.begin(), m_conflict_groups_owner.end(),
-                                     [&](auto& cg) { return &cg == pair2.second; }));
+            REALM_ASSERT(std::any_of(m_conflict_groups_owner.begin(), m_conflict_groups_owner.end(), [&](auto& cg) {
+                return &cg == pair2.second;
+            }));
         }
     }
 
     for (auto& pair : m_schema_instructions) {
         REALM_ASSERT(&*pair.second->self_it == pair.second);
-        REALM_ASSERT(std::any_of(m_conflict_groups_owner.begin(), m_conflict_groups_owner.end(),
-                                 [&](auto& cg) { return &cg == pair.second; }));
+        REALM_ASSERT(std::any_of(m_conflict_groups_owner.begin(), m_conflict_groups_owner.end(), [&](auto& cg) {
+            return &cg == pair.second;
+        }));
     }
 
     // Collect all changesets

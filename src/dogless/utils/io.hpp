@@ -26,7 +26,7 @@ namespace dogless {
 namespace utils {
 
 class IOServiceRunner {
-    public:
+public:
     // ctor/dtor
     IOServiceRunner(int thread_count = 1);
     IOServiceRunner(IOServiceRunner const&) = delete;
@@ -35,12 +35,12 @@ class IOServiceRunner {
     // accessor
     asio::io_service& operator()();
 
-    private:
+private:
     void run(int thread_count);
 
-    private:
-    asio::io_service         m_io_service;
-    asio::io_service::work   m_work;
+private:
+    asio::io_service m_io_service;
+    asio::io_service::work m_work;
     std::vector<std::thread> m_threads;
 };
 

@@ -93,8 +93,7 @@
     do {                                                                                                             \
         if (!CHECK(cond))                                                                                            \
             return;                                                                                                  \
-    }                                                                                                                \
-    while (false)
+    } while (false)
 
 #define CHECK_THROW(expr, exception_class)                                                                           \
     ([&] {                                                                                                           \
@@ -115,7 +114,7 @@
             (expr);                                                                                                  \
             test_context.throw_ex_failed(__FILE__, __LINE__, #expr, #exception_class, #exception_cond);              \
         }                                                                                                            \
-        catch (exception_class& e) {                                                                                 \
+        catch (exception_class & e) {                                                                                \
             if (exception_cond) {                                                                                    \
                 test_context.check_succeeded();                                                                      \
                 return true;                                                                                         \
@@ -144,7 +143,7 @@
             (expr);                                                                                                  \
             test_context.throw_any_failed(__FILE__, __LINE__, #expr);                                                \
         }                                                                                                            \
-        catch (std::exception& e) {                                                                                  \
+        catch (std::exception & e) {                                                                                 \
             test_context.check_succeeded();                                                                          \
             message = e.what();                                                                                      \
         }                                                                                                            \
@@ -157,7 +156,7 @@
             test_context.check_succeeded();                                                                          \
             return true;                                                                                             \
         }                                                                                                            \
-        catch (std::exception& ex) {                                                                                 \
+        catch (std::exception & ex) {                                                                                \
             test_context.nothrow_failed(__FILE__, __LINE__, #expr, &ex);                                             \
         }                                                                                                            \
         catch (...) {                                                                                                \

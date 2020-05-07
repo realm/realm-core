@@ -43,7 +43,10 @@ struct ScratchMemory {
         size_t block_index = 0;
         size_t offset = 0;
 
-        size_t bytes() const { return block_index * block_size + offset; }
+        size_t bytes() const
+        {
+            return block_index * block_size + offset;
+        }
     };
 
     Position get_current_position() const noexcept;
@@ -62,8 +65,7 @@ private:
     /// Reset the position in memory, normally in connection with destruction
     /// of an arena. This is a very cheap operation. All objects allocated
     /// through the arena become invalid.
-    void reset(const ScratchArena& current_arena, const ScratchArena* previous,
-               Position checkpoint) noexcept;
+    void reset(const ScratchArena& current_arena, const ScratchArena* previous, Position checkpoint) noexcept;
 
     /// Set the area as the current arena, and return the previous arena.
     /// ScratchMemory keeps track of the current arena with the sole purpose
@@ -116,20 +118,19 @@ private:
 };
 
 /// STL-compatible allocator
-template <class T> using ScratchAllocator = STLAllocator<T, ScratchArena>;
+template <class T>
+using ScratchAllocator = STLAllocator<T, ScratchArena>;
 
 // Implementation:
 
-inline bool operator<(const ScratchMemory::Position& a,
-                      const ScratchMemory::Position& b)
+inline bool operator<(const ScratchMemory::Position& a, const ScratchMemory::Position& b)
 {
     if (a.block_index == b.block_index)
         return a.offset < b.offset;
     return a.block_index < b.block_index;
 }
 
-inline bool operator<=(const ScratchMemory::Position& a,
-                       const ScratchMemory::Position& b)
+inline bool operator<=(const ScratchMemory::Position& a, const ScratchMemory::Position& b)
 {
     if (a.block_index == b.block_index)
         return a.offset <= b.offset;
@@ -138,7 +139,8 @@ inline bool operator<=(const ScratchMemory::Position& a,
 
 inline ScratchMemory::ScratchMemory(AllocatorBase& allocator) noexcept
     : m_allocator(allocator)
-{}
+{
+}
 
 inline ScratchMemory::~ScratchMemory()
 {
@@ -158,13 +160,11 @@ inline auto ScratchMemory::get_high_mark() const noexcept -> Position
 inline void ScratchMemory::shrink_to_fit() noexcept
 {
     if (m_blocks.size() > m_position.block_index + 1) {
-        m_blocks.erase(m_blocks.begin() + m_position.block_index + 1,
-                       m_blocks.end());
+        m_blocks.erase(m_blocks.begin() + m_position.block_index + 1, m_blocks.end());
     }
 }
 
-inline void ScratchMemory::reset(const ScratchArena& current_arena,
-                                 const ScratchArena* previous_arena,
+inline void ScratchMemory::reset(const ScratchArena& current_arena, const ScratchArena* previous_arena,
                                  Position checkpoint) noexcept
 {
     REALM_ASSERT(&current_arena == m_current_arena);
@@ -182,8 +182,7 @@ inline const ScratchArena* ScratchMemory::enter_arena(const ScratchArena& new_ar
     return prev;
 }
 
-inline void* ScratchMemory::allocate(const ScratchArena& current_arena,
-                                     size_t size)
+inline void* ScratchMemory::allocate(const ScratchArena& current_arena, size_t size)
 {
     REALM_ASSERT(&current_arena == m_current_arena);
 
@@ -195,8 +194,7 @@ inline void* ScratchMemory::allocate(const ScratchArena& current_arena,
         throw util::bad_alloc{};
 
     Position pos;
-    if (m_position.block_index < m_blocks.size() &&
-        size < block_size - m_position.offset) {
+    if (m_position.block_index < m_blocks.size() && size < block_size - m_position.offset) {
         // Allocation fits in current block
         pos = m_position;
         m_position.offset += size;
@@ -259,4 +257,3 @@ using ScratchDeleter = STLDeleter<T, ScratchArena>;
 
 
 #endif // REALM_UTIL_SCRATCH_ALLOCATOR_HPP
-

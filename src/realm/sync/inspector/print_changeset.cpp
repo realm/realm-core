@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
         --argc;
         ++argv;
         bool error = false;
-        bool help  = false;
+        bool help = false;
         int argc_2 = 0;
         int i = 0;
         char* arg = nullptr;
@@ -41,8 +41,7 @@ int main(int argc, char* argv[])
                 hex = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Unknown option: "<<arg<<"\n";
+            std::cerr << "ERROR: Unknown option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -56,23 +55,23 @@ int main(int argc, char* argv[])
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<" <changeset file>\n"
-                "\n"
-                "Where <changeset file> is the file system path of a file containing a\n"
-                "changeset, possibly in hex format.\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  -H, --hex            Interpret file contents as hex encoded.\n";
+            std::cerr << "Synopsis: " << prog
+                      << " <changeset file>\n"
+                         "\n"
+                         "Where <changeset file> is the file system path of a file containing a\n"
+                         "changeset, possibly in hex format.\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  -H, --hex            Interpret file contents as hex encoded.\n";
             return EXIT_SUCCESS;
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }

@@ -38,7 +38,7 @@ size_t convert_utf32_to_utf8(unsigned int utf32, char* p) noexcept
 
     unsigned int x = utf32;
     for (size_t i = 1; i < n; ++i) {
-        p[n-i] = 0x80 | (x & 0x3f);
+        p[n - i] = 0x80 | (x & 0x3f);
         x >>= 6;
     }
     p[0] = (0xfc << (6 - n)) | x;
@@ -60,8 +60,10 @@ std::string JSONParser::ErrorCategory::message(int ec) const
 {
     Error e = static_cast<Error>(ec);
     switch (e) {
-        case Error::unexpected_token: return "unexpected token";
-        case Error::unexpected_end_of_stream: return "unexpected end of stream";
+        case Error::unexpected_token:
+            return "unexpected token";
+        case Error::unexpected_end_of_stream:
+            return "unexpected end of stream";
     }
     REALM_UNREACHABLE();
 }
@@ -84,18 +86,36 @@ StringData JSONParser::Event::unescape_string(char* buffer) const noexcept
         char c = escaped_string[i];
         if (escape) {
             switch (c) {
-                case '"':  buffer[o++] = '"';  break;
-                case '\\': buffer[o++] = '\\'; break;
-                case '/':  buffer[o++] = '/';  break;
-                case 'b':  buffer[o++] = '\b'; break;
-                case 'f':  buffer[o++] = '\f'; break;
-                case 'n':  buffer[o++] = '\n'; break;
-                case 'r':  buffer[o++] = '\r'; break;
-                case 't':  buffer[o++] = '\t'; break;
+                case '"':
+                    buffer[o++] = '"';
+                    break;
+                case '\\':
+                    buffer[o++] = '\\';
+                    break;
+                case '/':
+                    buffer[o++] = '/';
+                    break;
+                case 'b':
+                    buffer[o++] = '\b';
+                    break;
+                case 'f':
+                    buffer[o++] = '\f';
+                    break;
+                case 'n':
+                    buffer[o++] = '\n';
+                    break;
+                case 'r':
+                    buffer[o++] = '\r';
+                    break;
+                case 't':
+                    buffer[o++] = '\t';
+                    break;
                 case 'u': {
                     if (i + 4 < escaped_string.size()) {
                         const char* u = escaped_string.data() + i + 1;
-                        if (std::all_of(u, u + 4, [](char d) { return std::isxdigit(d); })) {
+                        if (std::all_of(u, u + 4, [](char d) {
+                                return std::isxdigit(d);
+                            })) {
                             unsigned int utf16_codepoint = 0;
                             for (size_t x = 0; x < 4; ++x) {
                                 utf16_codepoint *= 16;
@@ -108,7 +128,9 @@ StringData JSONParser::Event::unescape_string(char* buffer) const noexcept
                                 u = escaped_string.data() + i + 5;
                                 if (i + 10 < escaped_string.size() && u[0] == '\\' && u[1] == 'u') {
                                     u += 2;
-                                    if (std::all_of(u, u + 4, [](char d) { return std::isxdigit(d); })) {
+                                    if (std::all_of(u, u + 4, [](char d) {
+                                            return std::isxdigit(d);
+                                        })) {
                                         unsigned int utf16_codepoint_2 = 0;
                                         for (size_t x = 0; x < 4; ++x) {
                                             utf16_codepoint_2 *= 16;
@@ -169,4 +191,3 @@ StringData JSONParser::Event::unescape_string(char* buffer) const noexcept
 
 } // namespace util
 } // namespace realm
-

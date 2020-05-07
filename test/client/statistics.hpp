@@ -27,7 +27,8 @@ namespace test_client {
 /// Specified sample must be sorted ascendingly. Also, the iterator type must be
 /// of the 'random access' type. This function returns zero if the sample is
 /// empty.
-template<class I> double fractile(I begin, I end, double fraction) noexcept
+template <class I>
+double fractile(I begin, I end, double fraction) noexcept
 {
     std::size_t n = end - begin;
     if (n == 0)

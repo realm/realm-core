@@ -26,18 +26,19 @@
 namespace dogless {
 namespace utils {
 
-template<typename T>
-std::string to_string(T value) {
+template <typename T>
+std::string to_string(T value)
+{
     return std::to_string(value);
 }
 
-template<>
-inline
-std::string to_string<double>(double value) {
+template <>
+inline std::string to_string<double>(double value)
+{
     auto str = std::to_string(value);
     size_t dot_idx = str.find('.');
     size_t idx = str.find_last_not_of('0');
-    if(idx > dot_idx) {
+    if (idx > dot_idx) {
         str.erase(str.begin() + idx + 1, str.end());
     }
     else {
@@ -46,9 +47,9 @@ std::string to_string<double>(double value) {
     return str.empty() ? "0" : str;
 }
 
-template<>
-inline
-std::string to_string<float>(float value) {
+template <>
+inline std::string to_string<float>(float value)
+{
     return to_string(static_cast<double>(value));
 }
 

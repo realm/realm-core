@@ -7,5 +7,6 @@
         "tuple": "cpp",
         "utility": "cpp"
     },
-    "C_Cpp.intelliSenseEngine": "Tag Parser"
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "cmake.configureOnOpen": false
 }

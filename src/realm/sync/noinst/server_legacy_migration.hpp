@@ -12,8 +12,7 @@ namespace _impl {
 /// If not already done, migrate legacy format server-side Realm files. This
 /// migration step introduces stable identifiers, and discards all
 /// client-specific state.
-void ensure_legacy_migration_1(const std::string& realms_dir, const std::string& migration_dir,
-                               util::Logger&);
+void ensure_legacy_migration_1(const std::string& realms_dir, const std::string& migration_dir, util::Logger&);
 
 } // namespace _impl
 } // namespace realm

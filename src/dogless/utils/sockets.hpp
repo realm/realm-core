@@ -42,7 +42,7 @@ enum MTU {
     MTU_LAN = 1432,
 #if defined(__APPLE__) // Apple platforms
     MTU_Jumbo = 9148,
-#else // Linux
+#else  // Linux
     MTU_Jumbo = 65468
 #endif // Windows not accounted for
 };
@@ -50,12 +50,10 @@ enum MTU {
 namespace utils {
 
 class UDPSocket {
-    public:
+public:
     // ctors/dtors
-    UDPSocket(asio::io_service& io_service,
-              std::string const& hostname, int port);
-    UDPSocket(asio::io_service& io_service,
-              std::vector<std::string> const& endpoints);
+    UDPSocket(asio::io_service& io_service, std::string const& hostname, int port);
+    UDPSocket(asio::io_service& io_service, std::vector<std::string> const& endpoints);
     UDPSocket(asio::io_service& io_service);
     UDPSocket(UDPSocket const&) = delete;
 
@@ -65,34 +63,30 @@ class UDPSocket {
     void add_endpoints(std::vector<std::string> const& endpoints);
     void send(std::string const& line);
 
-    private:
+private:
     // internal
-    void add_endpoint(std::string const& hostname,
-                      std::string const& port);
+    void add_endpoint(std::string const& hostname, std::string const& port);
     void back_off();
 
-    private:
+private:
     // properties
-    bool                  m_backing_off = false;
-    std::uint32_t         m_reconnect_attempts = 0;
-    asio::io_service&     m_io_service;
+    bool m_backing_off = false;
+    std::uint32_t m_reconnect_attempts = 0;
+    asio::io_service& m_io_service;
     asio::ip::udp::socket m_socket;
-    asio::deadline_timer  m_backoff_timer;
-    std::mutex            m_socket_mutex;
+    asio::deadline_timer m_backoff_timer;
+    std::mutex m_socket_mutex;
     std::vector<asio::ip::udp::endpoint> m_endpoints;
 };
 
 class BufferedUDPSocket {
-    public:
+public:
     // ctors/detors
-    BufferedUDPSocket(asio::io_service& io_service,
-                      std::string const& hostname, int port,
+    BufferedUDPSocket(asio::io_service& io_service, std::string const& hostname, int port,
                       std::size_t mtu = MTU_InternetSafe);
-    BufferedUDPSocket(asio::io_service& io_service,
-                      std::vector<std::string> const& endpoints,
+    BufferedUDPSocket(asio::io_service& io_service, std::vector<std::string> const& endpoints,
                       std::size_t mtu = MTU_InternetSafe);
-    BufferedUDPSocket(asio::io_service& io_service,
-                      std::size_t mtu = MTU_InternetSafe);
+    BufferedUDPSocket(asio::io_service& io_service, std::size_t mtu = MTU_InternetSafe);
     BufferedUDPSocket(BufferedUDPSocket const&) = delete;
 
     // accessors
@@ -110,19 +104,19 @@ class BufferedUDPSocket {
     void send(std::string const& line);
     void flush();
 
-    private:
+private:
     // internal methods
     void send_loop(asio::error_code ec);
 
-    private:
+private:
     // properties
-    UDPSocket            m_socket;
-    std::size_t          m_mtu;
-    std::mutex           m_buffer_mutex;
-    std::string          m_buffer;
+    UDPSocket m_socket;
+    std::size_t m_mtu;
+    std::mutex m_buffer_mutex;
+    std::string m_buffer;
     asio::deadline_timer m_send_timer;
-    int                  m_interval = 1;
-    bool                 m_loop_running = false;
+    int m_interval = 1;
+    bool m_loop_running = false;
 };
 
 } // namespace utils

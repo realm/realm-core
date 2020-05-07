@@ -31,7 +31,7 @@ TEST(EmbeddedObjects_Basic)
         top_obj.create_and_set_linked_object(sub_col).set("i", 1);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
@@ -65,7 +65,7 @@ TEST(EmbeddedObjects_ArrayOfObjects)
         }
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
@@ -117,7 +117,7 @@ TEST(EmbeddedObjects_NestedArray)
         }
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     auto threads = read_server.get_table("class_ForumThread");
@@ -230,7 +230,7 @@ TEST(EmbeddedObjects_SetDefaultNullIgnored)
             auto sub_obj = top_obj.get_linked_object(top->get_column_key("sub"));
             CHECK_EQUAL(sub_obj.get<int64_t>("i"), 5);
         }
-    });    
+    });
 }
 
 TEST(EmbeddedObjects_DiscardThroughImplicitErase)
@@ -281,7 +281,7 @@ TEST(EmbeddedObjects_DiscardThroughImplicitErase)
             CHECK_EQUAL(sub->size(), 0);
             CHECK(top->begin()->is_null("sub"));
         }
-    });    
+    });
 }
 
 TEST(EmbeddedObjects_AdjustPathOnInsert)
@@ -307,7 +307,7 @@ TEST(EmbeddedObjects_AdjustPathOnInsert)
         sub_obj2.set("i", 1);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     // Client 1 appends a new entry in the top's list.
     client_1->transaction([&](auto& c) {
@@ -331,7 +331,7 @@ TEST(EmbeddedObjects_AdjustPathOnInsert)
         sub_obj.set("i", 3);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);
@@ -381,7 +381,7 @@ TEST(EmbeddedObjects_AdjustPathOnErase)
         sub_obj2.set("i", 1);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     // Client 1 inserts a new entry in the top's list.
     client_1->transaction([&](auto& c) {
@@ -405,7 +405,7 @@ TEST(EmbeddedObjects_AdjustPathOnErase)
         top_list.remove(0);
     });
 
-    synchronize(server.get(), { client_1.get(), client_2.get() });
+    synchronize(server.get(), {client_1.get(), client_2.get()});
 
     ReadTransaction read_server(server->shared_group);
     ReadTransaction read_client_1(client_1->shared_group);

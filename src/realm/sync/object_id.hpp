@@ -51,7 +51,10 @@ using PrimaryKey = mpark::variant<mpark::monostate, int64_t, StringData, GlobalK
 /// instances to various output streams.
 struct format_pk {
     const PrimaryKey& pk;
-    explicit format_pk(const PrimaryKey& pk) : pk(pk) {}
+    explicit format_pk(const PrimaryKey& pk)
+        : pk(pk)
+    {
+    }
 };
 std::ostream& operator<<(std::ostream& os, format_pk);
 

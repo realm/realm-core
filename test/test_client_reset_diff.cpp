@@ -20,12 +20,9 @@ namespace {
 
 const util::Optional<std::array<char, 64>> encryption_key_none;
 
-void check_common(test_util::unit_test::TestContext& test_context,
-                  util::Logger& logger,
-                  const std::string& path_1, const std::string& path_2,
-                  const util::Optional<std::array<char, 64>>& encryption_key,
-                  sync::SaltedFileIdent client_file_ident,
-                  uint_fast64_t downloaded_bytes)
+void check_common(test_util::unit_test::TestContext& test_context, util::Logger& logger, const std::string& path_1,
+                  const std::string& path_2, const util::Optional<std::array<char, 64>>& encryption_key,
+                  sync::SaltedFileIdent client_file_ident, uint_fast64_t downloaded_bytes)
 {
     DBOptions options{encryption_key ? encryption_key->data() : nullptr};
     std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
@@ -38,9 +35,7 @@ void check_common(test_util::unit_test::TestContext& test_context,
         version_type current_client_version;
         SaltedFileIdent client_file_ident_2;
         SyncProgress progress;
-        history_2->get_status(current_client_version,
-                              client_file_ident_2,
-                              progress);
+        history_2->get_status(current_client_version, client_file_ident_2, progress);
 
         CHECK_EQUAL(client_file_ident_2.ident, client_file_ident.ident);
         CHECK_EQUAL(client_file_ident_2.salt, client_file_ident.salt);
@@ -53,9 +48,8 @@ void check_common(test_util::unit_test::TestContext& test_context,
         uint_fast64_t uploaded_bytes;
         uint_fast64_t uploadable_bytes_2;
         uint_fast64_t snapshot_version;
-        history_2->get_upload_download_bytes(downloaded_bytes_2, downloadable_bytes,
-                                             uploaded_bytes, uploadable_bytes_2,
-                                             snapshot_version);
+        history_2->get_upload_download_bytes(downloaded_bytes_2, downloadable_bytes, uploaded_bytes,
+                                             uploadable_bytes_2, snapshot_version);
         CHECK_EQUAL(downloaded_bytes_2, downloaded_bytes);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);
@@ -88,7 +82,7 @@ TEST(ClientResetDiff_TransferGroup)
     {
         std::unique_ptr<ClientReplication> history = make_client_replication(path_src);
         DBRef sg = DB::create(*history);
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
 
         {
             TableRef table = create_table(wt, "class_table_1");
@@ -144,116 +138,116 @@ TEST(ClientResetDiff_TransferGroup)
     {
         std::unique_ptr<ClientReplication> history = make_client_replication(path_dst);
         DBRef sg = DB::create(*history);
-        WriteTransaction wt {sg};
+        WriteTransaction wt{sg};
         Group& group = wt.get_group();
 
         {
             TableRef table = create_table(wt, "class_table_0");
             table->add_column(type_Int, "integer");
             sync::create_object(wt, *table).set_all(123);
-            }
-
-            {
-                TableRef table = create_table(wt, "class_table_1");
-                table->add_column(type_Int, "integer");
-                table->add_column(type_String, "string");
-                sync::create_object(wt, *table).set_all(123, "def");
-            }
-
-            {
-                TableRef table = create_table(wt, "class_table_2");
-                table->add_column(type_Int, "integer");
-                sync::create_object(wt, *table).set_all(123);
-            }
-
-            create_table_with_primary_key(wt, "class_table_3", type_Int, "pk_int");
-            create_table_with_primary_key(wt, "class_table_4", type_String, "pk_string");
-            {
-                TableRef table_3 = group.get_table("class_table_3");
-                TableRef table_4 = group.get_table("class_table_4");
-                auto col_3 = table_3->add_column_link(type_LinkList, "target_link3", *table_4);
-                auto col_4 = table_4->add_column_link(type_LinkList, "target_link4", *table_3);
-                auto col_4a = table_4->add_column_link(type_LinkList, "target_link4a", *table_4);
-
-                Obj obj_3 = sync::create_object_with_primary_key(wt, *table_3, 111);
-                Obj obj_4 = sync::create_object_with_primary_key(wt, *table_4, StringData{"abc"});
-                auto ll_3 = obj_3.get_linklist(col_3);
-                ll_3.insert(0, obj_4.get_key());
-                ll_3.insert(1, obj_4.get_key());
-
-                auto ll_4 = obj_4.get_linklist(col_4);
-                ll_4.insert(0, obj_3.get_key());
-
-                auto ll_4a = obj_4.get_linklist(col_4a);
-                ll_4a.insert(0, obj_4.get_key());
-            }
-
-            {
-                TableRef table = create_table_with_primary_key(wt, "class_table_5", type_Int, "pk_int");
-                {
-                    auto col_ndx = table->add_column_list(type_Int, "array_int");
-                    auto array = sync::create_object_with_primary_key(wt, *table, 666).get_list<Int>(col_ndx);
-                    array.add(10);
-                    array.add(8888);
-                    array.add(8888);
-                    array.add(12);
-                    array.add(13);
-                    array.add(14);
-                }
-            }
-
-            {
-                TableRef table = create_table_with_primary_key(wt, "class_table_6", type_String, "pk_string");
-                table->add_column(type_Int, "something");
-                auto col_ndx = table->add_column_link(type_LinkList, "target_link", *table);
-
-                // Opposite order such that the row indices are different.
-                Obj obj_f = sync::create_object_with_primary_key(wt, *table, "fff");
-                Obj obj_e = sync::create_object_with_primary_key(wt, *table, "eee");
-                Obj obj_d = sync::create_object_with_primary_key(wt, *table, "ddd");
-                sync::create_object_with_primary_key(wt, *table, "ccc");
-                Obj obj_b = sync::create_object_with_primary_key(wt, *table, "bbb");
-                Obj obj_a = sync::create_object_with_primary_key(wt, *table, "aaa");
-
-                auto ll = obj_b.get_linklist(col_ndx);
-                ll.add(obj_a.get_key());
-                ll.add(obj_b.get_key());
-                ll.add(obj_a.get_key());
-                ll.add(obj_d.get_key());
-                ll.add(obj_e.get_key());
-                ll.add(obj_f.get_key());
-            }
-
-            wt.commit();
         }
 
         {
-            std::unique_ptr<ClientReplication> history_src = make_client_replication(path_src);
-            DBRef sg_src = DB::create(*history_src);
-            ReadTransaction rt {sg_src};
-            TableInfoCache table_info_cache_src{rt};
-
-            std::unique_ptr<ClientReplication> history_dst = make_client_replication(path_dst);
-            DBRef sg_dst = DB::create(*history_dst);
-            WriteTransaction wt {sg_dst};
-            TableInfoCache table_info_cache_dst{wt};
-
-            transfer_group(rt, table_info_cache_src, wt, table_info_cache_dst, logger);
-
-            wt.commit();
+            TableRef table = create_table(wt, "class_table_1");
+            table->add_column(type_Int, "integer");
+            table->add_column(type_String, "string");
+            sync::create_object(wt, *table).set_all(123, "def");
         }
 
         {
-            std::unique_ptr<ClientReplication> history_src = make_client_replication(path_src);
-            DBRef sg_src = DB::create(*history_src);
-            ReadTransaction rt_src {sg_src};
-
-            std::unique_ptr<ClientReplication> history_dst = make_client_replication(path_dst);
-            DBRef sg_dst = DB::create(*history_dst);
-            ReadTransaction rt_dst {sg_dst};
-
-            CHECK(compare_groups(rt_src, rt_dst, logger));
+            TableRef table = create_table(wt, "class_table_2");
+            table->add_column(type_Int, "integer");
+            sync::create_object(wt, *table).set_all(123);
         }
+
+        create_table_with_primary_key(wt, "class_table_3", type_Int, "pk_int");
+        create_table_with_primary_key(wt, "class_table_4", type_String, "pk_string");
+        {
+            TableRef table_3 = group.get_table("class_table_3");
+            TableRef table_4 = group.get_table("class_table_4");
+            auto col_3 = table_3->add_column_link(type_LinkList, "target_link3", *table_4);
+            auto col_4 = table_4->add_column_link(type_LinkList, "target_link4", *table_3);
+            auto col_4a = table_4->add_column_link(type_LinkList, "target_link4a", *table_4);
+
+            Obj obj_3 = sync::create_object_with_primary_key(wt, *table_3, 111);
+            Obj obj_4 = sync::create_object_with_primary_key(wt, *table_4, StringData{"abc"});
+            auto ll_3 = obj_3.get_linklist(col_3);
+            ll_3.insert(0, obj_4.get_key());
+            ll_3.insert(1, obj_4.get_key());
+
+            auto ll_4 = obj_4.get_linklist(col_4);
+            ll_4.insert(0, obj_3.get_key());
+
+            auto ll_4a = obj_4.get_linklist(col_4a);
+            ll_4a.insert(0, obj_4.get_key());
+        }
+
+        {
+            TableRef table = create_table_with_primary_key(wt, "class_table_5", type_Int, "pk_int");
+            {
+                auto col_ndx = table->add_column_list(type_Int, "array_int");
+                auto array = sync::create_object_with_primary_key(wt, *table, 666).get_list<Int>(col_ndx);
+                array.add(10);
+                array.add(8888);
+                array.add(8888);
+                array.add(12);
+                array.add(13);
+                array.add(14);
+            }
+        }
+
+        {
+            TableRef table = create_table_with_primary_key(wt, "class_table_6", type_String, "pk_string");
+            table->add_column(type_Int, "something");
+            auto col_ndx = table->add_column_link(type_LinkList, "target_link", *table);
+
+            // Opposite order such that the row indices are different.
+            Obj obj_f = sync::create_object_with_primary_key(wt, *table, "fff");
+            Obj obj_e = sync::create_object_with_primary_key(wt, *table, "eee");
+            Obj obj_d = sync::create_object_with_primary_key(wt, *table, "ddd");
+            sync::create_object_with_primary_key(wt, *table, "ccc");
+            Obj obj_b = sync::create_object_with_primary_key(wt, *table, "bbb");
+            Obj obj_a = sync::create_object_with_primary_key(wt, *table, "aaa");
+
+            auto ll = obj_b.get_linklist(col_ndx);
+            ll.add(obj_a.get_key());
+            ll.add(obj_b.get_key());
+            ll.add(obj_a.get_key());
+            ll.add(obj_d.get_key());
+            ll.add(obj_e.get_key());
+            ll.add(obj_f.get_key());
+        }
+
+        wt.commit();
+    }
+
+    {
+        std::unique_ptr<ClientReplication> history_src = make_client_replication(path_src);
+        DBRef sg_src = DB::create(*history_src);
+        ReadTransaction rt{sg_src};
+        TableInfoCache table_info_cache_src{rt};
+
+        std::unique_ptr<ClientReplication> history_dst = make_client_replication(path_dst);
+        DBRef sg_dst = DB::create(*history_dst);
+        WriteTransaction wt{sg_dst};
+        TableInfoCache table_info_cache_dst{wt};
+
+        transfer_group(rt, table_info_cache_src, wt, table_info_cache_dst, logger);
+
+        wt.commit();
+    }
+
+    {
+        std::unique_ptr<ClientReplication> history_src = make_client_replication(path_src);
+        DBRef sg_src = DB::create(*history_src);
+        ReadTransaction rt_src{sg_src};
+
+        std::unique_ptr<ClientReplication> history_dst = make_client_replication(path_dst);
+        DBRef sg_dst = DB::create(*history_dst);
+        ReadTransaction rt_dst{sg_dst};
+
+        CHECK(compare_groups(rt_src, rt_dst, logger));
+    }
 }
 
 TEST(ClientResetDiff_1)
@@ -263,7 +257,7 @@ TEST(ClientResetDiff_1)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent client_file_ident = {123, 456}; // Anything.
-    sync::SaltedVersion server_version {1, 1234};
+    sync::SaltedVersion server_version{1, 1234};
     uint_fast64_t downloaded_bytes = 98765; // Anything.
     version_type client_version = 0;
 
@@ -314,14 +308,10 @@ TEST(ClientResetDiff_1)
 
     bool recover_local_changes = false;
     bool should_commit_remote = true;
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
-    check_common(test_context, logger, path_1, path_2, encryption_key_none,
-                 client_file_ident, downloaded_bytes);
+    check_common(test_context, logger, path_1, path_2, encryption_key_none, client_file_ident, downloaded_bytes);
 }
 
 TEST(ClientResetDiff_2)
@@ -331,7 +321,7 @@ TEST(ClientResetDiff_2)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent client_file_ident = {123, 456}; // Anything.
-    sync::SaltedVersion server_version {1, 1234};
+    sync::SaltedVersion server_version{1, 1234};
     uint_fast64_t downloaded_bytes = 98765; // Anything.
     version_type client_version = 0;
 
@@ -367,14 +357,10 @@ TEST(ClientResetDiff_2)
 
     bool recover_local_changes = true;
     bool should_commit_remote = true;
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
-    check_common(test_context, logger, path_1, path_2, encryption_key_none,
-                 client_file_ident, downloaded_bytes);
+    check_common(test_context, logger, path_1, path_2, encryption_key_none, client_file_ident, downloaded_bytes);
 
     // Check the content.
     {
@@ -393,7 +379,8 @@ TEST(ClientResetDiff_2)
 
             auto get_val = [&](StringData pk) -> int_fast64_t {
                 GlobalKey oid(pk);
-                int_fast64_t val = *sync::obj_for_object_id(table_info_cache, *table, oid).get<util::Optional<Int>>(col_ndx);
+                int_fast64_t val =
+                    *sync::obj_for_object_id(table_info_cache, *table, oid).get<util::Optional<Int>>(col_ndx);
                 return val;
             };
 
@@ -441,8 +428,7 @@ TEST(ClientResetDiff_2)
             version_type end_version = 3;
             std::vector<sync::ClientReplication::UploadChangeset> changesets;
             version_type locked_server_version; // Dummy
-            history.find_uploadable_changesets(upload_progress, end_version, changesets,
-                                               locked_server_version);
+            history.find_uploadable_changesets(upload_progress, end_version, changesets, locked_server_version);
 
             CHECK_EQUAL(upload_progress.client_version, 3);
             CHECK_EQUAL(upload_progress.last_integrated_server_version, server_version.version);
@@ -493,7 +479,7 @@ TEST(ClientResetDiff_FailedLocalRecovery)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent client_file_ident = {123, 456}; // Anything.
-    sync::SaltedVersion server_version {1, 1234};
+    sync::SaltedVersion server_version{1, 1234};
     uint_fast64_t downloaded_bytes = 98765; // Anything.
     version_type client_version = 0;
 
@@ -538,14 +524,10 @@ TEST(ClientResetDiff_FailedLocalRecovery)
 
     bool recover_local_changes = true;
     bool should_commit_remote = true;
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
-    check_common(test_context, logger, path_1, path_2, encryption_key_none,
-                 client_file_ident, downloaded_bytes);
+    check_common(test_context, logger, path_1, path_2, encryption_key_none, client_file_ident, downloaded_bytes);
 
     // Check the content.
     {
@@ -590,7 +572,7 @@ TEST(ClientResetDiff_ClientVersion)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent client_file_ident = {123, 456}; // Anything.
-    sync::SaltedVersion server_version {1, 1234};
+    sync::SaltedVersion server_version{1, 1234};
     uint_fast64_t downloaded_bytes = 98765; // Anything.
 
     auto create_schema_and_objects = [&](Transaction& wt) {
@@ -738,14 +720,10 @@ TEST(ClientResetDiff_ClientVersion)
     bool should_commit_remote = true;
     // The first two local changesets are known by the remote.
     version_type client_version = 2;
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
-    check_common(test_context, logger, path_1, path_2, encryption_key_none,
-                 client_file_ident, downloaded_bytes);
+    check_common(test_context, logger, path_1, path_2, encryption_key_none, client_file_ident, downloaded_bytes);
 
     // Check the content.
     {
@@ -806,7 +784,7 @@ TEST(ClientResetDiff_PrimitiveArrays)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent client_file_ident = {123, 456}; // Anything.
-    sync::SaltedVersion server_version {10, 1234};
+    sync::SaltedVersion server_version{10, 1234};
     uint_fast64_t downloaded_bytes = 987654; // Anything.
 
     auto create_schema = [&](Transaction& wt) {
@@ -914,14 +892,10 @@ TEST(ClientResetDiff_PrimitiveArrays)
     bool should_commit_remote = true;
     version_type client_version = 1;
 
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
-    check_common(test_context, logger, path_1, path_2, encryption_key_none,
-                 client_file_ident, downloaded_bytes);
+    check_common(test_context, logger, path_1, path_2, encryption_key_none, client_file_ident, downloaded_bytes);
 
     // Check the content.
     {
@@ -971,7 +945,7 @@ TEST(ClientResetDiff_NonSyncTables)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent client_file_ident = {123, 456}; // Anything.
-    sync::SaltedVersion server_version {10, 1234};
+    sync::SaltedVersion server_version{10, 1234};
     uint_fast64_t downloaded_bytes = 987654; // Anything.
 
     // The remote.
@@ -1011,11 +985,8 @@ TEST(ClientResetDiff_NonSyncTables)
     bool should_commit_remote = true;
     version_type client_version = 0;
 
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
     // Check the content.
     {
@@ -1066,9 +1037,9 @@ TEST(ClientResetDiff_Links)
 
     util::Logger& logger = test_context.logger;
     SaltedFileIdent remote_client_file_ident = {10, 100}; // Anything.
-    SaltedFileIdent local_client_file_ident = {20, 200}; // Anything.
-    SaltedFileIdent new_client_file_ident = {30, 300}; // Anything.
-    sync::SaltedVersion server_version {10, 1234};
+    SaltedFileIdent local_client_file_ident = {20, 200};  // Anything.
+    SaltedFileIdent new_client_file_ident = {30, 300};    // Anything.
+    sync::SaltedVersion server_version{10, 1234};
     uint_fast64_t downloaded_bytes = 98765; // Anything.
 
     // The remote.
@@ -1110,28 +1081,28 @@ TEST(ClientResetDiff_Links)
         Obj obj_53 = create_object_with_primary_key(wt, *table_2, 53);
 
         // Links in table_0.
-        remote_0.set(col_link_00, remote_1.get_key()); // remote_0 -> remote_1
+        remote_0.set(col_link_00, remote_1.get_key());       // remote_0 -> remote_1
         remote_1.set(col_link_00, remote_2.get_key(), true); // remote_1 -> remote_2
-        remote_0.set(col_link_01, bbb.get_key()); // remote_0 -> bbb
-        remote_2.set(col_link_01, ccc.get_key()); // remote_2 -> ccc
-        remote_0.set(col_link_02, obj_52.get_key()); // remote_0 -> 52
-        remote_1.set(col_link_02, obj_52.get_key()); // remote_1 -> 52
-        remote_2.set(col_link_02, obj_51.get_key()); // remote_2 -> 51
+        remote_0.set(col_link_01, bbb.get_key());            // remote_0 -> bbb
+        remote_2.set(col_link_01, ccc.get_key());            // remote_2 -> ccc
+        remote_0.set(col_link_02, obj_52.get_key());         // remote_0 -> 52
+        remote_1.set(col_link_02, obj_52.get_key());         // remote_1 -> 52
+        remote_2.set(col_link_02, obj_51.get_key());         // remote_2 -> 51
 
         // Links in table_1.
 
-        aaa.set(col_link_10, remote_1.get_key()); // aaa -> remote_1
-        ccc.set(col_link_10, remote_2.get_key(), true);  // ccc -> remote_2
-        aaa.set(col_link_11, bbb.get_key()); // aaa -> bbb
-        bbb.set(col_link_11, aaa.get_key()); // bbb -> aaa
-        ccc.set(col_link_11, aaa.get_key()); // ccc -> aaa
-        aaa.set(col_link_12, obj_53.get_key()); // aaa -> 53
-        bbb.set(col_link_12, obj_53.get_key()); // bbb -> 53
+        aaa.set(col_link_10, remote_1.get_key());       // aaa -> remote_1
+        ccc.set(col_link_10, remote_2.get_key(), true); // ccc -> remote_2
+        aaa.set(col_link_11, bbb.get_key());            // aaa -> bbb
+        bbb.set(col_link_11, aaa.get_key());            // bbb -> aaa
+        ccc.set(col_link_11, aaa.get_key());            // ccc -> aaa
+        aaa.set(col_link_12, obj_53.get_key());         // aaa -> 53
+        bbb.set(col_link_12, obj_53.get_key());         // bbb -> 53
 
         // Links in table_2.
         obj_51.set(col_link_20, remote_1.get_key()); // 51 -> remote_1
-        obj_51.set(col_link_21, bbb.get_key()); // 51 -> bbb
-        obj_51.set(col_link_22, obj_52.get_key()); // 51 -> 52
+        obj_51.set(col_link_21, bbb.get_key());      // 51 -> bbb
+        obj_51.set(col_link_22, obj_52.get_key());   // 51 -> 52
         //            table_2->set_link(1, 2, 2, true);
         //            table_2->set_link(2, 0, 1, false);
         //            table_2->set_link(2, 1, 0, false);
@@ -1186,22 +1157,22 @@ TEST(ClientResetDiff_Links)
         Obj obj_63 = sync::create_object_with_primary_key(wt, *table_2, 63);
 
         // Links in table_0.
-        local_0.set(col_link_01, aaa.get_key()); // local_0 -> aaa
+        local_0.set(col_link_01, aaa.get_key());     // local_0 -> aaa
         local_0.set(col_link_00, local_1.get_key()); // local_0 -> local_1
         local_2.set(col_link_00, local_2.get_key()); // local_2 -> local_2
         local_1.set_null(col_link_02);
 
         // Links in table_1.
-        ddd.set(col_link_11, aaa.get_key()); // ddd -> aaa
+        ddd.set(col_link_11, aaa.get_key());     // ddd -> aaa
         ddd.set(col_link_10, local_0.get_key()); // ddd -> local_0
-        aaa.set(col_link_12, obj_63.get_key()); // aaa -> 63
+        aaa.set(col_link_12, obj_63.get_key());  // aaa -> 63
         bbb.set(col_link_10, local_1.get_key()); // bbb -> local_1
 
         // Links in table_2.
         obj_51.set(col_link_20, local_2.get_key()); // 51 -> local_2
-        obj_51.set(col_link_22, obj_63.get_key()); // 51 -> 63
-        obj_62.set(col_link_21, aaa.get_key()); // 62 -> aaa
-        obj_63.set(col_link_22, obj_51.get_key()); // 63 -> 51
+        obj_51.set(col_link_22, obj_63.get_key());  // 51 -> 63
+        obj_62.set(col_link_21, aaa.get_key());     // 62 -> aaa
+        obj_63.set(col_link_22, obj_51.get_key());  // 63 -> 51
 
         wt.commit();
     }
@@ -1209,14 +1180,10 @@ TEST(ClientResetDiff_Links)
     bool recover_local_changes = true;
     bool should_commit_remote = true;
     version_type client_version = 0;
-    perform_client_reset_diff(path_1, path_2, encryption_key_none,
-                              new_client_file_ident, server_version,
-                              downloaded_bytes, client_version,
-                              recover_local_changes,
-                              logger, should_commit_remote);
+    perform_client_reset_diff(path_1, path_2, encryption_key_none, new_client_file_ident, server_version,
+                              downloaded_bytes, client_version, recover_local_changes, logger, should_commit_remote);
 
-    check_common(test_context, logger, path_1, path_2, encryption_key_none,
-                 new_client_file_ident, downloaded_bytes);
+    check_common(test_context, logger, path_1, path_2, encryption_key_none, new_client_file_ident, downloaded_bytes);
 
     // Check the content.
     {
@@ -1244,8 +1211,7 @@ TEST(ClientResetDiff_Links)
 
             ConstTableRef table_1 = group.get_table("class_table_1");
             CHECK(table_1);
-            const TableInfoCache::TableInfo& table_info_1 =
-                table_info_cache.get_table_info(*table_1);
+            const TableInfoCache::TableInfo& table_info_1 = table_info_cache.get_table_info(*table_1);
             ColKey pk_ndx_1 = table_info_1.primary_key_col;
             CHECK_EQUAL(table_1->get_column_count(), 4);
             auto col_ndx_1_0 = table_1->get_column_key("link_0");
@@ -1258,8 +1224,7 @@ TEST(ClientResetDiff_Links)
 
             ConstTableRef table_2 = group.get_table("class_table_2");
             CHECK(table_2);
-            const TableInfoCache::TableInfo& table_info_2 =
-                table_info_cache.get_table_info(*table_2);
+            const TableInfoCache::TableInfo& table_info_2 = table_info_cache.get_table_info(*table_2);
             ColKey pk_ndx_2 = table_info_2.primary_key_col;
             CHECK_EQUAL(table_2->get_column_count(), 4);
             auto col_ndx_2_0 = table_2->get_column_key("link_0");
@@ -1293,18 +1258,18 @@ TEST(ClientResetDiff_Links)
                     CHECK_EQUAL(table_1->get_object(row_ndx_1).get<String>(pk_ndx_1), "ccc");
                     CHECK_EQUAL(table_2->get_object(row_ndx_2).get<Int>(pk_ndx_2), 51);
                 }
-                else if (str  == "local_0") {
+                else if (str == "local_0") {
                     StringData str_link = table_0->get_object(row_ndx_0).get<String>(col_ndx_0_str);
                     CHECK_EQUAL(str_link, "local_1");
                     CHECK_EQUAL(table_1->get_object(row_ndx_1).get<String>(pk_ndx_1), "aaa");
                     CHECK(obj.is_null(col_ndx_0_2));
                 }
-                else if (str  == "local_1") {
+                else if (str == "local_1") {
                     CHECK(obj.is_null(col_ndx_0_0));
                     CHECK(obj.is_null(col_ndx_0_1));
                     CHECK(obj.is_null(col_ndx_0_2));
                 }
-                else if (str  == "local_2") {
+                else if (str == "local_2") {
                     StringData str_link = table_0->get_object(row_ndx_0).get<String>(col_ndx_0_str);
                     CHECK_EQUAL(str_link, "local_2");
                     CHECK(obj.is_null(col_ndx_0_1));

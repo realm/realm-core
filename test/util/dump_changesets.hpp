@@ -13,9 +13,9 @@ class TestContext;
 
 } // namespace unit_test
 
-std::unique_ptr<TestDirNameGenerator> get_changeset_dump_dir_generator(
-    const unit_test::TestContext& test_context, 
-    const char* env_var = "UNITTEST_DUMP_TRANSFORM");
+std::unique_ptr<TestDirNameGenerator>
+get_changeset_dump_dir_generator(const unit_test::TestContext& test_context,
+                                 const char* env_var = "UNITTEST_DUMP_TRANSFORM");
 
 } // namespace test_util
 } // namespace realm

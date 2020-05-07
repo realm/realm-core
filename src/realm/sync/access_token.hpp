@@ -13,7 +13,7 @@ namespace realm {
 namespace sync {
 
 using UserIdent = std::string;
-using AppIdent  = std::string;
+using AppIdent = std::string;
 using SyncLabel = std::string;
 using RealmFileIdent = std::string; // path
 
@@ -58,11 +58,9 @@ struct AccessToken {
 
     bool expired(std::chrono::system_clock::time_point now) const noexcept;
 
-    static bool parseJWT(StringData signed_access_token, AccessToken&, ParseError&,
-                      Verifier* = nullptr);
+    static bool parseJWT(StringData signed_access_token, AccessToken&, ParseError&, Verifier* = nullptr);
 
-    static bool parse(StringData signed_access_token, AccessToken&, ParseError&,
-                      Verifier* = nullptr);
+    static bool parse(StringData signed_access_token, AccessToken&, ParseError&, Verifier* = nullptr);
 };
 
 
@@ -73,7 +71,6 @@ public:
 protected:
     ~Verifier() = default;
 };
-
 
 
 // Implementation

@@ -34,16 +34,16 @@ public:
     class Connection;
     class Session;
 
-    using ReconnectMode        = sync::Client::ReconnectMode;
+    using ReconnectMode = sync::Client::ReconnectMode;
     using RoundtripTimeHandler = sync::Client::RoundtripTimeHandler;
-    using ProtocolEnvelope     = sync::ProtocolEnvelope;
-    using ProtocolError        = sync::ProtocolError;
-    using port_type            = sync::Session::port_type;
-    using version_type         = sync::version_type;
-    using timestamp_type       = sync::timestamp_type;
-    using SaltedVersion        = sync::SaltedVersion;
-    using milliseconds_type    = sync::milliseconds_type;
-    using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
+    using ProtocolEnvelope = sync::ProtocolEnvelope;
+    using ProtocolError = sync::ProtocolError;
+    using port_type = sync::Session::port_type;
+    using version_type = sync::version_type;
+    using timestamp_type = sync::timestamp_type;
+    using SaltedVersion = sync::SaltedVersion;
+    using milliseconds_type = sync::milliseconds_type;
+    using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
     using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
@@ -67,20 +67,20 @@ public:
     std::mt19937_64& get_random() noexcept;
 
     /// Returns false if the specified URL is invalid.
-    bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol,
-                              std::string& address, port_type& port, std::string& path) const;
+    bool decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
+                              port_type& port, std::string& path) const;
 
 protected:
     ClientImplBase(Config);
     ~ClientImplBase();
 
 private:
-    using file_ident_type    = sync::file_ident_type;
-    using salt_type          = sync::salt_type;
+    using file_ident_type = sync::file_ident_type;
+    using salt_type = sync::salt_type;
     using session_ident_type = sync::session_ident_type;
     using request_ident_type = sync::request_ident_type;
-    using SaltedFileIdent    = sync::SaltedFileIdent;
-    using ClientError        = sync::Client::Error;
+    using SaltedFileIdent = sync::SaltedFileIdent;
+    using ClientError = sync::Client::Error;
 
     const ReconnectMode m_reconnect_mode; // For testing purposes only
     const milliseconds_type m_connect_timeout;
@@ -113,9 +113,7 @@ constexpr int ClientImplBase::get_oldest_supported_protocol_version() noexcept
 }
 
 static_assert(ClientImplBase::get_oldest_supported_protocol_version() >= 1, "");
-static_assert(ClientImplBase::get_oldest_supported_protocol_version() <=
-              sync::get_current_protocol_version(), "");
-
+static_assert(ClientImplBase::get_oldest_supported_protocol_version() <= sync::get_current_protocol_version(), "");
 
 
 /// See sync::Client::Config for the meaning of the individual properties.
@@ -125,11 +123,11 @@ public:
     std::string user_agent_application_info;
     util::Logger* logger = nullptr;
     ReconnectMode reconnect_mode = ReconnectMode::normal;
-    milliseconds_type connect_timeout        = sync::Client::default_connect_timeout;
+    milliseconds_type connect_timeout = sync::Client::default_connect_timeout;
     milliseconds_type connection_linger_time = sync::Client::default_connection_linger_time;
-    milliseconds_type ping_keepalive_period  = sync::Client::default_ping_keepalive_period;
+    milliseconds_type ping_keepalive_period = sync::Client::default_ping_keepalive_period;
     milliseconds_type pong_keepalive_timeout = sync::Client::default_pong_keepalive_timeout;
-    milliseconds_type fast_reconnect_limit   = sync::Client::default_fast_reconnect_limit;
+    milliseconds_type fast_reconnect_limit = sync::Client::default_fast_reconnect_limit;
     bool disable_upload_activation_delay = false;
     bool dry_run = false;
     bool tcp_no_delay = false;
@@ -137,7 +135,6 @@ public:
     bool disable_upload_compaction = false;
     std::function<RoundtripTimeHandler> roundtrip_time_handler;
 };
-
 
 
 /// Information about why a connection (or connection initiation attempt) was
@@ -168,7 +165,6 @@ enum class ClientImplBase::ConnectionTerminationReason {
     /// negotiated protocol version.
     missing_protocol_feature,
 };
-
 
 
 /// Per-server endpoint information used to determine reconnect delays.
@@ -214,16 +210,15 @@ private:
 };
 
 
-
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
 class ClientImplBase::Connection : public util::websocket::Config {
 public:
-    using SSLVerifyCallback      = sync::Session::SSLVerifyCallback;
-    using ProxyConfig            = sync::Session::Config::ProxyConfig;
-    using ReconnectInfo          = ClientImplBase::ReconnectInfo;
-    using port_type              = ClientImplBase::port_type;
-    using ReadCompletionHandler  = util::websocket::ReadCompletionHandler;
+    using SSLVerifyCallback = sync::Session::SSLVerifyCallback;
+    using ProxyConfig = sync::Session::Config::ProxyConfig;
+    using ReconnectInfo = ClientImplBase::ReconnectInfo;
+    using port_type = ClientImplBase::port_type;
+    using ReadCompletionHandler = util::websocket::ReadCompletionHandler;
     using WriteCompletionHandler = util::websocket::WriteCompletionHandler;
 
     util::PrefixLogger logger;
@@ -300,8 +295,7 @@ public:
     void websocket_handshake_completion_handler(const HTTPHeaders&) override;
     void websocket_read_error_handler(std::error_code) override;
     void websocket_write_error_handler(std::error_code) override;
-    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*,
-                                           const util::StringView*) override;
+    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, const util::StringView*) override;
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
     bool websocket_pong_message_received(const char*, std::size_t) override;
@@ -309,15 +303,13 @@ public:
 protected:
     /// The application must ensure that the specified client object is kept
     /// alive at least until the connection object is destroyed.
-    Connection(ClientImplBase&, std::string logger_prefix,
-               ProtocolEnvelope, std::string address, port_type port,
-               bool verify_servers_ssl_certificate,
-               Optional<std::string> ssl_trust_certificate_path,
-               std::function<SSLVerifyCallback>,
-               Optional<ProxyConfig>, ReconnectInfo);
+    Connection(ClientImplBase&, std::string logger_prefix, ProtocolEnvelope, std::string address, port_type port,
+               bool verify_servers_ssl_certificate, Optional<std::string> ssl_trust_certificate_path,
+               std::function<SSLVerifyCallback>, Optional<ProxyConfig>, ReconnectInfo);
     virtual ~Connection();
 
-    template<class H> void for_each_active_session(H handler);
+    template <class H>
+    void for_each_active_session(H handler);
 
     //@{
     /// These are called as the state of the connection changes between
@@ -368,7 +360,7 @@ protected:
     virtual void set_http_request_headers(HTTPHeaders&);
 
 private:
-    using SyncProgress       = sync::SyncProgress;
+    using SyncProgress = sync::SyncProgress;
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
 
     ClientImplBase& m_client;
@@ -520,20 +512,13 @@ private:
 
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
-    void receive_error_message(int error_code, StringData message, bool try_again,
-                               session_ident_type);
+    void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
-    void receive_client_version_message(session_ident_type session_ident,
-                                        version_type client_version);
-    void receive_state_message(session_ident_type session_ident,
-                               version_type server_version,
-                               salt_type server_version_salt,
-                               uint_fast64_t begin_offset,
-                               uint_fast64_t end_offset,
-                               uint_fast64_t max_offset,
-                               BinaryData chunk);
-    void receive_download_message(session_ident_type, const SyncProgress&,
-                                  std::uint_fast64_t downloadable_bytes,
+    void receive_client_version_message(session_ident_type session_ident, version_type client_version);
+    void receive_state_message(session_ident_type session_ident, version_type server_version,
+                               salt_type server_version_salt, uint_fast64_t begin_offset, uint_fast64_t end_offset,
+                               uint_fast64_t max_offset, BinaryData chunk);
+    void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_alloc_message(session_ident_type, file_ident_type file_ident);
@@ -555,7 +540,6 @@ private:
 };
 
 
-
 /// A synchronization session between a local and a remote Realm file.
 ///
 /// All use of session objects, including construction and destruction, must
@@ -564,11 +548,11 @@ class ClientImplBase::Session {
 public:
     class Config;
 
-    using SyncProgress         = sync::SyncProgress;
-    using VersionInfo          = sync::VersionInfo;
-    using ClientHistoryBase    = sync::ClientReplicationBase;
-    using ReceivedChangesets   = ClientProtocol::ReceivedChangesets;
-    using IntegrationError     = ClientHistoryBase::IntegrationError;
+    using SyncProgress = sync::SyncProgress;
+    using VersionInfo = sync::VersionInfo;
+    using ClientHistoryBase = sync::ClientReplicationBase;
+    using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
+    using IntegrationError = ClientHistoryBase::IntegrationError;
 
     util::PrefixLogger logger;
 
@@ -743,9 +727,8 @@ public:
     /// This function is thread-safe, but if called from a thread other than the
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
-    bool integrate_changesets(ClientHistoryBase&, const SyncProgress&,
-                              std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&,
-                              VersionInfo&, IntegrationError&);
+    bool integrate_changesets(ClientHistoryBase&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                              const ReceivedChangesets&, VersionInfo&, IntegrationError&);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -757,8 +740,8 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(bool success, version_type client_version,
-                                  sync::DownloadCursor download_progress, IntegrationError error);
+    void on_changesets_integrated(bool success, version_type client_version, sync::DownloadCursor download_progress,
+                                  IntegrationError error);
 
     virtual ~Session();
 
@@ -817,8 +800,7 @@ protected:
     // reset. If it returns none, ordinary sync is used. If it returns a
     // Config::ClientReset, the session will be initiated with a state Realm
     // transfer from the server.
-    virtual const util::Optional<sync::Session::Config::ClientReset>&
-        get_client_reset_config() const noexcept;
+    virtual const util::Optional<sync::Session::Config::ClientReset>& get_client_reset_config() const noexcept;
 
     /// on_state_download_progress() is called with progress information if
     /// state download is employed. The default implementation does nothing.
@@ -869,8 +851,7 @@ protected:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    virtual void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
-                                               const ReceivedChangesets&);
+    virtual void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
     ///
@@ -912,7 +893,7 @@ protected:
     //@}
 
 private:
-    using UploadCursor   = sync::UploadCursor;
+    using UploadCursor = sync::UploadCursor;
     using DownloadCursor = sync::DownloadCursor;
 
     Connection& m_conn;
@@ -953,15 +934,15 @@ private:
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
-    bool m_bind_message_sent;           // Sending of BIND message has been initiated
+    bool m_bind_message_sent;                   // Sending of BIND message has been initiated
     bool m_client_version_request_message_sent; // Sending of CLIENT_VERSION_REQUEST has been initiated
-    bool m_state_request_message_sent;  // Sending of STATE_REQUEST message has been initiated
-    bool m_ident_message_sent;          // Sending of IDENT message has been initiated
-    bool m_alloc_message_sent;          // See send_alloc_message()
-    bool m_unbind_message_sent;         // Sending of UNBIND message has been initiated
-    bool m_unbind_message_sent_2;       // Sending of UNBIND message has been completed
-    bool m_error_message_received;      // Session specific ERROR message received
-    bool m_unbound_message_received;    // UNBOUND message received
+    bool m_state_request_message_sent;          // Sending of STATE_REQUEST message has been initiated
+    bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
+    bool m_alloc_message_sent;                  // See send_alloc_message()
+    bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
+    bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
+    bool m_error_message_received;              // Session specific ERROR message received
+    bool m_unbound_message_received;            // UNBOUND message received
 
     // True if and only if state download is in progress.
     bool m_state_download_in_progress = false;
@@ -1073,8 +1054,7 @@ private:
 
     std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
 
-    util::Optional<sync::Session::Config::ClientReset> m_client_reset_config =
-        util::none;
+    util::Optional<sync::Session::Config::ClientReset> m_client_reset_config = util::none;
 
     static std::string make_logger_prefix(session_ident_type);
 
@@ -1115,9 +1095,8 @@ private:
     void send_unbind_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_client_version_message(version_type client_version);
-    void receive_state_message(version_type server_version, salt_type server_version_salt,
-                               uint_fast64_t begin_offset, uint_fast64_t end_offset,
-                               uint_fast64_t max_offset, BinaryData chunk);
+    void receive_state_message(version_type server_version, salt_type server_version_salt, uint_fast64_t begin_offset,
+                               uint_fast64_t end_offset, uint_fast64_t max_offset, BinaryData chunk);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
@@ -1139,7 +1118,6 @@ private:
 };
 
 
-
 /// See sync::Client::Session for the meaning of the individual properties
 /// (other than `sync_transact_reporter`).
 class ClientImplBase::Session::Config {
@@ -1149,8 +1127,6 @@ public:
     bool disable_empty_upload = false;
     bool is_subserver = false;
 };
-
-
 
 
 // Implementation
@@ -1200,9 +1176,7 @@ inline std::mt19937_64& ClientImplBase::get_random() noexcept
     return m_random;
 }
 
-inline ClientImplBase::~ClientImplBase()
-{
-}
+inline ClientImplBase::~ClientImplBase() {}
 
 inline auto ClientImplBase::get_next_session_ident() noexcept -> session_ident_type
 {
@@ -1237,13 +1211,12 @@ inline int ClientImplBase::Connection::get_negotiated_protocol_version() noexcep
     return m_negotiated_protocol_version;
 }
 
-inline ClientImplBase::Connection::~Connection()
-{
-}
+inline ClientImplBase::Connection::~Connection() {}
 
-template<class H> void ClientImplBase::Connection::for_each_active_session(H handler)
+template <class H>
+void ClientImplBase::Connection::for_each_active_session(H handler)
 {
-    for (auto& p: m_sessions) {
+    for (auto& p : m_sessions) {
         Session& sess = *p.second;
         if (!sess.m_deactivation_initiated)
             handler(sess); // Throws
@@ -1307,8 +1280,7 @@ inline auto ClientImplBase::Connection::get_output_buffer() noexcept -> OutputBu
     return m_output_buffer;
 }
 
-inline auto ClientImplBase::Connection::get_session(session_ident_type ident) const noexcept ->
-    Session*
+inline auto ClientImplBase::Connection::get_session(session_ident_type ident) const noexcept -> Session*
 {
     auto i = m_sessions.find(ident);
     bool found = (i != m_sessions.end());
@@ -1438,19 +1410,19 @@ inline void ClientImplBase::Session::new_access_token_available()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImplBase::Session::Session(Connection& conn, Config config) :
-    Session{conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
+inline ClientImplBase::Session::Session(Connection& conn, Config config)
+    : Session{conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
 {
 }
 
-inline ClientImplBase::Session::Session(Connection& conn, session_ident_type ident, Config config) :
-    logger{make_logger_prefix(ident), conn.logger}, // Throws
-    m_conn{conn},
-    m_ident{ident},
-    m_sync_transact_reporter{config.sync_transact_reporter},
-    m_disable_upload{config.disable_upload},
-    m_disable_empty_upload{config.disable_empty_upload},
-    m_is_subserver{config.is_subserver}
+inline ClientImplBase::Session::Session(Connection& conn, session_ident_type ident, Config config)
+    : logger{make_logger_prefix(ident), conn.logger} // Throws
+    , m_conn{conn}
+    , m_ident{ident}
+    , m_sync_transact_reporter{config.sync_transact_reporter}
+    , m_disable_upload{config.disable_upload}
+    , m_disable_empty_upload{config.disable_empty_upload}
+    , m_is_subserver{config.is_subserver}
 {
     if (get_client().m_disable_upload_activation_delay)
         m_allow_upload = true;
@@ -1573,20 +1545,20 @@ inline void ClientImplBase::Session::initiate_rebind()
 
 inline void ClientImplBase::Session::reset_protocol_state() noexcept
 {
-    m_enlisted_to_send                    = false;
-    m_bind_message_sent                   = false;
+    m_enlisted_to_send = false;
+    m_bind_message_sent = false;
     m_client_version_request_message_sent = false;
-    m_state_request_message_sent          = false;
-    m_ident_message_sent                  = false;
-    m_alloc_message_sent                  = false;
-    m_unbind_message_sent                 = false;
-    m_unbind_message_sent_2               = false;
-    m_error_message_received              = false;
-    m_unbound_message_received            = false;
+    m_state_request_message_sent = false;
+    m_ident_message_sent = false;
+    m_alloc_message_sent = false;
+    m_unbind_message_sent = false;
+    m_unbind_message_sent_2 = false;
+    m_error_message_received = false;
+    m_unbound_message_received = false;
 
-    m_upload_progress                  = m_progress.upload;
+    m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
-    m_last_download_mark_sent          = m_last_download_mark_received;
+    m_last_download_mark_sent = m_last_download_mark_received;
 }
 
 inline void ClientImplBase::Session::ensure_enlisted_to_send()

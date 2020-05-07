@@ -10,11 +10,10 @@
 
 namespace {
 
-constexpr std::size_t g_max_stream_avail = (sizeof(uInt) < sizeof(size_t)) ?
-    std::numeric_limits<uInt>::max() :
-    std::numeric_limits<std::size_t>::max();
+constexpr std::size_t g_max_stream_avail =
+    (sizeof(uInt) < sizeof(size_t)) ? std::numeric_limits<uInt>::max() : std::numeric_limits<std::size_t>::max();
 
-class ErrorCategoryImpl: public std::error_category {
+class ErrorCategoryImpl : public std::error_category {
 public:
     const char* name() const noexcept override final
     {
@@ -123,8 +122,7 @@ std::error_code compression::compress_bound(const char* uncompressed_buf, std::s
 // zlib deflate()
 std::error_code compression::compress(const char* uncompressed_buf, std::size_t uncompressed_size,
                                       char* compressed_buf, std::size_t compressed_buf_size,
-                                      std::size_t& compressed_size, int compression_level,
-                                      Alloc* custom_allocator)
+                                      std::size_t& compressed_size, int compression_level, Alloc* custom_allocator)
 {
     z_stream strm;
     strm.opaque = Z_NULL;
@@ -134,7 +132,7 @@ std::error_code compression::compress(const char* uncompressed_buf, std::size_t 
     if (custom_allocator) {
         strm.opaque = custom_allocator;
         strm.zalloc = &custom_alloc;
-        strm.zfree  = &custom_free;
+        strm.zfree = &custom_free;
     }
 
     int rc = deflateInit(&strm, compression_level);
@@ -154,10 +152,10 @@ std::error_code compression::compress(const char* uncompressed_buf, std::size_t 
     REALM_ASSERT(rc == Z_OK);
     while (rc == Z_OK || rc == Z_BUF_ERROR) {
 
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char *>(strm.next_in + strm.avail_in))
-                     == uncompressed_buf + next_in_ndx);
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char *>(strm.next_out + strm.avail_out))
-                     == compressed_buf + next_out_ndx);
+        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_in + strm.avail_in)) ==
+                     uncompressed_buf + next_in_ndx);
+        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_out + strm.avail_out)) ==
+                     compressed_buf + next_out_ndx);
 
         bool stream_updated = false;
 
@@ -227,16 +225,16 @@ std::error_code compression::decompress(const char* compressed_buf, std::size_t 
     REALM_ASSERT(rc == Z_OK);
     while (rc == Z_OK || rc == Z_BUF_ERROR) {
 
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char *>(strm.next_in + strm.avail_in))
-                     == compressed_buf + next_in_ndx);
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char *>(strm.next_out + strm.avail_out))
-                     == decompressed_buf + next_out_ndx);
+        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_in + strm.avail_in)) ==
+                     compressed_buf + next_in_ndx);
+        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_out + strm.avail_out)) ==
+                     decompressed_buf + next_out_ndx);
 
         bool stream_updated = false;
 
         if (strm.avail_in == 0 && next_in_ndx < compressed_size) {
-            REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char *>(strm.next_in))
-                         == compressed_buf + next_in_ndx);
+            REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_in)) ==
+                         compressed_buf + next_in_ndx);
             std::size_t in_size = std::min(compressed_size - next_in_ndx, g_max_stream_avail);
             next_in_ndx += in_size;
             strm.avail_in = uInt(in_size);
@@ -244,8 +242,8 @@ std::error_code compression::decompress(const char* compressed_buf, std::size_t 
         }
 
         if (strm.avail_out == 0 && next_out_ndx < decompressed_size) {
-            REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char *>(strm.next_out))
-                         == decompressed_buf + next_out_ndx);
+            REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_out)) ==
+                         decompressed_buf + next_out_ndx);
             std::size_t out_size = std::min(decompressed_size - next_out_ndx, g_max_stream_avail);
             next_out_ndx += out_size;
             strm.avail_out = uInt(out_size);
@@ -277,8 +275,7 @@ std::error_code compression::decompress(const char* compressed_buf, std::size_t 
 
 
 std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_memory_arena,
-                                               BinaryData uncompressed_buf,
-                                               std::vector<char>& compressed_buf)
+                                               BinaryData uncompressed_buf, std::vector<char>& compressed_buf)
 {
     const int compression_level = 1;
     std::size_t compressed_size = 0;
@@ -289,13 +286,9 @@ std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_mem
         compressed_buf.resize(256); // Throws
 
     for (;;) {
-        std::error_code ec = compression::compress(uncompressed_buf.data(),
-                                      uncompressed_buf.size(),
-                                      compressed_buf.data(),
-                                      compressed_buf.size(),
-                                      compressed_size,
-                                      compression_level,
-                                      &compress_memory_arena);
+        std::error_code ec =
+            compression::compress(uncompressed_buf.data(), uncompressed_buf.size(), compressed_buf.data(),
+                                  compressed_buf.size(), compressed_size, compression_level, &compress_memory_arena);
 
         if (REALM_UNLIKELY(ec)) {
             if (ec == compression::error::compress_buffer_too_small) {
@@ -311,7 +304,7 @@ std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_mem
                 if (n == 0) {
                     // About 256KiB according to ZLIB documentation (about
                     // 1MiB in reality, strangely)
-                    n = 256*1024;
+                    n = 256 * 1024;
                 }
                 else {
                     REALM_ASSERT(n != std::numeric_limits<std::size_t>::max());
@@ -331,10 +324,8 @@ std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_mem
 
 namespace {
 
-std::error_code do_compress_file(const std::string& src_path,
-                                 const std::string& dst_path,
-                                 util::File::SizeType& src_size,
-                                 util::File::SizeType& dst_size,
+std::error_code do_compress_file(const std::string& src_path, const std::string& dst_path,
+                                 util::File::SizeType& src_size, util::File::SizeType& dst_size,
                                  std::size_t memory_usage)
 {
     util::File src_file;
@@ -411,13 +402,11 @@ std::error_code do_compress_file(const std::string& src_path,
 
     dst_size = dst_file.get_size();
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
-std::error_code do_decompress_file(const std::string& src_path,
-                                   const std::string& dst_path,
-                                   util::File::SizeType& src_size,
-                                   util::File::SizeType& dst_size,
+std::error_code do_decompress_file(const std::string& src_path, const std::string& dst_path,
+                                   util::File::SizeType& src_size, util::File::SizeType& dst_size,
                                    std::size_t memory_usage)
 {
     util::File src_file;
@@ -499,30 +488,24 @@ std::error_code do_decompress_file(const std::string& src_path,
 
 } // namespace
 
-std::error_code compression::compress_file(const std::string& src_path,
-                                           const std::string& dst_path,
-                                           util::File::SizeType& src_size,
-                                           util::File::SizeType& dst_size)
+std::error_code compression::compress_file(const std::string& src_path, const std::string& dst_path,
+                                           util::File::SizeType& src_size, util::File::SizeType& dst_size)
 {
     std::size_t memory_usage = 1 << 20;
     std::error_code ec = do_compress_file(src_path, dst_path, src_size, dst_size, memory_usage);
     return ec;
 }
 
-std::error_code compression::decompress_file(const std::string& src_path,
-                                             const std::string& dst_path,
-                                             util::File::SizeType& src_size,
-                                             util::File::SizeType& dst_size)
+std::error_code compression::decompress_file(const std::string& src_path, const std::string& dst_path,
+                                             util::File::SizeType& src_size, util::File::SizeType& dst_size)
 {
     std::size_t memory_usage = 1 << 20;
     std::error_code ec = do_decompress_file(src_path, dst_path, src_size, dst_size, memory_usage);
     return ec;
 }
 
-std::error_code compression::compress_block_with_header(const char* uncompressed_buf,
-                                                        std::size_t uncompressed_size,
-                                                        char* compressed_buf,
-                                                        std::size_t compressed_buf_size,
+std::error_code compression::compress_block_with_header(const char* uncompressed_buf, std::size_t uncompressed_size,
+                                                        char* compressed_buf, std::size_t compressed_buf_size,
                                                         std::size_t& compressed_size)
 {
     _impl::compression::CompressMemoryArena allocator;
@@ -536,7 +519,7 @@ std::error_code compression::compress_block_with_header(const char* uncompressed
 
     z_stream strm;
     strm.zalloc = &custom_alloc;
-    strm.zfree  = &custom_free;
+    strm.zfree = &custom_free;
     strm.opaque = &allocator;
     strm.data_type = Z_BINARY;
     int compression_level = Z_DEFAULT_COMPRESSION;
@@ -562,8 +545,7 @@ std::error_code compression::compress_block_with_header(const char* uncompressed
             return compression::error::out_of_memory;
         return compression::error::compress_error;
     }
-    std::size_t compressed_size_without_header =
-        compressed_buf_size - 4 - strm.avail_out;
+    std::size_t compressed_size_without_header = compressed_buf_size - 4 - strm.avail_out;
 
     deflateEnd(&strm);
 
@@ -577,27 +559,25 @@ std::error_code compression::compress_block_with_header(const char* uncompressed
     // compressed_size includes the 4 byte header.
     compressed_size = compressed_size_without_header + 4;
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
-std::error_code
-    compression::integrate_compressed_blocks_in_realm_file(const char* blocks,
-                                                           std::size_t blocks_size,
-                                                           const std::string& dst_path,
-                                                           const util::Optional<std::array<char, 64>>& encryption_key,
-                                                           std::uint_fast64_t& dst_size)
+std::error_code compression::integrate_compressed_blocks_in_realm_file(
+    const char* blocks, std::size_t blocks_size, const std::string& dst_path,
+    const util::Optional<std::array<char, 64>>& encryption_key, std::uint_fast64_t& dst_size)
 {
 #if REALM_ENABLE_ENCRYPTION
     std::unique_ptr<util::AESCryptor> aes_cryptor;
     if (encryption_key)
-        aes_cryptor.reset(new util::AESCryptor(reinterpret_cast<unsigned char*>(const_cast<char*>(encryption_key->data()))));
+        aes_cryptor.reset(
+            new util::AESCryptor(reinterpret_cast<unsigned char*>(const_cast<char*>(encryption_key->data()))));
 #else
     REALM_ASSERT(!encryption_key);
 #endif
 
     // A decompressed block is guaranteed to have size below 256 KB.
     const std::size_t buf_size = 1 << 18;
-    std::unique_ptr<char[]> buf {new char[buf_size]};
+    std::unique_ptr<char[]> buf{new char[buf_size]};
 
     util::File file;
     {
@@ -613,8 +593,8 @@ std::error_code
     if (encryption_key) {
         std::uint_fast64_t file_size = file.get_size();
         REALM_ASSERT(file_size % encryption_block_size == 0);
-        std::uint_fast64_t number_of_metadata_blocks = (file_size / encryption_block_size + blocks_per_metadata_block) /
-            (blocks_per_metadata_block + 1);
+        std::uint_fast64_t number_of_metadata_blocks =
+            (file_size / encryption_block_size + blocks_per_metadata_block) / (blocks_per_metadata_block + 1);
         decrypted_file_size = file_size - number_of_metadata_blocks * encryption_block_size;
     }
 #endif
@@ -671,11 +651,9 @@ std::error_code
 #if REALM_ENABLE_ENCRYPTION
         if (encryption_key) {
             REALM_ASSERT(aes_cryptor);
-            std::size_t next_decrypted_file_size =
-                std::size_t(decrypted_file_size + decompressed_size);
+            std::size_t next_decrypted_file_size = std::size_t(decrypted_file_size + decompressed_size);
             aes_cryptor->set_file_size(off_t(next_decrypted_file_size));
-            aes_cryptor->write(file.get_descriptor(), off_t(decrypted_file_size),
-                               buf.get(), decompressed_size);
+            aes_cryptor->write(file.get_descriptor(), off_t(decrypted_file_size), buf.get(), decompressed_size);
             decrypted_file_size = next_decrypted_file_size;
         }
 #endif
@@ -689,13 +667,11 @@ std::error_code
     inflateEnd(&strm);
     dst_size = file.get_size();
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
-std::error_code compression::compress_file_in_blocks(const char* src_path,
-                                                     const char* dst_path,
-                                                     util::File::SizeType& src_size,
-                                                     util::File::SizeType& dst_size)
+std::error_code compression::compress_file_in_blocks(const char* src_path, const char* dst_path,
+                                                     util::File::SizeType& src_size, util::File::SizeType& dst_size)
 {
     util::File src_file;
     try {
@@ -731,7 +707,7 @@ std::error_code compression::compress_file_in_blocks(const char* src_path,
 
     z_stream strm;
     strm.zalloc = &custom_alloc;
-    strm.zfree  = &custom_free;
+    strm.zfree = &custom_free;
     strm.opaque = &allocator;
     strm.data_type = Z_BINARY;
 
@@ -789,11 +765,10 @@ std::error_code compression::compress_file_in_blocks(const char* src_path,
 
     dst_size = dst_file.get_size();
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
-std::error_code compression::decompress_file_from_blocks(const char* src_path,
-                                                         const char* dst_path,
+std::error_code compression::decompress_file_from_blocks(const char* src_path, const char* dst_path,
                                                          util::File::SizeType& src_size,
                                                          util::File::SizeType& dst_size)
 {
@@ -833,7 +808,7 @@ std::error_code compression::decompress_file_from_blocks(const char* src_path,
 
     z_stream strm;
     strm.zalloc = &custom_alloc;
-    strm.zfree  = &custom_free;
+    strm.zfree = &custom_free;
     strm.opaque = &allocator;
     strm.data_type = Z_BINARY;
 
@@ -895,13 +870,11 @@ std::error_code compression::decompress_file_from_blocks(const char* src_path,
 
     dst_size = dst_file.get_size();
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
-std::error_code compression::decompress_block(const char* compressed_buf,
-                                              std::size_t compressed_size,
-                                              char* decompressed_buf,
-                                              std::size_t& decompressed_size)
+std::error_code compression::decompress_block(const char* compressed_buf, std::size_t compressed_size,
+                                              char* decompressed_buf, std::size_t& decompressed_size)
 {
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -937,50 +910,30 @@ std::error_code compression::decompress_block(const char* compressed_buf,
 
     decompressed_size = out_buf_size - strm.avail_out;
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
-std::error_code
-compression::extract_blocks_from_file(const std::string& path,
-                                      const util::Optional<std::array<char, 64>>& encryption_key,
-                                      std::uint_fast64_t current_offset,
-                                      std::uint_fast64_t& next_offset,
-                                      std::uint_fast64_t& max_offset,
-                                      char* buf,
-                                      std::size_t buf_size,
-                                      std::size_t& blocks_size)
+std::error_code compression::extract_blocks_from_file(const std::string& path,
+                                                      const util::Optional<std::array<char, 64>>& encryption_key,
+                                                      std::uint_fast64_t current_offset,
+                                                      std::uint_fast64_t& next_offset, std::uint_fast64_t& max_offset,
+                                                      char* buf, std::size_t buf_size, std::size_t& blocks_size)
 {
     if (encryption_key) {
 #if REALM_ENABLE_ENCRYPTION
-        return extract_blocks_from_encrypted_realm(path,
-                                                   *encryption_key,
-                                                   current_offset,
-                                                   next_offset,
-                                                   max_offset,
-                                                   buf,
-                                                   buf_size,
-                                                   blocks_size);
+        return extract_blocks_from_encrypted_realm(path, *encryption_key, current_offset, next_offset, max_offset,
+                                                   buf, buf_size, blocks_size);
 #endif
     }
     else {
-        return extract_blocks_from_unencrypted_block_file(path,
-                                                          current_offset,
-                                                          next_offset,
-                                                          max_offset,
-                                                          buf,
-                                                          buf_size,
-                                                          blocks_size);
+        return extract_blocks_from_unencrypted_block_file(path, current_offset, next_offset, max_offset, buf,
+                                                          buf_size, blocks_size);
     }
 }
 
-std::error_code
-compression::extract_blocks_from_unencrypted_block_file(const std::string& path,
-                                                        std::uint_fast64_t current_offset,
-                                                        std::uint_fast64_t& next_offset,
-                                                        std::uint_fast64_t& max_offset,
-                                                        char* buf,
-                                                        std::size_t buf_size,
-                                                        std::size_t& blocks_size)
+std::error_code compression::extract_blocks_from_unencrypted_block_file(
+    const std::string& path, std::uint_fast64_t current_offset, std::uint_fast64_t& next_offset,
+    std::uint_fast64_t& max_offset, char* buf, std::size_t buf_size, std::size_t& blocks_size)
 {
     util::File file;
     try {
@@ -1005,7 +958,7 @@ compression::extract_blocks_from_unencrypted_block_file(const std::string& path,
     std::size_t blocks_size_2 = 0;
     while (current_offset + blocks_size_2 + 4 <= max_offset) {
         unsigned char prefix[4];
-        std::size_t nread = file.read(reinterpret_cast<char *>(prefix), 4);
+        std::size_t nread = file.read(reinterpret_cast<char*>(prefix), 4);
         REALM_ASSERT(nread == 4);
         std::size_t block_size = 0;
         for (int i = 0; i < 4; ++i) {
@@ -1028,20 +981,17 @@ compression::extract_blocks_from_unencrypted_block_file(const std::string& path,
     blocks_size = blocks_size_2;
     next_offset = current_offset + blocks_size_2;
 
-    return std::error_code {};
+    return std::error_code{};
 }
 
 #if REALM_ENABLE_ENCRYPTION
 
-std::error_code
-compression::extract_blocks_from_encrypted_realm(const std::string& path,
-                                                 const std::array<char, 64>& encryption_key,
-                                                 std::uint_fast64_t current_offset,
-                                                 std::uint_fast64_t& next_offset,
-                                                 std::uint_fast64_t& max_offset,
-                                                 char* buf,
-                                                 std::size_t buf_size,
-                                                 std::size_t& blocks_size)
+std::error_code compression::extract_blocks_from_encrypted_realm(const std::string& path,
+                                                                 const std::array<char, 64>& encryption_key,
+                                                                 std::uint_fast64_t current_offset,
+                                                                 std::uint_fast64_t& next_offset,
+                                                                 std::uint_fast64_t& max_offset, char* buf,
+                                                                 std::size_t buf_size, std::size_t& blocks_size)
 {
     // More blocks will only be compressed as long as the buffer has more space
     // than threshold_buf_size left.
@@ -1063,16 +1013,13 @@ compression::extract_blocks_from_encrypted_realm(const std::string& path,
     const std::size_t blocks_per_metadata_block = 64;
     REALM_ASSERT(file_size % encryption_block_size == 0);
 
-    bool file_ends_with_metadata_block =
-        (file_size / encryption_block_size) % (blocks_per_metadata_block + 1) == 1;
+    bool file_ends_with_metadata_block = (file_size / encryption_block_size) % (blocks_per_metadata_block + 1) == 1;
 
     // Ignore a final useless metadata block.
-    std::uint_fast64_t effective_file_size = file_size -
-        (file_ends_with_metadata_block ? encryption_block_size : 0);
+    std::uint_fast64_t effective_file_size = file_size - (file_ends_with_metadata_block ? encryption_block_size : 0);
 
     const std::uint_fast64_t number_of_metadata_blocks =
-        (effective_file_size / encryption_block_size + blocks_per_metadata_block) /
-        (blocks_per_metadata_block + 1);
+        (effective_file_size / encryption_block_size + blocks_per_metadata_block) / (blocks_per_metadata_block + 1);
     REALM_ASSERT(number_of_metadata_blocks > 0);
 
     // The offset is a position in the encrypted Realm. The offset is always placed at the
@@ -1091,8 +1038,8 @@ compression::extract_blocks_from_encrypted_realm(const std::string& path,
     if (current_offset % (encryption_block_size * (blocks_per_metadata_block + 1)) != 0)
         return compression::error::invalid_input;
 
-    const std::uint_fast64_t decrypted_src_size = effective_file_size -
-        number_of_metadata_blocks * encryption_block_size;
+    const std::uint_fast64_t decrypted_src_size =
+        effective_file_size - number_of_metadata_blocks * encryption_block_size;
     util::AESCryptor aes_cryptor{reinterpret_cast<const unsigned char*>(encryption_key.data())};
     aes_cryptor.set_file_size(off_t(decrypted_src_size));
 
@@ -1102,12 +1049,12 @@ compression::extract_blocks_from_encrypted_realm(const std::string& path,
     std::size_t buf_pos = 0;
     std::uint_fast64_t offset = current_offset;
 
-    while(offset < max_offset && (buf_size - buf_pos)  >= threshold_buf_size) {
+    while (offset < max_offset && (buf_size - buf_pos) >= threshold_buf_size) {
         std::uint_fast64_t decrypted_offset = (offset / (blocks_per_metadata_block + 1)) * blocks_per_metadata_block;
         REALM_ASSERT(decrypted_offset < decrypted_src_size);
         std::size_t size_to_read =
             std::size_t(std::min(std::uint_fast64_t(blocks_per_metadata_block * encryption_block_size),
-                            decrypted_src_size - decrypted_offset));
+                                 decrypted_src_size - decrypted_offset));
         REALM_ASSERT(size_to_read % encryption_block_size == 0);
         REALM_ASSERT(decrypted_src_size % encryption_block_size == 0);
         REALM_ASSERT(decrypted_offset % encryption_block_size == 0);
@@ -1116,8 +1063,7 @@ compression::extract_blocks_from_encrypted_realm(const std::string& path,
         // must be included in the file as well.
         for (std::size_t pos = 0; pos < size_to_read; pos += encryption_block_size) {
             bool success = aes_cryptor.read(file.get_descriptor(), off_t(decrypted_offset + pos),
-                                            unencrypted_buf.get() + pos,
-                                            encryption_block_size);
+                                            unencrypted_buf.get() + pos, encryption_block_size);
             if (!success) {
                 // zero out the content.
                 std::memset(unencrypted_buf.get() + pos, 0, encryption_block_size);
@@ -1131,9 +1077,8 @@ compression::extract_blocks_from_encrypted_realm(const std::string& path,
         }
 
         std::size_t compressed_size_3;
-        std::error_code ec = compress_block_with_header(unencrypted_buf.get(), size_to_read,
-                                                        buf + buf_pos, buf_size - buf_pos,
-                                                        compressed_size_3);
+        std::error_code ec = compress_block_with_header(unencrypted_buf.get(), size_to_read, buf + buf_pos,
+                                                        buf_size - buf_pos, compressed_size_3);
         if (ec)
             return ec;
 

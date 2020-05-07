@@ -21,6 +21,7 @@ public:
     {
         return m_random;
     }
+
 private:
     std::mt19937_64 m_random;
 };
@@ -41,22 +42,19 @@ bool check_legacy_format_1(const Group& group)
     _impl::History::version_type dummy_version = 0;
     int history_type = 0;
     int history_schema_version = 0;
-    gf::get_version_and_history_info(alloc, top_ref, dummy_version,
-                                     history_type, history_schema_version);
-    bool good = (history_type == Replication::hist_SyncServer &&
-                 history_schema_version == 0);
+    gf::get_version_and_history_info(alloc, top_ref, dummy_version, history_type, history_schema_version);
+    bool good = (history_type == Replication::hist_SyncServer && history_schema_version == 0);
     return good;
 }
 
-bool try_migrate_file(const std::string original_path, const std::string& new_path,
-                      util::Logger& logger)
+bool try_migrate_file(const std::string original_path, const std::string& new_path, util::Logger& logger)
 {
     HistoryContext context; // Throws
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     Group legacy_group{original_path}; // Throws
     if (check_legacy_format_1(legacy_group)) {
         _impl::ServerHistory new_history{new_path, context, compaction_control}; // Throws
-        DBRef new_shared_group = DB::create(new_history); // Throws
+        DBRef new_shared_group = DB::create(new_history);                        // Throws
         WriteTransaction wt{new_shared_group};
         sync::import_from_legacy_format(legacy_group, wt, logger); // Throws
         wt.commit();
@@ -67,21 +65,20 @@ bool try_migrate_file(const std::string original_path, const std::string& new_pa
         // migrated, but verify the assumption by opening it with the right
         // history type.
         _impl::ServerHistory history{original_path, context, compaction_control}; // Throws
-        DBRef db = DB::create(history); // Throws
+        DBRef db = DB::create(history);                                           // Throws
         return false;
     }
 }
 
 void migrate_file_safely(const std::string& realm_file, const std::string& temp_file_1,
-                         const std::string& temp_file_2, const std::string& backup_file,
-                         util::Logger& logger)
+                         const std::string& temp_file_2, const std::string& backup_file, util::Logger& logger)
 {
-    std::string lock_file = realm_file + ".lock"; // Throws
+    std::string lock_file = realm_file + ".lock";       // Throws
     util::File lock{lock_file, util::File::mode_Write}; // Throws
-    lock.lock_exclusive(); // Throws
+    lock.lock_exclusive();                              // Throws
     util::File::UnlockGuard ug{lock};
-    util::File::copy(realm_file, temp_file_1); // Throws
-    util::File::try_remove(temp_file_2); // Throws
+    util::File::copy(realm_file, temp_file_1);                                      // Throws
+    util::File::try_remove(temp_file_2);                                            // Throws
     bool migration_was_needed = try_migrate_file(temp_file_1, temp_file_2, logger); // Throws
     if (migration_was_needed) {
         // Just-in-time backup of the original Realm file.
@@ -97,12 +94,11 @@ void migrate_file_safely(const std::string& realm_file, const std::string& temp_
 namespace realm {
 namespace _impl {
 
-void ensure_legacy_migration_1(const std::string& realms_dir, const std::string& migration_dir,
-                               util::Logger& logger)
+void ensure_legacy_migration_1(const std::string& realms_dir, const std::string& migration_dir, util::Logger& logger)
 {
     std::string completed_file = util::File::resolve("completed_1", migration_dir); // Throws
-    if (!util::File::exists(completed_file)) { // Throws
-        util::try_make_dir(migration_dir); // Throws
+    if (!util::File::exists(completed_file)) {                                      // Throws
+        util::try_make_dir(migration_dir);                                          // Throws
 
         // Find all the Realm files
         std::set<std::string> realm_dirs;
@@ -110,9 +106,9 @@ void ensure_legacy_migration_1(const std::string& realms_dir, const std::string&
         auto file_handler = [&](const std::string& file, const std::string& dir) {
             if (ends_with(file, ".realm")) {
                 if (!dir.empty())
-                    realm_dirs.insert(dir); // Throws
+                    realm_dirs.insert(dir);                          // Throws
                 std::string file_2 = util::File::resolve(file, dir); // Throws
-                realm_files.insert(file_2); // Throws
+                realm_files.insert(file_2);                          // Throws
             }
             return true; // Continue
         };
@@ -125,23 +121,23 @@ void ensure_legacy_migration_1(const std::string& realms_dir, const std::string&
             // Ensure that we have a backup directory with a subdirectory
             // structure matching the one in the Realms directory.
             std::string backup_dir = util::File::resolve("backup_1", migration_dir); // Throws
-            util::try_make_dir(backup_dir); // Throws
-            for (const auto& dir: realm_dirs) {
+            util::try_make_dir(backup_dir);                                          // Throws
+            for (const auto& dir : realm_dirs) {
                 std::string dir_2 = util::File::resolve(dir, backup_dir); // Throws
-                util::try_make_dir(dir_2); // Throws
+                util::try_make_dir(dir_2);                                // Throws
             }
 
             // Setup a directory for temporary files
             std::string temp_dir = util::File::resolve("temp_1", migration_dir); // Throws
-            util::try_make_dir(temp_dir); // Throws
-            std::string temp_file_1 = util::File::resolve("1", temp_dir); // Throws
-            std::string temp_file_2 = util::File::resolve("2", temp_dir); // Throws
+            util::try_make_dir(temp_dir);                                        // Throws
+            std::string temp_file_1 = util::File::resolve("1", temp_dir);        // Throws
+            std::string temp_file_2 = util::File::resolve("2", temp_dir);        // Throws
 
             // Migrate the Realm files.
             std::size_t n = 1;
-            for (const auto& file: realm_files) {
+            for (const auto& file : realm_files) {
                 logger.info("Migrating %1 (%2/%3)", file, n, realm_files.size());
-                std::string realm_file  = util::File::resolve(file, realms_dir); // Throws
+                std::string realm_file = util::File::resolve(file, realms_dir);  // Throws
                 std::string backup_file = util::File::resolve(file, backup_dir); // Throws
                 migrate_file_safely(realm_file, temp_file_1, temp_file_2, backup_file,
                                     logger); // Throws

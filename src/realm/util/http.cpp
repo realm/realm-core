@@ -13,7 +13,7 @@ StringData trim_whitespace(StringData str)
 {
     auto p0 = str.data();
     auto p1 = str.data() + str.size();
-    while (p1 > p0 && std::isspace(*(p1-1)))
+    while (p1 > p0 && std::isspace(*(p1 - 1)))
         --p1;
     while (p0 < p1 && std::isspace(*p0))
         ++p0;
@@ -21,10 +21,8 @@ StringData trim_whitespace(StringData str)
 }
 
 
-struct HTTPParserErrorCategory: std::error_category {
-    HTTPParserErrorCategory()
-    {
-    }
+struct HTTPParserErrorCategory : std::error_category {
+    HTTPParserErrorCategory() {}
 
     const char* name() const noexcept override
     {
@@ -35,12 +33,18 @@ struct HTTPParserErrorCategory: std::error_category {
     {
         using util::HTTPParserError;
         switch (HTTPParserError(condition)) {
-            case HTTPParserError::None: return "None";
-            case HTTPParserError::ContentTooLong: return "Content too long";
-            case HTTPParserError::HeaderLineTooLong: return "Header line too long";
-            case HTTPParserError::MalformedResponse: return "Malformed response";
-            case HTTPParserError::MalformedRequest: return "Malformed request";
-            default: REALM_TERMINATE("Invalid HTTP Parser Error");
+            case HTTPParserError::None:
+                return "None";
+            case HTTPParserError::ContentTooLong:
+                return "Content too long";
+            case HTTPParserError::HeaderLineTooLong:
+                return "Header line too long";
+            case HTTPParserError::MalformedResponse:
+                return "Malformed response";
+            case HTTPParserError::MalformedRequest:
+                return "Malformed request";
+            default:
+                REALM_TERMINATE("Invalid HTTP Parser Error");
         }
     }
 };
@@ -74,7 +78,7 @@ bool valid_http_status_code(unsigned int code)
 
 HTTPAuthorization parse_authorization(const std::string& header_value)
 {
-    //StringData line{header_value.c_str(), header_value.length()};
+    // StringData line{header_value.c_str(), header_value.length()};
 
     HTTPAuthorization auth;
     auto p = header_value.begin();
@@ -139,9 +143,9 @@ bool HTTPParserBase::parse_header_line(size_t len)
     }
 
     auto key_begin = p;
-    auto key_end   = colon;
+    auto key_end = colon;
     auto value_begin = colon + 1;
-    auto value_end   = end;
+    auto value_end = end;
 
     StringData key(key_begin, key_end - key_begin);
     StringData value(value_begin, value_end - value_begin);
@@ -182,21 +186,27 @@ bool HTTPParserBase::parse_header_line(size_t len)
 
 Optional<HTTPMethod> HTTPParserBase::parse_method_string(StringData method)
 {
-    if (method == "OPTIONS") return HTTPMethod::Options;
-    if (method == "GET")     return HTTPMethod::Get;
-    if (method == "HEAD")    return HTTPMethod::Head;
-    if (method == "POST")    return HTTPMethod::Post;
-    if (method == "PUT")     return HTTPMethod::Put;
-    if (method == "DELETE")  return HTTPMethod::Delete;
-    if (method == "TRACE")   return HTTPMethod::Trace;
-    if (method == "CONNECT") return HTTPMethod::Connect;
+    if (method == "OPTIONS")
+        return HTTPMethod::Options;
+    if (method == "GET")
+        return HTTPMethod::Get;
+    if (method == "HEAD")
+        return HTTPMethod::Head;
+    if (method == "POST")
+        return HTTPMethod::Post;
+    if (method == "PUT")
+        return HTTPMethod::Put;
+    if (method == "DELETE")
+        return HTTPMethod::Delete;
+    if (method == "TRACE")
+        return HTTPMethod::Trace;
+    if (method == "CONNECT")
+        return HTTPMethod::Connect;
     return none;
 }
 
 
-bool HTTPParserBase::parse_first_line_of_request(StringData line,
-                                                 HTTPMethod& out_method,
-                                                 StringData& out_uri)
+bool HTTPParserBase::parse_first_line_of_request(StringData line, HTTPMethod& out_method, StringData& out_uri)
 {
     line = trim_whitespace(line);
     auto p = line.data();
@@ -223,9 +233,7 @@ bool HTTPParserBase::parse_first_line_of_request(StringData line,
 }
 
 
-bool HTTPParserBase::parse_first_line_of_response(StringData line,
-                                                  HTTPStatus& out_status,
-                                                  StringData& out_reason,
+bool HTTPParserBase::parse_first_line_of_response(StringData line, HTTPStatus& out_status, StringData& out_reason,
                                                   util::Logger& logger)
 {
     line = trim_whitespace(line);
@@ -270,14 +278,22 @@ bool HTTPParserBase::parse_first_line_of_response(StringData line,
 std::ostream& operator<<(std::ostream& os, HTTPMethod method)
 {
     switch (method) {
-        case HTTPMethod::Options: return os << "OPTIONS";
-        case HTTPMethod::Get:     return os << "GET";
-        case HTTPMethod::Head:    return os << "HEAD";
-        case HTTPMethod::Post:    return os << "POST";
-        case HTTPMethod::Put:     return os << "PUT";
-        case HTTPMethod::Delete:  return os << "DELETE";
-        case HTTPMethod::Trace:   return os << "TRACE";
-        case HTTPMethod::Connect: return os << "CONNECT";
+        case HTTPMethod::Options:
+            return os << "OPTIONS";
+        case HTTPMethod::Get:
+            return os << "GET";
+        case HTTPMethod::Head:
+            return os << "HEAD";
+        case HTTPMethod::Post:
+            return os << "POST";
+        case HTTPMethod::Put:
+            return os << "PUT";
+        case HTTPMethod::Delete:
+            return os << "DELETE";
+        case HTTPMethod::Trace:
+            return os << "TRACE";
+        case HTTPMethod::Connect:
+            return os << "CONNECT";
     }
     REALM_TERMINATE("Invalid HTTPRequest object.");
 }
@@ -287,59 +303,112 @@ std::ostream& operator<<(std::ostream& os, HTTPStatus status)
 {
     os << int(status) << ' ';
     switch (status) {
-        case HTTPStatus::Unknown:                       return os << "Unknown Status";
-        case HTTPStatus::Continue:                      return os << "Continue";
-        case HTTPStatus::SwitchingProtocols:            return os << "Switching Protocols";
-        case HTTPStatus::Ok:                            return os << "OK";
-        case HTTPStatus::Created:                       return os << "Created";
-        case HTTPStatus::Accepted:                      return os << "Accepted";
-        case HTTPStatus::NonAuthoritative:              return os << "Non-Authoritative Information";
-        case HTTPStatus::NoContent:                     return os << "No Content";
-        case HTTPStatus::ResetContent:                  return os << "Reset Content";
-        case HTTPStatus::PartialContent:                return os << "Partial Content";
-        case HTTPStatus::MultipleChoices:               return os << "Multiple Choices";
-        case HTTPStatus::MovedPermanently:              return os << "Moved Permanently";
-        case HTTPStatus::Found:                         return os << "Found";
-        case HTTPStatus::SeeOther:                      return os << "See Other";
-        case HTTPStatus::NotModified:                   return os << "Not Modified";
-        case HTTPStatus::UseProxy:                      return os << "Use Proxy";
-        case HTTPStatus::SwitchProxy:                   return os << "Switch Proxy";
-        case HTTPStatus::TemporaryRedirect:             return os << "Temporary Redirect";
-        case HTTPStatus::PermanentRedirect:             return os << "Permanent Redirect";
-        case HTTPStatus::BadRequest:                    return os << "Bad Request";
-        case HTTPStatus::Unauthorized:                  return os << "Unauthorized";
-        case HTTPStatus::PaymentRequired:               return os << "Payment Required";
-        case HTTPStatus::Forbidden:                     return os << "Forbidden";
-        case HTTPStatus::NotFound:                      return os << "Not Found";
-        case HTTPStatus::MethodNotAllowed:              return os << "Method Not Allowed";
-        case HTTPStatus::NotAcceptable:                 return os << "Not Acceptable";
-        case HTTPStatus::ProxyAuthenticationRequired:   return os << "Proxy Authentication Required";
-        case HTTPStatus::RequestTimeout:                return os << "Request Timeout";
-        case HTTPStatus::Conflict:                      return os << "Conflict";
-        case HTTPStatus::Gone:                          return os << "Gone";
-        case HTTPStatus::LengthRequired:                return os << "Length Required";
-        case HTTPStatus::PreconditionFailed:            return os << "Precondition Failed";
-        case HTTPStatus::PayloadTooLarge:               return os << "Payload Too Large";
-        case HTTPStatus::UriTooLong:                    return os << "URI Too Long";
-        case HTTPStatus::UnsupportedMediaType:          return os << "Unsupported Media Type";
-        case HTTPStatus::RangeNotSatisfiable:           return os << "Range Not Satisfiable";
-        case HTTPStatus::ExpectationFailed:             return os << "Expectation Failed";
-        case HTTPStatus::ImATeapot:                     return os << "I'm A Teapot";
-        case HTTPStatus::MisdirectedRequest:            return os << "Misdirected Request";
-        case HTTPStatus::UpgradeRequired:               return os << "Upgrade Required";
-        case HTTPStatus::PreconditionRequired:          return os << "Precondition Required";
-        case HTTPStatus::TooManyRequests:               return os << "Too Many Requests";
-        case HTTPStatus::RequestHeaderFieldsTooLarge:   return os << "Request Header Fields Too Large";
-        case HTTPStatus::UnavailableForLegalReasons:    return os << "Unavailable For Legal Reasons";
-        case HTTPStatus::InternalServerError:           return os << "Internal Server Error";
-        case HTTPStatus::NotImplemented:                return os << "Not Implemented";
-        case HTTPStatus::BadGateway:                    return os << "Bad Gateway";
-        case HTTPStatus::ServiceUnavailable:            return os << "Service Unavailable";
-        case HTTPStatus::GatewayTimeout:                return os << "Gateway Timeout";
-        case HTTPStatus::HttpVersionNotSupported:       return os << "HTTP Version not supported";
-        case HTTPStatus::VariantAlsoNegotiates:         return os << "Variant Also Negotiates";
-        case HTTPStatus::NotExtended:                   return os << "Not Extended";
-        case HTTPStatus::NetworkAuthenticationRequired: return os << "Network Authentication Required";
+        case HTTPStatus::Unknown:
+            return os << "Unknown Status";
+        case HTTPStatus::Continue:
+            return os << "Continue";
+        case HTTPStatus::SwitchingProtocols:
+            return os << "Switching Protocols";
+        case HTTPStatus::Ok:
+            return os << "OK";
+        case HTTPStatus::Created:
+            return os << "Created";
+        case HTTPStatus::Accepted:
+            return os << "Accepted";
+        case HTTPStatus::NonAuthoritative:
+            return os << "Non-Authoritative Information";
+        case HTTPStatus::NoContent:
+            return os << "No Content";
+        case HTTPStatus::ResetContent:
+            return os << "Reset Content";
+        case HTTPStatus::PartialContent:
+            return os << "Partial Content";
+        case HTTPStatus::MultipleChoices:
+            return os << "Multiple Choices";
+        case HTTPStatus::MovedPermanently:
+            return os << "Moved Permanently";
+        case HTTPStatus::Found:
+            return os << "Found";
+        case HTTPStatus::SeeOther:
+            return os << "See Other";
+        case HTTPStatus::NotModified:
+            return os << "Not Modified";
+        case HTTPStatus::UseProxy:
+            return os << "Use Proxy";
+        case HTTPStatus::SwitchProxy:
+            return os << "Switch Proxy";
+        case HTTPStatus::TemporaryRedirect:
+            return os << "Temporary Redirect";
+        case HTTPStatus::PermanentRedirect:
+            return os << "Permanent Redirect";
+        case HTTPStatus::BadRequest:
+            return os << "Bad Request";
+        case HTTPStatus::Unauthorized:
+            return os << "Unauthorized";
+        case HTTPStatus::PaymentRequired:
+            return os << "Payment Required";
+        case HTTPStatus::Forbidden:
+            return os << "Forbidden";
+        case HTTPStatus::NotFound:
+            return os << "Not Found";
+        case HTTPStatus::MethodNotAllowed:
+            return os << "Method Not Allowed";
+        case HTTPStatus::NotAcceptable:
+            return os << "Not Acceptable";
+        case HTTPStatus::ProxyAuthenticationRequired:
+            return os << "Proxy Authentication Required";
+        case HTTPStatus::RequestTimeout:
+            return os << "Request Timeout";
+        case HTTPStatus::Conflict:
+            return os << "Conflict";
+        case HTTPStatus::Gone:
+            return os << "Gone";
+        case HTTPStatus::LengthRequired:
+            return os << "Length Required";
+        case HTTPStatus::PreconditionFailed:
+            return os << "Precondition Failed";
+        case HTTPStatus::PayloadTooLarge:
+            return os << "Payload Too Large";
+        case HTTPStatus::UriTooLong:
+            return os << "URI Too Long";
+        case HTTPStatus::UnsupportedMediaType:
+            return os << "Unsupported Media Type";
+        case HTTPStatus::RangeNotSatisfiable:
+            return os << "Range Not Satisfiable";
+        case HTTPStatus::ExpectationFailed:
+            return os << "Expectation Failed";
+        case HTTPStatus::ImATeapot:
+            return os << "I'm A Teapot";
+        case HTTPStatus::MisdirectedRequest:
+            return os << "Misdirected Request";
+        case HTTPStatus::UpgradeRequired:
+            return os << "Upgrade Required";
+        case HTTPStatus::PreconditionRequired:
+            return os << "Precondition Required";
+        case HTTPStatus::TooManyRequests:
+            return os << "Too Many Requests";
+        case HTTPStatus::RequestHeaderFieldsTooLarge:
+            return os << "Request Header Fields Too Large";
+        case HTTPStatus::UnavailableForLegalReasons:
+            return os << "Unavailable For Legal Reasons";
+        case HTTPStatus::InternalServerError:
+            return os << "Internal Server Error";
+        case HTTPStatus::NotImplemented:
+            return os << "Not Implemented";
+        case HTTPStatus::BadGateway:
+            return os << "Bad Gateway";
+        case HTTPStatus::ServiceUnavailable:
+            return os << "Service Unavailable";
+        case HTTPStatus::GatewayTimeout:
+            return os << "Gateway Timeout";
+        case HTTPStatus::HttpVersionNotSupported:
+            return os << "HTTP Version not supported";
+        case HTTPStatus::VariantAlsoNegotiates:
+            return os << "Variant Also Negotiates";
+        case HTTPStatus::NotExtended:
+            return os << "Not Extended";
+        case HTTPStatus::NetworkAuthenticationRequired:
+            return os << "Network Authentication Required";
     }
     return os;
 }
@@ -370,7 +439,7 @@ std::ostream& operator<<(std::ostream& os, const HTTPRequest& request)
         os << "\r\n";
     }
 
-    for (auto& pair: request.headers) {
+    for (auto& pair : request.headers) {
         if (pair.first == "Host")
             continue;
         // FIXME: No need for trimming here. There should be extra white space
@@ -395,7 +464,7 @@ std::ostream& operator<<(std::ostream& os, const HTTPResponse& response)
     os << "HTTP/1.1 " << response.status;
     os << "\r\n";
 
-    for (auto& pair: response.headers) {
+    for (auto& pair : response.headers) {
         StringData trimmed_value = trim_whitespace(pair.second);
         os << pair.first << ": " << trimmed_value << "\r\n";
     }

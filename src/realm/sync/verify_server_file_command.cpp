@@ -23,8 +23,8 @@ int main(int argc, char* argv[])
         const char* prog = argv[0];
         --argc;
         ++argv;
-        bool error   = false;
-        bool help    = false;
+        bool error = false;
+        bool help = false;
         bool version = false;
         int argc_2 = 0;
         int i = 0;
@@ -54,8 +54,7 @@ int main(int argc, char* argv[])
                 version = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Bad or missing value for option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -69,17 +68,17 @@ int main(int argc, char* argv[])
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<"  PATH\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
-                "                       encryption key to be used for accessing the specified\n"
-                "                       Realm file.\n"
-                "  -v, --version        Show the version of the Realm Sync release that this\n"
-                "                       command belongs to.\n";
+            std::cerr << "Synopsis: " << prog
+                      << "  PATH\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
+                         "                       encryption key to be used for accessing the specified\n"
+                         "                       Realm file.\n"
+                         "  -v, --version        Show the version of the Realm Sync release that this\n"
+                         "                       command belongs to.\n";
             return EXIT_SUCCESS;
         }
 
@@ -95,9 +94,9 @@ int main(int argc, char* argv[])
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }
@@ -118,13 +117,14 @@ int main(int argc, char* argv[])
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
     HistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
     _impl::ServerHistory hist{path, history_context, compaction_control}; // Throws
-    auto sg = DB::create(hist, options); // Throws
-    ReadTransaction rt{sg}; // Throws
-    rt.get_group().verify(); // Throws
+    auto sg = DB::create(hist, options);                                  // Throws
+    ReadTransaction rt{sg};                                               // Throws
+    rt.get_group().verify();                                              // Throws
 }

@@ -3,9 +3,9 @@
 #define REALM_NOINST_COMMAND_LINE_UTIL_HPP
 
 #ifdef _WIN32
-#   include <win32/getopt.h>
+#include <win32/getopt.h>
 #else
-#   include <getopt.h>
+#include <getopt.h>
 #endif
 
 #include <realm/util/logger.hpp>
@@ -31,10 +31,8 @@ inline bool parse_log_level(const char* string, util::Logger::Level& log_level)
 template <typename Configuration>
 void parse_config_file_path(int argc, char* argv[], Configuration& configuration)
 {
-    static struct option long_options[] = {
-        {"configuration",    required_argument, nullptr, 'c'},
-        {nullptr,            0,                 nullptr, 0}
-    };
+    static struct option long_options[] = {{"configuration", required_argument, nullptr, 'c'},
+                                           {nullptr, 0, nullptr, 0}};
 
     static const char* opt_desc = "c:";
 
@@ -55,7 +53,6 @@ void parse_config_file_path(int argc, char* argv[], Configuration& configuration
     opterr = old_opterr;
     optind = 0;
 }
-
 
 
 } // namespace _impl

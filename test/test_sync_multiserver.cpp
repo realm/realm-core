@@ -119,7 +119,8 @@ TEST(Sync_Multiserver_Merge)
     SHARED_GROUP_TEST_PATH(path_2);
     std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
     std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1); DBRef sg_2 = DB::create(*history_2);
+    DBRef sg_1 = DB::create(*history_1);
+    DBRef sg_2 = DB::create(*history_2);
 
     auto create_schema = [](DBRef sg) {
         WriteTransaction wt{sg};
@@ -164,8 +165,12 @@ TEST(Sync_Multiserver_Merge)
             }
         };
         ThreadWrapper thread_1, thread_2;
-        thread_1.start([&] { client_program(sg_1, session_1); });
-        thread_2.start([&] { client_program(sg_2, session_2); });
+        thread_1.start([&] {
+            client_program(sg_1, session_1);
+        });
+        thread_2.start([&] {
+            client_program(sg_2, session_2);
+        });
         CHECK(!thread_1.join());
         CHECK(!thread_2.join());
 
@@ -247,7 +252,9 @@ TEST(Sync_Multiserver_MultipleClientsPer2ndtierServer)
             auto run = [&](int i, int j) {
                 client_program(shared_groups[i][j], sessions[i][j]);
             };
-            threads[i][j].start([=] { run(i, j); });
+            threads[i][j].start([=] {
+                run(i, j);
+            });
         }
     }
 
@@ -282,6 +289,7 @@ TEST(Sync_Multiserver_MultipleClientsPer2ndtierServer)
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
@@ -363,7 +371,9 @@ TEST(Sync_Multiserver_ManyTiers)
             auto run = [&](int i, int j) {
                 client_program(shared_groups[i][j], sessions[i][j]);
             };
-            threads[i][j].start([=] { run(i, j); });
+            threads[i][j].start([=] {
+                run(i, j);
+            });
         }
     }
 
@@ -398,6 +408,7 @@ TEST(Sync_Multiserver_ManyTiers)
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
@@ -449,8 +460,7 @@ TEST(Sync_Multiserver_PartialSync)
             out.str(std::string{});
             out << "/test/__partial/test/" << client_ndx;
             std::string partial_path = out.str();
-            sessions[i][j] =
-                fixture.make_bound_session(client_ndx, path, server_ndx, partial_path);
+            sessions[i][j] = fixture.make_bound_session(client_ndx, path, server_ndx, partial_path);
         }
     }
 
@@ -497,7 +507,9 @@ TEST(Sync_Multiserver_PartialSync)
             auto run = [&](int i, int j) {
                 client_program(shared_groups[i][j], sessions[i][j]);
             };
-            threads[i][j].start([=] { run(i, j); });
+            threads[i][j].start([=] {
+                run(i, j);
+            });
         }
     }
 
@@ -532,6 +544,7 @@ TEST(Sync_Multiserver_PartialSync)
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
@@ -592,6 +605,7 @@ TEST(Sync_Multiserver_ServerSideModify)
         {
             return m_random;
         }
+
     private:
         std::mt19937_64 m_random;
     };
@@ -607,8 +621,7 @@ TEST(Sync_Multiserver_ServerSideModify)
     Session sessions[n_1][n_2];
     for (int i = 0; i < num_tiers; ++i) {
         std::string server_path = fixture.map_virtual_to_real_path(i, "/test");
-        server_histories[i] =
-            std::make_unique<_impl::ServerHistory>(server_path, context, compaction_control);
+        server_histories[i] = std::make_unique<_impl::ServerHistory>(server_path, context, compaction_control);
         server_shared_groups[i] = DB::create(*server_histories[i]);
         for (int j = 0; j < num_clients_per_tier; ++j) {
             std::ostringstream out;
@@ -673,12 +686,16 @@ TEST(Sync_Multiserver_ServerSideModify)
         auto run_server_prog = [&](int i) {
             server_side_program(server_shared_groups[i], i);
         };
-        server_program_threads[i].start([=] { run_server_prog(i); });
+        server_program_threads[i].start([=] {
+            run_server_prog(i);
+        });
         for (int j = 0; j < num_clients_per_tier; ++j) {
             auto run_client_prog = [&](int i, int j) {
                 client_side_program(client_shared_groups[i][j], sessions[i][j]);
             };
-            client_program_threads[i][j].start([=] { run_client_prog(i, j); });
+            client_program_threads[i][j].start([=] {
+                run_client_prog(i, j);
+            });
         }
     }
 

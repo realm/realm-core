@@ -24,8 +24,8 @@ std::tm gmtime(std::time_t);
 /// std::put_time() is unavailable in GCC 4. This function is thread safe.
 ///
 /// The default format is ISO 8601 date and time.
-template<class C, class T>
-void put_time(std::basic_ostream<C,T>&, const std::tm&, const C* format = "%FT%T%z");
+template <class C, class T>
+void put_time(std::basic_ostream<C, T>&, const std::tm&, const C* format = "%FT%T%z");
 
 // @{
 /// These functions combine localtime() or gmtime() with put_time() and
@@ -41,16 +41,13 @@ std::string format_utc_time(std::time_t, const char* format = "%FT%T%z");
 double local_time_microseconds();
 
 
-
-
 // Implementation
 
-template<class C, class T>
-inline void put_time(std::basic_ostream<C,T>& out, const std::tm& tm, const C* format)
+template <class C, class T>
+inline void put_time(std::basic_ostream<C, T>& out, const std::tm& tm, const C* format)
 {
-    const auto& facet = std::use_facet<std::time_put<C>>(out.getloc()); // Throws
-    facet.put(std::ostreambuf_iterator<C>(out), out, ' ', &tm,
-              format, format + T::length(format)); // Throws
+    const auto& facet = std::use_facet<std::time_put<C>>(out.getloc());                             // Throws
+    facet.put(std::ostreambuf_iterator<C>(out), out, ' ', &tm, format, format + T::length(format)); // Throws
 }
 
 inline std::string format_local_time(std::time_t time, const char* format)
@@ -58,7 +55,7 @@ inline std::string format_local_time(std::time_t time, const char* format)
     std::tm tm = util::localtime(time);
     std::ostringstream out;
     util::put_time(out, tm, format); // Throws
-    return out.str(); // Throws
+    return out.str();                // Throws
 }
 
 inline std::string format_utc_time(std::time_t time, const char* format)
@@ -66,7 +63,7 @@ inline std::string format_utc_time(std::time_t time, const char* format)
     std::tm tm = util::gmtime(time);
     std::ostringstream out;
     util::put_time(out, tm, format); // Throws
-    return out.str(); // Throws
+    return out.str();                // Throws
 }
 
 } // namespace util

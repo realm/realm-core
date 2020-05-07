@@ -11,305 +11,299 @@ using ReadCompletionHandler = websocket::ReadCompletionHandler;
 
 namespace {
 
-    // A class for connecting two socket endpoints through a memory buffer.
-    class Pipe {
-    public:
+// A class for connecting two socket endpoints through a memory buffer.
+class Pipe {
+public:
+    Pipe(util::Logger& logger)
+        : m_logger(logger)
+    {
+    }
 
-        Pipe(util::Logger& logger): m_logger(logger)
-        {
+    Pipe(const Pipe&) = delete;
+
+    void async_write(const char* data, size_t size, WriteCompletionHandler handler)
+    {
+        m_logger.trace("async_write, size = %1", size);
+        m_buffer.insert(m_buffer.end(), data, data + size);
+        do_read();
+        handler(std::error_code{}, size);
+    }
+
+    void async_read(char* buffer, size_t size, ReadCompletionHandler handler)
+    {
+        m_logger.trace("async_read, size = %1", size);
+        REALM_ASSERT(!m_reader_waiting);
+        m_reader_waiting = true;
+        m_plain_async_read = true;
+        m_read_buffer = buffer;
+        m_read_size = size;
+        m_handler = std::move(handler);
+        do_read();
+    }
+
+    void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler)
+    {
+        m_logger.trace("async_read_until, size = %1, delim = %2", size, delim);
+        REALM_ASSERT(!m_reader_waiting);
+        m_reader_waiting = true;
+        m_plain_async_read = false;
+        m_read_buffer = buffer;
+        m_read_size = size;
+        m_read_delim = delim;
+        m_handler = std::move(handler);
+        do_read();
+    }
+
+
+private:
+    util::Logger& m_logger;
+    std::vector<char> m_buffer;
+
+    bool m_reader_waiting = false;
+
+    // discriminates between the two async_read_* functions.
+    // true is async_read()
+    bool m_plain_async_read;
+    char* m_read_buffer = nullptr;
+    size_t m_read_size = 0;
+    char m_read_delim;
+    ReadCompletionHandler m_handler;
+
+    void do_read()
+    {
+        m_logger.trace("do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3", m_buffer.size(),
+                       m_reader_waiting, m_read_size);
+        if (!m_reader_waiting)
+            return;
+
+        if (m_plain_async_read) {
+            if (m_buffer.size() >= m_read_size)
+                transfer(m_read_size);
         }
-
-        Pipe(const Pipe&) = delete;
-
-        void async_write(const char* data, size_t size, WriteCompletionHandler handler)
-        {
-            m_logger.trace("async_write, size = %1", size);
-            m_buffer.insert(m_buffer.end(), data, data + size);
-            do_read();
-            handler(std::error_code {}, size);
+        else {
+            size_t min_size = std::min(m_buffer.size(), m_read_size);
+            auto found_iter = std::find(m_buffer.begin(), m_buffer.begin() + min_size, m_read_delim);
+            if (found_iter != m_buffer.begin() + min_size)
+                transfer(found_iter - m_buffer.begin() + 1);
+            else if (min_size == m_read_size)
+                delim_not_found();
         }
+    }
 
-        void async_read(char* buffer, size_t size, ReadCompletionHandler handler)
-        {
-            m_logger.trace("async_read, size = %1", size);
-            REALM_ASSERT(!m_reader_waiting);
-            m_reader_waiting = true;
-            m_plain_async_read = true;
-            m_read_buffer = buffer;
-            m_read_size = size;
-            m_handler = std::move(handler);
-            do_read();
-        }
+    void transfer(size_t size)
+    {
+        m_logger.trace("transfer()");
+        std::copy(m_buffer.begin(), m_buffer.begin() + size, m_read_buffer);
+        m_buffer.erase(m_buffer.begin(), m_buffer.begin() + size);
+        m_reader_waiting = false;
+        m_handler(std::error_code{}, size);
+    }
 
-        void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler)
-        {
-            m_logger.trace("async_read_until, size = %1, delim = %2", size, delim);
-            REALM_ASSERT(!m_reader_waiting);
-            m_reader_waiting = true;
-            m_plain_async_read = false;
-            m_read_buffer = buffer;
-            m_read_size = size;
-            m_read_delim = delim;
-            m_handler = std::move(handler);
-            do_read();
-        }
+    void delim_not_found()
+    {
+        m_logger.trace("delim_not_found");
+        m_reader_waiting = false;
+        m_handler(MiscExtErrors::delim_not_found, 0);
+    }
+};
 
+class PipeTest {
+public:
+    util::Logger& logger;
+    Pipe pipe;
 
-    private:
-        util::Logger& m_logger;
-        std::vector<char> m_buffer;
+    std::string result;
+    bool done = false;
+    bool error = false;
 
-        bool m_reader_waiting = false;
+    PipeTest(util::Logger& logger)
+        : logger(logger)
+        , pipe(logger)
+    {
+    }
 
-        // discriminates between the two async_read_* functions.
-        // true is async_read()
-        bool m_plain_async_read;
-        char* m_read_buffer = nullptr;
-        size_t m_read_size = 0;
-        char m_read_delim;
-        ReadCompletionHandler m_handler;
+    void write(std::string input)
+    {
+        auto write_handler = [=](std::error_code, size_t) {};
 
-        void do_read()
-        {
-            m_logger.trace("do_read(), m_buffer.size = %1, m_reader_waiting = %2, m_read_size = %3",
-                           m_buffer.size(), m_reader_waiting, m_read_size);
-            if (!m_reader_waiting)
-                return;
+        pipe.async_write(input.data(), input.size(), std::move(write_handler));
+    }
 
-            if (m_plain_async_read) {
-                if (m_buffer.size() >= m_read_size)
-                    transfer(m_read_size);
+    void read_plain(size_t size)
+    {
+        done = false;
+        m_read_buffer.resize(size);
+
+        auto handler = [=](std::error_code, size_t) {
+            done = true;
+            result = std::string{m_read_buffer.begin(), m_read_buffer.end()};
+        };
+
+        pipe.async_read(m_read_buffer.data(), size, std::move(handler));
+    }
+
+    void read_delim(size_t size, char delim)
+    {
+        done = false;
+        m_read_buffer.resize(size);
+
+        auto handler = [=](std::error_code ec, size_t actual_size) {
+            if (!ec) {
+                done = true;
+                result = std::string{m_read_buffer.begin(), m_read_buffer.begin() + actual_size};
             }
             else {
-                size_t min_size = std::min(m_buffer.size(), m_read_size);
-                auto found_iter = std::find(m_buffer.begin(), m_buffer.begin() + min_size, m_read_delim);
-                if (found_iter != m_buffer.begin() + min_size)
-                    transfer(found_iter - m_buffer.begin() + 1);
-                else if (min_size == m_read_size)
-                    delim_not_found();
+                error = true;
             }
+        };
 
-        }
+        pipe.async_read_until(m_read_buffer.data(), size, delim, std::move(handler));
+    }
 
-        void transfer(size_t size)
-        {
-            m_logger.trace("transfer()");
-            std::copy(m_buffer.begin(), m_buffer.begin() + size, m_read_buffer);
-            m_buffer.erase(m_buffer.begin(), m_buffer.begin() + size);
-            m_reader_waiting = false;
-            m_handler(std::error_code {}, size);
-        }
+private:
+    std::vector<char> m_read_buffer;
+};
 
-        void delim_not_found()
-        {
-            m_logger.trace("delim_not_found");
-            m_reader_waiting = false;
-            m_handler(MiscExtErrors::delim_not_found, 0);
-        }
-    };
+class WSConfig : public websocket::Config {
+public:
+    int n_handshake_completed = 0;
+    int n_protocol_errors = 0;
+    int n_read_errors = 0;
+    int n_write_errors = 0;
 
-    class PipeTest {
-    public:
-        util::Logger& logger;
-        Pipe pipe;
+    std::vector<std::string> text_messages;
+    std::vector<std::string> binary_messages;
+    std::vector<std::string> close_messages;
+    std::vector<std::string> ping_messages;
+    std::vector<std::string> pong_messages;
 
-        std::string result;
-        bool done = false;
-        bool error = false;
+    WSConfig(Pipe& pipe_in, Pipe& pipe_out, util::Logger& logger)
+        : m_pipe_in(pipe_in)
+        , m_pipe_out(pipe_out)
+        , m_logger(logger)
+    {
+    }
 
-        PipeTest(util::Logger& logger): logger(logger), pipe(logger)
-        {
-        }
+    util::Logger& websocket_get_logger() noexcept override
+    {
+        return m_logger;
+    }
 
-        void write(std::string input)
-        {
-            auto write_handler = [=](std::error_code, size_t)
-            {
-            };
+    std::mt19937_64& websocket_get_random() noexcept override
+    {
+        return m_random;
+    }
 
-            pipe.async_write(input.data(), input.size(), std::move(write_handler));
-        }
+    void async_write(const char* data, size_t size, WriteCompletionHandler handler) override
+    {
+        m_pipe_out.async_write(data, size, handler);
+    }
 
-        void read_plain(size_t size)
-        {
-            done = false;
-            m_read_buffer.resize(size);
+    void async_read(char* buffer, size_t size, ReadCompletionHandler handler) override
+    {
+        m_pipe_in.async_read(buffer, size, handler);
+    }
 
-            auto handler = [=](std::error_code, size_t)
-            {
-                done = true;
-                result = std::string {m_read_buffer.begin(), m_read_buffer.end()};
-            };
+    void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler) override
+    {
+        m_pipe_in.async_read_until(buffer, size, delim, handler);
+    }
 
-            pipe.async_read(m_read_buffer.data(), size, std::move(handler));
-        }
+    void websocket_handshake_completion_handler(const HTTPHeaders&) override
+    {
+        n_handshake_completed++;
+    }
 
-        void read_delim(size_t size, char delim)
-        {
-            done = false;
-            m_read_buffer.resize(size);
+    void websocket_read_error_handler(std::error_code) override
+    {
+        n_read_errors++;
+    }
 
-            auto handler = [=](std::error_code ec, size_t actual_size)
-            {
-                if (!ec) {
-                    done = true;
-                    result = std::string {m_read_buffer.begin(), m_read_buffer.begin() + actual_size};
-                }
-                else {
-                    error = true;
-                }
-            };
+    void websocket_write_error_handler(std::error_code) override
+    {
+        n_write_errors++;
+    }
 
-            pipe.async_read_until(m_read_buffer.data(), size, delim, std::move(handler));
-        }
+    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, const util::StringView*) override
+    {
+        n_protocol_errors++;
+    }
 
-    private:
-        std::vector<char> m_read_buffer;
-    };
+    void websocket_protocol_error_handler(std::error_code) override
+    {
+        n_protocol_errors++;
+    }
 
-    class WSConfig: public websocket::Config {
-    public:
-        int n_handshake_completed = 0;
-        int n_protocol_errors = 0;
-        int n_read_errors = 0;
-        int n_write_errors = 0;
+    bool websocket_text_message_received(const char* data, size_t size) override
+    {
+        text_messages.push_back(std::string{data, size});
+        return true;
+    }
 
-        std::vector<std::string> text_messages;
-        std::vector<std::string> binary_messages;
-        std::vector<std::string> close_messages;
-        std::vector<std::string> ping_messages;
-        std::vector<std::string> pong_messages;
+    bool websocket_binary_message_received(const char* data, size_t size) override
+    {
+        binary_messages.push_back(std::string{data, size});
+        return true;
+    }
 
-        WSConfig(Pipe& pipe_in, Pipe& pipe_out, util::Logger& logger):
-            m_pipe_in(pipe_in),
-            m_pipe_out(pipe_out),
-            m_logger(logger)
-        {
-        }
+    bool websocket_close_message_received(const char* data, size_t size) override
+    {
+        close_messages.push_back(std::string{data, size});
+        return true;
+    }
 
-        util::Logger& websocket_get_logger() noexcept override
-        {
-            return m_logger;
-        }
+    bool websocket_ping_message_received(const char* data, size_t size) override
+    {
+        ping_messages.push_back(std::string{data, size});
+        return true;
+    }
 
-        std::mt19937_64& websocket_get_random() noexcept override
-        {
-            return m_random;
-        }
-
-        void async_write(const char* data, size_t size, WriteCompletionHandler handler) override
-        {
-            m_pipe_out.async_write(data, size, handler);
-        }
-
-        void async_read(char* buffer, size_t size, ReadCompletionHandler handler) override
-        {
-            m_pipe_in.async_read(buffer, size, handler);
-        }
-
-        void async_read_until(char* buffer, size_t size, char delim,
-                              ReadCompletionHandler handler) override
-        {
-            m_pipe_in.async_read_until(buffer, size, delim, handler);
-        }
-
-        void websocket_handshake_completion_handler(const HTTPHeaders&) override
-        {
-            n_handshake_completed++;
-        }
-
-        void websocket_read_error_handler(std::error_code) override
-        {
-            n_read_errors++;
-        }
-
-        void websocket_write_error_handler(std::error_code) override
-        {
-            n_write_errors++;
-        }
-
-        void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*,
-                                               const util::StringView*) override
-        {
-            n_protocol_errors++;
-        }
-
-        void websocket_protocol_error_handler(std::error_code) override
-        {
-            n_protocol_errors++;
-        }
-
-        bool websocket_text_message_received(const char* data, size_t size) override
-        {
-            text_messages.push_back(std::string {data, size});
-            return true;
-        }
-
-        bool websocket_binary_message_received(const char* data, size_t size) override
-        {
-            binary_messages.push_back(std::string {data, size});
-            return true;
-        }
-
-        bool websocket_close_message_received(const char* data, size_t size) override
-        {
-            close_messages.push_back(std::string {data, size});
-            return true;
-        }
-
-        bool websocket_ping_message_received(const char* data, size_t size) override
-        {
-            ping_messages.push_back(std::string {data, size});
-            return true;
-        }
-
-        bool websocket_pong_message_received(const char* data, size_t size) override
-        {
-            pong_messages.push_back(std::string {data, size});
-            return true;
-        }
+    bool websocket_pong_message_received(const char* data, size_t size) override
+    {
+        pong_messages.push_back(std::string{data, size});
+        return true;
+    }
 
 
-    private:
-        Pipe &m_pipe_in, &m_pipe_out;
-        util::Logger& m_logger;
-        std::mt19937_64 m_random;
-    };
+private:
+    Pipe &m_pipe_in, &m_pipe_out;
+    util::Logger& m_logger;
+    std::mt19937_64 m_random;
+};
 
-    class Fixture {
-    public:
-        util::PrefixLogger m_prefix_logger_1, m_prefix_logger_2,
-            m_prefix_logger_3, m_prefix_logger_4;
-        Pipe pipe_1, pipe_2;
-        WSConfig config_1, config_2;
-        websocket::Socket socket_1, socket_2;
+class Fixture {
+public:
+    util::PrefixLogger m_prefix_logger_1, m_prefix_logger_2, m_prefix_logger_3, m_prefix_logger_4;
+    Pipe pipe_1, pipe_2;
+    WSConfig config_1, config_2;
+    websocket::Socket socket_1, socket_2;
 
-        Fixture(util::Logger& logger):
-            m_prefix_logger_1("Socket_1: ", logger),
-            m_prefix_logger_2("Socket_2: ", logger),
-            m_prefix_logger_3("Pipe_1: ", logger),
-            m_prefix_logger_4("Pipe_2: ", logger),
-            pipe_1(m_prefix_logger_3),
-            pipe_2(m_prefix_logger_4),
-            config_1(pipe_1, pipe_2, m_prefix_logger_1),
-            config_2(pipe_2, pipe_1, m_prefix_logger_2),
-            socket_1(config_1),
-            socket_2(config_2)
-        {
-        }
-    };
-}
+    Fixture(util::Logger& logger)
+        : m_prefix_logger_1("Socket_1: ", logger)
+        , m_prefix_logger_2("Socket_2: ", logger)
+        , m_prefix_logger_3("Pipe_1: ", logger)
+        , m_prefix_logger_4("Pipe_2: ", logger)
+        , pipe_1(m_prefix_logger_3)
+        , pipe_2(m_prefix_logger_4)
+        , config_1(pipe_1, pipe_2, m_prefix_logger_1)
+        , config_2(pipe_2, pipe_1, m_prefix_logger_2)
+        , socket_1(config_1)
+        , socket_2(config_2)
+    {
+    }
+};
+} // namespace
 
 
 TEST(WebSocket_Pipe)
 {
     {
-        PipeTest pipe_test {test_context.logger};
+        PipeTest pipe_test{test_context.logger};
         std::string input_1 = "Hello World";
         pipe_test.write(input_1);
         pipe_test.read_plain(input_1.size());
         CHECK(pipe_test.done);
-        CHECK_EQUAL(pipe_test.result,input_1);
+        CHECK_EQUAL(pipe_test.result, input_1);
         std::string input_2 = "Hello again";
         pipe_test.write(input_2);
         pipe_test.read_plain(3);
@@ -351,7 +345,7 @@ TEST(WebSocket_Pipe)
 
 TEST(WebSocket_Messages)
 {
-    Fixture fixt {test_context.logger};
+    Fixture fixt{test_context.logger};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -370,7 +364,7 @@ TEST(WebSocket_Messages)
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
 
-    auto handler_no_op = [=](){};
+    auto handler_no_op = [=]() {};
     socket_1.async_write_ping("ping example", 12, handler_no_op);
     CHECK_EQUAL(config_1.ping_messages.size(), 0);
     CHECK_EQUAL(config_2.ping_messages.size(), 1);
@@ -397,21 +391,20 @@ TEST(WebSocket_Messages)
     CHECK_EQUAL(config_1.close_messages.size(), 1);
     CHECK_EQUAL(config_1.close_messages[0], "close message");
 
-    std::vector<size_t> message_sizes {1, 2, 100, 125, 126, 127,
-        128, 200, 1000, 65000, 65535, 65536, 100000, 1000000};
+    std::vector<size_t> message_sizes{1, 2, 100, 125, 126, 127, 128, 200, 1000, 65000, 65535, 65536, 100000, 1000000};
     for (size_t i = 0; i < message_sizes.size(); ++i) {
         size_t size = message_sizes[i];
         std::vector<char> message(size, 'c');
         socket_2.async_write_binary(message.data(), size, handler_no_op);
         CHECK_EQUAL(config_1.binary_messages.size(), i + 1);
-        std::string str {message.data(), size};
+        std::string str{message.data(), size};
         CHECK_EQUAL(config_1.binary_messages[i], str);
     }
 }
 
 TEST(WebSocket_Fragmented_Messages)
 {
-    Fixture fixt {test_context.logger};
+    Fixture fixt{test_context.logger};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -427,7 +420,7 @@ TEST(WebSocket_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=](){};
+    auto handler_no_op = [=]() {};
 
     socket_1.async_write_frame(false, websocket::Opcode::binary, "abc", 3, handler_no_op);
     CHECK_EQUAL(config_2.binary_messages.size(), 0);
@@ -446,7 +439,7 @@ TEST(WebSocket_Fragmented_Messages)
 
 TEST(WebSocket_Interleaved_Fragmented_Messages)
 {
-    Fixture fixt {test_context.logger};
+    Fixture fixt{test_context.logger};
     WSConfig& config_1 = fixt.config_1;
     WSConfig& config_2 = fixt.config_2;
 
@@ -462,7 +455,7 @@ TEST(WebSocket_Interleaved_Fragmented_Messages)
     CHECK_EQUAL(config_1.n_handshake_completed, 1);
     CHECK_EQUAL(config_2.n_handshake_completed, 1);
 
-    auto handler_no_op = [=](){};
+    auto handler_no_op = [=]() {};
 
     CHECK_EQUAL(config_2.ping_messages.size(), 0);
     socket_1.async_write_frame(false, websocket::Opcode::binary, "a", 1, handler_no_op);

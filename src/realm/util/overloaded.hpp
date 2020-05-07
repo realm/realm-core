@@ -11,6 +11,6 @@ struct overloaded : Fs... {
 template <class... Fs>
 overloaded(Fs...)->overloaded<Fs...>;
 
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_OVERLOADED_HPP

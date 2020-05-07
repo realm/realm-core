@@ -25,6 +25,7 @@ public:
     {
         return m_random;
     }
+
 private:
     std::mt19937_64 m_random;
 };
@@ -43,7 +44,7 @@ int main(int argc, char* argv[])
         --argc;
         ++argv;
         bool error = false;
-        bool help  = false;
+        bool help = false;
         int argc_2 = 0;
         int i = 0;
         char* arg = nullptr;
@@ -71,7 +72,9 @@ int main(int argc, char* argv[])
             return false;
         };
         auto get_parsed_value = [&](auto& var) {
-            return get_parsed_value_with_check(var, [](auto) { return true; });
+            return get_parsed_value_with_check(var, [](auto) {
+                return true;
+            });
         };
         while (i < argc) {
             arg = argv[i++];
@@ -83,8 +86,7 @@ int main(int argc, char* argv[])
                 help = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Bad or missing value for option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -101,19 +103,19 @@ int main(int argc, char* argv[])
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<"  PATH  VERSION\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n";
+            std::cerr << "Synopsis: " << prog
+                      << "  PATH  VERSION\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n";
             return EXIT_SUCCESS;
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }
@@ -125,10 +127,9 @@ int main(int argc, char* argv[])
 
     auto history_contents = history.get_history_contents();
     const auto& sync_history = history_contents.sync_history;
-    std::size_t history_entry_index =
-        std::size_t(sync_version - history_contents.history_base_version - 1);
-    bool good_sync_version = (sync_version > history_contents.history_base_version &&
-                              history_entry_index < sync_history.size());
+    std::size_t history_entry_index = std::size_t(sync_version - history_contents.history_base_version - 1);
+    bool good_sync_version =
+        (sync_version > history_contents.history_base_version && history_entry_index < sync_history.size());
     if (!good_sync_version) {
         std::cerr << "Version is out of range\n";
         return EXIT_FAILURE;

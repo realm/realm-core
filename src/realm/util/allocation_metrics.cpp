@@ -76,7 +76,8 @@ AllocationMetricName::AllocationMetricName(const char* name) noexcept
     g_last = this;
 }
 
-AllocationMetricsContext::AllocationMetricsContext() : m_refcount(0)
+AllocationMetricsContext::AllocationMetricsContext()
+    : m_refcount(0)
 {
     g_metric_names_locked = true;
     // FIXME: With C++17, use aligned new to get the proper alignment
@@ -163,4 +164,3 @@ MeteredAllocator& MeteredAllocator::unknown() noexcept
     return AllocationMetricsContext::get_current().get_metric(g_unknown_name);
 #endif
 }
-

@@ -18,9 +18,8 @@ std::string inspector::get_gmtime(uint_fast64_t timestamp)
     using TimePoint = std::chrono::time_point<Clock>;
 
     uint_fast64_t ms_since_epoch = 1420070400000 + timestamp;
-    const Clock::duration duration_since_epoch =
-        std::chrono::milliseconds(ms_since_epoch);
-    const TimePoint timepoint {duration_since_epoch};
+    const Clock::duration duration_since_epoch = std::chrono::milliseconds(ms_since_epoch);
+    const TimePoint timepoint{duration_since_epoch};
     std::time_t time_1 = std::chrono::system_clock::to_time_t(timepoint);
     struct tm* timeptr = std::gmtime(&time_1);
 
@@ -29,14 +28,14 @@ std::string inspector::get_gmtime(uint_fast64_t timestamp)
     const char* format = "%F:%T GMT";
     size_t size = std::strftime(s, maxsize, format, timeptr);
 
-    return std::string {s, size};
+    return std::string{s, size};
 }
 
 std::string inspector::changeset_hex_to_binary(const std::string& changeset_hex)
 {
     std::vector<char> changeset_vec;
 
-    std::istringstream in {changeset_hex};
+    std::istringstream in{changeset_hex};
     int n;
     in >> std::hex >> n;
     while (in) {
@@ -45,12 +44,12 @@ std::string inspector::changeset_hex_to_binary(const std::string& changeset_hex)
         in >> std::hex >> n;
     }
 
-    return std::string {changeset_vec.data(), changeset_vec.size()};
+    return std::string{changeset_vec.data(), changeset_vec.size()};
 }
 
 sync::Changeset inspector::changeset_binary_to_sync_changeset(const std::string& changeset_binary)
 {
-    _impl::SimpleInputStream input_stream {changeset_binary.data(), changeset_binary.size()};
+    _impl::SimpleInputStream input_stream{changeset_binary.data(), changeset_binary.size()};
     sync::Changeset changeset;
     sync::parse_changeset(input_stream, changeset);
 
@@ -81,24 +80,23 @@ void inspector::print_changeset(const std::string& path, bool hex)
     do_print_changeset(changeset);
 }
 
-void inspector::IntegrationReporter::on_integration_session_begin() {
+void inspector::IntegrationReporter::on_integration_session_begin()
+{
     std::cerr << "IntegrationReporter: on_integrate_session_begin\n";
 }
 
 void inspector::IntegrationReporter::on_changeset_integrated(std::size_t changeset_size)
 {
-    std::cerr << "IntegrationReporter: on_changeset_integrated, changeset_size = "
-        << changeset_size << "\n";
+    std::cerr << "IntegrationReporter: on_changeset_integrated, changeset_size = " << changeset_size << "\n";
 }
 
 void inspector::IntegrationReporter::on_changesets_merged(long num_merges)
 {
-    std::cerr << "IntegrationReporter: on_changesets_merged_, num_merges = "
-        << num_merges << "\n";
+    std::cerr << "IntegrationReporter: on_changesets_merged_, num_merges = " << num_merges << "\n";
 }
 
-inspector::ServerHistoryContext::ServerHistoryContext():
-    m_transformer {sync::make_transformer()}
+inspector::ServerHistoryContext::ServerHistoryContext()
+    : m_transformer{sync::make_transformer()}
 {
 }
 
@@ -172,8 +170,7 @@ void inspector::print_tables(const Group& group)
                 std::cout << ", " << target_name;
             }
             bool has_search_index = table->has_search_index(col_key);
-            std::cout << ", " << (has_search_index ? "search_index" : "no_search_index")
-                << "\n";
+            std::cout << ", " << (has_search_index ? "search_index" : "no_search_index") << "\n";
         }
         std::cout << "\n";
     }
@@ -183,7 +180,7 @@ void inspector::print_server_history(const std::string& path)
 {
     ServerHistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history {path, history_context, compaction_control};
+    _impl::ServerHistory history{path, history_context, compaction_control};
     auto sg = DB::create(history);
 
     {
@@ -202,18 +199,15 @@ void inspector::print_server_history(const std::string& path)
         HistoryContents::ClientFile cf = hc.client_files[i];
 
         size_t rh_byte_size = 0;
-        for (const util::Optional<std::string>& entry: cf.reciprocal_history) {
+        for (const util::Optional<std::string>& entry : cf.reciprocal_history) {
             if (entry)
                 rh_byte_size += entry->size();
         }
 
-        std::cout << "client_file_ident = " << i
-            << ", salt = " << cf.ident_salt
-            << ", client_version = " << cf.client_version
-            << ", rh_base_version = " << cf.rh_base_version
-            << ", reciprocal history size(entries) = " << cf.reciprocal_history.size()
-            << ", reciprocal history byte size = " << rh_byte_size
-            << "\n";
+        std::cout << "client_file_ident = " << i << ", salt = " << cf.ident_salt
+                  << ", client_version = " << cf.client_version << ", rh_base_version = " << cf.rh_base_version
+                  << ", reciprocal history size(entries) = " << cf.reciprocal_history.size()
+                  << ", reciprocal history byte size = " << rh_byte_size << "\n";
     }
     std::cout << "\n\n";
 
@@ -225,15 +219,11 @@ void inspector::print_server_history(const std::string& path)
     for (size_t i = 0; i < hc.sync_history.size(); ++i) {
         const HistoryContents::HistoryEntry& he = hc.sync_history[i];
 
-        std::cout << "index = " << i
-            << ", version_salt = " << he.version_salt
-            << ", client_file_ident = " << he.client_file_ident
-            << ", client_version = " << he.client_version
-            << ", cumul_byte_size = " << he.cumul_byte_size
-            << ", timestamp = " << he.timestamp
-            << ", timestamp = " << get_gmtime(he.timestamp)
-            << ", changeset size = " << he.changeset.size()
-            << "\n";
+        std::cout << "index = " << i << ", version_salt = " << he.version_salt
+                  << ", client_file_ident = " << he.client_file_ident << ", client_version = " << he.client_version
+                  << ", cumul_byte_size = " << he.cumul_byte_size << ", timestamp = " << he.timestamp
+                  << ", timestamp = " << get_gmtime(he.timestamp) << ", changeset size = " << he.changeset.size()
+                  << "\n";
     }
 }
 
@@ -242,9 +232,9 @@ void inspector::inspect_server_realm(const std::string& path)
     {
         ServerHistoryContext history_context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history {path, history_context, compaction_control};
+        _impl::ServerHistory history{path, history_context, compaction_control};
         auto sg = DB::create(history);
-        ReadTransaction rt {sg};
+        ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         print_tables(group);
     }
@@ -256,34 +246,29 @@ void inspector::merge_changeset_into_server_realm(const MergeConfiguration& conf
 {
     std::string changeset_hex = util::load_file(config.changeset_path);
     std::string changeset_binary = changeset_hex_to_binary(changeset_hex);
-    BinaryData changeset {changeset_binary.data(), changeset_binary.size()};
+    BinaryData changeset{changeset_binary.data(), changeset_binary.size()};
     sync::file_ident_type origin_file_ident = 0;
 
     sync::UploadCursor upload_cursor{config.client_version, config.last_integrated_server_version};
-    _impl::ServerHistory::IntegratableChangeset integratable_changeset {
-        config.client_file_ident,
-        config.origin_timestamp,
-        origin_file_ident,
-        upload_cursor,
-        changeset
-    };
+    _impl::ServerHistory::IntegratableChangeset integratable_changeset{
+        config.client_file_ident, config.origin_timestamp, origin_file_ident, upload_cursor, changeset};
 
     _impl::ServerHistory::IntegratableChangesets integratable_changesets;
     integratable_changesets[config.client_file_ident].changesets.push_back(integratable_changeset);
 
     ServerHistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history {config.realm_path, history_context, compaction_control};
+    _impl::ServerHistory history{config.realm_path, history_context, compaction_control};
     auto sg = DB::create(history);
 
     util::StderrLogger logger;
     logger.set_level_threshold(Logger::Level::debug);
 
-    sync::VersionInfo version_info; // Dummy
-    bool backup_whole_realm; // Dummy
+    sync::VersionInfo version_info;                 // Dummy
+    bool backup_whole_realm;                        // Dummy
     _impl::ServerHistory::IntegrationResult result; // Dummy
-    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm,
-                                        result, logger); // Throws
+    history.integrate_client_changesets(integratable_changesets, version_info, backup_whole_realm, result,
+                                        logger); // Throws
 }
 
 void inspector::perform_partial_sync(const PartialSyncConfiguration& config)
@@ -292,47 +277,40 @@ void inspector::perform_partial_sync(const PartialSyncConfiguration& config)
 
     util::StderrLogger logger;
     logger.set_level_threshold(config.log_level);
-    util::PrefixLogger partial_logger {"Partial: ", logger};
-    util::PrefixLogger reference_logger {"Reference: ", logger};
+    util::PrefixLogger partial_logger{"Partial: ", logger};
+    util::PrefixLogger reference_logger{"Reference: ", logger};
 
     ServerHistoryContext history_context;
 
     // Reference Realm
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory reference_history {config.reference_realm_path, history_context, compaction_control};
+    _impl::ServerHistory reference_history{config.reference_realm_path, history_context, compaction_control};
     auto reference_sg = DB::create(reference_history);
     sync::VersionInfo reference_version_info;
-    bool has_upstream_status; // Dummy
-    sync::file_ident_type partial_file_ident; // Dummy
+    bool has_upstream_status;                              // Dummy
+    sync::file_ident_type partial_file_ident;              // Dummy
     sync::version_type partial_progress_reference_version; // Dummy
     reference_history.get_status(reference_version_info, has_upstream_status, partial_file_ident,
                                  partial_progress_reference_version); // Throws
 
     // Partial Realm
-    _impl::ServerHistory partial_history {config.partial_realm_path, history_context, compaction_control};
+    _impl::ServerHistory partial_history{config.partial_realm_path, history_context, compaction_control};
     auto partial_sg = DB::create(partial_history);
     sync::VersionInfo partial_version_info;
     partial_history.get_status(partial_version_info, has_upstream_status, partial_file_ident,
                                partial_progress_reference_version); // Throws
 
     _impl::ServerHistory::QueryCache query_cache;
-    partial_history.perform_partial_sync(scratch_memory,
-                                         reference_history,
-                                         config.is_admin,
-                                         config.user_identity,
-                                         partial_logger,
-                                         reference_logger,
-                                         partial_version_info,
-                                         partial_progress_reference_version,
-                                         reference_version_info,
-                                         query_cache);
+    partial_history.perform_partial_sync(scratch_memory, reference_history, config.is_admin, config.user_identity,
+                                         partial_logger, reference_logger, partial_version_info,
+                                         partial_progress_reference_version, reference_version_info, query_cache);
 }
 
 void inspector::inspect_client_realm(const std::string& path)
 {
     auto history = sync::make_client_replication(path);
     auto sg = DB::create(*history);
-    ReadTransaction rt {sg};
+    ReadTransaction rt{sg};
     const Group& group = rt.get_group();
 
     print_tables(group);

@@ -6,7 +6,8 @@
 namespace realm {
 namespace util {
 
-template<class C, class T> struct Quote {
+template <class C, class T>
+struct Quote {
     bool smart;
     util::BasicStringView<C, T> view;
 };
@@ -28,7 +29,8 @@ template<class C, class T> struct Quote {
 ///
 /// Quotation happens as the string is written to a stream, so there is no
 /// intermediate representation of the quoted string.
-template<class C, class T> Quote<C, T> quoted(util::BasicStringView<C, T>) noexcept;
+template <class C, class T>
+Quote<C, T> quoted(util::BasicStringView<C, T>) noexcept;
 
 
 /// Same as quoted(), except that in this case, quotation is elided when the
@@ -36,32 +38,31 @@ template<class C, class T> Quote<C, T> quoted(util::BasicStringView<C, T>) noexc
 /// precise, quotation is elided if the string is nonempty, consists entirely of
 /// printable charcters (std::isprint()), does not contain space (` `), and does
 /// not conatian quotation (`"`) or backslash (`\`).
-template<class C, class T> Quote<C, T> smart_quoted(util::BasicStringView<C, T>) noexcept;
+template <class C, class T>
+Quote<C, T> smart_quoted(util::BasicStringView<C, T>) noexcept;
 
 
-template<class C, class T>
+template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, Quote<C, T>);
-
-
-
 
 
 // Implementation
 
-template<class C, class T> inline Quote<C, T> quoted(util::BasicStringView<C, T> view) noexcept
+template <class C, class T>
+inline Quote<C, T> quoted(util::BasicStringView<C, T> view) noexcept
 {
     bool smart = false;
     return {smart, view};
 }
 
-template<class C, class T>
+template <class C, class T>
 inline Quote<C, T> smart_quoted(util::BasicStringView<C, T> view) noexcept
 {
     bool smart = true;
     return {smart, view};
 }
 
-template<class C, class T>
+template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Quote<C, T> quoted)
 {
     std::locale loc = out.getloc();
@@ -74,7 +75,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Quote
         }
         return out << view; // Throws
     }
-  quote:
+quote:
     typename std::basic_ostream<C, T>::sentry sentry{out};
     if (REALM_LIKELY(sentry)) {
         C dquote = ctype.widen('"');
@@ -113,24 +114,22 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Quote
                     goto escape_char;
             }
             goto numeric;
-          escape_char:
+        escape_char:
             out.put(bslash); // Throws
-          put_char:
+        put_char:
             out.put(ch); // Throws
-          next:
+        next:
             follows_hex = false;
             continue;
-          numeric:
+        numeric:
             out.put(bslash); // Throws
             using D = typename std::make_unsigned<C>::type;
-            char digits[] = {
-                '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-            };
+            char digits[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
             D val = ch;
             if (val < 512) {
-                out.put(ctype.widen(digits[val / 64    ])); // Throws
+                out.put(ctype.widen(digits[val / 64]));     // Throws
                 out.put(ctype.widen(digits[val % 64 / 8])); // Throws
-                out.put(ctype.widen(digits[val      % 8])); // Throws
+                out.put(ctype.widen(digits[val % 8]));      // Throws
                 goto next;
             }
             out.put(ctype.widen('x')); // Throws

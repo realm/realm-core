@@ -17,11 +17,8 @@ class ClientStateDownload {
 public:
     util::Logger& logger;
 
-    ClientStateDownload(util::Logger& logger,
-                        const std::string& realm_path,
-                        const std::string& metadata_dir,
-                        bool recover_local_changes,
-                        util::Optional<std::array<char, 64>> encryption_key);
+    ClientStateDownload(util::Logger& logger, const std::string& realm_path, const std::string& metadata_dir,
+                        bool recover_local_changes, util::Optional<std::array<char, 64>> encryption_key);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientStateDownload object. The ident
@@ -36,11 +33,8 @@ public:
     // receive_state receives the values received from a STATE message. The
     // return value is true if the values were compatible with prior values,
     // false otherwise.
-    bool receive_state(sync::version_type server_version,
-                       sync::salt_type server_version_salt,
-                       uint_fast64_t begin_offset,
-                       uint_fast64_t end_offset,
-                       uint_fast64_t max_offset,
+    bool receive_state(sync::version_type server_version, sync::salt_type server_version_salt,
+                       uint_fast64_t begin_offset, uint_fast64_t end_offset, uint_fast64_t max_offset,
                        BinaryData chunk);
 
     sync::version_type get_server_version();

@@ -20,7 +20,7 @@ using namespace realm;
 
 namespace {
 
-template<class T>
+template <class T>
 std::string format_num_something(T num, const char* singular_form, const char* plural_form,
                                  std::locale loc = std::locale{})
 {
@@ -57,7 +57,8 @@ public:
 
     std::string format_data_type(const Table&, ColKey col_ndx);
 
-    template<class T> std::string format_value(const T&);
+    template <class T>
+    std::string format_value(const T&);
 
     std::string format_string(StringData);
     std::string format_binary(BinaryData);
@@ -68,10 +69,12 @@ public:
     std::string format_link(ObjKey);
     std::string format_link_list(const ConstLnkLst&);
 
-    template<DataType> std::string format_cell(ConstObj& obj, ColKey col_key);
+    template <DataType>
+    std::string format_cell(ConstObj& obj, ColKey col_key);
     std::string format_cell_list(ConstObj& obj, ColKey col_key);
 
-    template<DataType> void format_column(const Table&, ColKey col_ndx, TextColumn&);
+    template <DataType>
+    void format_column(const Table&, ColKey col_ndx, TextColumn&);
     void format_column_list(const Table&, ColKey col_ndx, TextColumn&);
 
 private:
@@ -85,11 +88,11 @@ private:
     static util::TimestampFormatter::Config get_timestamp_formatter_config();
 };
 
-inline Formatter::Formatter(std::size_t limit, std::size_t offset, std::size_t max_string_size) :
-    m_limit{limit},
-    m_offset{offset},
-    m_max_string_size{max_string_size},
-    m_timestamp_formatter{get_timestamp_formatter_config()}
+inline Formatter::Formatter(std::size_t limit, std::size_t offset, std::size_t max_string_size)
+    : m_limit{limit}
+    , m_offset{offset}
+    , m_max_string_size{max_string_size}
+    , m_timestamp_formatter{get_timestamp_formatter_config()}
 {
     m_out << std::boolalpha;
 }
@@ -106,7 +109,8 @@ std::string Formatter::format_data_type(const Table& table, ColKey col_ndx)
     return str;
 }
 
-template<class T> std::string Formatter::format_value(const T& value)
+template <class T>
+std::string Formatter::format_value(const T& value)
 {
     m_out.reset();
     m_out << value;
@@ -172,72 +176,73 @@ std::string Formatter::format_link_list(const ConstLnkLst& list)
     return std::string{m_out.data(), m_out.size()};
 }
 
-template<DataType> inline std::string Formatter::format_cell(ConstObj&, ColKey)
+template <DataType>
+inline std::string Formatter::format_cell(ConstObj&, ColKey)
 {
     return "unknown";
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Int>(ConstObj& obj, ColKey col_key)
 {
     return format_value(obj.get<Int>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Bool>(ConstObj& obj, ColKey col_key)
 {
     return format_value(obj.get<bool>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Float>(ConstObj& obj, ColKey col_key)
 {
     return format_value(obj.get<float>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Double>(ConstObj& obj, ColKey col_key)
 {
     return format_value(obj.get<double>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_String>(ConstObj& obj, ColKey col_key)
 {
     return format_string(obj.get<String>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Binary>(ConstObj& obj, ColKey col_key)
 {
     return format_binary(obj.get<Binary>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Timestamp>(ConstObj& obj, ColKey col_key)
 {
     return format_timestamp(obj.get<Timestamp>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_ObjectId>(ConstObj& obj, ColKey col_key)
 {
     return format_object_id(obj.get<ObjectId>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Decimal>(ConstObj& obj, ColKey col_key)
 {
     return format_decimal(obj.get<Decimal128>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_Link>(ConstObj& obj, ColKey col_key)
 {
     return format_link(obj.get<ObjKey>(col_key));
 }
 
-template<>
+template <>
 inline std::string Formatter::format_cell<type_LinkList>(ConstObj& obj, ColKey col_key)
 {
     auto ll = obj.get_linklist(col_key);
@@ -250,7 +255,7 @@ inline std::string Formatter::format_cell_list(ConstObj& obj, ColKey col_key)
     return format_list(*ll);
 }
 
-template<DataType type>
+template <DataType type>
 void Formatter::format_column(const Table& table, ColKey col_ndx, TextColumn& col)
 {
     std::size_t end;
@@ -319,8 +324,8 @@ int main(int argc, char* argv[])
         const char* prog = argv[0];
         --argc;
         ++argv;
-        bool error   = false;
-        bool help    = false;
+        bool error = false;
+        bool help = false;
         bool version = false;
         int argc_2 = 0;
         int i = 0;
@@ -349,7 +354,9 @@ int main(int argc, char* argv[])
             return false;
         };
         auto get_parsed_value = [&](auto& var) {
-            return get_parsed_value_with_check(var, [](auto) { return true; });
+            return get_parsed_value_with_check(var, [](auto) {
+                return true;
+            });
         };
         while (i < argc) {
             arg = argv[i++];
@@ -381,8 +388,7 @@ int main(int argc, char* argv[])
                 version = true;
                 continue;
             }
-            std::cerr <<
-                "ERROR: Bad or missing value for option: "<<arg<<"\n";
+            std::cerr << "ERROR: Bad or missing value for option: " << arg << "\n";
             error = true;
         }
         argc = argc_2;
@@ -409,23 +415,23 @@ int main(int argc, char* argv[])
         }
 
         if (help) {
-            std::cerr <<
-                "Synopsis: "<<prog<<" <realm file> [<table> [<column>...]]\n"
-                "\n"
-                "Options:\n"
-                "  -h, --help           Display command-line synopsis followed by the list of\n"
-                "                       available options.\n"
-                "  -l, --limit          Maximum number of rows to dump when dumping contents of\n"
-                "                       a table. Default is 0, which means unlimited.\n"
-                "  -o, --offset         The number of inital rows to skip when dumping contents\n"
-                "                       of a table. Default is zero.\n"
-                "  -m, --max-string-size  Truncate strings longer than this value. Default is\n"
-                "                       30.\n"
-                "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
-                "                       encryption key to be used for accessing the specified\n"
-                "                       Realm file.\n"
-                "  -v, --version        Show the version of the Realm Sync release that this\n"
-                "                       command belongs to.\n";
+            std::cerr << "Synopsis: " << prog
+                      << " <realm file> [<table> [<column>...]]\n"
+                         "\n"
+                         "Options:\n"
+                         "  -h, --help           Display command-line synopsis followed by the list of\n"
+                         "                       available options.\n"
+                         "  -l, --limit          Maximum number of rows to dump when dumping contents of\n"
+                         "                       a table. Default is 0, which means unlimited.\n"
+                         "  -o, --offset         The number of inital rows to skip when dumping contents\n"
+                         "                       of a table. Default is zero.\n"
+                         "  -m, --max-string-size  Truncate strings longer than this value. Default is\n"
+                         "                       30.\n"
+                         "  -e, --encryption-key  The file-system path of a file containing a 64-byte\n"
+                         "                       encryption key to be used for accessing the specified\n"
+                         "                       Realm file.\n"
+                         "  -v, --version        Show the version of the Realm Sync release that this\n"
+                         "                       command belongs to.\n";
             return EXIT_SUCCESS;
         }
 
@@ -441,9 +447,9 @@ int main(int argc, char* argv[])
         }
 
         if (error) {
-            std::cerr <<
-                "ERROR: Bad command line.\n"
-                "Try `"<<prog<<" --help`\n";
+            std::cerr << "ERROR: Bad command line.\n"
+                         "Try `"
+                      << prog << " --help`\n";
             return EXIT_FAILURE;
         }
     }
@@ -468,7 +474,8 @@ int main(int argc, char* argv[])
             }
             if (!column_names.empty()) {
                 first_row_is_header = true;
-                std::size_t num_cols = column_names.size();table->get_column_count();
+                std::size_t num_cols = column_names.size();
+                table->get_column_count();
                 for (std::size_t i = 0; i < num_cols; ++i) {
                     ColKey col_ndx = table->get_column_key(column_names[i]);
                     if (!col_ndx) {

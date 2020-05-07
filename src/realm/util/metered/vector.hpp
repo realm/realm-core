@@ -15,4 +15,3 @@ using vector = std::vector<T, Alloc>;
 } // namespace realm
 
 #endif // REALM_UTIL_METERED_VECTOR_HPP
-

@@ -2,10 +2,10 @@
 #include <chrono>
 
 #ifdef _WIN32
-#  define NOMINMAX
-#  include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #else
-#  include <unistd.h>
+#include <unistd.h>
 #endif
 
 #include <realm/util/random.hpp>

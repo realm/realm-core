@@ -47,7 +47,9 @@ void connect_sockets(network::Socket& socket_1, network::Socket& socket_2)
         service_1.run();
     }
     else {
-        std::thread thread{[&] { service_1.run(); }};
+        std::thread thread{[&] {
+            service_1.run();
+        }};
         service_2.run();
         thread.join();
     }
@@ -78,15 +80,17 @@ private:
         if (m_num_posts == 0)
             return;
         --m_num_posts;
-        m_service.post([=]() { initiate(); });
+        m_service.post([=]() {
+            initiate();
+        });
     }
 };
 
 
 class Read {
 public:
-    Read(size_t size, size_t num):
-        m_read_size(size)
+    Read(size_t size, size_t num)
+        : m_read_size(size)
     {
         if (size > sizeof m_read_buffer)
             throw std::runtime_error("Overflow");
@@ -144,9 +148,9 @@ private:
 
 class Write {
 public:
-    Write(size_t size, size_t num):
-        m_write_size(size),
-        m_num_writes(num)
+    Write(size_t size, size_t num)
+        : m_write_size(size)
+        , m_num_writes(num)
     {
         if (size > sizeof m_write_buffer)
             throw std::runtime_error("Overflow");
@@ -178,8 +182,7 @@ private:
             if (ec != network::end_of_input)
                 initiate_read();
         };
-        m_read_socket.async_read(m_read_buffer, sizeof m_read_buffer, m_read_ahead_buffer,
-                                 handler);
+        m_read_socket.async_read(m_read_buffer, sizeof m_read_buffer, m_read_ahead_buffer, handler);
     }
 
     void initiate_write()

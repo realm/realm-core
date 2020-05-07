@@ -19,50 +19,50 @@ namespace {
 
 void usage(const char* program_name)
 {
-    std::cerr <<
-        "Usage: " << program_name << " [OPTIONS] [FILES]\n"
-        "\n"
-        "  Vacuum attempts to reduce the size of Realm files without modifying observable\n"
-        "  state. If the file is a server-side Realm, its transaction log may also be\n"
-        "  compacted.\n"
-        "\n"
-        "  NOTE: Vacuuming a Realm file that is currently opened by another process (such as\n"
-        "        the Realm Object Server) is currently not supported. Attempts to vacuum a\n"
-        "        file that is opened by another process will be ignored, and a warning will\n"
-        "        be emitted.\n"
-        "\n"
-        "Arguments:\n"
-        "\n"
-        "  -n, --dry-run                 Do not perform any modifying actions, but report\n"
-        "                                potential reductions in file size.\n"
-        "  --no-log-compaction           Do not run log compaction.\n"
-        "  --no-file-compaction          Do not run file compaction.\n"
-        "  --no-file-upgrade             Do not do attempt to upgrade any files to the\n"
-        "                                current format.\n"
-        "  --no-prompt                   Do not prompt for confirmation before modifying\n"
-        "                                files.\n"
-        "  -E, --encryption-key          Specify the path to a file containing an encryption\n"
-        "                                key, which will be used to open the Realm file(s).\n"
-        "  --history-type                None, InRealm, SyncServer or SyncClient.\n"
-        "  --bump-realm-version          Bump Realm snapshot version.\n"
-        "  --server-history-ttl          The 'time to live' in seconds since last activity for\n"
-        "                                entries in the client files registry of a server-side\n"
-        "                                file. This affects the potential for history compaction\n"
-        "                                to make a difference. The default is 'infinite'.\n"
-        "  --ignore-clients              If specified, the determination of how far in-place\n"
-        "                                history compaction can proceed will be based entirely\n"
-        "                                on the history itself, and the 'last access' timestamps\n"
-        "                                of client file entries will be completely ignored. This\n"
-        "                                should only be done in emergency situations. Expect it\n"
-        "                                to cause expiration of client files even when they have\n"
-        "                                seen acitivity within the specified time to live\n"
-        "                                (`--server-history-ttl`).\n"
-        "  -l, --log-level               Set log level. Valid values are 'all', 'trace',\n"
-        "                                'debug', 'detail', 'info', 'warn', 'error', 'fatal',\n"
-        "                                or 'off'. (default 'info')\n"
-        "  -h, --help                    Display command-line synopsis followed by the\n"
-        "                                available options.\n"
-        "\n";
+    std::cerr << "Usage: " << program_name
+              << " [OPTIONS] [FILES]\n"
+                 "\n"
+                 "  Vacuum attempts to reduce the size of Realm files without modifying observable\n"
+                 "  state. If the file is a server-side Realm, its transaction log may also be\n"
+                 "  compacted.\n"
+                 "\n"
+                 "  NOTE: Vacuuming a Realm file that is currently opened by another process (such as\n"
+                 "        the Realm Object Server) is currently not supported. Attempts to vacuum a\n"
+                 "        file that is opened by another process will be ignored, and a warning will\n"
+                 "        be emitted.\n"
+                 "\n"
+                 "Arguments:\n"
+                 "\n"
+                 "  -n, --dry-run                 Do not perform any modifying actions, but report\n"
+                 "                                potential reductions in file size.\n"
+                 "  --no-log-compaction           Do not run log compaction.\n"
+                 "  --no-file-compaction          Do not run file compaction.\n"
+                 "  --no-file-upgrade             Do not do attempt to upgrade any files to the\n"
+                 "                                current format.\n"
+                 "  --no-prompt                   Do not prompt for confirmation before modifying\n"
+                 "                                files.\n"
+                 "  -E, --encryption-key          Specify the path to a file containing an encryption\n"
+                 "                                key, which will be used to open the Realm file(s).\n"
+                 "  --history-type                None, InRealm, SyncServer or SyncClient.\n"
+                 "  --bump-realm-version          Bump Realm snapshot version.\n"
+                 "  --server-history-ttl          The 'time to live' in seconds since last activity for\n"
+                 "                                entries in the client files registry of a server-side\n"
+                 "                                file. This affects the potential for history compaction\n"
+                 "                                to make a difference. The default is 'infinite'.\n"
+                 "  --ignore-clients              If specified, the determination of how far in-place\n"
+                 "                                history compaction can proceed will be based entirely\n"
+                 "                                on the history itself, and the 'last access' timestamps\n"
+                 "                                of client file entries will be completely ignored. This\n"
+                 "                                should only be done in emergency situations. Expect it\n"
+                 "                                to cause expiration of client files even when they have\n"
+                 "                                seen acitivity within the specified time to live\n"
+                 "                                (`--server-history-ttl`).\n"
+                 "  -l, --log-level               Set log level. Valid values are 'all', 'trace',\n"
+                 "                                'debug', 'detail', 'info', 'warn', 'error', 'fatal',\n"
+                 "                                or 'off'. (default 'info')\n"
+                 "  -h, --help                    Display command-line synopsis followed by the\n"
+                 "                                available options.\n"
+                 "\n";
 }
 
 struct Configuration {
@@ -75,21 +75,19 @@ struct Configuration {
 
 Configuration parse_options(int argc, char* argv[])
 {
-    static ::option long_options[] = {
-        {"dry-run",            no_argument,       nullptr, 'n'},
-        {"no-log-compaction",  no_argument,       nullptr, 0},
-        {"no-file-compaction", no_argument,       nullptr, 0},
-        {"no-file-upgrade",    no_argument,       nullptr, 0},
-        {"no-prompt",          no_argument,       nullptr, 0},
-        {"encryption-key",     required_argument, nullptr, 'E'},
-        {"history-type",       required_argument, nullptr, 0},
-        {"bump-realm-version", no_argument,       nullptr, 0},
-        {"server-history-ttl", required_argument, nullptr, 0},
-        {"ignore-clients",     no_argument,       nullptr, 0},
-        {"log-level",          required_argument, nullptr, 'l'},
-        {"help",               no_argument,       nullptr, 'h'},
-        {nullptr,              0,                 nullptr, 0}
-    };
+    static ::option long_options[] = {{"dry-run", no_argument, nullptr, 'n'},
+                                      {"no-log-compaction", no_argument, nullptr, 0},
+                                      {"no-file-compaction", no_argument, nullptr, 0},
+                                      {"no-file-upgrade", no_argument, nullptr, 0},
+                                      {"no-prompt", no_argument, nullptr, 0},
+                                      {"encryption-key", required_argument, nullptr, 'E'},
+                                      {"history-type", required_argument, nullptr, 0},
+                                      {"bump-realm-version", no_argument, nullptr, 0},
+                                      {"server-history-ttl", required_argument, nullptr, 0},
+                                      {"ignore-clients", no_argument, nullptr, 0},
+                                      {"log-level", required_argument, nullptr, 'l'},
+                                      {"help", no_argument, nullptr, 'h'},
+                                      {nullptr, 0, nullptr, 0}};
 
     // Initial '-' means filenames can be intermixed with options.
     static const char opt_desc[] = "-nhE:l:";
@@ -158,7 +156,8 @@ Configuration parse_options(int argc, char* argv[])
                         }
                         else {
                             std::cerr << "Error: Invalid number of seconds "
-                                "`" << optarg << "'.\n\n";
+                                         "`"
+                                      << optarg << "'.\n\n";
                             usage(argv[0]);
                             std::exit(EXIT_FAILURE);
                         }
@@ -180,7 +179,8 @@ Configuration parse_options(int argc, char* argv[])
                         std::exit(EXIT_SUCCESS);
                         break;
                     }
-                    default: REALM_TERMINATE("Missing option handling");
+                    default:
+                        REALM_TERMINATE("Missing option handling");
                 }
                 break;
             }
@@ -213,7 +213,8 @@ Configuration parse_options(int argc, char* argv[])
                 std::exit(EXIT_FAILURE);
                 break;
             }
-            default: REALM_TERMINATE("Unhandled option");
+            default:
+                REALM_TERMINATE("Unhandled option");
         }
     }
 
@@ -238,7 +239,8 @@ Configuration parse_options(int argc, char* argv[])
     }
 
     if (result.prompt) {
-        std::cerr << "WARNING: Prompting before compaction has not been implemented yet. Pass --no-prompt to suppress this warning.\n";
+        std::cerr << "WARNING: Prompting before compaction has not been implemented yet. Pass --no-prompt to "
+                     "suppress this warning.\n";
     }
 
     if (result.options.dry_run) {
@@ -283,16 +285,18 @@ int main(int argc, char* argv[])
 
     program_name = argv[0];
     Configuration config;
-    catch_errors([&] {
-        config = parse_options(argc, argv);
-    }, true);
+    catch_errors(
+        [&] {
+            config = parse_options(argc, argv);
+        },
+        true);
 
     size_t errors_seen = 0;
 
     StderrLogger logger;
     logger.set_level_threshold(config.log_level);
     Vacuum vacuum{logger, config.options};
-    for (auto& file: config.files) {
+    for (auto& file : config.files) {
         try {
             Vacuum::Results results;
             if (config.dry_run) {
@@ -324,4 +328,3 @@ int main(int argc, char* argv[])
     }
     return (errors_seen == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
-

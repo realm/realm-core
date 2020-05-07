@@ -36,13 +36,32 @@ public:
 
 class ServerHistoryContextImpl : public _impl::ServerHistory::Context {
 public:
-    ServerHistoryContextImpl() : m_transformer(sync::make_transformer()) {}
-    bool owner_is_sync_server() const noexcept override { return true; }
-    std::mt19937_64& server_history_get_random() noexcept override { return m_random; }
+    ServerHistoryContextImpl()
+        : m_transformer(sync::make_transformer())
+    {
+    }
+    bool owner_is_sync_server() const noexcept override
+    {
+        return true;
+    }
+    std::mt19937_64& server_history_get_random() noexcept override
+    {
+        return m_random;
+    }
 
-    sync::Transformer& get_transformer() override { return *m_transformer; }
-    util::Buffer<char>& get_transform_buffer() override { return m_transform_buffer; }
-    _impl::ServerHistory::IntegrationReporter& get_integration_reporter() override { return m_integration_reporter; }
+    sync::Transformer& get_transformer() override
+    {
+        return *m_transformer;
+    }
+    util::Buffer<char>& get_transform_buffer() override
+    {
+        return m_transform_buffer;
+    }
+    _impl::ServerHistory::IntegrationReporter& get_integration_reporter() override
+    {
+        return m_integration_reporter;
+    }
+
 private:
     std::mt19937_64 m_random;
     std::unique_ptr<sync::Transformer> m_transformer;
@@ -53,7 +72,8 @@ private:
 } // unnamed namespace
 
 
-Replication::HistoryType peek_history_type(const std::string& file_name, const char* read_key) {
+Replication::HistoryType peek_history_type(const std::string& file_name, const char* read_key)
+{
     Group group{file_name, read_key};
     using gf = _impl::GroupFriend;
     Allocator& alloc = gf::get_alloc(group);
@@ -69,51 +89,52 @@ Replication::HistoryType peek_history_type(const std::string& file_name, const c
     return Replication::HistoryType(history_type);
 }
 
-void do_transform(const std::string& file_name, const char* read_key, const char* write_key, bool verbose) {
+void do_transform(const std::string& file_name, const char* read_key, const char* write_key, bool verbose)
+{
     bool success = false;
     const bool bump_version_number = false; // for all history types we can keep the current version
     switch (peek_history_type(file_name, read_key)) {
-    case Replication::hist_None:
-    {
-        bool no_create = true;
-        auto sg = DB::create(file_name, no_create, DBOptions{read_key});
-        success = sg->compact(bump_version_number, write_key);
-        break;
-    }
-    case Replication::hist_InRealm:
-    {
-        std::unique_ptr<Replication> hist(make_in_realm_history(file_name));
-        auto sg = DB::create(*hist, DBOptions(read_key));
-        success = sg->compact(bump_version_number, write_key);
-        break;
-    }
-    case Replication::hist_OutOfRealm:
-        throw std::runtime_error("Could not transform Realm file with history type 'OutOfRealm' for " + file_name);
-    case Replication::hist_SyncClient:
-    {
-        std::unique_ptr<Replication> reference_history = realm::sync::make_client_replication(file_name);
-        auto sg = DB::create(*reference_history, DBOptions(read_key));
-        success = sg->compact(bump_version_number, write_key);
-        break;
-    }
-    case Replication::hist_SyncServer:
-    {
-        ServerHistoryContextImpl context;
-        _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history{file_name, context, compaction_control};
-        auto sg = DB::create(history, DBOptions(read_key));
-        success = sg->compact(bump_version_number, write_key);
-        break;
-    }
+        case Replication::hist_None: {
+            bool no_create = true;
+            auto sg = DB::create(file_name, no_create, DBOptions{read_key});
+            success = sg->compact(bump_version_number, write_key);
+            break;
+        }
+        case Replication::hist_InRealm: {
+            std::unique_ptr<Replication> hist(make_in_realm_history(file_name));
+            auto sg = DB::create(*hist, DBOptions(read_key));
+            success = sg->compact(bump_version_number, write_key);
+            break;
+        }
+        case Replication::hist_OutOfRealm:
+            throw std::runtime_error("Could not transform Realm file with history type 'OutOfRealm' for " +
+                                     file_name);
+        case Replication::hist_SyncClient: {
+            std::unique_ptr<Replication> reference_history = realm::sync::make_client_replication(file_name);
+            auto sg = DB::create(*reference_history, DBOptions(read_key));
+            success = sg->compact(bump_version_number, write_key);
+            break;
+        }
+        case Replication::hist_SyncServer: {
+            ServerHistoryContextImpl context;
+            _impl::ServerHistory::DummyCompactionControl compaction_control;
+            _impl::ServerHistory history{file_name, context, compaction_control};
+            auto sg = DB::create(history, DBOptions(read_key));
+            success = sg->compact(bump_version_number, write_key);
+            break;
+        }
     }
     if (!success) {
         throw std::runtime_error("Unable to compact '" + file_name + "'. Check that it is not in use.");
-    } else if(verbose) {
+    }
+    else if (verbose) {
         std::cout << "Processed " << file_name << std::endl;
     }
 }
 
-void parallel_transform(const std::vector<std::string>& paths, const char* read_key, const char* write_key, bool verbose, size_t jobs) {
+void parallel_transform(const std::vector<std::string>& paths, const char* read_key, const char* write_key,
+                        bool verbose, size_t jobs)
+{
     REALM_ASSERT(jobs > 0);
     std::vector<std::thread> threads;
     size_t items_per_thread = size_t(std::ceil(float(paths.size()) / jobs));
@@ -137,16 +158,17 @@ size_t encryption_transformer::encrypt_transform(const encryption_transformer::C
     std::vector<std::string> paths;
     if (config.type == encryption_transformer::Configuration::TransformType::File) {
         paths.push_back(config.target_path);
-    } else {
+    }
+    else {
         util::File inputs(config.target_path);
         const size_t file_size = static_cast<size_t>(inputs.get_size());
-        char * buff = new char[file_size + 1];
+        char* buff = new char[file_size + 1];
         inputs.read(buff, file_size);
         std::string glob(buff, file_size);
         std::istringstream ss{glob};
         using StrIt = std::istream_iterator<std::string>;
         paths = std::vector<std::string>{StrIt{ss}, StrIt{}};
-        delete [] buff;
+        delete[] buff;
     }
     if (config.verbose) {
         std::cout << "Will transform the following files: " << std::endl;
@@ -160,12 +182,14 @@ size_t encryption_transformer::encrypt_transform(const encryption_transformer::C
     try {
         if (config.jobs) {
             parallel_transform(paths, read_key, write_key, config.verbose, *config.jobs);
-        } else {
+        }
+        else {
             for (auto& path : paths) {
                 do_transform(path, read_key, write_key, config.verbose);
             }
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         // Restore things as much as possible
         if (config.verbose) {
             std::cerr << "An error occurred, attempting to recover state: " << e.what() << std::endl;

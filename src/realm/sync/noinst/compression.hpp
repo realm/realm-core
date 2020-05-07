@@ -43,7 +43,8 @@ std::error_code make_error_code(error) noexcept;
 
 namespace std {
 
-template<> struct is_error_code_enum<realm::_impl::compression::error> {
+template <>
+struct is_error_code_enum<realm::_impl::compression::error> {
     static const bool value = true;
 };
 
@@ -61,14 +62,13 @@ public:
     virtual ~Alloc() {}
 };
 
-class CompressMemoryArena: public Alloc {
+class CompressMemoryArena : public Alloc {
 public:
     void* alloc(size_t size) override final
     {
         size_t offset = m_offset;
-        size_t misalignment = offset % alignof (std::max_align_t);
-        size_t padding =
-           (misalignment == 0) ? 0 : (alignof (std::max_align_t) - misalignment);
+        size_t misalignment = offset % alignof(std::max_align_t);
+        size_t padding = (misalignment == 0) ? 0 : (alignof(std::max_align_t) - misalignment);
         if (padding > m_size - offset)
             return nullptr;
         offset += padding;
@@ -114,8 +114,8 @@ private:
 /// size of the uncompressed data is \a uncompressed_size. \a compression_level
 /// is described under compress(). \a bound is set to the upper bound at
 /// return. The returned error code is of category compression::error_category.
-std::error_code compress_bound(const char* uncompressed_buf, size_t uncompressed_size,
-                               size_t& bound, int compression_level = 1);
+std::error_code compress_bound(const char* uncompressed_buf, size_t uncompressed_size, size_t& bound,
+                               int compression_level = 1);
 
 /// compress() compresses the data in the \a uncompressed_buf of size \a
 /// uncompressed_size into \a compressed_buf. compress() resizes \a
@@ -123,9 +123,8 @@ std::error_code compress_bound(const char* uncompressed_buf, size_t uncompressed
 /// data. \a compression_level is [1-9] with 1 the fastest for the current zlib
 /// implementation. The returned error code is of category
 /// compression::error_category.
-std::error_code compress(const char* uncompressed_buf, size_t uncompressed_size,
-                         char* compressed_buf, size_t compressed_buf_size,
-                         size_t& compressed_size, int compression_level = 1,
+std::error_code compress(const char* uncompressed_buf, size_t uncompressed_size, char* compressed_buf,
+                         size_t compressed_buf_size, size_t& compressed_size, int compression_level = 1,
                          Alloc* custom_allocator = nullptr);
 
 /// decompress() decompresses the data in \param compressed_buf of size \a
@@ -135,12 +134,11 @@ std::error_code compress(const char* uncompressed_buf, size_t uncompressed_size,
 /// error where the size of the decompressed data is unequal to
 /// decompressed_size.  The returned error code is of category
 /// compression::error_category.
-std::error_code decompress(const char* compressed_buf, size_t compressed_size,
-                           char* decompressed_buf, size_t decompressed_size);
+std::error_code decompress(const char* compressed_buf, size_t compressed_size, char* decompressed_buf,
+                           size_t decompressed_size);
 
 
-size_t allocate_and_compress(CompressMemoryArena& compress_memory_arena,
-                             BinaryData uncompressed_buf,
+size_t allocate_and_compress(CompressMemoryArena& compress_memory_arena, BinaryData uncompressed_buf,
                              std::vector<char>& compressed_buf);
 
 /// compress_file() compresses the file at path \a src_path into \a dst_path.
@@ -149,14 +147,12 @@ size_t allocate_and_compress(CompressMemoryArena& compress_memory_arena,
 /// if memory is low, or the compression library has internal errors. The out
 /// variables src_size and dst_size return the file sizes.
 std::error_code compress_file(const std::string& src_path, const std::string& dst_path,
-                              util::File::SizeType& src_size,
-                              util::File::SizeType& dst_size);
+                              util::File::SizeType& src_size, util::File::SizeType& dst_size);
 
 /// decompress_file() has the same semantics as compress_file() except that it
 /// decompresses.
 std::error_code decompress_file(const std::string& src_path, const std::string& dst_path,
-                              util::File::SizeType& src_size,
-                              util::File::SizeType& dst_size);
+                                util::File::SizeType& src_size, util::File::SizeType& dst_size);
 
 // compress_block_with_header() takes the input in 'uncompressed_buf' of size
 // 'uncompressed_size' and compresses it into 'compressed_buf' and prepends a
@@ -165,11 +161,8 @@ std::error_code decompress_file(const std::string& src_path, const std::string& 
 // 'compressed_buf_size' and it must be large enough to hold the result. The
 // output argument 'compressed_size' denotes the size of the entire compressed
 // block including the 4-byte header.
-std::error_code compress_block_with_header(const char* uncompressed_buf,
-                                           size_t uncompressed_size,
-                                           char* compressed_buf,
-                                           size_t compressed_buf_size,
-                                           size_t& compressed_size);
+std::error_code compress_block_with_header(const char* uncompressed_buf, size_t uncompressed_size,
+                                           char* compressed_buf, size_t compressed_buf_size, size_t& compressed_size);
 
 // integrate_compressed_blocks_in_realm_file() takes the input in the buffer
 // 'blocks' of size 'blocks_size', parses the block headers, decompresses the
@@ -185,8 +178,7 @@ std::error_code compress_block_with_header(const char* uncompressed_buf,
 // The size of the destination file is placed in 'dst_size'.
 //
 // On failure, the function returns a compression error code.
-std::error_code integrate_compressed_blocks_in_realm_file(const char* blocks,
-                                                          size_t blocks_size,
+std::error_code integrate_compressed_blocks_in_realm_file(const char* blocks, size_t blocks_size,
                                                           const std::string& dst_path,
                                                           const util::Optional<std::array<char, 64>>& encryption_key,
                                                           uint_fast64_t& dst_size);
@@ -202,17 +194,13 @@ std::error_code integrate_compressed_blocks_in_realm_file(const char* blocks,
 /// receiving side.
 ///
 /// The arguments and return value have the same meaning as in compress_file().
-std::error_code compress_file_in_blocks(const char* src_path,
-                                        const char* dst_path,
-                                        util::File::SizeType& src_size,
+std::error_code compress_file_in_blocks(const char* src_path, const char* dst_path, util::File::SizeType& src_size,
                                         util::File::SizeType& dst_size);
 
 // decompress_file_from_blocks performs the inverse operation of compress_file_in_blocks().
 // The arguments have the same meaning as in compress_file_in_blocks().
-std::error_code decompress_file_from_blocks(const char* src_path,
-                                            const char* dst_path,
-                                            util::File::SizeType& src_size,
-                                            util::File::SizeType& dst_size);
+std::error_code decompress_file_from_blocks(const char* src_path, const char* dst_path,
+                                            util::File::SizeType& src_size, util::File::SizeType& dst_size);
 
 // decompress_block() decompresses a single compressed block. The compressed
 // data is in compressed_buf of size compressed_size. The decompressed data is
@@ -221,9 +209,8 @@ std::error_code decompress_file_from_blocks(const char* src_path,
 // variable decompressed_size.
 // The return value is {} if the decompression succeeds and an appropriate
 // error code, of class compression::error, in case of errors.
-std::error_code decompress_block(const char* compressed_buf, size_t compressed_size,
-                                 char* decompressed_buf, size_t& decompressed_size);
-
+std::error_code decompress_block(const char* compressed_buf, size_t compressed_size, char* decompressed_buf,
+                                 size_t& decompressed_size);
 
 
 // extract_blocks_from_unencrypted_realm() and
@@ -260,29 +247,18 @@ std::error_code decompress_block(const char* compressed_buf, size_t compressed_s
 
 std::error_code extract_blocks_from_file(const std::string& path,
                                          const util::Optional<std::array<char, 64>>& encryption_key,
-                                         uint_fast64_t current_offset,
-                                         uint_fast64_t& next_offset,
-                                         uint_fast64_t& max_offset,
-                                         char* buf,
-                                         size_t buf_size,
-                                         size_t& blocks_size);
+                                         uint_fast64_t current_offset, uint_fast64_t& next_offset,
+                                         uint_fast64_t& max_offset, char* buf, size_t buf_size, size_t& blocks_size);
 
 
-std::error_code extract_blocks_from_unencrypted_block_file(const std::string& path,
-                                                           uint_fast64_t current_offset,
-                                                           uint_fast64_t& next_offset,
-                                                           uint_fast64_t& max_offset,
-                                                           char* buf,
-                                                           size_t buf_size,
-                                                           size_t& blocks_size);
+std::error_code extract_blocks_from_unencrypted_block_file(const std::string& path, uint_fast64_t current_offset,
+                                                           uint_fast64_t& next_offset, uint_fast64_t& max_offset,
+                                                           char* buf, size_t buf_size, size_t& blocks_size);
 #if REALM_ENABLE_ENCRYPTION
 std::error_code extract_blocks_from_encrypted_realm(const std::string& path,
                                                     const std::array<char, 64>& encryption_key,
-                                                    uint_fast64_t current_offset,
-                                                    uint_fast64_t& next_offset,
-                                                    uint_fast64_t& max_offset,
-                                                    char* buf,
-                                                    size_t buf_size,
+                                                    uint_fast64_t current_offset, uint_fast64_t& next_offset,
+                                                    uint_fast64_t& max_offset, char* buf, size_t buf_size,
                                                     size_t& blocks_size);
 #endif
 

@@ -23,7 +23,6 @@
 
 #include "unit_test.hpp"
 
-#define CHECK_SYSTEM_ERROR(expr, error_code) \
-    CHECK_THROW_EX(expr, std::system_error, e.code() == error_code)
+#define CHECK_SYSTEM_ERROR(expr, error_code) CHECK_THROW_EX(expr, std::system_error, e.code() == error_code)
 
 #endif // REALM_TEST_UTIL_CHECK_SYSTEM_ERROR_HPP

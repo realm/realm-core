@@ -13,13 +13,12 @@
 namespace realm {
 namespace _impl {
 
-class ReopeningFileLogger: public util::RootLogger {
+class ReopeningFileLogger : public util::RootLogger {
 public:
-    using Precision       = util::TimestampFormatter::Precision;
+    using Precision = util::TimestampFormatter::Precision;
     using TimestampConfig = util::TimestampFormatter::Config;
 
-    explicit ReopeningFileLogger(std::string path, volatile std::sig_atomic_t& reopen_log_file,
-                                 TimestampConfig = {});
+    explicit ReopeningFileLogger(std::string path, volatile std::sig_atomic_t& reopen_log_file, TimestampConfig = {});
 
 protected:
     void do_log(util::Logger::Level, std::string message) override;

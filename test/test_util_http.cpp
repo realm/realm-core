@@ -11,26 +11,30 @@ using namespace realm::util;
 namespace {
 
 struct BufferedSocket : network::Socket {
-    BufferedSocket(network::Service& service): network::Socket(service)
-    {}
-
-    BufferedSocket(network::Service& service, const network::StreamProtocol& protocol,
-                   native_handle_type native_handle):
-        network::Socket(service, protocol, native_handle)
-    {}
-
-
-    template<class H> void async_read_until(char* buffer, std::size_t size, char delim,
-                                            H handler)
+    BufferedSocket(network::Service& service)
+        : network::Socket(service)
     {
-        network::Socket::async_read_until(buffer, size, delim, m_read_buffer,
-                                          std::move(handler));
     }
 
-    template<class H> void async_read(char* buffer, std::size_t size, H handler)
+    BufferedSocket(network::Service& service, const network::StreamProtocol& protocol,
+                   native_handle_type native_handle)
+        : network::Socket(service, protocol, native_handle)
+    {
+    }
+
+
+    template <class H>
+    void async_read_until(char* buffer, std::size_t size, char delim, H handler)
+    {
+        network::Socket::async_read_until(buffer, size, delim, m_read_buffer, std::move(handler));
+    }
+
+    template <class H>
+    void async_read(char* buffer, std::size_t size, H handler)
     {
         network::Socket::async_read(buffer, size, m_read_buffer, std::move(handler));
     }
+
 private:
     network::ReadAheadBuffer m_read_buffer;
 };
@@ -219,13 +223,21 @@ TEST(HTTPParser_RequestLine)
         "GET path?with=query HTTP/1.1",
         "GET",
     };
-    constexpr size_t num_inputs = sizeof(input)/sizeof(input[0]);
+    constexpr size_t num_inputs = sizeof(input) / sizeof(input[0]);
     struct expect_t {
         bool success;
         HTTPMethod method;
         StringData uri;
-        expect_t(bool s): success(s) {}
-        expect_t(bool s, HTTPMethod m, StringData u): success(s), method(m), uri(u) {}
+        expect_t(bool s)
+            : success(s)
+        {
+        }
+        expect_t(bool s, HTTPMethod m, StringData u)
+            : success(s)
+            , method(m)
+            , uri(u)
+        {
+        }
     };
     expect_t expectations[num_inputs] = {
         {true, HTTPMethod::Get, "/"},
@@ -259,19 +271,21 @@ TEST(HTTPParser_ResponseLine)
         bool success;
         HTTPStatus status;
         StringData reason;
-        expect_t(bool s): success(s) {}
-        expect_t(bool s, HTTPStatus status, StringData reason): success(s), status(status), reason(reason) {}
+        expect_t(bool s)
+            : success(s)
+        {
+        }
+        expect_t(bool s, HTTPStatus status, StringData reason)
+            : success(s)
+            , status(status)
+            , reason(reason)
+        {
+        }
     };
 
-    StringData input[] = {
-        "HTTP/1.1 200 OK",
-        "HTTP 200 OK",
-        "HTTP/1.1 500 Detailed Reason",
-        "HTTP/1.1",
-        "HTTP/1.1 200",
-        "HTTP/1.1 non-integer OK"
-    };
-    constexpr size_t num_inputs = sizeof(input)/sizeof(input[0]);
+    StringData input[] = {"HTTP/1.1 200 OK", "HTTP 200 OK",  "HTTP/1.1 500 Detailed Reason",
+                          "HTTP/1.1",        "HTTP/1.1 200", "HTTP/1.1 non-integer OK"};
+    constexpr size_t num_inputs = sizeof(input) / sizeof(input[0]);
     expect_t expectations[num_inputs] = {
         {true, HTTPStatus::Ok, "OK"},
         {false},
@@ -300,45 +314,59 @@ struct FakeHTTPParser : HTTPParserBase {
     StringData body;
     std::error_code error;
 
-    FakeHTTPParser(util::Logger& logger): HTTPParserBase{logger} {}
+    FakeHTTPParser(util::Logger& logger)
+        : HTTPParserBase{logger}
+    {
+    }
 
-    std::error_code on_first_line(StringData) override { return std::error_code{}; }
-    void on_header(StringData k, StringData v) override { key = k; value = v; }
-    void on_body(StringData b) override { body = b; }
-    void on_complete(std::error_code ec) override { error = ec; }
+    std::error_code on_first_line(StringData) override
+    {
+        return std::error_code{};
+    }
+    void on_header(StringData k, StringData v) override
+    {
+        key = k;
+        value = v;
+    }
+    void on_body(StringData b) override
+    {
+        body = b;
+    }
+    void on_complete(std::error_code ec) override
+    {
+        error = ec;
+    }
 };
 
 TEST(HTTPParser_ParseHeaderLine)
 {
     util::Logger& logger = test_context.logger;
-    FakeHTTPParser p {logger};
+    FakeHTTPParser p{logger};
 
     struct expect {
         bool success;
         StringData key;
         StringData value;
 
-        expect(bool s): success(s) {}
-        expect(StringData k, StringData v): success(true), key(k), value(v) {}
+        expect(bool s)
+            : success(s)
+        {
+        }
+        expect(StringData k, StringData v)
+            : success(true)
+            , key(k)
+            , value(v)
+        {
+        }
     };
 
     StringData input[] = {
-        "My-Header: Value",
-        ":",
-        "",
-        "Header: Value",
-        "Header:",
-        ": Just a value",
+        "My-Header: Value", ":", "", "Header: Value", "Header:", ": Just a value",
     };
 
-    constexpr size_t num_inputs = sizeof(input)/sizeof(input[0]);
+    constexpr size_t num_inputs = sizeof(input) / sizeof(input[0]);
     expect expectations[num_inputs] = {
-        {"My-Header", "Value"},
-        {false},
-        {false},
-        {"Header", "Value"},
-        {"Header", ""},
-        {false},
+        {"My-Header", "Value"}, {false}, {false}, {"Header", "Value"}, {"Header", ""}, {false},
     };
 
     for (size_t i = 0; i < num_inputs; ++i) {

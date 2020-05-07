@@ -15,33 +15,35 @@ namespace _impl {
 
 /// The maximum number of bytes that can be consumed by encode_int() for an
 /// integer of the same type, \a T.
-template<class T> constexpr std::size_t encode_int_max_bytes();
+template <class T>
+constexpr std::size_t encode_int_max_bytes();
 
 /// The size of the specified buffer must be at least what is returned by
 /// encode_int_max_bytes().
 ///
 /// Returns the number of bytes used to hold the encoded value.
-template<class T> std::size_t encode_int(T value, char* buffer) noexcept;
+template <class T>
+std::size_t encode_int(T value, char* buffer) noexcept;
 
 /// If decoding succeeds, the decoded value is assigned to \a value and the
 /// number of consumed bytes is returned (which will always be at least
 /// one). Otherwise \a value is left unmodified, and zero is returned.
-template<class T> std::size_t decode_int(const char* buffer, std::size_t size, T& value) noexcept;
+template <class T>
+std::size_t decode_int(const char* buffer, std::size_t size, T& value) noexcept;
 
 /// \tparam I Must have member function `bool read_char(char&)`.
 ///
 /// If decoding succeeds, the decoded value is assigned to \a value and `true`
 /// is returned. Otherwise \a value is left unmodified, and `false` is returned.
-template<class I, class T> bool decode_int(I& input, T& value)
-    noexcept(noexcept(std::declval<I>().read_char(std::declval<char&>())));
-
-
+template <class I, class T>
+bool decode_int(I& input, T& value) noexcept(noexcept(std::declval<I>().read_char(std::declval<char&>())));
 
 
 // Implementation
 
 // Work-around for insufficient constexpr support from GCC 4.9.
-template<class T> struct EncodeIntMaxBytesHelper {
+template <class T>
+struct EncodeIntMaxBytesHelper {
     // One sign bit plus number of value bits
     static const int num_bits = 1 + std::numeric_limits<T>::digits;
     // Only the first 7 bits are available per byte. Had it not been
@@ -52,12 +54,14 @@ template<class T> struct EncodeIntMaxBytesHelper {
     static const int max_bytes = (num_bits + (bits_per_byte - 1)) / bits_per_byte;
 };
 
-template<class T> constexpr std::size_t encode_int_max_bytes()
+template <class T>
+constexpr std::size_t encode_int_max_bytes()
 {
     return std::size_t(EncodeIntMaxBytesHelper<T>::max_bytes);
 }
 
-template<class T> std::size_t encode_int(char* buffer, T value)
+template <class T>
+std::size_t encode_int(char* buffer, T value)
 {
     REALM_DIAG_PUSH();
     REALM_DIAG_IGNORE_UNSIGNED_MINUS();
@@ -91,15 +95,14 @@ template<class T> std::size_t encode_int(char* buffer, T value)
         ++ptr;
         value_2 >>= bits_per_byte;
     }
-    *reinterpret_cast<uchar*>(ptr) =
-        uchar(negative ? (1U << (bits_per_byte - 1)) | unsigned(value_2) : value_2);
+    *reinterpret_cast<uchar*>(ptr) = uchar(negative ? (1U << (bits_per_byte - 1)) | unsigned(value_2) : value_2);
     ++ptr;
     return std::size_t(ptr - buffer);
     REALM_DIAG_POP();
 }
 
-template<class I, class T> bool decode_int(I& input, T& value)
-    noexcept(noexcept(std::declval<I>().read_char(std::declval<char&>())))
+template <class I, class T>
+bool decode_int(I& input, T& value) noexcept(noexcept(std::declval<I>().read_char(std::declval<char&>())))
 {
     REALM_DIAG_PUSH();
     REALM_DIAG_IGNORE_UNSIGNED_MINUS();
@@ -138,7 +141,8 @@ template<class I, class T> bool decode_int(I& input, T& value)
     REALM_DIAG_POP();
 }
 
-template<class T> std::size_t decode_int(const char* buffer, std::size_t size, T& value) noexcept
+template <class T>
+std::size_t decode_int(const char* buffer, std::size_t size, T& value) noexcept
 {
     struct Input {
         const char* ptr;

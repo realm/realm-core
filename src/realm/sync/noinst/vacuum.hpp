@@ -38,10 +38,11 @@ public:
         bool ignored = false;
     };
 
-    explicit Vacuum(util::Logger& logger, Options options) :
-        logger {logger},
-        m_options(std::move(options))
-    {}
+    explicit Vacuum(util::Logger& logger, Options options)
+        : logger{logger}
+        , m_options(std::move(options))
+    {
+    }
 
     Results vacuum(const std::string& file);
     Results dry_run(const std::string& file);
@@ -60,4 +61,3 @@ struct VacuumError : std::runtime_error {
 } // namespace realm
 
 #endif // REALM_NOINST_VACUUM_HPP
-

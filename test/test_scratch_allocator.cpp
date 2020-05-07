@@ -90,7 +90,8 @@ TEST(ScratchAllocator_UnorderedMap)
     ScratchMemory memory;
     {
         ScratchArena space{memory};
-        std::unordered_map<int, int, std::hash<int>, std::equal_to<>, ScratchAllocator<std::pair<const int, int>>> mymap{space};
+        std::unordered_map<int, int, std::hash<int>, std::equal_to<>, ScratchAllocator<std::pair<const int, int>>>
+            mymap{space};
 
         for (int i = 0; i < 1000000; ++i) {
             mymap[i] = i;

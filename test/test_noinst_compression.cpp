@@ -36,7 +36,7 @@ std::unique_ptr<char[]> generate_compressible_data(size_t size)
 
     auto content = std::make_unique<char[]>(size);
     size_t position = 0;
-    while(position < size) {
+    while (position < size) {
         size_t copy_size = std::min(atom_size, size - position);
         std::memcpy(content.get() + position, atom, copy_size);
         position += copy_size;
@@ -54,51 +54,51 @@ std::unique_ptr<char[]> generate_non_compressible_data(size_t size)
 }
 
 // Compress, decompress and verify equality.
-void compress_decompress_compare(test_util::unit_test::TestContext& test_context, size_t uncompressed_size, const char* uncompressed_buf)
+void compress_decompress_compare(test_util::unit_test::TestContext& test_context, size_t uncompressed_size,
+                                 const char* uncompressed_buf)
 {
-        size_t bound;
-        std::error_code ec = compression::compress_bound(uncompressed_buf, uncompressed_size, bound);
-        CHECK_NOT(ec);
+    size_t bound;
+    std::error_code ec = compression::compress_bound(uncompressed_buf, uncompressed_size, bound);
+    CHECK_NOT(ec);
 
-        size_t compressed_buf_size = bound;
-        auto compressed_buf_unique_ptr = std::make_unique<char[]>(compressed_buf_size);
-        char* compressed_buf = compressed_buf_unique_ptr.get();
-        size_t compressed_size;
-        int compression_level = 1;
+    size_t compressed_buf_size = bound;
+    auto compressed_buf_unique_ptr = std::make_unique<char[]>(compressed_buf_size);
+    char* compressed_buf = compressed_buf_unique_ptr.get();
+    size_t compressed_size;
+    int compression_level = 1;
 
-        ec = compression::compress(uncompressed_buf, uncompressed_size,
-                                   compressed_buf, compressed_buf_size,
-                                   compressed_size, compression_level);
-        CHECK_NOT(ec);
-
-        auto decompressed_buf_unique_ptr = std::make_unique<char[]>(uncompressed_size);
-        char* decompressed_buf = decompressed_buf_unique_ptr.get();
-        size_t decompressed_size = uncompressed_size;
-
-        ec = compression::decompress(compressed_buf, compressed_size, decompressed_buf, decompressed_size);
-        CHECK_NOT(ec);
-
-        int compare = std::memcmp(uncompressed_buf, decompressed_buf, uncompressed_size);
-        CHECK_EQUAL(compare, 0);
-}
-
-void allocate_and_compress_decompress_compare(test_util::unit_test::TestContext& test_context, size_t uncompressed_size, const char* uncompressed_buf)
-{
-    BinaryData uncompressed_bd {uncompressed_buf, uncompressed_size};
-    std::vector<char> compressed_buf;
-
-    compression::CompressMemoryArena compress_memory_arena;
-
-    size_t compressed_size =
-        compression::allocate_and_compress(compress_memory_arena,
-                                           uncompressed_bd,
-                                           compressed_buf);
+    ec = compression::compress(uncompressed_buf, uncompressed_size, compressed_buf, compressed_buf_size,
+                               compressed_size, compression_level);
+    CHECK_NOT(ec);
 
     auto decompressed_buf_unique_ptr = std::make_unique<char[]>(uncompressed_size);
     char* decompressed_buf = decompressed_buf_unique_ptr.get();
     size_t decompressed_size = uncompressed_size;
 
-    std::error_code ec = compression::decompress(compressed_buf.data(), compressed_size, decompressed_buf, decompressed_size);
+    ec = compression::decompress(compressed_buf, compressed_size, decompressed_buf, decompressed_size);
+    CHECK_NOT(ec);
+
+    int compare = std::memcmp(uncompressed_buf, decompressed_buf, uncompressed_size);
+    CHECK_EQUAL(compare, 0);
+}
+
+void allocate_and_compress_decompress_compare(test_util::unit_test::TestContext& test_context,
+                                              size_t uncompressed_size, const char* uncompressed_buf)
+{
+    BinaryData uncompressed_bd{uncompressed_buf, uncompressed_size};
+    std::vector<char> compressed_buf;
+
+    compression::CompressMemoryArena compress_memory_arena;
+
+    size_t compressed_size =
+        compression::allocate_and_compress(compress_memory_arena, uncompressed_bd, compressed_buf);
+
+    auto decompressed_buf_unique_ptr = std::make_unique<char[]>(uncompressed_size);
+    char* decompressed_buf = decompressed_buf_unique_ptr.get();
+    size_t decompressed_size = uncompressed_size;
+
+    std::error_code ec =
+        compression::decompress(compressed_buf.data(), compressed_size, decompressed_buf, decompressed_size);
     CHECK_NOT(ec);
 
     int compare = std::memcmp(uncompressed_buf, decompressed_buf, uncompressed_size);
@@ -107,8 +107,8 @@ void allocate_and_compress_decompress_compare(test_util::unit_test::TestContext&
 
 bool files_compare_equal(const std::string& path_0, const std::string& path_1)
 {
-    util::File file_0 {path_0};
-    util::File file_1 {path_1};
+    util::File file_0{path_0};
+    util::File file_1{path_1};
     if (file_0.get_size() != file_1.get_size())
         return false;
 
@@ -116,8 +116,8 @@ bool files_compare_equal(const std::string& path_0, const std::string& path_1)
     std::unique_ptr<char[]> buf_0 = std::make_unique<char[]>(buf_size);
     std::unique_ptr<char[]> buf_1 = std::make_unique<char[]>(buf_size);
     while (true) {
-        size_t nread_0 = file_0.read(buf_0.get(),buf_size);
-        size_t nread_1 = file_1.read(buf_1.get(),buf_size);
+        size_t nread_0 = file_0.read(buf_0.get(), buf_size);
+        size_t nread_1 = file_1.read(buf_1.get(), buf_size);
         REALM_ASSERT(nread_0 == nread_1);
         if (std::memcmp(buf_0.get(), buf_1.get(), nread_0) != 0)
             return false;
@@ -138,7 +138,7 @@ size_t generate_repetitive_file(const std::string& path)
         std::unique_ptr<char[]> buf = std::make_unique<char[]>(size);
         for (size_t i = 0; i < num_repetitions; ++i)
             memcpy(buf.get() + 10 * i, block, 10);
-        util::File file {path, util::File::mode_Write};
+        util::File file{path, util::File::mode_Write};
         file.write(buf.get(), size);
         REALM_ASSERT(file.get_size() == size);
     }
@@ -154,7 +154,7 @@ size_t generate_random_file(const std::string& path)
     const size_t size = num_blocks * block_size;
 
     {
-        util::File file {path, util::File::mode_Write};
+        util::File file{path, util::File::mode_Write};
         test_util::Random random(test_util::produce_nondeterministic_random_seed());
         std::unique_ptr<char[]> buf = std::make_unique<char[]>(block_size);
         for (size_t i = 0; i < num_blocks; ++i) {
@@ -167,25 +167,21 @@ size_t generate_random_file(const std::string& path)
 }
 
 // The return value is the size of the compressed file.
-size_t compress_and_decompress_file(test_util::unit_test::TestContext& test_context,
-                                    const std::string& path)
+size_t compress_and_decompress_file(test_util::unit_test::TestContext& test_context, const std::string& path)
 {
     std::string path_1 = path + ".1";
     std::string path_2 = path + ".2";
 
     util::File::SizeType size_0;
     util::File::SizeType size_1;
-    std::error_code ec =
-        compression::compress_file(path.c_str(), path_1.c_str(),
-                                   size_0, size_1);
+    std::error_code ec = compression::compress_file(path.c_str(), path_1.c_str(), size_0, size_1);
 
     CHECK_NOT(ec);
     CHECK(!files_compare_equal(path, path_1));
 
     util::File::SizeType size_2;
     util::File::SizeType size_3;
-    ec = compression::decompress_file(path_1.c_str(), path_2.c_str(),
-                                      size_2, size_3);
+    ec = compression::decompress_file(path_1.c_str(), path_2.c_str(), size_2, size_3);
     CHECK_NOT(ec);
     CHECK_EQUAL(size_0, size_3);
     CHECK_EQUAL(size_1, size_2);
@@ -202,16 +198,13 @@ size_t compress_and_decompress_file_in_blocks(test_util::unit_test::TestContext&
 
     util::File::SizeType size_0;
     util::File::SizeType size_1;
-    std::error_code ec =
-        compression::compress_file_in_blocks(path.c_str(), path_1.c_str(),
-                                             size_0, size_1);
+    std::error_code ec = compression::compress_file_in_blocks(path.c_str(), path_1.c_str(), size_0, size_1);
     CHECK_NOT(ec);
     CHECK(!files_compare_equal(path, path_1));
 
     util::File::SizeType size_2;
     util::File::SizeType size_3;
-    ec = compression::decompress_file_from_blocks(path_1.c_str(), path_2.c_str(),
-                                                  size_2, size_3);
+    ec = compression::decompress_file_from_blocks(path_1.c_str(), path_2.c_str(), size_2, size_3);
     CHECK_NOT(ec);
     CHECK_EQUAL(size_0, size_3);
     CHECK_EQUAL(size_1, size_2);
@@ -227,7 +220,7 @@ void make_data_in_realm(const std::string& realm_path, size_t data_size,
     std::unique_ptr<ClientReplication> history = make_client_replication(realm_path);
     DBRef sg = DB::create(*history, options);
 
-    WriteTransaction wt {sg};
+    WriteTransaction wt{sg};
     TableRef tr = sync::create_table(wt, "class_table");
     tr->add_column(type_Binary, "binary column");
     std::unique_ptr<char[]> data = generate_non_compressible_data(data_size);
@@ -252,9 +245,8 @@ TEST(Compression_Compress_Buffer_Too_Small)
     size_t compressed_size;
     int compression_level = 1;
 
-    std::error_code ec = compression::compress(uncompressed_buf, uncompressed_size,
-                                               compressed_buf, compressed_buf_size,
-                                               compressed_size, compression_level);
+    std::error_code ec = compression::compress(uncompressed_buf, uncompressed_size, compressed_buf,
+                                               compressed_buf_size, compressed_size, compression_level);
     CHECK_EQUAL(ec, compression::error::compress_buffer_too_small);
 }
 
@@ -271,9 +263,8 @@ TEST(Compression_Decompress_Incorrect_Size)
     size_t compressed_size;
     int compression_level = 5;
 
-    std::error_code ec = compression::compress(uncompressed_buf, uncompressed_size,
-                                               compressed_buf, compressed_buf_size,
-                                               compressed_size, compression_level);
+    std::error_code ec = compression::compress(uncompressed_buf, uncompressed_size, compressed_buf,
+                                               compressed_buf_size, compressed_size, compression_level);
     CHECK_NOT(ec);
 
     size_t decompressed_size = 5000; // incorrect
@@ -289,20 +280,14 @@ TEST(Compression_Decompress_Incorrect_Size)
 TEST(Compression_Compressible_Data_Small)
 {
     size_t uncompressed_sizes[] = {
-        0,
-        1,
-        2,
-        256,
-        1 << 10,
-        1 << 20,
+        0, 1, 2, 256, 1 << 10, 1 << 20,
     };
     size_t num_sizes = sizeof(uncompressed_sizes) / sizeof(uncompressed_sizes[0]);
 
     for (size_t i = 0; i < num_sizes; ++i) {
         size_t uncompressed_size = uncompressed_sizes[i];
 
-        const std::unique_ptr<char[]> content =
-            generate_compressible_data(uncompressed_size);
+        const std::unique_ptr<char[]> content = generate_compressible_data(uncompressed_size);
 
         compress_decompress_compare(test_context, uncompressed_size, content.get());
     }
@@ -312,18 +297,13 @@ TEST(Compression_Compressible_Data_Small)
 // uncompressed data are tested including sizes above 4GB.
 TEST_IF(Compression_Compressible_Data_Large, false)
 {
-    size_t uncompressed_sizes[] = {
-        (size_t(1) << 32) - 1,
-        (size_t(1) << 32) + 500,
-        size_t(1) << 33
-    };
+    size_t uncompressed_sizes[] = {(size_t(1) << 32) - 1, (size_t(1) << 32) + 500, size_t(1) << 33};
     size_t num_sizes = sizeof(uncompressed_sizes) / sizeof(uncompressed_sizes[0]);
 
     for (size_t i = 0; i < num_sizes; ++i) {
         size_t uncompressed_size = uncompressed_sizes[i];
 
-        const std::unique_ptr<char[]> content =
-            generate_compressible_data(uncompressed_size);
+        const std::unique_ptr<char[]> content = generate_compressible_data(uncompressed_size);
 
         compress_decompress_compare(test_context, uncompressed_size, content.get());
     }
@@ -333,19 +313,13 @@ TEST_IF(Compression_Compressible_Data_Large, false)
 // Multiple small sizes of the uncompressed data are tested.
 TEST(Compression_Non_Compressible_Data_Small)
 {
-    size_t uncompressed_sizes[] = {
-        0,
-        1,
-        1 << 10,
-        1 << 20
-    };
+    size_t uncompressed_sizes[] = {0, 1, 1 << 10, 1 << 20};
     size_t num_sizes = sizeof(uncompressed_sizes) / sizeof(uncompressed_sizes[0]);
 
     for (size_t i = 0; i < num_sizes; ++i) {
         size_t uncompressed_size = uncompressed_sizes[i];
 
-        const std::unique_ptr<char[]> content =
-            generate_non_compressible_data(uncompressed_size);
+        const std::unique_ptr<char[]> content = generate_non_compressible_data(uncompressed_size);
 
         compress_decompress_compare(test_context, uncompressed_size, content.get());
     }
@@ -356,17 +330,13 @@ TEST(Compression_Non_Compressible_Data_Small)
 // above 4GB.
 TEST_IF(Compression_Non_Compressible_Data_Large, false)
 {
-    size_t uncompressed_sizes[] = {
-        (size_t(1) << 32) - 1,
-        (size_t(1) << 32) + 100
-    };
+    size_t uncompressed_sizes[] = {(size_t(1) << 32) - 1, (size_t(1) << 32) + 100};
     size_t num_sizes = sizeof(uncompressed_sizes) / sizeof(uncompressed_sizes[0]);
 
     for (size_t i = 0; i < num_sizes; ++i) {
         size_t uncompressed_size = uncompressed_sizes[i];
 
-        const std::unique_ptr<char[]> content =
-            generate_non_compressible_data(uncompressed_size);
+        const std::unique_ptr<char[]> content = generate_non_compressible_data(uncompressed_size);
 
         compress_decompress_compare(test_context, uncompressed_size, content.get());
     }
@@ -378,8 +348,7 @@ TEST(Compression_Allocate_And_Compress_Small)
 {
     size_t uncompressed_size = size_t(1) << 20;
 
-    const std::unique_ptr<char[]> content =
-        generate_compressible_data(uncompressed_size);
+    const std::unique_ptr<char[]> content = generate_compressible_data(uncompressed_size);
 
     allocate_and_compress_decompress_compare(test_context, uncompressed_size, content.get());
 }
@@ -390,8 +359,7 @@ TEST_IF(Compression_Allocate_And_Compress_Large, false)
 {
     size_t uncompressed_size = (size_t(1) << 32) + 100;
 
-    const std::unique_ptr<char[]> content =
-        generate_compressible_data(uncompressed_size);
+    const std::unique_ptr<char[]> content = generate_compressible_data(uncompressed_size);
 
     allocate_and_compress_decompress_compare(test_context, uncompressed_size, content.get());
 }
@@ -425,8 +393,7 @@ TEST(Compression_File_Block_1)
 
     size_t size = generate_repetitive_file(path);
 
-    size_t compressed_size =
-        compress_and_decompress_file_in_blocks(test_context, path);
+    size_t compressed_size = compress_and_decompress_file_in_blocks(test_context, path);
     CHECK_LESS(compressed_size, size / 10);
 }
 
@@ -437,8 +404,7 @@ TEST(Compression_File_Block_2)
 
     size_t size = generate_random_file(path);
 
-    size_t compressed_size =
-        compress_and_decompress_file_in_blocks(test_context, path);
+    size_t compressed_size = compress_and_decompress_file_in_blocks(test_context, path);
     CHECK_GREATER(compressed_size, size / 10);
 }
 
@@ -460,10 +426,8 @@ TEST(Compression_RealmBlocksSmall)
 
     std::error_code ec;
 
-    ec = compression::compress_file_in_blocks(std::string(src_path).c_str(),
-                                              std::string(blocks_path).c_str(),
-                                              src_size,
-                                              blocks_size);
+    ec = compression::compress_file_in_blocks(std::string(src_path).c_str(), std::string(blocks_path).c_str(),
+                                              src_size, blocks_size);
     CHECK_NOT(ec);
 
     util::File blocks_file{std::string(blocks_path)};
@@ -474,18 +438,12 @@ TEST(Compression_RealmBlocksSmall)
     CHECK_EQUAL(nread, blocks_size);
 
     uint_fast64_t dst_size;
-    ec = compression::integrate_compressed_blocks_in_realm_file(blocks.get(),
-                                                                blocks_size,
-                                                                std::string(unencrypted_path),
-                                                                encryption_key_none,
-                                                                dst_size);
+    ec = compression::integrate_compressed_blocks_in_realm_file(
+        blocks.get(), blocks_size, std::string(unencrypted_path), encryption_key_none, dst_size);
     CHECK_NOT(ec);
 
-    ec = compression::integrate_compressed_blocks_in_realm_file(blocks.get(),
-                                                                blocks_size,
-                                                                std::string(encrypted_path),
-                                                                encryption_key,
-                                                                dst_size);
+    ec = compression::integrate_compressed_blocks_in_realm_file(
+        blocks.get(), blocks_size, std::string(encrypted_path), encryption_key, dst_size);
     CHECK_NOT(ec);
 
     CHECK(files_compare_equal(src_path, unencrypted_path));
@@ -498,9 +456,9 @@ TEST(Compression_RealmBlocksSmall)
         std::unique_ptr<ClientReplication> history_encrypted = make_client_replication(encrypted_path);
         DBOptions options{encryption_key ? encryption_key->data() : nullptr};
         DBRef sg_encrypted = DB::create(*history_encrypted, options);
-        ReadTransaction rt_src {sg_src};
-        ReadTransaction rt_unencrypted {sg_unencrypted};
-        ReadTransaction rt_encrypted {sg_encrypted};
+        ReadTransaction rt_src{sg_src};
+        ReadTransaction rt_unencrypted{sg_unencrypted};
+        ReadTransaction rt_encrypted{sg_encrypted};
         CHECK(compare_groups(rt_src, rt_unencrypted));
         CHECK(compare_groups(rt_src, rt_encrypted));
     }
@@ -524,10 +482,8 @@ TEST(Compression_RealmBlocksLarge)
 
     std::error_code ec;
 
-    ec = compression::compress_file_in_blocks(std::string(src_path).c_str(),
-                                              std::string(blocks_path).c_str(),
-                                              src_size,
-                                              blocks_size);
+    ec = compression::compress_file_in_blocks(std::string(src_path).c_str(), std::string(blocks_path).c_str(),
+                                              src_size, blocks_size);
     CHECK_NOT(ec);
 
     util::File blocks_file{std::string(blocks_path)};
@@ -538,18 +494,12 @@ TEST(Compression_RealmBlocksLarge)
     CHECK_EQUAL(nread, blocks_size);
 
     uint_fast64_t dst_size;
-    ec = compression::integrate_compressed_blocks_in_realm_file(blocks.get(),
-                                                                blocks_size,
-                                                                std::string(unencrypted_path),
-                                                                encryption_key_none,
-                                                                dst_size);
+    ec = compression::integrate_compressed_blocks_in_realm_file(
+        blocks.get(), blocks_size, std::string(unencrypted_path), encryption_key_none, dst_size);
     CHECK_NOT(ec);
 
-    ec = compression::integrate_compressed_blocks_in_realm_file(blocks.get(),
-                                                                blocks_size,
-                                                                std::string(encrypted_path),
-                                                                encryption_key,
-                                                                dst_size);
+    ec = compression::integrate_compressed_blocks_in_realm_file(
+        blocks.get(), blocks_size, std::string(encrypted_path), encryption_key, dst_size);
     CHECK_NOT(ec);
 
     CHECK(files_compare_equal(src_path, unencrypted_path));
@@ -562,9 +512,9 @@ TEST(Compression_RealmBlocksLarge)
         std::unique_ptr<ClientReplication> history_encrypted = make_client_replication(encrypted_path);
         DBOptions options{encryption_key ? encryption_key->data() : nullptr};
         DBRef sg_encrypted = DB::create(*history_encrypted, options);
-        ReadTransaction rt_src {sg_src};
-        ReadTransaction rt_unencrypted {sg_unencrypted};
-        ReadTransaction rt_encrypted {sg_encrypted};
+        ReadTransaction rt_src{sg_src};
+        ReadTransaction rt_unencrypted{sg_unencrypted};
+        ReadTransaction rt_encrypted{sg_encrypted};
         CHECK(compare_groups(rt_src, rt_unencrypted));
         CHECK(compare_groups(rt_src, rt_encrypted));
     }
@@ -586,11 +536,8 @@ TEST(Compression_RealmBlocksUnencryptedSplit)
     util::File::SizeType src_size;
     util::File::SizeType blocks_size;
 
-    std::error_code ec =
-        compression::compress_file_in_blocks(std::string(src_path).c_str(),
-                                             std::string(blocks_path).c_str(),
-                                             src_size,
-                                             blocks_size);
+    std::error_code ec = compression::compress_file_in_blocks(
+        std::string(src_path).c_str(), std::string(blocks_path).c_str(), src_size, blocks_size);
 
     CHECK_NOT(ec);
 
@@ -612,18 +559,12 @@ TEST(Compression_RealmBlocksUnencryptedSplit)
             ndx++;
         }
         uint_fast64_t dst_size;
-        ec = compression::integrate_compressed_blocks_in_realm_file(blocks.get() + ndx - 4,
-                                                                4 + block_size,
-                                                                std::string(unencrypted_path),
-                                                                encryption_key_none,
-                                                                dst_size);
+        ec = compression::integrate_compressed_blocks_in_realm_file(
+            blocks.get() + ndx - 4, 4 + block_size, std::string(unencrypted_path), encryption_key_none, dst_size);
         CHECK_NOT(ec);
 
-        ec = compression::integrate_compressed_blocks_in_realm_file(blocks.get() + ndx - 4,
-                                                                4 + block_size,
-                                                                std::string(encrypted_path),
-                                                                encryption_key,
-                                                                dst_size);
+        ec = compression::integrate_compressed_blocks_in_realm_file(
+            blocks.get() + ndx - 4, 4 + block_size, std::string(encrypted_path), encryption_key, dst_size);
         CHECK_NOT(ec);
 
         ndx += block_size;
@@ -639,9 +580,9 @@ TEST(Compression_RealmBlocksUnencryptedSplit)
         std::unique_ptr<ClientReplication> history_encrypted = make_client_replication(encrypted_path);
         DBOptions options{encryption_key ? encryption_key->data() : nullptr};
         DBRef sg_encrypted = DB::create(*history_encrypted, options);
-        ReadTransaction rt_src {sg_src};
-        ReadTransaction rt_unencrypted {sg_unencrypted};
-        ReadTransaction rt_encrypted {sg_encrypted};
+        ReadTransaction rt_src{sg_src};
+        ReadTransaction rt_unencrypted{sg_unencrypted};
+        ReadTransaction rt_encrypted{sg_encrypted};
         CHECK(compare_groups(rt_src, rt_unencrypted));
         CHECK(compare_groups(rt_src, rt_encrypted));
     }
@@ -661,11 +602,8 @@ TEST(Compression_ExtractBlocksUnencrypted)
     util::File::SizeType src_size;
     util::File::SizeType blocks_size;
 
-    std::error_code ec =
-        compression::compress_file_in_blocks(std::string(src_path).c_str(),
-                                             std::string(blocks_path).c_str(),
-                                             src_size,
-                                             blocks_size);
+    std::error_code ec = compression::compress_file_in_blocks(
+        std::string(src_path).c_str(), std::string(blocks_path).c_str(), src_size, blocks_size);
 
     CHECK_NOT(ec);
 
@@ -677,25 +615,16 @@ TEST(Compression_ExtractBlocksUnencrypted)
         uint_fast64_t max_offset;
         size_t blocks_size;
 
-        ec = compression::extract_blocks_from_file(std::string(blocks_path).c_str(),
-                                                   none,
-                                                   current_offset,
-                                                   next_offset,
-                                                   max_offset,
-                                                   buf.get(),
-                                                   buf_size,
-                                                   blocks_size);
+        ec = compression::extract_blocks_from_file(std::string(blocks_path).c_str(), none, current_offset,
+                                                   next_offset, max_offset, buf.get(), buf_size, blocks_size);
 
         CHECK_NOT(ec);
         CHECK_GREATER(next_offset, current_offset);
         CHECK_GREATER(blocks_size, 0);
 
         uint_fast64_t dst_size;
-        ec = compression::integrate_compressed_blocks_in_realm_file(buf.get(),
-                                                                    blocks_size,
-                                                                    std::string(unencrypted_path),
-                                                                    encryption_key_none,
-                                                                    dst_size);
+        ec = compression::integrate_compressed_blocks_in_realm_file(
+            buf.get(), blocks_size, std::string(unencrypted_path), encryption_key_none, dst_size);
         CHECK_NOT(ec);
 
         current_offset = next_offset;
@@ -737,14 +666,8 @@ TEST(Compression_ExtractBlocksEncrypted)
         uint_fast64_t max_offset;
         size_t blocks_size;
 
-        ec = compression::extract_blocks_from_file(path_1.c_str(),
-                                                   encryption_key_1,
-                                                   current_offset,
-                                                   next_offset,
-                                                   max_offset,
-                                                   buf.get(),
-                                                   buf_size,
-                                                   blocks_size);
+        ec = compression::extract_blocks_from_file(path_1.c_str(), encryption_key_1, current_offset, next_offset,
+                                                   max_offset, buf.get(), buf_size, blocks_size);
 
         CHECK_NOT(ec);
         CHECK_GREATER(next_offset, current_offset);
@@ -752,19 +675,13 @@ TEST(Compression_ExtractBlocksEncrypted)
         CHECK_LESS_EQUAL(next_offset, max_offset);
 
         uint_fast64_t size_dummy;
-        ec = compression::integrate_compressed_blocks_in_realm_file(buf.get(),
-                                                                    blocks_size,
-                                                                    std::string(path_2),
-                                                                    encryption_key_2,
-                                                                    size_dummy);
+        ec = compression::integrate_compressed_blocks_in_realm_file(buf.get(), blocks_size, std::string(path_2),
+                                                                    encryption_key_2, size_dummy);
 
         CHECK_NOT(ec);
 
-        ec = compression::integrate_compressed_blocks_in_realm_file(buf.get(),
-                                                                    blocks_size,
-                                                                    std::string(path_3),
-                                                                    encryption_key_3,
-                                                                    size_dummy);
+        ec = compression::integrate_compressed_blocks_in_realm_file(buf.get(), blocks_size, std::string(path_3),
+                                                                    encryption_key_3, size_dummy);
         CHECK_NOT(ec);
 
         current_offset = next_offset;
@@ -787,9 +704,9 @@ TEST(Compression_ExtractBlocksEncrypted)
         std::unique_ptr<ClientReplication> history_3 = make_client_replication(path_3);
         DBRef sg_3 = DB::create(*history_3, options_3);
 
-        ReadTransaction rt_1 {sg_1};
-        ReadTransaction rt_2 {sg_2};
-        ReadTransaction rt_3 {sg_3};
+        ReadTransaction rt_1{sg_1};
+        ReadTransaction rt_2{sg_2};
+        ReadTransaction rt_3{sg_3};
         CHECK(compare_groups(rt_1, rt_2));
         CHECK(compare_groups(rt_1, rt_3));
     }

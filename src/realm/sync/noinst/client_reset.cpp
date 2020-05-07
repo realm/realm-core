@@ -25,7 +25,8 @@ namespace {
 // 1. Destructive schema changes.
 // 2. Creation of an already existing table with another type.
 // 3. Creation of an already existing column with another type.
-struct ClientResetFailed {};
+struct ClientResetFailed {
+};
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
 template <class T>
@@ -96,27 +97,27 @@ bool _copy_list(const ConstObj& src_obj, ColKey src_col, Obj& dst_obj, ColKey ds
 bool copy_list(const ConstObj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 {
     switch (src_col.get_type()) {
-    case col_type_Int:
-        if (src_col.get_attrs().test(col_attr_Nullable)) {
-            return _copy_list<util::Optional<Int>>(src_obj, src_col, dst_obj, dst_col);
-        }
-        else {
-            return _copy_list<Int>(src_obj, src_col, dst_obj, dst_col);
-        }
-    case col_type_Bool:
-        return _copy_list<util::Optional<Bool>>(src_obj, src_col, dst_obj, dst_col);
-    case col_type_Float:
-        return _copy_list<util::Optional<float>>(src_obj, src_col, dst_obj, dst_col);
-    case col_type_Double:
-        return _copy_list<util::Optional<double>>(src_obj, src_col, dst_obj, dst_col);
-    case col_type_String:
-        return _copy_list<String>(src_obj, src_col, dst_obj, dst_col);
-    case col_type_Binary:
-        return _copy_list<Binary>(src_obj, src_col, dst_obj, dst_col);
-    case col_type_Timestamp:
-        return _copy_list<Timestamp>(src_obj, src_col, dst_obj, dst_col);
-    default:
-        break;
+        case col_type_Int:
+            if (src_col.get_attrs().test(col_attr_Nullable)) {
+                return _copy_list<util::Optional<Int>>(src_obj, src_col, dst_obj, dst_col);
+            }
+            else {
+                return _copy_list<Int>(src_obj, src_col, dst_obj, dst_col);
+            }
+        case col_type_Bool:
+            return _copy_list<util::Optional<Bool>>(src_obj, src_col, dst_obj, dst_col);
+        case col_type_Float:
+            return _copy_list<util::Optional<float>>(src_obj, src_col, dst_obj, dst_col);
+        case col_type_Double:
+            return _copy_list<util::Optional<double>>(src_obj, src_col, dst_obj, dst_col);
+        case col_type_String:
+            return _copy_list<String>(src_obj, src_col, dst_obj, dst_col);
+        case col_type_Binary:
+            return _copy_list<Binary>(src_obj, src_col, dst_obj, dst_col);
+        case col_type_Timestamp:
+            return _copy_list<Timestamp>(src_obj, src_col, dst_obj, dst_col);
+        default:
+            break;
     }
     REALM_ASSERT(false);
     return false;
@@ -353,7 +354,8 @@ bool copy_linklist(ConstLnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(Obj
 //                     logger.warn("Table %1 has different types on client and server", table_name);
 //                     throw ClientResetFailed{};
 //                 }
-//                 else if (spec->type == Instruction::Payload::Type::String && table_info.primary_key_type != type_String) {
+//                 else if (spec->type == Instruction::Payload::Type::String && table_info.primary_key_type !=
+//                 type_String) {
 //                     logger.warn("Table %1 has different types on client and server", table_name);
 //                     throw ClientResetFailed{};
 //                 }
@@ -374,13 +376,13 @@ bool copy_linklist(ConstLnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(Obj
 //                 }
 //                 case Instruction::Payload::Type::Int: {
 //                     StringData pk_col_name = get_string(spec->field);
-//                     sync::create_table_with_primary_key(transaction, table_name, type_Int, pk_col_name, spec->nullable);
-//                     break;
+//                     sync::create_table_with_primary_key(transaction, table_name, type_Int, pk_col_name,
+//                     spec->nullable); break;
 //                 }
 //                 case Instruction::Payload::Type::String: {
 //                     StringData pk_col_name = get_string(spec->field);
-//                     sync::create_table_with_primary_key(transaction, table_name, type_String, pk_col_name, spec->nullable);
-//                     break;
+//                     sync::create_table_with_primary_key(transaction, table_name, type_String, pk_col_name,
+//                     spec->nullable); break;
 //                 }
 //                 default: {
 //                     throw ClientResetFailed{};
@@ -584,8 +586,8 @@ bool copy_linklist(ConstLnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(Obj
 //                 TableRef table_target = selected_table->get_link_target(col_key);
 //                 std::string target_name = table_name_for_class(instr.link_target_table);
 //                 if (table_target->get_name() != target_name) {
-//                     logger.debug("Failed here, target_name = %1, name = %2", target_name, table_target->get_name());
-//                     logger.warn("The column %1 in table %2 has incompatible "
+//                     logger.debug("Failed here, target_name = %1, name = %2", target_name,
+//                     table_target->get_name()); logger.warn("The column %1 in table %2 has incompatible "
 //                                 "type between client and server",
 //                                 column_name, selected_table->get_name());
 //                     failed = true;
@@ -717,9 +719,9 @@ bool copy_linklist(ConstLnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(Obj
 //                 }
 //                 case type_Link: {
 //                     REALM_ASSERT(link_target_table);
-//                     GlobalKey oid_target = convert_oid(link_target_table->get_name(), instr.payload.data.link.target);
-//                     ObjKey target_obj_key = row_for_object_id(table_info_cache, *link_target_table, oid_target);
-//                     if (!target_obj_key)
+//                     GlobalKey oid_target = convert_oid(link_target_table->get_name(),
+//                     instr.payload.data.link.target); ObjKey target_obj_key = row_for_object_id(table_info_cache,
+//                     *link_target_table, oid_target); if (!target_obj_key)
 //                         return;
 //                     REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(list));
 //                     static_cast<Lst<ObjKey>*>(list)->set(instr.ndx, target_obj_key);
@@ -787,9 +789,9 @@ bool copy_linklist(ConstLnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(Obj
 //                     break;
 //                 }
 //                 case type_Link: {
-//                     GlobalKey oid_target = convert_oid(link_target_table->get_name(), instr.payload.data.link.target);
-//                     ObjKey target_obj_key = row_for_object_id(table_info_cache, *link_target_table, oid_target);
-//                     if (!target_obj_key)
+//                     GlobalKey oid_target = convert_oid(link_target_table->get_name(),
+//                     instr.payload.data.link.target); ObjKey target_obj_key = row_for_object_id(table_info_cache,
+//                     *link_target_table, oid_target); if (!target_obj_key)
 //                         return;
 
 //                     REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(list));
@@ -891,10 +893,8 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
             continue;
 
         // Now the tables both have primary keys.
-        const sync::TableInfoCache::TableInfo& table_info_src =
-            table_info_cache_src.get_table_info(*table_src);
-        const sync::TableInfoCache::TableInfo& table_info_dst =
-            table_info_cache_dst.get_table_info(*table_dst);
+        const sync::TableInfoCache::TableInfo& table_info_src = table_info_cache_src.get_table_info(*table_src);
+        const sync::TableInfoCache::TableInfo& table_info_dst = table_info_cache_dst.get_table_info(*table_dst);
         if (table_info_src.primary_key_type != table_info_dst.primary_key_type ||
             table_info_src.primary_key_nullable != table_info_dst.primary_key_nullable) {
             logger.debug("Table '%1' will be removed", table_name);
@@ -931,16 +931,15 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                 }
             }
         }
-        for (const std::string& col_name: columns_to_remove) {
-            logger.debug("Column '%1' in table '%2' is removed",
-                         col_name, table_dst->get_name());
+        for (const std::string& col_name : columns_to_remove) {
+            logger.debug("Column '%1' in table '%2' is removed", col_name, table_dst->get_name());
             ColKey col_key = table_dst->get_column_key(col_name);
             table_dst->remove_column(col_key);
         }
     }
 
     // Remove the tables to be removed.
-    for (const std::string& table_name: tables_to_remove)
+    for (const std::string& table_name : tables_to_remove)
         sync::erase_table(group_dst, table_info_cache_dst, table_name);
 
     table_info_cache_dst.clear();
@@ -962,8 +961,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                 const sync::TableInfoCache::TableInfo& table_info_src =
                     table_info_cache_src.get_table_info(*table_src);
                 DataType pk_type = table_info_src.primary_key_type;
-                StringData pk_col_name =
-                    table_src->get_column_name(table_info_src.primary_key_col);
+                StringData pk_col_name = table_src->get_column_name(table_info_src.primary_key_col);
                 bool nullable = table_info_src.primary_key_nullable;
                 group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, nullable);
             }
@@ -1022,9 +1020,8 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                 }
             }
         }
-        for (const std::string& col_name: columns_to_remove) {
-            logger.debug("Column '%1' in table '%2' is removed",
-                         col_name, table_name);
+        for (const std::string& col_name : columns_to_remove) {
+            logger.debug("Column '%1' in table '%2' is removed", col_name, table_name);
             ColKey col_key = table_dst->get_column_key(col_name);
             table_dst->remove_column(col_key);
         }
@@ -1034,7 +1031,9 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
     for (auto table_key : group_src.get_table_keys()) {
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
-        if (!table_name.begins_with("class")) // FIXME: This is an imprecise check. A more correct version would check for `class_`, but this should be done by a shared function somewhere. Maybe one exists already.
+        if (!table_name.begins_with(
+                "class")) // FIXME: This is an imprecise check. A more correct version would check for `class_`, but
+                          // this should be done by a shared function somewhere. Maybe one exists already.
             continue;
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_dst);
@@ -1053,7 +1052,6 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                     ConstTableRef target_src = table_src->get_link_target(col_key);
                     TableRef target_dst = group_dst.get_table(target_src->get_name());
                     col_key_dst = table_dst->add_column_link(type, col_name, *target_dst);
-
                 }
                 else if (col_key.get_attrs().test(col_attr_List)) {
                     col_key_dst = table_dst->add_column_list(type, col_name, nullable);
@@ -1132,8 +1130,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
-        const sync::TableInfoCache::TableInfo& table_info_src =
-            table_info_cache_src.get_table_info(*table_src);
+        const sync::TableInfoCache::TableInfo& table_info_src = table_info_cache_src.get_table_info(*table_src);
         if (table_src->get_primary_key_column()) {
             logger.debug("Updating values for table '%1', number of rows = %2, "
                          "number of columns = %3, primary_key_col = %4, "
@@ -1147,8 +1144,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         }
 
         for (const ConstObj& src : *table_src) {
-            auto oid =
-                sync::object_id_for_row(table_info_cache_src, src);
+            auto oid = sync::object_id_for_row(table_info_cache_src, src);
             auto dst = obj_for_object_id(table_info_cache_dst, *table_dst, oid);
             REALM_ASSERT(dst);
             bool updated = false;
@@ -1174,8 +1170,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                     else {
                         ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
                         GlobalKey target_oid =
-                            sync::object_id_for_row(table_info_cache_src, *table_target_src,
-                                    target_obj_key_src);
+                            sync::object_id_for_row(table_info_cache_src, *table_target_src, target_obj_key_src);
                         ObjKey target_obj_key_dst =
                             sync::row_for_object_id(table_info_cache_dst, *table_target_dst, target_oid);
                         if (dst.get<ObjKey>(col_key_dst) != target_obj_key_dst) {
@@ -1192,8 +1187,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                     // to the row index in table_target_dst such that the
                     // object ids are the same.
                     auto convert_ndx = [&](ObjKey key_src) {
-                        auto oid =
-                            sync::object_id_for_row(table_info_cache_src, *table_target_src, key_src);
+                        auto oid = sync::object_id_for_row(table_info_cache_src, *table_target_src, key_src);
                         ObjKey key_dst = sync::row_for_object_id(table_info_cache_dst, *table_target_dst, oid);
                         REALM_ASSERT(key_dst);
                         return key_dst;
@@ -1226,10 +1220,8 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
 }
 
 
-void client_reset::recover_schema(const Transaction& group_src,
-                                  const sync::TableInfoCache& table_info_cache_src,
-                                  Transaction& group_dst,
-                                  util::Logger& logger)
+void client_reset::recover_schema(const Transaction& group_src, const sync::TableInfoCache& table_info_cache_src,
+                                  Transaction& group_dst, util::Logger& logger)
 {
     // First the missing tables are created. Columns must be created later due
     // to links.
@@ -1251,11 +1243,9 @@ void client_reset::recover_schema(const Transaction& group_src,
             sync::create_table(group_dst, table_name);
         }
         else {
-            const sync::TableInfoCache::TableInfo& table_info_src =
-                table_info_cache_src.get_table_info(*table_src);
+            const sync::TableInfoCache::TableInfo& table_info_src = table_info_cache_src.get_table_info(*table_src);
             DataType pk_type = table_info_src.primary_key_type;
-            StringData pk_col_name =
-                table_src->get_column_name(table_info_src.primary_key_col);
+            StringData pk_col_name = table_src->get_column_name(table_info_src.primary_key_col);
             bool nullable = table_info_src.primary_key_nullable;
             group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, nullable);
         }
@@ -1294,17 +1284,12 @@ void client_reset::recover_schema(const Transaction& group_src,
     }
 }
 
-client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
-    const std::string& path_remote,
-    const std::string& path_local,
-    const util::Optional<std::array<char, 64>>& encryption_key,
-    sync::SaltedFileIdent client_file_ident,
-    sync::SaltedVersion server_version,
-    uint_fast64_t downloaded_bytes,
-    sync::version_type client_version,
-    bool recover_local_changes,
-    util::Logger& logger,
-    bool should_commit_remote)
+client_reset::LocalVersionIDs
+client_reset::perform_client_reset_diff(const std::string& path_remote, const std::string& path_local,
+                                        const util::Optional<std::array<char, 64>>& encryption_key,
+                                        sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
+                                        uint_fast64_t downloaded_bytes, sync::version_type client_version,
+                                        bool recover_local_changes, util::Logger& logger, bool should_commit_remote)
 {
     logger.info("Client reset, path_remote = %1, path_local = %2, "
                 "encryption = %3, client_file_ident.ident = %4, "
@@ -1312,12 +1297,9 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
                 "server_version.salt = %7, downloaded_bytes = %8, "
                 "client_version = %9, recover_local_changes = %10, "
                 "should_commit_remote = %11.",
-                path_remote, path_local, (encryption_key ? "on" : "off"),
-                client_file_ident.ident, client_file_ident.salt,
-                server_version.version, server_version.salt,
-                downloaded_bytes, client_version,
-                (recover_local_changes ? "true" : "false"),
-                (should_commit_remote ? "true" : "false"));
+                path_remote, path_local, (encryption_key ? "on" : "off"), client_file_ident.ident,
+                client_file_ident.salt, server_version.version, server_version.salt, downloaded_bytes, client_version,
+                (recover_local_changes ? "true" : "false"), (should_commit_remote ? "true" : "false"));
 
     DBOptions shared_group_options(encryption_key ? encryption_key->data() : nullptr);
     ClientHistoryImpl history_local{path_local};
@@ -1327,7 +1309,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     VersionID old_version_local = group_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
-    sync::TableInfoCache table_info_cache_local {*group_local};
+    sync::TableInfoCache table_info_cache_local{*group_local};
 
     std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
     DBRef sg_remote = DB::create(*history_remote, shared_group_options);
@@ -1339,7 +1321,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     if (recover_local_changes) {
         // Set the client file ident in the remote Realm to prepare it for creation of
         // local changes.
-        sync::TableInfoCache table_info_cache_remote {*wt_remote};
+        sync::TableInfoCache table_info_cache_remote{*wt_remote};
 
         // Copy tables and columns from local into remote to avoid destructive schema changes.
         // The instructions that create tables and columns present in local but not
@@ -1354,15 +1336,15 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
         // when the function returns.
 
         // FIXME: Re-enable
-        // bool recovered_local_changes = recover_local_changesets(current_version_local, history_local, client_version,
+        // bool recovered_local_changes = recover_local_changesets(current_version_local, history_local,
+        // client_version,
         //                                                         *wt_remote, table_info_cache_remote, logger);
         bool recovered_local_changes = false;
 
         if (!recovered_local_changes) {
-            const char* msg =
-                "The local data in the client Realm could not be recovered "
-                // "due to a schema mismatch"; // FIXME
-                "due to recovery not being supported";
+            const char* msg = "The local data in the client Realm could not be recovered "
+                              // "due to a schema mismatch"; // FIXME
+                              "due to recovery not being supported";
             logger.warn(msg);
             // Reset the transaction.
             wt_remote.reset(); // Rollback
@@ -1381,10 +1363,9 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
 
     // Diff the content from remote into local.
     {
-        sync::TableInfoCache table_info_cache_remote {*wt_remote};
+        sync::TableInfoCache table_info_cache_remote{*wt_remote};
         // Copy, by diffing, all group content from the remote to the local.
-        transfer_group(*wt_remote, table_info_cache_remote, *group_local,
-                       table_info_cache_local, logger);
+        transfer_group(*wt_remote, table_info_cache_remote, *group_local, table_info_cache_local, logger);
     }
 
     // Extract the changeset produced in the remote Realm during recovery.
@@ -1392,13 +1373,13 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     const sync::ChangesetEncoder::Buffer& buffer = instruction_encoder.buffer();
     BinaryData recovered_changeset{buffer.data(), buffer.size()};
 
-//    {
-//        // Debug.
-//        ChunkedBinaryInputStream in{recovered_changeset};
-//        sync::Changeset log;
-//        sync::parse_changeset(in, log); // Throws
-//        log.print();
-//    }
+    //    {
+    //        // Debug.
+    //        ChunkedBinaryInputStream in{recovered_changeset};
+    //        sync::Changeset log;
+    //        sync::parse_changeset(in, log); // Throws
+    //        log.print();
+    //    }
 
     history_local.set_client_reset_adjustments(current_version_local, client_file_ident, server_version,
                                                downloaded_bytes, recovered_changeset);
@@ -1411,8 +1392,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(
     logger.debug("perform_client_reset_diff is done, old_version.version = %1, "
                  "old_version.index = %2, new_version.version = %3, "
                  "new_version.index = %4",
-                 old_version_local.version, old_version_local.index,
-                 new_version_local.version, new_version_local.index);
+                 old_version_local.version, old_version_local.index, new_version_local.version,
+                 new_version_local.index);
 
     return LocalVersionIDs{old_version_local, new_version_local};
 }

@@ -15,7 +15,7 @@ namespace {
 const char* get_error_message(sync::auth::Error error)
 {
     using Error = sync::auth::Error;
-    switch(error) {
+    switch (error) {
         case Error::unexpected_response_status:
             return "Unexpected HTTP reesponse status code";
         case Error::unauthorized:
@@ -27,7 +27,7 @@ const char* get_error_message(sync::auth::Error error)
 }
 
 
-class AuthErrorCategory: public std::error_category {
+class AuthErrorCategory : public std::error_category {
 public:
     const char* name() const noexcept final override
     {
@@ -37,7 +37,7 @@ public:
     std::string message(int error_code) const override final
     {
         const char* msg = get_error_message(sync::auth::Error(error_code));
-        return msg ? std::string {msg} : "unknown error";
+        return msg ? std::string{msg} : "unknown error";
     }
 };
 
@@ -59,13 +59,13 @@ std::string to_json(const std::string& str)
 
 class ResponseParser {
 public:
-    bool access_token_found  = false;
+    bool access_token_found = false;
     bool refresh_token_found = false;
     std::string access_token;
     std::string refresh_token;
 
-    ResponseParser(bool is_refresh) :
-        m_is_refresh{is_refresh}
+    ResponseParser(bool is_refresh)
+        : m_is_refresh{is_refresh}
     {
     }
 
@@ -165,7 +165,7 @@ bool get_tokens_from_login(const util::HTTPResponse& res, std::string& access_to
     std::error_condition ec = json_parser.parse(parser);
     bool good = (!ec && parser.access_token_found && parser.refresh_token_found);
     if (REALM_LIKELY(good)) {
-        access_token  = std::move(parser.access_token);
+        access_token = std::move(parser.access_token);
         refresh_token = std::move(parser.refresh_token);
         return true;
     }
@@ -193,13 +193,13 @@ bool get_access_token_from_refresh(const util::HTTPResponse& res, std::string& a
 
 const std::error_category& sync::auth::auth_error_category() noexcept
 {
-   return g_auth_error_category;
+    return g_auth_error_category;
 }
 
 
 std::error_code sync::auth::make_error_code(auth::Error error) noexcept
 {
-    return std::error_code {int(error), g_auth_error_category};
+    return std::error_code{int(error), g_auth_error_category};
 }
 
 
@@ -216,14 +216,12 @@ public:
     // These three socket like functions are needed to make the request object act
     // as a Socket for the HTTP handler.  They will also  be needed for
     // SSL support.
-    void async_read(char* buffer, std::size_t size,
-                    std::function<void(std::error_code, std::size_t)> handler);
+    void async_read(char* buffer, std::size_t size, std::function<void(std::error_code, std::size_t)> handler);
 
     void async_read_until(char* buffer, std::size_t size, char delim,
                           std::function<void(std::error_code, std::size_t)> handler);
 
-    void async_write(const char* data, std::size_t size,
-                     std::function<void(std::error_code, std::size_t)> handler);
+    void async_write(const char* data, std::size_t size, std::function<void(std::error_code, std::size_t)> handler);
 
 protected:
     Client& m_client;
@@ -257,7 +255,7 @@ private:
     void initiate_http_request()
     {
         m_http_client.emplace(*this, logger); // Throws
-        do_initiate_http_request(); // Throws
+        do_initiate_http_request();           // Throws
     }
 
     virtual void do_initiate_http_request() = 0;
@@ -272,8 +270,8 @@ private:
 class Client::LoginRequest : public Request {
 public:
     LoginRequest(Client&, std::int_fast64_t request_counter, std::function<LoginHandler>);
-    LoginRequest(Client&, std::int_fast64_t request_counter, std::string username,
-                 std::string password, std::function<LoginHandler>);
+    LoginRequest(Client&, std::int_fast64_t request_counter, std::string username, std::string password,
+                 std::function<LoginHandler>);
 
 private:
     const bool m_has_user;
@@ -305,24 +303,22 @@ private:
 };
 
 
-Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id,
-               Config config) :
-    logger{config.logger ? *config.logger : g_fallback_logger},
-    m_service{}, // Throws
-    m_auth_ssl{auth_ssl},
-    m_auth_address{std::move(auth_address)},
-    m_auth_port{auth_port},
-    m_http_host{util::make_http_host(auth_ssl, auth_address, auth_port)}, // Throws
-    m_max_number_of_connections{config.max_number_of_connections},
-    m_verify_servers_ssl_certificate{config.verify_servers_ssl_certificate},
-    m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)},
-    m_ssl_verify_callback{std::move(config.ssl_verify_callback)},
-    m_request_base_path{std::move(config.request_base_path)},
-    m_app_request_path{m_request_base_path + "/app/" + app_id}, // Throws
-    m_keep_running_timer{m_service}
+Client::Client(bool auth_ssl, std::string auth_address, port_type auth_port, std::string app_id, Config config)
+    : logger{config.logger ? *config.logger : g_fallback_logger}
+    , m_service{} // Throws
+    , m_auth_ssl{auth_ssl}
+    , m_auth_address{std::move(auth_address)}
+    , m_auth_port{auth_port}
+    , m_http_host{util::make_http_host(auth_ssl, auth_address, auth_port)} // Throws
+    , m_max_number_of_connections{config.max_number_of_connections}
+    , m_verify_servers_ssl_certificate{config.verify_servers_ssl_certificate}
+    , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
+    , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
+    , m_request_base_path{std::move(config.request_base_path)}
+    , m_app_request_path{m_request_base_path + "/app/" + app_id} // Throws
+    , m_keep_running_timer{m_service}
 {
-    logger.info("Auth client started for server: [%1]:%2'",
-                auth_address, auth_port);
+    logger.info("Auth client started for server: [%1]:%2'", auth_address, auth_port);
 
     util::seed_prng_nondeterministically(m_random);
     start_keep_running_timer();
@@ -350,8 +346,7 @@ void Client::login_anon(std::function<LoginHandler> handler)
 }
 
 
-void Client::login_user(std::string username, std::string password,
-                        std::function<LoginHandler> handler)
+void Client::login_user(std::string username, std::string password, std::function<LoginHandler> handler)
 {
     auto handler_2 = [this, username = std::move(username), password = std::move(password),
                       handler = std::move(handler)] {
@@ -363,8 +358,7 @@ void Client::login_user(std::string username, std::string password,
 
 void Client::refresh(std::string refresh_token, std::function<RefreshHandler> handler)
 {
-    auto handler_2 = [this, refresh_token = std::move(refresh_token),
-                      handler = std::move(handler)] {
+    auto handler_2 = [this, refresh_token = std::move(refresh_token), handler = std::move(handler)] {
         do_refresh(std::move(refresh_token), std::move(handler)); // Throws
     };
     m_service.post(handler_2); // Throws
@@ -405,9 +399,7 @@ std::mt19937_64& Client::get_random()
 }
 
 
-Client::~Client() noexcept
-{
-}
+Client::~Client() noexcept {}
 
 
 void Client::start_keep_running_timer()
@@ -425,19 +417,18 @@ void Client::do_login_anon(std::function<LoginHandler> handler)
     std::int_fast64_t request_counter = m_request_counter++;
     std::unique_ptr<Request> request =
         std::make_unique<LoginRequest>(*this, request_counter, std::move(handler)); // Throws
-    m_requests.emplace(request_counter, std::move(request)); // Throws
-    schedule_requests(); // Throws
+    m_requests.emplace(request_counter, std::move(request));                        // Throws
+    schedule_requests();                                                            // Throws
 }
 
 
 void Client::do_login_user(std::string username, std::string password, std::function<LoginHandler> handler)
 {
     std::int_fast64_t request_counter = m_request_counter++;
-    std::unique_ptr<Request> request =
-        std::make_unique<LoginRequest>(*this, request_counter, std::move(username),
-                                       std::move(password), std::move(handler)); // Throws
-    m_requests.emplace(request_counter, std::move(request)); // Throws
-    schedule_requests(); // Throws
+    std::unique_ptr<Request> request = std::make_unique<LoginRequest>(
+        *this, request_counter, std::move(username), std::move(password), std::move(handler)); // Throws
+    m_requests.emplace(request_counter, std::move(request));                                   // Throws
+    schedule_requests();                                                                       // Throws
 }
 
 
@@ -447,15 +438,14 @@ void Client::do_refresh(std::string access_token, std::function<RefreshHandler> 
     std::unique_ptr<Request> request =
         std::make_unique<RefreshRequest>(*this, request_counter, std::move(access_token),
                                          std::move(handler)); // Throws
-    m_requests.emplace(request_counter, std::move(request)); // Throws
-    schedule_requests(); // Throws
+    m_requests.emplace(request_counter, std::move(request));  // Throws
+    schedule_requests();                                      // Throws
 }
 
 
 void Client::schedule_requests()
 {
-    while (m_pending_request_counter < m_request_counter &&
-           m_active_requests < m_max_number_of_connections) {
+    while (m_pending_request_counter < m_request_counter && m_active_requests < m_max_number_of_connections) {
         m_requests.at(m_pending_request_counter)->initiate(); // Throws
         ++m_pending_request_counter;
         ++m_active_requests;
@@ -465,11 +455,11 @@ void Client::schedule_requests()
 
 // Request
 
-Client::Request::Request(Client& client, std::int_fast64_t request_counter) :
-    logger{client.logger},
-    m_client{client},
-    m_request_counter{request_counter},
-    m_wait_timer{client.get_service()}
+Client::Request::Request(Client& client, std::int_fast64_t request_counter)
+    : logger{client.logger}
+    , m_client{client}
+    , m_request_counter{request_counter}
+    , m_wait_timer{client.get_service()}
 {
 }
 
@@ -480,8 +470,7 @@ void Client::Request::initiate()
 }
 
 
-void Client::Request::async_read(char* buffer, size_t size,
-                                 std::function<void(std::error_code, std::size_t)> handler)
+void Client::Request::async_read(char* buffer, size_t size, std::function<void(std::error_code, std::size_t)> handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -555,10 +544,9 @@ void Client::Request::initiate_tcp_connect(util::network::Endpoint::List endpoin
     REALM_ASSERT(i < endpoints.size());
 
     util::network::Endpoint ep = *(endpoints.begin() + i);
-    logger.debug("Connecting to endpoint [%1]:%2 (%3/%4)", ep.address(), ep.port(),
-                  (i+1), endpoints.size());
+    logger.debug("Connecting to endpoint [%1]:%2 (%3/%4)", ep.address(), ep.port(), (i + 1), endpoints.size());
 
-    auto handler = [this, endpoints=std::move(endpoints), i](std::error_code ec) mutable {
+    auto handler = [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
         if (ec != util::error::operation_aborted)
             handle_tcp_connect(ec, std::move(endpoints), i);
     };
@@ -567,14 +555,12 @@ void Client::Request::initiate_tcp_connect(util::network::Endpoint::List endpoin
 }
 
 
-void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints,
-                                         std::size_t i)
+void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);
     if (ec) {
-        logger.debug("Failed to connect to endpoint [%1]:%2: %3", ep.address(), ep.port(),
-                     ec.message());
+        logger.debug("Failed to connect to endpoint [%1]:%2: %3", ep.address(), ep.port(), ec.message());
         std::size_t i_2 = i + 1;
         if (i_2 < endpoints.size()) {
             initiate_tcp_connect(std::move(endpoints), i_2);
@@ -588,8 +574,8 @@ void Client::Request::handle_tcp_connect(std::error_code ec, util::network::Endp
 
     REALM_ASSERT(m_socket);
     util::network::Endpoint ep_2 = m_socket->local_endpoint();
-    logger.debug("Connected to endpoint [%1]:%2 (from [%3]:%4)", ep.address(), ep.port(),
-                ep_2.address(), ep_2.port()); // Throws
+    logger.debug("Connected to endpoint [%1]:%2 (from [%3]:%4)", ep.address(), ep.port(), ep_2.address(),
+                 ep_2.port()); // Throws
 
     if (m_client.m_auth_ssl) {
         initiate_ssl_handshake(); // Throws
@@ -653,7 +639,7 @@ void Client::Request::handle_ssl_handshake(std::error_code ec)
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
         logger.error("SSL handshake failed: %1", ec.message()); // Throws
-        disconnect_and_wait(); // Throws
+        disconnect_and_wait();                                  // Throws
         return;
     }
 
@@ -665,7 +651,7 @@ void Client::Request::initiate_wait(std::uint_fast64_t delay)
 {
     logger.debug("Waiting %1 ms before connecting to the auth server", delay);
 
-    auto handler = [this] (std::error_code ec) {
+    auto handler = [this](std::error_code ec) {
         if (ec != util::error::operation_aborted) {
             initiate_resolve();
         }
@@ -710,28 +696,26 @@ std::uint_fast64_t Client::Request::randomize_delay(std::uint_fast64_t delay)
 
 
 Client::LoginRequest::LoginRequest(Client& client, std::int_fast64_t request_counter,
-                                   std::function<LoginHandler> handler) :
-    Request{client, request_counter},
-    m_has_user{false},
-    m_handler{std::move(handler)}
+                                   std::function<LoginHandler> handler)
+    : Request{client, request_counter}
+    , m_has_user{false}
+    , m_handler{std::move(handler)}
 {
 }
 
 
-Client::LoginRequest::LoginRequest(Client& client, std::int_fast64_t request_counter,
-                                   std::string username, std::string password,
-                                   std::function<LoginHandler> handler) :
-    Request{client, request_counter},
-    m_has_user{true},
-    m_username{std::move(username)},
-    m_password{std::move(password)},
-    m_handler{std::move(handler)}
+Client::LoginRequest::LoginRequest(Client& client, std::int_fast64_t request_counter, std::string username,
+                                   std::string password, std::function<LoginHandler> handler)
+    : Request{client, request_counter}
+    , m_has_user{true}
+    , m_username{std::move(username)}
+    , m_password{std::move(password)}
+    , m_handler{std::move(handler)}
 {
 }
 
 
-void Client::LoginRequest::call_handler(std::error_code ec, std::string access_token,
-                                        std::string refresh_token)
+void Client::LoginRequest::call_handler(std::error_code ec, std::string access_token, std::string refresh_token)
 {
     m_handler(ec, std::move(access_token), std::move(refresh_token)); // Throws
     m_handler = {};
@@ -742,28 +726,31 @@ void Client::LoginRequest::do_initiate_http_request()
 {
     std::string path, body;
     if (m_has_user) {
-        logger.debug("Requesting user login"); // Throws
+        logger.debug("Requesting user login");                                       // Throws
         path = m_client.m_app_request_path + "/auth/providers/local-userpass/login"; // Throws
         body = "{"
-            "\"provider\": \"local-userpass\", "
-            "\"username\": " + to_json(m_username) + ", "
-            "\"password\": " + to_json(m_password) + "}"; // Throws
+               "\"provider\": \"local-userpass\", "
+               "\"username\": " +
+               to_json(m_username) +
+               ", "
+               "\"password\": " +
+               to_json(m_password) + "}"; // Throws
     }
     else {
-        logger.debug("Requesting anonymous login"); // Throws
+        logger.debug("Requesting anonymous login");                             // Throws
         path = m_client.m_app_request_path + "/auth/providers/anon-user/login"; // Throws
-        body = "{\"provider\": \"anon-user\"}"; // Throws
+        body = "{\"provider\": \"anon-user\"}";                                 // Throws
     }
     util::HTTPRequest req;
     req.method = util::HTTPMethod::Post;
     req.path = std::move(path);
     req.body = std::move(body);
-    req.headers["Content-Type"] = "application/json; charset=utf-8"; // Throws
+    req.headers["Content-Type"] = "application/json; charset=utf-8";   // Throws
     req.headers["Content-Length"] = util::to_string(req.body->size()); // Throws
-    req.headers["Accept"] = "application/json"; // Throws
-    req.headers["Host"] = m_client.m_http_host; // Throws
+    req.headers["Accept"] = "application/json";                        // Throws
+    req.headers["Host"] = m_client.m_http_host;                        // Throws
 
-    auto handler = [this] (util::HTTPResponse res, std::error_code ec) {
+    auto handler = [this](util::HTTPResponse res, std::error_code ec) {
         if (ec != util::error::operation_aborted)
             handle_http_request(res, ec); // Throws
     };
@@ -781,8 +768,8 @@ void Client::LoginRequest::handle_http_request(const util::HTTPResponse& res, st
     if (res.status == util::HTTPStatus::Ok) {
         logger.debug("Login was successful");
         std::string access_token, refresh_token;
-        if (get_tokens_from_login(res, access_token, refresh_token)) { // Throws
-            std::error_code ec; // Success
+        if (get_tokens_from_login(res, access_token, refresh_token)) {           // Throws
+            std::error_code ec;                                                  // Success
             call_handler(ec, std::move(access_token), std::move(refresh_token)); // Throws
             finalize();
         }
@@ -805,12 +792,11 @@ void Client::LoginRequest::handle_http_request(const util::HTTPResponse& res, st
 }
 
 
-Client::RefreshRequest::RefreshRequest(Client& client, std::int_fast64_t request_counter,
-                                       std::string refresh_token,
-                                       std::function<RefreshHandler> handler) :
-    Request{client, request_counter},
-    m_refresh_token{std::move(refresh_token)},
-    m_handler{std::move(handler)}
+Client::RefreshRequest::RefreshRequest(Client& client, std::int_fast64_t request_counter, std::string refresh_token,
+                                       std::function<RefreshHandler> handler)
+    : Request{client, request_counter}
+    , m_refresh_token{std::move(refresh_token)}
+    , m_handler{std::move(handler)}
 {
 }
 
@@ -828,11 +814,11 @@ void Client::RefreshRequest::do_initiate_http_request()
     util::HTTPRequest req;
     req.method = util::HTTPMethod::Post;
     req.path = m_client.m_request_base_path + "/auth/session"; // Throws
-    req.headers["Accept"] = "application/json"; // Throws
+    req.headers["Accept"] = "application/json";                // Throws
     req.headers["Authorization"] = "Bearer " + m_refresh_token;
     req.headers["Host"] = m_client.m_http_host; // Throws
 
-    auto handler = [this] (util::HTTPResponse res, std::error_code ec) {
+    auto handler = [this](util::HTTPResponse res, std::error_code ec) {
         if (ec != util::error::operation_aborted)
             handle_http_request(res, ec); // Throws
     };
@@ -851,8 +837,8 @@ void Client::RefreshRequest::handle_http_request(const util::HTTPResponse& res, 
         logger.debug("Refresh was successful");
         std::string access_token;
         if (get_access_token_from_refresh(res, access_token)) { // Throws
-            std::error_code ec; // Success
-            call_handler(ec, std::move(access_token)); // Throws
+            std::error_code ec;                                 // Success
+            call_handler(ec, std::move(access_token));          // Throws
             finalize();
         }
         else {

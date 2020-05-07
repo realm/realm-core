@@ -12,7 +12,7 @@ EnumMapper::EnumMapper(const util::EnumAssoc* map, bool ignore_case)
     const std::ctype<char>& ctype = std::use_facet<std::ctype<char>>(std::locale::classic());
     const util::EnumAssoc* i = map;
     while (i->name) {
-        std::string name = i->name; // Throws (copy)
+        std::string name = i->name;                       // Throws (copy)
         auto p_1 = value_to_name.emplace(i->value, name); // Throws
         bool was_inserted_1 = p_1.second;
         REALM_ASSERT(was_inserted_1);
@@ -26,7 +26,7 @@ EnumMapper::EnumMapper(const util::EnumAssoc* map, bool ignore_case)
 }
 
 
-bool EnumMapper::parse(const std::string& string, int &value, bool ignore_case) const
+bool EnumMapper::parse(const std::string& string, int& value, bool ignore_case) const
 {
     std::string string_2 = string; // Throws (copy)
     if (ignore_case) {

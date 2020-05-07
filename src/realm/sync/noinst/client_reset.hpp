@@ -19,9 +19,8 @@ namespace client_reset {
 //
 // The result is that src group is unchanged and the dst group is equal to src
 // when this function returns.
-void transfer_group(const Transaction& tr_src, const sync::TableInfoCache& table_info_cache_src,
-                    Transaction& tr_dst, sync::TableInfoCache& table_info_cache_dst,
-                    util::Logger& logger);
+void transfer_group(const Transaction& tr_src, const sync::TableInfoCache& table_info_cache_src, Transaction& tr_dst,
+                    sync::TableInfoCache& table_info_cache_dst, util::Logger& logger);
 
 // recover_schema() transfers all tables and columns that exist in src but not
 // in dst into dst. Nothing is erased in dst.
@@ -48,15 +47,11 @@ struct LocalVersionIDs {
     realm::VersionID old_version;
     realm::VersionID new_version;
 };
-LocalVersionIDs perform_client_reset_diff(const std::string& path_remote,
-                                          const std::string& path_local,
+LocalVersionIDs perform_client_reset_diff(const std::string& path_remote, const std::string& path_local,
                                           const util::Optional<std::array<char, 64>>& encryption_key,
-                                          sync::SaltedFileIdent client_file_ident,
-                                          sync::SaltedVersion server_version,
-                                          uint_fast64_t downloaded_bytes,
-                                          sync::version_type client_version,
-                                          bool recover_local_changes,
-                                          util::Logger& logger,
+                                          sync::SaltedFileIdent client_file_ident, sync::SaltedVersion server_version,
+                                          uint_fast64_t downloaded_bytes, sync::version_type client_version,
+                                          bool recover_local_changes, util::Logger& logger,
                                           bool should_commit_remote = false);
 
 } // namespace client_reset

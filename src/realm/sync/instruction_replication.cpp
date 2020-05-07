@@ -553,7 +553,7 @@ void SyncReplication::list_set_link(const Lst<ObjKey>& list, size_t ndx, ObjKey 
         Instruction::Set instr;
         populate_path_instr(instr, list, uint32_t(ndx));
         REALM_ASSERT(instr.is_array_set());
-        
+
         ConstTableRef target_table = list.get_table()->get_link_target(list.get_col_key());
         if (target_table->is_embedded()) {
             if (value) {

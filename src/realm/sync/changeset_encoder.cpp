@@ -97,47 +97,49 @@ void ChangesetEncoder::append_value(Instruction::Payload::Type type)
     append_value(int64_t(type));
 }
 
-void ChangesetEncoder::append_value(const Instruction::Payload::Link& link) {
+void ChangesetEncoder::append_value(const Instruction::Payload::Link& link)
+{
     append_value(link.target_table);
     append_value(link.target);
 }
 
-void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk) {
+void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
+{
     using Type = Instruction::Payload::Type;
-    mpark::visit(util::overloaded {
-        [&](mpark::monostate) {
-            append_value(Type::Null);
-        },
-        [&](int64_t value) {
-            append_value(Type::Int);
-            append_value(value);
-        },
-        [&](InternString str) {
-            // Note: Contextual difference. In payloads, Type::String denotes a StringBufferRange,
-            // but here it denotes to an InternString.
-            append_value(Type::String);
-            append_value(str);
-        },
-        [&](GlobalKey key) {
-            append_value(Type::GlobalKey);
-            append_value(key);
-        },
-        [&](ObjectId id) {
-            append_value(Type::ObjectId);
-            append_value(id);
-        }
-    }, pk);
+    mpark::visit(util::overloaded{[&](mpark::monostate) {
+                                      append_value(Type::Null);
+                                  },
+                                  [&](int64_t value) {
+                                      append_value(Type::Int);
+                                      append_value(value);
+                                  },
+                                  [&](InternString str) {
+                                      // Note: Contextual difference. In payloads, Type::String denotes a
+                                      // StringBufferRange, but here it denotes to an InternString.
+                                      append_value(Type::String);
+                                      append_value(str);
+                                  },
+                                  [&](GlobalKey key) {
+                                      append_value(Type::GlobalKey);
+                                      append_value(key);
+                                  },
+                                  [&](ObjectId id) {
+                                      append_value(Type::ObjectId);
+                                      append_value(id);
+                                  }},
+                 pk);
 }
 
 void ChangesetEncoder::append_value(const Instruction::Path& path)
 {
     append_value(uint32_t(path.m_path.size()));
-    for (auto& element: path.m_path) {
+    for (auto& element : path.m_path) {
         // Integer path elements are encoded as their integer values.
         // String path elements are encoded as [-1, intern_string_id].
         if (auto index = mpark::get_if<uint32_t>(&element)) {
             append_value(int64_t(*index));
-        } else if (auto name = mpark::get_if<InternString>(&element)) {
+        }
+        else if (auto name = mpark::get_if<InternString>(&element)) {
             // Since indices cannot be negative, use -1 to indicate that the path element is a
             // string.
             append_value(int64_t(-1));
@@ -239,7 +241,8 @@ void ChangesetEncoder::append(Instruction::Type t, Args&&... args)
 }
 
 template <class... Args>
-void ChangesetEncoder::append_path_instr(Instruction::Type t, const Instruction::PathInstruction& instr, Args&&... args)
+void ChangesetEncoder::append_path_instr(Instruction::Type t, const Instruction::PathInstruction& instr,
+                                         Args&&... args)
 {
     append_value(uint8_t(t));
     append_value(instr.table);

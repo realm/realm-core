@@ -24,8 +24,8 @@ namespace dogless {
 
 using std::string;
 
-class DogStatsd: public TaggedStatsCollectorBase {
-    public:
+class DogStatsd : public TaggedStatsCollectorBase {
+public:
     using Tags = std::vector<string>;
 
     // ctors & dtors
@@ -37,23 +37,20 @@ class DogStatsd: public TaggedStatsCollectorBase {
     // modifiers
     void default_tags(Tags const& default_tags);
 
-    protected:
+protected:
     // internal methods
     string build_eol(const char** tags, size_t num_tags) const;
 
-    private:
+private:
     // options
     Tags m_default_tags;
 };
 
 class UnbufferedDogStatsd : public DogStatsd {
-    public:
+public:
     // ctors & dtors
-    UnbufferedDogStatsd(string const& hostname = "localhost",
-                        int port = 8125,
-                        Tags const& default_tags = Tags());
-    UnbufferedDogStatsd(std::vector<string> const& endpoints,
-                        Tags const& default_tags);
+    UnbufferedDogStatsd(string const& hostname = "localhost", int port = 8125, Tags const& default_tags = Tags());
+    UnbufferedDogStatsd(std::vector<string> const& endpoints, Tags const& default_tags);
     UnbufferedDogStatsd(Tags const& default_tags);
     UnbufferedDogStatsd(UnbufferedDogStatsd const&) = delete;
 
@@ -63,36 +60,28 @@ class UnbufferedDogStatsd : public DogStatsd {
     void add_endpoints(std::vector<string> const& endpoints);
 
     // main API
-    void decrement(const char* metric, int value = 1,
-                   const char** tags = nullptr, size_t num_tags = 0,
+    void decrement(const char* metric, int value = 1, const char** tags = nullptr, size_t num_tags = 0,
                    float sample_rate = 1.0) final;
-    void gauge(const char* metric, double value,
-               const char** tags = nullptr, size_t num_tags = 0,
+    void gauge(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
                float sample_rate = 1.0) final;
-    void histogram(const char* metric, double value,
-                   const char** tags = nullptr, size_t num_tags = 0,
+    void histogram(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
                    float sample_rate = 1.0) final;
-    void increment(const char* metric, int value = 1,
-                   const char** tags = nullptr, size_t num_tags = 0,
+    void increment(const char* metric, int value = 1, const char** tags = nullptr, size_t num_tags = 0,
                    float sample_rate = 1.0) final;
-    void timing(const char* metric, double value,
-                   const char** tags = nullptr, size_t num_tags = 0,
-                   float sample_rate = 1.0) final;
+    void timing(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
+                float sample_rate = 1.0) final;
 
-    private:
+private:
     // properties
     UnbufferedStatsd m_statsd;
 };
 
 class BufferedDogStatsd : public DogStatsd {
-    public:
+public:
     // ctors & dtors
-    BufferedDogStatsd(string const& hostname = "localhost",
-                      int port = 8125,
-                      Tags const& default_tags = Tags(),
+    BufferedDogStatsd(string const& hostname = "localhost", int port = 8125, Tags const& default_tags = Tags(),
                       std::size_t mtu = MTU_InternetSafe);
-    BufferedDogStatsd(std::vector<string> const& endpoints,
-                      Tags const& default_tags,
+    BufferedDogStatsd(std::vector<string> const& endpoints, Tags const& default_tags,
                       std::size_t mtu = MTU_InternetSafe);
     BufferedDogStatsd(Tags const& default_tags);
     BufferedDogStatsd(BufferedDogStatsd const&) = delete;
@@ -109,24 +98,19 @@ class BufferedDogStatsd : public DogStatsd {
     void mtu(std::size_t mtu) noexcept;
 
     // main API
-    void decrement(const char* metric, int value = 1,
-                   const char** tags = nullptr, size_t num_tags = 0,
+    void decrement(const char* metric, int value = 1, const char** tags = nullptr, size_t num_tags = 0,
                    float sample_rate = 1.0) final;
-    void gauge(const char* metric, double value,
-               const char** tags = nullptr, size_t num_tags = 0,
+    void gauge(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
                float sample_rate = 1.0) final;
-    void histogram(const char* metric, double value,
-                   const char** tags = nullptr, size_t num_tags = 0,
+    void histogram(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
                    float sample_rate = 1.0) final;
-    void increment(const char* metric, int value = 1,
-                   const char** tags = nullptr, size_t num_tags = 0,
+    void increment(const char* metric, int value = 1, const char** tags = nullptr, size_t num_tags = 0,
                    float sample_rate = 1.0) final;
-    void timing(const char* metric, double value,
-                   const char** tags = nullptr, size_t num_tags = 0,
-                   float sample_rate = 1.0) final;
+    void timing(const char* metric, double value, const char** tags = nullptr, size_t num_tags = 0,
+                float sample_rate = 1.0) final;
     void flush();
 
-    private:
+private:
     // options
     BufferedStatsd m_statsd;
 };

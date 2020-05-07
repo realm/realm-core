@@ -26,14 +26,15 @@ struct Changeset {
     using StringBuffer = util::BasicStringBuffer<MeteredAllocator>;
 
     Changeset();
-    struct share_buffers_tag {};
+    struct share_buffers_tag {
+    };
     Changeset(const Changeset&, share_buffers_tag);
     Changeset(Changeset&&) = default;
     Changeset& operator=(Changeset&&) = default;
     Changeset(const Changeset&) = delete;
     Changeset& operator=(const Changeset&) = delete;
 
-    InternString intern_string(StringData); // Slow!
+    InternString intern_string(StringData);              // Slow!
     InternString find_string(StringData) const noexcept; // Slow!
     StringData string_data() const noexcept;
 
@@ -62,7 +63,8 @@ struct Changeset {
     bool is_dirty() const noexcept;
 
     // Interface to imitate std::vector:
-    template <bool is_const> struct IteratorImpl;
+    template <bool is_const>
+    struct IteratorImpl;
     using iterator = IteratorImpl<false>;
     using const_iterator = IteratorImpl<true>;
     using value_type = Instruction;
@@ -207,14 +209,24 @@ struct Changeset::IteratorImpl {
     // `util::Optional<Instruction&>`, but that runs into other issues.
     using reference_type = std::conditional_t<is_const, const Instruction*, Instruction*>;
 
-    using pointer_type   = std::conditional_t<is_const, const Instruction*, Instruction*>;
+    using pointer_type = std::conditional_t<is_const, const Instruction*, Instruction*>;
     using difference_type = std::ptrdiff_t;
 
-    IteratorImpl() : m_pos(0) {}
+    IteratorImpl()
+        : m_pos(0)
+    {
+    }
     template <bool is_const_ = is_const>
     IteratorImpl(const IteratorImpl<false>& other, std::enable_if_t<is_const_>* = nullptr)
-        : m_inner(other.m_inner), m_pos(other.m_pos) {}
-    IteratorImpl(inner_iterator_type inner, size_t pos = 0) : m_inner(inner), m_pos(pos) {}
+        : m_inner(other.m_inner)
+        , m_pos(other.m_pos)
+    {
+    }
+    IteratorImpl(inner_iterator_type inner, size_t pos = 0)
+        : m_inner(inner)
+        , m_pos(pos)
+    {
+    }
 
     inline IteratorImpl& operator++()
     {
@@ -334,11 +346,14 @@ struct Changeset::Reflector {
         virtual void before_each() {}
     };
 
-    Reflector(Tracer& tracer, const Changeset& changeset) :
-        m_tracer(tracer), m_changeset(changeset)
-    {}
+    Reflector(Tracer& tracer, const Changeset& changeset)
+        : m_tracer(tracer)
+        , m_changeset(changeset)
+    {
+    }
 
     void visit_all() const;
+
 private:
     Tracer& m_tracer;
     const Changeset& m_changeset;
@@ -354,8 +369,10 @@ private:
 };
 
 struct Changeset::Printer : Changeset::Reflector::Tracer {
-    explicit Printer(std::ostream& os) : m_out(os)
-    {}
+    explicit Printer(std::ostream& os)
+        : m_out(os)
+    {
+    }
 
     // ChangesetReflector::Tracer interface:
     void name(StringData) final;
@@ -365,7 +382,10 @@ struct Changeset::Printer : Changeset::Reflector::Tracer {
     void field(StringData, const Instruction::Payload&) final;
     void field(StringData, const Instruction::Path&) final;
     void field(StringData, uint32_t) final;
-    void set_changeset(const Changeset* changeset) final { m_changeset = changeset; }
+    void set_changeset(const Changeset* changeset) final
+    {
+        m_changeset = changeset;
+    }
     void after_each() final;
 
 private:
@@ -378,7 +398,6 @@ private:
     std::string primary_key_to_string(const Instruction::PrimaryKey&);
 };
 #endif // REALM_DEBUG
-
 
 
 /// Implementation:
@@ -421,7 +440,7 @@ inline bool Changeset::empty() const noexcept
 inline size_t Changeset::size() const noexcept
 {
     size_t sum = 0;
-    for (auto& x: m_instructions)
+    for (auto& x : m_instructions)
         sum += x.size();
     return sum;
 }

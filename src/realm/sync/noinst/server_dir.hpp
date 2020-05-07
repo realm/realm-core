@@ -33,37 +33,31 @@ struct VirtualPathComponents {
 //
 // The argument root_path can be any valid path and is only used as a base
 // directory for realm_realm_path.
-VirtualPathComponents parse_virtual_path(const std::string& root_path,
-                                         const std::string& virt_path);
+VirtualPathComponents parse_virtual_path(const std::string& root_path, const std::string& virt_path);
 
 
 // If virt_path is valid, the return value is the local Realm path corresponding to the
 // virtual path. If the virtual path is invalid, the return value is util::none.
-bool map_virt_to_real_realm_path(const std::string& root_path, const std::string& virt_path,
-                                 std::string& real_path);
+bool map_virt_to_real_realm_path(const std::string& root_path, const std::string& virt_path, std::string& real_path);
 
-std::string map_virt_to_real_realm_path(const std::string& root_path,
-                                        const std::string& virt_path);
+std::string map_virt_to_real_realm_path(const std::string& root_path, const std::string& virt_path);
 
-bool map_partial_to_reference_virt_path(const std::string& partial_path,
-                                        std::string& reference_path);
+bool map_partial_to_reference_virt_path(const std::string& partial_path, std::string& reference_path);
 
 std::string map_partial_to_reference_virt_path(const std::string& partial_path);
 
 void make_dirs(const std::string& root_path, const std::string& virt_path);
 
-std::unique_ptr<char[]> read_realm_content(const std::string& realm_path,
-        size_t& file_size);
+std::unique_ptr<char[]> read_realm_content(const std::string& realm_path, size_t& file_size);
 
-void write_realm_content(const std::string& root_path,
-        const std::string& realm_name, const BinaryData& realm_content);
+void write_realm_content(const std::string& root_path, const std::string& realm_name,
+                         const BinaryData& realm_content);
 
 // The realm fragment is placed in buffer and fragment_size and realm_size are
 // set. The function throws if the file does not exist or the offset is greater
 // than or equal to the size of the size of the Realm.
-void read_realm_fragment(const std::string& realm_path, char* buffer,
-                        size_t buffer_size, uint_fast64_t offset,
-                        size_t& fragment_size, uint_fast64_t& realm_size);
+void read_realm_fragment(const std::string& realm_path, char* buffer, size_t buffer_size, uint_fast64_t offset,
+                         size_t& fragment_size, uint_fast64_t& realm_size);
 
 /// Returns the set of virtual paths corresponding to the Realm files found
 /// under the specified root directory.
@@ -76,13 +70,13 @@ std::set<std::string> find_realm_files(const std::string& root_dir);
 /// of the Realm file, which is an extension of the specified root directory
 /// path. The second argument is the virtual path of the Realm file relative to
 /// the specified root directory.
-template<class H> void find_realm_files(const std::string& root_dir, H handler);
+template <class H>
+void find_realm_files(const std::string& root_dir, H handler);
 
 
 // Implementation
 
-inline std::string map_virt_to_real_realm_path(const std::string& root_path,
-                                               const std::string& virt_path)
+inline std::string map_virt_to_real_realm_path(const std::string& root_path, const std::string& virt_path)
 {
     std::string real_path;
     if (map_virt_to_real_realm_path(root_path, virt_path, real_path))
@@ -108,26 +102,26 @@ inline std::set<std::string> find_realm_files(const std::string& root_dir)
     return virt_paths;
 }
 
-template<class H> void find_realm_files(const std::string& root_dir, H handler)
+template <class H>
+void find_realm_files(const std::string& root_dir, H handler)
 {
     StringData realm_suffix = ".realm";
     std::function<void(const std::string&, const std::string&)> scan_dir;
     scan_dir = [&](const std::string& real_path, const std::string& virt_path) {
         util::DirScanner ds{real_path}; // Throws
         std::string name;
-        while (ds.next(name)) { // Throws
+        while (ds.next(name)) {                                              // Throws
             std::string real_subpath = util::File::resolve(name, real_path); // Throws
-            if (util::File::is_dir(real_subpath)) { // Throws
+            if (util::File::is_dir(real_subpath)) {                          // Throws
                 if (StringData{name}.ends_with(realm_suffix))
                     throw std::runtime_error("Illegal directory path: " + real_subpath);
                 std::string virt_subpath = virt_path + "/" + name; // Throws
-                scan_dir(real_subpath, virt_subpath); // Throws
+                scan_dir(real_subpath, virt_subpath);              // Throws
             }
             else if (StringData{name}.ends_with(realm_suffix)) {
-                std::string base_name =
-                    name.substr(0, name.size() - realm_suffix.size()); // Throws
-                std::string virt_subpath = virt_path + "/" + base_name; // Throws
-                handler(std::move(real_subpath), std::move(virt_subpath)); // Throws
+                std::string base_name = name.substr(0, name.size() - realm_suffix.size()); // Throws
+                std::string virt_subpath = virt_path + "/" + base_name;                    // Throws
+                handler(std::move(real_subpath), std::move(virt_subpath));                 // Throws
             }
         }
         return true;

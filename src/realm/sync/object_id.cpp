@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <ostream>
-#include <cctype>  // std::isxdigit
+#include <cctype>   // std::isxdigit
 #include <stdlib.h> // strtoull
 
 using namespace realm;
@@ -14,23 +14,22 @@ using namespace realm::sync;
 std::ostream& realm::sync::operator<<(std::ostream& os, format_pk fmt)
 {
     const auto& key = fmt.pk;
-    mpark::visit(util::overloaded {
-        [&](mpark::monostate) {
-            os << "NULL";
-        },
-        [&](int64_t x) {
-            os << "Int(" << x << ")";
-        },
-        [&](StringData x) {
-            os << "\"" << x << "\"";
-        },
-        [&](GlobalKey x) {
-            os << "GlobalKey{" << x << "}";
-        },
-        [&](ObjectId x) {
-            os << "ObjectId{" << x << "}";
-        }
-    }, key);
+    mpark::visit(util::overloaded{[&](mpark::monostate) {
+                                      os << "NULL";
+                                  },
+                                  [&](int64_t x) {
+                                      os << "Int(" << x << ")";
+                                  },
+                                  [&](StringData x) {
+                                      os << "\"" << x << "\"";
+                                  },
+                                  [&](GlobalKey x) {
+                                      os << "GlobalKey{" << x << "}";
+                                  },
+                                  [&](ObjectId x) {
+                                      os << "ObjectId{" << x << "}";
+                                  }},
+                 key);
     return os;
 }
 
@@ -91,7 +90,7 @@ bool FieldSet::contains(StringData table, const PrimaryKey& object_id) const noe
         return false;
 
     const auto& single_table_fields = search_1->second;
-    for (const auto& kv: single_table_fields) {
+    for (const auto& kv : single_table_fields) {
         const auto& single_field_ids = kv.second;
         if (single_field_ids.find(object_id) != single_field_ids.end())
             return true;

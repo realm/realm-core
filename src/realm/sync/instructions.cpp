@@ -14,6 +14,5 @@ namespace sync {
 const InternString InternString::npos = InternString{uint32_t(-1)};
 
 
-} // namespace _impl
+} // namespace sync
 } // namespace realm
-

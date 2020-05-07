@@ -16,13 +16,12 @@ bool valid_virt_path_segment(const std::string& seg)
     // Prevent spurious clashes between directory names and file names
     // created by appending `.realm`, `.realm.lock`, or `.realm.management`
     // to the last component of client specified virtual paths.
-    bool possible_clash = (StringData(seg).ends_with(".realm") ||
-            StringData(seg).ends_with(".realm.lock") ||
-            StringData(seg).ends_with(".realm.management"));
+    bool possible_clash = (StringData(seg).ends_with(".realm") || StringData(seg).ends_with(".realm.lock") ||
+                           StringData(seg).ends_with(".realm.management"));
     if (possible_clash)
         return false;
     std::locale c_loc = std::locale::classic();
-    for (char ch: seg) {
+    for (char ch : seg) {
         if (std::isalnum(ch, c_loc)) // A-Za-z0-9
             continue;
         if (ch == '_' || ch == '-' || ch == '.')
@@ -35,8 +34,7 @@ bool valid_virt_path_segment(const std::string& seg)
 } // unnamed namespace
 
 
-_impl::VirtualPathComponents _impl::parse_virtual_path(const std::string& root_path,
-                                                       const std::string& virt_path)
+_impl::VirtualPathComponents _impl::parse_virtual_path(const std::string& root_path, const std::string& virt_path)
 {
     VirtualPathComponents result;
     if (virt_path.empty() || virt_path.front() != '/')
@@ -78,10 +76,9 @@ bool _impl::map_virt_to_real_realm_path(const std::string& root_path, const std:
 }
 
 
-bool _impl::map_partial_to_reference_virt_path(const std::string& partial_path,
-                                               std::string& reference_path)
+bool _impl::map_partial_to_reference_virt_path(const std::string& partial_path, std::string& reference_path)
 {
-    std::string root_path = ""; // Immaterial
+    std::string root_path = "";                                                 // Immaterial
     VirtualPathComponents result = parse_virtual_path(root_path, partial_path); // Throws
     if (result.is_valid && result.is_partial_view) {
         reference_path = std::move(result.reference_path);
@@ -101,7 +98,7 @@ void _impl::make_dirs(const std::string& root_path, const std::string& virt_path
         size_t pos = virt_path.find('/', prev_pos);
         if (pos == std::string::npos)
             break;
-        std::string name = virt_path.substr(prev_pos, pos-prev_pos);
+        std::string name = virt_path.substr(prev_pos, pos - prev_pos);
         REALM_ASSERT(valid_virt_path_segment(name));
         real_path = util::File::resolve(name, real_path);
         util::try_make_dir(real_path);
@@ -109,8 +106,7 @@ void _impl::make_dirs(const std::string& root_path, const std::string& virt_path
     }
 }
 
-std::unique_ptr<char[]> _impl::read_realm_content(const std::string& realm_path,
-        size_t& file_size)
+std::unique_ptr<char[]> _impl::read_realm_content(const std::string& realm_path, size_t& file_size)
 {
     util::File file(realm_path);
     util::File::SizeType actual_file_size = file.get_size();
@@ -126,9 +122,8 @@ std::unique_ptr<char[]> _impl::read_realm_content(const std::string& realm_path,
     return buffer;
 }
 
-void _impl::write_realm_content(const std::string& root_path,
-        const std::string& realm_name,
-        const BinaryData& realm_content)
+void _impl::write_realm_content(const std::string& root_path, const std::string& realm_name,
+                                const BinaryData& realm_content)
 {
     make_dirs(root_path, realm_name);
 
@@ -140,9 +135,8 @@ void _impl::write_realm_content(const std::string& root_path,
     util::File::move(temp_path, path);
 }
 
-void _impl::read_realm_fragment(const std::string& realm_path, char* buffer,
-                        size_t buffer_size, uint_fast64_t offset,
-                        size_t& fragment_size, uint_fast64_t& realm_size)
+void _impl::read_realm_fragment(const std::string& realm_path, char* buffer, size_t buffer_size, uint_fast64_t offset,
+                                size_t& fragment_size, uint_fast64_t& realm_size)
 {
     util::File file(realm_path);
     realm_size = uint_fast64_t(file.get_size());

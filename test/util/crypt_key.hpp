@@ -52,7 +52,6 @@ bool is_always_encrypt_enabled();
 void enable_always_encrypt();
 
 
-
 // Implementation
 
 inline std::string crypt_key_2(bool always)
