@@ -171,7 +171,7 @@ def splitTagSemVer(tag):
 
 orderingColumns = ['versionMajor', 'versionMinor', 'versionPatch', 'versionExtra', 'versionExtra2', 'versionExtra3']
 def addVersionColumns(data):
-    types = {'names': list(orderingColumns), 'formats': ['int32', 'int32', 'int32', 'U100', 'int32', 'U100']}
+    types = {'names': list(orderingColumns), 'formats': ['int32', 'int32', 'int32', 'U100', 'int32', 'int32']}
     for element in data.dtype.descr:
         types['names'].append(element[0])
         types['formats'].append(element[1])
@@ -187,10 +187,10 @@ def addVersionColumns(data):
             row['versionPatch'] = int(splits[2])
             if len(splits) >= 4:
                 row['versionExtra'] = splits[3]
-            if len(splits) >= 6:
-                row['versionExtra3'] = splits[5]
-            if len(splits) >= 5: # if the conversion to int fails here, we still have part 5 above
+            if len(splits) >= 5:
                 row['versionExtra2'] = int(splits[4])
+            if len(splits) >= 6:
+                row['versionExtra3'] = int(splits[5])
         except Exception as e:
             print("parse error while processing semver of " + str(row['tag']) + str(e))
     return space
