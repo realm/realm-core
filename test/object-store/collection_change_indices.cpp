@@ -301,8 +301,8 @@ TEST_CASE("collection_change: calculate() table order")
 {
     _impl::CollectionChangeBuilder c;
 
-    auto all_modified = [](size_t) { return true; };
-    auto none_modified = [](size_t) { return false; };
+    auto all_modified = [](auto) { return true; };
+    auto none_modified = [](auto) { return false; };
     bool in_table_order = true;
 
     SECTION("returns an empty set when input and output are identical")
@@ -406,8 +406,8 @@ TEST_CASE("collection_change: calculate() sorted")
 {
     _impl::CollectionChangeBuilder c;
 
-    auto all_modified = [](size_t) { return true; };
-    auto none_modified = [](size_t) { return false; };
+    auto all_modified = [](auto) { return true; };
+    auto none_modified = [](auto) { return false; };
     size_t npos = -1;
 
     SECTION("returns an empty set when input and output are identical")
@@ -645,12 +645,12 @@ TEST_CASE("collection_change: calculate() sorted")
 
     SECTION("prefers to produce diffs where modified rows are the ones to move when it is ambiguous")
     {
-        auto two_modified = [](size_t ndx) { return ndx == 2; };
+        auto two_modified = [](auto ndx) { return ndx == 2; };
         c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 3, 2}, two_modified);
         REQUIRE_INDICES(c.deletions, 1);
         REQUIRE_INDICES(c.insertions, 2);
 
-        auto three_modified = [](size_t ndx) { return ndx == 3; };
+        auto three_modified = [](auto ndx) { return ndx == 3; };
         c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {1, 3, 2}, three_modified);
         REQUIRE_INDICES(c.deletions, 2);
         REQUIRE_INDICES(c.insertions, 1);
@@ -658,7 +658,7 @@ TEST_CASE("collection_change: calculate() sorted")
 
     SECTION("prefers smaller diffs over larger diffs moving only modified rows")
     {
-        auto two_modified = [](size_t ndx) { return ndx == 2; };
+        auto two_modified = [](auto ndx) { return ndx == 2; };
         c = _impl::CollectionChangeBuilder::calculate({1, 2, 3}, {2, 3, 1}, two_modified);
         REQUIRE_INDICES(c.deletions, 0);
         REQUIRE_INDICES(c.insertions, 2);
@@ -700,7 +700,7 @@ TEST_CASE("collection_change: calculate() sorted")
 
     SECTION("produces diffs which let merge collapse insert -> move -> delete to no-op")
     {
-        auto four_modified = [](size_t ndx) { return ndx == 4; };
+        auto four_modified = [](auto ndx) { return ndx == 4; };
         for (int insert_pos = 0; insert_pos < 4; ++insert_pos) {
             for (int move_to_pos = 0; move_to_pos < 4; ++move_to_pos) {
                 if (insert_pos == move_to_pos)

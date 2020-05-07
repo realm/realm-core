@@ -70,7 +70,10 @@ void notify_fd(int fd)
             }
         }
         std::vector<uint8_t> buff(1024);
-        read(fd, buff.data(), buff.size());
+        auto actual = read(fd, buff.data(), buff.size());
+        if (actual == 0) {
+            throw std::runtime_error("Could not read from pipe");
+        }
     }
 }
 } // anonymous namespace

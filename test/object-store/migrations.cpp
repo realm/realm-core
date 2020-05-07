@@ -179,7 +179,7 @@ auto create_objects(Table& table, size_t count)
     std::vector<ObjKey> keys;
     table.create_objects(count, keys);
     return keys;
-};
+}
 } // anonymous namespace
 
 TEST_CASE("migration: Automatic")

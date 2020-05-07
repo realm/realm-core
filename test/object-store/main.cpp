@@ -52,7 +52,10 @@ int main(int argc, char** argv)
         return 1;
     }
     const char* directory = dirname(executable);
-    chdir(directory);
+    if (chdir(directory) < 0) {
+        fprintf(stderr, "Failed to change directory.\n");
+        return 1;
+    }
 #endif
 
     int result = Catch::Session().run(argc, argv);
