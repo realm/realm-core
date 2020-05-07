@@ -527,7 +527,7 @@ def buildPerformance() {
           publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance_Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
-                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_5fReport\"}' " +
+                 "-d '{ \"body\": \"Check the performance result [here](${env.BUILD_URL}Performance_5fReport).\"}' " +
                  "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
           }
         }
