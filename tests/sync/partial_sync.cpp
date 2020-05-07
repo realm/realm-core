@@ -43,6 +43,8 @@
 #include <realm/parser/query_builder.hpp>
 #include <realm/util/optional.hpp>
 
+#include <condition_variable>
+
 using namespace realm;
 using namespace std::string_literals;
 

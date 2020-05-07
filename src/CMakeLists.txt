@@ -93,7 +93,6 @@ if(REALM_ENABLE_SYNC)
         sync/subscription_state.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
-        sync/sync_permission.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
         sync/impl/sync_client.hpp
@@ -105,7 +104,6 @@ if(REALM_ENABLE_SYNC)
         sync/partial_sync.cpp
         sync/sync_config.cpp
         sync/sync_manager.cpp
-        sync/sync_permission.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
         sync/impl/sync_file.cpp
