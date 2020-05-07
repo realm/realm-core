@@ -1,6 +1,5 @@
 add_executable(realm-benchmark-common-tasks main.cpp compatibility.cpp)
 target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} TestUtil)
-add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
 add_executable(realm-stats stats.cpp compatibility.cpp)
 target_link_libraries(realm-stats ${PLATFORM_LIBRARIES} Storage)

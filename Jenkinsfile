@@ -226,16 +226,9 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
             withEnv(environment) {
                 buildEnv.inside() {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        sh "cmake -B build-dir -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja"
+                        runAndCollectWarnings(script: "cmake --build build-dir")
+                        sh 'CTEST_OUTPUT_ON_FAILURE=TRUE cmake --build build-dir --target test'
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -263,16 +256,13 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        sh "cmake -B build-dir -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja"
+                        runAndCollectWarnings(script: "cmake --build build-dir")
                         sh """
                            cd build-dir/test
                            ./realm-tests
                         """
+
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -289,7 +279,6 @@ def doBuildLinux(String buildType) {
 
             docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
                 sh """
-                   cmake --help
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
@@ -553,7 +542,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
                 try {
                     dir("build-macosx-${buildType}") {
                         withEnv(environment()) {
-                            sh 'UNITTEST_PROGRESS=1 ./test/realm-tests'
+                            sh 'UNITTEST_PROGRESS=1 ctest --output-on-failure'
                         }
                     }
                 } finally {
@@ -606,7 +595,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 15, unit: 'MINUTES') {
+                    timeout(time: 20, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
