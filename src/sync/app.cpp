@@ -264,18 +264,21 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         handle_default_response(response, completion_block);
     };
 
-    nlohmann::json body = {
+    bson::BsonDocument arg = {
         { "email", email },
         { "password", password },
         { "arguments", args }
     };
-    
+
+    std::stringstream body;
+    body << bson::Bson(arg);
+
     m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
         get_request_headers(),
-        body.dump()
+        body.str()
     }, handler);
 }
 
