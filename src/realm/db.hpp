@@ -352,7 +352,7 @@ public:
     // can be acquired, the callback will be executed with the lock and then return true.
     // Otherwise false will be returned directly.
     // The lock taken precludes races with other threads or processes accessing the
-    // files through a SharedGroup.
+    // files through a DB.
     // It is safe to delete/replace realm files inside the callback.
     // WARNING: It is not safe to delete the lock file in the callback.
     using CallbackWithLock = std::function<void(const std::string& realm_path)>;
@@ -609,8 +609,7 @@ public:
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
 
-    /// Get a version id which may be used to request a different SharedGroup
-    /// to start transaction at a specific version.
+    /// Get a version id which may be used to request a different transaction locked to specific version.
     VersionID get_version_of_current_transaction();
 
     void upgrade_file_format(int target_file_format_version);

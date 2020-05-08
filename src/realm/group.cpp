@@ -346,7 +346,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
-    // SharedGroup::do_open() must ensure this. Be sure to revisit the
+    // DB::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
@@ -499,7 +499,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
 Group::~Group() noexcept
 {
     // If this group accessor is detached at this point in time, it is either
-    // because it is SharedGroup::m_group (m_is_shared), or it is a free-stading
+    // because it is DB::m_group (m_is_shared), or it is a free-stading
     // group accessor that was never successfully opened.
     if (!m_top.is_attached())
         return;
@@ -796,7 +796,7 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
     }
 
     Replication* repl = *get_repl();
-    if (do_repl && repl && name.begins_with(g_class_name_prefix))
+    if (do_repl && repl)
         repl->add_class(key, name, is_embedded);
 
     ++m_num_tables;
@@ -1108,7 +1108,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // the top-array. The free-space information of the group will only be
         // included if a non-zero version number is given as parameter,
         // indicating that versioning info is to be saved. This is used from
-        // SharedGroup to compact the database by writing only the live data
+        // DB to compact the database by writing only the live data
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
@@ -1357,7 +1357,7 @@ size_t Group::get_used_space() const noexcept
     if (m_top.size() > 4) {
         Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
         free_lengths.init_from_ref(ref_type(m_top.get(4)));
-        used_space -= size_t(free_lengths.sum());
+        used_space -= size_t(free_lengths.get_sum());
     }
 
     return used_space;
@@ -1810,7 +1810,7 @@ void Group::verify() const
                             m_top.size() == 11,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
-        ArrayInteger pos(alloc), len(alloc), ver(alloc);
+        Array pos(alloc), len(alloc), ver(alloc);
         pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
         len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
         ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
@@ -1909,7 +1909,7 @@ void Group::print() const
 void Group::print_free() const
 {
     Allocator& alloc = m_top.get_alloc();
-    ArrayInteger pos(alloc), len(alloc), ver(alloc);
+    Array pos(alloc), len(alloc), ver(alloc);
     pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
     len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
     ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
@@ -1934,12 +1934,12 @@ void Group::print_free() const
 
     size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
-        size_t offset = to_size_t(pos[i]);
-        size_t size_of_i = to_size_t(len[i]);
+        size_t offset = to_size_t(pos.get(i));
+        size_t size_of_i = to_size_t(len.get(i));
         std::cout << i << ": " << offset << " " << size_of_i;
 
         if (has_versions) {
-            size_t version = to_size_t(ver[i]);
+            size_t version = to_size_t(ver.get(i));
             std::cout << " " << version;
         }
         std::cout << "\n";

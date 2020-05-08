@@ -190,7 +190,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
     for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
         const size_t LEN = 64 * 20 + 1000;
         ArrayInteger a(Allocator::get_default());
-        a.create(Array::type_Normal);
+        a.create();
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
 
@@ -246,46 +246,6 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     else {
                         CHECK(f == size_t(-1));
                     }
-
-                    if (v[w] != LL_MIN) {
-                        // MIN
-                        int64_t val = 0;
-                        a.set(match, v[w] - 1);
-                        bool b = a.minimum(val, from, to);
-                        a.set(match, v[w]);
-                        CHECK_EQUAL(true, b);
-                        if (match >= from && match < to)
-                            CHECK(val == v[w] - 1);
-                        else
-                            CHECK(val == v[w]);
-                    }
-
-                    // MAX
-                    if (v[w] != LL_MAX) {
-                        int64_t val = 0;
-                        a.set(match, v[w] + 1);
-                        bool b = a.maximum(val, from, to);
-                        a.set(match, v[w]);
-                        CHECK_EQUAL(true, b);
-                        if (match >= from && match < to)
-                            CHECK(val == v[w] + 1);
-                        else
-                            CHECK(val == v[w]);
-                    }
-
-                    // SUM
-                    int64_t val = 0;
-                    a.set(match, v[w] + 1);
-                    val = a.sum(from, to);
-                    a.set(match, v[w]);
-                    int64_t intended;
-                    if (match >= from && match < to)
-                        intended = (to - from - 1) * v[w] + v[w] + 1;
-                    else
-                        intended = (to - from) * v[w];
-
-                    CHECK(intended == val);
-
 
                     // Find all, LESS
                     if (v[w] != LL_MIN) {

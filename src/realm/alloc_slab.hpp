@@ -42,7 +42,7 @@ namespace util {
 struct SharedFileInfo;
 }
 
-/// Thrown by Group and SharedGroup constructors if the specified file
+/// Thrown by Group and DB constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm
 /// database.
 struct InvalidDatabase;
@@ -75,7 +75,7 @@ public:
     /// the SlabAlloc.
     ///
     /// \var Config::is_shared
-    /// Must be true if, and only if we are called on behalf of SharedGroup.
+    /// Must be true if, and only if we are called on behalf of DB.
     ///
     /// \var Config::read_only
     /// Open the file in read-only mode. This implies \a Config::no_create.
@@ -85,7 +85,7 @@ public:
     ///
     /// \var Config::skip_validate
     /// Skip validation of file header. In a
-    /// set of overlapping SharedGroups, only the first one (the one
+    /// set of overlapping DBs, only the first one (the one
     /// that creates/initlializes the coordination file) may validate
     /// the header, otherwise it will result in a race condition.
     ///
@@ -129,8 +129,8 @@ public:
     /// application to ensure that the Realm file is not modified concurrently
     /// from any other thread or process.
     ///
-    /// In shared mode (when this function is called on behalf of a SharedGroup
-    /// instance), the caller (SharedGroup::do_open()) must take steps to ensure
+    /// In shared mode (when this function is called on behalf of a DB
+    /// instance), the caller (DB::do_open()) must take steps to ensure
     /// cross-process mutual exclusion.
     ///
     /// Except for \a file_path, the parameters are passed in through a
@@ -376,8 +376,8 @@ private:
         attach_None,        // Nothing is attached
         attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
         attach_UsersBuffer, // We do not own the buffer
-        attach_SharedFile,  // On behalf of SharedGroup
-        attach_UnsharedFile // Not on behalf of SharedGroup
+        attach_SharedFile,  // On behalf of DB
+        attach_UnsharedFile // Not on behalf of DB
     };
 
     // A slab is a dynamically allocated contiguous chunk of memory used to

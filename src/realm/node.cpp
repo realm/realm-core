@@ -19,6 +19,10 @@
 #include <realm/node.hpp>
 #include <realm/utilities.hpp>
 
+#if REALM_ENABLE_MEMDEBUG
+#include <cstring>
+#endif
+
 using namespace realm;
 
 MemRef Node::create_node(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type, int width)

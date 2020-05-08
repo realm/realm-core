@@ -28,6 +28,7 @@
 #include "realm/array_decimal128.hpp"
 #include "realm/array_object_id.hpp"
 #include "realm/array_key.hpp"
+#include "realm/array_ref.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/index_string.hpp"
 #include "realm/column_type_traits.hpp"
@@ -1546,7 +1547,7 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
 void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
 {
     auto col_ndx = col_key.get_index();
-    ArrayInteger indexes(m_alloc);
+    Array indexes(m_alloc);
     indexes.create(Array::type_Normal, false);
     ArrayString values(m_alloc);
     ref_type ref = Array::get_as_ref(col_ndx.val + s_first_col_index);
