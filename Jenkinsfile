@@ -11,6 +11,53 @@ org = tokens[tokens.size()-3]
 repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
+// FIXME: move this to realm/ci repository
+def runAndCollectWarningsNG(args = [:]) {
+    def parser = args.get('parser', 'gcc')
+    def failOnWarning = args.get('failOnWarning', true)
+    def script = args.get('script', null)
+    def isWindows = args.get('isWindows', false)
+    def reportName = args.get('name', "${parser}")
+    def reportId = args.get('id', "${reportName}-${UUID.randomUUID().toString()}")
+    def sourcesDir = args.get('sources', "")
+    echo "reportId is: ${reportId}"
+    if (!script) {
+        error 'The "script" parameters needs to be specified'
+    }
+
+    def parsers = [
+        gcc: {String output -> gcc(pattern: output, id: reportId, name: reportName) },
+        clang: {String output -> clang(pattern: output, id: reportId, name: reportName) },
+        msbuild: {String output -> msBuild(pattern: output, id: reportId, name: reportName) }
+    ]
+    def currentParser = parsers[parser]
+    if (!currentParser) {
+        error "The parser '${parser}' is not supported. Please choose among ${parsers.keySet()}"
+    }
+
+    def output = ''
+    try {
+        if (isWindows) {
+            output = bat returnStdout: true, script: script
+        } else {
+            output = sh returnStdout: true, script: script
+        }
+    } finally {
+        writeFile file: 'step-output.txt', text: output
+        echo output
+        recordIssues(
+            failOnError: true, // if this step fails (eg can't find sources) trigger failure
+            blameDisabled: true, // disable git blame for lines with warnings, requires "Git Forensics Plugin"
+            forensicsDisabled: true,  // disable git statistics for files with warnings, requires "Git Forensics Plugin"
+            qualityGates: [[threshold: 1, type: 'TOTAL', unstable: !failOnWarning]], // exceeding 1 warning will cause a build failure or unstable build
+            sourceDirectory: sourcesDir, // optionally set sources directory
+            sourceCodeEncoding: 'UTF-8', // encoding of source files
+            tool: currentParser("step-output.txt") // specify the actual tool to parse this output
+        )
+    }
+}
+
+
 jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
@@ -236,16 +283,11 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
             withEnv(environment) {
                 buildEnv.inside() {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        dir('build-dir') {
+                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja .."
+                            runAndCollectWarningsNG(script: "ninja", name: "Linux-${buildType}-Encrypt${enableEncryption}-BPNODESIZE_${maxBpNodeSize}")
+                            sh "./test/realm-tests"
+                        }
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -273,16 +315,11 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        dir('build-dir') {
+                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja .."
+                            runAndCollectWarningsNG(script: "ninja", name: "Linux-Clang-${buildType}-${maxBpNodeSize}-${sanitizeMode}")
+                            sh "./test/realm-tests"
+                        }
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -328,9 +365,9 @@ def doBuildLinuxClang(String buildType) {
                    mkdir build-dir
                    cd build-dir
                    cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
-                   ninja
-                   cpack -G TGZ
                 """
+                runAndCollectWarningsNG(script: "ninja", name: "Linux-Clang-${buildType}")
+                sh "cd build-dir && cpack -G TGZ"
             }
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
@@ -358,7 +395,7 @@ def doCheckValgrind() {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarningsNG(script: "cd build-dir && ninja")
                         sh """
                             cd build-dir/test
                             valgrind --version
@@ -399,7 +436,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                            runAndCollectWarningsNG(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
@@ -454,7 +491,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             dir('build-dir') {
                 bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
-                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
+                    runAndCollectWarningsNG(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}", name: "Windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}")
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
                 if (gitTag) {
@@ -545,11 +582,11 @@ def doBuildMacOs(String buildType, boolean runTests) {
                         }
                     }
 
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                    runAndCollectWarningsNG(parser: 'clang', script: 'ninja package', name: "OSX-clang-${buildType}")
                 }
             }
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
-                runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build')
+                runAndCollectWarningsNG(parser: 'clang', script: 'xcrun swift build')
             }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
@@ -595,7 +632,7 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_BUILD_LIB_ONLY=ON \\
                                   -G Ninja ..
                         """
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                    runAndCollectWarningsNG(parser: 'clang', script: 'ninja package', name: "OSX-maccatalyst-${buildType}")
                 }
             }
 
@@ -673,7 +710,7 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
                             ..
                     """
 
-                    runAndCollectWarnings(script: "ninja")
+                    runAndCollectWarningsNG(script: "ninja", name: "Linux-CrossCompile-${target}-${buildType}")
 
                     if (testOptions != null) {
                         if (testOptions.get('emulator')) {
@@ -746,7 +783,7 @@ def recordTests(tag) {
     def tests = readFile('build-dir/test/unit-test-report.xml')
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
-    junit 'build-dir/test/modified-test-report.xml'
+    junit testResults: 'build-dir/test/modified-test-report.xml'
 }
 
 def environment() {

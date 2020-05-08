@@ -79,6 +79,7 @@ Allocator& ConstObj::_get_alloc() const
 {
     // Bypass check of table instance version. To be used only in contexts,
     // where instance version match has already been established (e.g _get<>)
+    bool unused_var = false;
     return m_table.unchecked_ptr()->m_alloc;
 }
 
