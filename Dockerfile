@@ -8,9 +8,11 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     gcovr \
     gdb \
     git \
-    gcc-7 \
-    g++-7 \
+    gcc-8 \
+    g++-8 \
     lcov \
+    libcurl4-openssl-dev \
+    libuv1-dev \
     libprocps-dev \
     ninja-build \
     python-matplotlib \
@@ -21,6 +23,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     unzip \
     valgrind \
     wget \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p ~/.ssh \
@@ -32,6 +35,8 @@ RUN cd /opt \
     && tar zxf cmake-3.15.2-Linux-x86_64.tar.gz
 
 ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"
+ENV CC gcc-8
+ENV CXX g++-8
 
 VOLUME /source
 VOLUME /out

@@ -27,6 +27,9 @@ set(SYNC_SOURCES
     object.cpp
     protocol.cpp
     transform.cpp
+    ../util/network_ssl.cpp
+    ../util/network.cpp
+    
 )
 
 set(SERVER_SOURCES
@@ -41,6 +44,7 @@ set(SERVER_SOURCES
     metrics.cpp
     server_configuration.cpp
     server.cpp
+    ../util/system_process.cpp
 )
 
 set(SERVER_INSTALL_HEADERS

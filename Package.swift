@@ -29,6 +29,7 @@ let package = Package(
                 "realm/metrics",
                 "realm/exec",
                 "realm/object-store",
+                "realm/sync",
                 "external/pegtl",
                 "win32",
             ],

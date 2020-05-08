@@ -95,10 +95,22 @@ jobWrapper {
         }
     }
     stage('Checking') {
+        def linuxOptions = [
+            maxBpNodeSize: "1000",
+            enableEncryption: "ON",
+            enableSync: "OFF",
+        ]
+        def linuxOptionsNoEncrypt = [
+            maxBpNodeSize: "4",
+            enableEncryption: "OFF",
+            enableSync: "OFF",
+        ]
+
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxRelease       : doCheckInDocker('Release'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+            checkLinuxDebug         : doCheckInDocker(linuxOptions << [buildType : "Debug"]),
+            checkLinuxRelease       : doCheckInDocker(linuxOptions << [buildType : "Release"]),
+            checkLinuxDebug_Sync    : doCheckInDocker(linuxOptions << [buildType : "Debug", enableSync : "ON"]),
+            checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
             checkMacOsRelease       : doBuildMacOs('Release', true),
             checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
@@ -110,7 +122,6 @@ jobWrapper {
         ]
         if (releaseTesting) {
             extendedChecks = [
-                checkLinuxRelease       : doCheckInDocker('Release'),
                 checkRaspberryPiRelease : doLinuxCrossCompile('armhf', 'Release', 'qemu-arm -cpu cortex-a7'),
                 checkMacOsDebug         : doBuildMacOs('Debug', true),
                 buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
@@ -215,22 +226,36 @@ jobWrapper {
     }
 }
 
-def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
+def doCheckInDocker(Map options = [:]) {
+    def cmakeOptions = [
+        CMAKE_BUILD_TYPE: options.buildType,
+        REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
+        REALM_ENABLE_ENCRYPTION: options.enableEncryption,
+        REALM_ENABLE_SYNC: options.enableSync,
+    ]
+    if (longRunningTests) {
+        cmakeOptions << [
+            CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
+        ]
+    }
+
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+
     return {
         node('docker') {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
-            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
             environment << 'UNITTEST_PROGRESS=1'
+            environment << 'CTEST_OUTPUT_ON_FAILURE=TRUE'
             withEnv(environment) {
                 buildEnv.inside() {
                     try {
-                        sh "cmake -B build-dir -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja"
+                        sh "cmake -B build-dir ${cmakeDefinitions} -G Ninja"
                         runAndCollectWarnings(script: "cmake --build build-dir")
-                        sh 'CTEST_OUTPUT_ON_FAILURE=TRUE cmake --build build-dir --target test'
+                        sh 'cmake --build build-dir --target test'
                     } finally {
-                        recordTests("Linux-${buildType}")
+                        recordTests("Linux-${options.buildType}")
                     }
                 }
             }

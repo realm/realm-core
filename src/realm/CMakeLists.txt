@@ -87,13 +87,10 @@ set(UTIL_SOURCES
     util/json_parser.cpp
     util/load_file.cpp
     util/misc_ext_errors.cpp
-    util/network_ssl.cpp
-    util/network.cpp
     util/parent_dir.cpp
     util/random.cpp
     util/resource_limits.cpp
     util/substitute.cpp
-    util/system_process.cpp
     util/uri.cpp
     util/websocket.cpp
 )
@@ -413,9 +410,9 @@ if(UNIX AND NOT APPLE)
 endif()
 
 if(APPLE)
-    target_link_libraries(Storage INTERFACE "-framework Foundation")
+    target_link_libraries(Storage PUBLIC ${Foundation})
     if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(StorageShared PRIVATE ${Foundation})
+        target_link_libraries(StorageShared PUBLIC ${Foundation})
     endif()
 endif(APPLE)
 
