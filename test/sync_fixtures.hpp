@@ -8,9 +8,9 @@
 #include <realm/util/http.hpp>
 #include <realm/string_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/noinst/protocol_codec.hpp>
-#include <realm/noinst/server_dir.hpp>
-#include <realm/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/server_dir.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>

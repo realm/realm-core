@@ -1,7 +1,7 @@
 #include "test.hpp"
 
 #include <realm/util/file.hpp>
-#include <realm/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server_dir.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

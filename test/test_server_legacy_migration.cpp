@@ -1,8 +1,8 @@
 #include <realm/list.hpp>
 #include <realm/table.hpp>
 #include <realm/group.hpp>
-#include <realm/noinst/server_legacy_migration.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_legacy_migration.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/sync/object.hpp>
 #include <realm/sync/history.hpp>
 

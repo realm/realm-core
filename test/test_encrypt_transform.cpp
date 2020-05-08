@@ -1,10 +1,10 @@
 #include "test.hpp"
 
-#include <realm/encrypt/encryption_transformer.hpp>
+#include <realm/sync/encrypt/encryption_transformer.hpp>
 #include <realm/util/file.hpp>
 #include <realm/db.hpp>
 #include <realm/sync/object.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 
 #include "sync_fixtures.hpp"
 

@@ -31,8 +31,8 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
-#include <realm/noinst/compact_changesets.hpp>
-#include <realm/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/util/file.hpp>
 
 #include "util/test_path.hpp"
@@ -554,7 +554,7 @@ public:
         std::ostringstream out;
         out << ".server" << path_add_on << ".realm";
         std::string suffix = out.str();
-        std::string test_path = get_test_path(test_context, suffix);
+        std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         util::Logger& logger = test_context.logger;
         return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, logger));
     }
@@ -570,7 +570,7 @@ public:
         std::ostringstream out;
         out << ".client_" << client_file_ident << path_add_on << ".realm";
         std::string suffix = out.str();
-        std::string test_path = get_test_path(test_context, suffix);
+        std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         util::Logger& logger = test_context.logger;
         return std::unique_ptr<Peer>(new Peer(client_file_ident, test_path, changeset_dump_dir_gen, logger));
     }

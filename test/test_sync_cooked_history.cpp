@@ -7,8 +7,8 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/changeset_cooker.hpp>
-#include <realm/noinst/client_history_impl.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 
 #include "sync_fixtures.hpp"
 

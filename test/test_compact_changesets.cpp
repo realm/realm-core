@@ -1,7 +1,7 @@
 #include "test.hpp"
 #include "util/random.hpp"
 
-#include <realm/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/compact_changesets.hpp>
 #include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/object.hpp>
 

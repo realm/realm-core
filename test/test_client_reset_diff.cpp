@@ -3,8 +3,8 @@
 #include <realm/util/random.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/db.hpp>
-#include <realm/noinst/client_history_impl.hpp>
-#include <realm/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 

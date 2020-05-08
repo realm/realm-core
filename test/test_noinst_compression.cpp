@@ -3,7 +3,7 @@
 #include "util/compare_groups.hpp"
 #include "util/crypt_key.hpp"
 
-#include <realm/noinst/compression.hpp>
+#include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/history.hpp>
 
 #include <algorithm>

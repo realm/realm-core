@@ -23,8 +23,8 @@ struct Fixture {
 
     explicit Fixture(unit_test::TestContext& test_context)
         : test_context(test_context)
-        , path_1(realm::test_util::get_test_path(test_context, ".path_1.realm"))
-        , path_2(realm::test_util::get_test_path(test_context, ".path_2.realm"))
+        , path_1(realm::test_util::get_test_path(test_context.get_test_name(), ".path_1.realm"))
+        , path_2(realm::test_util::get_test_path(test_context.get_test_name(), ".path_2.realm"))
         , history_1(make_client_replication(path_1))
         , history_2(make_client_replication(path_2))
         , sg_1(DB::create(*history_1))

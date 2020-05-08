@@ -1,7 +1,7 @@
 #include <memory>
 
 #include <realm/db.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
 

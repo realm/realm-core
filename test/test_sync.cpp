@@ -19,9 +19,9 @@
 #include <realm/util/random.hpp>
 #include <realm/util/websocket.hpp>
 #include <realm/chunked_binary.hpp>
-#include <realm/noinst/server_history.hpp>
-#include <realm/noinst/protocol_codec.hpp>
-#include <realm/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/db.hpp>
 #include <realm/sync/version.hpp>
@@ -1972,7 +1972,7 @@ TEST(Sync_Randomized)
         std::ostringstream out;
         out << ".client_" << i << ".realm";
         std::string suffix = out.str();
-        std::string test_path = get_test_path(test_context, suffix);
+        std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         client_path_guards[i].reset(new DBTestPathGuard(test_path));
         client_histories[i] = make_client_replication(test_path);
         client_shared_groups[i] = DB::create(*client_histories[i]);
@@ -3756,7 +3756,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     std::vector<Session> sessions;
 
     for (int i = 0; i < number_of_download_clients; ++i) {
-        std::string path = get_test_path(test_context, std::to_string(i));
+        std::string path = get_test_path(test_context.get_test_name(), std::to_string(i));
         std::unique_ptr<DBTestPathGuard> sgg = std::make_unique<DBTestPathGuard>(path);
         shared_group_test_path_guards.push_back(std::move(sgg));
         Session session = fixture.make_session(path);

@@ -1,7 +1,7 @@
 #include "test.hpp"
 
 #include <realm/sync/history.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/db.hpp>
 
 #include <realm/sync/object.hpp>
