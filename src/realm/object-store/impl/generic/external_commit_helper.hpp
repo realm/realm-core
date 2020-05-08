@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 #include <future>
 
@@ -32,14 +32,14 @@ public:
     ~ExternalCommitHelper();
 
     // A no-op in this version, but needed for the Apple version
-    void notify_others() {}
+    void notify_others();
 
 private:
     RealmCoordinator& m_parent;
 
     // A shared group used to listen for changes
     std::unique_ptr<Replication> m_history;
-    Transaction m_sg;
+    DBRef m_sg;
 
     // The listener thread
     std::future<void> m_thread;
