@@ -37,8 +37,7 @@
 
 #define GROUP_TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "realm");
 
-#define SHARED_GROUP_TEST_PATH(var_name)                                                                             \
-    TEST_PATH_HELPER(realm::test_util::SharedGroupTestPathGuard, var_name, "realm");
+#define SHARED_GROUP_TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::DBTestPathGuard, var_name, "realm");
 
 namespace realm {
 namespace test_util {
@@ -95,7 +94,10 @@ void set_test_libexec_path(const std::string&);
 // RealmPathInfo test_context { path };
 struct RealmPathInfo {
     std::string m_path;
-    std::string get_test_name() const { return m_path; }
+    std::string get_test_name() const
+    {
+        return m_path;
+    }
 };
 
 
@@ -140,14 +142,14 @@ private:
     void clean_dir(const std::string& path);
 };
 
-class SharedGroupTestPathGuard : public TestPathGuard {
+class DBTestPathGuard : public TestPathGuard {
 public:
-    SharedGroupTestPathGuard(const std::string& path);
+    DBTestPathGuard(const std::string& path);
     std::string get_lock_path() const
     {
         return m_path + ".lock"; // ".management/access_control";
     }
-    ~SharedGroupTestPathGuard() noexcept;
+    ~DBTestPathGuard() noexcept;
 
 private:
     void cleanup() const noexcept;

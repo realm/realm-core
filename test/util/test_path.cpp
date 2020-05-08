@@ -160,20 +160,20 @@ void TestDirGuard::clean_dir(const std::string& path)
 }
 
 
-SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path)
+DBTestPathGuard::DBTestPathGuard(const std::string& path)
     : TestPathGuard(path)
 {
     cleanup();
 }
 
 
-SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
+DBTestPathGuard::~DBTestPathGuard() noexcept
 {
     if (!keep_files)
         cleanup();
 }
 
-void SharedGroupTestPathGuard::cleanup() const noexcept
+void DBTestPathGuard::cleanup() const noexcept
 {
     try {
         do_clean_dir(m_path + ".management", ".management");

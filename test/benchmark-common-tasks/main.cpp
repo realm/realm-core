@@ -1651,7 +1651,7 @@ struct BenchmarkNonInitiatorOpen : Benchmark {
         return "NonInitiatorOpen";
     }
     // the shared realm will be removed after the benchmark finishes
-    std::unique_ptr<realm::test_util::SharedGroupTestPathGuard> path;
+    std::unique_ptr<realm::test_util::DBTestPathGuard> path;
     DBRef initiator;
 
     DBRef do_open()
@@ -1674,7 +1674,7 @@ struct BenchmarkNonInitiatorOpen : Benchmark {
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
 
-        path = std::unique_ptr<realm::test_util::SharedGroupTestPathGuard>(new realm::test_util::SharedGroupTestPathGuard(ident));
+        path = std::make_unique<realm::test_util::DBTestPathGuard>(ident);
 
         // open once - session initiation
         initiator = do_open();
@@ -1892,7 +1892,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
-        realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
+        realm::test_util::DBTestPathGuard realm_path("benchmark_common_tasks" + ident);
         DBRef group;
         group = create_new_shared_group(realm_path, level, key);
         benchmark.before_all(group);
