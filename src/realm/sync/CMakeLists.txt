@@ -114,13 +114,11 @@ if(APPLE AND NOT REALM_FORCE_OPENSSL)
     list(APPEND SERVER_SOURCES
         sync/crypto_server_apple.mm
     )
-    set(PLATFORM_DEFINES REALM_HAVE_OPENSSL=0 REALM_HAVE_SECURE_TRANSPORT=1)
-    set(PLATFORM_LIBRARIES ${FOUNDATION} ${SECURITY})
+    set(PLATFORM_LIBRARIES ${Foundation} ${Security})
 else()
     list(APPEND SYNC_SOURCES
         crypto_server_openssl.cpp
         )
-    set(PLATFORM_DEFINES REALM_HAVE_OPENSSL=1)
     set(PLATFORM_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
@@ -143,7 +141,6 @@ if (APPLE)
 endif()
 
 target_compile_definitions(Sync PUBLIC
-    ${PLATFORM_DEFINES}
     # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
     # FIXME: This should be exported by Core's realm-config.cmake instead.
     $<$<CONFIG:Debug>:REALM_DEBUG=1>

@@ -188,6 +188,7 @@ endif()
 # Platform-specific build configuration
 if(APPLE)
     find_library(Foundation Foundation)
+    find_library(Security Security)
 elseif(ANDROID)
     list(APPEND PLATFORM_LIBRARIES log android)
 endif()
@@ -211,7 +212,7 @@ if(NOT REALM_PLATFORM OR REALM_PLATFORM STREQUAL "Node")
         find_path(UV_INCLUDE_DIR uv.h)
 
         list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
-        add_definitions(-DREALM_HAVE_UV)
+        set(REALM_HAVE_UV "1")
     endif()
 endif()
 
@@ -227,9 +228,6 @@ if(REALM_PLATFORM STREQUAL "Node")
 endif()
 
 check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
-if(REALM_HAVE_EPOLL)
-    add_definitions(-DREALM_HAVE_EPOLL)
-endif()
 
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
@@ -244,6 +242,10 @@ check_include_files(malloc.h HAVE_MALLOC_H)
 
 if(UNIX AND NOT APPLE)
     set(REALM_HAVE_OPENSSL "1")
+endif()
+
+if(APPLE)
+    set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
 # Store configuration in header file
