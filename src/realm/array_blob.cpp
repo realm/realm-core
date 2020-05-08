@@ -18,6 +18,7 @@
 
 #include <algorithm>
 
+#include <realm/array.hpp>
 #include <realm/array_blob.hpp>
 
 using namespace realm;

@@ -1,0 +1,5 @@
+# This file is only used by the Seasoned Software fuzz system.
+install:
+  apt-get:
+    - libssl-dev
+    - libprocps-dev

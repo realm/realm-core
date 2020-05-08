@@ -98,12 +98,16 @@ TEST(Alloc_1)
     MemRef mr2 = alloc.alloc(16);
     MemRef mr3 = alloc.alloc(256);
     MemRef mr4 = alloc.alloc(96);
+    // This will grow the file with 0x20000, but the 32 bytes are not enough to
+    // create a new free block
+    MemRef mr5 = alloc.alloc(0x20000 - 32);
 
     // Set size in headers (needed for Alloc::free())
     set_capacity(mr1.get_addr(), 8);
     set_capacity(mr2.get_addr(), 16);
     set_capacity(mr3.get_addr(), 256);
     set_capacity(mr4.get_addr(), 96);
+    set_capacity(mr5.get_addr(), 0x20000 - 32);
 
     // Are pointers 64bit aligned
     CHECK_EQUAL(0, intptr_t(mr1.get_addr()) & 0x7);
@@ -121,6 +125,7 @@ TEST(Alloc_1)
     alloc.free_(mr4.get_ref(), mr4.get_addr());
     alloc.free_(mr1.get_ref(), mr1.get_addr());
     alloc.free_(mr2.get_ref(), mr2.get_addr());
+    alloc.free_(mr5.get_ref(), mr5.get_addr());
 
     // SlabAlloc destructor will verify that all is free'd
 }
@@ -201,7 +206,7 @@ TEST(Alloc_AttachBuffer)
         {
             File file(path);
             buffer_size = size_t(file.get_size());
-            buffer.reset(static_cast<char*>(malloc(buffer_size)));
+            buffer.reset(new char[buffer_size]);
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }
@@ -335,37 +340,6 @@ public:
 } // end anonymous namespace
 
 
-TEST(Alloc_MaxSectionBoundaryOverflow)
-{
-    TestSlabAlloc alloc;
-
-    size_t first_bound_lower = alloc.test_get_lower_section_boundary(0);
-    size_t first_bound_upper = alloc.test_get_upper_section_boundary(0);
-    CHECK_EQUAL(first_bound_lower, 0);
-    CHECK_EQUAL(alloc.test_get_lower_section_boundary(1), first_bound_lower);
-    CHECK_LESS(first_bound_lower, first_bound_upper);
-
-    size_t max = std::numeric_limits<size_t>::max();
-
-    size_t last_1_bound_lower = alloc.test_get_lower_section_boundary(max - 1);
-    size_t last_1_bound_upper = alloc.test_get_upper_section_boundary(max - 1);
-    CHECK_LESS(last_1_bound_lower, last_1_bound_upper);
-
-    size_t last_bound_lower = alloc.test_get_lower_section_boundary(max);
-    size_t last_bound_upper = alloc.test_get_upper_section_boundary(max);
-    CHECK_LESS(last_bound_lower, last_bound_upper);
-
-    size_t max_index = alloc.test_get_section_index(max);
-    for (size_t i = 0; i <= max_index; ++i) {
-        size_t lowest_ref_in_section = alloc.test_get_section_base(i);
-        size_t lower_boundary = alloc.test_get_lower_section_boundary(lowest_ref_in_section);
-        size_t upper_boundary = alloc.test_get_upper_section_boundary(lowest_ref_in_section);
-        CHECK_EQUAL(lowest_ref_in_section, lower_boundary);
-        CHECK_LESS(lower_boundary, upper_boundary);
-    }
-}
-
-
 // This test reproduces the sporadic issue that was seen for large refs (addresses)
 // on 32-bit iPhone 5 Simulator runs on certain host machines.
 TEST(Alloc_ToAndFromRef)
@@ -426,7 +400,7 @@ private:
 template <class T>
 using Alloc = util::STLAllocator<T, MyAllocator>;
 using Vector = std::vector<int, Alloc<int>>;
-}
+} // namespace
 
 TEST(Allocator_STLAllocator)
 {
@@ -480,7 +454,8 @@ TEST(Allocator_Polymorphic)
     MyAllocator alloc;
     {
         // Instance of std::unique_ptr with pointer to base class allocator.
-        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr, STLDeleter<char[]>{DefaultAllocator::get_default()}};
+        std::unique_ptr<char[], STLDeleter<char[]>> abstract{nullptr,
+                                                             STLDeleter<char[]>{DefaultAllocator::get_default()}};
 
         // Instance of std::unique_ptr with pointer to base class, and base
         // class allocator.
@@ -532,7 +507,7 @@ struct hash<MyString> {
         return std::hash<std::string>{}(std::string{str.c_str(), str.size()});
     }
 };
-}
+} // namespace std
 
 TEST(Allocator_StandardContainers)
 {

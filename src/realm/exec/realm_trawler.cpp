@@ -20,8 +20,10 @@
 
 #include <realm/array_direct.hpp>
 #include <realm/alloc_slab.hpp>
+#include <realm/keys.hpp>
 #include <realm/array.hpp>
 #include <realm/column_type.hpp>
+#include <realm/data_type.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -245,43 +247,24 @@ public:
             m_column_types.init(alloc, spec.get_ref(0));
             m_column_names.init(alloc, spec.get_ref(1));
             m_column_attributes.init(alloc, spec.get_ref(2));
-            if (spec.size() > 3) {
+            if (spec.size() > 5) {
+                // Must be a Core-6 file.
+                m_column_colkeys.init(alloc, spec.get_ref(5));
+            }
+            else if (spec.size() > 3) {
+                // In pre Core-6, the subspecs array is optional
+                // Not used in Core-6
                 m_column_subspecs.init(alloc, spec.get_ref(3));
+            }
+            if (size() > 7) {
+                // Must be a Core-6 file.
+                m_opposite_table.init(alloc, get_ref(7));
             }
         }
     }
     void print_columns(const Group&) const;
 
 private:
-    std::string type_to_string(realm::ColumnType type) const
-    {
-        switch (type) {
-            case realm::col_type_Int:
-                return "int";
-            case realm::col_type_Bool:
-                return "bool";
-            case realm::col_type_String:
-            case realm::col_type_StringEnum:
-                return "string";
-            case realm::col_type_Binary:
-                return "data";
-            case realm::col_type_Table:
-                return "List";
-            case realm::col_type_Timestamp:
-                return "date";
-            case realm::col_type_Float:
-                return "float";
-            case realm::col_type_Double:
-                return "double";
-            case realm::col_type_Link:
-                return "Link";
-            case realm::col_type_LinkList:
-                return "LinkList";
-            default:
-                break;
-        }
-        return "Unknown";
-    }
     size_t get_subspec_ndx_after(size_t column_ndx) const noexcept
     {
         REALM_ASSERT(column_ndx <= m_column_names.size());
@@ -290,7 +273,7 @@ private:
         size_t subspec_ndx = 0;
         for (size_t i = 0; i != column_ndx; ++i) {
             auto type = realm::ColumnType(m_column_types.get_val(i));
-            if (type == realm::col_type_Table || type == realm::col_type_Link || type == realm::col_type_LinkList) {
+            if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
                 subspec_ndx += 1; // index of dest column
             }
             else if (type == realm::col_type_BackLink) {
@@ -304,6 +287,8 @@ private:
     Array m_column_names;
     Array m_column_attributes;
     Array m_column_subspecs;
+    Array m_column_colkeys;
+    Array m_opposite_table;
 };
 
 class Group : public Array {
@@ -312,7 +297,7 @@ public:
         : Array(alloc, ref)
         , m_alloc(alloc)
     {
-        m_valid &= (size() <= 10);
+        m_valid &= (size() <= 11);
         if (valid()) {
             m_file_size = get_val(2);
             current_logical_file_size = m_file_size;
@@ -360,6 +345,10 @@ public:
     int get_history_schema_version() const
     {
         return int(get_val(9));
+    }
+    int get_file_ident() const
+    {
+        return int(get_val(10));
     }
     unsigned get_nb_tables() const
     {
@@ -440,6 +429,9 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
             ostr << "History type: " << g.get_history_type() << std::endl;
             ostr << "History schema version: " << g.get_history_schema_version() << std::endl;
         }
+        if (g.size() > 10) {
+            ostr << "File ident: " << g.get_file_ident() << std::endl;
+        }
     }
     else {
         ostr << "*** Invalid group ***" << std::endl;
@@ -453,15 +445,33 @@ void Table::print_columns(const Group& group) const
         auto type = realm::ColumnType(m_column_types.get_val(i));
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
         std::string type_str;
+        realm::ColKey col_key;
+        if (this->m_column_colkeys.valid()) {
+            // core6
+            col_key = realm::ColKey(m_column_colkeys.get_val(i));
+        }
+
         if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
-            size_t target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
-            type_str = group.get_table_name(target_table_ndx);
+            size_t target_table_ndx;
+            type_str = "->";
+            if (col_key) {
+                // core6
+                realm::TableKey opposite_table_key(m_opposite_table.get_val(col_key.get_index().val));
+                target_table_ndx = opposite_table_key.value & 0xFFFF;
+            }
+            else {
+                target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
+            }
+            type_str += group.get_table_name(target_table_ndx);
             if (type == realm::col_type_LinkList) {
                 type_str += "[]";
             }
         }
         else {
-            type_str = type_to_string(type);
+            type_str = get_data_type_name(realm::DataType(type));
+            if (col_key && col_key.get_attrs().test(realm::col_attr_List)) {
+                type_str += "[]";
+            }
             if (attr & realm::col_attr_Nullable)
                 type_str += "?";
             if (attr & realm::col_attr_Indexed)

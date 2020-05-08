@@ -10,47 +10,49 @@ add_subdirectory(benchmark-crud)
 # FIXME: Add other benchmarks
 
 set(NORMAL_TESTS
+    # slowest to compile first
+    test_query.cpp
+    test_query2.cpp
+    test_query_big.cpp
+    test_table.cpp
+    test_lang_bind_helper.cpp
+    test_parser.cpp
+
     test_all.cpp
     test_alloc.cpp
     test_array.cpp
-    test_array_binary.cpp
+    test_array_blobs_small.cpp
     test_array_blob.cpp
     test_array_blobs_big.cpp
     test_array_float.cpp
     test_array_integer.cpp
-    test_array_string.cpp
-    test_array_string_long.cpp
+    test_array_mixed.cpp
+    test_array_string_short.cpp
     test_basic_utils.cpp
     test_binary_data.cpp
+    test_bplus_tree.cpp
     test_column.cpp
-    test_column_binary.cpp
     test_column_float.cpp
-    test_column_mixed.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
-    test_descriptor.cpp
     test_destroy_guard.cpp
-    test_destructor_thread_safety.cpp
     test_file.cpp
     test_file_locks.cpp
     test_group.cpp
     test_impl_simulated_failure.cpp
     test_index_string.cpp
     test_json.cpp
-    test_lang_bind_helper.cpp
     test_link_query_view.cpp
     test_links.cpp
     test_metrics.cpp
+    test_global_key.cpp
     test_optional.cpp
-    test_parser.cpp
     test_priority_queue.cpp
-    test_query.cpp
     test_replication.cpp
     test_safe_int_ops.cpp
     test_self.cpp
     test_shared.cpp
     test_string_data.cpp
-    test_table.cpp
     test_table_view.cpp
     test_thread.cpp
     test_transactions.cpp
@@ -118,7 +120,7 @@ else()
 endif()
 
 if (MSVC)
-    set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
+    set_source_files_properties(test_query.cpp test_query_big.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
 add_executable(CoreTests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
@@ -133,6 +135,27 @@ endif()
 target_link_libraries(CoreTests
                       TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
+
+if(WINDOWS_STORE)
+    set_target_properties(CoreTests PROPERTIES
+        VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
+        CXX_STANDARD 17 # the test runner needs to call Windows APIs with C++/WinRT which needs C++ 17
+    )
+
+    file(GLOB UWP_ASSETS "${CMAKE_ROOT}/Templates/Windows/*")
+    
+    set(UWP_SOURCES
+        Package.appxmanifest
+        ${UWP_ASSETS}
+        ${REQUIRED_TEST_FILES}
+    )
+
+    target_sources(CoreTests PRIVATE ${UWP_SOURCES})
+    set_property(SOURCE ${UWP_SOURCES} PROPERTY VS_DEPLOYMENT_CONTENT 1)
+
+    set_property(SOURCE ${UWP_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
+    set_property(SOURCE ${REQUIRED_TEST_FILES} PROPERTY VS_DEPLOYMENT_LOCATION "TestAssets")
+endif()
 
 if(UNIX AND NOT APPLE)
     # This enables symbols in backtraces

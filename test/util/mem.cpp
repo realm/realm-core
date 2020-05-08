@@ -33,98 +33,6 @@
 
 #include "mem.hpp"
 
-
-#ifdef _WIN32
-
-namespace {
-
-int compare(const void* a, const void* b)
-{
-    if (*PDWORD(a) == *PDWORD(b))
-        return 0;
-    return *PDWORD(a) > *PDWORD(b) ? 1 : -1;
-}
-
-// Calculate Private Working Set
-// Source: http://www.codeproject.com/KB/cpp/XPWSPrivate.aspx
-DWORD calculate_ws_private(DWORD process_id)
-{
-    DWORD dWorkingSetPages[1024 * 128]; // hold the working set information get from QueryWorkingSet()
-    DWORD dPageSize = 0x1000;
-
-    DWORD dSharedPages = 0;
-    DWORD dPrivatePages = 0;
-    DWORD dPageTablePages = 0;
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_id);
-
-    if (hProcess)
-        throw std::runtime_error("Failed");
-
-    __try {
-        if (!QueryWorkingSet(hProcess, dWorkingSetPages, sizeof(dWorkingSetPages)))
-            __leave;
-
-        DWORD dPages = dWorkingSetPages[0];
-
-        qsort(&dWorkingSetPages[1], dPages, sizeof(DWORD), compare);
-
-        for (DWORD i = 1; i <= dPages; ++i) {
-            DWORD dCurrentPageStatus = 0;
-            DWORD dCurrentPageAddress;
-            DWORD dNextPageAddress;
-            DWORD dNextPageFlags;
-            DWORD dPageAddress = dWorkingSetPages[i] & 0xFFFFF000;
-            DWORD dPageFlags = dWorkingSetPages[i] & 0x00000FFF;
-
-            while (i <= dPages) { // iterate all pages
-                dCurrentPageStatus++;
-
-                if (i == dPages)
-                    break; // if last page
-
-                dCurrentPageAddress = dWorkingSetPages[i] & 0xFFFFF000;
-                dNextPageAddress = dWorkingSetPages[i + 1] & 0xFFFFF000;
-                dNextPageFlags = dWorkingSetPages[i + 1] & 0x00000FFF;
-
-                // decide whether iterate further or exit
-                //(this is non-contiguous page or have different flags)
-                if ((dNextPageAddress == (dCurrentPageAddress + dPageSize)) && (dNextPageFlags == dPageFlags)) {
-                    i++;
-                }
-                else
-                    break;
-            }
-
-            if ((dPageAddress < 0xC0000000) || (dPageAddress > 0xE0000000)) {
-                if (dPageFlags & 0x100) // this is shared one
-                    dSharedPages += dCurrentPageStatus;
-
-                else // private one
-                    dPrivatePages += dCurrentPageStatus;
-            }
-            else {
-                dPageTablePages += dCurrentPageStatus; // page table region
-            }
-        }
-
-        DWORD dTotal = dPages * 4;
-        DWORD dShared = dSharedPages * 4;
-        DWORD WSPrivate = dTotal - dShared;
-
-        return WSPrivate;
-    }
-    __finally {
-        CloseHandle(hProcess);
-    }
-    throw std::runtime_error("Failed");
-}
-
-} // anonymous namespace
-
-#endif // _WIN32
-
-
 namespace realm {
 namespace test_util {
 
@@ -133,10 +41,9 @@ size_t get_mem_usage()
 {
 #if defined _WIN32
 
-    // FIXME: Does this return virtual size or resident set size? What
-    // we need is the virtual size, i.e., we want to include that
-    // which is temporarily swapped out.
-    return calculate_ws_private(GetCurrentProcessId());
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PPROCESS_MEMORY_COUNTERS>(&pmc), sizeof(pmc));
+    return pmc.PrivateUsage;
 
 #elif REALM_PLATFORM_APPLE
 

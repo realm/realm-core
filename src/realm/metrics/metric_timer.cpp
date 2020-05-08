@@ -65,7 +65,8 @@ MetricTimer::time_point MetricTimer::get_timer_ticks() const
     return clock_type::now();
 }
 
-nanosecond_storage_t MetricTimer::calc_elapsed_nanoseconds(MetricTimer::time_point begin, MetricTimer::time_point end) const
+nanosecond_storage_t MetricTimer::calc_elapsed_nanoseconds(MetricTimer::time_point begin,
+                                                           MetricTimer::time_point end) const
 {
     std::chrono::duration<nanosecond_storage_t, std::nano> elapsed = end - begin;
     return elapsed.count();

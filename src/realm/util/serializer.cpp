@@ -19,9 +19,11 @@
 #include <realm/util/serializer.hpp>
 
 #include <realm/binary_data.hpp>
+#include <realm/keys.hpp>
 #include <realm/null.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/string_data.hpp>
+#include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/string_buffer.hpp>
@@ -103,18 +105,26 @@ std::string print_value<>(realm::Timestamp t)
         return "NULL";
     }
     std::stringstream ss;
-    ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
+    if (t.is_null()) {
+        ss << "null";
+    }
+    else {
+        ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
+    }
     return ss.str();
 }
 
 template <>
-std::string print_value<>(realm::RowIndex r)
+std::string print_value<>(realm::ObjKey k)
 {
-    if (!r.is_attached() || !r.is_null()) {
-        throw SerialisationError("Serialisation of object comparisons is not supported");
+    std::stringstream ss;
+    if (!k) {
+        ss << "NULL";
     }
-    // the remaining option is that it is NULL, and this we do know how to serialise
-    return "NULL";
+    else {
+        ss << "O" << k.value;
+    }
+    return ss.str();
 }
 
 // The variable name must be unique with respect to the already chosen variables at
@@ -122,7 +132,8 @@ std::string print_value<>(realm::RowIndex r)
 // This assumes that columns can start with '$' and that we might one day want to support
 // referencing the parent table columns in the subquery. This is currently disabled by an assertion in the
 // core SubQuery constructor.
-std::string SerialisationState::get_variable_name(ConstTableRef table) {
+std::string SerialisationState::get_variable_name(ConstTableRef table)
+{
     std::string guess_prefix = "$";
     const char start_char = 'x';
     char add_char = start_char;
@@ -147,7 +158,7 @@ std::string SerialisationState::get_variable_name(ConstTableRef table) {
             next_guess();
             continue;
         }
-        if (table->get_column_index(guess) != realm::npos) {
+        if (table->get_column_key(guess) != ColKey()) {
             next_guess();
             continue;
         }
@@ -155,44 +166,47 @@ std::string SerialisationState::get_variable_name(ConstTableRef table) {
     }
 }
 
-std::string SerialisationState::get_column_name(ConstTableRef table, size_t col_ndx)
+std::string SerialisationState::get_column_name(ConstTableRef table, ColKey col_key)
 {
-    ColumnType col_type = table->get_real_column_type(col_ndx);
+    ColumnType col_type = table->get_real_column_type(col_key);
     if (col_type == col_type_BackLink) {
-        const BacklinkColumn& col = table->get_column_backlink(col_ndx);
-        std::string source_table_name = col.get_origin_table().get_name();
-        std::string source_col_name = col.get_origin_table().get_column_name(col.get_origin_column().get_column_index());
-        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator + source_col_name;
+        const Table::BacklinkOrigin origin = table->find_backlink_origin(col_key);
+        REALM_ASSERT(origin);
+        std::string source_table_name = origin->first->get_name();
+        std::string source_col_name = origin->first->get_column_name(origin->second);
+        return "@links" + util::serializer::value_separator + source_table_name + util::serializer::value_separator +
+               source_col_name;
     }
-    else if (col_ndx < table->get_column_count()) {
-        return std::string(table->get_column_name(col_ndx));
+    else if (col_key != ColKey()) {
+        return std::string(table->get_column_name(col_key));
     }
     return "";
 }
 
-std::string SerialisationState::get_backlink_column_name(ConstTableRef from, size_t col_ndx)
+std::string SerialisationState::describe_column(ConstTableRef table, ColKey col_key)
 {
-    ColumnType col_type = from->get_real_column_type(col_ndx);
-    REALM_ASSERT_EX(col_type == col_type_Link || col_type == col_type_LinkList, col_type);
-    const LinkColumnBase& forward = from->get_column_link_base(col_ndx);
-    size_t backlink_col_ndx = forward.get_backlink_column().get_column_index();
-    return get_column_name(forward.get_target_table().get_table_ref(), backlink_col_ndx);
-}
-
-std::string SerialisationState::describe_column(ConstTableRef table, size_t col_ndx)
-{
-    if (table && col_ndx != npos) {
+    if (table && col_key) {
         std::string desc;
         if (!subquery_prefix_list.empty()) {
             desc += subquery_prefix_list.back() + value_separator;
         }
-        desc += get_column_name(table, col_ndx);
+        desc += get_column_name(table, col_key);
         return desc;
     }
     return "";
 }
 
-std::string SerialisationState::describe_columns(const LinkMap& link_map, size_t target_col_ndx)
+std::string SerialisationState::get_backlink_column_name(ConstTableRef from, ColKey col_key)
+{
+    ColumnType col_type = col_key.get_type();
+    REALM_ASSERT_EX(col_type == col_type_Link || col_type == col_type_LinkList, col_type);
+
+    auto target_table = from->get_opposite_table(col_key);
+    auto backlink_col = from->get_opposite_column(col_key);
+    return get_column_name(target_table, backlink_col);
+}
+
+std::string SerialisationState::describe_columns(const LinkMap& link_map, ColKey target_col_key)
 {
     std::string desc;
     if (!subquery_prefix_list.empty()) {
@@ -204,12 +218,12 @@ std::string SerialisationState::describe_columns(const LinkMap& link_map, size_t
         }
         desc += link_map.description(*this);
     }
-    const Table* target = link_map.target_table();
-    if (target && target_col_ndx != npos) {
+    ConstTableRef target = link_map.get_target_table();
+    if (target && target_col_key) {
         if (!desc.empty()) {
             desc += util::serializer::value_separator;
         }
-        desc += get_column_name(target->get_table_ref(), target_col_ndx);
+        desc += get_column_name(target, target_col_key);
     }
     return desc;
 }

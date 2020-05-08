@@ -22,7 +22,6 @@
 #include <iostream>
 
 #include <realm.hpp>
-#include <realm/group_shared.hpp>
 
 using namespace realm;
 
@@ -75,7 +74,7 @@ int main(int argc, const char* const argv[])
         positional_args.pop_front();
     }
 
-    SharedGroup db(database_file.c_str());
+    DB db(database_file.c_str());
     if (!db.is_valid())
         throw runtime_error("Failed to open database");
 

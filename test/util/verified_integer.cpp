@@ -72,8 +72,9 @@ int64_t VerifiedInteger::sum(size_t start, size_t end)
 
     for (size_t t = start; t < end; ++t)
         running_sum += v[t];
-
+#ifdef LEGACY_TEST
     REALM_ASSERT(running_sum == u.sum(start, end));
+#endif
     return running_sum;
 }
 
@@ -91,7 +92,9 @@ int64_t VerifiedInteger::maximum(size_t start, size_t end)
         if (v[t] > max)
             max = v[t];
 
+#ifdef LEGACY_TEST
     REALM_ASSERT(max == u.maximum(start, end));
+#endif
     return max;
 }
 
@@ -109,7 +112,9 @@ int64_t VerifiedInteger::minimum(size_t start, size_t end)
         if (v[t] < min)
             min = v[t];
 
+#ifdef LEGACY_TEST
     REALM_ASSERT(min == u.minimum(start, end));
+#endif
     return min;
 }
 
@@ -152,36 +157,6 @@ size_t VerifiedInteger::size()
 {
     REALM_ASSERT(v.size() == u.size());
     return v.size();
-}
-
-// todo/fixme, end ignored
-void VerifiedInteger::find_all(IntegerColumn& c, int64_t value, size_t start, size_t end)
-{
-    std::vector<int64_t>::iterator ita = v.begin() + start;
-    std::vector<int64_t>::iterator itb =
-        end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);
-    ;
-    std::vector<size_t> result;
-    while (ita != itb) {
-        ita = std::find(ita, itb, value);
-        size_t ndx = std::distance(v.begin(), ita);
-        if (ndx < v.size()) {
-            result.push_back(ndx);
-            ita++;
-        }
-    }
-
-    c.clear();
-
-    u.find_all(c, value);
-    if (c.size() != result.size())
-        REALM_ASSERT(false);
-    for (size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != size_t(c.get(t)))
-            REALM_ASSERT(false);
-    }
-
-    return;
 }
 
 bool VerifiedInteger::verify()

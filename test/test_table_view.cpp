@@ -25,9 +25,7 @@
 #include <ostream>
 #include <cwchar>
 
-#include <realm/group_shared.hpp>
-#include <realm/table_view.hpp>
-#include <realm/query_expression.hpp>
+#include <realm.hpp>
 
 #include "util/misc.hpp"
 
@@ -69,14 +67,11 @@ using namespace test_util;
 TEST(TableView_Json)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col = table.add_column(type_Int, "first");
 
-    size_t ndx = table.add_empty_row();
-    table.set_int(0, ndx, 1);
-    ndx = table.add_empty_row();
-    table.set_int(0, ndx, 2);
-    ndx = table.add_empty_row();
-    table.set_int(0, ndx, 3);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 3);
 
     TableView v = table.where().find_all(1);
     std::stringstream ss;
@@ -92,418 +87,329 @@ TEST(TableView_Json)
 TEST(TableView_TimestampMaxMinCount)
 {
     Table t;
-    t.add_column(type_Timestamp, "ts", true);
-    t.add_empty_row();
-    t.set_timestamp(0, 0, Timestamp(300, 300));
+    auto col = t.add_column(type_Timestamp, "ts", true);
+    auto max_key = t.create_object().set_all(Timestamp(300, 300)).get_key();
+    auto min_key = t.create_object().set_all(Timestamp(100, 100)).get_key();
+    t.create_object().set_all(Timestamp(200, 200));
 
-    t.add_empty_row();
-    t.set_timestamp(0, 1, Timestamp(100, 100));
-
-    t.add_empty_row();
-    t.set_timestamp(0, 2, Timestamp(200, 200));
-
-    // Add row with null. For max(), any non-null is greater, and for min() any non-null is less
-    t.add_empty_row();
+    // Add object with null. For max(), any non-null is greater, and for min() any non-null is less
+    t.create_object();
 
     TableView tv = t.where().find_all();
     Timestamp ts;
 
-    ts = tv.maximum_timestamp(0, nullptr);
+    ts = tv.maximum_timestamp(col, nullptr);
     CHECK_EQUAL(ts, Timestamp(300, 300));
-    ts = tv.minimum_timestamp(0, nullptr);
+    ts = tv.minimum_timestamp(col, nullptr);
     CHECK_EQUAL(ts, Timestamp(100, 100));
 
-    size_t index;
-    ts = tv.maximum_timestamp(0, &index);
-    CHECK_EQUAL(index, 0);
-    ts = tv.minimum_timestamp(0, &index);
-    CHECK_EQUAL(index, 1);
+    ObjKey key;
+    ts = tv.maximum_timestamp(col, &key);
+    CHECK_EQUAL(key, max_key);
+    ts = tv.minimum_timestamp(col, &key);
+    CHECK_EQUAL(key, min_key);
 
     size_t cnt;
-    cnt = tv.count_timestamp(0, Timestamp(100, 100));
+    cnt = tv.count_timestamp(col, Timestamp(100, 100));
     CHECK_EQUAL(cnt, 1);
 
-    cnt = tv.count_timestamp(0, Timestamp{});
+    cnt = tv.count_timestamp(col, Timestamp{});
     CHECK_EQUAL(cnt, 1);
 }
 
-TEST(TableView_TimestampGetSet)
-{
-    Table t;
-    t.add_column(type_Timestamp, "ts", true);
-    t.add_empty_row(3);
-    t.set_timestamp(0, 0, Timestamp(000, 010));
-    t.set_timestamp(0, 1, Timestamp(100, 110));
-    t.set_timestamp(0, 2, Timestamp(200, 210));
-
-    TableView tv = t.where().find_all();
-    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(000, 010));
-    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(100, 110));
-    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(200, 210));
-
-    tv.set_timestamp(0, 0, Timestamp(1000, 1010));
-    tv.set_timestamp(0, 1, Timestamp(1100, 1110));
-    tv.set_timestamp(0, 2, Timestamp(1200, 1210));
-    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(1000, 1010));
-    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(1100, 1110));
-    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(1200, 1210));
-}
-
-TEST(TableView_GetSetInteger)
-{
-    TestTable table;
-    table.add_column(type_Int, "1");
-
-    add(table, 1);
-    add(table, 2);
-    add(table, 3);
-    add(table, 1);
-    add(table, 2);
-
-    TableView v;                 // Test empty construction
-    v = table.find_all_int(0, 2); // Test assignment
-
-    CHECK_EQUAL(2, v.size());
-
-    // Test of Get
-    CHECK_EQUAL(2, v[0].get_int(0));
-    CHECK_EQUAL(2, v[1].get_int(0));
-
-    // Test of Set
-    v[0].set_int(0, 123);
-    CHECK_EQUAL(123, v[0].get_int(0));
-}
-
-
-TEST(TableView_FloatsGetSet)
-{
-    TestTable table;
-    table.add_column(type_Float, "1");
-    table.add_column(type_Double, "2");
-    table.add_column(type_Int, "3");
-
-    float f_val[] = {1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
-    double d_val[] = {1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
-
-    CHECK_EQUAL(true, table.is_empty());
-
-    // Test add(?,?) with parameters
-    for (size_t i = 0; i < 5; ++i)
-        add(table, f_val[i], d_val[i], int64_t(i));
-
-    table.add_empty_row();
-
-    CHECK_EQUAL(6, table.size());
-    for (size_t i = 0; i < 6; ++i) {
-        CHECK_EQUAL(f_val[i], table.get_float(0, i));
-        CHECK_EQUAL(d_val[i], table.get_double(1, i));
-    }
-
-    TableView v;                         // Test empty construction
-    v = table.find_all_float(0, 2.1f); // Test assignment
-    CHECK_EQUAL(2, v.size());
-
-    TableView v2(v);
-
-
-    // Test of Get
-    CHECK_EQUAL(2.1f, v[0].get_float(0));
-    CHECK_EQUAL(2.1f, v[1].get_float(0));
-    CHECK_EQUAL(2.2, v[0].get_double(1));
-    CHECK_EQUAL(2.3, v[1].get_double(1));
-
-    // Test of Set
-    v[0].set_float(0, 123.321f);
-    CHECK_EQUAL(123.321f, v[0].get_float(0));
-    v[0].set_double(1, 123.3219);
-    CHECK_EQUAL(123.3219, v[0].get_double(1));
-}
 
 TEST(TableView_FloatsFindAndAggregations)
 {
-    TestTable table;
-    table.add_column(type_Float, "1");
-    table.add_column(type_Double, "2");
-    table.add_column(type_Int, "3");
+    Table table;
+    auto col_float = table.add_column(type_Float, "1");
+    auto col_double = table.add_column(type_Double, "2");
+    auto col_int = table.add_column(type_Int, "3");
 
     float f_val[] = {1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
     double d_val[] = {-1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
     // v_some =       ^^^^            ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
-    for (size_t i = 0; i < 6; ++i) {
-        add(table, f_val[i], d_val[i], 1);
+    std::vector<ObjKey> keys;
+    table.create_objects(6, keys);
+    for (int i = 0; i < 6; ++i) {
+        table.get_object(keys[i]).set_all(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
 
     // Test find_all()
-    TableView v_all = table.find_all_int(2, 1);
+    TableView v_all = table.find_all_int(col_int, 1);
     CHECK_EQUAL(6, v_all.size());
 
-    TableView v_some = table.find_all_double(1, -1.2);
+    TableView v_some = table.find_all_double(col_double, -1.2);
     CHECK_EQUAL(2, v_some.size());
-    CHECK_EQUAL(0, v_some.get_source_ndx(0));
-    CHECK_EQUAL(3, v_some.get_source_ndx(1));
+    CHECK_EQUAL(ObjKey(0), v_some.get_key(0));
+    CHECK_EQUAL(ObjKey(3), v_some.get_key(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.find_first_double(1, -1.2));
-    CHECK_EQUAL(5, v_all.find_first_double(1, 0.0));
-    CHECK_EQUAL(2, v_all.find_first_double(1, 3.2));
+    CHECK_EQUAL(0, v_all.find_first<Double>(col_double, -1.2));
+    CHECK_EQUAL(5, v_all.find_first<Double>(col_double, 0.0));
+    CHECK_EQUAL(2, v_all.find_first<Double>(col_double, 3.2));
 
-    CHECK_EQUAL(1, v_all.find_first_float(0, 2.1f));
-    CHECK_EQUAL(5, v_all.find_first_float(0, 0.0f));
-    CHECK_EQUAL(2, v_all.find_first_float(0, 3.1f));
+    CHECK_EQUAL(1, v_all.find_first<float>(col_float, 2.1f));
+    CHECK_EQUAL(5, v_all.find_first<float>(col_float, 0.0f));
+    CHECK_EQUAL(2, v_all.find_first<float>(col_float, 3.1f));
 
     // TODO: add for float as well
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(col_float), 10 * epsilon);
 
-    size_t ndx = not_found;
+    ObjKey key;
 
     // Test max
-    CHECK_EQUAL(3.2, v_all.maximum_double(1, &ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.2, v_all.maximum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(2), key);
 
-    CHECK_EQUAL(-1.2, v_some.maximum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(3.1f, v_all.maximum_float(0, &ndx));
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(2), key);
 
-    CHECK_EQUAL(1.2f, v_some.maximum_float(0, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
     // Max without ret_index
-    CHECK_EQUAL(3.2, v_all.maximum_double(1));
-    CHECK_EQUAL(-1.2, v_some.maximum_double(1));
-    CHECK_EQUAL(3.1f, v_all.maximum_float(0));
-    CHECK_EQUAL(1.2f, v_some.maximum_float(0));
+    CHECK_EQUAL(3.2, v_all.maximum_double(col_double));
+    CHECK_EQUAL(-1.2, v_some.maximum_double(col_double));
+    CHECK_EQUAL(3.1f, v_all.maximum_float(col_float));
+    CHECK_EQUAL(1.2f, v_some.maximum_float(col_float));
 
     // Test min
-    CHECK_EQUAL(-1.2, v_all.minimum_double(1));
-    CHECK_EQUAL(-1.2, v_some.minimum_double(1));
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(0));
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(0));
-
+    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double));
+    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double));
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float));
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float));
     // min with ret_ndx
-    CHECK_EQUAL(-1.2, v_all.minimum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_all.minimum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(-1.2, v_some.minimum_double(1, &ndx));
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(-1.2, v_some.minimum_double(col_double, &key));
+    CHECK_EQUAL(ObjKey(0), key);
 
-    CHECK_EQUAL(-1.1f, v_all.minimum_float(0, &ndx));
-    CHECK_EQUAL(3, ndx);
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(3), key);
 
-    CHECK_EQUAL(-1.1f, v_some.minimum_float(0, &ndx));
-    CHECK_EQUAL(1, ndx);
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(col_float, &key));
+    CHECK_EQUAL(ObjKey(3), key);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(1), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(0), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(col_double), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(col_float), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(col_float), 10 * epsilon);
 
-    CHECK_EQUAL(1, v_some.count_float(0, 1.2f));
-    CHECK_EQUAL(2, v_some.count_double(1, -1.2));
-    CHECK_EQUAL(2, v_some.count_int(2, 1));
+    CHECK_EQUAL(1, v_some.count_float(col_float, 1.2f));
+    CHECK_EQUAL(2, v_some.count_double(col_double, -1.2));
+    CHECK_EQUAL(2, v_some.count_int(col_int, 1));
 
-    CHECK_EQUAL(2, v_all.count_float(0, 2.1f));
-    CHECK_EQUAL(2, v_all.count_double(1, -1.2));
-    CHECK_EQUAL(6, v_all.count_int(2, 1));
+    CHECK_EQUAL(2, v_all.count_float(col_float, 2.1f));
+    CHECK_EQUAL(2, v_all.count_double(col_double, -1.2));
+    CHECK_EQUAL(6, v_all.count_int(col_int, 1));
 }
 
 TEST(TableView_Sum)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
+    Table table;
+    auto c0 = table.add_column(type_Int, "1");
 
-    add(table, 2);
-    add(table, 2);
-    add(table, 2);
-    add(table, 2);
-    add(table, 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
 
-    TableView v = table.find_all_int(0, 2);
+    TableView v = table.find_all_int(c0, 2);
     CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.sum_int(0);
+    int64_t sum = v.sum_int(c0);
     CHECK_EQUAL(10, sum);
 }
 
 TEST(TableView_Average)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
+    Table table;
+    auto c0 = table.add_column(type_Int, "1");
 
-    add(table, 2);
-    add(table, 2);
-    add(table, 2);
-    add(table, 2);
-    add(table, 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
+    table.create_object().set_all( 2);
 
-    TableView v = table.find_all_int(0, 2);
+    TableView v = table.find_all_int(c0, 2);
     CHECK_EQUAL(5, v.size());
 
-    double sum = v.average_int(0);
+    double sum = v.average_int(c0);
     CHECK_APPROXIMATELY_EQUAL(2., sum, 0.00001);
 }
 
 TEST(TableView_SumNegative)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
+    Table table;
+    auto c0 = table.add_column(type_Int, "1");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, 11);
-    v[2].set_int(0, -20);
+    TableView v = table.find_all_int(c0, 0);
+    v[0].set<Int>(c0, 11);
+    v[2].set<Int>(c0, -20);
 
-    int64_t sum = v.sum_int(0);
+    int64_t sum = v.sum_int(c0);
     CHECK_EQUAL(-9, sum);
 }
 
 TEST(TableView_IsAttached)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
+    Table table;
+    auto c0 = table.add_column(type_Int, "1");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
 
-    TableView v = table.find_all_int(0, 0);
-    TableView v2 = table.find_all_int(0, 0);
-    v[0].set_int(0, 11);
+    TableView v = table.find_all_int(c0, 0);
+    TableView v2 = table.find_all_int(c0, 0);
+    v[0].set<Int>(c0, 11);
     CHECK_EQUAL(true, v.is_attached());
     CHECK_EQUAL(true, v2.is_attached());
     v.remove_last();
-    CHECK_EQUAL(true, v.is_attached());
-    CHECK_EQUAL(true, v2.is_attached());
-
-    table.remove_last();
     CHECK_EQUAL(true, v.is_attached());
     CHECK_EQUAL(true, v2.is_attached());
 }
 
 TEST(TableView_Max)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
+    Table table;
+    auto c0 = table.add_column(type_Int, "1");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, -1);
-    v[1].set_int(0, 2);
-    v[2].set_int(0, 1);
+    TableView v = table.find_all_int(c0, 0);
+    v[0].set<Int>(c0, -1);
+    v[1].set<Int>(c0, 2);
+    v[2].set<Int>(c0, 1);
 
-    int64_t max = v.maximum_int(0);
+    int64_t max = v.maximum_int(c0);
     CHECK_EQUAL(2, max);
 }
 
 TEST(TableView_Max2)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
+    Table table;
+    auto c0 = table.add_column(type_Int, "1");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, -1);
-    v[1].set_int(0, -2);
-    v[2].set_int(0, -3);
+    TableView v = table.find_all_int(c0, 0);
+    v[0].set<Int>(c0, -1);
+    v[1].set<Int>(c0, -2);
+    v[2].set<Int>(c0, -3);
 
-    int64_t max = v.maximum_int(0, 0);
+    int64_t max = v.maximum_int(c0, 0);
     CHECK_EQUAL(-1, max);
 }
 
 
 TEST(TableView_Min)
 {
-    TestTable table;
-    table.add_column(type_Int, "first");
+    Table table;
+    auto c0 = table.add_column(type_Int, "first");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, -1);
-    v[1].set_int(0, 2);
-    v[2].set_int(0, 1);
+    TableView v = table.find_all_int(c0, 0);
+    v[0].set<Int>(c0, -1);
+    v[1].set<Int>(c0, 2);
+    v[2].set<Int>(c0, 1);
 
-    int64_t min = v.minimum_int(0);
+    int64_t min = v.minimum_int(c0);
     CHECK_EQUAL(-1, min);
 
-    size_t ndx = not_found;
-    min = v.minimum_int(0, &ndx);
+    ObjKey key;
+    min = v.minimum_int(c0, &key);
     CHECK_EQUAL(-1, min);
-    CHECK_EQUAL(0, ndx);
+    CHECK_EQUAL(v[0].get_key(), key);
 }
 
 TEST(TableView_Min2)
 {
-    TestTable table;
-    table.add_column(type_Int, "first");
+    Table table;
+    auto c0 = table.add_column(type_Int, "first");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
+    table.create_object().set_all( 0);
 
-    TableView v = table.find_all_int(0, 0);
-    v[0].set_int(0, -1);
-    v[1].set_int(0, -2);
-    v[2].set_int(0, -3);
+    TableView v = table.find_all_int(c0, 0);
+    v[0].set<Int>(c0, -1);
+    v[1].set<Int>(c0, -2);
+    v[2].set<Int>(c0, -3);
 
-    int64_t min = v.minimum_int(0);
+    int64_t min = v.minimum_int(c0);
     CHECK_EQUAL(-3, min);
 
-    size_t ndx = not_found;
-    min = v.minimum_int(0 ,&ndx);
+    ObjKey key;
+    min = v.minimum_int(c0 ,&key);
     CHECK_EQUAL(-3, min);
-    CHECK_EQUAL(2, ndx);
+    CHECK_EQUAL(v[2].get_key(), key);
 }
 
 
 TEST(TableView_Find)
 {
-    TestTable table;
-    table.add_column(type_Int, "int");
-    table.add_column(type_Int, "int?", true);
-    table.add_column(type_Bool, "bool");
-    table.add_column(type_Bool, "bool?", true);
-    table.add_column(type_Float, "float");
-    table.add_column(type_Float, "float?", true);
-    table.add_column(type_Double, "double");
-    table.add_column(type_Double, "double?", true);
-    table.add_column(type_Timestamp, "timestamp");
-    table.add_column(type_Timestamp, "timestamp?", true);
-    table.add_column(type_String, "string");
-    table.add_column(type_String, "string?", true);
-    table.add_column(type_Binary, "binary");
-    table.add_column(type_Binary, "binary?", true);
+    Table table;
+    auto col0 = table.add_column(type_Int, "int");
+    auto col1 = table.add_column(type_Int, "int?", true);
+    auto col2 = table.add_column(type_Bool, "bool");
+    auto col3 = table.add_column(type_Bool, "bool?", true);
+    auto col4 = table.add_column(type_Float, "float");
+    auto col5 = table.add_column(type_Float, "float?", true);
+    auto col6 = table.add_column(type_Double, "double");
+    auto col7 = table.add_column(type_Double, "double?", true);
+    auto col8 = table.add_column(type_Timestamp, "timestamp");
+    auto col9 = table.add_column(type_Timestamp, "timestamp?", true);
+    auto col10 = table.add_column(type_String, "string");
+    auto col11 = table.add_column(type_String, "string?", true);
+    auto col12 = table.add_column(type_Binary, "binary");
+    auto col13 = table.add_column(type_Binary, "binary?", true);
 
-    add(table, 0);
-    add(table, 1, 1, false, false, 1.1f, 1.1f, 1.1, 1.1, Timestamp(1, 1), Timestamp(1, 1),
-        "a", "a", BinaryData("a", 1), BinaryData("a", 1));
-    add(table, 2, nullptr, true, nullptr, 2.2f, nullptr, 2.2, nullptr, Timestamp(2, 2), nullptr,
-        "b", nullptr, BinaryData("b", 1), nullptr);
-    add(table, -1);
+    Obj obj0 = table.create_object();
+    Obj obj1 = table.create_object();
+    Obj obj2 = table.create_object();
+    Obj obj3 = table.create_object();
+
+    obj0.set(col0, 0);
+    obj1.set_all(1, 1, false, false, 1.1f, 1.1f, 1.1, 1.1, Timestamp(1, 1), Timestamp(1, 1), "a", "a",
+                 BinaryData("a", 1), BinaryData("a", 1));
+    obj2.set(col0, 2);
+    obj2.set(col2, true);
+    obj2.set(col4, 2.2f);
+    obj2.set(col6, 2.2);
+    obj2.set(col8, Timestamp(2, 2));
+    obj2.set(col10, "b");
+    obj2.set(col12, BinaryData("b", 1));
+    obj3.set(col0, -1);
 
     // TV where index in TV equals the index in the table
     TableView all = table.where().find_all();
@@ -511,109 +417,109 @@ TEST(TableView_Find)
     TableView after_first = table.where().find_all(1);
 
     // Ensure the TVs have a detached ref to deal with
-    table.remove(3);
+    obj3.remove();
 
     // Look for the values in the second row
-    CHECK_EQUAL(1, all.find_first_int(0, 1));
-    CHECK_EQUAL(1, all.find_first(1, util::Optional<int64_t>(1)));
-    CHECK_EQUAL(0, all.find_first(2, false));
-    CHECK_EQUAL(1, all.find_first(3, util::make_optional(false)));
-    CHECK_EQUAL(1, all.find_first(4, 1.1f));
-    CHECK_EQUAL(1, all.find_first(5, util::make_optional(1.1f)));
-    CHECK_EQUAL(1, all.find_first(6, 1.1));
-    CHECK_EQUAL(1, all.find_first(7, util::make_optional(1.1)));
-    CHECK_EQUAL(1, all.find_first(8, Timestamp(1, 1)));
-    CHECK_EQUAL(1, all.find_first(9, Timestamp(1, 1)));
-    CHECK_EQUAL(1, all.find_first(10, StringData("a")));
-    CHECK_EQUAL(1, all.find_first(11, StringData("a")));
-    CHECK_EQUAL(1, all.find_first(12, BinaryData("a", 1)));
-    CHECK_EQUAL(1, all.find_first(13, BinaryData("a", 1)));
+    CHECK_EQUAL(1, all.find_first<Int>(col0, 1));
+    CHECK_EQUAL(1, all.find_first(col1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, all.find_first(col2, false));
+    CHECK_EQUAL(1, all.find_first(col3, util::make_optional(false)));
+    CHECK_EQUAL(1, all.find_first(col4, 1.1f));
+    CHECK_EQUAL(1, all.find_first(col5, util::make_optional(1.1f)));
+    CHECK_EQUAL(1, all.find_first(col6, 1.1));
+    CHECK_EQUAL(1, all.find_first(col7, util::make_optional(1.1)));
+    CHECK_EQUAL(1, all.find_first(col8, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(col9, Timestamp(1, 1)));
+    CHECK_EQUAL(1, all.find_first(col10, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(col11, StringData("a")));
+    CHECK_EQUAL(1, all.find_first(col12, BinaryData("a", 1)));
+    CHECK_EQUAL(1, all.find_first(col13, BinaryData("a", 1)));
 
-    CHECK_EQUAL(0, after_first.find_first_int(0, 1));
-    CHECK_EQUAL(0, after_first.find_first(1, util::Optional<int64_t>(1)));
-    CHECK_EQUAL(0, after_first.find_first(2, false));
-    CHECK_EQUAL(0, after_first.find_first(3, util::make_optional(false)));
-    CHECK_EQUAL(0, after_first.find_first(4, 1.1f));
-    CHECK_EQUAL(0, after_first.find_first(5, util::make_optional(1.1f)));
-    CHECK_EQUAL(0, after_first.find_first(6, 1.1));
-    CHECK_EQUAL(0, after_first.find_first(7, util::make_optional(1.1)));
-    CHECK_EQUAL(0, after_first.find_first(8, Timestamp(1, 1)));
-    CHECK_EQUAL(0, after_first.find_first(9, Timestamp(1, 1)));
-    CHECK_EQUAL(0, after_first.find_first(10, StringData("a")));
-    CHECK_EQUAL(0, after_first.find_first(11, StringData("a")));
-    CHECK_EQUAL(0, after_first.find_first(12, BinaryData("a", 1)));
-    CHECK_EQUAL(0, after_first.find_first(13, BinaryData("a", 1)));
+    CHECK_EQUAL(0, after_first.find_first<Int>(col0, 1));
+    CHECK_EQUAL(0, after_first.find_first(col1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, after_first.find_first(col2, false));
+    CHECK_EQUAL(0, after_first.find_first(col3, util::make_optional(false)));
+    CHECK_EQUAL(0, after_first.find_first(col4, 1.1f));
+    CHECK_EQUAL(0, after_first.find_first(col5, util::make_optional(1.1f)));
+    CHECK_EQUAL(0, after_first.find_first(col6, 1.1));
+    CHECK_EQUAL(0, after_first.find_first(col7, util::make_optional(1.1)));
+    CHECK_EQUAL(0, after_first.find_first(col8, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(col9, Timestamp(1, 1)));
+    CHECK_EQUAL(0, after_first.find_first(col10, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(col11, StringData("a")));
+    CHECK_EQUAL(0, after_first.find_first(col12, BinaryData("a", 1)));
+    CHECK_EQUAL(0, after_first.find_first(col13, BinaryData("a", 1)));
 
     // Look for the values in the third row
-    CHECK_EQUAL(2, all.find_first_int(0, 2));
-    CHECK_EQUAL(0, all.find_first(1, util::Optional<int64_t>()));
-    CHECK_EQUAL(2, all.find_first(2, true));
-    CHECK_EQUAL(0, all.find_first(3, util::Optional<bool>()));
-    CHECK_EQUAL(2, all.find_first(4, 2.2f));
-    CHECK_EQUAL(0, all.find_first(5, util::Optional<float>()));
-    CHECK_EQUAL(2, all.find_first(6, 2.2));
-    CHECK_EQUAL(0, all.find_first(7, util::Optional<double>()));
-    CHECK_EQUAL(2, all.find_first(8, Timestamp(2, 2)));
-    CHECK_EQUAL(0, all.find_first(9, Timestamp()));
-    CHECK_EQUAL(2, all.find_first(10, StringData("b")));
-    CHECK_EQUAL(0, all.find_first(11, StringData()));
-    CHECK_EQUAL(2, all.find_first(12, BinaryData("b", 1)));
-    CHECK_EQUAL(0, all.find_first(13, BinaryData()));
+    CHECK_EQUAL(2, all.find_first<Int>(col0, 2));
+    CHECK_EQUAL(0, all.find_first(col1, util::Optional<int64_t>()));
+    CHECK_EQUAL(2, all.find_first(col2, true));
+    CHECK_EQUAL(0, all.find_first(col3, util::Optional<bool>()));
+    CHECK_EQUAL(2, all.find_first(col4, 2.2f));
+    CHECK_EQUAL(0, all.find_first(col5, util::Optional<float>()));
+    CHECK_EQUAL(2, all.find_first(col6, 2.2));
+    CHECK_EQUAL(0, all.find_first(col7, util::Optional<double>()));
+    CHECK_EQUAL(2, all.find_first(col8, Timestamp(2, 2)));
+    CHECK_EQUAL(0, all.find_first(col9, Timestamp()));
+    CHECK_EQUAL(2, all.find_first(col10, StringData("b")));
+    CHECK_EQUAL(0, all.find_first(col11, StringData()));
+    CHECK_EQUAL(2, all.find_first(col12, BinaryData("b", 1)));
+    CHECK_EQUAL(0, all.find_first(col13, BinaryData()));
 
-    CHECK_EQUAL(1, after_first.find_first_int(0, 2));
-    CHECK_EQUAL(1, after_first.find_first(1, util::Optional<int64_t>()));
-    CHECK_EQUAL(1, after_first.find_first(2, true));
-    CHECK_EQUAL(1, after_first.find_first(3, util::Optional<bool>()));
-    CHECK_EQUAL(1, after_first.find_first(4, 2.2f));
-    CHECK_EQUAL(1, after_first.find_first(5, util::Optional<float>()));
-    CHECK_EQUAL(1, after_first.find_first(6, 2.2));
-    CHECK_EQUAL(1, after_first.find_first(7, util::Optional<double>()));
-    CHECK_EQUAL(1, after_first.find_first(8, Timestamp(2, 2)));
-    CHECK_EQUAL(1, after_first.find_first(9, Timestamp()));
-    CHECK_EQUAL(1, after_first.find_first(10, StringData("b")));
-    CHECK_EQUAL(1, after_first.find_first(11, StringData()));
-    CHECK_EQUAL(1, after_first.find_first(12, BinaryData("b", 1)));
-    CHECK_EQUAL(1, after_first.find_first(13, BinaryData()));
+    CHECK_EQUAL(1, after_first.find_first<Int>(col0, 2));
+    CHECK_EQUAL(1, after_first.find_first(col1, util::Optional<int64_t>()));
+    CHECK_EQUAL(1, after_first.find_first(col2, true));
+    CHECK_EQUAL(1, after_first.find_first(col3, util::Optional<bool>()));
+    CHECK_EQUAL(1, after_first.find_first(col4, 2.2f));
+    CHECK_EQUAL(1, after_first.find_first(col5, util::Optional<float>()));
+    CHECK_EQUAL(1, after_first.find_first(col6, 2.2));
+    CHECK_EQUAL(1, after_first.find_first(col7, util::Optional<double>()));
+    CHECK_EQUAL(1, after_first.find_first(col8, Timestamp(2, 2)));
+    CHECK_EQUAL(1, after_first.find_first(col9, Timestamp()));
+    CHECK_EQUAL(1, after_first.find_first(col10, StringData("b")));
+    CHECK_EQUAL(1, after_first.find_first(col11, StringData()));
+    CHECK_EQUAL(1, after_first.find_first(col12, BinaryData("b", 1)));
+    CHECK_EQUAL(1, after_first.find_first(col13, BinaryData()));
 
     // Look for values that aren't present
-    CHECK_EQUAL(npos, all.find_first_int(0, 5));
-    CHECK_EQUAL(npos, all.find_first(1, util::Optional<int64_t>(5)));
-    CHECK_EQUAL(npos, all.find_first(4, 3.3f));
-    CHECK_EQUAL(npos, all.find_first(5, util::make_optional(3.3f)));
-    CHECK_EQUAL(npos, all.find_first(6, 3.3));
-    CHECK_EQUAL(npos, all.find_first(7, util::make_optional(3.3)));
-    CHECK_EQUAL(npos, all.find_first(8, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, all.find_first(9, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, all.find_first(10, StringData("c")));
-    CHECK_EQUAL(npos, all.find_first(11, StringData("c")));
-    CHECK_EQUAL(npos, all.find_first(12, BinaryData("c", 1)));
-    CHECK_EQUAL(npos, all.find_first(13, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, all.find_first<Int>(col0, 5));
+    CHECK_EQUAL(npos, all.find_first(col1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, all.find_first(col4, 3.3f));
+    CHECK_EQUAL(npos, all.find_first(col5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, all.find_first(col6, 3.3));
+    CHECK_EQUAL(npos, all.find_first(col7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, all.find_first(col8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(col9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, all.find_first(col10, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(col11, StringData("c")));
+    CHECK_EQUAL(npos, all.find_first(col12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, all.find_first(col13, BinaryData("c", 1)));
 
-    CHECK_EQUAL(npos, after_first.find_first_int(0, 5));
-    CHECK_EQUAL(npos, after_first.find_first(1, util::Optional<int64_t>(5)));
-    CHECK_EQUAL(npos, after_first.find_first(4, 3.3f));
-    CHECK_EQUAL(npos, after_first.find_first(5, util::make_optional(3.3f)));
-    CHECK_EQUAL(npos, after_first.find_first(6, 3.3));
-    CHECK_EQUAL(npos, after_first.find_first(7, util::make_optional(3.3)));
-    CHECK_EQUAL(npos, after_first.find_first(8, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, after_first.find_first(9, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, after_first.find_first(10, StringData("c")));
-    CHECK_EQUAL(npos, after_first.find_first(11, StringData("c")));
-    CHECK_EQUAL(npos, after_first.find_first(12, BinaryData("c", 1)));
-    CHECK_EQUAL(npos, after_first.find_first(13, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, after_first.find_first<Int>(col0, 5));
+    CHECK_EQUAL(npos, after_first.find_first(col1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, after_first.find_first(col4, 3.3f));
+    CHECK_EQUAL(npos, after_first.find_first(col5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, after_first.find_first(col6, 3.3));
+    CHECK_EQUAL(npos, after_first.find_first(col7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, after_first.find_first(col8, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(col9, Timestamp(3, 3)));
+    CHECK_EQUAL(npos, after_first.find_first(col10, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(col11, StringData("c")));
+    CHECK_EQUAL(npos, after_first.find_first(col12, BinaryData("c", 1)));
+    CHECK_EQUAL(npos, after_first.find_first(col13, BinaryData("c", 1)));
 }
 
 
 TEST(TableView_Follows_Changes)
 {
     Table table;
-    table.add_column(type_Int, "first");
-    table.add_empty_row();
-    table.set_int(0, 0, 1);
-    Query q = table.where().equal(0, 1);
+    auto col = table.add_column(type_Int, "first");
+    Obj obj0 = table.create_object().set(col, 1);
+
+    Query q = table.where().equal(col, 1);
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v[0].get<Int>(col));
 
     // low level sanity check that we can copy a query and run the copy:
     Query q2 = q;
@@ -621,49 +527,45 @@ TEST(TableView_Follows_Changes)
 
     // now the fun begins
     CHECK_EQUAL(1, v.size());
-    table.add_empty_row();
+    Obj obj1 = table.create_object();
     CHECK_EQUAL(1, v.size());
-    table.set_int(0, 1, 1);
+    obj1.set<Int>(col, 1);
     v.sync_if_needed();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
-    CHECK_EQUAL(1, v.get_int(0, 1));
-    table.set_int(0, 0, 7);
+    CHECK_EQUAL(1, v[0].get<Int>(col));
+    CHECK_EQUAL(1, v[1].get<Int>(col));
+    obj0.set<Int>(col, 7);
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
-    table.set_int(0, 1, 7);
+    CHECK_EQUAL(1, v[0].get<Int>(col));
+    obj1.set<Int>(col, 7);
     v.sync_if_needed();
     CHECK_EQUAL(0, v.size());
-    table.set_int(0, 1, 1);
+    obj1.set<Int>(col, 1);
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v[0].get<Int>(col));
 }
 
 
 TEST(TableView_Distinct_Follows_Changes)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col_int = table.add_column(type_Int, "first");
     table.add_column(type_String, "second");
-    table.add_search_index(0);
+    table.add_search_index(col_int);
 
-    table.add_empty_row(5);
     for (int i = 0; i < 5; ++i) {
-        table.set_int(0, i, i);
-        table.set_string(1, i, "Foo");
+        table.create_object().set_all(i, "Foo");
     }
 
-    TableView distinct_ints = table.get_distinct_view(0);
+    TableView distinct_ints = table.get_distinct_view(col_int);
     CHECK_EQUAL(5, distinct_ints.size());
     CHECK(distinct_ints.is_in_sync());
 
     // Check that adding a value that doesn't actually impact the
     // view still invalidates the view (which is inspected for now).
-    table.add_empty_row();
-    table.set_int(0, 5, 4);
-    table.set_string(1, 5, "Foo");
+    table.create_object().set_all(4, "Foo");
     CHECK(!distinct_ints.is_in_sync());
     distinct_ints.sync_if_needed();
     CHECK(distinct_ints.is_in_sync());
@@ -671,9 +573,7 @@ TEST(TableView_Distinct_Follows_Changes)
 
     // Check that adding a value that impacts the view invalidates the view.
     distinct_ints.sync_if_needed();
-    table.add_empty_row();
-    table.set_int(0, 6, 10);
-    table.set_string(1, 6, "Foo");
+    table.create_object().set_all(6, "Foo");
     CHECK(!distinct_ints.is_in_sync());
     distinct_ints.sync_if_needed();
     CHECK(distinct_ints.is_in_sync());
@@ -684,23 +584,21 @@ TEST(TableView_Distinct_Follows_Changes)
 TEST(TableView_SyncAfterCopy)
 {
     Table table;
-    table.add_column(type_Int, "first");
-    table.add_empty_row();
-    table.set_int(0, 0, 1);
+    auto col = table.add_column(type_Int, "first");
+    table.create_object().set(col, 1);
 
     // do initial query
-    Query q = table.where().equal(0, 1);
+    Query q = table.where().equal(col, 1);
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v[0].get<Int>(col));
 
     // move the tableview
     TableView v2 = v;
     CHECK_EQUAL(1, v2.size());
 
     // make a change
-    size_t ndx2 = table.add_empty_row();
-    table.set_int(0, ndx2, 1);
+    table.create_object().set(col, 1);
 
     // verify that the copied view sees the change
     v2.sync_if_needed();
@@ -709,45 +607,45 @@ TEST(TableView_SyncAfterCopy)
 
 TEST(TableView_FindAll)
 {
-    TestTable table;
-    table.add_column(type_Int, "first");
+    Table table;
+    auto col = table.add_column(type_Int, "first");
 
-    add(table, 0);
-    add(table, 0);
-    add(table, 0);
+    table.create_object().set_all(3);
+    auto k1 = table.create_object().set_all(3).get_key();
+    auto k2 = table.create_object().set_all(3).get_key();
 
-    TableView v = table.find_all_int(0, 0);
+    TableView v = table.find_all_int(col, 3);
     CHECK_EQUAL(3, v.size());
-    v[0].set_int(0, 5);
-    v[1].set_int(0, 4); // match
-    v[2].set_int(0, 4); // match
+    v[0].set(col, 5);
+    v[1].set(col, 4); // match
+    v[2].set(col, 4); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView v2 = v.find_all_int(0, 4);
+    auto v2 = v.find_all<Int>(col, 4);
     CHECK_EQUAL(2, v2.size());
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
-    CHECK_EQUAL(2, v2.get_source_ndx(1));
+    CHECK_EQUAL(k1, v2.get_key(0));
+    CHECK_EQUAL(k2, v2.get_key(1));
 }
 
 
 TEST(TableView_FindAllString)
 {
-    TestTable table;
-    table.add_column(type_String, "1");
+    Table table;
+    auto col = table.add_column(type_String, "1");
 
-    add(table, "a");
-    add(table, "a");
-    add(table, "a");
+    table.create_object().set_all("a").get_key();
+    auto k1 = table.create_object().set_all("a").get_key();
+    auto k2 = table.create_object().set_all("a").get_key();
 
-    TableView v = table.find_all_string(0, "a");
-    v[0].set_string(0, "foo");
-    v[1].set_string(0, "bar"); // match
-    v[2].set_string(0, "bar"); // match
+    TableView v = table.find_all_string(col, "a");
+    v[0].set<String>(col, "foo");
+    v[1].set<String>(col, "bar"); // match
+    v[2].set<String>(col, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
-    TableView v2 = v.find_all_string(0, "bar");
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
-    CHECK_EQUAL(2, v2.get_source_ndx(1));
+    auto v2 = v.find_all(col, StringData("bar"));
+    CHECK_EQUAL(k1, v2.get_key(0));
+    CHECK_EQUAL(k2, v2.get_key(1));
 }
 
 
@@ -757,38 +655,38 @@ NONCONCURRENT_TEST(TableView_StringSort)
     // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
 
     // Test of handling of unicode takes place in test_utf8.cpp
-    TestTable table;
-    table.add_column(type_String, "1");
+    Table table;
+    auto col = table.add_column(type_String, "1");
 
-    add(table, "alpha");
-    add(table, "zebra");
-    add(table, "ALPHA");
-    add(table, "ZEBRA");
+    table.create_object().set_all( "alpha");
+    table.create_object().set_all( "zebra");
+    table.create_object().set_all( "ALPHA");
+    table.create_object().set_all( "ZEBRA");
 
     // Core-only is default comparer
     TableView v = table.where().find_all();
-    v.sort(0);
-    CHECK_EQUAL("alpha", v[0].get_string(0));
-    CHECK_EQUAL("ALPHA", v[1].get_string(0));
-    CHECK_EQUAL("zebra", v[2].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[3].get_string(0));
+    v.sort(col);
+    CHECK_EQUAL("alpha", v[0].get<String>(col));
+    CHECK_EQUAL("ALPHA", v[1].get<String>(col));
+    CHECK_EQUAL("zebra", v[2].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[3].get<String>(col));
 
     // Should be exactly the same as above because 0 was default already
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     v = table.where().find_all();
-    v.sort(0);
-    CHECK_EQUAL("alpha", v[0].get_string(0));
-    CHECK_EQUAL("ALPHA", v[1].get_string(0));
-    CHECK_EQUAL("zebra", v[2].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[3].get_string(0));
+    v.sort(col);
+    CHECK_EQUAL("alpha", v[0].get<String>(col));
+    CHECK_EQUAL("ALPHA", v[1].get<String>(col));
+    CHECK_EQUAL("zebra", v[2].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[3].get<String>(col));
 
     // Test descending mode
     v = table.where().find_all();
-    v.sort(0, false);
-    CHECK_EQUAL("alpha", v[3].get_string(0));
-    CHECK_EQUAL("ALPHA", v[2].get_string(0));
-    CHECK_EQUAL("zebra", v[1].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[0].get_string(0));
+    v.sort(col, false);
+    CHECK_EQUAL("alpha", v[3].get<String>(col));
+    CHECK_EQUAL("ALPHA", v[2].get<String>(col));
+    CHECK_EQUAL("zebra", v[1].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[0].get<String>(col));
 
     // primitive C locale comparer. But that's OK since all we want to test is
     // if the callback is invoked
@@ -801,11 +699,11 @@ NONCONCURRENT_TEST(TableView_StringSort)
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
     set_string_compare_method(STRING_COMPARE_CALLBACK, comparer);
     v = table.where().find_all();
-    v.sort(0);
-    CHECK_EQUAL("ALPHA", v[0].get_string(0));
-    CHECK_EQUAL("ZEBRA", v[1].get_string(0));
-    CHECK_EQUAL("alpha", v[2].get_string(0));
-    CHECK_EQUAL("zebra", v[3].get_string(0));
+    v.sort(col);
+    CHECK_EQUAL("ALPHA", v[0].get<String>(col));
+    CHECK_EQUAL("ZEBRA", v[1].get<String>(col));
+    CHECK_EQUAL("alpha", v[2].get<String>(col));
+    CHECK_EQUAL("zebra", v[3].get<String>(col));
     CHECK_EQUAL(true, got_called);
 
 #ifdef _MSC_VER
@@ -815,11 +713,11 @@ NONCONCURRENT_TEST(TableView_StringSort)
     bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
         v = table.where().find_all();
-        v.sort(0);
-        CHECK_EQUAL("alpha", v[0].get_string(0));
-        CHECK_EQUAL("ALPHA", v[1].get_string(0));
-        CHECK_EQUAL("zebra", v[2].get_string(0));
-        CHECK_EQUAL("ZEBRA", v[3].get_string(0));
+        v.sort(col);
+        CHECK_EQUAL("alpha", v[0].get<String>(col));
+        CHECK_EQUAL("ALPHA", v[1].get<String>(col));
+        CHECK_EQUAL("zebra", v[2].get<String>(col));
+        CHECK_EQUAL("ZEBRA", v[3].get<String>(col));
         CHECK_EQUAL(false, got_called);
     }
 #endif
@@ -828,39 +726,66 @@ NONCONCURRENT_TEST(TableView_StringSort)
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
 
+TEST(TableView_BinarySort)
+{
+    Table t;
+    auto col_bin = t.add_column(type_Binary, "bin", true);
+    auto col_rank = t.add_column(type_Int, "rank");
+
+    const char b1[] = {1, 2, 3, 4, 5};
+    const char b2[] = {1, 2, 0, 4, 5};
+    const char b3[] = {1, 2, 3, 4};
+    const char b4[] = {1, 2, 3, 4, 5, 6};
+
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b1, sizeof(b1))}, {col_rank, 4}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b2, sizeof(b2))}, {col_rank, 2}});
+    t.create_object(ObjKey{}, {{col_rank, 1}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b3, sizeof(b3))}, {col_rank, 3}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b4, sizeof(b4))}, {col_rank, 5}});
+
+    TableView tv = t.where().find_all();
+    tv.sort(col_bin);
+    int64_t rank = 0;
+    for (size_t n = 0; n < tv.size(); n++) {
+        auto this_rank = tv.get_object(n).get<Int>(col_rank);
+        CHECK_GREATER(this_rank, rank);
+        rank = this_rank;
+    }
+}
+
 
 TEST(TableView_FloatDoubleSort)
 {
-    TestTable t;
-    t.add_column(type_Float, "1");
-    t.add_column(type_Double, "2");
+    Table t;
+    auto col_float = t.add_column(type_Float, "1");
+    auto col_double = t.add_column(type_Double, "2");
 
-    add(t, 1.0f, 10.0);
-    add(t, 3.0f, 30.0);
-    add(t, 2.0f, 20.0);
-    add(t, 0.0f, 5.0);
+    t.create_object().set_all(1.0f, 10.0);
+    t.create_object().set_all(3.0f, 30.0);
+    t.create_object().set_all(2.0f, 20.0);
+    t.create_object().set_all(0.0f, 5.0);
 
     TableView tv = t.where().find_all();
-    tv.sort(0);
+    tv.sort(col_float);
 
-    CHECK_EQUAL(0.0f, tv[0].get_float(0));
-    CHECK_EQUAL(1.0f, tv[1].get_float(0));
-    CHECK_EQUAL(2.0f, tv[2].get_float(0));
-    CHECK_EQUAL(3.0f, tv[3].get_float(0));
+    CHECK_EQUAL(0.0f, tv[0].get<float>(col_float));
+    CHECK_EQUAL(1.0f, tv[1].get<float>(col_float));
+    CHECK_EQUAL(2.0f, tv[2].get<float>(col_float));
+    CHECK_EQUAL(3.0f, tv[3].get<float>(col_float));
 
-    tv.sort(1);
-    CHECK_EQUAL(5.0f, tv[0].get_double(1));
-    CHECK_EQUAL(10.0f, tv[1].get_double(1));
-    CHECK_EQUAL(20.0f, tv[2].get_double(1));
-    CHECK_EQUAL(30.0f, tv[3].get_double(1));
+    tv.sort(col_double);
+    CHECK_EQUAL(5.0f, tv[0].get<double>(col_double));
+    CHECK_EQUAL(10.0f, tv[1].get<double>(col_double));
+    CHECK_EQUAL(20.0f, tv[2].get<double>(col_double));
+    CHECK_EQUAL(30.0f, tv[3].get<double>(col_double));
 }
 
 TEST(TableView_DoubleSortPrecision)
 {
-    // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost
-    TestTable t;
-    t.add_column(type_Float, "1");
-    t.add_column(type_Double, "2");
+    // Detect if sorting algorithm accidentally casts doubles to float somewhere so that precision gets lost
+    Table t;
+    auto col_float = t.add_column(type_Float, "1");
+    auto col_double = t.add_column(type_Double, "2");
 
     double d1 = 100000000000.0;
     double d2 = 100000000001.0;
@@ -875,124 +800,134 @@ TEST(TableView_DoubleSortPrecision)
     // First verify that our unit is guaranteed to find such a bug; that is, test if such a cast is guaranteed to give
     // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the
     // correct sorting order. Fortunatly we use std::stable_sort which must maintain order on draws.
-    add(t, f2, d2);
-    add(t, f1, d1);
+    t.create_object().set_all(f2, d2);
+    t.create_object().set_all(f1, d1);
 
     TableView tv = t.where().find_all();
-    tv.sort(0);
+    tv.sort(col_float);
 
     // Sort should be stable
-    CHECK_EQUAL(f2, tv[0].get_float(0));
-    CHECK_EQUAL(f1, tv[1].get_float(0));
+    CHECK_EQUAL(f2, tv[0].get<float>(col_float));
+    CHECK_EQUAL(f1, tv[1].get<float>(col_float));
 
-    // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm,
+    // If sort is stable, and compare makes a draw because the doubles are accidentally casted to float in Realm,
     // then
     // original order would be maintained. Check that it's not maintained:
-    tv.sort(1);
-    CHECK_EQUAL(d1, tv[0].get_double(1));
-    CHECK_EQUAL(d2, tv[1].get_double(1));
+    tv.sort(col_double);
+    CHECK_EQUAL(d1, tv[0].get<double>(col_double));
+    CHECK_EQUAL(d2, tv[1].get<double>(col_double));
 }
 
 TEST(TableView_SortNullString)
 {
     Table t;
-    t.add_column(type_String, "s", true);
-    t.add_empty_row(4);
-    t.set_string(0, 0, StringData("")); // empty string
-    t.set_string(0, 1, realm::null());  // realm::null()
-    t.set_string(0, 2, StringData("")); // empty string
-    t.set_string(0, 3, realm::null());  // realm::null()
+    auto col = t.add_column(type_String, "s", true);
+    Obj obj = t.create_object().set(col, StringData("")); // empty string
+    t.create_object().set(col, realm::null());            // realm::null()
+    t.create_object().set(col, StringData(""));           // empty string
+    t.create_object().set(col, realm::null());            // realm::null()
 
     TableView tv;
 
     tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+    tv.sort(col);
+    CHECK(tv[0].get<String>(col).is_null());
+    CHECK(tv[1].get<String>(col).is_null());
+    CHECK_NOT(tv[2].get<String>(col).is_null());
+    CHECK_NOT(tv[3].get<String>(col).is_null());
 
-    t.set_string(0, 0, StringData("medium medium medium medium"));
-
-    tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
-
-    t.set_string(0, 0, StringData("long long long long long long long long long long long long long long"));
+    obj.set(col, StringData("medium medium medium medium"));
 
     tv = t.where().find_all();
-    tv.sort(0);
-    CHECK(tv.get_string(0, 0).is_null());
-    CHECK(tv.get_string(0, 1).is_null());
-    CHECK(!tv.get_string(0, 2).is_null());
-    CHECK(!tv.get_string(0, 3).is_null());
+    tv.sort(col);
+    CHECK(tv[0].get<String>(col).is_null());
+    CHECK(tv[1].get<String>(col).is_null());
+    CHECK_NOT(tv[2].get<String>(col).is_null());
+    CHECK_NOT(tv[3].get<String>(col).is_null());
+
+    obj.set(col, StringData("long long long long long long long long long long long long long long"));
+
+    tv = t.where().find_all();
+    tv.sort(col);
+    CHECK(tv[0].get<String>(col).is_null());
+    CHECK(tv[1].get<String>(col).is_null());
+    CHECK_NOT(tv[2].get<String>(col).is_null());
+    CHECK_NOT(tv[3].get<String>(col).is_null());
 }
 
 TEST(TableView_Delete)
 {
-    TestTable table;
-    table.add_column(type_Int, "first");
+    Table table;
+    auto col = table.add_column(type_Int, "first");
 
-    add(table, 1);
-    add(table, 2);
-    add(table, 1);
-    add(table, 3);
-    add(table, 1);
+    auto k0 = table.create_object().set(col, 1).get_key();
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 3);
+    auto k4 = table.create_object().set(col, 1).get_key();
 
-    TableView v = table.find_all_int(0, 1);
-    CHECK_EQUAL(3, v.size());
+    TableView v = table.find_all_int(col, 1);
+    CHECK_EQUAL(3, v.size()); // k0, k2, k4
 
-    v.remove(1);
+    v.remove(1); // k0, k4
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(0, v.get_source_ndx(0));
-    CHECK_EQUAL(3, v.get_source_ndx(1));
+    CHECK_EQUAL(k0, v.get_key(0));
+    CHECK_EQUAL(k4, v.get_key(1));
 
     CHECK_EQUAL(4, table.size());
-    CHECK_EQUAL(1, table[0].get_int(0));
-    CHECK_EQUAL(2, table[1].get_int(0));
-    CHECK_EQUAL(3, table[2].get_int(0));
-    CHECK_EQUAL(1, table[3].get_int(0));
+    auto it = table.begin();
+    CHECK_EQUAL(1, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(1, it->get<int64_t>(col));
 
-    v.remove(0);
+    v.remove(0); // k4
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(2, v.get_source_ndx(0));
+    CHECK_EQUAL(k4, v.get_key(0));
 
     CHECK_EQUAL(3, table.size());
-    CHECK_EQUAL(2, table[0].get_int(0));
-    CHECK_EQUAL(3, table[1].get_int(0));
-    CHECK_EQUAL(1, table[2].get_int(0));
+    it = table.begin();
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(1, it->get<int64_t>(col));
 
     v.remove(0);
     CHECK_EQUAL(0, v.size());
 
     CHECK_EQUAL(2, table.size());
-    CHECK_EQUAL(2, table[0].get_int(0));
-    CHECK_EQUAL(3, table[1].get_int(0));
+    it = table.begin();
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
 }
 
 TEST(TableView_Clear)
 {
-    TestTable table;
-    table.add_column(type_Int, "first");
+    Table table;
+    auto col = table.add_column(type_Int, "first");
 
-    add(table, 1);
-    add(table, 2);
-    add(table, 1);
-    add(table, 3);
-    add(table, 1);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 3);
+    table.create_object().set(col, 1);
 
-    TableView v = table.find_all_int(0, 1);
+    TableView v = table.find_all_int(col, 1);
     CHECK_EQUAL(3, v.size());
 
     v.clear();
     CHECK_EQUAL(0, v.size());
 
     CHECK_EQUAL(2, table.size());
-    CHECK_EQUAL(2, table[0].get_int(0));
-    CHECK_EQUAL(3, table[1].get_int(0));
+    auto it = table.begin();
+    CHECK_EQUAL(2, it->get<int64_t>(col));
+    ++it;
+    CHECK_EQUAL(3, it->get<int64_t>(col));
 }
 
 
@@ -1001,20 +936,18 @@ TEST(TableView_Clear)
 TEST(TableView_Imperative_Clear)
 {
     Table t;
-    t.add_column(type_Int, "i1");
-    t.add_empty_row(3);
-    t.set_int(0, 0, 7);
-    t.set_int(0, 1, 13);
-    t.set_int(0, 2, 29);
+    auto col = t.add_column(type_Int, "i1");
+    t.create_object().set(col, 7);
+    t.create_object().set(col, 13);
+    t.create_object().set(col, 29);
 
-    TableView v = t.where().less(0, 20).find_all();
+    TableView v = t.where().less(col, 20).find_all();
     CHECK_EQUAL(2, v.size());
     // remove the underlying entry in the table, introducing a detached ref
-    t.move_last_over(v.get_source_ndx(0));
+    t.remove_object(v.get_key(0));
     // the detached ref still counts as an entry when calling size()
     CHECK_EQUAL(2, v.size());
-    // but is does not count as attached anymore:
-    CHECK_EQUAL(1, v.num_attached_rows());
+
     v.clear();
     CHECK_EQUAL(0, v.size());
     CHECK_EQUAL(1, t.size());
@@ -1027,30 +960,25 @@ TEST(TableView_Imperative_Clear)
 TEST(TableView_Stacked)
 {
     Table t;
-    t.add_column(type_Int, "i1");
-    t.add_column(type_Int, "i2");
-    t.add_column(type_String, "S1");
-    t.add_empty_row(2);
-    t.set_int(0, 0, 1);      // 1
-    t.set_int(1, 0, 2);      // 2
-    t.set_string(2, 0, "A"); // "A"
-    t.set_int(0, 1, 2);      // 2
-    t.set_int(1, 1, 2);      // 2
-    t.set_string(2, 1, "B"); // "B"
+    auto col_int0 = t.add_column(type_Int, "i1");
+    auto col_int1 = t.add_column(type_Int, "i2");
+    auto col_str = t.add_column(type_String, "S1");
+    t.create_object().set_all(1, 2, "A");
+    t.create_object().set_all(2, 2, "B");
 
-    TableView tv = t.find_all_int(0, 2);
-    TableView tv2 = tv.find_all_int(1, 2);
+    TableView tv = t.find_all_int(col_int0, 2);
+    auto tv2 = tv.find_all<Int>(col_int1, 2);
     CHECK_EQUAL(1, tv2.size());             // evaluates tv2.size to 1 which is expected
-    CHECK_EQUAL("B", tv2.get_string(2, 0)); // evalates get_string(2,0) to "A" which is not expected
+    CHECK_EQUAL("B", tv2[0].get<String>(col_str)); // evalates get_string(2,0) to "A" which is not expected
 }
 
 
 TEST(TableView_ClearNone)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    auto col = table.add_column(type_Int, "first");
 
-    TableView v = table.find_all_int(0, 1);
+    TableView v = table.find_all_int(col, 1);
     CHECK_EQUAL(0, v.size());
 
     v.clear();
@@ -1058,480 +986,74 @@ TEST(TableView_ClearNone)
 
 TEST(TableView_FindAllStacked)
 {
-    TestTable table;
-    table.add_column(type_Int, "1");
-    table.add_column(type_Int, "2");
+    Table table;
+    auto col_int0 = table.add_column(type_Int, "1");
+    auto col_int1 = table.add_column(type_Int, "2");
 
-    add(table, 0, 1);
-    add(table, 0, 2);
-    add(table, 0, 3);
-    add(table, 1, 1);
-    add(table, 1, 2);
-    add(table, 1, 3);
+    table.create_object().set_all( 0, 1);
+    auto k = table.create_object().set_all(0, 2).get_key();
+    table.create_object().set_all( 0, 3);
+    table.create_object().set_all( 1, 1);
+    table.create_object().set_all( 1, 2);
+    table.create_object().set_all( 1, 3);
 
-    TableView v = table.find_all_int(0, 0);
+    TableView v = table.find_all_int(col_int0, 0);
     CHECK_EQUAL(3, v.size());
 
-    TableView v2 = v.find_all_int(1, 2);
+    auto v2 = v.find_all<Int>(col_int1, 2);
     CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(0, v2[0].get_int(0));
-    CHECK_EQUAL(2, v2[0].get_int(1));
-    CHECK_EQUAL(1, v2.get_source_ndx(0));
+    CHECK_EQUAL(0, v2[0].get<Int>(col_int0));
+    CHECK_EQUAL(2, v2[0].get<Int>(col_int1));
+    CHECK_EQUAL(k, v2.get_key(0));
 }
 
-
-TEST(TableView_LowLevelSubtables)
-{
-    Table table;
-    std::vector<size_t> column_path;
-    table.add_column(type_Bool, "enable");
-    table.add_column(type_Table, "subtab");
-    table.add_column(type_Mixed, "mixed");
-    column_path.push_back(1);
-    table.add_subcolumn(column_path, type_Bool, "enable");
-    table.add_subcolumn(column_path, type_Table, "subtab");
-    table.add_subcolumn(column_path, type_Mixed, "mixed");
-    column_path.push_back(1);
-    table.add_subcolumn(column_path, type_Bool, "enable");
-    table.add_subcolumn(column_path, type_Table, "subtab");
-    table.add_subcolumn(column_path, type_Mixed, "mixed");
-
-    table.add_empty_row(2 * 2);
-    table.set_bool(0, 1, true);
-    table.set_bool(0, 3, true);
-    TableView view = table.where().equal(0, true).find_all();
-    CHECK_EQUAL(2, view.size());
-    for (int i_1 = 0; i_1 != 2; ++i_1) {
-        TableRef subtab = view.get_subtable(1, i_1);
-        subtab->add_empty_row(2 * (2 + i_1));
-        for (int i_2 = 0; i_2 != 2 * (2 + i_1); ++i_2)
-            subtab->set_bool(0, i_2, i_2 % 2 == 0);
-        TableView subview = subtab->where().equal(0, true).find_all();
-        CHECK_EQUAL(2 + i_1, subview.size());
-        {
-            TableRef subsubtab = subview.get_subtable(1, 0 + i_1);
-            subsubtab->add_empty_row(2 * (3 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (3 + i_1); ++i_3)
-                subsubtab->set_bool(0, i_3, i_3 % 2 == 1);
-            TableView subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(3 + i_1, subsubview.size());
-
-            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            subview.clear_subtable(2, 1 + i_1); // Mixed
-            TableRef subsubtab_mix = subview.get_subtable(2, 1 + i_1);
-            subsubtab_mix->add_column(type_Bool, "enable");
-            subsubtab_mix->add_column(type_Table, "subtab");
-            subsubtab_mix->add_column(type_Mixed, "mixed");
-            subsubtab_mix->add_empty_row(2 * (1 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (1 + i_1); ++i_3)
-                subsubtab_mix->set_bool(0, i_3, i_3 % 2 == 0);
-            TableView subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(1 + i_1, subsubview_mix.size());
-
-            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(subview.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 1 + i_1, bool(subview.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, subview.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, subview.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        view.clear_subtable(2, i_1); // Mixed
-        TableRef subtab_mix = view.get_subtable(2, i_1);
-        std::vector<size_t> subcol_path;
-        subtab_mix->add_column(type_Bool, "enable");
-        subtab_mix->add_column(type_Table, "subtab");
-        subtab_mix->add_column(type_Mixed, "mixed");
-        subcol_path.push_back(1);
-        subtab_mix->add_subcolumn(subcol_path, type_Bool, "enable");
-        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
-        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
-        subtab_mix->add_empty_row(2 * (3 + i_1));
-        for (int i_2 = 0; i_2 != 2 * (3 + i_1); ++i_2)
-            subtab_mix->set_bool(0, i_2, i_2 % 2 == 1);
-        TableView subview_mix = subtab_mix->where().equal(0, true).find_all();
-        CHECK_EQUAL(3 + i_1, subview_mix.size());
-        {
-            TableRef subsubtab = subview_mix.get_subtable(1, 1 + i_1);
-            subsubtab->add_empty_row(2 * (7 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (7 + i_1); ++i_3)
-                subsubtab->set_bool(0, i_3, i_3 % 2 == 1);
-            TableView subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(7 + i_1, subsubview.size());
-
-            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            subview_mix.clear_subtable(2, 2 + i_1); // Mixed
-            TableRef subsubtab_mix = subview_mix.get_subtable(2, 2 + i_1);
-            subsubtab_mix->add_column(type_Bool, "enable");
-            subsubtab_mix->add_column(type_Table, "subtab");
-            subsubtab_mix->add_column(type_Mixed, "mixed");
-            subsubtab_mix->add_empty_row(2 * (5 + i_1));
-            for (int i_3 = 0; i_3 != 2 * (5 + i_1); ++i_3)
-                subsubtab_mix->set_bool(0, i_3, i_3 % 2 == 0);
-            TableView subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(5 + i_1, subsubview_mix.size());
-
-            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(subview_mix.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 2 + i_1, bool(subview_mix.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, subview_mix.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, subview_mix.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        CHECK_EQUAL(true, bool(view.get_subtable(1, i_1)));
-        CHECK_EQUAL(true, bool(view.get_subtable(2, i_1))); // Mixed
-        CHECK_EQUAL(2 * (2 + i_1), view.get_subtable_size(1, i_1));
-        CHECK_EQUAL(2 * (3 + i_1), view.get_subtable_size(2, i_1)); // Mixed
-    }
-
-
-    ConstTableView const_view = table.where().equal(0, true).find_all();
-    CHECK_EQUAL(2, const_view.size());
-    for (int i_1 = 0; i_1 != 2; ++i_1) {
-        ConstTableRef subtab = const_view.get_subtable(1, i_1);
-        ConstTableView const_subview = subtab->where().equal(0, true).find_all();
-        CHECK_EQUAL(2 + i_1, const_subview.size());
-        {
-            ConstTableRef subsubtab = const_subview.get_subtable(1, 0 + i_1);
-            ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(3 + i_1, const_subsubview.size());
-            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            ConstTableRef subsubtab_mix = const_subview.get_subtable(2, 1 + i_1);
-            ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(1 + i_1, const_subsubview_mix.size());
-            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(const_subview.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 1 + i_1, bool(const_subview.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, const_subview.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, const_subview.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        ConstTableRef subtab_mix = const_view.get_subtable(2, i_1);
-        ConstTableView const_subview_mix = subtab_mix->where().equal(0, true).find_all();
-        CHECK_EQUAL(3 + i_1, const_subview_mix.size());
-        {
-            ConstTableRef subsubtab = const_subview_mix.get_subtable(1, 1 + i_1);
-            ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
-            CHECK_EQUAL(7 + i_1, const_subsubview.size());
-            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
-            }
-
-            ConstTableRef subsubtab_mix = const_subview_mix.get_subtable(2, 2 + i_1);
-            ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
-            CHECK_EQUAL(5 + i_1, const_subsubview_mix.size());
-            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true, bool(const_subsubview_mix.get_subtable(1, i_3)));
-                CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
-                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
-            }
-        }
-        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true, bool(const_subview_mix.get_subtable(1, i_2)));
-            CHECK_EQUAL(i_2 == 2 + i_1, bool(const_subview_mix.get_subtable(2, i_2))); // Mixed
-            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, const_subview_mix.get_subtable_size(1, i_2));
-            CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, const_subview_mix.get_subtable_size(2, i_2)); // Mixed
-        }
-
-        CHECK_EQUAL(true, bool(const_view.get_subtable(1, i_1)));
-        CHECK_EQUAL(true, bool(const_view.get_subtable(2, i_1))); // Mixed
-        CHECK_EQUAL(2 * (2 + i_1), const_view.get_subtable_size(1, i_1));
-        CHECK_EQUAL(2 * (3 + i_1), const_view.get_subtable_size(2, i_1)); // Mixed
-    }
-}
-
-
-TEST(TableView_HighLevelSubtables)
-{
-    Table t;
-    t.add_column(type_Int, "val");
-    DescriptorRef sub;
-    t.add_column(type_Table, "subtab", &sub);
-    sub->add_column(type_Int, "val");
-    DescriptorRef subsub;
-    sub->add_column(type_Table, "subtab", &subsub);
-    subsub->add_column(type_Int, "value");
-
-    const Table& ct = t;
-
-    t.add_empty_row();
-    TableView v = t.find_all_int(0, 0);
-    ConstTableView cv = ct.find_all_int(0, 0);
-
-    {
-        TableView v2 = v.find_all_int(0, 0);
-        ConstTableView cv2 = cv.find_all_int(0, 0);
-
-        ConstTableView cv3 = t.find_all_int(0, 0);
-        ConstTableView cv4 = v.find_all_int(0, 0);
-
-        // Also test assigment that converts to const
-        cv3 = t.find_all_int(0, 0);
-        cv4 = v.find_all_int(0, 0);
-
-        static_cast<void>(v2);
-        static_cast<void>(cv2);
-        static_cast<void>(cv3);
-        static_cast<void>(cv4);
-    }
-
-    v[0].get_subtable(1).get()->add_empty_row();
-    v[0].get_subtable(1).get()->get_subtable(1, 0).get()->add_empty_row();
-
-    v[0].get_subtable(1).get()->set_int(0, 0, 1);
-    v[0].get_subtable(1).get()->get_subtable(1, 0).get()->set_int(0, 0, 2);
-
-    CHECK_EQUAL(v[0].get_subtable(1).get()->get_int(0, 0), 1);
-    CHECK_EQUAL(v.get_subtable(1, 0).get()->get_subtable(1, 0).get()->get_int(0, 0), 2);
-
-    CHECK_EQUAL(cv[0].get_subtable(1).get()->get_int(0, 0), 1);
-    CHECK_EQUAL(cv.get_subtable(1, 0).get()->get_subtable(1, 0).get()->get_int(0, 0), 2);
-}
-
-
-TEST(TableView_ToString)
-{
-    TestTable tbl;
-    tbl.add_column(type_Int, "first");
-    tbl.add_column(type_Int, "second");
-
-    add(tbl, 2, 123456);
-    add(tbl, 4, 1234567);
-    add(tbl, 6, 12345678);
-    add(tbl, 4, 12345678);
-
-    std::string s = "    first    second\n";
-    std::string s0 = "0:      2    123456\n";
-    std::string s1 = "1:      4   1234567\n";
-    std::string s2 = "2:      6  12345678\n";
-    std::string s3 = "3:      4  12345678\n";
-
-    // Test full view
-    std::stringstream ss;
-    TableView tv = tbl.where().find_all();
-    tv.to_string(ss);
-    CHECK_EQUAL(s + s0 + s1 + s2 + s3, ss.str());
-
-    // Find partial view: row 1+3
-    std::stringstream ss2;
-    tv = tbl.where().equal(0, 4).find_all();
-    tv.to_string(ss2);
-    CHECK_EQUAL(s + s1 + s3, ss2.str());
-
-    // test row_to_string. get row 0 of previous view - i.e. row 1 in tbl
-    std::stringstream ss3;
-    tv.row_to_string(0, ss3);
-    CHECK_EQUAL(s + s1, ss3.str());
-}
-
-
-TEST(TableView_RefCounting)
-{
-    TableView tv, tv2;
-    {
-        TableRef t = Table::create();
-        t->add_column(type_Int, "myint");
-        t->add_empty_row();
-        t->set_int(0, 0, 12);
-        tv = t->where().find_all();
-    }
-
-    {
-        TableRef t2 = Table::create();
-        t2->add_column(type_String, "mystr");
-        t2->add_empty_row();
-        t2->set_string(0, 0, "just a test string");
-        tv2 = t2->where().find_all();
-    }
-
-    // Now try to access TableView and see that the Table is still alive
-    int64_t i = tv.get_int(0, 0);
-    CHECK_EQUAL(i, 12);
-    std::string s = tv2.get_string(0, 0);
-    CHECK_EQUAL(s, "just a test string");
-}
-
-
-TEST(TableView_DynPivot)
-{
-    TableRef table = Table::create();
-    size_t column_ndx_sex = table->add_column(type_String, "sex");
-    size_t column_ndx_age = table->add_column(type_Int, "age");
-    table->add_column(type_Bool, "hired");
-
-    size_t count = 5000;
-    for (size_t i = 0; i < count; ++i) {
-        StringData sex = i % 2 ? "Male" : "Female";
-        table->insert_empty_row(i);
-        table->set_string(0, i, sex);
-        table->set_int(1, i, 20 + (i % 20));
-        table->set_bool(2, i, true);
-    }
-
-    TableView tv = table->where().find_all();
-
-    Table result_count;
-    tv.aggregate(0, 1, Table::aggr_count, result_count);
-    int64_t half = count / 2;
-    CHECK_EQUAL(2, result_count.get_column_count());
-    CHECK_EQUAL(2, result_count.size());
-    CHECK_EQUAL(half, result_count.get_int(1, 0));
-    CHECK_EQUAL(half, result_count.get_int(1, 1));
-
-    Table result_sum;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
-
-    Table result_avg;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
-
-    Table result_min;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_min, result_min);
-
-    Table result_max;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_max, result_max);
-
-
-    // Test with enumerated strings
-    table->optimize();
-
-    Table result_count2;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_count, result_count2);
-    CHECK_EQUAL(2, result_count2.get_column_count());
-    CHECK_EQUAL(2, result_count2.size());
-    CHECK_EQUAL(half, result_count2.get_int(1, 0));
-    CHECK_EQUAL(half, result_count2.get_int(1, 1));
-}
-
-
-TEST(TableView_RowAccessor)
-{
-    Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    table.set_int(0, 0, 703);
-    TableView tv = table.where().find_all();
-    Row row = tv[0];
-    CHECK_EQUAL(703, row.get_int(0));
-    ConstRow crow = tv[0];
-    CHECK_EQUAL(703, crow.get_int(0));
-    ConstTableView ctv = table.where().find_all();
-    ConstRow crow_2 = ctv[0];
-    CHECK_EQUAL(703, crow_2.get_int(0));
-}
-
-TEST(TableView_FindBySourceNdx)
-{
-    Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_int(0, 0);
-    table[1].set_int(0, 1);
-    table[2].set_int(0, 2);
-    TableView tv = table.where().find_all();
-    tv.sort(0, false);
-    CHECK_EQUAL(0, tv.find_by_source_ndx(2));
-    CHECK_EQUAL(1, tv.find_by_source_ndx(1));
-    CHECK_EQUAL(2, tv.find_by_source_ndx(0));
-}
 
 TEST(TableView_MultiColSort)
 {
     Table table;
-    table.add_column(type_Int, "");
-    table.add_column(type_Float, "");
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_int(0, 0);
-    table[1].set_int(0, 1);
-    table[2].set_int(0, 1);
+    auto col_int = table.add_column(type_Int, "int");
+    auto col_float = table.add_column(type_Float, "float");
 
-    table[0].set_float(1, 0.f);
-    table[1].set_float(1, 2.f);
-    table[2].set_float(1, 1.f);
+    table.create_object().set_all(0, 0.f);
+    table.create_object().set_all(1, 2.f);
+    table.create_object().set_all(1, 1.f);
 
     TableView tv = table.where().find_all();
 
-    std::vector<std::vector<size_t>> v = {{0}, {1}};
+    std::vector<std::vector<ColKey>> v = {{col_int}, {col_float}};
     std::vector<bool> a = {true, true};
 
-    tv.sort(SortDescriptor{table, v, a});
+    tv.sort(SortDescriptor{v, a});
 
-    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
-    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
-    CHECK_EQUAL(tv.get_float(1, 2), 2.f);
+    CHECK_EQUAL(tv[0].get<float>(col_float), 0.f);
+    CHECK_EQUAL(tv[1].get<float>(col_float), 1.f);
+    CHECK_EQUAL(tv[2].get<float>(col_float), 2.f);
 
     std::vector<bool> a_descending = {false, false};
     tv = table.where().find_all();
-    tv.sort(SortDescriptor{table, v, a_descending});
+    tv.sort(SortDescriptor{v, a_descending});
 
-    CHECK_EQUAL(tv.get_float(1, 0), 2.f);
-    CHECK_EQUAL(tv.get_float(1, 1), 1.f);
-    CHECK_EQUAL(tv.get_float(1, 2), 0.f);
+    CHECK_EQUAL(tv[0].get<float>(col_float), 2.f);
+    CHECK_EQUAL(tv[1].get<float>(col_float), 1.f);
+    CHECK_EQUAL(tv[2].get<float>(col_float), 0.f);
 
     std::vector<bool> a_ascdesc = {true, false};
     tv = table.where().find_all();
-    tv.sort(SortDescriptor{table, v, a_ascdesc});
+    tv.sort(SortDescriptor{v, a_ascdesc});
 
-    CHECK_EQUAL(tv.get_float(1, 0), 0.f);
-    CHECK_EQUAL(tv.get_float(1, 1), 2.f);
-    CHECK_EQUAL(tv.get_float(1, 2), 1.f);
+    CHECK_EQUAL(tv[0].get<float>(col_float), 0.f);
+    CHECK_EQUAL(tv[1].get<float>(col_float), 2.f);
+    CHECK_EQUAL(tv[2].get<float>(col_float), 1.f);
 }
 
 TEST(TableView_QueryCopy)
 {
     Table table;
-    table.add_column(type_Int, "");
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_int(0, 0);
-    table[1].set_int(0, 1);
-    table[2].set_int(0, 2);
+    auto col = table.add_column(type_Int, "");
+
+    table.create_object().set_all(0);
+    table.create_object().set_all(1);
+    table.create_object().set_all(2);
 
     // Test if copy-assign of Query in TableView works
     TableView tv = table.where().find_all();
@@ -1539,15 +1061,15 @@ TEST(TableView_QueryCopy)
     Query q = table.where();
 
     q.group();
-    q.equal(0, 1);
+    q.equal(col, 1);
     q.Or();
-    q.equal(0, 2);
+    q.equal(col, 2);
     q.end_group();
 
     q.count();
 
     Query q2;
-    q2 = table.where().equal(0, 1234);
+    q2 = table.where().equal(col, 1234);
 
     q2 = q;
     size_t t = q2.count();
@@ -1558,17 +1080,12 @@ TEST(TableView_QueryCopy)
 TEST(TableView_QueryCopyStringOr)
 {
     Table table;
-    size_t str_col_ndx = table.add_column(type_String, "str_col", true);
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table.add_empty_row();
-    table[0].set_string(str_col_ndx, "one");
-    table[1].set_string(str_col_ndx, "two");
-    table[2].set_string(str_col_ndx, "three");
-    table[3].set_string(str_col_ndx, "");
-    table[4].set_null(str_col_ndx);
+    auto str_col_key = table.add_column(type_String, "str_col", true);
+    table.create_object().set_all("one");
+    table.create_object().set_all("two");
+    table.create_object().set_all("three");
+    table.create_object().set_all("");
+    table.create_object().set_null(str_col_key);
 
     // Test if copy-assign of Query in TableView works
     TableView tv = table.where().find_all();
@@ -1576,191 +1093,53 @@ TEST(TableView_QueryCopyStringOr)
     Query q = table.where();
 
     q.group();
-    q.equal(str_col_ndx, "one");
+    q.equal(str_col_key, "one");
     q.Or();
-    q.equal(str_col_ndx, "two");
+    q.equal(str_col_key, "two");
     q.Or();
-    q.equal(str_col_ndx, realm::null());
+    q.equal(str_col_key, realm::null());
     q.Or();
-    q.equal(str_col_ndx, "");
+    q.equal(str_col_key, "");
     q.end_group();
 
     size_t before_copy_count = q.count();
     CHECK_EQUAL(before_copy_count, 4);
 
     Query q2;
-    q2 = table.where().equal(str_col_ndx, "not found");
+    q2 = table.where().equal(str_col_key, "not found");
     size_t q2_count = q2.count();
     CHECK_EQUAL(q2_count, 0);
 
     q2 = q;
     size_t after_copy_count = q2.count();
-
+    CHECK_EQUAL(q.count(), 4);
     CHECK_EQUAL(after_copy_count, 4);
 }
 
 TEST(TableView_SortEnum)
 {
     Table table;
-    table.add_column(type_String, "str");
-    table.add_empty_row(3);
-    table[0].set_string(0, "foo");
-    table[1].set_string(0, "foo");
-    table[2].set_string(0, "foo");
+    auto col = table.add_column(type_String, "str");
 
-    table.optimize();
+    table.create_object().set_all("foo");
+    table.create_object().set_all("foo");
+    table.create_object().set_all("foo");
 
-    table.add_empty_row(3);
-    table[3].set_string(0, "bbb");
-    table[4].set_string(0, "aaa");
-    table[5].set_string(0, "baz");
+    table.enumerate_string_column(col);
+
+    table.create_object().set_all("bbb");
+    table.create_object().set_all("aaa");
+    table.create_object().set_all("baz");
 
     TableView tv = table.where().find_all();
-    tv.sort(0);
+    tv.sort(col);
 
-    CHECK_EQUAL(tv[0].get_string(0), "aaa");
-    CHECK_EQUAL(tv[1].get_string(0), "baz");
-    CHECK_EQUAL(tv[2].get_string(0), "bbb");
-    CHECK_EQUAL(tv[3].get_string(0), "foo");
-    CHECK_EQUAL(tv[4].get_string(0), "foo");
-    CHECK_EQUAL(tv[5].get_string(0), "foo");
-}
-
-
-TEST(TableView_UnderlyingRowRemoval)
-{
-    struct Fixture {
-        Table table;
-        TableView view;
-        Fixture()
-        {
-            table.add_column(type_Int, "a");
-            table.add_column(type_Int, "b");
-            table.add_empty_row(5);
-
-            table.set_int(0, 0, 0);
-            table.set_int(0, 1, 1);
-            table.set_int(0, 2, 2);
-            table.set_int(0, 3, 3);
-            table.set_int(0, 4, 4);
-
-            table.set_int(1, 0, 0);
-            table.set_int(1, 1, 1);
-            table.set_int(1, 2, 0);
-            table.set_int(1, 3, 1);
-            table.set_int(1, 4, 1);
-
-            view = table.find_all_int(1, 0);
-        }
-    };
-
-    // Sanity
-    {
-        Fixture f;
-        CHECK_EQUAL(2, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-        CHECK_EQUAL(2, f.view.get_source_ndx(1));
-    }
-
-    // The following checks assume that unordered row removal in the underlying
-    // table is done using `Table::move_last_over()`, and that Table::clear()
-    // does that in reverse order of rows in the view.
-
-    // Ordered remove()
-    {
-        Fixture f;
-        f.view.remove(0);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(1, f.table.get_int(0, 0));
-        CHECK_EQUAL(2, f.table.get_int(0, 1));
-        CHECK_EQUAL(3, f.table.get_int(0, 2));
-        CHECK_EQUAL(4, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(1, f.view.get_source_ndx(0));
-    }
-    {
-        Fixture f;
-        f.view.remove(1);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(3, f.table.get_int(0, 2));
-        CHECK_EQUAL(4, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Unordered remove()
-    {
-        Fixture f;
-        f.view.remove(0, RemoveMode::unordered);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(4, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(2, f.table.get_int(0, 2));
-        CHECK_EQUAL(3, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(2, f.view.get_source_ndx(0));
-    }
-    {
-        Fixture f;
-        f.view.remove(1, RemoveMode::unordered);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(3, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Ordered remove_last()
-    {
-        Fixture f;
-        f.view.remove_last();
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(3, f.table.get_int(0, 2));
-        CHECK_EQUAL(4, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Unordered remove_last()
-    {
-        Fixture f;
-        f.view.remove_last(RemoveMode::unordered);
-        CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(3, f.table.get_int(0, 3));
-        CHECK_EQUAL(1, f.view.size());
-        CHECK_EQUAL(0, f.view.get_source_ndx(0));
-    }
-
-    // Ordered clear()
-    {
-        Fixture f;
-        f.view.clear();
-        CHECK_EQUAL(3, f.table.size());
-        CHECK_EQUAL(1, f.table.get_int(0, 0));
-        CHECK_EQUAL(3, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(0, f.view.size());
-    }
-
-    // Unordered clear()
-    {
-        Fixture f;
-        f.view.clear(RemoveMode::unordered);
-        CHECK_EQUAL(3, f.table.size());
-        CHECK_EQUAL(3, f.table.get_int(0, 0));
-        CHECK_EQUAL(1, f.table.get_int(0, 1));
-        CHECK_EQUAL(4, f.table.get_int(0, 2));
-        CHECK_EQUAL(0, f.view.size());
-    }
+    CHECK_EQUAL(tv[0].get<String>(col), "aaa");
+    CHECK_EQUAL(tv[1].get<String>(col), "baz");
+    CHECK_EQUAL(tv[2].get<String>(col), "bbb");
+    CHECK_EQUAL(tv[3].get<String>(col), "foo");
+    CHECK_EQUAL(tv[4].get<String>(col), "foo");
+    CHECK_EQUAL(tv[5].get<String>(col), "foo");
 }
 
 TEST(TableView_Backlinks)
@@ -1771,38 +1150,41 @@ TEST(TableView_Backlinks)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    links->add_column_link(type_Link, "link", *source);
-    links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column_link(type_Link, "link", *source);
+    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
 
-    source->add_empty_row(3);
-
+    std::vector<ObjKey> keys;
+    source->create_objects(3, keys);
+    ObjKey k(500);
     {
         // Links
-        TableView tv = source->get_backlink_view(2, links.get(), 0);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv = obj.get_backlink_view(links, col_link);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        links->add_empty_row();
-        links->set_link(0, 0, 2);
+        links->create_object(k).set(col_link, keys[2]).get_key();
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 1);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
     }
     {
         // LinkViews
-        TableView tv = source->get_backlink_view(2, links.get(), 1);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv = obj.get_backlink_view(links, col_linklist);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        auto ll = links->get_linklist(1, 0);
-        ll->add(2);
-        ll->add(0);
-        ll->add(2);
+        auto ll = links->get_object(k).get_linklist_ptr(col_linklist);
+        ll->add(keys[2]);
+        ll->add(keys[0]);
+        ll->add(keys[2]);
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 2);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
+        CHECK_EQUAL(tv[1].get_key(), k);
     }
 }
 
@@ -1816,191 +1198,187 @@ TEST(TableView_BacklinksAfterMoveAssign)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    links->add_column_link(type_Link, "link", *source);
-    links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column_link(type_Link, "link", *source);
+    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
 
-    source->add_empty_row(3);
-
+    std::vector<ObjKey> keys;
+    source->create_objects(3, keys);
+    ObjKey k(500);
     {
         // Links
-        TableView tv_source = source->get_backlink_view(2, links.get(), 0);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv_source = obj.get_backlink_view(links, col_link);
         TableView tv;
         tv = std::move(tv_source);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        links->add_empty_row();
-        links->set_link(0, 0, 2);
+        links->create_object(k).set(col_link, keys[2]).get_key();
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 1);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
     }
     {
         // LinkViews
-        TableView tv_source = source->get_backlink_view(2, links.get(), 1);
+        Obj obj = source->get_object(keys[2]);
+        TableView tv_source = obj.get_backlink_view(links, col_linklist);
         TableView tv;
         tv = std::move(tv_source);
 
         CHECK_EQUAL(tv.size(), 0);
 
-        auto ll = links->get_linklist(1, 0);
-        ll->add(2);
-        ll->add(0);
-        ll->add(2);
+        auto ll = links->get_object(k).get_linklist_ptr(col_linklist);
+        ll->add(keys[2]);
+        ll->add(keys[0]);
+        ll->add(keys[2]);
 
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), 2);
-        CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
+        CHECK_EQUAL(tv[0].get_key(), k);
     }
 }
 
-// Verify that a TableView that represents backlinks continues to track the correct row
-// when it moves within a table or is deleted.
-TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
-{
-    Group group;
-
-    TableRef source = group.add_table("source");
-    source->add_column(type_Int, "int");
-
-    TableRef links = group.add_table("links");
-    size_t col_link = links->add_column_link(type_Link, "link", *source);
-    size_t col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
-
-    source->add_empty_row(3);
-
-    links->add_empty_row(3);
-    links->set_link(col_link, 0, 1);
-    LinkViewRef ll = links->get_linklist(col_linklist, 0);
-    ll->add(1);
-    ll->add(0);
-
-    links->set_link(col_link, 1, 1);
-    ll = links->get_linklist(col_linklist, 1);
-    ll->add(1);
-
-    links->set_link(col_link, 2, 0);
-
-    TableView tv_link = source->get_backlink_view(1, links.get(), col_link);
-    TableView tv_linklist = source->get_backlink_view(1, links.get(), col_linklist);
-
-    CHECK_EQUAL(tv_link.size(), 2);
-    CHECK_EQUAL(tv_linklist.size(), 2);
-
-    source->swap_rows(1, 0);
-    tv_link.sync_if_needed();
-    tv_linklist.sync_if_needed();
-
-    CHECK_EQUAL(tv_link.size(), 2);
-    CHECK_EQUAL(tv_linklist.size(), 2);
-
-    CHECK(!tv_link.depends_on_deleted_object());
-    CHECK(!tv_linklist.depends_on_deleted_object());
-
-    source->move_last_over(0);
-
-    CHECK(tv_link.depends_on_deleted_object());
-    CHECK(tv_linklist.depends_on_deleted_object());
-
-    CHECK(!tv_link.is_in_sync());
-    CHECK(!tv_linklist.is_in_sync());
-
-    tv_link.sync_if_needed();
-    tv_linklist.sync_if_needed();
-
-    CHECK(tv_link.is_in_sync());
-    CHECK(tv_linklist.is_in_sync());
-
-    CHECK_EQUAL(tv_link.size(), 0);
-    CHECK_EQUAL(tv_linklist.size(), 0);
-
-    source->add_empty_row();
-
-    // TableViews that depend on a deleted row will stay in sync despite modifications to their table.
-    CHECK(tv_link.is_in_sync());
-    CHECK(tv_linklist.is_in_sync());
-}
-
-TEST(TableView_BacklinksWithColumnInsertion)
+TEST(TableView_SortOverLink)
 {
     Group g;
     TableRef target = g.add_table("target");
-    target->add_column(type_Int, "int");
-    target->add_empty_row(2);
-    target->set_int(0, 1, 10);
-
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *target);
-    origin->add_column_link(type_LinkList, "linklist", *target);
-    origin->add_empty_row(2);
-    origin->set_link(0, 1, 1);
-    origin->get_linklist(1, 1)->add(1);
+    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_int = origin->add_column(type_Int, "int");
+    auto col_str = target->add_column(type_String, "s", true);
 
-    auto tv1 = target->get_backlink_view(1, origin.get(), 0);
-    CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
+    target->create_object().set(col_str, StringData("bravo"));
+    target->create_object().set(col_str, StringData("alfa"));
+    target->create_object().set(col_str, StringData("delta"));
+    Obj obj = target->create_object().set(col_str, StringData("charley"));
 
-    auto tv2 = target->get_backlink_view(1, origin.get(), 1);
-    CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
 
-    target->insert_column(0, type_String, "string");
-    target->insert_empty_row(0);
+    int64_t i = 0;
+    for (auto it : *target) {
+        Obj o = origin->create_object();
+        o.set(col_int, i);
+        o.set(col_link, it.get_key());
+        i++;
+    }
 
-    tv1.sync_if_needed();
-    CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
+    auto tv = origin->where().greater(col_int, 1).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 2);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
+    std::vector<std::vector<ColKey>> v = {{col_link, col_str}};
+    std::vector<bool> a = {true};
+    tv.sort(SortDescriptor{v, a});
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 2);
 
-    tv2.sync_if_needed();
-    CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv2.get_source_ndx(0), 1);
+    // Modifying origin table should trigger query - and sort
+    origin->begin()->set(col_int, 6);
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 6);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 2);
 
-    origin->insert_column(0, type_String, "string");
-    target->insert_empty_row(0);
-    origin->insert_empty_row(0);
+    // Modifying target table should trigger sort
+    obj.set(col_str, StringData("echo"));
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 6);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 2);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 3);
+}
 
-    tv1.sync_if_needed();
-    CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get_source_ndx(0), 2);
+TEST(TableView_SortOverMultiLink)
+{
+    Group g;
+    TableRef target = g.add_table("target");
+    TableRef between = g.add_table("between");
+    TableRef origin = g.add_table("origin");
+    auto col_link1 = origin->add_column_link(type_Link, "link", *between);
+    auto col_link2 = between->add_column_link(type_Link, "link", *target);
+    auto col_int = origin->add_column(type_Int, "int");
 
-    tv2.sync_if_needed();
-    CHECK_EQUAL(tv2.size(), 1);
-    CHECK_EQUAL(tv2.get_source_ndx(0), 2);
+    auto col_str = target->add_column(type_String, "str");
+
+    target->create_object().set(col_str, StringData("bravo"));
+    target->create_object().set(col_str, StringData("alfa"));
+    target->create_object().set(col_str, StringData("delta"));
+    target->create_object().set(col_str, StringData("charley"));
+
+    int64_t i = 27;
+    for (auto it : *target) {
+        Obj o1 = origin->create_object();
+        ObjKey k(i);
+        Obj o2 = between->create_object(k);
+        o1.set(col_int, i);
+        o1.set(col_link1, k);
+        o2.set(col_link2, it.get_key());
+        i++;
+    }
+
+    auto tv = origin->where().find_all();
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 27);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 28);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 29);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 30);
+
+    std::vector<std::vector<ColKey>> v = {{col_link1, col_link2, col_str}};
+    std::vector<bool> a = {true};
+    tv.sort(SortDescriptor{v, a});
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 28);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 27);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 30);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 29);
+
+    // swap first two links in between
+    auto it = target->begin();
+    between->get_object(1).set(col_link2, it->get_key());
+    ++it;
+    between->get_object(0).set(col_link2, it->get_key());
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(tv[0].get<Int>(col_int), 27);
+    CHECK_EQUAL(tv[1].get<Int>(col_int), 28);
+    CHECK_EQUAL(tv[2].get<Int>(col_int), 30);
+    CHECK_EQUAL(tv[3].get<Int>(col_int), 29);
 }
 
 namespace {
 struct DistinctDirect {
     Table& table;
-    DistinctDirect(TableRef, TableRef t)
+    DistinctDirect(TableRef, TableRef t, ColKey)
         : table(*t)
     {
     }
 
-    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
             column_indices.push_back({col});
-        return SortDescriptor(table, column_indices, ascending);
+        return SortDescriptor(column_indices, ascending);
     }
 
-    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
             column_indices.push_back({col});
-        return DistinctDescriptor(table, column_indices);
+        return DistinctDescriptor(column_indices);
     }
 
-    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    ObjKey get_key(const TableView& tv, size_t ndx) const
     {
-        return tv.get_source_ndx(ndx);
+        return tv.get_key(ndx);
     }
 
-    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    StringData get_string(const TableView& tv, ColKey col, size_t row) const
     {
-        return tv.get_string(col, row);
+        return tv.ConstTableView::get_object(row).get<String>(col);
     }
 
     TableView find_all() const
@@ -2011,35 +1389,37 @@ struct DistinctDirect {
 
 struct DistinctOverLink {
     Table& table;
-    DistinctOverLink(TableRef t, TableRef)
+    ColKey m_col_link;
+    DistinctOverLink(TableRef t, TableRef, ColKey col_link)
         : table(*t)
+        , m_col_link(col_link)
     {
     }
 
-    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
-            column_indices.push_back({0, col});
-        return SortDescriptor(table, column_indices, ascending);
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
+            column_indices.push_back({m_col_link, col});
+        return SortDescriptor(column_indices, ascending);
     }
 
-    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<size_t>> column_indices;
-        for (size_t col : columns)
-            column_indices.push_back({0, col});
-        return DistinctDescriptor(table, column_indices);
+        std::vector<std::vector<ColKey>> column_indices;
+        for (ColKey col : columns)
+            column_indices.push_back({m_col_link, col});
+        return DistinctDescriptor(column_indices);
     }
 
-    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    ObjKey get_key(const TableView& tv, size_t ndx) const
     {
-        return tv.get_link(0, ndx);
+        return tv.ConstTableView::get_object(ndx).get<ObjKey>(m_col_link);
     }
 
-    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    StringData get_string(const TableView& tv, ColKey col, size_t ndx) const
     {
-        return tv.get_link_target(0)->get_string(col, tv.get_link(0, row));
+        return tv.ConstTableView::get_object(ndx).get_linked_object(m_col_link).get<String>(col);
     }
 
     TableView find_all() const
@@ -2064,188 +1444,165 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column_link(type_Link, "link", *target);
 
     Table& t = *target;
-    t.add_column(type_String, "s", true);
-    t.add_column(type_Int, "i", true);
+    auto col_str = t.add_column(type_String, "s", true);
+    auto col_int = t.add_column(type_Int, "i", true);
     t.add_column(type_Float, "f", true);
 
-    t.add_empty_row(7);
-    t.set_string(0, 0, StringData(""));
-    t.set_int(1, 0, 100);
-    t.set_float(2, 0, 100.f);
+    ObjKey k0 = t.create_object().set_all(StringData(""), 100, 100.f).get_key();
+    ObjKey k1 = t.create_object().set_all(StringData(), 200, 200.f).get_key();
+    t.create_object().set_all(StringData(""), 100, 100.f).get_key();
+    t.create_object().set_all(StringData(), 200, 200.f).get_key();
+    ObjKey k4 = t.create_object().set_all(StringData("foo"), 300, 300.f).get_key();
+    ObjKey k5 = t.create_object().set_all(StringData("foo"), 400, 400.f).get_key();
+    ObjKey k6 = t.create_object().set_all(StringData("bar"), 500, 500.f).get_key();
 
-    t.set_string(0, 1, realm::null());
-    t.set_int(1, 1, 200);
-    t.set_float(2, 1, 200.f);
+    for (auto it : t) {
+        origin->create_object().set(col_link, it.get_key());
+    }
 
-    t.set_string(0, 2, StringData(""));
-    t.set_int(1, 2, 100);
-    t.set_float(2, 2, 100.f);
-
-    t.set_string(0, 3, realm::null());
-    t.set_int(1, 3, 200);
-    t.set_float(2, 3, 200.f);
-
-    t.set_string(0, 4, "foo");
-    t.set_int(1, 4, 300);
-    t.set_float(2, 4, 300.f);
-
-    t.set_string(0, 5, "foo");
-    t.set_int(1, 5, 400);
-    t.set_float(2, 5, 400.f);
-
-    t.set_string(0, 6, "bar");
-    t.set_int(1, 6, 500);
-    t.set_float(2, 6, 500.f);
-
-    origin->add_empty_row(t.size());
-    for (size_t i = 0; i < t.size(); ++i)
-        origin->set_link(0, i, i);
-
-    TEST_TYPE h(origin, target);
+    TEST_TYPE h(origin, target, col_link);
 
     TableView tv;
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0}));
+    tv.distinct(h.get_distinct({col_str}));
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 1);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 6);
+    CHECK_EQUAL(h.get_key(tv, 0), k0);
+    CHECK_EQUAL(h.get_key(tv, 1), k1);
+    CHECK_EQUAL(h.get_key(tv, 2), k4);
+    CHECK_EQUAL(h.get_key(tv, 3), k6);
 
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0}));
-    tv.sort(h.get_sort({0}));
+    tv.distinct(h.get_distinct({col_str}));
+    tv.sort(h.get_sort({col_str}));
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 1);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 4);
+    CHECK_EQUAL(h.get_key(tv, 0), k1);
+    CHECK_EQUAL(h.get_key(tv, 1), k0);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k4);
 
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0}));
-    tv.sort(h.get_sort({0}, {false}));
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 1);
+    tv.distinct(h.get_distinct({col_str}));
+    tv.sort(h.get_sort({col_str}, {false}));
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k6);
+    CHECK_EQUAL(h.get_key(tv, 2), k0);
+    CHECK_EQUAL(h.get_key(tv, 3), k1);
 
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0, 1}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str, col_int}));
+    tv.sort(h.get_sort({col_str}, {false}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k5);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k0);
+    CHECK_EQUAL(h.get_key(tv, 4), k1);
 
 
     // Now try distinct on string+float column. The float column has the same values as the int column
     // so the result should equal the test above
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0, 1}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str, col_int}));
+    tv.sort(h.get_sort({col_str}, {false}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k5);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k0);
+    CHECK_EQUAL(h.get_key(tv, 4), k1);
 
 
     // Same as previous test, but with string column being Enum
-    t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
+    t.enumerate_string_column(col_str);
     tv = h.find_all();
-    tv.distinct(h.get_distinct({0, 1}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str, col_int}));
+    tv.sort(h.get_sort({col_str}, {false}));
     CHECK_EQUAL(tv.size(), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
-    CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
-    CHECK_EQUAL(h.get_source_ndx(tv, 2), 6);
-    CHECK_EQUAL(h.get_source_ndx(tv, 3), 0);
-    CHECK_EQUAL(h.get_source_ndx(tv, 4), 1);
+    CHECK_EQUAL(h.get_key(tv, 0), k4);
+    CHECK_EQUAL(h.get_key(tv, 1), k5);
+    CHECK_EQUAL(h.get_key(tv, 2), k6);
+    CHECK_EQUAL(h.get_key(tv, 3), k0);
+    CHECK_EQUAL(h.get_key(tv, 4), k1);
 
 
     // Now test sync_if_needed()
     tv = h.find_all();
     // "", null, "", null, "foo", "foo", "bar"
 
-    tv.distinct(h.get_distinct({0}));
-    tv.sort(h.get_sort({0}, {false}));
+    tv.distinct(h.get_distinct({col_str}));
+    tv.sort(h.get_sort({col_str}, {false}));
     // "foo", "bar", "", null
 
     CHECK_EQUAL(tv.size(), 4);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "bar");
-    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
-    CHECK(h.get_string(tv, 0, 3).is_null());
+    CHECK_EQUAL(h.get_string(tv, col_str, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, col_str, 1), "bar");
+    CHECK_EQUAL(h.get_string(tv, col_str, 2), "");
+    CHECK(h.get_string(tv, col_str, 3).is_null());
 
     // remove "bar"
-    origin->remove(6);
-    target->remove(6);
+    target->remove_object(k6);
     // access to tv undefined; may crash
 
     tv.sync_if_needed();
     // "foo", "", null
 
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "");
-    CHECK(h.get_string(tv, 0, 2).is_null());
+    CHECK_EQUAL(h.get_string(tv, col_str, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, col_str, 1), "");
+    CHECK(h.get_string(tv, col_str, 2).is_null());
 }
 
 TEST(TableView_DistinctOverNullLink)
 {
     Group g;
     TableRef target = g.add_table("target");
-    target->add_column(type_Int, "value");
-    target->add_empty_row(2);
-    target->set_int(0, 0, 1);
-    target->set_int(0, 0, 2);
+    auto col_int = target->add_column(type_Int, "value");
+
+    ObjKey k0 = target->create_object().set(col_int, 0).get_key();
+    ObjKey k1 = target->create_object().set(col_int, 1).get_key();
 
     TableRef origin = g.add_table("origin");
-    origin->add_column_link(type_Link, "link", *target);
-    origin->add_empty_row(5);
-    origin->set_link(0, 0, 0);
-    origin->set_link(0, 1, 1);
-    origin->set_link(0, 2, 0);
-    origin->set_link(0, 3, 1);
-    // 4 is null
+    auto col_link = origin->add_column_link(type_Link, "link", *target);
+
+    origin->create_object().set(col_link, k0);
+    origin->create_object().set(col_link, k1);
+    origin->create_object().set(col_link, k0);
+    origin->create_object().set(col_link, k1);
+    origin->create_object(); // link is null
 
     auto tv = origin->where().find_all();
-    tv.distinct(DistinctDescriptor(*origin, {{0, 0}}));
+    tv.distinct(DistinctDescriptor({{col_link, col_int}}));
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_source_ndx(0), 0);
-    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+    CHECK_EQUAL(tv.get(0).get_linked_object(col_link).get<Int>(col_int), 0);
+    CHECK_EQUAL(tv.get(1).get_linked_object(col_link).get<Int>(col_int), 1);
 }
 
 TEST(TableView_IsRowAttachedAfterClear)
 {
     Table t;
-    size_t col_id = t.add_column(type_Int, "id");
+    auto col_id = t.add_column(type_Int, "id");
 
-    t.add_empty_row(2);
-    t.set_int(col_id, 0, 0);
-    t.set_int(col_id, 1, 1);
+    t.create_object().set(col_id, 0);
+    t.create_object().set(col_id, 1);
 
     TableView tv = t.where().find_all();
     CHECK_EQUAL(2, tv.size());
-    CHECK(tv.is_row_attached(0));
-    CHECK(tv.is_row_attached(1));
+    CHECK(tv.is_obj_valid(0));
+    CHECK(tv.is_obj_valid(1));
 
-    t.move_last_over(1);
+    t.get_object(1).remove();
     CHECK_EQUAL(2, tv.size());
-    CHECK(tv.is_row_attached(0));
-    CHECK(!tv.is_row_attached(1));
+    CHECK(tv.is_obj_valid(0));
+    CHECK(!tv.is_obj_valid(1));
 
     t.clear();
     CHECK_EQUAL(2, tv.size());
-    CHECK(!tv.is_row_attached(0));
-    CHECK(!tv.is_row_attached(1));
+    CHECK(!tv.is_obj_valid(0));
+    CHECK(!tv.is_obj_valid(1));
 }
 
 TEST(TableView_IsInTableOrder)
@@ -2255,13 +1612,14 @@ TEST(TableView_IsInTableOrder)
     TableRef source = g.add_table("source");
     TableRef target = g.add_table("target");
 
-    size_t col_link = source->add_column_link(type_LinkList, "link", *target);
-    size_t col_name = source->add_column(type_String, "name");
-    size_t col_id = target->add_column(type_Int, "id");
+    auto col_link = source->add_column_link(type_LinkList, "link", *target);
+    source->add_column(type_String, "name");
+    auto col_id = target->add_column(type_Int, "id");
     target->add_search_index(col_id);
 
-    source->add_empty_row();
-    target->add_empty_row();
+    Obj obj7 = target->create_object(ObjKey(7));
+    Obj src_obj = source->create_object();
+    src_obj.get_list<ObjKey>(col_link).add(ObjKey(7));
 
     // Detached views are in table order.
     TableView tv;
@@ -2285,17 +1643,14 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Backlinks are not guaranteed to be in table order.
-    tv = target->get_backlink_view(0, source.get(), col_link);
+    tv = obj7.get_backlink_view(source, col_link);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
     // Views derived from a LinkView are not guaranteed to be in table order.
-    LinkViewRef ll = source->get_linklist(col_link, 0);
-    tv = ll->get_sorted_view(col_name);
+    auto ll = src_obj.get_linklist_ptr(col_link);
+    tv = ll->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
 
-    // Views based directly on a table are in table order.
-    tv = target->get_range_view(0, 1);
-    CHECK_EQUAL(true, tv.is_in_table_order());
     tv = target->get_distinct_view(col_id);
     CHECK_EQUAL(true, tv.is_in_table_order());
 
@@ -2304,11 +1659,10 @@ TEST(TableView_IsInTableOrder)
     CHECK_EQUAL(false, tv.is_in_table_order());
 }
 
-
 NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 {
-    TestTable table;
-    table.add_column(type_String, "1");
+    Table table;
+    auto col = table.add_column(type_String, "1");
 
     // This tests the expected sorting order with STRING_COMPARE_CORE_SIMILAR. See utf8_compare() in unicode.cpp. Only
     // characters
@@ -2338,541 +1692,541 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 
     set_string_compare_method(STRING_COMPARE_CORE_SIMILAR, nullptr);
 
-    add(table, " ");
-    add(table, "!");
-    add(table, "\"");
-    add(table, "#");
-    add(table, "%");
-    add(table, "&");
-    add(table, "'");
-    add(table, "(");
-    add(table, ")");
-    add(table, "*");
-    add(table, "+");
-    add(table, ",");
-    add(table, "-");
-    add(table, ".");
-    add(table, "/");
-    add(table, ":");
-    add(table, ";");
-    add(table, "<");
-    add(table, "=");
-    add(table, ">");
-    add(table, "?");
-    add(table, "@");
-    add(table, "[");
-    add(table, "\\");
-    add(table, "]");
-    add(table, "^");
-    add(table, "_");
-    add(table, "`");
-    add(table, "{");
-    add(table, "|");
-    add(table, "}");
-    add(table, "~");
-    add(table, " ");
-    add(table, "¡");
-    add(table, "¦");
-    add(table, "§");
-    add(table, "¨");
-    add(table, "©");
-    add(table, "«");
-    add(table, "¬");
-    add(table, "®");
-    add(table, "¯");
-    add(table, "°");
-    add(table, "±");
-    add(table, "´");
-    add(table, "¶");
-    add(table, "·");
-    add(table, "¸");
-    add(table, "»");
-    add(table, "¿");
-    add(table, "×");
-    add(table, "÷");
-    add(table, "¤");
-    add(table, "¢");
-    add(table, "$");
-    add(table, "£");
-    add(table, "¥");
-    add(table, "0");
-    add(table, "1");
-    add(table, "¹");
-    add(table, "½");
-    add(table, "¼");
-    add(table, "2");
-    add(table, "²");
-    add(table, "3");
-    add(table, "³");
-    add(table, "¾");
-    add(table, "4");
-    add(table, "5");
-    add(table, "6");
-    add(table, "7");
-    add(table, "8");
-    add(table, "9");
-    add(table, "a");
-    add(table, "A");
-    add(table, "ª");
-    add(table, "á");
-    add(table, "Á");
-    add(table, "à");
-    add(table, "À");
-    add(table, "ă");
-    add(table, "Ă");
-    add(table, "â");
-    add(table, "Â");
-    add(table, "ǎ");
-    add(table, "Ǎ");
-    add(table, "å");
-    add(table, "Å");
-    add(table, "ǻ");
-    add(table, "Ǻ");
-    add(table, "ä");
-    add(table, "Ä");
-    add(table, "ǟ");
-    add(table, "Ǟ");
-    add(table, "ã");
-    add(table, "Ã");
-    add(table, "ȧ");
-    add(table, "Ȧ");
-    add(table, "ǡ");
-    add(table, "Ǡ");
-    add(table, "ą");
-    add(table, "Ą");
-    add(table, "ā");
-    add(table, "Ā");
-    add(table, "ȁ");
-    add(table, "Ȁ");
-    add(table, "ȃ");
-    add(table, "Ȃ");
-    add(table, "æ");
-    add(table, "Æ");
-    add(table, "ǽ");
-    add(table, "Ǽ");
-    add(table, "ǣ");
-    add(table, "Ǣ");
-    add(table, "Ⱥ");
-    add(table, "b");
-    add(table, "B");
-    add(table, "ƀ");
-    add(table, "Ƀ");
-    add(table, "Ɓ");
-    add(table, "ƃ");
-    add(table, "Ƃ");
-    add(table, "c");
-    add(table, "C");
-    add(table, "ć");
-    add(table, "Ć");
-    add(table, "ĉ");
-    add(table, "Ĉ");
-    add(table, "č");
-    add(table, "Č");
-    add(table, "ċ");
-    add(table, "Ċ");
-    add(table, "ç");
-    add(table, "Ç");
-    add(table, "ȼ");
-    add(table, "Ȼ");
-    add(table, "ƈ");
-    add(table, "Ƈ");
-    add(table, "d");
-    add(table, "D");
-    add(table, "ď");
-    add(table, "Ď");
-    add(table, "đ");
-    add(table, "Đ");
-    add(table, "ð");
-    add(table, "Ð");
-    add(table, "ȸ");
-    add(table, "ǳ");
-    add(table, "ǲ");
-    add(table, "Ǳ");
-    add(table, "ǆ");
-    add(table, "ǅ");
-    add(table, "Ǆ");
-    add(table, "Ɖ");
-    add(table, "Ɗ");
-    add(table, "ƌ");
-    add(table, "Ƌ");
-    add(table, "ȡ");
-    add(table, "e");
-    add(table, "E");
-    add(table, "é");
-    add(table, "É");
-    add(table, "è");
-    add(table, "È");
-    add(table, "ĕ");
-    add(table, "Ĕ");
-    add(table, "ê");
-    add(table, "Ê");
-    add(table, "ě");
-    add(table, "Ě");
-    add(table, "ë");
-    add(table, "Ë");
-    add(table, "ė");
-    add(table, "Ė");
-    add(table, "ȩ");
-    add(table, "Ȩ");
-    add(table, "ę");
-    add(table, "Ę");
-    add(table, "ē");
-    add(table, "Ē");
-    add(table, "ȅ");
-    add(table, "Ȅ");
-    add(table, "ȇ");
-    add(table, "Ȇ");
-    add(table, "ɇ");
-    add(table, "Ɇ");
-    add(table, "ǝ");
-    add(table, "Ǝ");
-    add(table, "Ə");
-    add(table, "Ɛ");
-    add(table, "f");
-    add(table, "F");
-    add(table, "ƒ");
-    add(table, "Ƒ");
-    add(table, "g");
-    add(table, "G");
-    add(table, "ǵ");
-    add(table, "Ǵ");
-    add(table, "ğ");
-    add(table, "Ğ");
-    add(table, "ĝ");
-    add(table, "Ĝ");
-    add(table, "ǧ");
-    add(table, "Ǧ");
-    add(table, "ġ");
-    add(table, "Ġ");
-    add(table, "ģ");
-    add(table, "Ģ");
-    add(table, "ǥ");
-    add(table, "Ǥ");
-    add(table, "Ɠ");
-    add(table, "Ɣ");
-    add(table, "ƣ");
-    add(table, "Ƣ");
-    add(table, "h");
-    add(table, "H");
-    add(table, "ĥ");
-    add(table, "Ĥ");
-    add(table, "ȟ");
-    add(table, "Ȟ");
-    add(table, "ħ");
-    add(table, "Ħ");
-    add(table, "ƕ");
-    add(table, "Ƕ");
-    add(table, "i");
-    add(table, "I");
-    add(table, "í");
-    add(table, "Í");
-    add(table, "ì");
-    add(table, "Ì");
-    add(table, "ĭ");
-    add(table, "Ĭ");
-    add(table, "î");
-    add(table, "Î");
-    add(table, "ǐ");
-    add(table, "Ǐ");
-    add(table, "ï");
-    add(table, "Ï");
-    add(table, "ĩ");
-    add(table, "Ĩ");
-    add(table, "İ");
-    add(table, "į");
-    add(table, "Į");
-    add(table, "ī");
-    add(table, "Ī");
-    add(table, "ȉ");
-    add(table, "Ȉ");
-    add(table, "ȋ");
-    add(table, "Ȋ");
-    add(table, "ĳ");
-    add(table, "Ĳ");
-    add(table, "ı");
-    add(table, "Ɨ");
-    add(table, "Ɩ");
-    add(table, "j");
-    add(table, "J");
-    add(table, "ĵ");
-    add(table, "Ĵ");
-    add(table, "ǰ");
-    add(table, "ȷ");
-    add(table, "ɉ");
-    add(table, "Ɉ");
-    add(table, "k");
-    add(table, "K");
-    add(table, "ǩ");
-    add(table, "Ǩ");
-    add(table, "ķ");
-    add(table, "Ķ");
-    add(table, "ƙ");
-    add(table, "Ƙ");
-    add(table, "ĺ");
-    add(table, "Ĺ");
-    add(table, "ľ");
-    add(table, "Ľ");
-    add(table, "ļ");
-    add(table, "Ļ");
-    add(table, "ł");
-    add(table, "Ł");
-    add(table, "ŀ");
-    add(table, "l");
-    add(table, "Ŀ");
-    add(table, "L");
-    add(table, "ǉ");
-    add(table, "ǈ");
-    add(table, "Ǉ");
-    add(table, "ƚ");
-    add(table, "Ƚ");
-    add(table, "ȴ");
-    add(table, "ƛ");
-    add(table, "m");
-    add(table, "M");
-    add(table, "n");
-    add(table, "N");
-    add(table, "ń");
-    add(table, "Ń");
-    add(table, "ǹ");
-    add(table, "Ǹ");
-    add(table, "ň");
-    add(table, "Ň");
-    add(table, "ñ");
-    add(table, "Ñ");
-    add(table, "ņ");
-    add(table, "Ņ");
-    add(table, "ǌ");
-    add(table, "ǋ");
-    add(table, "Ǌ");
-    add(table, "Ɲ");
-    add(table, "ƞ");
-    add(table, "Ƞ");
-    add(table, "ȵ");
-    add(table, "ŋ");
-    add(table, "Ŋ");
-    add(table, "o");
-    add(table, "O");
-    add(table, "º");
-    add(table, "ó");
-    add(table, "Ó");
-    add(table, "ò");
-    add(table, "Ò");
-    add(table, "ŏ");
-    add(table, "Ŏ");
-    add(table, "ô");
-    add(table, "Ô");
-    add(table, "ǒ");
-    add(table, "Ǒ");
-    add(table, "ö");
-    add(table, "Ö");
-    add(table, "ȫ");
-    add(table, "Ȫ");
-    add(table, "ő");
-    add(table, "Ő");
-    add(table, "õ");
-    add(table, "Õ");
-    add(table, "ȭ");
-    add(table, "Ȭ");
-    add(table, "ȯ");
-    add(table, "Ȯ");
-    add(table, "ȱ");
-    add(table, "Ȱ");
-    add(table, "ø");
-    add(table, "Ø");
-    add(table, "ǿ");
-    add(table, "Ǿ");
-    add(table, "ǫ");
-    add(table, "Ǫ");
-    add(table, "ǭ");
-    add(table, "Ǭ");
-    add(table, "ō");
-    add(table, "Ō");
-    add(table, "ȍ");
-    add(table, "Ȍ");
-    add(table, "ȏ");
-    add(table, "Ȏ");
-    add(table, "ơ");
-    add(table, "Ơ");
-    add(table, "œ");
-    add(table, "Œ");
-    add(table, "Ɔ");
-    add(table, "Ɵ");
-    add(table, "ȣ");
-    add(table, "Ȣ");
-    add(table, "p");
-    add(table, "P");
-    add(table, "ƥ");
-    add(table, "Ƥ");
-    add(table, "q");
-    add(table, "Q");
-    add(table, "ȹ");
-    add(table, "ɋ");
-    add(table, "Ɋ");
-    add(table, "ĸ");
-    add(table, "r");
-    add(table, "R");
-    add(table, "ŕ");
-    add(table, "Ŕ");
-    add(table, "ř");
-    add(table, "Ř");
-    add(table, "ŗ");
-    add(table, "Ŗ");
-    add(table, "ȑ");
-    add(table, "Ȑ");
-    add(table, "ȓ");
-    add(table, "Ȓ");
-    add(table, "Ʀ");
-    add(table, "ɍ");
-    add(table, "Ɍ");
-    add(table, "s");
-    add(table, "S");
-    add(table, "ś");
-    add(table, "Ś");
-    add(table, "ŝ");
-    add(table, "Ŝ");
-    add(table, "š");
-    add(table, "Š");
-    add(table, "ş");
-    add(table, "Ş");
-    add(table, "ș");
-    add(table, "Ș");
-    add(table, "ſ");
-    add(table, "ß");
-    add(table, "ȿ");
-    add(table, "Ʃ");
-    add(table, "ƪ");
-    add(table, "t");
-    add(table, "T");
-    add(table, "ť");
-    add(table, "Ť");
-    add(table, "ţ");
-    add(table, "Ţ");
-    add(table, "ț");
-    add(table, "Ț");
-    add(table, "ƾ");
-    add(table, "ŧ");
-    add(table, "Ŧ");
-    add(table, "Ⱦ");
-    add(table, "ƫ");
-    add(table, "ƭ");
-    add(table, "Ƭ");
-    add(table, "Ʈ");
-    add(table, "ȶ");
-    add(table, "u");
-    add(table, "U");
-    add(table, "ú");
-    add(table, "Ú");
-    add(table, "ù");
-    add(table, "Ù");
-    add(table, "ŭ");
-    add(table, "Ŭ");
-    add(table, "û");
-    add(table, "Û");
-    add(table, "ǔ");
-    add(table, "Ǔ");
-    add(table, "ů");
-    add(table, "Ů");
-    add(table, "ü");
-    add(table, "Ü");
-    add(table, "ǘ");
-    add(table, "Ǘ");
-    add(table, "ǜ");
-    add(table, "Ǜ");
-    add(table, "ǚ");
-    add(table, "Ǚ");
-    add(table, "ǖ");
-    add(table, "Ǖ");
-    add(table, "ű");
-    add(table, "Ű");
-    add(table, "ũ");
-    add(table, "Ũ");
-    add(table, "ų");
-    add(table, "Ų");
-    add(table, "ū");
-    add(table, "Ū");
-    add(table, "ȕ");
-    add(table, "Ȕ");
-    add(table, "ȗ");
-    add(table, "Ȗ");
-    add(table, "ư");
-    add(table, "Ư");
-    add(table, "Ʉ");
-    add(table, "Ɯ");
-    add(table, "Ʊ");
-    add(table, "v");
-    add(table, "V");
-    add(table, "Ʋ");
-    add(table, "Ʌ");
-    add(table, "w");
-    add(table, "W");
-    add(table, "ŵ");
-    add(table, "Ŵ");
-    add(table, "x");
-    add(table, "X");
-    add(table, "y");
-    add(table, "Y");
-    add(table, "ý");
-    add(table, "Ý");
-    add(table, "ŷ");
-    add(table, "Ŷ");
-    add(table, "ÿ");
-    add(table, "Ÿ");
-    add(table, "ȳ");
-    add(table, "Ȳ");
-    add(table, "ɏ");
-    add(table, "Ɏ");
-    add(table, "ƴ");
-    add(table, "Ƴ");
-    add(table, "ȝ");
-    add(table, "Ȝ");
-    add(table, "z");
-    add(table, "Z");
-    add(table, "ź");
-    add(table, "Ź");
-    add(table, "ž");
-    add(table, "Ž");
-    add(table, "ż");
-    add(table, "Ż");
-    add(table, "ƍ");
-    add(table, "ƶ");
-    add(table, "Ƶ");
-    add(table, "ȥ");
-    add(table, "Ȥ");
-    add(table, "ɀ");
-    add(table, "Ʒ");
-    add(table, "ǯ");
-    add(table, "Ǯ");
-    add(table, "ƹ");
-    add(table, "Ƹ");
-    add(table, "ƺ");
-    add(table, "þ");
-    add(table, "Þ");
-    add(table, "ƿ");
-    add(table, "Ƿ");
-    add(table, "ƻ");
-    add(table, "ƨ");
-    add(table, "Ƨ");
-    add(table, "ƽ");
-    add(table, "Ƽ");
-    add(table, "ƅ");
-    add(table, "Ƅ");
-    add(table, "ɂ");
-    add(table, "Ɂ");
-    add(table, "ŉ");
-    add(table, "ǀ");
-    add(table, "ǁ");
-    add(table, "ǂ");
-    add(table, "ǃ");
-    add(table, "µ");
+    table.create_object().set_all( " ");
+    table.create_object().set_all( "!");
+    table.create_object().set_all( "\"");
+    table.create_object().set_all( "#");
+    table.create_object().set_all( "%");
+    table.create_object().set_all( "&");
+    table.create_object().set_all( "'");
+    table.create_object().set_all( "(");
+    table.create_object().set_all( ")");
+    table.create_object().set_all( "*");
+    table.create_object().set_all( "+");
+    table.create_object().set_all( ",");
+    table.create_object().set_all( "-");
+    table.create_object().set_all( ".");
+    table.create_object().set_all( "/");
+    table.create_object().set_all( ":");
+    table.create_object().set_all( ";");
+    table.create_object().set_all( "<");
+    table.create_object().set_all( "=");
+    table.create_object().set_all( ">");
+    table.create_object().set_all( "?");
+    table.create_object().set_all( "@");
+    table.create_object().set_all( "[");
+    table.create_object().set_all( "\\");
+    table.create_object().set_all( "]");
+    table.create_object().set_all( "^");
+    table.create_object().set_all( "_");
+    table.create_object().set_all( "`");
+    table.create_object().set_all( "{");
+    table.create_object().set_all( "|");
+    table.create_object().set_all( "}");
+    table.create_object().set_all( "~");
+    table.create_object().set_all( " ");
+    table.create_object().set_all( "¡");
+    table.create_object().set_all( "¦");
+    table.create_object().set_all( "§");
+    table.create_object().set_all( "¨");
+    table.create_object().set_all( "©");
+    table.create_object().set_all( "«");
+    table.create_object().set_all( "¬");
+    table.create_object().set_all( "®");
+    table.create_object().set_all( "¯");
+    table.create_object().set_all( "°");
+    table.create_object().set_all( "±");
+    table.create_object().set_all( "´");
+    table.create_object().set_all( "¶");
+    table.create_object().set_all( "·");
+    table.create_object().set_all( "¸");
+    table.create_object().set_all( "»");
+    table.create_object().set_all( "¿");
+    table.create_object().set_all( "×");
+    table.create_object().set_all( "÷");
+    table.create_object().set_all( "¤");
+    table.create_object().set_all( "¢");
+    table.create_object().set_all( "$");
+    table.create_object().set_all( "£");
+    table.create_object().set_all( "¥");
+    table.create_object().set_all( "0");
+    table.create_object().set_all( "1");
+    table.create_object().set_all( "¹");
+    table.create_object().set_all( "½");
+    table.create_object().set_all( "¼");
+    table.create_object().set_all( "2");
+    table.create_object().set_all( "²");
+    table.create_object().set_all( "3");
+    table.create_object().set_all( "³");
+    table.create_object().set_all( "¾");
+    table.create_object().set_all( "4");
+    table.create_object().set_all( "5");
+    table.create_object().set_all( "6");
+    table.create_object().set_all( "7");
+    table.create_object().set_all( "8");
+    table.create_object().set_all( "9");
+    table.create_object().set_all( "a");
+    table.create_object().set_all( "A");
+    table.create_object().set_all( "ª");
+    table.create_object().set_all( "á");
+    table.create_object().set_all( "Á");
+    table.create_object().set_all( "à");
+    table.create_object().set_all( "À");
+    table.create_object().set_all( "ă");
+    table.create_object().set_all( "Ă");
+    table.create_object().set_all( "â");
+    table.create_object().set_all( "Â");
+    table.create_object().set_all( "ǎ");
+    table.create_object().set_all( "Ǎ");
+    table.create_object().set_all( "å");
+    table.create_object().set_all( "Å");
+    table.create_object().set_all( "ǻ");
+    table.create_object().set_all( "Ǻ");
+    table.create_object().set_all( "ä");
+    table.create_object().set_all( "Ä");
+    table.create_object().set_all( "ǟ");
+    table.create_object().set_all( "Ǟ");
+    table.create_object().set_all( "ã");
+    table.create_object().set_all( "Ã");
+    table.create_object().set_all( "ȧ");
+    table.create_object().set_all( "Ȧ");
+    table.create_object().set_all( "ǡ");
+    table.create_object().set_all( "Ǡ");
+    table.create_object().set_all( "ą");
+    table.create_object().set_all( "Ą");
+    table.create_object().set_all( "ā");
+    table.create_object().set_all( "Ā");
+    table.create_object().set_all( "ȁ");
+    table.create_object().set_all( "Ȁ");
+    table.create_object().set_all( "ȃ");
+    table.create_object().set_all( "Ȃ");
+    table.create_object().set_all( "æ");
+    table.create_object().set_all( "Æ");
+    table.create_object().set_all( "ǽ");
+    table.create_object().set_all( "Ǽ");
+    table.create_object().set_all( "ǣ");
+    table.create_object().set_all( "Ǣ");
+    table.create_object().set_all( "Ⱥ");
+    table.create_object().set_all( "b");
+    table.create_object().set_all( "B");
+    table.create_object().set_all( "ƀ");
+    table.create_object().set_all( "Ƀ");
+    table.create_object().set_all( "Ɓ");
+    table.create_object().set_all( "ƃ");
+    table.create_object().set_all( "Ƃ");
+    table.create_object().set_all( "c");
+    table.create_object().set_all( "C");
+    table.create_object().set_all( "ć");
+    table.create_object().set_all( "Ć");
+    table.create_object().set_all( "ĉ");
+    table.create_object().set_all( "Ĉ");
+    table.create_object().set_all( "č");
+    table.create_object().set_all( "Č");
+    table.create_object().set_all( "ċ");
+    table.create_object().set_all( "Ċ");
+    table.create_object().set_all( "ç");
+    table.create_object().set_all( "Ç");
+    table.create_object().set_all( "ȼ");
+    table.create_object().set_all( "Ȼ");
+    table.create_object().set_all( "ƈ");
+    table.create_object().set_all( "Ƈ");
+    table.create_object().set_all( "d");
+    table.create_object().set_all( "D");
+    table.create_object().set_all( "ď");
+    table.create_object().set_all( "Ď");
+    table.create_object().set_all( "đ");
+    table.create_object().set_all( "Đ");
+    table.create_object().set_all( "ð");
+    table.create_object().set_all( "Ð");
+    table.create_object().set_all( "ȸ");
+    table.create_object().set_all( "ǳ");
+    table.create_object().set_all( "ǲ");
+    table.create_object().set_all( "Ǳ");
+    table.create_object().set_all( "ǆ");
+    table.create_object().set_all( "ǅ");
+    table.create_object().set_all( "Ǆ");
+    table.create_object().set_all( "Ɖ");
+    table.create_object().set_all( "Ɗ");
+    table.create_object().set_all( "ƌ");
+    table.create_object().set_all( "Ƌ");
+    table.create_object().set_all( "ȡ");
+    table.create_object().set_all( "e");
+    table.create_object().set_all( "E");
+    table.create_object().set_all( "é");
+    table.create_object().set_all( "É");
+    table.create_object().set_all( "è");
+    table.create_object().set_all( "È");
+    table.create_object().set_all( "ĕ");
+    table.create_object().set_all( "Ĕ");
+    table.create_object().set_all( "ê");
+    table.create_object().set_all( "Ê");
+    table.create_object().set_all( "ě");
+    table.create_object().set_all( "Ě");
+    table.create_object().set_all( "ë");
+    table.create_object().set_all( "Ë");
+    table.create_object().set_all( "ė");
+    table.create_object().set_all( "Ė");
+    table.create_object().set_all( "ȩ");
+    table.create_object().set_all( "Ȩ");
+    table.create_object().set_all( "ę");
+    table.create_object().set_all( "Ę");
+    table.create_object().set_all( "ē");
+    table.create_object().set_all( "Ē");
+    table.create_object().set_all( "ȅ");
+    table.create_object().set_all( "Ȅ");
+    table.create_object().set_all( "ȇ");
+    table.create_object().set_all( "Ȇ");
+    table.create_object().set_all( "ɇ");
+    table.create_object().set_all( "Ɇ");
+    table.create_object().set_all( "ǝ");
+    table.create_object().set_all( "Ǝ");
+    table.create_object().set_all( "Ə");
+    table.create_object().set_all( "Ɛ");
+    table.create_object().set_all( "f");
+    table.create_object().set_all( "F");
+    table.create_object().set_all( "ƒ");
+    table.create_object().set_all( "Ƒ");
+    table.create_object().set_all( "g");
+    table.create_object().set_all( "G");
+    table.create_object().set_all( "ǵ");
+    table.create_object().set_all( "Ǵ");
+    table.create_object().set_all( "ğ");
+    table.create_object().set_all( "Ğ");
+    table.create_object().set_all( "ĝ");
+    table.create_object().set_all( "Ĝ");
+    table.create_object().set_all( "ǧ");
+    table.create_object().set_all( "Ǧ");
+    table.create_object().set_all( "ġ");
+    table.create_object().set_all( "Ġ");
+    table.create_object().set_all( "ģ");
+    table.create_object().set_all( "Ģ");
+    table.create_object().set_all( "ǥ");
+    table.create_object().set_all( "Ǥ");
+    table.create_object().set_all( "Ɠ");
+    table.create_object().set_all( "Ɣ");
+    table.create_object().set_all( "ƣ");
+    table.create_object().set_all( "Ƣ");
+    table.create_object().set_all( "h");
+    table.create_object().set_all( "H");
+    table.create_object().set_all( "ĥ");
+    table.create_object().set_all( "Ĥ");
+    table.create_object().set_all( "ȟ");
+    table.create_object().set_all( "Ȟ");
+    table.create_object().set_all( "ħ");
+    table.create_object().set_all( "Ħ");
+    table.create_object().set_all( "ƕ");
+    table.create_object().set_all( "Ƕ");
+    table.create_object().set_all( "i");
+    table.create_object().set_all( "I");
+    table.create_object().set_all( "í");
+    table.create_object().set_all( "Í");
+    table.create_object().set_all( "ì");
+    table.create_object().set_all( "Ì");
+    table.create_object().set_all( "ĭ");
+    table.create_object().set_all( "Ĭ");
+    table.create_object().set_all( "î");
+    table.create_object().set_all( "Î");
+    table.create_object().set_all( "ǐ");
+    table.create_object().set_all( "Ǐ");
+    table.create_object().set_all( "ï");
+    table.create_object().set_all( "Ï");
+    table.create_object().set_all( "ĩ");
+    table.create_object().set_all( "Ĩ");
+    table.create_object().set_all( "İ");
+    table.create_object().set_all( "į");
+    table.create_object().set_all( "Į");
+    table.create_object().set_all( "ī");
+    table.create_object().set_all( "Ī");
+    table.create_object().set_all( "ȉ");
+    table.create_object().set_all( "Ȉ");
+    table.create_object().set_all( "ȋ");
+    table.create_object().set_all( "Ȋ");
+    table.create_object().set_all( "ĳ");
+    table.create_object().set_all( "Ĳ");
+    table.create_object().set_all( "ı");
+    table.create_object().set_all( "Ɨ");
+    table.create_object().set_all( "Ɩ");
+    table.create_object().set_all( "j");
+    table.create_object().set_all( "J");
+    table.create_object().set_all( "ĵ");
+    table.create_object().set_all( "Ĵ");
+    table.create_object().set_all( "ǰ");
+    table.create_object().set_all( "ȷ");
+    table.create_object().set_all( "ɉ");
+    table.create_object().set_all( "Ɉ");
+    table.create_object().set_all( "k");
+    table.create_object().set_all( "K");
+    table.create_object().set_all( "ǩ");
+    table.create_object().set_all( "Ǩ");
+    table.create_object().set_all( "ķ");
+    table.create_object().set_all( "Ķ");
+    table.create_object().set_all( "ƙ");
+    table.create_object().set_all( "Ƙ");
+    table.create_object().set_all( "ĺ");
+    table.create_object().set_all( "Ĺ");
+    table.create_object().set_all( "ľ");
+    table.create_object().set_all( "Ľ");
+    table.create_object().set_all( "ļ");
+    table.create_object().set_all( "Ļ");
+    table.create_object().set_all( "ł");
+    table.create_object().set_all( "Ł");
+    table.create_object().set_all( "ŀ");
+    table.create_object().set_all( "l");
+    table.create_object().set_all( "Ŀ");
+    table.create_object().set_all( "L");
+    table.create_object().set_all( "ǉ");
+    table.create_object().set_all( "ǈ");
+    table.create_object().set_all( "Ǉ");
+    table.create_object().set_all( "ƚ");
+    table.create_object().set_all( "Ƚ");
+    table.create_object().set_all( "ȴ");
+    table.create_object().set_all( "ƛ");
+    table.create_object().set_all( "m");
+    table.create_object().set_all( "M");
+    table.create_object().set_all( "n");
+    table.create_object().set_all( "N");
+    table.create_object().set_all( "ń");
+    table.create_object().set_all( "Ń");
+    table.create_object().set_all( "ǹ");
+    table.create_object().set_all( "Ǹ");
+    table.create_object().set_all( "ň");
+    table.create_object().set_all( "Ň");
+    table.create_object().set_all( "ñ");
+    table.create_object().set_all( "Ñ");
+    table.create_object().set_all( "ņ");
+    table.create_object().set_all( "Ņ");
+    table.create_object().set_all( "ǌ");
+    table.create_object().set_all( "ǋ");
+    table.create_object().set_all( "Ǌ");
+    table.create_object().set_all( "Ɲ");
+    table.create_object().set_all( "ƞ");
+    table.create_object().set_all( "Ƞ");
+    table.create_object().set_all( "ȵ");
+    table.create_object().set_all( "ŋ");
+    table.create_object().set_all( "Ŋ");
+    table.create_object().set_all( "o");
+    table.create_object().set_all( "O");
+    table.create_object().set_all( "º");
+    table.create_object().set_all( "ó");
+    table.create_object().set_all( "Ó");
+    table.create_object().set_all( "ò");
+    table.create_object().set_all( "Ò");
+    table.create_object().set_all( "ŏ");
+    table.create_object().set_all( "Ŏ");
+    table.create_object().set_all( "ô");
+    table.create_object().set_all( "Ô");
+    table.create_object().set_all( "ǒ");
+    table.create_object().set_all( "Ǒ");
+    table.create_object().set_all( "ö");
+    table.create_object().set_all( "Ö");
+    table.create_object().set_all( "ȫ");
+    table.create_object().set_all( "Ȫ");
+    table.create_object().set_all( "ő");
+    table.create_object().set_all( "Ő");
+    table.create_object().set_all( "õ");
+    table.create_object().set_all( "Õ");
+    table.create_object().set_all( "ȭ");
+    table.create_object().set_all( "Ȭ");
+    table.create_object().set_all( "ȯ");
+    table.create_object().set_all( "Ȯ");
+    table.create_object().set_all( "ȱ");
+    table.create_object().set_all( "Ȱ");
+    table.create_object().set_all( "ø");
+    table.create_object().set_all( "Ø");
+    table.create_object().set_all( "ǿ");
+    table.create_object().set_all( "Ǿ");
+    table.create_object().set_all( "ǫ");
+    table.create_object().set_all( "Ǫ");
+    table.create_object().set_all( "ǭ");
+    table.create_object().set_all( "Ǭ");
+    table.create_object().set_all( "ō");
+    table.create_object().set_all( "Ō");
+    table.create_object().set_all( "ȍ");
+    table.create_object().set_all( "Ȍ");
+    table.create_object().set_all( "ȏ");
+    table.create_object().set_all( "Ȏ");
+    table.create_object().set_all( "ơ");
+    table.create_object().set_all( "Ơ");
+    table.create_object().set_all( "œ");
+    table.create_object().set_all( "Œ");
+    table.create_object().set_all( "Ɔ");
+    table.create_object().set_all( "Ɵ");
+    table.create_object().set_all( "ȣ");
+    table.create_object().set_all( "Ȣ");
+    table.create_object().set_all( "p");
+    table.create_object().set_all( "P");
+    table.create_object().set_all( "ƥ");
+    table.create_object().set_all( "Ƥ");
+    table.create_object().set_all( "q");
+    table.create_object().set_all( "Q");
+    table.create_object().set_all( "ȹ");
+    table.create_object().set_all( "ɋ");
+    table.create_object().set_all( "Ɋ");
+    table.create_object().set_all( "ĸ");
+    table.create_object().set_all( "r");
+    table.create_object().set_all( "R");
+    table.create_object().set_all( "ŕ");
+    table.create_object().set_all( "Ŕ");
+    table.create_object().set_all( "ř");
+    table.create_object().set_all( "Ř");
+    table.create_object().set_all( "ŗ");
+    table.create_object().set_all( "Ŗ");
+    table.create_object().set_all( "ȑ");
+    table.create_object().set_all( "Ȑ");
+    table.create_object().set_all( "ȓ");
+    table.create_object().set_all( "Ȓ");
+    table.create_object().set_all( "Ʀ");
+    table.create_object().set_all( "ɍ");
+    table.create_object().set_all( "Ɍ");
+    table.create_object().set_all( "s");
+    table.create_object().set_all( "S");
+    table.create_object().set_all( "ś");
+    table.create_object().set_all( "Ś");
+    table.create_object().set_all( "ŝ");
+    table.create_object().set_all( "Ŝ");
+    table.create_object().set_all( "š");
+    table.create_object().set_all( "Š");
+    table.create_object().set_all( "ş");
+    table.create_object().set_all( "Ş");
+    table.create_object().set_all( "ș");
+    table.create_object().set_all( "Ș");
+    table.create_object().set_all( "ſ");
+    table.create_object().set_all( "ß");
+    table.create_object().set_all( "ȿ");
+    table.create_object().set_all( "Ʃ");
+    table.create_object().set_all( "ƪ");
+    table.create_object().set_all( "t");
+    table.create_object().set_all( "T");
+    table.create_object().set_all( "ť");
+    table.create_object().set_all( "Ť");
+    table.create_object().set_all( "ţ");
+    table.create_object().set_all( "Ţ");
+    table.create_object().set_all( "ț");
+    table.create_object().set_all( "Ț");
+    table.create_object().set_all( "ƾ");
+    table.create_object().set_all( "ŧ");
+    table.create_object().set_all( "Ŧ");
+    table.create_object().set_all( "Ⱦ");
+    table.create_object().set_all( "ƫ");
+    table.create_object().set_all( "ƭ");
+    table.create_object().set_all( "Ƭ");
+    table.create_object().set_all( "Ʈ");
+    table.create_object().set_all( "ȶ");
+    table.create_object().set_all( "u");
+    table.create_object().set_all( "U");
+    table.create_object().set_all( "ú");
+    table.create_object().set_all( "Ú");
+    table.create_object().set_all( "ù");
+    table.create_object().set_all( "Ù");
+    table.create_object().set_all( "ŭ");
+    table.create_object().set_all( "Ŭ");
+    table.create_object().set_all( "û");
+    table.create_object().set_all( "Û");
+    table.create_object().set_all( "ǔ");
+    table.create_object().set_all( "Ǔ");
+    table.create_object().set_all( "ů");
+    table.create_object().set_all( "Ů");
+    table.create_object().set_all( "ü");
+    table.create_object().set_all( "Ü");
+    table.create_object().set_all( "ǘ");
+    table.create_object().set_all( "Ǘ");
+    table.create_object().set_all( "ǜ");
+    table.create_object().set_all( "Ǜ");
+    table.create_object().set_all( "ǚ");
+    table.create_object().set_all( "Ǚ");
+    table.create_object().set_all( "ǖ");
+    table.create_object().set_all( "Ǖ");
+    table.create_object().set_all( "ű");
+    table.create_object().set_all( "Ű");
+    table.create_object().set_all( "ũ");
+    table.create_object().set_all( "Ũ");
+    table.create_object().set_all( "ų");
+    table.create_object().set_all( "Ų");
+    table.create_object().set_all( "ū");
+    table.create_object().set_all( "Ū");
+    table.create_object().set_all( "ȕ");
+    table.create_object().set_all( "Ȕ");
+    table.create_object().set_all( "ȗ");
+    table.create_object().set_all( "Ȗ");
+    table.create_object().set_all( "ư");
+    table.create_object().set_all( "Ư");
+    table.create_object().set_all( "Ʉ");
+    table.create_object().set_all( "Ɯ");
+    table.create_object().set_all( "Ʊ");
+    table.create_object().set_all( "v");
+    table.create_object().set_all( "V");
+    table.create_object().set_all( "Ʋ");
+    table.create_object().set_all( "Ʌ");
+    table.create_object().set_all( "w");
+    table.create_object().set_all( "W");
+    table.create_object().set_all( "ŵ");
+    table.create_object().set_all( "Ŵ");
+    table.create_object().set_all( "x");
+    table.create_object().set_all( "X");
+    table.create_object().set_all( "y");
+    table.create_object().set_all( "Y");
+    table.create_object().set_all( "ý");
+    table.create_object().set_all( "Ý");
+    table.create_object().set_all( "ŷ");
+    table.create_object().set_all( "Ŷ");
+    table.create_object().set_all( "ÿ");
+    table.create_object().set_all( "Ÿ");
+    table.create_object().set_all( "ȳ");
+    table.create_object().set_all( "Ȳ");
+    table.create_object().set_all( "ɏ");
+    table.create_object().set_all( "Ɏ");
+    table.create_object().set_all( "ƴ");
+    table.create_object().set_all( "Ƴ");
+    table.create_object().set_all( "ȝ");
+    table.create_object().set_all( "Ȝ");
+    table.create_object().set_all( "z");
+    table.create_object().set_all( "Z");
+    table.create_object().set_all( "ź");
+    table.create_object().set_all( "Ź");
+    table.create_object().set_all( "ž");
+    table.create_object().set_all( "Ž");
+    table.create_object().set_all( "ż");
+    table.create_object().set_all( "Ż");
+    table.create_object().set_all( "ƍ");
+    table.create_object().set_all( "ƶ");
+    table.create_object().set_all( "Ƶ");
+    table.create_object().set_all( "ȥ");
+    table.create_object().set_all( "Ȥ");
+    table.create_object().set_all( "ɀ");
+    table.create_object().set_all( "Ʒ");
+    table.create_object().set_all( "ǯ");
+    table.create_object().set_all( "Ǯ");
+    table.create_object().set_all( "ƹ");
+    table.create_object().set_all( "Ƹ");
+    table.create_object().set_all( "ƺ");
+    table.create_object().set_all( "þ");
+    table.create_object().set_all( "Þ");
+    table.create_object().set_all( "ƿ");
+    table.create_object().set_all( "Ƿ");
+    table.create_object().set_all( "ƻ");
+    table.create_object().set_all( "ƨ");
+    table.create_object().set_all( "Ƨ");
+    table.create_object().set_all( "ƽ");
+    table.create_object().set_all( "Ƽ");
+    table.create_object().set_all( "ƅ");
+    table.create_object().set_all( "Ƅ");
+    table.create_object().set_all( "ɂ");
+    table.create_object().set_all( "Ɂ");
+    table.create_object().set_all( "ŉ");
+    table.create_object().set_all( "ǀ");
+    table.create_object().set_all( "ǁ");
+    table.create_object().set_all( "ǂ");
+    table.create_object().set_all( "ǃ");
+    table.create_object().set_all( "µ");
 
     // Core-only is default comparer
     TableView v1 = table.where().find_all();
     TableView v2 = table.where().find_all();
 
-    v2.sort(0);
+    v2.sort(col);
 
     for (size_t t = 0; t < v1.size(); t++) {
-        CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
+        CHECK_EQUAL(v1.get_object(t).get_key(), v2.get_object(t).get_key());
     }
 
     // Set back to default in case other tests rely on this
@@ -2882,8 +2236,8 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 
 NONCONCURRENT_TEST(TableView_SortOrder_Core)
 {
-    TestTable table;
-    table.add_column(type_String, "1");
+    Table table;
+    auto col = table.add_column(type_String, "1");
 
     // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only
     // characters
@@ -2894,540 +2248,540 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
-    add(table, "'");
-    add(table, "-");
-    add(table, " ");
-    add(table, " ");
-    add(table, "!");
-    add(table, "\"");
-    add(table, "#");
-    add(table, "$");
-    add(table, "%");
-    add(table, "&");
-    add(table, "(");
-    add(table, ")");
-    add(table, "*");
-    add(table, ",");
-    add(table, ".");
-    add(table, "/");
-    add(table, ":");
-    add(table, ";");
-    add(table, "?");
-    add(table, "@");
-    add(table, "[");
-    add(table, "\\");
-    add(table, "^");
-    add(table, "_");
-    add(table, "`");
-    add(table, "{");
-    add(table, "|");
-    add(table, "}");
-    add(table, "~");
-    add(table, "¡");
-    add(table, "¦");
-    add(table, "¨");
-    add(table, "¯");
-    add(table, "´");
-    add(table, "¸");
-    add(table, "¿");
-    add(table, "ǃ");
-    add(table, "¢");
-    add(table, "£");
-    add(table, "¤");
-    add(table, "¥");
-    add(table, "+");
-    add(table, "<");
-    add(table, "=");
-    add(table, ">");
-    add(table, "±");
-    add(table, "«");
-    add(table, "»");
-    add(table, "×");
-    add(table, "÷");
-    add(table, "ǀ");
-    add(table, "ǁ");
-    add(table, "ǂ");
-    add(table, "§");
-    add(table, "©");
-    add(table, "¬");
-    add(table, "®");
-    add(table, "°");
-    add(table, "µ");
-    add(table, "¶");
-    add(table, "·");
-    add(table, "0");
-    add(table, "¼");
-    add(table, "½");
-    add(table, "¾");
-    add(table, "1");
-    add(table, "¹");
-    add(table, "2");
-    add(table, "ƻ");
-    add(table, "²");
-    add(table, "3");
-    add(table, "³");
-    add(table, "4");
-    add(table, "5");
-    add(table, "ƽ");
-    add(table, "Ƽ");
-    add(table, "6");
-    add(table, "7");
-    add(table, "8");
-    add(table, "9");
-    add(table, "a");
-    add(table, "A");
-    add(table, "ª");
-    add(table, "á");
-    add(table, "Á");
-    add(table, "à");
-    add(table, "À");
-    add(table, "ȧ");
-    add(table, "Ȧ");
-    add(table, "â");
-    add(table, "Â");
-    add(table, "ǎ");
-    add(table, "Ǎ");
-    add(table, "ă");
-    add(table, "Ă");
-    add(table, "ā");
-    add(table, "Ā");
-    add(table, "ã");
-    add(table, "Ã");
-    add(table, "ą");
-    add(table, "Ą");
-    add(table, "Ⱥ");
-    add(table, "ǡ");
-    add(table, "Ǡ");
-    add(table, "ǻ");
-    add(table, "Ǻ");
-    add(table, "ǟ");
-    add(table, "Ǟ");
-    add(table, "ȁ");
-    add(table, "Ȁ");
-    add(table, "ȃ");
-    add(table, "Ȃ");
-    add(table, "ǽ");
-    add(table, "Ǽ");
-    add(table, "b");
-    add(table, "B");
-    add(table, "ƀ");
-    add(table, "Ƀ");
-    add(table, "Ɓ");
-    add(table, "ƃ");
-    add(table, "Ƃ");
-    add(table, "ƅ");
-    add(table, "Ƅ");
-    add(table, "c");
-    add(table, "C");
-    add(table, "ć");
-    add(table, "Ć");
-    add(table, "ċ");
-    add(table, "Ċ");
-    add(table, "ĉ");
-    add(table, "Ĉ");
-    add(table, "č");
-    add(table, "Č");
-    add(table, "ç");
-    add(table, "Ç");
-    add(table, "ȼ");
-    add(table, "Ȼ");
-    add(table, "ƈ");
-    add(table, "Ƈ");
-    add(table, "Ɔ");
-    add(table, "d");
-    add(table, "D");
-    add(table, "ď");
-    add(table, "Ď");
-    add(table, "đ");
-    add(table, "Đ");
-    add(table, "ƌ");
-    add(table, "Ƌ");
-    add(table, "Ɗ");
-    add(table, "ð");
-    add(table, "Ð");
-    add(table, "ƍ");
-    add(table, "ȸ");
-    add(table, "ǳ");
-    add(table, "ǲ");
-    add(table, "Ǳ");
-    add(table, "ǆ");
-    add(table, "ǅ");
-    add(table, "Ǆ");
-    add(table, "Ɖ");
-    add(table, "ȡ");
-    add(table, "e");
-    add(table, "E");
-    add(table, "é");
-    add(table, "É");
-    add(table, "è");
-    add(table, "È");
-    add(table, "ė");
-    add(table, "Ė");
-    add(table, "ê");
-    add(table, "Ê");
-    add(table, "ë");
-    add(table, "Ë");
-    add(table, "ě");
-    add(table, "Ě");
-    add(table, "ĕ");
-    add(table, "Ĕ");
-    add(table, "ē");
-    add(table, "Ē");
-    add(table, "ę");
-    add(table, "Ę");
-    add(table, "ȩ");
-    add(table, "Ȩ");
-    add(table, "ɇ");
-    add(table, "Ɇ");
-    add(table, "ȅ");
-    add(table, "Ȅ");
-    add(table, "ȇ");
-    add(table, "Ȇ");
-    add(table, "ǝ");
-    add(table, "Ǝ");
-    add(table, "Ə");
-    add(table, "Ɛ");
-    add(table, "ȝ");
-    add(table, "Ȝ");
-    add(table, "f");
-    add(table, "F");
-    add(table, "ƒ");
-    add(table, "Ƒ");
-    add(table, "g");
-    add(table, "G");
-    add(table, "ǵ");
-    add(table, "Ǵ");
-    add(table, "ġ");
-    add(table, "Ġ");
-    add(table, "ĝ");
-    add(table, "Ĝ");
-    add(table, "ǧ");
-    add(table, "Ǧ");
-    add(table, "ğ");
-    add(table, "Ğ");
-    add(table, "ģ");
-    add(table, "Ģ");
-    add(table, "ǥ");
-    add(table, "Ǥ");
-    add(table, "Ɠ");
-    add(table, "Ɣ");
-    add(table, "h");
-    add(table, "H");
-    add(table, "ĥ");
-    add(table, "Ĥ");
-    add(table, "ȟ");
-    add(table, "Ȟ");
-    add(table, "ħ");
-    add(table, "Ħ");
-    add(table, "ƕ");
-    add(table, "Ƕ");
-    add(table, "i");
-    add(table, "I");
-    add(table, "ı");
-    add(table, "í");
-    add(table, "Í");
-    add(table, "ì");
-    add(table, "Ì");
-    add(table, "İ");
-    add(table, "î");
-    add(table, "Î");
-    add(table, "ï");
-    add(table, "Ï");
-    add(table, "ǐ");
-    add(table, "Ǐ");
-    add(table, "ĭ");
-    add(table, "Ĭ");
-    add(table, "ī");
-    add(table, "Ī");
-    add(table, "ĩ");
-    add(table, "Ĩ");
-    add(table, "į");
-    add(table, "Į");
-    add(table, "Ɨ");
-    add(table, "ȉ");
-    add(table, "Ȉ");
-    add(table, "ȋ");
-    add(table, "Ȋ");
-    add(table, "Ɩ");
-    add(table, "ĳ");
-    add(table, "Ĳ");
-    add(table, "j");
-    add(table, "J");
-    add(table, "ȷ");
-    add(table, "ĵ");
-    add(table, "Ĵ");
-    add(table, "ǰ");
-    add(table, "ɉ");
-    add(table, "Ɉ");
-    add(table, "k");
-    add(table, "K");
-    add(table, "ǩ");
-    add(table, "Ǩ");
-    add(table, "ķ");
-    add(table, "Ķ");
-    add(table, "ƙ");
-    add(table, "Ƙ");
-    add(table, "l");
-    add(table, "L");
-    add(table, "ĺ");
-    add(table, "Ĺ");
-    add(table, "ŀ");
-    add(table, "Ŀ");
-    add(table, "ľ");
-    add(table, "Ľ");
-    add(table, "ļ");
-    add(table, "Ļ");
-    add(table, "ƚ");
-    add(table, "Ƚ");
-    add(table, "ł");
-    add(table, "Ł");
-    add(table, "ƛ");
-    add(table, "ǉ");
-    add(table, "ǈ");
-    add(table, "Ǉ");
-    add(table, "ȴ");
-    add(table, "m");
-    add(table, "M");
-    add(table, "Ɯ");
-    add(table, "n");
-    add(table, "N");
-    add(table, "ń");
-    add(table, "Ń");
-    add(table, "ǹ");
-    add(table, "Ǹ");
-    add(table, "ň");
-    add(table, "Ň");
-    add(table, "ñ");
-    add(table, "Ñ");
-    add(table, "ņ");
-    add(table, "Ņ");
-    add(table, "Ɲ");
-    add(table, "ŉ");
-    add(table, "ƞ");
-    add(table, "Ƞ");
-    add(table, "ǌ");
-    add(table, "ǋ");
-    add(table, "Ǌ");
-    add(table, "ȵ");
-    add(table, "ŋ");
-    add(table, "Ŋ");
-    add(table, "o");
-    add(table, "O");
-    add(table, "º");
-    add(table, "ó");
-    add(table, "Ó");
-    add(table, "ò");
-    add(table, "Ò");
-    add(table, "ȯ");
-    add(table, "Ȯ");
-    add(table, "ô");
-    add(table, "Ô");
-    add(table, "ǒ");
-    add(table, "Ǒ");
-    add(table, "ŏ");
-    add(table, "Ŏ");
-    add(table, "ō");
-    add(table, "Ō");
-    add(table, "õ");
-    add(table, "Õ");
-    add(table, "ǫ");
-    add(table, "Ǫ");
-    add(table, "Ɵ");
-    add(table, "ȱ");
-    add(table, "Ȱ");
-    add(table, "ȫ");
-    add(table, "Ȫ");
-    add(table, "ǿ");
-    add(table, "Ǿ");
-    add(table, "ȭ");
-    add(table, "Ȭ");
-    add(table, "ǭ");
-    add(table, "Ǭ");
-    add(table, "ȍ");
-    add(table, "Ȍ");
-    add(table, "ȏ");
-    add(table, "Ȏ");
-    add(table, "ơ");
-    add(table, "Ơ");
-    add(table, "ƣ");
-    add(table, "Ƣ");
-    add(table, "œ");
-    add(table, "Œ");
-    add(table, "ȣ");
-    add(table, "Ȣ");
-    add(table, "p");
-    add(table, "P");
-    add(table, "ƥ");
-    add(table, "Ƥ");
-    add(table, "q");
-    add(table, "Q");
-    add(table, "ĸ");
-    add(table, "ɋ");
-    add(table, "Ɋ");
-    add(table, "ȹ");
-    add(table, "r");
-    add(table, "R");
-    add(table, "Ʀ");
-    add(table, "ŕ");
-    add(table, "Ŕ");
-    add(table, "ř");
-    add(table, "Ř");
-    add(table, "ŗ");
-    add(table, "Ŗ");
-    add(table, "ɍ");
-    add(table, "Ɍ");
-    add(table, "ȑ");
-    add(table, "Ȑ");
-    add(table, "ȓ");
-    add(table, "Ȓ");
-    add(table, "s");
-    add(table, "S");
-    add(table, "ś");
-    add(table, "Ś");
-    add(table, "ŝ");
-    add(table, "Ŝ");
-    add(table, "š");
-    add(table, "Š");
-    add(table, "ş");
-    add(table, "Ş");
-    add(table, "ș");
-    add(table, "Ș");
-    add(table, "ȿ");
-    add(table, "Ʃ");
-    add(table, "ƨ");
-    add(table, "Ƨ");
-    add(table, "ƪ");
-    add(table, "ß");
-    add(table, "ſ");
-    add(table, "t");
-    add(table, "T");
-    add(table, "ť");
-    add(table, "Ť");
-    add(table, "ţ");
-    add(table, "Ţ");
-    add(table, "ƭ");
-    add(table, "Ƭ");
-    add(table, "ƫ");
-    add(table, "Ʈ");
-    add(table, "ț");
-    add(table, "Ț");
-    add(table, "Ⱦ");
-    add(table, "ȶ");
-    add(table, "þ");
-    add(table, "Þ");
-    add(table, "ŧ");
-    add(table, "Ŧ");
-    add(table, "u");
-    add(table, "U");
-    add(table, "ú");
-    add(table, "Ú");
-    add(table, "ù");
-    add(table, "Ù");
-    add(table, "û");
-    add(table, "Û");
-    add(table, "ǔ");
-    add(table, "Ǔ");
-    add(table, "ŭ");
-    add(table, "Ŭ");
-    add(table, "ū");
-    add(table, "Ū");
-    add(table, "ũ");
-    add(table, "Ũ");
-    add(table, "ů");
-    add(table, "Ů");
-    add(table, "ų");
-    add(table, "Ų");
-    add(table, "Ʉ");
-    add(table, "ǘ");
-    add(table, "Ǘ");
-    add(table, "ǜ");
-    add(table, "Ǜ");
-    add(table, "ǚ");
-    add(table, "Ǚ");
-    add(table, "ǖ");
-    add(table, "Ǖ");
-    add(table, "ȕ");
-    add(table, "Ȕ");
-    add(table, "ȗ");
-    add(table, "Ȗ");
-    add(table, "ư");
-    add(table, "Ư");
-    add(table, "Ʊ");
-    add(table, "v");
-    add(table, "V");
-    add(table, "Ʋ");
-    add(table, "Ʌ");
-    add(table, "w");
-    add(table, "W");
-    add(table, "ŵ");
-    add(table, "Ŵ");
-    add(table, "ƿ");
-    add(table, "Ƿ");
-    add(table, "x");
-    add(table, "X");
-    add(table, "y");
-    add(table, "Y");
-    add(table, "ý");
-    add(table, "Ý");
-    add(table, "ŷ");
-    add(table, "Ŷ");
-    add(table, "ÿ");
-    add(table, "Ÿ");
-    add(table, "ȳ");
-    add(table, "Ȳ");
-    add(table, "ű");
-    add(table, "Ű");
-    add(table, "ɏ");
-    add(table, "Ɏ");
-    add(table, "ƴ");
-    add(table, "Ƴ");
-    add(table, "ü");
-    add(table, "Ü");
-    add(table, "z");
-    add(table, "Z");
-    add(table, "ź");
-    add(table, "Ź");
-    add(table, "ż");
-    add(table, "Ż");
-    add(table, "ž");
-    add(table, "Ž");
-    add(table, "ƶ");
-    add(table, "Ƶ");
-    add(table, "ȥ");
-    add(table, "Ȥ");
-    add(table, "ɀ");
-    add(table, "æ");
-    add(table, "Æ");
-    add(table, "Ʒ");
-    add(table, "ǣ");
-    add(table, "Ǣ");
-    add(table, "ä");
-    add(table, "Ä");
-    add(table, "ǯ");
-    add(table, "Ǯ");
-    add(table, "ƹ");
-    add(table, "Ƹ");
-    add(table, "ƺ");
-    add(table, "ø");
-    add(table, "Ø");
-    add(table, "ö");
-    add(table, "Ö");
-    add(table, "ő");
-    add(table, "Ő");
-    add(table, "å");
-    add(table, "Å");
-    add(table, "ƾ");
-    add(table, "ɂ");
-    add(table, "Ɂ");
+    table.create_object().set_all( "'");
+    table.create_object().set_all( "-");
+    table.create_object().set_all( " ");
+    table.create_object().set_all( " ");
+    table.create_object().set_all( "!");
+    table.create_object().set_all( "\"");
+    table.create_object().set_all( "#");
+    table.create_object().set_all( "$");
+    table.create_object().set_all( "%");
+    table.create_object().set_all( "&");
+    table.create_object().set_all( "(");
+    table.create_object().set_all( ")");
+    table.create_object().set_all( "*");
+    table.create_object().set_all( ",");
+    table.create_object().set_all( ".");
+    table.create_object().set_all( "/");
+    table.create_object().set_all( ":");
+    table.create_object().set_all( ";");
+    table.create_object().set_all( "?");
+    table.create_object().set_all( "@");
+    table.create_object().set_all( "[");
+    table.create_object().set_all( "\\");
+    table.create_object().set_all( "^");
+    table.create_object().set_all( "_");
+    table.create_object().set_all( "`");
+    table.create_object().set_all( "{");
+    table.create_object().set_all( "|");
+    table.create_object().set_all( "}");
+    table.create_object().set_all( "~");
+    table.create_object().set_all( "¡");
+    table.create_object().set_all( "¦");
+    table.create_object().set_all( "¨");
+    table.create_object().set_all( "¯");
+    table.create_object().set_all( "´");
+    table.create_object().set_all( "¸");
+    table.create_object().set_all( "¿");
+    table.create_object().set_all( "ǃ");
+    table.create_object().set_all( "¢");
+    table.create_object().set_all( "£");
+    table.create_object().set_all( "¤");
+    table.create_object().set_all( "¥");
+    table.create_object().set_all( "+");
+    table.create_object().set_all( "<");
+    table.create_object().set_all( "=");
+    table.create_object().set_all( ">");
+    table.create_object().set_all( "±");
+    table.create_object().set_all( "«");
+    table.create_object().set_all( "»");
+    table.create_object().set_all( "×");
+    table.create_object().set_all( "÷");
+    table.create_object().set_all( "ǀ");
+    table.create_object().set_all( "ǁ");
+    table.create_object().set_all( "ǂ");
+    table.create_object().set_all( "§");
+    table.create_object().set_all( "©");
+    table.create_object().set_all( "¬");
+    table.create_object().set_all( "®");
+    table.create_object().set_all( "°");
+    table.create_object().set_all( "µ");
+    table.create_object().set_all( "¶");
+    table.create_object().set_all( "·");
+    table.create_object().set_all( "0");
+    table.create_object().set_all( "¼");
+    table.create_object().set_all( "½");
+    table.create_object().set_all( "¾");
+    table.create_object().set_all( "1");
+    table.create_object().set_all( "¹");
+    table.create_object().set_all( "2");
+    table.create_object().set_all( "ƻ");
+    table.create_object().set_all( "²");
+    table.create_object().set_all( "3");
+    table.create_object().set_all( "³");
+    table.create_object().set_all( "4");
+    table.create_object().set_all( "5");
+    table.create_object().set_all( "ƽ");
+    table.create_object().set_all( "Ƽ");
+    table.create_object().set_all( "6");
+    table.create_object().set_all( "7");
+    table.create_object().set_all( "8");
+    table.create_object().set_all( "9");
+    table.create_object().set_all( "a");
+    table.create_object().set_all( "A");
+    table.create_object().set_all( "ª");
+    table.create_object().set_all( "á");
+    table.create_object().set_all( "Á");
+    table.create_object().set_all( "à");
+    table.create_object().set_all( "À");
+    table.create_object().set_all( "ȧ");
+    table.create_object().set_all( "Ȧ");
+    table.create_object().set_all( "â");
+    table.create_object().set_all( "Â");
+    table.create_object().set_all( "ǎ");
+    table.create_object().set_all( "Ǎ");
+    table.create_object().set_all( "ă");
+    table.create_object().set_all( "Ă");
+    table.create_object().set_all( "ā");
+    table.create_object().set_all( "Ā");
+    table.create_object().set_all( "ã");
+    table.create_object().set_all( "Ã");
+    table.create_object().set_all( "ą");
+    table.create_object().set_all( "Ą");
+    table.create_object().set_all( "Ⱥ");
+    table.create_object().set_all( "ǡ");
+    table.create_object().set_all( "Ǡ");
+    table.create_object().set_all( "ǻ");
+    table.create_object().set_all( "Ǻ");
+    table.create_object().set_all( "ǟ");
+    table.create_object().set_all( "Ǟ");
+    table.create_object().set_all( "ȁ");
+    table.create_object().set_all( "Ȁ");
+    table.create_object().set_all( "ȃ");
+    table.create_object().set_all( "Ȃ");
+    table.create_object().set_all( "ǽ");
+    table.create_object().set_all( "Ǽ");
+    table.create_object().set_all( "b");
+    table.create_object().set_all( "B");
+    table.create_object().set_all( "ƀ");
+    table.create_object().set_all( "Ƀ");
+    table.create_object().set_all( "Ɓ");
+    table.create_object().set_all( "ƃ");
+    table.create_object().set_all( "Ƃ");
+    table.create_object().set_all( "ƅ");
+    table.create_object().set_all( "Ƅ");
+    table.create_object().set_all( "c");
+    table.create_object().set_all( "C");
+    table.create_object().set_all( "ć");
+    table.create_object().set_all( "Ć");
+    table.create_object().set_all( "ċ");
+    table.create_object().set_all( "Ċ");
+    table.create_object().set_all( "ĉ");
+    table.create_object().set_all( "Ĉ");
+    table.create_object().set_all( "č");
+    table.create_object().set_all( "Č");
+    table.create_object().set_all( "ç");
+    table.create_object().set_all( "Ç");
+    table.create_object().set_all( "ȼ");
+    table.create_object().set_all( "Ȼ");
+    table.create_object().set_all( "ƈ");
+    table.create_object().set_all( "Ƈ");
+    table.create_object().set_all( "Ɔ");
+    table.create_object().set_all( "d");
+    table.create_object().set_all( "D");
+    table.create_object().set_all( "ď");
+    table.create_object().set_all( "Ď");
+    table.create_object().set_all( "đ");
+    table.create_object().set_all( "Đ");
+    table.create_object().set_all( "ƌ");
+    table.create_object().set_all( "Ƌ");
+    table.create_object().set_all( "Ɗ");
+    table.create_object().set_all( "ð");
+    table.create_object().set_all( "Ð");
+    table.create_object().set_all( "ƍ");
+    table.create_object().set_all( "ȸ");
+    table.create_object().set_all( "ǳ");
+    table.create_object().set_all( "ǲ");
+    table.create_object().set_all( "Ǳ");
+    table.create_object().set_all( "ǆ");
+    table.create_object().set_all( "ǅ");
+    table.create_object().set_all( "Ǆ");
+    table.create_object().set_all( "Ɖ");
+    table.create_object().set_all( "ȡ");
+    table.create_object().set_all( "e");
+    table.create_object().set_all( "E");
+    table.create_object().set_all( "é");
+    table.create_object().set_all( "É");
+    table.create_object().set_all( "è");
+    table.create_object().set_all( "È");
+    table.create_object().set_all( "ė");
+    table.create_object().set_all( "Ė");
+    table.create_object().set_all( "ê");
+    table.create_object().set_all( "Ê");
+    table.create_object().set_all( "ë");
+    table.create_object().set_all( "Ë");
+    table.create_object().set_all( "ě");
+    table.create_object().set_all( "Ě");
+    table.create_object().set_all( "ĕ");
+    table.create_object().set_all( "Ĕ");
+    table.create_object().set_all( "ē");
+    table.create_object().set_all( "Ē");
+    table.create_object().set_all( "ę");
+    table.create_object().set_all( "Ę");
+    table.create_object().set_all( "ȩ");
+    table.create_object().set_all( "Ȩ");
+    table.create_object().set_all( "ɇ");
+    table.create_object().set_all( "Ɇ");
+    table.create_object().set_all( "ȅ");
+    table.create_object().set_all( "Ȅ");
+    table.create_object().set_all( "ȇ");
+    table.create_object().set_all( "Ȇ");
+    table.create_object().set_all( "ǝ");
+    table.create_object().set_all( "Ǝ");
+    table.create_object().set_all( "Ə");
+    table.create_object().set_all( "Ɛ");
+    table.create_object().set_all( "ȝ");
+    table.create_object().set_all( "Ȝ");
+    table.create_object().set_all( "f");
+    table.create_object().set_all( "F");
+    table.create_object().set_all( "ƒ");
+    table.create_object().set_all( "Ƒ");
+    table.create_object().set_all( "g");
+    table.create_object().set_all( "G");
+    table.create_object().set_all( "ǵ");
+    table.create_object().set_all( "Ǵ");
+    table.create_object().set_all( "ġ");
+    table.create_object().set_all( "Ġ");
+    table.create_object().set_all( "ĝ");
+    table.create_object().set_all( "Ĝ");
+    table.create_object().set_all( "ǧ");
+    table.create_object().set_all( "Ǧ");
+    table.create_object().set_all( "ğ");
+    table.create_object().set_all( "Ğ");
+    table.create_object().set_all( "ģ");
+    table.create_object().set_all( "Ģ");
+    table.create_object().set_all( "ǥ");
+    table.create_object().set_all( "Ǥ");
+    table.create_object().set_all( "Ɠ");
+    table.create_object().set_all( "Ɣ");
+    table.create_object().set_all( "h");
+    table.create_object().set_all( "H");
+    table.create_object().set_all( "ĥ");
+    table.create_object().set_all( "Ĥ");
+    table.create_object().set_all( "ȟ");
+    table.create_object().set_all( "Ȟ");
+    table.create_object().set_all( "ħ");
+    table.create_object().set_all( "Ħ");
+    table.create_object().set_all( "ƕ");
+    table.create_object().set_all( "Ƕ");
+    table.create_object().set_all( "i");
+    table.create_object().set_all( "I");
+    table.create_object().set_all( "ı");
+    table.create_object().set_all( "í");
+    table.create_object().set_all( "Í");
+    table.create_object().set_all( "ì");
+    table.create_object().set_all( "Ì");
+    table.create_object().set_all( "İ");
+    table.create_object().set_all( "î");
+    table.create_object().set_all( "Î");
+    table.create_object().set_all( "ï");
+    table.create_object().set_all( "Ï");
+    table.create_object().set_all( "ǐ");
+    table.create_object().set_all( "Ǐ");
+    table.create_object().set_all( "ĭ");
+    table.create_object().set_all( "Ĭ");
+    table.create_object().set_all( "ī");
+    table.create_object().set_all( "Ī");
+    table.create_object().set_all( "ĩ");
+    table.create_object().set_all( "Ĩ");
+    table.create_object().set_all( "į");
+    table.create_object().set_all( "Į");
+    table.create_object().set_all( "Ɨ");
+    table.create_object().set_all( "ȉ");
+    table.create_object().set_all( "Ȉ");
+    table.create_object().set_all( "ȋ");
+    table.create_object().set_all( "Ȋ");
+    table.create_object().set_all( "Ɩ");
+    table.create_object().set_all( "ĳ");
+    table.create_object().set_all( "Ĳ");
+    table.create_object().set_all( "j");
+    table.create_object().set_all( "J");
+    table.create_object().set_all( "ȷ");
+    table.create_object().set_all( "ĵ");
+    table.create_object().set_all( "Ĵ");
+    table.create_object().set_all( "ǰ");
+    table.create_object().set_all( "ɉ");
+    table.create_object().set_all( "Ɉ");
+    table.create_object().set_all( "k");
+    table.create_object().set_all( "K");
+    table.create_object().set_all( "ǩ");
+    table.create_object().set_all( "Ǩ");
+    table.create_object().set_all( "ķ");
+    table.create_object().set_all( "Ķ");
+    table.create_object().set_all( "ƙ");
+    table.create_object().set_all( "Ƙ");
+    table.create_object().set_all( "l");
+    table.create_object().set_all( "L");
+    table.create_object().set_all( "ĺ");
+    table.create_object().set_all( "Ĺ");
+    table.create_object().set_all( "ŀ");
+    table.create_object().set_all( "Ŀ");
+    table.create_object().set_all( "ľ");
+    table.create_object().set_all( "Ľ");
+    table.create_object().set_all( "ļ");
+    table.create_object().set_all( "Ļ");
+    table.create_object().set_all( "ƚ");
+    table.create_object().set_all( "Ƚ");
+    table.create_object().set_all( "ł");
+    table.create_object().set_all( "Ł");
+    table.create_object().set_all( "ƛ");
+    table.create_object().set_all( "ǉ");
+    table.create_object().set_all( "ǈ");
+    table.create_object().set_all( "Ǉ");
+    table.create_object().set_all( "ȴ");
+    table.create_object().set_all( "m");
+    table.create_object().set_all( "M");
+    table.create_object().set_all( "Ɯ");
+    table.create_object().set_all( "n");
+    table.create_object().set_all( "N");
+    table.create_object().set_all( "ń");
+    table.create_object().set_all( "Ń");
+    table.create_object().set_all( "ǹ");
+    table.create_object().set_all( "Ǹ");
+    table.create_object().set_all( "ň");
+    table.create_object().set_all( "Ň");
+    table.create_object().set_all( "ñ");
+    table.create_object().set_all( "Ñ");
+    table.create_object().set_all( "ņ");
+    table.create_object().set_all( "Ņ");
+    table.create_object().set_all( "Ɲ");
+    table.create_object().set_all( "ŉ");
+    table.create_object().set_all( "ƞ");
+    table.create_object().set_all( "Ƞ");
+    table.create_object().set_all( "ǌ");
+    table.create_object().set_all( "ǋ");
+    table.create_object().set_all( "Ǌ");
+    table.create_object().set_all( "ȵ");
+    table.create_object().set_all( "ŋ");
+    table.create_object().set_all( "Ŋ");
+    table.create_object().set_all( "o");
+    table.create_object().set_all( "O");
+    table.create_object().set_all( "º");
+    table.create_object().set_all( "ó");
+    table.create_object().set_all( "Ó");
+    table.create_object().set_all( "ò");
+    table.create_object().set_all( "Ò");
+    table.create_object().set_all( "ȯ");
+    table.create_object().set_all( "Ȯ");
+    table.create_object().set_all( "ô");
+    table.create_object().set_all( "Ô");
+    table.create_object().set_all( "ǒ");
+    table.create_object().set_all( "Ǒ");
+    table.create_object().set_all( "ŏ");
+    table.create_object().set_all( "Ŏ");
+    table.create_object().set_all( "ō");
+    table.create_object().set_all( "Ō");
+    table.create_object().set_all( "õ");
+    table.create_object().set_all( "Õ");
+    table.create_object().set_all( "ǫ");
+    table.create_object().set_all( "Ǫ");
+    table.create_object().set_all( "Ɵ");
+    table.create_object().set_all( "ȱ");
+    table.create_object().set_all( "Ȱ");
+    table.create_object().set_all( "ȫ");
+    table.create_object().set_all( "Ȫ");
+    table.create_object().set_all( "ǿ");
+    table.create_object().set_all( "Ǿ");
+    table.create_object().set_all( "ȭ");
+    table.create_object().set_all( "Ȭ");
+    table.create_object().set_all( "ǭ");
+    table.create_object().set_all( "Ǭ");
+    table.create_object().set_all( "ȍ");
+    table.create_object().set_all( "Ȍ");
+    table.create_object().set_all( "ȏ");
+    table.create_object().set_all( "Ȏ");
+    table.create_object().set_all( "ơ");
+    table.create_object().set_all( "Ơ");
+    table.create_object().set_all( "ƣ");
+    table.create_object().set_all( "Ƣ");
+    table.create_object().set_all( "œ");
+    table.create_object().set_all( "Œ");
+    table.create_object().set_all( "ȣ");
+    table.create_object().set_all( "Ȣ");
+    table.create_object().set_all( "p");
+    table.create_object().set_all( "P");
+    table.create_object().set_all( "ƥ");
+    table.create_object().set_all( "Ƥ");
+    table.create_object().set_all( "q");
+    table.create_object().set_all( "Q");
+    table.create_object().set_all( "ĸ");
+    table.create_object().set_all( "ɋ");
+    table.create_object().set_all( "Ɋ");
+    table.create_object().set_all( "ȹ");
+    table.create_object().set_all( "r");
+    table.create_object().set_all( "R");
+    table.create_object().set_all( "Ʀ");
+    table.create_object().set_all( "ŕ");
+    table.create_object().set_all( "Ŕ");
+    table.create_object().set_all( "ř");
+    table.create_object().set_all( "Ř");
+    table.create_object().set_all( "ŗ");
+    table.create_object().set_all( "Ŗ");
+    table.create_object().set_all( "ɍ");
+    table.create_object().set_all( "Ɍ");
+    table.create_object().set_all( "ȑ");
+    table.create_object().set_all( "Ȑ");
+    table.create_object().set_all( "ȓ");
+    table.create_object().set_all( "Ȓ");
+    table.create_object().set_all( "s");
+    table.create_object().set_all( "S");
+    table.create_object().set_all( "ś");
+    table.create_object().set_all( "Ś");
+    table.create_object().set_all( "ŝ");
+    table.create_object().set_all( "Ŝ");
+    table.create_object().set_all( "š");
+    table.create_object().set_all( "Š");
+    table.create_object().set_all( "ş");
+    table.create_object().set_all( "Ş");
+    table.create_object().set_all( "ș");
+    table.create_object().set_all( "Ș");
+    table.create_object().set_all( "ȿ");
+    table.create_object().set_all( "Ʃ");
+    table.create_object().set_all( "ƨ");
+    table.create_object().set_all( "Ƨ");
+    table.create_object().set_all( "ƪ");
+    table.create_object().set_all( "ß");
+    table.create_object().set_all( "ſ");
+    table.create_object().set_all( "t");
+    table.create_object().set_all( "T");
+    table.create_object().set_all( "ť");
+    table.create_object().set_all( "Ť");
+    table.create_object().set_all( "ţ");
+    table.create_object().set_all( "Ţ");
+    table.create_object().set_all( "ƭ");
+    table.create_object().set_all( "Ƭ");
+    table.create_object().set_all( "ƫ");
+    table.create_object().set_all( "Ʈ");
+    table.create_object().set_all( "ț");
+    table.create_object().set_all( "Ț");
+    table.create_object().set_all( "Ⱦ");
+    table.create_object().set_all( "ȶ");
+    table.create_object().set_all( "þ");
+    table.create_object().set_all( "Þ");
+    table.create_object().set_all( "ŧ");
+    table.create_object().set_all( "Ŧ");
+    table.create_object().set_all( "u");
+    table.create_object().set_all( "U");
+    table.create_object().set_all( "ú");
+    table.create_object().set_all( "Ú");
+    table.create_object().set_all( "ù");
+    table.create_object().set_all( "Ù");
+    table.create_object().set_all( "û");
+    table.create_object().set_all( "Û");
+    table.create_object().set_all( "ǔ");
+    table.create_object().set_all( "Ǔ");
+    table.create_object().set_all( "ŭ");
+    table.create_object().set_all( "Ŭ");
+    table.create_object().set_all( "ū");
+    table.create_object().set_all( "Ū");
+    table.create_object().set_all( "ũ");
+    table.create_object().set_all( "Ũ");
+    table.create_object().set_all( "ů");
+    table.create_object().set_all( "Ů");
+    table.create_object().set_all( "ų");
+    table.create_object().set_all( "Ų");
+    table.create_object().set_all( "Ʉ");
+    table.create_object().set_all( "ǘ");
+    table.create_object().set_all( "Ǘ");
+    table.create_object().set_all( "ǜ");
+    table.create_object().set_all( "Ǜ");
+    table.create_object().set_all( "ǚ");
+    table.create_object().set_all( "Ǚ");
+    table.create_object().set_all( "ǖ");
+    table.create_object().set_all( "Ǖ");
+    table.create_object().set_all( "ȕ");
+    table.create_object().set_all( "Ȕ");
+    table.create_object().set_all( "ȗ");
+    table.create_object().set_all( "Ȗ");
+    table.create_object().set_all( "ư");
+    table.create_object().set_all( "Ư");
+    table.create_object().set_all( "Ʊ");
+    table.create_object().set_all( "v");
+    table.create_object().set_all( "V");
+    table.create_object().set_all( "Ʋ");
+    table.create_object().set_all( "Ʌ");
+    table.create_object().set_all( "w");
+    table.create_object().set_all( "W");
+    table.create_object().set_all( "ŵ");
+    table.create_object().set_all( "Ŵ");
+    table.create_object().set_all( "ƿ");
+    table.create_object().set_all( "Ƿ");
+    table.create_object().set_all( "x");
+    table.create_object().set_all( "X");
+    table.create_object().set_all( "y");
+    table.create_object().set_all( "Y");
+    table.create_object().set_all( "ý");
+    table.create_object().set_all( "Ý");
+    table.create_object().set_all( "ŷ");
+    table.create_object().set_all( "Ŷ");
+    table.create_object().set_all( "ÿ");
+    table.create_object().set_all( "Ÿ");
+    table.create_object().set_all( "ȳ");
+    table.create_object().set_all( "Ȳ");
+    table.create_object().set_all( "ű");
+    table.create_object().set_all( "Ű");
+    table.create_object().set_all( "ɏ");
+    table.create_object().set_all( "Ɏ");
+    table.create_object().set_all( "ƴ");
+    table.create_object().set_all( "Ƴ");
+    table.create_object().set_all( "ü");
+    table.create_object().set_all( "Ü");
+    table.create_object().set_all( "z");
+    table.create_object().set_all( "Z");
+    table.create_object().set_all( "ź");
+    table.create_object().set_all( "Ź");
+    table.create_object().set_all( "ż");
+    table.create_object().set_all( "Ż");
+    table.create_object().set_all( "ž");
+    table.create_object().set_all( "Ž");
+    table.create_object().set_all( "ƶ");
+    table.create_object().set_all( "Ƶ");
+    table.create_object().set_all( "ȥ");
+    table.create_object().set_all( "Ȥ");
+    table.create_object().set_all( "ɀ");
+    table.create_object().set_all( "æ");
+    table.create_object().set_all( "Æ");
+    table.create_object().set_all( "Ʒ");
+    table.create_object().set_all( "ǣ");
+    table.create_object().set_all( "Ǣ");
+    table.create_object().set_all( "ä");
+    table.create_object().set_all( "Ä");
+    table.create_object().set_all( "ǯ");
+    table.create_object().set_all( "Ǯ");
+    table.create_object().set_all( "ƹ");
+    table.create_object().set_all( "Ƹ");
+    table.create_object().set_all( "ƺ");
+    table.create_object().set_all( "ø");
+    table.create_object().set_all( "Ø");
+    table.create_object().set_all( "ö");
+    table.create_object().set_all( "Ö");
+    table.create_object().set_all( "ő");
+    table.create_object().set_all( "Ő");
+    table.create_object().set_all( "å");
+    table.create_object().set_all( "Å");
+    table.create_object().set_all( "ƾ");
+    table.create_object().set_all( "ɂ");
+    table.create_object().set_all( "Ɂ");
 
     // Core-only is default comparer
     TableView v1 = table.where().find_all();
     TableView v2 = table.where().find_all();
 
-    v2.sort(0);
+    v2.sort(col);
 
     for (size_t t = 0; t < v1.size(); t++) {
-        CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
+        CHECK_EQUAL(v1.get_object(t).get_key(), v2.get_object(t).get_key());
     }
 
     // Set back to default in case other tests rely on this
@@ -3435,13 +2789,60 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 }
 
 
+TEST(TableView_SortNull)
+{
+    // Verifiest that NULL values will come first when sorting
+    Table table;
+    auto col_int = table.add_column(type_Int, "int", true);
+    auto col_bool = table.add_column(type_Bool, "bool", true);
+    auto col_float = table.add_column(type_Float, "float", true);
+    auto col_double = table.add_column(type_Double, "double", true);
+    auto col_str = table.add_column(type_String, "string", true);
+    auto col_date = table.add_column(type_Timestamp, "date", true);
+
+    std::vector<ObjKey> keys;
+    auto k = table.create_object().set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1)).get_key();
+    keys.push_back(k);
+    auto all_cols = table.get_column_keys();
+    int i = 0;
+    for (auto col : all_cols) {
+        Obj o = table.create_object();
+        o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i));
+        // Set one field to Null. This element must come first when sorting by this column
+        o.set_null(col);
+        keys.push_back(o.get_key());
+        i++;
+    }
+
+    auto tv = table.where().find_all();
+    // Without sorting first object comes first
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[0]);
+    tv.sort(col_int);
+    // Now second element should come first
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[1]);
+    tv.sort(col_bool);
+    // Now third element should come first
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[2]);
+    tv.sort(col_float);
+    // etc.
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[3]);
+    tv.sort(col_double);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[4]);
+    tv.sort(col_str);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[5]);
+    tv.sort(col_date);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[6]);
+}
+
 // Verify that copy-constructed and copy-assigned TableViews work normally.
 TEST(TableView_Copy)
 {
     Table table;
-    size_t col_id = table.add_column(type_Int, "id");
-    for (size_t i = 0; i < 3; ++i)
-        table.set_int(col_id, table.add_empty_row(), i);
+    auto col_id = table.add_column(type_Int, "id");
+
+    table.create_object().set(col_id, -1);
+    ObjKey k1 = table.create_object().set(col_id, 1).get_key();
+    ObjKey k2 = table.create_object().set(col_id, 2).get_key();
 
     TableView tv = (table.column<Int>(col_id) > 0).find_all();
     CHECK_EQUAL(2, tv.size());
@@ -3451,69 +2852,70 @@ TEST(TableView_Copy)
     copy_2 = tv;
 
     CHECK_EQUAL(2, copy_1.size());
-    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
-    CHECK_EQUAL(2, copy_1.get_source_ndx(1));
+    CHECK_EQUAL(k1, copy_1.get_key(0));
+    CHECK_EQUAL(k2, copy_1.get_key(1));
 
     CHECK_EQUAL(2, copy_2.size());
-    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
-    CHECK_EQUAL(2, copy_2.get_source_ndx(1));
+    CHECK_EQUAL(k1, copy_2.get_key(0));
+    CHECK_EQUAL(k2, copy_2.get_key(1));
 
-    table.move_last_over(1);
+    table.remove_object(k1);
 
     CHECK(!copy_1.is_in_sync());
     CHECK(!copy_2.is_in_sync());
 
     copy_1.sync_if_needed();
     CHECK_EQUAL(1, copy_1.size());
-    CHECK_EQUAL(1, copy_1.get_source_ndx(0));
+    CHECK_EQUAL(k2, copy_1.get_key(0));
 
     copy_2.sync_if_needed();
     CHECK_EQUAL(1, copy_2.size());
-    CHECK_EQUAL(1, copy_2.get_source_ndx(0));
+    CHECK_EQUAL(k2, copy_2.get_key(0));
 }
 
-TEST(TableView_InsertColumnsAfterSort)
+TEST(TableView_RemoveColumnsAfterSort)
 {
     Table table;
-    table.add_column(type_Int, "value");
-    table.add_empty_row(10);
-    for (size_t i = 0; i < 10; ++i)
-        table.set_int(0, i, i);
+    auto col_str0 = table.add_column(type_String, "0");
+    auto col_str1 = table.add_column(type_String, "1");
+    auto col_int = table.add_column(type_Int, "value");
+    for (int i = 0; i < 10; ++i) {
+        table.create_object().set(col_int, i);
+    }
 
-    SortDescriptor desc(table, {{0}}, {false}); // sort by the one column in descending order
-
-    table.insert_column(0, type_String, "0");
+    SortDescriptor desc({{col_int}}, {false}); // sort by the one column in descending order
+    table.create_object();
+    table.remove_column(col_str0);
     auto tv = table.get_sorted_view(desc);
-    CHECK_EQUAL(tv.get_int(1, 0), 9);
-    CHECK_EQUAL(tv.get_int(1, 9), 0);
+    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get(9).get<Int>(col_int), 0);
 
-    table.insert_column(0, type_String, "1");
-    table.add_empty_row();
+    table.remove_column(col_str1);
+    table.create_object();
     tv.sync_if_needed();
-    CHECK_EQUAL(tv.get_int(2, 0), 9);
-    CHECK_EQUAL(tv.get_int(2, 10), 0);
+    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get(10).get<Int>(col_int), 0);
 }
 
 TEST(TableView_TimestampMaxRemoveRow)
 {
     Table table;
-    table.add_column(type_Timestamp, "time");
+    auto col_date = table.add_column(type_Timestamp, "time");
     for (size_t i = 0; i < 10; ++i) {
-        table.add_empty_row();
-        table.set_timestamp(0, i, Timestamp(i, 0));
+        table.create_object().set(col_date, Timestamp(i, 0));
     }
 
     TableView tv = table.where().find_all();
     CHECK_EQUAL(tv.size(), 10);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(9, 0));
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(9, 0));
 
-    table.move_last_over(9);
+    table.remove_object(ObjKey(9));
     CHECK_EQUAL(tv.size(), 10);                            // not changed since sync_if_needed hasn't been called
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0)); // but aggregate functions skip removed rows
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0)); // but aggregate functions skip removed rows
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 9);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));
+    CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0));
 }
 
 #endif // TEST_TABLE_VIEW

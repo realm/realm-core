@@ -24,7 +24,8 @@
 #include <string>
 
 #include <realm/string_data.hpp>
-#include <realm/column_string.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_string.hpp>
 
 namespace realm {
 namespace test_util {
@@ -41,7 +42,6 @@ public:
     void erase(size_t ndx);
     void clear();
     size_t find_first(StringData value);
-    void find_all(IntegerColumn& c, StringData value, size_t start = 0, size_t end = -1);
     size_t size();
     bool verify();
     bool conditional_verify();
@@ -49,7 +49,7 @@ public:
 
 private:
     std::vector<std::string> v;
-    StringColumn u;
+    BPlusTree<StringData> u;
 };
 
 

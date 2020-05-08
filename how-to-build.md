@@ -57,9 +57,9 @@ to download the appropriate installers.
 ## Configure, build & test
 
 To get submodule dependencies:
-    
+
     git submodule update --init --recursive
-    
+
 Run the following commands to configure, build and test core:
 
     mkdir build.<buildtype>
@@ -68,14 +68,14 @@ Run the following commands to configure, build and test core:
     cmake --build .
     ctest
 
-Where `buildtype` is either `Debug` or `Release`
+Where `buildtype` is either `debug` or `release`
     
 ## Building for Android, iOS, watchOS and tvOS
 
-Building for Android required the NDK r10e installed and ANDROID_NDK set 
+Building for Android required the NDK r10e installed and ANDROID_NDK set
 to the directory where it's installed.
 
-These targets can be built using the cross_compile.sh command. 
+These targets can be built using the cross_compile.sh command.
 'Release' can be replaced with 'Debug' to produce a debug build. :
 
     tools/cross_compile.sh -o android -a armeabi-v7a -t Release -v <X.Y.Z>
@@ -85,7 +85,7 @@ The command shows the available options simply with:
     tools/cross_compile.sh
 
 These commands produce a tarball containing the realm static library
-and its include files. The string after '-v' just denotes the version part 
+and its include files. The string after '-v' just denotes the version part
 of the name of the tarball produced - it's optional.
 
 ## Testing
@@ -95,6 +95,10 @@ The core library comes with a suite of unit tests. You can run the unit tests li
     cd build-dir/test
     ./realm-tests
     
+or run both unit tests and performance tests with just:
+
+    ctest
+
 or run both unit tests and performance tests with just:
 
     ctest
@@ -178,6 +182,8 @@ This will allow to produce coverage information which is then digestable by gcov
     ./realm-tests
     gcovr --filter='.*src/realm.*'
 
+Alternatively you can run the script `tools/coverage.sh`.
+
 ## Install
 
 You can install core itself on Linux if needed, but be aware that the API exposed
@@ -223,7 +229,7 @@ CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_T
 ## Other tools
 
 The `realm-import` tool lets you load files containing
-comma-separated values into Realm. 
+comma-separated values into Realm.
 
 The next two are used transparently by the Realm library when `async` transactions are
 enabled. The two `config` programs provide the necessary compiler

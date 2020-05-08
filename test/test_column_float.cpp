@@ -22,7 +22,7 @@
 #include <iostream>
 
 #include "test.hpp"
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/table.hpp>
 
 using namespace realm;
@@ -82,8 +82,8 @@ const size_t num_double_values = size_of_array(double_values);
 template <class C>
 void BasicColumn_IsEmpty(TestContext& test_context)
 {
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default());
+    c.create();
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0U, c.size());
@@ -102,8 +102,8 @@ TEST(DoubleColumn_IsEmpty)
 template <class C, typename T>
 void BasicColumn_AddGet(TestContext& test_context, T values[], size_t num_values)
 {
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default());
+    c.create();
 
     for (size_t i = 0; i < num_values; ++i) {
         c.add(values[i]);
@@ -129,13 +129,13 @@ TEST(DoubleColumn_AddGet)
 template <class C, typename T>
 void BasicColumn_Clear(TestContext& test_context)
 {
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default());
+    c.create();
 
     CHECK(c.is_empty());
 
     for (size_t i = 0; i < 100; ++i)
-        c.add();
+        c.add(T());
     CHECK(!c.is_empty());
 
     c.clear();
@@ -156,8 +156,8 @@ TEST(DoubleColumn_Clear)
 template <class C, typename T>
 void BasicColumn_Set(TestContext& test_context, T values[], size_t num_values)
 {
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default());
+    c.create();
 
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
@@ -191,8 +191,8 @@ void BasicColumn_Insert(TestContext& test_context, T values[], size_t num_values
 {
     static_cast<void>(num_values);
 
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default());
+    c.create();
 
     // Insert in empty column
     c.insert(0, values[0]);
@@ -244,18 +244,33 @@ TEST(DoubleColumn_Insert)
 template <class C, typename T>
 void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_values)
 {
-    static_cast<void>(test_context);
-    static_cast<void>(num_values);
-    static_cast<void>(values);
+    C c(Allocator::get_default());
+    c.create();
 
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    CHECK_EQUAL(0.0, bptree_sum(c));
 
-    //    double sum = c.sum();
-    //    CHECK_EQUAL(0, sum);
+    for (size_t i = 0; i < num_values; ++i)
+        c.add(values[i]);
 
-    // todo: add tests for minimum, maximum,
-    // todo !!!
+    auto x = bptree_sum(c);
+    decltype(x) sum{};
+    for (size_t i = 0; i < num_values; i++) {
+        sum += values[i];
+    }
+    CHECK_EQUAL(x, sum);
+
+    size_t ndx;
+    auto max = bptree_maximum(c, &ndx);
+    CHECK_EQUAL(ndx, 3);
+    CHECK_EQUAL(max, values[3]);
+
+    auto min = bptree_minimum(c, &ndx);
+    CHECK_EQUAL(ndx, 4);
+    CHECK_EQUAL(min, values[4]);
+
+    auto avg = bptree_average(c, &ndx);
+    CHECK_EQUAL(ndx, 5);
+    CHECK_EQUAL(avg, sum / num_values);
 
     c.destroy();
 }
@@ -272,8 +287,8 @@ TEST(DoubleColumn_Aggregates)
 template <class C, typename T>
 void BasicColumn_Delete(TestContext& test_context, T values[], size_t num_values)
 {
-    ref_type ref = C::create(Allocator::get_default());
-    C c(Allocator::get_default(), ref);
+    C c(Allocator::get_default());
+    c.create();
 
     for (size_t i = 0; i < num_values; ++i)
         c.add(values[i]);
@@ -331,8 +346,8 @@ TEST(FloatColumn_SwapRows)
 
     // Normal case
     {
-        ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        FloatColumn c(Allocator::get_default());
+        c.create();
 
         c.add(-21.389f);
         c.add(30.221f);
@@ -343,7 +358,7 @@ TEST(FloatColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
         CHECK_EQUAL(c.size(), 4); // size should not change
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
@@ -354,14 +369,14 @@ TEST(FloatColumn_SwapRows)
 
     // First two elements
     {
-        ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        FloatColumn c(Allocator::get_default());
+        c.create();
 
         c.add(30.221f);
         c.add(10.93f);
         c.add(5.0099f);
 
-        c.swap_rows(0, 1);
+        c.swap(0, 1);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
@@ -372,14 +387,14 @@ TEST(FloatColumn_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        FloatColumn c(Allocator::get_default());
+        c.create();
 
         c.add(5.0099f);
         c.add(30.221f);
         c.add(10.93f);
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
@@ -390,14 +405,14 @@ TEST(FloatColumn_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = FloatColumn::create(Allocator::get_default());
-        FloatColumn c(Allocator::get_default(), ref);
+        FloatColumn c(Allocator::get_default());
+        c.create();
 
         c.add(5.0099f);
         c.add(30.221f);
         c.add(10.93f);
 
-        c.swap_rows(2, 1);
+        c.swap(2, 1);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
@@ -413,8 +428,8 @@ TEST(DoubleColumn_SwapRows)
 
     // Normal case
     {
-        ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        DoubleColumn c(Allocator::get_default());
+        c.create();
 
         c.add(-21.389);
         c.add(30.221);
@@ -425,7 +440,7 @@ TEST(DoubleColumn_SwapRows)
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
         CHECK_EQUAL(c.size(), 4); // size should not change
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
@@ -436,14 +451,14 @@ TEST(DoubleColumn_SwapRows)
 
     // First two elements
     {
-        ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        DoubleColumn c(Allocator::get_default());
+        c.create();
 
         c.add(30.221);
         c.add(10.93);
         c.add(5.0099);
 
-        c.swap_rows(0, 1);
+        c.swap(0, 1);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
@@ -454,14 +469,14 @@ TEST(DoubleColumn_SwapRows)
 
     // Last two elements
     {
-        ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        DoubleColumn c(Allocator::get_default());
+        c.create();
 
         c.add(5.0099);
         c.add(30.221);
         c.add(10.93);
 
-        c.swap_rows(1, 2);
+        c.swap(1, 2);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
@@ -472,14 +487,14 @@ TEST(DoubleColumn_SwapRows)
 
     // Indices in wrong order
     {
-        ref_type ref = DoubleColumn::create(Allocator::get_default());
-        DoubleColumn c(Allocator::get_default(), ref);
+        DoubleColumn c(Allocator::get_default());
+        c.create();
 
         c.add(5.0099);
         c.add(30.221);
         c.add(10.93);
 
-        c.swap_rows(2, 1);
+        c.swap(2, 1);
 
         CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
         CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
@@ -492,15 +507,13 @@ TEST(DoubleColumn_SwapRows)
 TEST(DoubleColumn_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_Double, "works");
-    t.add_column(type_Double, "works also");
-    t.add_empty_row();
-    t.set_double(0, 0, 1.1);
-    t.set_double(1, 0, 2.2);
-    t.remove_column(1);
-    t.add_empty_row();
+    auto col_0 = t.add_column(type_Double, "works");
+    auto col_1 = t.add_column(type_Double, "works also");
+    t.create_object().set_all(1.1, 2.2);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
     t.add_column(type_Double, "doesn't work");
-    CHECK_EQUAL(0.0, t.get_double(1, 0));
+    CHECK_EQUAL(0.0, obj.get<Double>(col_0));
 }
 
 // Test for a bug where default values of newly added float/double columns did not obey their nullability
@@ -509,16 +522,16 @@ TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::fal
     constexpr bool nullable_toggle = TEST_TYPE::value;
     Table t;
     t.add_column(type_Int, "unused");
-    t.add_empty_row();
-    t.add_column(type_Double, "d", nullable_toggle);
-    t.add_column(type_Float, "f", nullable_toggle);
-    CHECK(t.is_null(1, 0) == nullable_toggle);
-    CHECK(t.is_null(2, 0) == nullable_toggle);
+    Obj obj = t.create_object();
+    auto col_0 = t.add_column(type_Double, "d", nullable_toggle);
+    auto col_1 = t.add_column(type_Float, "f", nullable_toggle);
+    CHECK(obj.is_null(col_0) == nullable_toggle);
+    CHECK(obj.is_null(col_1) == nullable_toggle);
     if (nullable_toggle) {
-        t.set_null(1, 0);
-        t.set_null(2, 0);
-        CHECK(t.is_null(1, 0));
-        CHECK(t.is_null(2, 0));
+        obj.set_null(col_0);
+        obj.set_null(col_1);
+        CHECK(obj.is_null(col_0));
+        CHECK(obj.is_null(col_1));
     }
 }
 
@@ -526,85 +539,60 @@ TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Float, "works");
-    t.add_column(type_Float, "works also");
-    t.add_empty_row();
-    t.set_float(0, 0, 1.1f);
-    t.set_float(1, 0, 2.2f);
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Float, "doesn't work");
-    CHECK_EQUAL(0.0, t.get_float(1, 0));
+    auto col_1 = t.add_column(type_Float, "works also");
+    t.create_object().set_all(1.1f, 2.2f);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Float, "doesn't work");
+    CHECK_EQUAL(0.0, obj.get<Float>(col_2));
 }
 
 TEST(ColumnInt_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Int, "works");
-    t.add_column(type_Int, "works also");
-    t.add_empty_row();
-    t.set_int(0, 0, 1);
-    t.set_int(1, 0, 2);
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Int, "doesn't work");
-    CHECK_EQUAL(0, t.get_int(1, 0));
+    auto col_1 = t.add_column(type_Int, "works also");
+    t.create_object().set_all(1, 2);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Int, "doesn't work");
+    CHECK_EQUAL(0, obj.get<Int>(col_2));
 }
 
 TEST(ColumnString_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_String, "works");
-    t.add_column(type_String, "works also", false);
-    t.add_empty_row();
-    t.set_string(0, 0, "yellow");
-    t.set_string(1, 0, "very bright");
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_String, "doesn't work");
-    CHECK_EQUAL("", t.get_string(1, 0));
+    auto col_1 = t.add_column(type_String, "works also", false);
+    t.create_object().set_all("yellow", "very bright");
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_String, "doesn't work");
+    CHECK_EQUAL("", obj.get<String>(col_2));
 }
 
 TEST(ColumnBinary_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Binary, "works");
-    t.add_column(type_Binary, "works also");
-    t.add_empty_row();
-    t.set_binary(0, 0, BinaryData("yellow"));
-    t.set_binary(1, 0, BinaryData("very bright"));
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Binary, "doesn't work");
-    CHECK_NOT_EQUAL(BinaryData(), t.get_binary(1, 0));
+    auto col_1 = t.add_column(type_Binary, "works also");
+    t.create_object().set_all(BinaryData("yellow"), BinaryData("very bright"));
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Binary, "doesn't work");
+    CHECK_NOT_EQUAL(BinaryData(), obj.get<Binary>(col_2));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)
 {
     Table t;
     t.add_column(type_Bool, "works");
-    t.add_column(type_Bool, "works also");
-    t.add_empty_row();
-    t.set_bool(0, 0, true);
-    t.set_bool(1, 0, true);
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Bool, "doesn't work");
-    CHECK_EQUAL(false, t.get_bool(1, 0));
+    auto col_1 = t.add_column(type_Bool, "works also");
+    t.create_object().set_all(true, true);
+    t.remove_column(col_1);
+    Obj obj = t.create_object();
+    auto col_2 = t.add_column(type_Bool, "doesn't work");
+    CHECK_EQUAL(false, obj.get<Bool>(col_2));
 }
-
-TEST(ColumnMixed_InitOfEmptyColumn)
-{
-    Table t;
-    t.add_column(type_Mixed, "works");
-    t.add_column(type_Mixed, "works also");
-    t.add_empty_row();
-    t.set_mixed(0, 0, Mixed(1.1));
-    t.set_mixed(1, 0, Mixed(2.2));
-    t.remove_column(1);
-    t.add_empty_row();
-    t.add_column(type_Mixed, "doesn't work");
-    CHECK_EQUAL(0, t.get_mixed(1, 0));
-}
-
 
 #endif // TEST_COLUMN_FLOAT

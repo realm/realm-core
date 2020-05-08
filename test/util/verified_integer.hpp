@@ -23,7 +23,7 @@
 #include <vector>
 
 #include <realm/array.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 
 #include "random.hpp"
 
@@ -43,7 +43,6 @@ public:
     void erase(size_t ndx);
     void clear();
     size_t find_first(int64_t value);
-    void find_all(IntegerColumn& c, int64_t value, size_t start = 0, size_t end = -1);
     size_t size();
     int64_t sum(size_t start = 0, size_t end = -1);
     int64_t maximum(size_t start = 0, size_t end = -1);
@@ -62,10 +61,10 @@ private:
 // Implementation
 
 inline VerifiedInteger::VerifiedInteger(Random& random)
-    : u(IntegerColumn::unattached_root_tag(), Allocator::get_default())
+    : u(Allocator::get_default())
     , m_random(random)
 {
-    u.get_root_array()->create(Array::type_Normal); // Throws
+    u.create();
 }
 
 

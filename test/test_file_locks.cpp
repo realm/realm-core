@@ -175,7 +175,7 @@ TEST(File_NoSpuriousTryLockFailures)
 
 // Same as above, but with busy waiting to increase the chance that try_lock is called simultaneously from
 // all the threads. Busy waiting is very slow in Valgrind and tsan, so don't run it there.
-TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with_tsan))
+TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with_tsan) && TEST_DURATION > 0)
 {
 #if TEST_DURATION < 1
     const size_t num_rounds = 20;

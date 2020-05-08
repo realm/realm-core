@@ -19,9 +19,24 @@
 #include <realm/query_engine.hpp>
 
 #include <realm/query_expression.hpp>
+#include <realm/index_string.hpp>
+#include <realm/db.hpp>
 #include <realm/utilities.hpp>
 
 using namespace realm;
+
+ParentNode::ParentNode(const ParentNode& from)
+    : m_child(from.m_child ? from.m_child->clone() : nullptr)
+    , m_condition_column_name(from.m_condition_column_name)
+    , m_condition_column_key(from.m_condition_column_key)
+    , m_dD(from.m_dD)
+    , m_dT(from.m_dT)
+    , m_probes(from.m_probes)
+    , m_matches(from.m_matches)
+    , m_table(from.m_table)
+{
+}
+
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {
@@ -52,13 +67,23 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
+bool ParentNode::match(ConstObj& obj)
+{
+    auto cb = [this](const Cluster* cluster, size_t row) {
+        set_cluster(cluster);
+        size_t m = find_first(row, row + 1);
+        return m != npos;
+    };
+    return obj.evaluate(cb);
+}
+
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
     if (TAction == act_ReturnFirst) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, ArrayInteger>;
     }
     else if (TAction == act_Count) {
         // For count(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
@@ -67,43 +92,43 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         if (nullable)
             REALM_ASSERT(false);
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Count, ArrayInteger>;
     }
     else if (TAction == act_Sum && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayInteger>;
     }
     else if (TAction == act_Sum && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayFloat>;
     }
     else if (TAction == act_Sum && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Sum, ArrayDouble>;
     }
     else if (TAction == act_Max && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayInteger>;
     }
     else if (TAction == act_Max && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayFloat>;
     }
     else if (TAction == act_Max && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Max, ArrayDouble>;
     }
     else if (TAction == act_Min && col_id == type_Int) {
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayInteger>;
     }
     else if (TAction == act_Min && col_id == type_Float) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, FloatColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayFloat>;
     }
     else if (TAction == act_Min && col_id == type_Double) {
-        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, DoubleColumn>;
+        m_column_action_specializer = &ThisType::column_action_specialization<act_Min, ArrayDouble>;
     }
     else if (TAction == act_FindAll) {
         // For find_all(), the column below is a dummy and the caller sets it to nullptr. Hence, no data is being read
@@ -112,16 +137,16 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
         if (nullable)
             REALM_ASSERT(false);
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_FindAll, ArrayInteger>;
     }
     else if (TAction == act_CallbackIdx) {
         // Future features where for each query match, you want to perform an action that only requires knowlege
         // about the row index, and not the payload there. Examples could be find_all(), however, this code path
         // below is for new features given in a callback method and not yet supported by core.
         if (nullable)
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntNullColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayIntNull>;
         else
-            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, IntegerColumn>;
+            m_column_action_specializer = &ThisType::column_action_specialization<act_CallbackIdx, ArrayInteger>;
     }
     else {
         REALM_ASSERT(false);
@@ -129,7 +154,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 }
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                   SequentialGetterBase* source_column)
+                                   ArrayPayload* source_column)
 {
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -139,6 +164,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
     // data type array to make array call match() directly on each match, like for integers.
 
+    m_state = st;
     size_t local_matches = 0;
 
     size_t r = start - 1;
@@ -178,51 +204,24 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     }
 }
 
-void StringNodeEqualBase::deallocate() noexcept
-{
-    // Must be called after each query execution to free temporary resources used by the execution. Run in
-    // destructor, but also in Init because a user could define a query once and execute it multiple times.
-    clear_leaf_state();
-
-    if (m_index_matches_destroy)
-        m_index_matches->destroy();
-
-    m_index_matches_destroy = false;
-    m_index_matches.reset();
-    m_index_getter.reset();
-}
-
 void StringNodeEqualBase::init()
 {
-    deallocate();
     m_dD = 10.0;
     StringNodeBase::init();
 
-    if (m_column_type == col_type_StringEnum) {
+    if (m_is_string_enum) {
         m_dT = 1.0;
-        m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
     }
-    else if (m_condition_column->has_search_index()) {
+    else if (m_has_search_index) {
         m_dT = 0.0;
     }
     else {
         m_dT = 10.0;
     }
 
-    if (m_condition_column->has_search_index()) {
-        m_index_matches_destroy = false;
-        m_last_start = size_t(-1);
-
+    if (m_has_search_index) {
         // Will set m_index_matches, m_index_matches_destroy, m_results_start and m_results_end
         _search_index_init();
-
-        if (m_index_matches) {
-            m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
-        }
-    }
-    else if (m_column_type != col_type_String) {
-        REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
-        m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
     }
 }
 
@@ -230,60 +229,43 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
 
-    if (m_condition_column->has_search_index()) {
-        // Indexed string column
-        if (!m_index_getter)
-            return not_found; // no matches in the index
-
-        if (m_last_start > start)
-            m_last_indexed = m_results_start;
-        m_last_start = start;
-
-        while (m_last_indexed < m_results_end) {
-            m_index_getter->cache_next(m_last_indexed);
-            size_t f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
-                                                            m_results_end - m_index_getter->m_leaf_start);
-
-            if (f == not_found) {
-                // Not found in this leaf - move on to next
-                m_last_indexed = m_index_getter->m_leaf_end;
+    if (m_has_search_index) {
+        if (start < end) {
+            ObjKey first_key = m_cluster->get_real_key(start);
+            if (first_key < m_last_start_key) {
+                // We are not advancing through the clusters. We basically don't know where we are,
+                // so just start over from the beginning.
+                m_results_ndx = m_results_start;
+                m_actual_key = get_key(m_results_ndx);
             }
-            else if (f >= (m_results_end - m_index_getter->m_leaf_start)) {
-                // Found outside valid range
-                return not_found;
-            }
-            else {
-                size_t found_index = to_size_t(m_index_getter->m_leaf_ptr->get(f));
-                if (found_index >= end)
-                    return not_found;
-                else {
-                    m_last_indexed = f + m_index_getter->m_leaf_start;
-                    return found_index;
+            m_last_start_key = first_key;
+
+            // Check if we can expect to find more keys
+            if (m_results_ndx < m_results_end) {
+                // Check if we should advance to next key to search for
+                while (first_key > m_actual_key) {
+                    m_results_ndx++;
+                    if (m_results_ndx == m_results_end) {
+                        return not_found;
+                    }
+                    m_actual_key = get_key(m_results_ndx);
                 }
+
+                // If actual_key is bigger than last key, it is not in this leaf
+                ObjKey last_key = m_cluster->get_real_key(end - 1);
+                if (m_actual_key > last_key)
+                    return not_found;
+
+                // Now actual_key must be found in leaf keys
+                return m_cluster->lower_bound_key(ObjKey(m_actual_key.value - m_cluster->get_offset()));
             }
         }
-        return not_found;
-    }
-
-    if (m_column_type != col_type_String) {
-        // Enum string column
-        if (m_key_ndx == not_found)
-            return not_found; // not in key set
-
-        for (size_t s = start; s < end; ++s) {
-            m_cse.cache_next(s);
-            s = m_cse.m_leaf_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
-            if (s == not_found)
-                s = m_cse.m_leaf_end - 1;
-            else
-                return s + m_cse.m_leaf_start;
-        }
-
         return not_found;
     }
 
     return _find_first_local(start, end);
 }
+
 
 namespace realm {
 
@@ -292,38 +274,36 @@ void StringNode<Equal>::_search_index_init()
     FindRes fr;
     InternalFindResult res;
 
-    if (m_column_type == col_type_StringEnum) {
-        fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
+    m_last_start_key = ObjKey();
+    m_results_start = 0;
+    if (ParentNode::m_table->get_primary_key_column() == ParentNode::m_condition_column_key) {
+        m_actual_key = ParentNode::m_table.unchecked_ptr()->find_first(ParentNode::m_condition_column_key,
+                                                                       StringData(StringNodeBase::m_value));
+        m_results_end = m_actual_key ? 1 : 0;
     }
     else {
-        fr = static_cast<const StringColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
+        auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
+        fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
-    switch (fr) {
-        case FindRes_single:
-            m_index_matches.reset(
-                new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-            m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
-            m_index_matches->add(res.payload);
-            m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
-            m_results_start = 0;
-            m_results_end = 1;
-            break;
-        case FindRes_column:
-            // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which
-            // simply makes
-            // translate(x) = x. Shouldn't it inherit owner column's allocator?!
-            m_index_matches.reset(new IntegerColumn(m_condition_column->get_alloc(), res.payload)); // Throws
-            m_results_start = res.start_ndx;
-            m_results_end = res.end_ndx;
-
-            // FIXME: handle start and end of find_result!
-            break;
-        case FindRes_not_found:
-            m_index_matches.reset();
-            m_index_getter.reset();
-            break;
+        switch (fr) {
+            case FindRes_single:
+                m_actual_key = ObjKey(res.payload);
+                m_results_end = 1;
+                break;
+            case FindRes_column:
+                m_index_matches.reset(
+                    new IntegerColumn(m_table.unchecked_ptr()->get_alloc(), ref_type(res.payload))); // Throws
+                m_results_start = res.start_ndx;
+                m_results_end = res.end_ndx;
+                m_actual_key = ObjKey(m_index_matches->get(m_results_start));
+                break;
+            case FindRes_not_found:
+                m_index_matches.reset();
+                m_results_end = 0;
+                break;
+        }
     }
+    m_results_ndx = m_results_start;
 }
 
 void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
@@ -334,7 +314,7 @@ void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
     // 2) no search index, combine conditions:      O(N)
     // 3) no search index, conditions not combined: O(N*M)
     // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible choose 2.
-    REALM_ASSERT(m_condition_column == other->m_condition_column);
+    REALM_ASSERT(m_condition_column_key == other->m_condition_column_key);
     REALM_ASSERT(other->m_needles.empty());
     if (m_needles.empty()) {
         m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
@@ -349,90 +329,43 @@ void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
     }
 }
 
-// Requirements of template types:
-// ArrayType must support: size() -> size_t, and get_string(size_t) -> Stringdata
-template <class ArrayType>
-size_t StringNode<Equal>::find_first_in(ArrayType& array, size_t begin, size_t end)
+size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
 {
-    if (m_needles.empty())
-        return not_found;
+    if (m_needles.empty()) {
+        return m_leaf_ptr->find_first(m_value, start, end);
+    }
+    else {
+        size_t n = m_leaf_ptr->size();
+        if (end == npos)
+            end = n;
+        REALM_ASSERT_7(start, <=, n, &&, end, <=, n);
+        REALM_ASSERT_3(start, <=, end);
 
-    size_t n = array.size();
-    if (end == npos)
-        end = n;
-    REALM_ASSERT_7(begin, <=, n, &&, end, <=, n);
-    REALM_ASSERT_3(begin, <=, end);
-
-    const auto not_in_set = m_needles.end();
-    // For a small number of conditions it is faster to cycle through
-    // and check them individually. The threshold depends on how fast
-    // our hashing of StringData is (see `StringData.hash()`). The
-    // number 20 was found empirically when testing small strings
-    // with N==100k
-    if (m_needles.size() < 20) {
-        for (size_t i = begin; i < end; ++i) {
-            StringData element = array.get_string(i);
-            for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                if (*it == element)
+        const auto not_in_set = m_needles.end();
+        // For a small number of conditions it is faster to cycle through
+        // and check them individually. The threshold depends on how fast
+        // our hashing of StringData is (see `StringData.hash()`). The
+        // number 20 was found empirically when testing small strings
+        // with N==100k
+        if (m_needles.size() < 20) {
+            for (size_t i = start; i < end; ++i) {
+                auto element = m_leaf_ptr->get(i);
+                StringData value_2{element.data(), element.size()};
+                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
+                    if (*it == value_2)
+                        return i;
+                }
+            }
+        }
+        else {
+            for (size_t i = start; i < end; ++i) {
+                auto element = m_leaf_ptr->get(i);
+                StringData value_2{element.data(), element.size()};
+                if (m_needles.find(value_2) != not_in_set)
                     return i;
             }
         }
     }
-    else {
-        for (size_t i = begin; i < end; ++i) {
-            StringData element = array.get_string(i);
-            if (m_needles.find(element) != not_in_set)
-                return i;
-        }
-    }
-
-    return not_found;
-}
-
-size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
-{
-    const bool multi_target_search = !m_needles.empty();
-    // Normal string column, with long or short leaf
-    for (size_t s = start; s < end; ++s) {
-        const StringColumn* asc = static_cast<const StringColumn*>(m_condition_column);
-        if (s >= m_leaf_end || s < m_leaf_start) {
-            clear_leaf_state();
-            size_t ndx_in_leaf;
-            m_leaf = asc->get_leaf(s, ndx_in_leaf, m_leaf_type);
-            m_leaf_start = s - ndx_in_leaf;
-            if (m_leaf_type == StringColumn::leaf_type_Small)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayString&>(*m_leaf).size();
-            else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                m_leaf_end = m_leaf_start + static_cast<const ArrayStringLong&>(*m_leaf).size();
-            else
-                m_leaf_end = m_leaf_start + static_cast<const ArrayBigBlobs&>(*m_leaf).size();
-            REALM_ASSERT(m_leaf);
-        }
-        size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-
-        if (multi_target_search) {
-            if (m_leaf_type == StringColumn::leaf_type_Small)
-                s = find_first_in(static_cast<const ArrayString&>(*m_leaf), s - m_leaf_start, end2);
-            else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                s = find_first_in(static_cast<const ArrayStringLong&>(*m_leaf), s - m_leaf_start, end2);
-            else
-                s = find_first_in(static_cast<const ArrayBigBlobs&>(*m_leaf), s - m_leaf_start, end2);
-        }
-        else {
-            if (m_leaf_type == StringColumn::leaf_type_Small)
-                s = static_cast<const ArrayString&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-            else if (m_leaf_type == StringColumn::leaf_type_Medium)
-                s = static_cast<const ArrayStringLong&>(*m_leaf).find_first(m_value, s - m_leaf_start, end2);
-            else
-                s = static_cast<const ArrayBigBlobs&>(*m_leaf).find_first(str_to_bin(m_value), true, s - m_leaf_start,
-                                                                          end2);
-        }
-        if (s == not_found)
-            s = m_leaf_end - 1;
-        else
-            return s + m_leaf_start;
-    }
-
     return not_found;
 }
 
@@ -443,13 +376,11 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
     }
 
     // FIXME: once the parser supports it, print something like "column IN {s1, s2, s3}"
-    REALM_ASSERT(m_condition_column != nullptr);
     std::string desc;
     bool is_first = true;
     for (auto it : m_needles) {
         StringData sd(it.data(), it.size());
-        desc += (is_first ? "" : " or ") +
-                state.describe_column(ParentNode::m_table, m_condition_column->get_column_index()) + " " +
+        desc += (is_first ? "" : " or ") + state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
                 Equal::description() + " " + util::serializer::print_value(sd);
         is_first = false;
     }
@@ -462,24 +393,14 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
 
 void StringNode<EqualIns>::_search_index_init()
 {
-    if (m_column_type == col_type_StringEnum) {
-        REALM_ASSERT_RELEASE(false && "Case insensitive searches in StringEnum columns is not yet implemented.");
-        // FindRes fr;
-        InternalFindResult res;
-        /*fr = */ static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
-    }
-    else {
-        m_index_matches.reset(
-            new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-        m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
-        // m_index_matches->add(res.payload);
-        StringData needle(m_value);
-        m_condition_column->get_search_index()->find_all(*m_index_matches, needle, true);
-    }
-
-    m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
+    auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
     m_results_start = 0;
-    m_results_end = m_index_matches->size();
+    m_results_ndx = 0;
+    m_results_end = m_index_matches.size();
+    if (m_results_start != m_results_end) {
+        m_actual_key = m_index_matches[0];
+    }
 }
 
 size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
@@ -639,7 +560,12 @@ ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 
 void ExpressionNode::table_changed()
 {
-    m_expression->set_base_table(m_table.get());
+    m_expression->set_base_table(m_table);
+}
+
+void ExpressionNode::cluster_changed()
+{
+    m_expression->set_cluster(m_cluster);
 }
 
 void ExpressionNode::init()
@@ -658,9 +584,9 @@ std::string ExpressionNode::describe(util::serializer::SerialisationState& state
     }
 }
 
-void ExpressionNode::verify_column() const
+void ExpressionNode::collect_dependencies(std::vector<TableKey>& tables) const
 {
-    m_expression->verify_column();
+    m_expression->collect_dependencies(tables);
 }
 
 size_t ExpressionNode::find_first_local(size_t start, size_t end)
@@ -668,240 +594,13 @@ size_t ExpressionNode::find_first_local(size_t start, size_t end)
     return m_expression->find_first(start, end);
 }
 
-std::unique_ptr<ParentNode> ExpressionNode::clone(QueryNodeHandoverPatches* patches) const
+std::unique_ptr<ParentNode> ExpressionNode::clone() const
 {
-    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
+    return std::unique_ptr<ParentNode>(new ExpressionNode(*this));
 }
 
-void ExpressionNode::apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group)
-{
-    m_expression->apply_handover_patch(patches, group);
-    ParentNode::apply_handover_patch(patches, group);
-}
-
-ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches)
-: ParentNode(from, patches)
-, m_expression(from.m_expression->clone(patches))
+ExpressionNode::ExpressionNode(const ExpressionNode& from)
+    : ParentNode(from)
+    , m_expression(from.m_expression->clone())
 {
 }
-
-namespace realm {
-template <>
-size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-
-    if (this->m_value.is_null()) {
-        return not_found;
-    }
-    while (start < end) {
-        size_t ret = this->find_first_local_seconds<GreaterEqual>(start, end);
-
-        if (ret == not_found)
-            return not_found;
-
-        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
-        if (!seconds) {
-            start = ret + 1;
-            continue;
-        }
-        if (*seconds > m_value.get_seconds()) {
-            return ret;
-        }
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(ret);
-        if (nanos > m_value.get_nanoseconds()) {
-            return ret;
-        }
-        start = ret + 1;
-    }
-
-    return not_found;
-}
-
-template <>
-size_t TimestampNode<Less>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-
-    if (this->m_value.is_null()) {
-        return not_found;
-    }
-    while (start < end) {
-        size_t ret = this->find_first_local_seconds<LessEqual>(start, end);
-
-        if (ret == not_found)
-            return not_found;
-
-        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
-        if (!seconds) {
-            start = ret + 1;
-            continue;
-        }
-        if (*seconds < m_value.get_seconds()) {
-            return ret;
-        }
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(ret);
-        if (nanos < m_value.get_nanoseconds()) {
-            return ret;
-        }
-        start = ret + 1;
-    }
-
-    return not_found;
-}
-
-template <>
-size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-
-    while (start < end) {
-        size_t ret = this->find_first_local_seconds<GreaterEqual>(start, end);
-
-        if (ret == not_found)
-            return not_found;
-
-        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
-        if (!seconds) { // null equality
-            if (this->m_value.is_null()) {
-                return ret;
-            }
-            start = ret + 1;
-            continue;
-        }
-        if (*seconds > m_value.get_seconds()) {
-            return ret;
-        }
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(ret);
-        if (nanos >= m_value.get_nanoseconds()) {
-            return ret;
-        }
-        start = ret + 1;
-    }
-
-    return not_found;
-}
-
-template <>
-size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-
-    while (start < end) {
-        size_t ret = this->find_first_local_seconds<LessEqual>(start, end);
-
-        if (ret == not_found)
-            return not_found;
-
-        util::Optional<int64_t> seconds = get_seconds_and_cache(ret);
-        if (!seconds) { // null equality
-            if (this->m_value.is_null()) {
-                return ret;
-            }
-            start = ret + 1;
-            continue;
-        }
-        if (*seconds < m_value.get_seconds()) {
-            return ret;
-        }
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(ret);
-        if (nanos <= m_value.get_nanoseconds()) {
-            return ret;
-        }
-        start = ret + 1;
-    }
-
-    return not_found;
-}
-
-template <>
-size_t TimestampNode<Equal>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-
-    if (m_value.is_null()) {
-        if (REALM_UNLIKELY(!m_condition_column_is_nullable)) {
-            return not_found;
-        }
-        return this->find_first_local_seconds<Equal>(start, end);
-    }
-
-    while (start < end) {
-        size_t ret = this->find_first_local_seconds<Equal>(start, end);
-
-        if (ret == not_found)
-            return not_found;
-
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(ret);
-        if (nanos == m_value.get_nanoseconds()) {
-            return ret;
-        }
-        start = ret + 1;
-    }
-
-    return not_found;
-}
-
-template <>
-size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-
-    if (m_value.is_null()) {
-        if (REALM_UNLIKELY(!m_condition_column_is_nullable)) {
-            return not_found;
-        }
-        return this->find_first_local_seconds<NotNull>(start, end);
-    }
-
-    int64_t needle_seconds = m_value.get_seconds();
-    while (start < end) {
-        util::Optional<int64_t> seconds = get_seconds_and_cache(start);
-        // Null value does not match
-        if (! seconds || *seconds != needle_seconds) {
-            return start;
-        }
-        // We now know that neither m_value nor current value is null and that seconds part equals
-        // We are just missing to compare nanoseconds part
-        int32_t nanos = this->get_nanoseconds_and_cache(start);
-        if (nanos != m_value.get_nanoseconds()) {
-            return start;
-        }
-        ++start;
-    }
-
-    return not_found;
-}
-
-template <>
-size_t TimestampNode<NotNull>::find_first_local(size_t start, size_t end)
-{
-    REALM_ASSERT(this->m_table);
-    if (REALM_UNLIKELY(!m_condition_column_is_nullable)) {
-        return start; // all are not null, return first
-    }
-    return this->find_first_local_seconds<NotNull>(start, end);
-}
-
-
-#ifdef _WIN32
-// Explicit instantiation required on some windows builds
-template size_t TimestampNode<Greater>::find_first_local(size_t start, size_t end);
-template size_t TimestampNode<Less>::find_first_local(size_t start, size_t end);
-template size_t TimestampNode<GreaterEqual>::find_first_local(size_t start, size_t end);
-template size_t TimestampNode<LessEqual>::find_first_local(size_t start, size_t end);
-template size_t TimestampNode<Equal>::find_first_local(size_t start, size_t end);
-template size_t TimestampNode<NotEqual>::find_first_local(size_t start, size_t end);
-template size_t TimestampNode<NotNull>::find_first_local(size_t start, size_t end);
-#endif
-} // namespace realm

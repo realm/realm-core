@@ -18,8 +18,17 @@
 
 #include <realm/exceptions.hpp>
 #include <realm/version.hpp>
+#include <realm/util/to_string.hpp>
 
 using namespace realm;
+
+DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string obj_type, std::string prop)
+    : logic_error(util::format("Primary key property '%1.%2' has duplicate values after migration.", obj_type, prop))
+    , m_object_type(obj_type)
+    , m_property(prop)
+{
+}
+
 
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)
@@ -34,6 +43,10 @@ const char* LogicError::message() const noexcept
             return "Table name too long";
         case column_name_too_long:
             return "Column name too long";
+        case column_name_in_use:
+            return "Column name must be unique";
+        case invalid_column_name:
+            return "Column name not found";
         case table_index_out_of_range:
             return "Table index out of range";
         case row_index_out_of_range:
@@ -91,6 +104,8 @@ const char* LogicError::message() const noexcept
             return "Column does not exist";
         case subtable_of_subtable_index:
             return "Search index on a subtable of a subtable is not yet supported";
+        case list_type_mismatch:
+            return "Instantiating a list object not matching column type";
     }
     return "Unknown error";
 }

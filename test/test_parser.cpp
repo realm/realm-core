@@ -52,9 +52,8 @@
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-#include <realm/descriptor.hpp>
+#include <realm.hpp>
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 #include <realm/query_expression.hpp>
@@ -62,6 +61,7 @@
 #include <realm/util/any.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
+#include "test_table_helper.hpp"
 
 #include <chrono>
 #include <string>
@@ -75,6 +75,7 @@ using namespace realm::metrics;
 using namespace realm::test_util;
 using namespace realm::util;
 
+// clang-format off
 static std::vector<std::string> valid_queries = {
     // true/false predicates
     "truepredicate",
@@ -350,6 +351,7 @@ static std::vector<std::string> invalid_queries = {
     "@backlinks.@count > 2",
     "prop@links > 2",
 };
+// clang-format on
 
 TEST(Parser_valid_queries) {
     for (auto& query : valid_queries) {
@@ -395,7 +397,8 @@ TEST(Parser_empty_input)
     std::string table_name = "table";
     TableRef t = g.add_table(table_name);
     t->add_column(type_Int, "int_col");
-    t->add_empty_row(5);
+    std::vector<ObjKey> keys;
+    t->create_objects(5, keys);
 
     // an empty query string is an invalid predicate
     CHECK_THROW_ANY(verify_query(test_context, t, "", 5));
@@ -422,58 +425,58 @@ TEST(Parser_ConstrainedQuery)
     Group g;
     std::string table_name = "table";
     TableRef t = g.add_table(table_name);
-    size_t int_col = t->add_column(type_Int, "age");
-    size_t list_col = t->add_column_link(type_LinkList, "self_list", *t);
-    t->add_empty_row(2);
-    t->set_int(int_col, 1, 1);
+    auto int_col = t->add_column(type_Int, "age");
+    auto list_col = t->add_column_link(type_LinkList, "self_list", *t);
 
-    LinkViewRef list_0 = t->get_linklist(list_col, 0);
-    list_0->add(0);
-    list_0->add(1);
+    Obj obj0 = t->create_object();
+    Obj obj1 = t->create_object();
 
-    TableView tv = t->get_backlink_view(0, t.get(), list_col);
-    Query q(const_cast<const Table&>(*t), &tv);
+    obj1.set(int_col, 1);
+
+    auto list_0 = obj0.get_linklist(list_col);
+    list_0.add(obj0.get_key());
+    list_0.add(obj1.get_key());
+
+    TableView tv = obj0.get_backlink_view(t, list_col);
+    Query q(t, &tv);
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
     CHECK_THROW(q.get_description(), SerialisationError);
 
-    Query q2(const_cast<const Table&>(*t), list_0);
+    Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
     CHECK_THROW(q2.get_description(), SerialisationError);
 }
 
-
 TEST(Parser_basic_serialisation)
 {
     Group g;
     std::string table_name = "person";
     TableRef t = g.add_table(table_name);
-    size_t int_col_ndx = t->add_column(type_Int, "age");
-    size_t str_col_ndx = t->add_column(type_String, "name");
-    size_t double_col_ndx = t->add_column(type_Double, "fees", true);
-    size_t bool_col_ndx = t->add_column(type_Bool, "licensed", true);
-    size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
-    size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
-    t->add_search_index(int_col_ndx);
-    t->add_empty_row(5);
+    auto int_col_key = t->add_column(type_Int, "age");
+    t->add_column(type_String, "name");
+    t->add_column(type_Double, "fees", true);
+    t->add_column(type_Bool, "licensed", true);
+    auto link_col = t->add_column_link(type_Link, "buddy", *t);
+    auto time_col = t->add_column(type_Timestamp, "time", true);
+    t->add_search_index(int_col_key);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<ObjKey> keys;
 
+    t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(int_col_ndx, i, i);
-        t->set_string(str_col_ndx, i, names[i]);
-        t->set_double(double_col_ndx, i, fees[i]);
-        t->set_bool(bool_col_ndx, i, i % 2 == 0);
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i], (i % 2 == 0));
     }
-    t->set_timestamp(time_col_ndx, 0, Timestamp(realm::null()));
-    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 0)); // 2017/12/02 @ 12:47am (UTC)
-    t->set_timestamp(time_col_ndx, 2, Timestamp(1512130073, 505)); // with nanoseconds
-    t->set_timestamp(time_col_ndx, 3, Timestamp(1, 2));
-    t->set_timestamp(time_col_ndx, 4, Timestamp(0, 0));
-    t->set_link(link_col_ndx, 0, 1);
+    t->get_object(keys[0]).set(time_col, Timestamp(realm::null()));
+    t->get_object(keys[1]).set(time_col, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
+    t->get_object(keys[2]).set(time_col, Timestamp(1512130073, 505)); // with nanoseconds
+    t->get_object(keys[3]).set(time_col, Timestamp(1, 2));
+    t->get_object(keys[4]).set(time_col, Timestamp(0, 0));
+    t->get_object(keys[0]).set(link_col, keys[1]);
 
     Query q = t->where();
 
@@ -544,17 +547,19 @@ TEST(Parser_LinksToSameTable)
 {
     Group g;
     TableRef t = g.add_table("class_Person");
-    size_t age_col_ndx = t->add_column(type_Int, "age");
-    size_t name_col_ndx = t->add_column(type_String, "name");
-    size_t link_col_ndx = t->add_column_link(type_Link, "buddy", *t);
+    ColKey age_col = t->add_column(type_Int, "age");
+    ColKey name_col = t->add_column(type_String, "name");
+    ColKey link_col = t->add_column_link(type_Link, "buddy", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    t->add_empty_row(5);
+    std::vector<ObjKey> people_keys;
+    t->create_objects(names.size(), people_keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(age_col_ndx, i, i);
-        t->set_string(name_col_ndx, i, names[i]);
-        t->set_link(link_col_ndx, i, (i + 1) % t->size());
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(age_col, int64_t(i));
+        obj.set(name_col, StringData(names[i]));
+        obj.set(link_col, people_keys[(i + 1) % t->size()]);
     }
-    t->nullify_link(link_col_ndx, 4);
+    t->get_object(people_keys[4]).set_null(link_col);
 
     verify_query(test_context, t, "age > 0", 4);
     verify_query(test_context, t, "buddy.age > 0", 4);
@@ -574,55 +579,62 @@ TEST(Parser_LinksToDifferentTable)
     Group g;
 
     TableRef discounts = g.add_table("class_Discounts");
-    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
-    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+    ColKey discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    ColKey discount_active_col = discounts->add_column(type_Bool, "active");
 
     using discount_t = std::pair<double, bool>;
     std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
-    for (discount_t i : discount_info) {
-        size_t row_ndx = discounts->add_empty_row();
-        discounts->set_double(discount_off_col, row_ndx, i.first);
-        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    std::vector<ObjKey> discount_keys;
+    discounts->create_objects(discount_info.size(), discount_keys);
+    for (size_t i = 0; i < discount_keys.size(); ++i) {
+        Obj obj = discounts->get_object(discount_keys[i]);
+        obj.set(discount_off_col, discount_info[i].first);
+        obj.set(discount_active_col, discount_info[i].second);
     }
 
     TableRef items = g.add_table("class_Items");
-    size_t item_name_col = items->add_column(type_String, "name");
-    size_t item_price_col = items->add_column(type_Double, "price");
-    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
-    for (item_t i : item_info) {
-        size_t row_ndx = items->add_empty_row();
-        items->set_string(item_name_col, row_ndx, i.first);
-        items->set_double(item_price_col, row_ndx, i.second);
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        Obj obj = items->get_object(item_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
     }
-    items->set_link(item_discount_col, 0, 2); // milk -0.50
-    items->set_link(item_discount_col, 2, 1); // pizza -2.5
-    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+    items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
+    items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
+    items->get_object(item_keys[3]).set(item_discount_col, discount_keys[0]); // cereal -3.0 inactive
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
-    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
-    t->add_empty_row(3);
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col_ndx, i, i);
-    }
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
 
-    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    list_0->add(3);
+    Obj person0 = t->create_object();
+    Obj person1 = t->create_object();
+    Obj person2 = t->create_object();
+    person0.set(id_col, int64_t(0));
+    person1.set(id_col, int64_t(1));
+    person2.set(id_col, int64_t(2));
 
-    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    LnkLst list_0 = person0.get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
+    list_0.add(item_keys[3]);
+
+    LnkLst list_1 = person1.get_linklist(items_col);
     for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
+        list_1.add(item_keys[0]);
     }
 
-    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
-    list_2->add(2);
-    list_2->add(2);
-    list_2->add(3);
+    LnkLst list_2 = person2.get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[3]);
 
     verify_query(test_context, t, "items.@count > 2", 3); // how many people bought more than two items?
     verify_query(test_context, t, "items.price > 3.0", 3); // how many people buy items over $3.0?
@@ -660,16 +672,18 @@ TEST(Parser_StringOperations)
 {
     Group g;
     TableRef t = g.add_table("person");
-    size_t name_col_ndx = t->add_column(type_String, "name", true);
-    size_t link_col_ndx = t->add_column_link(type_Link, "father", *t);
+    ColKey name_col = t->add_column(type_String, "name", true);
+    ColKey link_col = t->add_column_link(type_Link, "father", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
-    t->add_empty_row(5);
+    std::vector<ObjKey> people_keys;
+    t->create_objects(names.size(), people_keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->set_string(name_col_ndx, i, names[i]);
-        t->set_link(link_col_ndx, i, (i + 1) % t->size());
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(name_col, StringData(names[i]));
+        obj.set(link_col, people_keys[(i + 1) % people_keys.size()]);
     }
-    t->add_empty_row(); // null
-    t->nullify_link(link_col_ndx, 4);
+    t->create_object(); // null
+    t->get_object(people_keys[4]).set_null(link_col);
 
     verify_query(test_context, t, "name == 'Bob'", 1);
     verify_query(test_context, t, "father.name == 'Bob'", 1);
@@ -737,26 +751,27 @@ TEST(Parser_Timestamps)
 {
     Group g;
     TableRef t = g.add_table("person");
-    size_t birthday_col_ndx = t->add_column(type_Timestamp, "birthday");           // disallow null
-    size_t internal_col_ndx = t->add_column(type_Timestamp, "T399", true);         // allow null
-    size_t readable_col_ndx = t->add_column(type_Timestamp, "T2017-12-04", true);  // allow null
-    size_t link_col_ndx = t->add_column_link(type_Link, "linked", *t);
-    t->add_empty_row(5);
+    ColKey birthday_col = t->add_column(type_Timestamp, "birthday");          // disallow null
+    ColKey internal_col = t->add_column(type_Timestamp, "T399", true);        // allow null
+    ColKey readable_col = t->add_column(type_Timestamp, "T2017-12-04", true); // allow null
+    ColKey link_col = t->add_column_link(type_Link, "linked", *t);
+    std::vector<ObjKey> keys;
+    t->create_objects(5, keys);
 
-    t->set_timestamp(birthday_col_ndx, 0, Timestamp(-1, -1)); // before epoch by 1 second and one nanosecond
-    t->set_timestamp(birthday_col_ndx, 1, Timestamp(0, -1)); // before epoch by one nanosecond
+    t->get_object(keys[0]).set(birthday_col, Timestamp(-1, -1)); // before epoch by 1 second and one nanosecond
+    t->get_object(keys[1]).set(birthday_col, Timestamp(0, -1));  // before epoch by one nanosecond
 
-    t->set_timestamp(internal_col_ndx, 0, Timestamp(realm::null()));
-    t->set_timestamp(internal_col_ndx, 1, Timestamp(1512130073, 0)); // 2017/12/02 @ 12:47am (UTC)
-    t->set_timestamp(internal_col_ndx, 2, Timestamp(1512130073, 505)); // with nanoseconds
-    t->set_timestamp(internal_col_ndx, 3, Timestamp(1, 2));
-    t->set_timestamp(internal_col_ndx, 4, Timestamp(0, 0));
+    t->get_object(keys[0]).set(internal_col, Timestamp(realm::null()));
+    t->get_object(keys[1]).set(internal_col, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
+    t->get_object(keys[2]).set(internal_col, Timestamp(1512130073, 505)); // with nanoseconds
+    t->get_object(keys[3]).set(internal_col, Timestamp(1, 2));
+    t->get_object(keys[4]).set(internal_col, Timestamp(0, 0));
 
-    t->set_timestamp(readable_col_ndx, 0, Timestamp(1512130073, 0));
-    t->set_timestamp(readable_col_ndx, 1, Timestamp(1512130073, 505));
+    t->get_object(keys[0]).set(readable_col, Timestamp(1512130073, 0));
+    t->get_object(keys[1]).set(readable_col, Timestamp(1512130073, 505));
 
-    t->set_link(link_col_ndx, 0, 1);
-    t->set_link(link_col_ndx, 2, 0);
+    t->get_object(keys[0]).set(link_col, keys[1]);
+    t->get_object(keys[2]).set(link_col, keys[0]);
 
     Query q = t->where();
     auto verify_with_format = [&](const char* separator) {
@@ -839,26 +854,26 @@ TEST(Parser_NullableBinaries)
     Group g;
     TableRef items = g.add_table("item");
     TableRef people = g.add_table("person");
-    size_t binary_col_ndx = items->add_column(type_Binary, "data");
-    size_t nullable_binary_col_ndx = items->add_column(type_Binary, "nullable_data", true);
-    items->add_empty_row(5);
+    ColKey binary_col = items->add_column(type_Binary, "data");
+    ColKey nullable_binary_col = items->add_column(type_Binary, "nullable_data", true);
+    std::vector<ObjKey> item_keys;
+    items->create_objects(5, item_keys);
     BinaryData bd0("knife", 5);
-    items->set_binary(binary_col_ndx, 0, bd0);
-    items->set_binary(nullable_binary_col_ndx, 0, bd0);
+    items->get_object(item_keys[0]).set(binary_col, bd0);
+    items->get_object(item_keys[0]).set(nullable_binary_col, bd0);
     BinaryData bd1("plate", 5);
-    items->set_binary(binary_col_ndx, 1, bd1);
-    items->set_binary(nullable_binary_col_ndx, 1, bd1);
+    items->get_object(item_keys[1]).set(binary_col, bd1);
+    items->get_object(item_keys[1]).set(nullable_binary_col, bd1);
     BinaryData bd2("fork", 4);
-    items->set_binary(binary_col_ndx, 2, bd2);
-    items->set_binary(nullable_binary_col_ndx, 2, bd2);
+    items->get_object(item_keys[2]).set(binary_col, bd2);
+    items->get_object(item_keys[2]).set(nullable_binary_col, bd2);
 
-    size_t fav_item_col_ndx = people->add_column_link(type_Link, "fav_item", *items);
-    people->add_empty_row(5);
-    people->set_link(fav_item_col_ndx, 0, 0);
-    people->set_link(fav_item_col_ndx, 1, 1);
-    people->set_link(fav_item_col_ndx, 2, 2);
-    people->set_link(fav_item_col_ndx, 3, 3);
-    people->set_link(fav_item_col_ndx, 4, 4);
+    ColKey fav_item_col = people->add_column_link(type_Link, "fav_item", *items);
+    std::vector<ObjKey> people_keys;
+    people->create_objects(5, people_keys);
+    for (size_t i = 0; i < people_keys.size(); ++i) {
+        people->get_object(people_keys[i]).set(fav_item_col, item_keys[i]);
+    }
 
     // direct checks
     verify_query(test_context, items, "data == NULL", 0);
@@ -925,7 +940,9 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, people, "fav_item.data == fav_item.data", 5);
     verify_query(test_context, people, "fav_item.nullable_data == fav_item.nullable_data", 5);
 
-    verify_query(test_context, items, "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'", 1);
+    verify_query(test_context, items,
+                 "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'",
+                 1);
 }
 
 
@@ -933,23 +950,25 @@ TEST(Parser_OverColumnIndexChanges)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t first_col_ndx = table->add_column(type_Int, "to_remove");
-    size_t int_col_ndx = table->add_column(type_Int, "ints");
-    size_t double_col_ndx = table->add_column(type_Double, "doubles");
-    size_t string_col_ndx = table->add_column(type_String, "strings");
-    table->add_empty_row(3);
-    for (size_t i = 0; i < table->size(); ++i) {
-        table->set_int(int_col_ndx, i, i);
-        table->set_double(double_col_ndx, i, double(i));
+    ColKey first_col = table->add_column(type_Int, "to_remove");
+    ColKey int_col = table->add_column(type_Int, "ints");
+    ColKey double_col = table->add_column(type_Double, "doubles");
+    ColKey string_col = table->add_column(type_String, "strings");
+    std::vector<ObjKey> keys;
+    table->create_objects(3, keys);
+    for (size_t i = 0; i < keys.size(); ++i) {
+        Obj obj = table->get_object(keys[i]);
+        obj.set(int_col, int64_t(i));
+        obj.set(double_col, double(i));
         std::string str(i, 'a');
-        table->set_string(string_col_ndx, i, StringData(str));
+        obj.set(string_col, StringData(str));
     }
 
     std::string ints_before = verify_query(test_context, table, "ints >= 1", 2).get_description();
     std::string doubles_before = verify_query(test_context, table, "doubles >= 1", 2).get_description();
     std::string strings_before = verify_query(test_context, table, "strings.@count >= 1", 2).get_description();
 
-    table->remove_column(first_col_ndx);
+    table->remove_column(first_col);
 
     std::string ints_after = verify_query(test_context, table, "ints >= 1", 2).get_description();
     std::string doubles_after = verify_query(test_context, table, "doubles >= 1", 2).get_description();
@@ -965,20 +984,22 @@ TEST(Parser_TwoColumnExpressionBasics)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
-    size_t double_col_ndx = table->add_column(type_Double, "doubles");
-    size_t string_col_ndx = table->add_column(type_String, "strings");
-    size_t link_col_ndx = table->add_column_link(type_Link, "link", *table);
-    table->add_empty_row(3);
-    for (size_t i = 0; i < table->size(); ++i) {
-        table->set_int(int_col_ndx, i, i);
-        table->set_double(double_col_ndx, i, double(i));
+    ColKey int_col = table->add_column(type_Int, "ints", true);
+    ColKey double_col = table->add_column(type_Double, "doubles");
+    ColKey string_col = table->add_column(type_String, "strings");
+    ColKey link_col = table->add_column_link(type_Link, "link", *table);
+    std::vector<ObjKey> keys;
+    table->create_objects(3, keys);
+    for (size_t i = 0; i < keys.size(); ++i) {
+        Obj obj = table->get_object(keys[i]);
+        obj.set(int_col, int64_t(i));
+        obj.set(double_col, double(i));
         std::string str(i, 'a');
-        table->set_string(string_col_ndx, i, StringData(str));
+        obj.set(string_col, StringData(str));
     }
-    table->set_link(link_col_ndx, 1, 0);
+    table->get_object(keys[1]).set(link_col, keys[0]);
 
-    Query q = table->where().and_query(table->column<Int>(int_col_ndx) == table->column<String>(string_col_ndx).size());
+    Query q = table->where().and_query(table->column<Int>(int_col) == table->column<String>(string_col).size());
     CHECK_EQUAL(q.count(), 3);
     std::string desc = q.get_description();
 
@@ -999,66 +1020,77 @@ TEST(Parser_TwoColumnExpressionBasics)
 
 }
 
+
 TEST(Parser_TwoColumnAggregates)
 {
     Group g;
 
     TableRef discounts = g.add_table("class_Discounts");
-    size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
-    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
-    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+    ColKey discount_name_col = discounts->add_column(type_String, "promotion", true);
+    ColKey discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    ColKey discount_active_col = discounts->add_column(type_Bool, "active");
 
     using discount_t = std::pair<double, bool>;
     std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
-    for (discount_t i : discount_info) {
-        size_t row_ndx = discounts->add_empty_row();
-        discounts->set_double(discount_off_col, row_ndx, i.first);
-        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    std::vector<ObjKey> discount_keys;
+    discounts->create_objects(discount_info.size(), discount_keys);
+    for (size_t i = 0; i < discount_keys.size(); ++i) {
+        Obj obj = discounts->get_object(discount_keys[i]);
+        obj.set(discount_off_col, discount_info[i].first);
+        obj.set(discount_active_col, discount_info[i].second);
     }
-    discounts->set_string(discount_name_col, 0, "back to school");
-    discounts->set_string(discount_name_col, 1, "pizza lunch special");
-    discounts->set_string(discount_name_col, 2, "manager's special");
+    discounts->get_object(discount_keys[0]).set(discount_name_col, StringData("back to school"));
+    discounts->get_object(discount_keys[1]).set(discount_name_col, StringData("pizza lunch special"));
+    discounts->get_object(discount_keys[2]).set(discount_name_col, StringData("manager's special"));
 
     TableRef items = g.add_table("class_Items");
-    size_t item_name_col = items->add_column(type_String, "name");
-    size_t item_price_col = items->add_column(type_Double, "price");
-    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
-    for (item_t i : item_info) {
-        size_t row_ndx = items->add_empty_row();
-        items->set_string(item_name_col, row_ndx, i.first);
-        items->set_double(item_price_col, row_ndx, i.second);
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        Obj obj = items->get_object(item_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
     }
-    items->set_link(item_discount_col, 0, 2); // milk -0.50
-    items->set_link(item_discount_col, 2, 1); // pizza -2.5
-    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
+    items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
+    items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
+    items->get_object(item_keys[3]).set(item_discount_col, discount_keys[0]); // cereal -3.0 inactive
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
-    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
-    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
-    t->add_empty_row(3);
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col_ndx, i, i);
-        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
-    }
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
 
-    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    list_0->add(3);
+    Obj person0 = t->create_object();
+    Obj person1 = t->create_object();
+    Obj person2 = t->create_object();
 
-    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
+    person0.set(id_col, int64_t(0));
+    person0.set(account_col, double(10.0));
+    person1.set(id_col, int64_t(1));
+    person1.set(account_col, double(20.0));
+    person2.set(id_col, int64_t(2));
+    person2.set(account_col, double(30.0));
+
+    LnkLst list_0 = person0.get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
+    list_0.add(item_keys[3]);
+
+    LnkLst list_1 = person1.get_linklist(items_col);
     for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
+        list_1.add(item_keys[0]);
     }
 
-    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
-    list_2->add(2);
-    list_2->add(2);
-    list_2->add(3);
+    LnkLst list_2 = person2.get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[3]);
 
     // int vs linklist count/size
     verify_query(test_context, t, "customer_id < items.@count", 3);
@@ -1140,56 +1172,67 @@ TEST(Parser_substitution)
 {
     Group g;
     TableRef t = g.add_table("person");
-    size_t int_col_ndx = t->add_column(type_Int, "age");
-    size_t str_col_ndx = t->add_column(type_String, "name");
-    size_t double_col_ndx = t->add_column(type_Double, "fees");
-    size_t bool_col_ndx = t->add_column(type_Bool, "paid", true);
-    size_t time_col_ndx = t->add_column(type_Timestamp, "time", true);
-    size_t binary_col_ndx = t->add_column(type_Binary, "binary", true);
-    size_t float_col_ndx = t->add_column(type_Float, "floats", true);
-    size_t link_col_ndx = t->add_column_link(type_Link, "links", *t);
-    size_t list_col_ndx = t->add_column_link(type_LinkList, "list", *t);
-    t->add_empty_row(5);
+    ColKey int_col = t->add_column(type_Int, "age");
+    ColKey str_col = t->add_column(type_String, "name");
+    ColKey double_col = t->add_column(type_Double, "fees");
+    ColKey bool_col = t->add_column(type_Bool, "paid", true);
+    ColKey time_col = t->add_column(type_Timestamp, "time", true);
+    ColKey binary_col = t->add_column(type_Binary, "binary", true);
+    ColKey float_col = t->add_column(type_Float, "floats", true);
+    ColKey nullable_double_col = t->add_column(type_Float, "nuldouble", true);
+    ColKey link_col = t->add_column_link(type_Link, "links", *t);
+    ColKey list_col = t->add_column_link(type_LinkList, "list", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<ObjKey> obj_keys;
+    t->create_objects(names.size(), obj_keys);
 
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(int_col_ndx, i, i);
-        t->set_string(str_col_ndx, i, names[i]);
-        t->set_double(double_col_ndx, i, fees[i]);
+    for (size_t i = 0; i < obj_keys.size(); ++i) {
+        Obj obj = t->get_object(obj_keys[i]);
+        obj.set(int_col, int64_t(i));
+        obj.set(str_col, StringData(names[i]));
+        obj.set(double_col, fees[i]);
     }
-    t->set_bool(bool_col_ndx, 0, true);
-    t->set_bool(bool_col_ndx, 1, false);
-    t->set_timestamp(time_col_ndx, 1, Timestamp(1512130073, 505)); // 2017/12/02 @ 12:47am (UTC) + 505 nanoseconds
+    t->get_object(obj_keys[0]).set(bool_col, true);
+    t->get_object(obj_keys[1]).set(bool_col, false);
+    t->get_object(obj_keys[1])
+        .set(time_col, Timestamp(1512130073, 505)); // 2017/12/02 @ 12:47am (UTC) + 505 nanoseconds
     BinaryData bd0("oe");
     BinaryData bd1("eo");
-    t->set_binary(binary_col_ndx, 0, bd0);
-    t->set_binary(binary_col_ndx, 1, bd1);
-    t->set_float(float_col_ndx, 0, 2.33f);
-    t->set_float(float_col_ndx, 1, 2.22f);
-    t->set_link(link_col_ndx, 0, 1);
-    t->set_link(link_col_ndx, 1, 0);
-    LinkViewRef list_0 = t->get_linklist(list_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    LinkViewRef list_1 = t->get_linklist(list_col_ndx, 1);
-    list_1->add(0);
+    t->get_object(obj_keys[0]).set(binary_col, bd0);
+    t->get_object(obj_keys[1]).set(binary_col, bd1);
+    t->get_object(obj_keys[0]).set(float_col, 2.33f);
+    t->get_object(obj_keys[1]).set(float_col, 2.22f);
+    t->get_object(obj_keys[0]).set(nullable_double_col, 2.33f);
+    t->get_object(obj_keys[1]).set(nullable_double_col, 2.22f);
+    t->get_object(obj_keys[0]).set(link_col, obj_keys[1]);
+    t->get_object(obj_keys[1]).set(link_col, obj_keys[0]);
+    LnkLst list_0 = t->get_object(obj_keys[0]).get_linklist(list_col);
+    list_0.add(obj_keys[0]);
+    list_0.add(obj_keys[1]);
+    list_0.add(obj_keys[2]);
+    LnkLst list_1 = t->get_object(obj_keys[1]).get_linklist(list_col);
+    list_1.add(obj_keys[0]);
 
-    util::Any args [] = { Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true),
-                            Timestamp(1512130073, 505), bd0, Float(2.33), Int(1), Int(3), Int(4) };
-    size_t num_args = 11;
+    util::Any args[] = {Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
+                        bd0,    Float(2.33),  Int(1),       Int(3),        Int(4),     Bool(false)};
+    size_t num_args = 12;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
     verify_query_sub(test_context, t, "name CONTAINS[c] $2", args, num_args, 2);
     verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "paid != $3", args, num_args, 2);
     verify_query_sub(test_context, t, "paid == $4", args, num_args, 1);
+    verify_query_sub(test_context, t, "paid != $4", args, num_args, 4);
+    verify_query_sub(test_context, t, "paid = $11", args, num_args, 1);
     verify_query_sub(test_context, t, "time == $5", args, num_args, 1);
     verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
     verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);
     verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "floats == $7", args, num_args, 1);
     verify_query_sub(test_context, t, "floats == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "nuldouble == $7", args, num_args, 1);
+    verify_query_sub(test_context, t, "nuldouble == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
 
     // substitutions through collection aggregates is a different code path
@@ -1290,8 +1333,8 @@ TEST(Parser_string_binary_encoding)
 {
     Group g;
     TableRef t = g.add_table("person");
-    size_t str_col_ndx = t->add_column(type_String, "string_col", true);
-    size_t bin_col_ndx = t->add_column(type_Binary, "binary_col", true);
+    ColKey str_col = t->add_column(type_String, "string_col", true);
+    ColKey bin_col = t->add_column(type_Binary, "binary_col", true);
 
     std::vector<std::string> test_strings = {
         // Credit of the following list to https://github.com/minimaxir/big-list-of-naughty-strings (MIT)
@@ -1389,7 +1432,7 @@ TEST(Parser_string_binary_encoding)
         "<foo val=`bar' />"
     };
 
-    t->add_empty_row(); // nulls
+    t->create_object(); // nulls
     // add a single char of each value
     for (size_t i = 0; i < 256; ++i) {
         char c = static_cast<char>(i);
@@ -1401,14 +1444,20 @@ TEST(Parser_string_binary_encoding)
     for (const std::string& buff : test_strings) {
         StringData sd(buff);
         BinaryData bd(buff);
-        size_t row_ndx = t->add_empty_row();
-        t->set_string(str_col_ndx, row_ndx, sd);
-        t->set_binary(bin_col_ndx, row_ndx, bd);
+        Obj obj = t->create_object();
+        obj.set(str_col, sd);
+        obj.set(bin_col, bd);
     }
 
     struct TestValues {
-        TestValues(size_t processed, bool replace) : num_processed(processed), should_be_replaced(replace) {}
-        TestValues() {}
+        TestValues(size_t processed, bool replace)
+            : num_processed(processed)
+            , should_be_replaced(replace)
+        {
+        }
+        TestValues()
+        {
+        }
         size_t num_processed = 0;
         bool should_be_replaced = false;
     };
@@ -1430,8 +1479,8 @@ TEST(Parser_string_binary_encoding)
 
     for (const std::string& buff : test_strings) {
         size_t num_results = 1;
-        Query qstr = t->where().equal(str_col_ndx, StringData(buff), true);
-        Query qbin = t->where().equal(bin_col_ndx, BinaryData(buff));
+        Query qstr = t->where().equal(str_col, StringData(buff), true);
+        Query qbin = t->where().equal(bin_col, BinaryData(buff));
         CHECK_EQUAL(qstr.count(), num_results);
         CHECK_EQUAL(qbin.count(), num_results);
         std::string string_description = qstr.get_description();
@@ -1445,29 +1494,28 @@ TEST(Parser_string_binary_encoding)
 
                 // std::cout << "string: '" << it->first << "' described: " << string_description << std::endl;
                 if (!it->second.should_be_replaced) {
-                    bool validate = string_description.find(base64_prefix) == std::string::npos
-                        && string_description.find(base64_suffix) == std::string::npos
-                        && binary_description.find(base64_prefix) == std::string::npos
-                        && binary_description.find(base64_suffix) == std::string::npos
-                        && string_description.find(it->first) != std::string::npos
-                        && binary_description.find(it->first) != std::string::npos;
+                    bool validate = string_description.find(base64_prefix) == std::string::npos &&
+                                    string_description.find(base64_suffix) == std::string::npos &&
+                                    binary_description.find(base64_prefix) == std::string::npos &&
+                                    binary_description.find(base64_suffix) == std::string::npos &&
+                                    string_description.find(it->first) != std::string::npos &&
+                                    binary_description.find(it->first) != std::string::npos;
                     CHECK(validate);
                     if (!validate) {
                         std::stringstream ss;
-                        ss << "string should not be replaced: '" << it->first << "' described: " << string_description;
+                        ss << "string should not be replaced: '" << it->first
+                           << "' described: " << string_description;
                         CHECK_EQUAL(ss.str(), "");
                     }
-
-                } else {
+                }
+                else {
                     size_t str_b64_pre_pos = string_description.find(base64_prefix);
                     size_t str_b64_suf_pos = string_description.find(base64_suffix);
                     size_t bin_b64_pre_pos = binary_description.find(base64_prefix);
                     size_t bin_b64_suf_pos = binary_description.find(base64_suffix);
 
-                    bool validate = str_b64_pre_pos != std::string::npos
-                        && str_b64_suf_pos != std::string::npos
-                        && bin_b64_pre_pos != std::string::npos
-                        && bin_b64_suf_pos != std::string::npos;
+                    bool validate = str_b64_pre_pos != std::string::npos && str_b64_suf_pos != std::string::npos &&
+                                    bin_b64_pre_pos != std::string::npos && bin_b64_suf_pos != std::string::npos;
                     CHECK(validate);
 
                     size_t contents_str = string_description.find(it->first, str_b64_pre_pos + base64_prefix.size());
@@ -1507,54 +1555,62 @@ TEST(Parser_string_binary_encoding)
     }
 }
 
+
 TEST(Parser_collection_aggregates)
 {
     Group g;
     TableRef people = g.add_table("class_Person");
     TableRef courses = g.add_table("class_Course");
-    size_t title_col_ndx = courses->add_column(type_String, "title");
-    size_t credits_col_ndx = courses->add_column(type_Double, "credits");
-    size_t hours_col_ndx = courses->add_column(type_Int, "hours_required");
-    size_t fail_col_ndx = courses->add_column(type_Float, "failure_percentage");
-    size_t int_col_ndx = people->add_column(type_Int, "age");
-    size_t str_col_ndx = people->add_column(type_String, "name");
-    size_t courses_col_ndx = people->add_column_link(type_LinkList, "courses_taken", *courses);
-    size_t binary_col_ndx = people->add_column(type_Binary, "hash");
-    using info_t = std::pair<std::string, size_t>;
+    auto title_col = courses->add_column(type_String, "title");
+    auto credits_col = courses->add_column(type_Double, "credits");
+    auto hours_col = courses->add_column(type_Int, "hours_required");
+    auto fail_col = courses->add_column(type_Float, "failure_percentage");
+    auto int_col = people->add_column(type_Int, "age");
+    auto str_col = people->add_column(type_String, "name");
+    auto courses_col = people->add_column_link(type_LinkList, "courses_taken", *courses);
+    auto binary_col = people->add_column(type_Binary, "hash");
+    using info_t = std::pair<std::string, int64_t>;
     std::vector<info_t> person_info
         = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
+    size_t j = 0;
     for (info_t i : person_info) {
-        size_t row_ndx = people->add_empty_row();
-        people->set_string(str_col_ndx, row_ndx, i.first);
-        people->set_int(int_col_ndx, row_ndx, i.second);
-        std::string hash(row_ndx, 'a'); // a repeated i times
+        Obj obj = people->create_object();
+        obj.set(str_col, StringData(i.first));
+        obj.set(int_col, i.second);
+        std::string hash(j++, 'a'); // a repeated j times
         BinaryData payload(hash);
-        people->set_binary(binary_col_ndx, row_ndx, payload);
+        obj.set(binary_col, payload);
     }
-    using cinfo = std::tuple<std::string, double, size_t, float>;
+    using cinfo = std::tuple<std::string, double, int64_t, float>;
     std::vector<cinfo> course_info
             = { cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f}, cinfo{"Chemistry", 4.0, 41, 0.40f},
             cinfo{"English", 3.5, 40, 0.07f}, cinfo{"Physics", 4.5, 42, 0.42f} };
+    std::vector<ObjKey> course_keys;
     for (cinfo course : course_info) {
-        size_t row_ndx = courses->add_empty_row();
-        courses->set_string(title_col_ndx, row_ndx, std::get<0>(course));
-        courses->set_double(credits_col_ndx, row_ndx, std::get<1>(course));
-        courses->set_int(hours_col_ndx, row_ndx, std::get<2>(course));
-        courses->set_float(fail_col_ndx, row_ndx, std::get<3>(course));
+        Obj obj = courses->create_object();
+        course_keys.push_back(obj.get_key());
+        obj.set(title_col, StringData(std::get<0>(course)));
+        obj.set(credits_col, std::get<1>(course));
+        obj.set(hours_col, std::get<2>(course));
+        obj.set(fail_col, std::get<3>(course));
     }
-    LinkViewRef billy_courses = people->get_linklist(courses_col_ndx, 0);
-    billy_courses->add(0);
-    billy_courses->add(1);
-    billy_courses->add(4);
-    LinkViewRef bob_courses = people->get_linklist(courses_col_ndx, 1);
-    bob_courses->add(0);
-    bob_courses->add(1);
-    bob_courses->add(1);
-    LinkViewRef joe_courses = people->get_linklist(courses_col_ndx, 2);
-    joe_courses->add(3);
-    LinkViewRef jane_courses = people->get_linklist(courses_col_ndx, 3);
-    jane_courses->add(2);
-    jane_courses->add(4);
+    auto it = people->begin();
+    LnkLstPtr billy_courses = it->get_linklist_ptr(courses_col);
+    billy_courses->add(course_keys[0]);
+    billy_courses->add(course_keys[1]);
+    billy_courses->add(course_keys[4]);
+    ++it;
+    LnkLstPtr bob_courses = it->get_linklist_ptr(courses_col);
+    bob_courses->add(course_keys[0]);
+    bob_courses->add(course_keys[1]);
+    bob_courses->add(course_keys[1]);
+    ++it;
+    LnkLstPtr joe_courses = it->get_linklist_ptr(courses_col);
+    joe_courses->add(course_keys[3]);
+    ++it;
+    LnkLstPtr jane_courses = it->get_linklist_ptr(courses_col);
+    jane_courses->add(course_keys[2]);
+    jane_courses->add(course_keys[4]);
 
     Query q = people->where();
 
@@ -1628,6 +1684,71 @@ TEST(Parser_collection_aggregates)
     CHECK_THROW_ANY(verify_query(test_context, courses, "failure_percentage.@size <= 2", 0));
 }
 
+TEST(Parser_NegativeAgg)
+{
+    Group g;
+
+    TableRef items = g.add_table("class_Items");
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_price_float_col = items->add_column(type_Float, "price_float");
+    using item_t = std::pair<std::string, double>;
+    std::vector<item_t> item_info = {{"milk", -5.5}, {"oranges", -4.0}, {"pizza", -9.5}, {"cereal", -6.5}};
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        Obj obj = items->get_object(item_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
+        obj.set(item_price_float_col, float(item_info[i].second));
+    }
+
+    TableRef t = g.add_table("class_Person");
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
+
+    Obj person0 = t->create_object();
+    Obj person1 = t->create_object();
+    Obj person2 = t->create_object();
+
+    person0.set(id_col, int64_t(0));
+    person0.set(account_col, double(10.0));
+    person0.set(account_float_col, float(10.0));
+    person1.set(id_col, int64_t(1));
+    person1.set(account_col, double(20.0));
+    person1.set(account_float_col, float(20.0));
+    person2.set(id_col, int64_t(2));
+    person2.set(account_col, double(30.0));
+    person2.set(account_float_col, float(30.0));
+
+    LnkLst list_0 = person0.get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
+    list_0.add(item_keys[3]);
+
+    LnkLst list_1 = person1.get_linklist(items_col);
+    for (size_t i = 0; i < 10; ++i) {
+        list_1.add(item_keys[0]);
+    }
+
+    LnkLst list_2 = person2.get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[3]);
+
+    verify_query(test_context, t, "items.@min.price == -9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@max.price == -4.0", 1);   // person0
+    verify_query(test_context, t, "items.@sum.price == -25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@avg.price == -6.375", 1); // person0
+
+    verify_query(test_context, t, "items.@min.price_float == -9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@max.price_float == -4.0", 1);   // person0
+    verify_query(test_context, t, "items.@sum.price_float == -25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@avg.price_float == -6.375", 1); // person0
+}
 
 TEST(Parser_SortAndDistinctSerialisation)
 {
@@ -1635,31 +1756,32 @@ TEST(Parser_SortAndDistinctSerialisation)
     TableRef people = g.add_table("person");
     TableRef accounts = g.add_table("account");
 
-    size_t name_col = people->add_column(type_String, "name");
-    size_t age_col = people->add_column(type_Int, "age");
-    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+    ColKey name_col = people->add_column(type_String, "name");
+    ColKey age_col = people->add_column(type_Int, "age");
+    ColKey account_col = people->add_column_link(type_Link, "account", *accounts);
 
-    size_t balance_col = accounts->add_column(type_Double, "balance");
-    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+    ColKey balance_col = accounts->add_column(type_Double, "balance");
+    ColKey transaction_col = accounts->add_column(type_Int, "num_transactions");
 
-    accounts->add_empty_row(3);
-    accounts->set_double(balance_col, 0, 50.55);
-    accounts->set_int(transaction_col, 0, 2);
-    accounts->set_double(balance_col, 1, 175.23);
-    accounts->set_int(transaction_col, 1, 73);
-    accounts->set_double(balance_col, 2, 98.92);
-    accounts->set_int(transaction_col, 2, 17);
+    Obj account0 = accounts->create_object();
+    account0.set(balance_col, 50.55);
+    account0.set(transaction_col, 2);
+    Obj account1 = accounts->create_object();
+    account1.set(balance_col, 175.23);
+    account1.set(transaction_col, 73);
+    Obj account2 = accounts->create_object();
+    account2.set(balance_col, 98.92);
+    account2.set(transaction_col, 17);
 
-    people->add_empty_row(3);
-    people->set_string(name_col, 0, "Adam");
-    people->set_int(age_col, 0, 28);
-    people->set_link(account_col, 0, 0);
-    people->set_string(name_col, 1, "Frank");
-    people->set_int(age_col, 1, 30);
-    people->set_link(account_col, 1, 1);
-    people->set_string(name_col, 2, "Ben");
-    people->set_int(age_col, 2, 18);
-    people->set_link(account_col, 2, 2);
+    Obj person0 = people->create_object();
+    person0.set(name_col, StringData("Adam"));
+    person0.set(age_col, 28);
+    Obj person1 = people->create_object();
+    person1.set(name_col, StringData("Frank"));
+    person1.set(age_col, 30);
+    Obj person2 = people->create_object();
+    person2.set(name_col, StringData("Ben"));
+    person2.set(age_col, 18);
 
     // person:                      | account:
     // name     age     account     | balance       num_transactions
@@ -1671,7 +1793,7 @@ TEST(Parser_SortAndDistinctSerialisation)
     TableView tv = people->where().find_all();
     tv.sort(name_col, false);
     tv.sort(age_col, true);
-    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
 
@@ -1679,14 +1801,14 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv = people->where().find_all();
     tv.distinct(name_col);
     tv.distinct(age_col);
-    tv.distinct(DistinctDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}));
+    tv.distinct(DistinctDescriptor({{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
     CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
 
     // combined sort and distinct serialisation
     tv = people->where().find_all();
-    tv.distinct(DistinctDescriptor(*people, {{name_col}, {age_col}}));
-    tv.sort(SortDescriptor(*people, {{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
+    tv.distinct(DistinctDescriptor({{name_col}, {age_col}}));
+    tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     description = tv.get_descriptor_ordering_description();
     CHECK(description.find("DISTINCT(name, age)") != std::string::npos);
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);
@@ -1724,31 +1846,35 @@ TEST(Parser_SortAndDistinct)
     TableRef people = g.add_table("person");
     TableRef accounts = g.add_table("account");
 
-    size_t name_col = people->add_column(type_String, "name");
-    size_t age_col = people->add_column(type_Int, "age");
-    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+    ColKey name_col = people->add_column(type_String, "name");
+    ColKey age_col = people->add_column(type_Int, "age");
+    ColKey account_col = people->add_column_link(type_Link, "account", *accounts);
 
-    size_t balance_col = accounts->add_column(type_Double, "balance");
-    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+    ColKey balance_col = accounts->add_column(type_Double, "balance");
+    ColKey transaction_col = accounts->add_column(type_Int, "num_transactions");
 
-    accounts->add_empty_row(3);
-    accounts->set_double(balance_col, 0, 50.55);
-    accounts->set_int(transaction_col, 0, 2);
-    accounts->set_double(balance_col, 1, 50.55);
-    accounts->set_int(transaction_col, 1, 73);
-    accounts->set_double(balance_col, 2, 98.92);
-    accounts->set_int(transaction_col, 2, 17);
+    Obj account0 = accounts->create_object();
+    account0.set(balance_col, 50.55);
+    account0.set(transaction_col, 2);
+    Obj account1 = accounts->create_object();
+    account1.set(balance_col, 50.55);
+    account1.set(transaction_col, 73);
+    Obj account2 = accounts->create_object();
+    account2.set(balance_col, 98.92);
+    account2.set(transaction_col, 17);
 
-    people->add_empty_row(3);
-    people->set_string(name_col, 0, "Adam");
-    people->set_int(age_col, 0, 28);
-    people->set_link(account_col, 0, 0);
-    people->set_string(name_col, 1, "Frank");
-    people->set_int(age_col, 1, 30);
-    people->set_link(account_col, 1, 1);
-    people->set_string(name_col, 2, "Ben");
-    people->set_int(age_col, 2, 28);
-    people->set_link(account_col, 2, 2);
+    Obj p1 = people->create_object();
+    p1.set(name_col, StringData("Adam"));
+    p1.set(age_col, 28);
+    p1.set(account_col, account0.get_key());
+    Obj p2 = people->create_object();
+    p2.set(name_col, StringData("Frank"));
+    p2.set(age_col, 30);
+    p2.set(account_col, account1.get_key());
+    Obj p3 = people->create_object();
+    p3.set(name_col, StringData("Ben"));
+    p3.set(age_col, 28);
+    p3.set(account_col, account2.get_key());
 
     // person:                      | account:
     // name     age     account     | balance       num_transactions
@@ -1759,64 +1885,66 @@ TEST(Parser_SortAndDistinct)
     // sort serialisation
     TableView tv = get_sorted_view(people, "age > 0 SORT(age ASC)");
     for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        CHECK(tv.get_int(age_col, row_ndx - 1) <= tv.get_int(age_col, row_ndx));
+        CHECK(tv.get(row_ndx - 1).get<Int>(age_col) <= tv.get(row_ndx).get<Int>(age_col));
     }
 
     tv = get_sorted_view(people, "age > 0 SORT(age DESC)");
     for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        CHECK(tv.get_int(age_col, row_ndx - 1) >= tv.get_int(age_col, row_ndx));
+        CHECK(tv.get(row_ndx - 1).get<Int>(age_col) >= tv.get(row_ndx).get<Int>(age_col));
     }
 
     tv = get_sorted_view(people, "age > 0 SORT(age ASC, name DESC)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 2), "Frank");
+    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
+    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv.get(2).get<String>(name_col), "Frank");
 
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance ascending)");
     for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        size_t link_ndx1 = tv.get_link(account_col, row_ndx - 1);
-        size_t link_ndx2 = tv.get_link(account_col, row_ndx);
-        CHECK(accounts->get_double(balance_col, link_ndx1) <= accounts->get_double(balance_col, link_ndx2));
+        ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
+        ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
+        CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) <=
+              accounts->get_object(link_ndx2).get<double>(balance_col));
     }
 
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(account.balance descending)");
     for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        size_t link_ndx1 = tv.get_link(account_col, row_ndx - 1);
-        size_t link_ndx2 = tv.get_link(account_col, row_ndx);
-        CHECK(accounts->get_double(balance_col, link_ndx1) >= accounts->get_double(balance_col, link_ndx2));
+        ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
+        ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
+        CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) >=
+              accounts->get_object(link_ndx2).get<double>(balance_col));
     }
 
     tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 2);
     for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-        CHECK(tv.get_int(age_col, row_ndx - 1) != tv.get_int(age_col, row_ndx));
+        CHECK(tv.get(row_ndx - 1).get<Int>(age_col) != tv.get(row_ndx).get<Int>(age_col));
     }
 
     tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age, account.balance)");
     CHECK_EQUAL(tv.size(), 3);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
-    CHECK_EQUAL(tv.get_string(name_col, 2), "Ben");
+    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+    CHECK_EQUAL(tv.get(2).get<String>(name_col), "Ben");
 
     tv = get_sorted_view(people, "TRUEPREDICATE DISTINCT(age) DISTINCT(account.balance)");
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
 
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_int(age_col, 0), 28);
-    CHECK_EQUAL(tv.get_int(age_col, 1), 30);
+    CHECK_EQUAL(tv.get(0).get<Int>(age_col), 28);
+    CHECK_EQUAL(tv.get(1).get<Int>(age_col), 30);
 
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name DESC) DISTINCT(age) SORT(name ASC) DISTINCT(name)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
+    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
 
     tv = get_sorted_view(people, "account.num_transactions > 10 SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
+    CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(get_sorted_view(people, "TRUEPREDICATE DISTINCT(balance)"), message);
@@ -1826,26 +1954,21 @@ TEST(Parser_SortAndDistinct)
     CHECK_EQUAL(message, "No property 'name' found on object type 'account' specified in 'sort' clause");
 }
 
-
 TEST(Parser_Limit)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+    auto sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    Group& g = sg.begin_write();
-    TableRef people = g.add_table("person");
+    auto wt = sg->start_write();
+    TableRef people = wt->add_table("person");
 
-    size_t name_col = people->add_column(type_String, "name");
-    size_t age_col = people->add_column(type_Int, "age");
+    auto name_col = people->add_column(type_String, "name");
+    people->add_column(type_Int, "age");
 
-    people->add_empty_row(3);
-    people->set_string(name_col, 0, "Adam");
-    people->set_int(age_col, 0, 28);
-    people->set_string(name_col, 1, "Frank");
-    people->set_int(age_col, 1, 30);
-    people->set_string(name_col, 2, "Ben");
-    people->set_int(age_col, 2, 28);
+    people->create_object().set_all("Adam", 28);
+    people->create_object().set_all("Frank", 30);
+    people->create_object().set_all("Ben", 28);
 
     // solely limit
     TableView tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(0)");
@@ -1871,18 +1994,18 @@ TEST(Parser_Limit)
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 3);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
-    CHECK_EQUAL(tv.get_string(name_col, 2), "Frank");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
+    CHECK_EQUAL(tv[2].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 3);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
@@ -1894,17 +2017,17 @@ TEST(Parser_Limit)
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "TRUEPREDICATE SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
@@ -1916,15 +2039,15 @@ TEST(Parser_Limit)
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(3)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
     tv = get_sorted_view(people, "age < 30 SORT(name ASC) DISTINCT(age) LIMIT(4)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
@@ -1936,7 +2059,7 @@ TEST(Parser_Limit)
     tv = get_sorted_view(people, "age < 30 && name == 'Adam' LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
 
     // limit multiple times, order matters
     tv = get_sorted_view(people, "TRUEPREDICATE LIMIT(2) LIMIT(1)");
@@ -1948,20 +2071,20 @@ TEST(Parser_Limit)
     tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2)");
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Ben");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Ben");
     tv = get_sorted_view(people, "age > 0 LIMIT(2) SORT(name ASC)");
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Adam");
-    CHECK_EQUAL(tv.get_string(name_col, 1), "Frank");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Adam");
+    CHECK_EQUAL(tv[1].get<String>(name_col), "Frank");
     tv = get_sorted_view(people, "age > 0 SORT(name ASC) LIMIT(2) DISTINCT(age)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 1); // the other result is excluded by distinct not limit
     tv = get_sorted_view(people, "age > 0 SORT(name DESC) LIMIT(2) SORT(age ASC) LIMIT(1)");
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 2);
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Ben");
+    CHECK_EQUAL(tv[0].get<String>(name_col), "Ben");
 
     // size_unlimited() checks
     tv = get_sorted_view(people, "age == 30");
@@ -2011,15 +2134,15 @@ TEST(Parser_Limit)
     CHECK_EQUAL(tv.get_num_results_excluded_by_limit(), 0);
 
     // errors
-    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)")); // only accepting positive integers
-    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(age)")); // only accepting positive integers
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(-1)"));    // only accepting positive integers
+    CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT(age)"));   // only accepting positive integers
     CHECK_THROW_ANY(get_sorted_view(people, "TRUEPREDICATE LIMIT('age')")); // only accepting positive integers
 
-    sg.commit();
+    wt->commit();
 
     // handover
-    const Group& reader = sg.begin_read();
-    ConstTableRef peopleRead = reader.get_table("person");
+    auto reader = sg->start_read();
+    ConstTableRef peopleRead = reader->get_table("person");
 
     TableView items = peopleRead->where().find_all();
     CHECK_EQUAL(items.size(), 3);
@@ -2029,9 +2152,9 @@ TEST(Parser_Limit)
     CHECK(desc.will_apply_limit());
     items.apply_descriptor_ordering(desc);
     CHECK_EQUAL(items.size(), 1);
-    std::unique_ptr<SharedGroup::Handover<TableView>> handover = sg.export_for_handover(items, ConstSourcePayload::Copy);
 
-    std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover)));
+    auto tr = reader->duplicate();
+    auto tv2 = tr->import_copy_of(items, PayloadPolicy::Copy);
     CHECK(tv2->is_attached());
     CHECK(tv2->is_in_sync());
     CHECK_EQUAL(tv2->size(), 1);
@@ -2044,31 +2167,23 @@ TEST(Parser_IncludeDescriptor)
     TableRef people = g.add_table("person");
     TableRef accounts = g.add_table("account");
 
-    size_t name_col = people->add_column(type_String, "name");
-    size_t age_col = people->add_column(type_Int, "age");
-    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+    auto name_col = people->add_column(type_String, "name");
+    auto age_col = people->add_column(type_Int, "age");
+    auto account_col = people->add_column_link(type_Link, "account", *accounts);
+    static_cast<void>(age_col);     // silence warning
+    static_cast<void>(account_col); // do
 
-    size_t balance_col = accounts->add_column(type_Double, "balance");
-    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
+    auto balance_col = accounts->add_column(type_Double, "balance");
+    static_cast<void>(balance_col);
+    auto transaction_col = accounts->add_column(type_Int, "num_transactions");
 
-    accounts->add_empty_row(3);
-    accounts->set_double(balance_col, 0, 50.55);
-    accounts->set_int(transaction_col, 0, 2);
-    accounts->set_double(balance_col, 1, 50.55);
-    accounts->set_int(transaction_col, 1, 73);
-    accounts->set_double(balance_col, 2, 98.92);
-    accounts->set_int(transaction_col, 2, 17);
+    auto a0 = accounts->create_object().set_all(50.55, 2);
+    auto a1 = accounts->create_object().set_all(50.55, 73);
+    auto a2 = accounts->create_object().set_all(98.92, 17);
 
-    people->add_empty_row(3);
-    people->set_string(name_col, 0, "Adam");
-    people->set_int(age_col, 0, 28);
-    people->set_link(account_col, 0, 0);
-    people->set_string(name_col, 1, "Frank");
-    people->set_int(age_col, 1, 30);
-    people->set_link(account_col, 1, 1);
-    people->set_string(name_col, 2, "Ben");
-    people->set_int(age_col, 2, 28);
-    people->set_link(account_col, 2, 2);
+    auto p0 = people->create_object().set_all("Adam", 28, a0.get_key());
+    auto p1 = people->create_object().set_all("Frank", 30, a1.get_key());
+    auto p2 = people->create_object().set_all("Ben", 28, a2.get_key());
 
     // person:                      | account:
     // name     age     account     | balance       num_transactions
@@ -2082,27 +2197,27 @@ TEST(Parser_IncludeDescriptor)
     CHECK(includes.is_valid());
     CHECK_EQUAL(tv.size(), 3);
 
-    CHECK_EQUAL(tv.get_int(transaction_col, 0), 2);
-    CHECK_EQUAL(tv.get_int(transaction_col, 1), 17);
-    CHECK_EQUAL(tv.get_int(transaction_col, 2), 73);
+    CHECK_EQUAL(tv.get(0).get<Int>(transaction_col), 2);
+    CHECK_EQUAL(tv.get(1).get<Int>(transaction_col), 17);
+    CHECK_EQUAL(tv.get(2).get<Int>(transaction_col), 73);
 
     std::vector<std::string> expected_include_names;
-    auto reporter = [&](const Table* table, const std::unordered_set<size_t>& rows) {
-        CHECK(table == people);
-        CHECK_EQUAL(expected_include_names.size(), rows.size());
-        for (auto row : rows) {
-            std::string row_value = table->get_string(name_col, row);
-            CHECK(std::find(expected_include_names.begin(), expected_include_names.end(), row_value) !=
+    auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& objs) {
+        CHECK(table == people.unchecked_ptr());
+        CHECK_EQUAL(expected_include_names.size(), objs.size());
+        for (auto obj : objs) {
+            std::string obj_value = table->get_object(obj).get<String>(name_col);
+            CHECK(std::find(expected_include_names.begin(), expected_include_names.end(), obj_value) !=
                   expected_include_names.end());
         }
     };
 
     expected_include_names = {"Adam"};
-    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+    includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
     expected_include_names = {"Ben"};
-    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+    includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
     expected_include_names = {"Frank"};
-    includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+    includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
 
     // Error checking
     std::string message;
@@ -2126,53 +2241,44 @@ TEST(Parser_IncludeDescriptorMultiple)
     TableRef banks = g.add_table("bank");
     TableRef languages = g.add_table("language");
 
-    size_t name_col = people->add_column(type_String, "name");
-    size_t account_col = people->add_column_link(type_Link, "account", *accounts);
+    auto name_col = people->add_column(type_String, "name");
+    auto account_col = people->add_column_link(type_Link, "account", *accounts);
 
-    size_t balance_col = accounts->add_column(type_Double, "balance");
-    size_t transaction_col = accounts->add_column(type_Int, "num_transactions");
-    size_t account_bank_col = accounts->add_column_link(type_Link, "bank", *banks);
+    auto balance_col = accounts->add_column(type_Double, "balance");
+    auto transaction_col = accounts->add_column(type_Int, "num_transactions");
+    auto account_bank_col = accounts->add_column_link(type_Link, "bank", *banks);
 
-    size_t bank_name_col = banks->add_column(type_String, "name");
+    auto bank_name_col = banks->add_column(type_String, "name");
 
-    size_t language_name_col = languages->add_column(type_String, "name");
-    size_t language_available_col = languages->add_column_link(type_LinkList, "available_from", *banks);
+    auto language_name_col = languages->add_column(type_String, "name");
+    auto language_available_col = languages->add_column_link(type_LinkList, "available_from", *banks);
 
-    banks->add_empty_row(2);
-    banks->set_string(bank_name_col, 0, "Danske Bank");
-    banks->set_string(bank_name_col, 1, "RBC");
+    auto b0 = banks->create_object().set_all("Danske Bank");
+    auto b1 = banks->create_object().set_all("RBC");
 
-    languages->add_empty_row(3);
-    languages->set_string(language_name_col, 0, "English");
-    languages->set_string(language_name_col, 1, "Danish");
-    languages->set_string(language_name_col, 2, "French");
-    LinkViewRef list0 = languages->get_linklist(language_available_col, 0);
-    list0->add(0);
-    list0->add(1);
-    LinkViewRef list1 = languages->get_linklist(language_available_col, 1);
-    list1->add(0);
-    LinkViewRef list2 = languages->get_linklist(language_available_col, 2);
-    list2->add(1);
+    auto l0 = languages->create_object().set_all("English");
+    auto l1 = languages->create_object().set_all("Danish");
+    auto l2 = languages->create_object().set_all("French");
+    auto ll0 = l0.get_linklist(language_available_col);
+    ll0.add(b0.get_key());
+    ll0.add(b1.get_key());
+    auto ll1 = l1.get_linklist(language_available_col);
+    ll1.add(b0.get_key());
+    auto ll2 = l2.get_linklist(language_available_col);
+    ll2.add(b1.get_key());
 
-    accounts->add_empty_row(3);
-    accounts->set_double(balance_col, 0, 50.55);
-    accounts->set_int(transaction_col, 0, 2);
-    accounts->set_link(account_bank_col, 0, 1);
-    accounts->set_double(balance_col, 1, 50.55);
-    accounts->set_int(transaction_col, 1, 73);
-    accounts->set_link(account_bank_col, 1, 0);
-    accounts->set_double(balance_col, 2, 98.92);
-    accounts->set_int(transaction_col, 2, 17);
-    accounts->set_link(account_bank_col, 2, 1);
+    auto a0 = accounts->create_object().set_all(50.55, 2, b1.get_key());
+    auto a1 = accounts->create_object().set_all(50.55, 73, b0.get_key());
+    auto a2 = accounts->create_object().set_all(98.92, 17, b1.get_key());
 
-    people->add_empty_row(3);
-    people->set_string(name_col, 0, "Adam");
-    people->set_link(account_col, 0, 0);
-    people->set_string(name_col, 1, "Frank");
-    people->set_link(account_col, 1, 1);
-    people->set_string(name_col, 2, "Ben");
-    people->set_link(account_col, 2, 2);
+    people->create_object().set_all("Adam", a0.get_key());
+    people->create_object().set_all("Frank", a1.get_key());
+    people->create_object().set_all("Ben", a2.get_key());
 
+    static_cast<void>(account_col);
+    static_cast<void>(balance_col);
+    static_cast<void>(account_bank_col);
+    static_cast<void>(bank_name_col);
     // person:             | account:                              | bank:        | languages:
     // name    account     | balance       num_transactions  bank  | name         | name      available_from
     // Adam    0 ->        | 50.55         2                 1     | Danske Bank  | English    {0, 1}
@@ -2185,26 +2291,29 @@ TEST(Parser_IncludeDescriptorMultiple)
         "balance > 0 SORT(num_transactions ASC) INCLUDE(@links.person.account, bank.@links.language.available_from)");
     CHECK_EQUAL(tv.size(), 3);
 
-    CHECK_EQUAL(tv.get_int(transaction_col, 0), 2);
-    CHECK_EQUAL(tv.get_int(transaction_col, 1), 17);
-    CHECK_EQUAL(tv.get_int(transaction_col, 2), 73);
+    CHECK_EQUAL(tv.get(0).get<Int>(transaction_col), 2);
+    CHECK_EQUAL(tv.get(1).get<Int>(transaction_col), 17);
+    CHECK_EQUAL(tv.get(2).get<Int>(transaction_col), 73);
 
     std::vector<std::string> expected_people_names;
     std::vector<std::string> expected_language_names;
-    auto reporter = [&](const Table* table, const std::unordered_set<size_t>& rows) {
-        CHECK(table == people || table == languages);
-        if (table == people) {
+    auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& rows) {
+        CHECK(table == people.unchecked_ptr() || table == languages.unchecked_ptr());
+        if (table == people.unchecked_ptr()) {
             CHECK_EQUAL(expected_people_names.size(), rows.size());
             for (auto row : rows) {
-                std::string row_value = table->get_string(name_col, row);
+                std::string row_value = table->get_object(row).get<StringData>(name_col);
                 CHECK(std::find(expected_people_names.begin(), expected_people_names.end(), row_value) !=
                       expected_people_names.end());
             }
         }
-        else if (table == languages) {
+        else if (table == languages.unchecked_ptr()) {
             CHECK_EQUAL(expected_language_names.size(), rows.size());
+            if (expected_language_names.size() != rows.size()) {
+                throw std::runtime_error("blob");
+            }
             for (auto row : rows) {
-                std::string row_value = table->get_string(language_name_col, row);
+                std::string row_value = table->get_object(row).get<StringData>(language_name_col);
                 CHECK(std::find(expected_language_names.begin(), expected_language_names.end(), row_value) !=
                       expected_language_names.end());
             }
@@ -2216,13 +2325,13 @@ TEST(Parser_IncludeDescriptorMultiple)
         CHECK(includes.is_valid());
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
     }
     {
         parser::KeyPathMapping mapping;
@@ -2245,13 +2354,13 @@ TEST(Parser_IncludeDescriptorMultiple)
 
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
     }
     {
         parser::KeyPathMapping mapping;
@@ -2287,13 +2396,13 @@ TEST(Parser_IncludeDescriptorMultiple)
 
         expected_people_names = {"Adam"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(0), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(0), reporter);
         expected_people_names = {"Ben"};
         expected_language_names = {"English", "French"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(1), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(1), reporter);
         expected_people_names = {"Frank"};
         expected_language_names = {"Danish", "English"};
-        includes.report_included_backlinks(accounts.get(), tv.get_source_ndx(2), reporter);
+        includes.report_included_backlinks(accounts, tv.get_key(2), reporter);
 
         std::string message;
         CHECK_THROW_ANY_GET_MESSAGE(realm::parser::parse_include_path(""), message);
@@ -2311,19 +2420,14 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     Group g;
     TableRef people = g.add_table("person");
 
-    size_t name_col = people->add_column(type_String, "name");
-    size_t link_col = people->add_column_link(type_Link, "father", *people);
+    auto name_col = people->add_column(type_String, "name");
+    auto link_col = people->add_column_link(type_Link, "father", *people);
 
-    people->add_empty_row(5);
-    people->set_string(name_col, 0, "Bones");
-    people->set_string(name_col, 1, "John");
-    people->set_link(link_col, 1, 0);
-    people->set_string(name_col, 2, "Mark");
-    people->set_link(link_col, 2, 1);
-    people->set_string(name_col, 3, "Jonathan");
-    people->set_link(link_col, 3, 2);
-    people->set_string(name_col, 4, "Eli");
-    people->set_link(link_col, 4, 3);
+    auto bones = people->create_object().set(name_col, "Bones");
+    auto john = people->create_object().set(name_col, "John").set(link_col, bones.get_key());
+    auto mark = people->create_object().set(name_col, "Mark").set(link_col, john.get_key());
+    auto jonathan = people->create_object().set(name_col, "Jonathan").set(link_col, mark.get_key());
+    auto eli = people->create_object().set(name_col, "Eli").set(link_col, jonathan.get_key());
 
     // include serialisation
     TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) INCLUDE(@links.person.father.@links.person.father.@links.person.father.@links.person.father)");
@@ -2331,19 +2435,19 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     CHECK(includes.is_valid());
     CHECK_EQUAL(tv.size(), 1);
 
-    CHECK_EQUAL(tv.get_string(name_col, 0), "Bones");
+    CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Bones");
 
     size_t cur_ndx_to_check = 0;
     std::vector<std::string> expected_include_names;
-    auto reporter = [&](const Table* table, const std::unordered_set<size_t>& rows) {
-        CHECK(table == people);
+    auto reporter = [&](const Table* table, const std::unordered_set<ObjKey>& rows) {
+        CHECK(table == people.unchecked_ptr());
         CHECK_EQUAL(1, rows.size());
-        std::string row_value = table->get_string(name_col, *rows.begin());
+        std::string row_value = table->get_object(*rows.begin()).get<String>(name_col);
         CHECK_EQUAL(row_value, expected_include_names[cur_ndx_to_check++]);
     };
 
     expected_include_names = {"John", "Mark", "Jonathan", "Eli"};
-    includes.report_included_backlinks(people.get(), tv.get_source_ndx(0), reporter);
+    includes.report_included_backlinks(people, tv.get_key(0), reporter);
 }
 
 
@@ -2352,62 +2456,71 @@ TEST(Parser_Backlinks)
     Group g;
 
     TableRef items = g.add_table("class_Items");
-    size_t item_name_col = items->add_column(type_String, "name");
-    size_t item_price_col = items->add_column(type_Double, "price");
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
     using item_t = std::pair<std::string, double>;
-    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}, {"bread", 3.5}};
-    for (item_t i : item_info) {
-        size_t row_ndx = items->add_empty_row();
-        items->set_string(item_name_col, row_ndx, i.first);
-        items->set_double(item_price_col, row_ndx, i.second);
+    std::vector<item_t> item_info = {
+        {"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}, {"bread", 3.5}};
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_info.size(); ++i) {
+        Obj row_obj = items->get_object(item_keys[i]);
+        item_t cur_item = item_info[i];
+        row_obj.set(item_name_col, StringData(cur_item.first));
+        row_obj.set(item_price_col, cur_item.second);
     }
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
-    size_t name_col_ndx = t->add_column(type_String, "name");
-    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
-    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
-    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
-    t->add_empty_row(3);
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col_ndx, i, i);
-        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
-        t->set_link(fav_col_ndx, i, i);
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey name_col = t->add_column(type_String, "name");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    std::vector<ObjKey> people_keys;
+    t->create_objects(3, people_keys);
+    for (size_t i = 0; i < people_keys.size(); ++i) {
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(id_col, int64_t(i));
+        obj.set(account_col, double((i + 1) * 10.0));
+        obj.set(fav_col, obj.get_key());
+        if (i == 0) {
+            obj.set(name_col, StringData("Adam"));
+            LnkLst list_0 = obj.get_linklist(items_col);
+            list_0.add(item_keys[0]);
+            list_0.add(item_keys[1]);
+            list_0.add(item_keys[2]);
+            list_0.add(item_keys[3]);
+        }
+        else if (i == 1) {
+            obj.set(name_col, StringData("James"));
+            LnkLst list_1 = obj.get_linklist(items_col);
+            for (size_t j = 0; j < 10; ++j) {
+                list_1.add(item_keys[0]);
+            }
+        }
+        else if (i == 2) {
+            obj.set(name_col, StringData("John"));
+            LnkLst list_2 = obj.get_linklist(items_col);
+            list_2.add(item_keys[2]);
+            list_2.add(item_keys[2]);
+            list_2.add(item_keys[3]);
+        }
     }
 
-    t->set_string(name_col_ndx, 0, "Adam");
-    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    list_0->add(3);
-
-    t->set_string(name_col_ndx, 1, "James");
-    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
-    for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
-    }
-
-    t->set_string(name_col_ndx, 2, "John");
-    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
-    list_2->add(2);
-    list_2->add(2);
-    list_2->add(3);
-
-    Query q = items->backlink(*t, fav_col_ndx).column<Double>(account_col_ndx) > 20;
+    Query q = items->backlink(*t, fav_col).column<Double>(account_col) > 20;
     CHECK_EQUAL(q.count(), 1);
     std::string desc = q.get_description();
     CHECK(desc.find("@links.class_Person.fav_item.account_balance") != std::string::npos);
 
-    q = items->backlink(*t, items_col_ndx).column<Double>(account_col_ndx) > 20;
+    q = items->backlink(*t, items_col).column<Double>(account_col) > 20;
     CHECK_EQUAL(q.count(), 2);
     desc = q.get_description();
     CHECK(desc.find("@links.class_Person.items.account_balance") != std::string::npos);
 
     // favourite items bought by people who have > 20 in their account
-    verify_query(test_context, items, "@links.class_Person.fav_item.account_balance > 20", 1);  // backlinks via link
+    verify_query(test_context, items, "@links.class_Person.fav_item.account_balance > 20", 1); // backlinks via link
     // items bought by people who have > 20 in their account
-    verify_query(test_context, items, "@links.class_Person.items.account_balance > 20", 2);     // backlinks via list
+    verify_query(test_context, items, "@links.class_Person.items.account_balance > 20", 2); // backlinks via list
     // items bought by people who have 'J' as the first letter of their name
     verify_query(test_context, items, "@links.class_Person.items.name LIKE[c] 'j*'", 3);
     verify_query(test_context, items, "@links.class_Person.items.name BEGINSWITH 'J'", 3);
@@ -2424,7 +2537,8 @@ TEST(Parser_Backlinks)
     verify_query(test_context, items, "@links.class_Person.items.@avg.account_balance > 20", 1);
 
     // subquery over backlinks
-    verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2", 1);
+    verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2",
+                 1);
 
     // backlinks over link
     // people having a favourite item which is also the favourite item of another person
@@ -2435,7 +2549,8 @@ TEST(Parser_Backlinks)
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
     CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1),
+                                message);
     CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
@@ -2464,7 +2579,8 @@ TEST(Parser_Backlinks)
     q = items->where();
     p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
     CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
-    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship of property 'items' on type 'Person'");
+    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
+                         "of property 'items' on type 'Person'");
 
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     parser::KeyPathMapping mapping_with_prefix;
@@ -2489,44 +2605,46 @@ TEST(Parser_BacklinkCount)
     Group g;
 
     TableRef items = g.add_table("class_Items");
-    size_t item_id_col = items->add_column(type_Int, "item_id");
-    size_t item_link_col = items->add_column_link(type_Link, "self", *items);
-    size_t double_col = items->add_column(type_Double, "double_col");
+    items->add_column(type_Int, "item_id");
+    auto item_link_col = items->add_column_link(type_Link, "self", *items);
+    items->add_column(type_Double, "double_col");
 
     std::vector<int64_t> item_ids{5, 2, 12, 14, 20};
-    items->add_empty_row(5);
-    for (size_t i = 0; i < items->size(); ++i) {
-        items->set_int(item_id_col, i, item_ids[i]);
-        items->set_link(item_link_col, i, i);
-        items->set_double(double_col, i, double(i) + 0.5);
+    ObjKeyVector item_keys(item_ids);
+    for (size_t i = 0; i < item_keys.size(); ++i) {
+        items->create_object(item_keys[i]).set_all(item_ids[i], item_keys[i], double(i) + 0.5);
     }
-    items->nullify_link(item_link_col, 4); // last item will have a total of 0 backlinks
+    items->get_object(item_keys[4]).set(item_link_col, null_key); // last item will have a total of 0 backlinks
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col = t->add_column(type_Int, "customer_id");
-    size_t items_col = t->add_column_link(type_LinkList, "items", *items);
-    size_t fav_col = t->add_column_link(type_Link, "fav_item", *items);
-    size_t float_col = t->add_column(type_Float, "float_col");
-    t->add_empty_row(3);
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col, i, i);
-        t->set_link(fav_col, i, 2 - i);
-        t->set_float(float_col, i, float(i) + 0.5f);
+    auto id_col = t->add_column(type_Int, "customer_id");
+    auto items_col = t->add_column_link(type_LinkList, "items", *items);
+    auto fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    auto float_col = t->add_column(type_Float, "float_col");
+
+    for (int i = 0; i < 3; ++i) {
+        Obj obj = t->create_object();
+        obj.set(id_col, i);
+        obj.set(fav_col, item_keys[2 - i]);
+        obj.set(float_col, float(i) + 0.5f);
     }
 
-    LinkViewRef list_0 = t->get_linklist(items_col, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
+    auto it = t->begin();
+    auto list_0 = it->get_linklist(items_col);
+    list_0.add(item_keys[0]);
+    list_0.add(item_keys[1]);
+    list_0.add(item_keys[2]);
 
-    LinkViewRef list_1 = t->get_linklist(items_col, 1);
+    ++it;
+    auto list_1 = it->get_linklist(items_col);
     for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
+        list_1.add(item_keys[0]);
     }
 
-    LinkViewRef list_2 = t->get_linklist(items_col, 2);
-    list_2->add(2);
-    list_2->add(2);
+    ++it;
+    auto list_2 = it->get_linklist(items_col);
+    list_2.add(item_keys[2]);
+    list_2.add(item_keys[2]);
 
     verify_query(test_context, items, "@links.@count == 0", 1);
     verify_query(test_context, items, "@links.@count == 0 && item_id == 20", 1);
@@ -2563,7 +2681,8 @@ TEST(Parser_BacklinkCount)
 
     // backlink count compared to int
     verify_query(test_context, items, "@links.@count == 0", 1);
-    verify_query(test_context, items, "@links.@count >= item_id", 2); // 2 items have an id less than their backlink count
+    verify_query(test_context, items, "@links.@count >= item_id", 2); // 2 items have an id less than
+                                                                      // their backlink count
     verify_query(test_context, items, "@links.@count >= @links.class_Person.fav_item.customer_id", 3);
 
     // backlink count compared to double
@@ -2580,14 +2699,15 @@ TEST(Parser_BacklinkCount)
     // all backlinks count compared to single column backlink count
     // this is essentially checking if a single column contains all backlinks of a object
     verify_query(test_context, items, "@links.@count == @links.class_Person.fav_item.@count", 1); // item 5 (0 links)
-    verify_query(test_context, items, "@links.@count == @links.class_Person.items.@count", 1); // item 5 (0 links)
+    verify_query(test_context, items, "@links.@count == @links.class_Person.items.@count", 1);    // item 5 (0 links)
     verify_query(test_context, items, "@links.@count == @links.class_Items.self.@count", 2); // items 4,5 (1,0 links)
 
     std::string message;
     // backlink count requires comparison to a numeric type
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 'string'", -1), message);
     CHECK_EQUAL(message, "Cannot convert string 'string'");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1),
+                                message);
     CHECK_EQUAL(message, "Attempting to compare a numeric property to a non-numeric value");
 
     // no suffix after @links.@count is allowed
@@ -2635,89 +2755,112 @@ TEST(Parser_Subquery)
     Group g;
 
     TableRef discounts = g.add_table("class_Discounts");
-    size_t discount_name_col = discounts->add_column(type_String, "promotion", true);
-    size_t discount_off_col = discounts->add_column(type_Double, "reduced_by");
-    size_t discount_active_col = discounts->add_column(type_Bool, "active");
+    ColKey discount_name_col = discounts->add_column(type_String, "promotion", true);
+    ColKey discount_off_col = discounts->add_column(type_Double, "reduced_by");
+    ColKey discount_active_col = discounts->add_column(type_Bool, "active");
 
     using discount_t = std::pair<double, bool>;
     std::vector<discount_t> discount_info = {{3.0, false}, {2.5, true}, {0.50, true}, {1.50, true}};
-    for (discount_t i : discount_info) {
-        size_t row_ndx = discounts->add_empty_row();
-        discounts->set_double(discount_off_col, row_ndx, i.first);
-        discounts->set_bool(discount_active_col, row_ndx, i.second);
+    std::vector<ObjKey> discount_keys;
+    discounts->create_objects(discount_info.size(), discount_keys);
+    for (size_t i = 0; i < discount_keys.size(); ++i) {
+        Obj obj = discounts->get_object(discount_keys[i]);
+        obj.set(discount_off_col, discount_info[i].first);
+        obj.set(discount_active_col, discount_info[i].second);
+        if (i == 0) {
+            obj.set(discount_name_col, StringData("back to school"));
+        }
+        else if (i == 1) {
+            obj.set(discount_name_col, StringData("pizza lunch special"));
+        }
+        else if (i == 2) {
+            obj.set(discount_name_col, StringData("manager's special"));
+        }
     }
-    discounts->set_string(discount_name_col, 0, "back to school");
-    discounts->set_string(discount_name_col, 1, "pizza lunch special");
-    discounts->set_string(discount_name_col, 2, "manager's special");
 
     TableRef ingredients = g.add_table("class_Allergens");
-    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
-    size_t population_col = ingredients->add_column(type_Double, "population_affected");
-    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
+    ColKey ingredient_name_col = ingredients->add_column(type_String, "name");
+    ColKey population_col = ingredients->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> ingredients_list = {
+        {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005}};
+    std::vector<ObjKey> ingredients_keys;
+    ingredients->create_objects(ingredients_list.size(), ingredients_keys);
     for (size_t i = 0; i < ingredients_list.size(); ++i) {
-        size_t row_ndx = ingredients->add_empty_row();
-        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
-        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+        Obj obj = ingredients->get_object(ingredients_keys[i]);
+        obj.set(ingredient_name_col, StringData(ingredients_list[i].first));
+        obj.set(population_col, ingredients_list[i].second);
     }
 
     TableRef items = g.add_table("class_Items");
-    size_t item_name_col = items->add_column(type_String, "name");
-    size_t item_price_col = items->add_column(type_Double, "price");
-    size_t item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
-    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    ColKey item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
-    for (item_t i : item_info) {
-        size_t row_ndx = items->add_empty_row();
-        items->set_string(item_name_col, row_ndx, i.first);
-        items->set_double(item_price_col, row_ndx, i.second);
+    std::vector<ObjKey> item_keys;
+    items->create_objects(item_info.size(), item_keys);
+    for (size_t i = 0; i < item_info.size(); ++i) {
+        Obj obj = items->get_object(item_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
+        if (i == 0) {
+            obj.set(item_discount_col, discount_keys[2]); // milk -0.50
+            LnkLst milk_contains = obj.get_linklist(item_contains_col);
+            milk_contains.add(ingredients_keys[0]);
+        }
+        else if (i == 2) {
+            obj.set(item_discount_col, discount_keys[1]); // pizza -2.5
+            LnkLst pizza_contains = obj.get_linklist(item_contains_col);
+            pizza_contains.add(ingredients_keys[0]);
+            pizza_contains.add(ingredients_keys[2]);
+            pizza_contains.add(ingredients_keys[3]);
+        }
+        else if (i == 3) {
+            obj.set(item_discount_col, discount_keys[0]); // cereal -3.0 inactive
+            LnkLst cereal_contains = obj.get_linklist(item_contains_col);
+            cereal_contains.add(ingredients_keys[0]);
+            cereal_contains.add(ingredients_keys[1]);
+            cereal_contains.add(ingredients_keys[2]);
+        }
     }
-    items->set_link(item_discount_col, 0, 2); // milk -0.50
-    items->set_link(item_discount_col, 2, 1); // pizza -2.5
-    items->set_link(item_discount_col, 3, 0); // cereal -3.0 inactive
-    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
-    milk_contains->add(0);
-    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
-    pizza_contains->add(0);
-    pizza_contains->add(2);
-    pizza_contains->add(3);
-    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
-    cereal_contains->add(0);
-    cereal_contains->add(1);
-    cereal_contains->add(2);
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
-    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
-    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
-    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
-    t->add_empty_row(3);
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    std::vector<ObjKey> people_keys;
+    t->create_objects(3, people_keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col_ndx, i, i);
-        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
-        t->set_link(fav_col_ndx, i, i);
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(id_col, int64_t(i));
+        obj.set(account_col, double((i + 1) * 10.0));
+        obj.set(fav_col, item_keys[i]);
+        LnkLst list = obj.get_linklist(items_col);
+        if (i == 0) {
+            list.add(item_keys[0]);
+            list.add(item_keys[1]);
+            list.add(item_keys[2]);
+            list.add(item_keys[3]);
+        }
+        else if (i == 1) {
+            for (size_t j = 0; j < 10; ++j) {
+                list.add(item_keys[0]);
+            }
+        }
+        else if (i == 2) {
+            list.add(item_keys[2]);
+            list.add(item_keys[2]);
+            list.add(item_keys[3]);
+        }
     }
 
-    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    list_0->add(3);
 
-    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
-    for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
-    }
-
-    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
-    list_2->add(2);
-    list_2->add(2);
-    list_2->add(3);
-
-    Query q = t->column<LinkList>(items_col_ndx, items->column<String>(item_name_col).contains("a")
-                                  && items->column<Double>(item_price_col) > 5.0
-                                  && items->link(item_discount_col).column<Double>(discount_off_col) > 0.5
-                                  && items->column<Link>(item_contains_col).count() > 1).count() > 1;
+    Query sub = items->column<String>(item_name_col).contains("a") && items->column<Double>(item_price_col) > 5.0 &&
+                items->link(item_discount_col).column<Double>(discount_off_col) > 0.5 &&
+                items->column<Link>(item_contains_col).count() > 1;
+    Query q = t->column<Link>(items_col, sub).count() > 1;
 
     std::string subquery_description = q.get_description();
     CHECK(subquery_description.find("SUBQUERY(items, $x,") != std::string::npos);
@@ -2741,11 +2884,14 @@ TEST(Parser_Subquery)
     // string constraint subquery
     verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK').@count >= 1", 2);
     // compound subquery &&
-    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' && $x.price == 5.5).@count >= 1", 2);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' && $x.price == 5.5).@count >= 1",
+                 2);
     // compound subquery ||
-    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' || $x.price >= 5.5).@count >= 1", 3);
+    verify_query(test_context, t, "SUBQUERY(items, $x, $x.name CONTAINS[c] 'MILK' || $x.price >= 5.5).@count >= 1",
+                 3);
     // variable name change
-    verify_query(test_context, t, "SUBQUERY(items, $anyNAME_-0123456789, 5.5 == $anyNAME_-0123456789.price ).@count > 0", 2);
+    verify_query(test_context, t,
+                 "SUBQUERY(items, $anyNAME_-0123456789, 5.5 == $anyNAME_-0123456789.price ).@count > 0", 2);
     // variable names cannot contain '.'
     CHECK_THROW_ANY(verify_query(test_context, t, "SUBQUERY(items, $x.y, 5.5 == $x.y.price ).@count > 0", 2));
     // variable name must begin with '$'
@@ -2762,20 +2908,30 @@ TEST(Parser_Subquery)
     // two column subquery
     verify_query(test_context, t, "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count > 0", 2);
     // subquery count (int) vs double
-    verify_query(test_context, t, "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count < account_balance", 3);
+    verify_query(test_context, t,
+                 "SUBQUERY(items, $x, $x.discount.promotion CONTAINS[c] $x.name).@count < account_balance", 3);
     // subquery over link
     verify_query(test_context, t, "SUBQUERY(fav_item.allergens, $x, $x.name CONTAINS[c] 'dairy').@count > 0", 2);
     // nested subquery
-    verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] 'dairy').@count > 0).@count > 0", 3);
+    verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.allergens, $allergy, $allergy.name CONTAINS[c] "
+                                  "'dairy').@count > 0).@count > 0",
+                 3);
     // nested subquery operating on the same table with same variable is not allowed
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(items, $x, SUBQUERY($x.discount.@links.class_Items.discount, $x, $x.price > 5).@count > 0).@count > 0", 2), message);
-    CHECK_EQUAL(message, "Unable to create a subquery expression with variable '$x' since an identical variable already exists in this context");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(items, $x, "
+                                                              "SUBQUERY($x.discount.@links.class_Items.discount, $x, "
+                                                              "$x.price > 5).@count > 0).@count > 0",
+                                             2),
+                                message);
+    CHECK_EQUAL(message, "Unable to create a subquery expression with variable '$x' since an identical variable "
+                         "already exists in this context");
 
     // target property must be a list
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(account_balance, $x, TRUEPREDICATE).@count > 0", 3), message);
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, t, "SUBQUERY(account_balance, $x, TRUEPREDICATE).@count > 0", 3), message);
     CHECK_EQUAL(message, "A subquery must operate on a list property, but 'account_balance' is type 'Double'");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(fav_item, $x, TRUEPREDICATE).@count > 0", 3), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(fav_item, $x, TRUEPREDICATE).@count > 0", 3),
+                                message);
     CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'Link'");
 }
 
@@ -2784,65 +2940,79 @@ TEST(Parser_AggregateShortcuts)
 {
     Group g;
 
-    TableRef ingredients = g.add_table("class_Allergens");
-    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
-    size_t population_col = ingredients->add_column(type_Double, "population_affected");
-    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
-    for (size_t i = 0; i < ingredients_list.size(); ++i) {
-        size_t row_ndx = ingredients->add_empty_row();
-        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
-        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    TableRef allergens = g.add_table("class_Allergens");
+    ColKey ingredient_name_col = allergens->add_column(type_String, "name");
+    ColKey population_col = allergens->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> allergens_list = {
+        {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005}};
+    std::vector<ObjKey> allergens_keys;
+    allergens->create_objects(allergens_list.size(), allergens_keys);
+    for (size_t i = 0; i < allergens_list.size(); ++i) {
+        Obj obj = allergens->get_object(allergens_keys[i]);
+        obj.set(ingredient_name_col, StringData(allergens_list[i].first));
+        obj.set(population_col, allergens_list[i].second);
     }
 
     TableRef items = g.add_table("class_Items");
-    size_t item_name_col = items->add_column(type_String, "name");
-    size_t item_price_col = items->add_column(type_Double, "price");
-    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_contains_col = items->add_column_link(type_LinkList, "allergens", *allergens);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
-    for (item_t i : item_info) {
-        size_t row_ndx = items->add_empty_row();
-        items->set_string(item_name_col, row_ndx, i.first);
-        items->set_double(item_price_col, row_ndx, i.second);
+    std::vector<ObjKey> items_keys;
+    items->create_objects(item_info.size(), items_keys);
+    for (size_t i = 0; i < item_info.size(); ++i) {
+        Obj obj = items->get_object(items_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
+        if (i == 0) {
+            LnkLst milk_contains = obj.get_linklist(item_contains_col);
+            milk_contains.add(allergens_keys[0]);
+        }
+        else if (i == 2) {
+            LnkLst pizza_contains = obj.get_linklist(item_contains_col);
+            pizza_contains.add(allergens_keys[0]);
+            pizza_contains.add(allergens_keys[2]);
+            pizza_contains.add(allergens_keys[3]);
+        }
+        else if (i == 3) {
+            LnkLst cereal_contains = obj.get_linklist(item_contains_col);
+            cereal_contains.add(allergens_keys[0]);
+            cereal_contains.add(allergens_keys[1]);
+            cereal_contains.add(allergens_keys[2]);
+        }
     }
-    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
-    milk_contains->add(0);
-    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
-    pizza_contains->add(0);
-    pizza_contains->add(2);
-    pizza_contains->add(3);
-    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
-    cereal_contains->add(0);
-    cereal_contains->add(1);
-    cereal_contains->add(2);
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
-    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
-    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
-    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
-    t->add_empty_row(3);
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col_ndx, i, i);
-        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
-        t->set_link(fav_col_ndx, i, i);
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    std::vector<ObjKey> people_keys;
+    t->create_objects(3, people_keys);
+    for (size_t i = 0; i < people_keys.size(); ++i) {
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(id_col, int64_t(i));
+        obj.set(account_col, double((i + 1) * 10.0));
+        obj.set(fav_col, items_keys[i]);
+        LnkLst list = obj.get_linklist(items_col);
+        if (i == 0) {
+            list.add(items_keys[0]);
+            list.add(items_keys[1]);
+            list.add(items_keys[2]);
+            list.add(items_keys[3]);
+        }
+        else if (i == 1) {
+            for (size_t j = 0; j < 10; ++j) {
+                list.add(items_keys[0]);
+            }
+        }
+        else if (i == 2) {
+            list.add(items_keys[2]);
+            list.add(items_keys[2]);
+            list.add(items_keys[3]);
+        }
     }
-
-    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    list_0->add(3);
-
-    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
-    for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
-    }
-
-    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
-    list_2->add(2);
-    list_2->add(2);
-    list_2->add(3);
 
     // any is implied over list properties
     verify_query(test_context, t, "items.price == 5.5", 2);
@@ -2904,7 +3074,8 @@ TEST(Parser_AggregateShortcuts)
     verify_query(test_context, t, "ANY items.price > items.@avg.price", 2);
     verify_query(test_context, t, "SOME items.price > items.@avg.price", 2);
 
-    // ALL/NONE do not support testing against other columns currently because of how they are implemented in a subquery
+    // ALL/NONE do not support testing against other columns currently because of how they are implemented in a
+    // subquery
     // The restriction is because subqueries must operate on properties on the target table and cannot reference
     // properties in the parent scope. This restriction may be lifted if we actually implement ALL/NONE in core.
     std::string message;
@@ -2946,65 +3117,79 @@ TEST(Parser_OperatorIN)
 {
     Group g;
 
-    TableRef ingredients = g.add_table("class_Allergens");
-    size_t ingredient_name_col = ingredients->add_column(type_String, "name");
-    size_t population_col = ingredients->add_column(type_Double, "population_affected");
-    std::vector<std::pair<std::string, double>> ingredients_list = { {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005} };
-    for (size_t i = 0; i < ingredients_list.size(); ++i) {
-        size_t row_ndx = ingredients->add_empty_row();
-        ingredients->set_string(ingredient_name_col, row_ndx, ingredients_list[i].first);
-        ingredients->set_double(population_col, row_ndx, ingredients_list[i].second);
+    TableRef allergens = g.add_table("class_Allergens");
+    ColKey ingredient_name_col = allergens->add_column(type_String, "name");
+    ColKey population_col = allergens->add_column(type_Double, "population_affected");
+    std::vector<std::pair<std::string, double>> allergens_list = {
+        {"dairy", 0.75}, {"nuts", 0.01}, {"wheat", 0.01}, {"soy", 0.005}};
+    std::vector<ObjKey> allergens_keys;
+    allergens->create_objects(allergens_list.size(), allergens_keys);
+    for (size_t i = 0; i < allergens_list.size(); ++i) {
+        Obj obj = allergens->get_object(allergens_keys[i]);
+        obj.set(ingredient_name_col, StringData(allergens_list[i].first));
+        obj.set(population_col, allergens_list[i].second);
     }
 
     TableRef items = g.add_table("class_Items");
-    size_t item_name_col = items->add_column(type_String, "name");
-    size_t item_price_col = items->add_column(type_Double, "price", true);
-    size_t item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    ColKey item_name_col = items->add_column(type_String, "name");
+    ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_contains_col = items->add_column_link(type_LinkList, "allergens", *allergens);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
-    for (item_t i : item_info) {
-        size_t row_ndx = items->add_empty_row();
-        items->set_string(item_name_col, row_ndx, i.first);
-        items->set_double(item_price_col, row_ndx, i.second);
+    std::vector<ObjKey> items_keys;
+    items->create_objects(item_info.size(), items_keys);
+    for (size_t i = 0; i < item_info.size(); ++i) {
+        Obj obj = items->get_object(items_keys[i]);
+        obj.set(item_name_col, StringData(item_info[i].first));
+        obj.set(item_price_col, item_info[i].second);
+        if (i == 0) {
+            LnkLst milk_contains = obj.get_linklist(item_contains_col);
+            milk_contains.add(allergens_keys[0]);
+        }
+        else if (i == 2) {
+            LnkLst pizza_contains = obj.get_linklist(item_contains_col);
+            pizza_contains.add(allergens_keys[0]);
+            pizza_contains.add(allergens_keys[2]);
+            pizza_contains.add(allergens_keys[3]);
+        }
+        else if (i == 3) {
+            LnkLst cereal_contains = obj.get_linklist(item_contains_col);
+            cereal_contains.add(allergens_keys[0]);
+            cereal_contains.add(allergens_keys[1]);
+            cereal_contains.add(allergens_keys[2]);
+        }
     }
-    LinkViewRef milk_contains = items->get_linklist(item_contains_col, 0);
-    milk_contains->add(0);
-    LinkViewRef pizza_contains = items->get_linklist(item_contains_col, 2);
-    pizza_contains->add(0);
-    pizza_contains->add(2);
-    pizza_contains->add(3);
-    LinkViewRef cereal_contains = items->get_linklist(item_contains_col, 3);
-    cereal_contains->add(0);
-    cereal_contains->add(1);
-    cereal_contains->add(2);
 
     TableRef t = g.add_table("class_Person");
-    size_t id_col_ndx = t->add_column(type_Int, "customer_id");
-    size_t account_col_ndx = t->add_column(type_Double, "account_balance");
-    size_t items_col_ndx = t->add_column_link(type_LinkList, "items", *items);
-    size_t fav_col_ndx = t->add_column_link(type_Link, "fav_item", *items);
-    t->add_empty_row(3);
-    for (size_t i = 0; i < t->size(); ++i) {
-        t->set_int(id_col_ndx, i, i);
-        t->set_double(account_col_ndx, i, double((i + 1) * 10.0));
-        t->set_link(fav_col_ndx, i, i);
+    ColKey id_col = t->add_column(type_Int, "customer_id");
+    ColKey account_col = t->add_column(type_Double, "account_balance");
+    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    std::vector<ObjKey> people_keys;
+    t->create_objects(3, people_keys);
+    for (size_t i = 0; i < people_keys.size(); ++i) {
+        Obj obj = t->get_object(people_keys[i]);
+        obj.set(id_col, int64_t(i));
+        obj.set(account_col, double((i + 1) * 10.0));
+        obj.set(fav_col, items_keys[i]);
+        LnkLst list = obj.get_linklist(items_col);
+        if (i == 0) {
+            list.add(items_keys[0]);
+            list.add(items_keys[1]);
+            list.add(items_keys[2]);
+            list.add(items_keys[3]);
+        }
+        else if (i == 1) {
+            for (size_t j = 0; j < 10; ++j) {
+                list.add(items_keys[0]);
+            }
+        }
+        else if (i == 2) {
+            list.add(items_keys[2]);
+            list.add(items_keys[2]);
+            list.add(items_keys[3]);
+        }
     }
-
-    LinkViewRef list_0 = t->get_linklist(items_col_ndx, 0);
-    list_0->add(0);
-    list_0->add(1);
-    list_0->add(2);
-    list_0->add(3);
-
-    LinkViewRef list_1 = t->get_linklist(items_col_ndx, 1);
-    for (size_t i = 0; i < 10; ++i) {
-        list_1->add(0);
-    }
-
-    LinkViewRef list_2 = t->get_linklist(items_col_ndx, 2);
-    list_2->add(2);
-    list_2->add(2);
-    list_2->add(3);
 
     verify_query(test_context, t, "5.5 IN items.price", 2);
     verify_query(test_context, t, "!(5.5 IN items.price)", 1);              // group not
@@ -3012,7 +3197,7 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "'MiLk' IN[c] items.name", 2);            // string compare with insensitivity
     verify_query(test_context, t, "NULL IN items.price", 0);                // null
     verify_query(test_context, t, "'dairy' IN fav_item.allergens.name", 2); // through link prefix
-    verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1);        // backlinks
+    verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1); // backlinks
     verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
 
     // aggregate modifiers must operate on a list
@@ -3030,33 +3215,35 @@ TEST(Parser_OperatorIN)
     CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
     // list property vs list property is not supported by core yet
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN items.price", 0), message);
-    CHECK_EQUAL(message, "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
+    CHECK_EQUAL(
+        message,
+        "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
 }
 
 
 // we won't support full object comparisons until we have stable keys in core, but as an exception
 // we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
-TEST(Parser_RowIndex)
+TEST(Parser_Object)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t int_col_ndx = table->add_column(type_Int, "ints", true);
-    size_t link_col_ndx = table->add_column_link(type_Link, "link", *table);
-    table->add_empty_row(3);
-    for (size_t i = 0; i < table->size(); ++i) {
-        table->set_int(int_col_ndx, i, i);
+    auto int_col = table->add_column(type_Int, "ints", true);
+    auto link_col = table->add_column_link(type_Link, "link", *table);
+    for (size_t i = 0; i < 3; ++i) {
+        table->create_object().set<int64_t>(int_col, i);
     }
-    table->set_link(link_col_ndx, 1, 0);
+    table->get_object(1).set(link_col, table->begin()->get_key());
     TableView tv = table->where().find_all();
 
     verify_query(test_context, table, "link == NULL", 2); // vanilla base check
+    // FIXME: verify_query(test_context, table, "link == O0", 2);
 
-    // object comparison not yet supported
-    Query q0 = table->where().and_query(table->column<Link>(link_col_ndx) == tv.get(0));
-    CHECK_THROW(q0.get_description(), SerialisationError);
+    Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get(0));
+    std::string description = q0.get_description(); // shouldn't throw
+    CHECK(description.find("O0") != std::string::npos);
 
-    Query q1 = table->column<Link>(link_col_ndx) == realm::null();
-    std::string description = q1.get_description(); // shouldn't throw
+    Query q1 = table->column<Link>(link_col) == realm::null();
+    description = q1.get_description(); // shouldn't throw
     CHECK(description.find("NULL") != std::string::npos);
     CHECK_EQUAL(q1.count(), 2);
 
@@ -3067,12 +3254,10 @@ TEST(Parser_Between)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t int_col_ndx = table->add_column(type_Int, "age", true);
-    size_t between_col_ndx = table->add_column(type_Int, "between", true);
-    table->add_empty_row(3);
-    for (size_t i = 0; i < table->size(); ++i) {
-        table->set_int(int_col_ndx, i, i + 24);
-        table->set_int(between_col_ndx, i, i);
+    auto int_col_key = table->add_column(type_Int, "age", true);
+    auto between_col_key = table->add_column(type_Int, "between", true);
+    for (int i = 0; i < 3; ++i) {
+        table->create_object().set(int_col_key, i + 24).set(between_col_key, i);
     }
 
     // normal querying on a property named "between" is allowed.
@@ -3090,28 +3275,24 @@ TEST(Parser_ChainedStringEqualQueries)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t a_col_ndx = table->add_column(type_String, "a", false);
-    size_t b_col_ndx = table->add_column(type_String, "b", true);
-    size_t c_col_ndx = table->add_column(type_String, "c", false);
-    size_t d_col_ndx = table->add_column(type_String, "d", true);
+    ColKey a_col_ndx = table->add_column(type_String, "a", false);
+    ColKey b_col_ndx = table->add_column(type_String, "b", true);
+    ColKey c_col_ndx = table->add_column(type_String, "c", false);
+    ColKey d_col_ndx = table->add_column(type_String, "d", true);
 
     table->add_search_index(c_col_ndx);
     table->add_search_index(d_col_ndx);
 
-    table->add_empty_row(100);
     std::vector<std::string> populated_data;
     std::stringstream ss;
-    for (size_t i = 0; i < table->size(); ++i) {
+    for (size_t i = 0; i < 100; ++i) {
         ss.str({});
         ss << i;
         std::string sd(ss.str());
         populated_data.push_back(sd);
-        table->set_string(a_col_ndx, i, sd);
-        table->set_string(b_col_ndx, i, sd);
-        table->set_string(c_col_ndx, i, sd);
-        table->set_string(d_col_ndx, i, sd);
+        table->create_object().set(a_col_ndx, sd).set(b_col_ndx, sd).set(c_col_ndx, sd).set(d_col_ndx, sd);
     }
-    table->add_empty_row(); // one null/empty string
+    table->create_object(); // one null/empty string
 
     verify_query(test_context, table, "a == '0' or a == '1' or a == '2'", 3);
     verify_query(test_context, table, "a == '0' or b == '2' or a == '3' or b == '4'", 4);
@@ -3144,25 +3325,26 @@ TEST(Parser_ChainedIntEqualQueries)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t a_col_ndx = table->add_column(type_Int, "a", false);
-    size_t b_col_ndx = table->add_column(type_Int, "b", true);
-    size_t c_col_ndx = table->add_column(type_Int, "c", false);
-    size_t d_col_ndx = table->add_column(type_Int, "d", true);
+    auto a_col_key = table->add_column(type_Int, "a", false);
+    auto b_col_key = table->add_column(type_Int, "b", true);
+    auto c_col_key = table->add_column(type_Int, "c", false);
+    auto d_col_key = table->add_column(type_Int, "d", true);
 
-    table->add_search_index(c_col_ndx);
-    table->add_search_index(d_col_ndx);
+    table->add_search_index(c_col_key);
+    table->add_search_index(d_col_key);
 
-    table->add_empty_row(100);
+    std::vector<ObjKey> keys;
+    table->create_objects(100, keys);
     std::vector<int64_t> populated_data;
-    for (size_t i = 0; i < table->size(); ++i) {
-        int64_t payload = i;
+    for (auto o = table->begin(); o != table->end(); ++o) {
+        auto payload = o->get_key().value;
         populated_data.push_back(payload);
-        table->set_int(a_col_ndx, i, payload);
-        table->set_int(b_col_ndx, i, payload);
-        table->set_int(c_col_ndx, i, payload);
-        table->set_int(d_col_ndx, i, payload);
+        o->set(a_col_key, payload);
+        o->set(b_col_key, payload);
+        o->set(c_col_key, payload);
+        o->set(d_col_key, payload);
     }
-    size_t default_row_ndx = table->add_empty_row(); // one null/default 0 row
+    auto default_obj = table->create_object(); // one null/default 0 object
 
     verify_query(test_context, table, "a == 0 or a == 1 or a == 2", 4);
     verify_query(test_context, table, "a == 1 or b == 2 or a == 3 or b == 4", 4);
@@ -3189,7 +3371,7 @@ TEST(Parser_ChainedIntEqualQueries)
         first = false;
         column_to_query = (column_to_query + 1) % 4;
     }
-    table->move_last_over(default_row_ndx);
+    default_obj.remove();
     verify_query(test_context, table, query, populated_data.size());
 }
 
@@ -3197,20 +3379,17 @@ TEST(Parser_TimestampNullable)
 {
     Group g;
     TableRef table = g.add_table("table");
-    size_t a_col_ndx = table->add_column(type_Timestamp, "a", false);
-    size_t b_col_ndx = table->add_column(type_Timestamp, "b", false);
-    table->add_empty_row(2);
-    table->set_timestamp(a_col_ndx, 0, Timestamp(7, 0));
-    table->set_timestamp(a_col_ndx, 1, Timestamp(7, 0));
-    table->set_timestamp(b_col_ndx, 0, Timestamp(17, 0));
-    table->set_timestamp(b_col_ndx, 1, Timestamp(17, 0));
+    ColKey a_col = table->add_column(type_Timestamp, "a", false);
+    ColKey b_col = table->add_column(type_Timestamp, "b", false);
+    table->create_object().set(a_col, Timestamp(7, 0)).set(b_col, Timestamp(17, 0));
+    table->create_object().set(a_col, Timestamp(7, 0)).set(b_col, Timestamp(17, 0));
 
     Query q = table->where()
-      .equal(b_col_ndx, Timestamp(200, 0))
+      .equal(b_col, Timestamp(200, 0))
       .group()
-      .equal(a_col_ndx, Timestamp(100, 0))
+      .equal(a_col, Timestamp(100, 0))
       .Or()
-      .equal(a_col_ndx, Timestamp(realm::null()))
+      .equal(a_col, Timestamp(realm::null()))
       .end_group();
     std::string description = q.get_description();
     CHECK(description.find("NULL") != std::string::npos);

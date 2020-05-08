@@ -36,11 +36,13 @@
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/impl/destroy_guard.hpp>
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
+#include <realm/bplustree.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/column_string.hpp>
 #include <realm/index_string.hpp>
 #include <realm/array_integer.hpp>
+#include <realm/array_key.hpp>
+#include <realm/impl/array_writer.hpp>
 
 
 // Header format (8 bytes):
@@ -188,6 +190,14 @@
 using namespace realm;
 using namespace realm::util;
 
+void QueryStateBase::dyncast()
+{
+}
+
+ArrayPayload::~ArrayPayload()
+{
+}
+
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -210,30 +220,34 @@ size_t Array::bit_width(int64_t v)
 
 void Array::init_from_mem(MemRef mem) noexcept
 {
-    char* header = mem.get_addr();
+    char* header = Node::init_from_mem(mem);
     // Parse header
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-    m_width = get_width_from_header(header);
-    m_size = get_size_from_header(header);
 
-    // Capacity is how many items there are room for
-    if (m_alloc.is_read_only(mem.get_ref())) {
-        m_capacity = m_size;
-    }
-    else {
-        size_t byte_capacity = get_capacity_from_header(header);
-        // FIXME: Avoid calling virtual method calc_item_count() here,
-        // instead calculate the capacity in a way similar to what is done
-        // in get_byte_size_from_header(). The virtual call makes "life"
-        // hard for constructors in derived array classes.
-        m_capacity = calc_item_count(byte_capacity, m_width);
-    }
-
-    m_ref = mem.get_ref();
-    m_data = get_data_from_header(header);
     set_width(m_width);
+}
+
+bool Array::update_from_parent(size_t old_baseline) noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    ArrayParent* parent = get_parent();
+    REALM_ASSERT_DEBUG(parent);
+
+    // Array nodes that are part of the previous version of the
+    // database will not be overwritten by Group::commit(). This is
+    // necessary for robustness in the face of abrupt termination of
+    // the process. It also means that we can be sure that an array
+    // remains unchanged across a commit if the new ref is equal to
+    // the old ref and the ref is below the previous baseline.
+
+    ref_type new_ref = get_ref_from_parent();
+    if (new_ref == m_ref && new_ref < old_baseline)
+        return false; // Has not changed
+
+    init_from_ref(new_ref);
+    return true; // Might have changed
 }
 
 void Array::set_type(Type type)
@@ -256,104 +270,10 @@ void Array::set_type(Type type)
     }
     m_is_inner_bptree_node = init_is_inner_bptree_node;
     m_has_refs = init_has_refs;
-    set_header_is_inner_bptree_node(init_is_inner_bptree_node);
-    set_header_hasrefs(init_has_refs);
-}
 
-
-bool Array::update_from_parent(size_t old_baseline) noexcept
-{
-    REALM_ASSERT_DEBUG(is_attached());
-    REALM_ASSERT_DEBUG(m_parent);
-
-    // Array nodes that are part of the previous version of the
-    // database will not be overwritten by Group::commit(). This is
-    // necessary for robustness in the face of abrupt termination of
-    // the process. It also means that we can be sure that an array
-    // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous baseline.
-
-    ref_type new_ref = m_parent->get_child_ref(m_ndx_in_parent);
-    if (new_ref == m_ref && new_ref < old_baseline)
-        return false; // Has not changed
-
-    init_from_ref(new_ref);
-    return true; // Might have changed
-}
-
-
-MemRef Array::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-
-    Array new_slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&new_slice);
-    Type type = get_type();
-    new_slice.create(type, m_context_flag); // Throws
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        int_fast64_t value = get(i);
-        new_slice.add(value); // Throws
-    }
-    dg.release();
-    return new_slice.get_mem();
-}
-
-
-MemRef Array::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    REALM_ASSERT(is_attached());
-    if (!has_refs())
-        return slice(offset, slice_size, target_alloc); // Throws
-
-    Array new_slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&new_slice);
-    Type type = get_type();
-    new_slice.create(type, m_context_flag); // Throws
-    _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
-    size_t begin = offset;
-    size_t end = offset + slice_size;
-    for (size_t i = begin; i != end; ++i) {
-        int_fast64_t value = get(i);
-
-        // Null-refs signify empty subtrees. Also, all refs are
-        // 8-byte aligned, so the lowest bits cannot be set. If they
-        // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && (value & 1) == 0;
-        if (!is_subarray) {
-            new_slice.add(value); // Throws
-            continue;
-        }
-
-        ref_type ref = to_ref(value);
-        Allocator& allocator = get_alloc();
-        MemRef new_mem = clone(MemRef(ref, allocator), allocator, target_alloc); // Throws
-        dg_2.reset(new_mem.get_ref());
-        value = from_ref(new_mem.get_ref());
-        new_slice.add(value); // Throws
-        dg_2.release();
-    }
-    dg.release();
-    return new_slice.get_mem();
-}
-
-
-// Allocates space for 'num_items' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::preset(size_t bitwidth, size_t num_items)
-{
-    clear_and_destroy_children();
-    set_width(bitwidth);
-    alloc(num_items, bitwidth); // Throws
-    m_size = num_items;
-    for (size_t i = 0; i != num_items; ++i)
-        set(i, 0);
-}
-
-void Array::preset(int64_t min, int64_t max, size_t num_items)
-{
-    size_t w = std::max(bit_width(max), bit_width(min));
-    preset(w, num_items);
+    char* header = get_header();
+    set_is_inner_bptree_node_in_header(init_is_inner_bptree_node, header);
+    set_hasrefs_in_header(init_has_refs, header);
 }
 
 
@@ -448,114 +368,36 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     realm::safe_copy_n(begin_2, end_2 - begin_2, dest_begin_2);
 }
 
-void Array::move_backward(size_t begin, size_t end, size_t dest_end)
+void Array::move(Array& dst, size_t ndx)
 {
-    REALM_ASSERT_3(begin, <=, end);
-    REALM_ASSERT_3(end, <=, m_size);
-    REALM_ASSERT_3(dest_end, <=, m_size);
-    REALM_ASSERT_3(end - begin, <=, dest_end);
-    REALM_ASSERT(!(dest_end > begin && dest_end <= end)); // Required by std::copy_backward
+    size_t nb_to_move = m_size - ndx;
+    dst.copy_on_write();
+    dst.ensure_minimum_width(this->m_ubound);
+    dst.alloc(dst.m_size + nb_to_move, dst.m_width); // Make room for the new elements
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
+    // cache variables used in tight loop
+    size_t dest_begin = dst.m_size;
+    auto getter = m_getter;
+    auto setter = dst.m_vtable->setter;
+    size_t sz = m_size;
 
-    size_t bits_per_elem = m_width;
-    const char* header = get_header_from_data(m_data);
-    if (get_wtype_from_header(header) == wtype_Multiply) {
-        bits_per_elem *= 8;
+    for (size_t i = ndx; i < sz; i++) {
+        auto v = (this->*getter)(i);
+        (dst.*setter)(dest_begin++, v);
     }
 
-    if (bits_per_elem < 8) {
-        // FIXME: Should be optimized
-        for (size_t i = end; i != begin; --i) {
-            int_fast64_t v = (this->*m_getter)(i - 1);
-            (this->*(m_vtable->setter))(--dest_end, v);
-        }
-        return;
-    }
-
-    size_t bytes_per_elem = bits_per_elem / 8;
-    const char* begin_2 = m_data + begin * bytes_per_elem;
-    const char* end_2 = m_data + end * bytes_per_elem;
-    char* dest_end_2 = m_data + dest_end * bytes_per_elem;
-    std::copy_backward(begin_2, end_2, dest_end_2);
+    dst.m_size += nb_to_move;
+    truncate(ndx);
 }
-
-
-void Array::move_rotate(size_t from, size_t to, size_t num_elems)
-{
-    REALM_ASSERT_DEBUG_EX(from < m_size && to < m_size && num_elems <= m_size, from, to, num_elems, m_size);
-
-    if (from == to)
-        return;
-
-    copy_on_write(); // Throws
-
-    size_t bits_per_elem = m_width;
-    const char* header = get_header_from_data(m_data);
-    if (get_wtype_from_header(header) == wtype_Multiply) {
-        bits_per_elem *= 8;
-    }
-
-    if (bits_per_elem < 8) {
-        // Allocate some space for saving the moved elements.
-        // FIXME: Optimize this.
-        // FIXME: Support larger numbers of elements.
-        static const size_t small_save_limit = 32;
-        std::array<int64_t, small_save_limit> small_save;
-        std::unique_ptr<int64_t[]> big_save;
-        int64_t* save;
-        if (num_elems < small_save_limit) {
-            save = small_save.data();
-        }
-        else {
-            big_save.reset(new int64_t[num_elems]);
-            save = big_save.get();
-        }
-
-        // Save elements that should be moved.=
-        for (size_t i = 0; i < num_elems; ++i) {
-            save[i] = get(from + i);
-        }
-
-        // Shift elements in between up or down.
-        if (from < to) {
-            // Shift down.
-            move(from + num_elems, to + num_elems, from);
-        }
-        else { // from > to
-            // Shift up.
-            move_backward(to, from, from + num_elems);
-        }
-
-        // Restore saved elements at new location.
-        for (size_t i = 0; i < num_elems; ++i) {
-            set(to + i, save[i]);
-        }
-    }
-    else {
-        size_t bytes_per_elem = bits_per_elem / 8;
-        char* first;
-        char* new_first;
-        char* last;
-        if (from < to) {
-            first = m_data + (from * bytes_per_elem);
-            new_first = m_data + ((from + num_elems) * bytes_per_elem);
-            last = m_data + ((to + num_elems) * bytes_per_elem);
-        }
-        else {
-            first = m_data + (to * bytes_per_elem);
-            new_first = m_data + (from * bytes_per_elem);
-            last = m_data + ((from + num_elems) * bytes_per_elem);
-        }
-        std::rotate(first, new_first, last);
-    }
-}
-
 
 void Array::add_to_column(IntegerColumn* column, int64_t value)
 {
     column->add(value);
+}
+
+void Array::add_to_column(KeyColumn* column, int64_t value)
+{
+    column->add(ObjKey(value));
 }
 
 void Array::set(size_t ndx, int64_t value)
@@ -700,9 +542,8 @@ void Array::truncate(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
-        set_header_width(0);
+        set_width_in_header(0, get_header());
     }
 }
 
@@ -734,9 +575,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        m_capacity = calc_item_count(get_capacity_from_header(), 0);
         set_width(0);
-        set_header_width(0);
+        set_width_in_header(0, get_header());
     }
 }
 
@@ -768,11 +608,8 @@ void Array::set_all_to_zero()
 
     copy_on_write(); // Throws
 
-    m_capacity = calc_item_count(get_capacity_from_header(), 0);
     set_width(0);
-
-    // Update header
-    set_header_width(0);
+    set_width_in_header(0, get_header());
 }
 
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
@@ -1532,32 +1369,6 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
     return aligned_byte_size;
 }
 
-size_t Array::calc_byte_len(size_t num_items, size_t width) const
-{
-    REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
-
-    // FIXME: Consider calling `calc_aligned_byte_size(size)`
-    // instead. Note however, that calc_byte_len() is supposed to return
-    // the unaligned byte size. It is probably the case that no harm
-    // is done by returning the aligned version, and most callers of
-    // calc_byte_len() will actually benefit if calc_byte_len() was
-    // changed to always return the aligned byte size.
-
-    size_t bits = num_items * width;
-    size_t bytes = (bits + 7) / 8; // round up
-    return bytes + header_size;    // add room for 8 byte header
-}
-
-size_t Array::calc_item_count(size_t bytes, size_t width) const noexcept
-{
-    if (width == 0)
-        return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
-
-    size_t bytes_data = bytes - header_size; // ignore 8 byte header
-    size_t total_bits = bytes_data * 8;
-    return total_bits / width;
-}
-
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
     const char* header = mem.get_addr();
@@ -1579,7 +1390,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
 
         // Update with correct capacity
-        set_header_capacity(size, clone_header);
+        set_capacity_in_header(size, clone_header);
 
         return clone_mem;
     }
@@ -1623,50 +1434,6 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     return new_array.get_mem();
 }
 
-void Array::do_copy_on_write(size_t minimum_size)
-{
-    // Calculate size in bytes
-    size_t array_size = calc_byte_len(m_size, m_width);
-    size_t new_size = std::max(array_size, minimum_size);
-    new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
-    // Plus a bit of matchcount room for expansion
-    new_size += 64;
-
-    // Create new copy of array
-    MemRef mref = m_alloc.alloc(new_size); // Throws
-    const char* old_begin = get_header_from_data(m_data);
-    const char* old_end = get_header_from_data(m_data) + array_size;
-    char* new_begin = mref.get_addr();
-    realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
-
-    ref_type old_ref = m_ref;
-
-    // Update internal data
-    m_ref = mref.get_ref();
-    m_data = get_data_from_header(new_begin);
-    m_capacity = calc_item_count(new_size, m_width);
-    REALM_ASSERT_DEBUG(m_capacity > 0);
-
-    // Update capacity in header. Uses m_data to find header, so
-    // m_data must be initialized correctly first.
-    set_header_capacity(new_size);
-
-    update_parent();
-
-#if REALM_ENABLE_MEMDEBUG
-    if (!m_alloc.is_read_only(old_ref)) {
-        // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
-        // of the allocated block in order to free it. This size is computed from the width and size header
-        // fields.
-        memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
-    }
-#endif
-
-    // Mark original as deleted, so that the space can be reclaimed in
-    // future commits, when no versions are using it anymore
-    m_alloc.free_(old_ref, old_begin);
-}
-
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
                      Allocator& alloc)
 {
@@ -1707,70 +1474,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     }
 
     return mem;
-}
-
-void Array::alloc(size_t init_size, size_t width)
-{
-    REALM_ASSERT(is_attached());
-
-    size_t needed_bytes = calc_byte_len(init_size, width);
-    // this method is not public and callers must (and currently do) ensure that
-    // needed_bytes are never larger than max_array_payload.
-    REALM_ASSERT_RELEASE(init_size <= max_array_size);
-
-    if (is_read_only())
-        do_copy_on_write(needed_bytes);
-
-    REALM_ASSERT(!m_alloc.is_read_only(m_ref));
-    REALM_ASSERT_3(m_capacity, >, 0);
-    if (m_capacity < init_size || width != m_width) {
-        size_t orig_capacity_bytes = get_capacity_from_header();
-        size_t capacity_bytes = orig_capacity_bytes;
-
-        if (capacity_bytes < needed_bytes) {
-            // Double to avoid too many reallocs (or initialize to initial size), but truncate if that exceeds the
-            // maximum allowed payload (measured in bytes) for arrays. This limitation is due to 24-bit capacity
-            // field in the header.
-            size_t new_capacity_bytes = capacity_bytes * 2;
-            if (new_capacity_bytes < capacity_bytes) // overflow detected, clamp to max
-                new_capacity_bytes = max_array_payload_aligned;
-            if (new_capacity_bytes > max_array_payload_aligned) // cap at max allowed allocation
-                new_capacity_bytes = max_array_payload_aligned;
-            capacity_bytes = new_capacity_bytes;
-
-            // If doubling is not enough, expand enough to fit
-            if (capacity_bytes < needed_bytes) {
-                size_t rest = (~needed_bytes & 0x7) + 1;
-                capacity_bytes = needed_bytes;
-                if (rest < 8)
-                    capacity_bytes += rest; // 64bit align
-            }
-
-            // Allocate and update header
-            char* header = get_header_from_data(m_data);
-            MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes, capacity_bytes); // Throws
-
-            header = mem_ref.get_addr();
-            set_header_width(int(width), header);
-            set_header_size(init_size, header);
-            set_header_capacity(capacity_bytes, header);
-
-            // Update this accessor and its ancestors
-            m_ref = mem_ref.get_ref();
-            m_data = get_data_from_header(header);
-            m_capacity = calc_item_count(capacity_bytes, width);
-            // FIXME: Trouble when this one throws. We will then leave
-            // this array instance in a corrupt state
-            update_parent(); // Throws
-            return;
-        }
-
-        m_capacity = calc_item_count(capacity_bytes, width);
-        set_header_width(int(width));
-    }
-
-    // Update header
-    set_header_size(init_size);
 }
 
 int_fast64_t Array::lbound_for_width(size_t width) noexcept
@@ -1950,36 +1653,6 @@ void Array::set(size_t ndx, int64_t value)
 }
 
 
-// FIXME: Not exception safe (leaks are possible).
-ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
-{
-    size_t leaf_size = size();
-    REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx)
-        ndx = leaf_size;
-    if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-        insert(ndx, value); // Throws
-        return 0;           // Leaf was not split
-    }
-
-    // Split leaf node
-    Array new_leaf(m_alloc);
-    new_leaf.create(has_refs() ? type_HasRefs : type_Normal); // Throws
-    if (ndx == leaf_size) {
-        new_leaf.add(value); // Throws
-        state.m_split_offset = ndx;
-    }
-    else {
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i)); // Throws
-        truncate(ndx);            // Throws
-        add(value);               // Throws
-        state.m_split_offset = ndx + 1;
-    }
-    state.m_split_size = leaf_size + 1;
-    return new_leaf.get_ref();
-}
-
 // LCOV_EXCL_START ignore debug functions
 
 std::pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
@@ -2086,6 +1759,23 @@ void Array::report_memory_usage_2(MemUsageHandler& handler) const
     }
 }
 
+void Array::verify() const
+{
+#ifdef REALM_DEBUG
+    REALM_ASSERT(is_attached());
+
+    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                 m_width == 32 || m_width == 64);
+
+    if (!get_parent())
+        return;
+
+    // Check that parent is set correctly
+    ref_type ref_in_parent = get_ref_from_parent();
+    REALM_ASSERT_3(ref_in_parent, ==, m_ref);
+#endif
+}
+
 
 #ifdef REALM_DEBUG
 
@@ -2098,21 +1788,6 @@ void Array::print() const
         std::cout << get(i);
     }
     std::cout << "\n";
-}
-
-void Array::verify() const
-{
-    REALM_ASSERT(is_attached());
-
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
-
-    if (!m_parent)
-        return;
-
-    // Check that parent is set correctly
-    ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
-    REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 }
 
 namespace {
@@ -2385,8 +2060,7 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
     if (end == npos)
         end = m_size;
 
-    QueryState<int64_t> state;
-    state.init(act_FindAll, result, static_cast<size_t>(-1));
+    QueryState<int64_t> state(act_FindAll, result);
     REALM_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;

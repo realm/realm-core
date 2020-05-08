@@ -19,8 +19,8 @@
 #include <vector>
 
 #include <realm/array_integer.hpp>
-#include <realm/column.hpp>
 #include <realm/impl/destroy_guard.hpp>
+#include <realm/column_integer.hpp>
 
 using namespace realm;
 
@@ -70,43 +70,19 @@ bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min
     }
 }
 
-
-std::vector<int64_t> ArrayInteger::to_vector() const
+void ArrayRef::verify() const
 {
-    std::vector<int64_t> v;
-    const size_t array_size = size();
-    for (size_t t = 0; t < array_size; ++t)
-        v.push_back(Array::get(t));
-    return v;
+#ifdef REALM_DEBUG
+    Array::verify();
+    REALM_ASSERT(has_refs());
+#endif
 }
 
-// if value does not contain an integer, then create an all 0 array with 0 also represeting null
-// if value contains an integer, make sure to pick a different integer to represent null
-MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, value_type value, Allocator& alloc)
+
+MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, Allocator& alloc)
 {
-    int64_t val = value.value_or(0);
-    MemRef r = Array::create(type, context_flag, wtype_Bits, size + 1, val, alloc); // Throws
-    ArrayIntNull arr(alloc);
-    _impl::DestroyGuard<ArrayIntNull> dg(&arr);
-    arr.Array::init_from_mem(r);
-    if (value) {
-        if (arr.m_width == 64) {
-            int_fast64_t null_value = val ^ 1; // Just anything different from value.
-            arr.Array::set(0, null_value);     // Throws
-        }
-        else {
-            // For all other bit widths, we use the upper bound to represent null (also stored at index 0).
-            int_fast64_t null_value = arr.m_ubound;
-            if (val == null_value) {
-                // the initial value is equal to the existing upper bound, so expand to next bit width
-                int_fast64_t next_upper_bound = ubound_for_width(bit_width(arr.m_ubound + 1));
-                null_value = next_upper_bound;
-            }
-            arr.Array::set(0, null_value); // Throws
-        }
-    }
-    dg.release();
-    return arr.get_mem();
+    // Create an array with null value as the first element
+    return Array::create(type, context_flag, wtype_Bits, size + 1, 0, alloc); // Throws
 }
 
 
@@ -121,16 +97,8 @@ void ArrayIntNull::init_from_mem(MemRef mem) noexcept
 {
     Array::init_from_mem(mem);
 
-    if (m_size == 0) {
-        // This can only happen when mem is being reused from another
-        // array (which happens when shrinking the B+tree), so we need
-        // to add the "magic" null value to the beginning.
-
-        // Since init_* functions are noexcept, but insert() isn't, we
-        // need to ensure that insert() will not allocate.
-        REALM_ASSERT(m_capacity != 0);
-        Array::insert(0, m_ubound);
-    }
+    // We always have the null value stored at position 0
+    REALM_ASSERT(m_size > 0);
 }
 
 void ArrayIntNull::init_from_parent() noexcept
@@ -256,76 +224,11 @@ void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
     }
 }
 
-namespace {
-
-// FIXME: Move this logic to BpTree.
-struct ArrayIntNullLeafInserter {
-    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, util::Optional<int64_t> value,
-                                TreeInsertBase& state)
-    {
-        size_t leaf_size = self.size();
-        REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
-        if (leaf_size < ndx)
-            ndx = leaf_size;
-        if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
-            self.insert(ndx, value); // Throws
-            return 0;                // Leaf was not split
-        }
-
-        // Split leaf node
-        ArrayIntNull new_leaf(alloc);
-        new_leaf.create(Array::type_Normal); // Throws
-        if (ndx == leaf_size) {
-            new_leaf.add(value); // Throws
-            state.m_split_offset = ndx;
-        }
-        else {
-            for (size_t i = ndx; i < leaf_size; ++i) {
-                new_leaf.add(self.get(i)); // Throws
-            }
-            self.truncate(ndx); // Throws
-            self.add(value);    // Throws
-            state.m_split_offset = ndx + 1;
-        }
-        state.m_split_size = leaf_size + 1;
-        return new_leaf.get_ref();
+void ArrayIntNull::move(ArrayIntNull& dst, size_t ndx)
+{
+    size_t sz = size();
+    for (size_t i = ndx; i < sz; i++) {
+        dst.add(get(i));
     }
-};
-
-} // anonymous namespace
-
-ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, value_type value, TreeInsertBase& state)
-{
-    return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
-}
-
-MemRef ArrayIntNull::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    // NOTE: It would be nice to consolidate this with Array::slice somehow.
-
-    REALM_ASSERT(is_attached());
-
-    Array array_slice(target_alloc);
-    _impl::DeepArrayDestroyGuard dg(&array_slice);
-    Type type = get_type();
-    array_slice.create(type, m_context_flag); // Throws
-    array_slice.add(null_value());
-
-    size_t begin = offset + 1;
-    size_t end = offset + slice_size + 1;
-    for (size_t i = begin; i != end; ++i) {
-        int_fast64_t value = Array::get(i);
-        array_slice.add(value); // Throws
-    }
-    dg.release();
-    return array_slice.get_mem();
-}
-
-MemRef ArrayIntNull::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
-{
-    // NOTE: It would be nice to consolidate this with Array::slice_and_clone_children somehow.
-
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(!has_refs());
-    return slice(offset, slice_size, target_alloc);
+    truncate(ndx + 1);
 }

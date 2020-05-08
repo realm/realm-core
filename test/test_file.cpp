@@ -418,7 +418,7 @@ TEST(File_PreallocResizing)
     TEST_PATH(path);
     File file(path, File::mode_Write);
     CHECK(file.is_attached());
-    file.set_encryption_key(crypt_key());
+    // we cannot test this with encryption...prealloc always allocates a full page
     file.prealloc(0); // this is allowed
     CHECK_EQUAL(file.get_size(), 0);
     file.prealloc(100);

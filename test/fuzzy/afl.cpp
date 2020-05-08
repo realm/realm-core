@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include "../fuzz_group.hpp"
 
 int main(int argc, const char* argv[])

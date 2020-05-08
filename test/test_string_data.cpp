@@ -532,12 +532,12 @@ TEST(StringData_Hash_CityHash64)
         const uint_least64_t hash = realm::cityhash_64(data, input_expected[i].first.size());
 
         // With libc++ (on macOS), use this line to generate a reference hash:
-        //const uint_least64_t hash = std::__murmur2_or_cityhash<uint_least64_t, 64>{}(data, input_expected[i].first.size());
+        // const uint_least64_t hash = std::__murmur2_or_cityhash<uint_least64_t, 64>{}(data,
+        // input_expected[i].first.size());
 
         if (!CHECK_EQUAL(hash, input_expected[i].second)) {
-            std::cerr << "Failed input string: " << input_expected[i].first
-                << ", hex expected: " << std::hex << input_expected[i].second
-                << ", hex got: " << std::hex << hash << "\n";
+            std::cerr << "Failed input string: " << input_expected[i].first << ", hex expected: " << std::hex
+                      << input_expected[i].second << ", hex got: " << std::hex << hash << "\n";
         }
     }
 }
@@ -556,11 +556,11 @@ TEST(StringData_Hash_SelectsAppropriateAlgorithmForArchitecture)
         const uint_least64_t expected = 0x3d880bd14a5a7954ULL;
 
         // With libc++ (on macOS), use this line to generate a reference hash:
-        //auto expected = std::__murmur2_or_cityhash<uint_least64_t, 64>{}(reinterpret_cast<const unsigned char*>(input.data()), input.size());
+        // auto expected = std::__murmur2_or_cityhash<uint_least64_t, 64>{}(reinterpret_cast<const unsigned
+        // char*>(input.data()), input.size());
 
         CHECK_EQUAL(uint_least64_t{hash}, expected);
     }
 }
 
 #endif
-

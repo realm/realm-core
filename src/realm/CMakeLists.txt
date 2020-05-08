@@ -1,47 +1,49 @@
 set(REALM_SOURCES
+    # slowest to compile first
+    query.cpp
+    array.cpp
+
     alloc.cpp
     alloc_slab.cpp
-    array.cpp
+    array_backlink.cpp
     array_binary.cpp
     array_blob.cpp
+    array_blobs_small.cpp
     array_blobs_big.cpp
     array_integer.cpp
+    array_mixed.cpp
+    array_unsigned.cpp
     array_string.cpp
-    array_string_long.cpp
-    bptree.cpp
-    column.cpp
-    column_backlink.cpp
+    array_string_short.cpp
+    array_timestamp.cpp
+    bplustree.cpp
+    cluster.cpp
     column_binary.cpp
-    column_link.cpp
-    column_link_base.cpp
-    column_linklist.cpp
-    column_mixed.cpp
-    column_string.cpp
-    column_string_enum.cpp
-    column_table.cpp
-    column_timestamp.cpp
-    descriptor.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
     group.cpp
-    group_shared.cpp
+    db.cpp
     group_writer.cpp
     history.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
     impl/transact_log.cpp
     index_string.cpp
-    lang_bind_helper.cpp
-    link_view.cpp
-    query.cpp
+    list.cpp
+    node.cpp
+    mixed.cpp
+    obj.cpp
+    global_key.cpp
     query_engine.cpp
     query_expression.cpp
     replication.cpp
-    row.cpp
     spec.cpp
     string_data.cpp
     table.cpp
+    table_ref.cpp
+    obj_list.cpp
     table_view.cpp
+    sort_descriptor.cpp
     unicode.cpp
     util/allocator.cpp
     util/backtrace.cpp
@@ -56,83 +58,81 @@ set(REALM_SOURCES
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/serializer.cpp
+    util/sha_crypto.cpp
     util/terminate.cpp
     util/thread.cpp
     util/to_string.cpp
     utilities.cpp
     version.cpp
-    views.cpp
 ) # REALM_SOURCES
 
 set(REALM_INSTALL_GENERAL_HEADERS
     alloc.hpp
     alloc_slab.hpp
     array.hpp
+    array_backlink.hpp
     array_basic.hpp
     array_basic_tpl.hpp
     array_binary.hpp
     array_blob.hpp
     array_blobs_big.hpp
+    array_blobs_small.hpp
+    array_bool.hpp
     array_direct.hpp
     array_integer.hpp
+    array_mixed.hpp
+    array_key.hpp
+    array_list.hpp
     array_string.hpp
-    array_string_long.hpp
+    array_string_short.hpp
+    array_timestamp.hpp
+    array_unsigned.hpp
     binary_data.hpp
-    bptree.hpp
-    column.hpp
-    column_backlink.hpp
+    bplustree.hpp
+    cluster.hpp
+    cluster_tree.hpp
     column_binary.hpp
+    column_integer.hpp
     column_fwd.hpp
-    column_link.hpp
-    column_linkbase.hpp
-    column_linklist.hpp
-    column_mixed.hpp
-    column_mixed_tpl.hpp
-    column_string.hpp
-    column_string_enum.hpp
-    column_table.hpp
-    column_timestamp.hpp
-    column_tpl.hpp
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
-    descriptor.hpp
-    descriptor_fwd.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
     group.hpp
-    group_shared.hpp
-    group_shared_options.hpp
+    db.hpp
+    db_options.hpp
     group_writer.hpp
     handover_defs.hpp
     history.hpp
     index_string.hpp
-    lang_bind_helper.hpp
-    link_view.hpp
-    link_view_fwd.hpp
+    keys.hpp
     mixed.hpp
     null.hpp
-    olddatetime.hpp
+    list.hpp
+    node.hpp
+    node_header.hpp
+    obj.hpp
+    global_key.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
-    query_operators.hpp
     realm_nmmintrin.h
     replication.hpp
-    row.hpp
     spec.hpp
     string_data.hpp
     table.hpp
     table_ref.hpp
+    sort_descriptor.hpp
+    obj_list.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp
     utilities.hpp
     version.hpp
     version_id.hpp
-    views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_INSTALL_IMPL_HEADERS
@@ -141,7 +141,6 @@ set(REALM_INSTALL_IMPL_HEADERS
     impl/destroy_guard.hpp
     impl/input_stream.hpp
     impl/output_stream.hpp
-    impl/sequential_getter.hpp
     impl/simulated_failure.hpp
     impl/transact_log.hpp
 )
@@ -163,6 +162,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/fifo_helper.hpp
     util/file.hpp
     util/file_mapper.hpp
+    util/function_ref.hpp
     util/hex_dump.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
@@ -195,6 +195,7 @@ set(REALM_METRICS_HEADERS
 ) # REALM_METRICS_HEADERS
 
 set(REALM_OTHER_UTIL_HEADERS
+    util/sha_crypto.hpp
     util/aes_cryptor.hpp
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
@@ -226,6 +227,10 @@ set_target_properties(CoreObjects PROPERTIES
 target_compile_definitions(CoreObjects PRIVATE
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
+)
+target_compile_definitions(CoreObjects PRIVATE
+  $<$<CONFIG:Debug>:REALM_DEBUG=1>
+  $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 target_compile_options(CoreObjects PRIVATE ${REALM_SANITIZER_FLAGS})
 
@@ -259,18 +264,23 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
 endif()
 
 
-add_library(Core STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
-set_target_properties(Core PROPERTIES OUTPUT_NAME "realm")
-add_library(realm ALIAS Core)
+add_library(Storage STATIC ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
+set_target_properties(Storage PROPERTIES OUTPUT_NAME "realm")
+add_library(realm ALIAS Storage)
 
-target_compile_definitions(Core PUBLIC
-  "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
-  "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>"
+target_compile_definitions(Storage PUBLIC
+  $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
+  $<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>
+)
+
+target_compile_definitions(Storage PUBLIC
+  $<$<CONFIG:Debug>:REALM_DEBUG=1>
+  $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
 if(NOT MSVC)
-    target_compile_options(Core PUBLIC ${REALM_SANITIZER_FLAGS})
-    target_link_options(Core PUBLIC ${REALM_SANITIZER_FLAGS})
+    target_compile_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
+    target_link_options(Storage PUBLIC ${REALM_SANITIZER_FLAGS})
 endif()
 
 # GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
@@ -280,78 +290,86 @@ endif()
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     try_compile(USES_OLD_ABI ${RealmCore_BINARY_DIR}/abitest ${RealmCore_SOURCE_DIR}/tools/cmake/abitest abitest)
     if(USES_OLD_ABI)
-        message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on Realm::Core will be built with _GLIBCXX_USE_CXX11_ABI=0.")
-        target_compile_definitions(Core INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
+        message(WARNING "You are compiling on a system that uses a non-compliant C++11 ABI. Downstream components depending on RealmCore::Storage will be built with _GLIBCXX_USE_CXX11_ABI=0.")
+        target_compile_definitions(Storage INTERFACE "_GLIBCXX_USE_CXX11_ABI=0")
     endif()
 endif()
 
-target_include_directories(Core
+target_include_directories(Storage
     INTERFACE
         $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
         $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(Core INTERFACE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(Storage INTERFACE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
     set(REALM_SKIP_SHARED_LIB ON)
 endif()
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    add_library(CoreShared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
-    add_library(realm-shared ALIAS CoreShared)
+    add_library(StorageShared SHARED ${REALM_OBJECT_FILES} ${REALM_XCODE_DEPENDENCY})
+    add_library(realm-shared ALIAS StorageShared)
 
-    target_include_directories(CoreShared
+    target_include_directories(StorageShared
         INTERFACE
             $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
             $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
     set_target_properties(
-            CoreShared PROPERTIES
+        StorageShared PROPERTIES
             OUTPUT_NAME "realm"
     )
 
-    target_link_libraries(CoreShared PRIVATE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT}
+    target_link_libraries(StorageShared PRIVATE ${REALM_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT}
     )
 endif()
 
-if(REALM_ENABLE_ENCRYPTION AND UNIX AND NOT APPLE)
-    if(ANDROID)
-        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
-        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-${ANDROID_OPENSSL_BUILD_NUMBER}-Android-${ANDROID_ABI}")
-        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
+if(UNIX AND NOT APPLE)
+    if(NOT OpenSSL_DIR)
+        if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+            if(ANDROID)
+                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+            else()
+                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+            endif()
 
-        message(STATUS "Downloading OpenSSL...")
-        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
+            message(STATUS "Getting ${OPENSSL_URL}...")
+            file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
 
-        message(STATUS "Uncompressing OpenSSL...")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
+            list(GET download_status 0 status_code)
+            if (NOT "${status_code}" STREQUAL "0")
+                message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+            endif()
 
-        set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
-        set(OPENSSL_INCLUDE_DIR "${OPENSSL_ROOT_DIR}/include")
-        set(OPENSSL_CRYPTO_LIBRARY "${OPENSSL_ROOT_DIR}/lib/libcrypto.a")
-        install(
-            DIRECTORY ${OPENSSL_ROOT_DIR}
-            DESTINATION .
-            COMPONENT devel)
+            message(STATUS "Uncompressing OpenSSL...")
+            execute_process(
+                COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+            )
+        endif()
+
+        set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
     endif()
-    find_package(OpenSSL REQUIRED)
-    target_include_directories(CoreObjects PUBLIC ${OPENSSL_INCLUDE_DIR})
-    target_link_libraries(Core INTERFACE OpenSSL::Crypto)
+    find_package(OpenSSL REQUIRED CONFIG)
+    get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
+
+    target_include_directories(CoreObjects SYSTEM PUBLIC ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
     if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(CoreShared PRIVATE OpenSSL::Crypto)
+        target_link_libraries(StorageShared PUBLIC OpenSSL::Crypto)
     endif()
 endif()
 
 if(APPLE)
-    target_link_libraries(Core INTERFACE "-framework Foundation")
+    target_link_libraries(Storage INTERFACE "-framework Foundation")
     if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(CoreShared PRIVATE ${Foundation})
+        target_link_libraries(StorageShared PRIVATE ${Foundation})
     endif()
 endif(APPLE)
 
-install(TARGETS Core EXPORT realm
+install(TARGETS Storage EXPORT realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 
 # include .pdb files with debug symbols on Windows
@@ -385,7 +403,7 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         COMPONENT devel)
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    install(TARGETS CoreShared
+    install(TARGETS StorageShared
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
             RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
 endif()

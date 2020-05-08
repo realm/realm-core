@@ -13,6 +13,8 @@ branch = tokens[tokens.size()-1]
 
 jobWrapper {
     stage('gather-info') {
+        isPullRequest = !!env.CHANGE_TARGET
+        targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
         node('docker') {
             getSourceArchive()
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
@@ -36,15 +38,20 @@ jobWrapper {
                     setBuildName("Tag ${gitTag}")
                 }
             }
+            targetSHA1 = 'NONE'
+            if (isPullRequest) {
+                targetSHA1 = sh(returnStdout: true, script: "git merge-base origin/${targetBranch} HEAD").trim()
+            }
+ 
         }
 
-        isPullRequest = !!env.CHANGE_TARGET
-        targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
         println "Target branch: ${targetBranch}"
 
         releaseTesting = targetBranch.contains('release')
+        isMaster = currentBranch.contains('master')
+        longRunningTests = isMaster || currentBranch.contains('next-major')
         isPublishingRun = false
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
@@ -53,25 +60,51 @@ jobWrapper {
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
+        echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
-        if (['master'].contains(env.BRANCH_NAME)) {
+        if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
             env.DOCKER_PUSH = "1"
         }
     }
 
+    if (isPullRequest) {
+        stage('FormatCheck') {
+            node('docker') {
+                getArchive()
+                docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+                    echo "Checking code formatting"
+                    modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
+                    try {
+                        if (!modifications.equals('no modified files to format')) {
+                            if (!modifications.equals('clang-format did not modify any files')) {
+                                echo "Commit violates formatting rules"
+                                sh "git clang-format --diff ${targetSHA1} > format_error.txt"
+                                archiveArtifacts('format_error.txt')
+                                sh 'exit 1'
+                            }
+                        }
+                        currentBuild.result = 'SUCCESS'
+                    } catch (Exception err) {
+                        currentBuild.result = 'FAILURE'
+                        throw err
+                    }
+                }
+            }
+        }
+    }
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
+            checkLinuxDebugNoEncryp : doCheckInDocker('Release', '4', 'OFF'),
             checkMacOsRelease       : doBuildMacOs('Release', true),
-            checkWin32Debug         : doBuildWindows('Debug', false, 'Win32', true),
-            checkWin64Release       : doBuildWindows('Release', false, 'x64', true),
+            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
+            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-            addressSanitizer        : doCheckSanity('Debug', '1000', 'address')
+            addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -81,7 +114,7 @@ jobWrapper {
                 androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                : doBuildCoverage(),
                 performance             : buildPerformance(),
-                valgrind                : doCheckValgrind()
+                // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
         }
@@ -114,7 +147,7 @@ jobWrapper {
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
 
-            androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+            androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
             androidBuildTypes = ['Debug', 'Release']
 
             for (abi in androidAbis) {
@@ -176,8 +209,9 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
     return {
         node('docker') {
             getArchive()
-            def buildEnv = docker.build 'realm-core:snapshot'
+            def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
+            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 buildEnv.inside() {
@@ -185,7 +219,7 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
                         sh """
                            mkdir build-dir
                            cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
+                           cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
                         """
                         runAndCollectWarnings(script: "cd build-dir && ninja")
                         sh """
@@ -205,7 +239,7 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
     return {
         node('docker') {
             getArchive()
-            def buildEnv = docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .')
+            def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
             def sanitizeFlags = ''
             def privileged = '';
@@ -243,14 +277,14 @@ def doBuildLinux(String buildType) {
         node('docker') {
             getSourceArchive()
 
-            docker.build('realm-core-generic:snapshot', '-f generic.Dockerfile .').inside {
+            docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
                 sh """
                    cmake --help
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-6 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 ..
-                   make -j4
+                   scl enable devtoolset-8 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   ninja
                    cpack -G TGZ
                 """
             }
@@ -269,7 +303,7 @@ def doBuildLinuxClang(String buildType) {
     return {
         node('docker') {
             getArchive()
-            docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+            docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
                 sh """
                    mkdir build-dir
                    cd build-dir
@@ -292,7 +326,7 @@ def doCheckValgrind() {
     return {
         node('docker') {
             getArchive()
-            def buildEnv = docker.build('realm-core-valgrind:snapshot', '-f valgrind.Dockerfile .')
+            def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
@@ -326,13 +360,13 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
+            def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -385,7 +419,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
     def cmakeDefinitions;
     if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
+      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
     }
@@ -410,7 +444,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     publishingStashes << stashName
                 }
             }
-            if (runTests) {
+            if (runTests && !isUWP) {
                 def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
                 environment << 'UNITTEST_PROGRESS=1'
                 withEnv(environment) {
@@ -439,7 +473,7 @@ def buildPerformance() {
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      docker.build('realm-core:snapshot').inside {
+      docker.build('realm-core-linux:18.04').inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -471,7 +505,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
         node('osx') {
             getArchive()
 
-            def buildTests = runTests ? '' : '-DREALM_NO_TESTS=1'
+            def buildTests = runTests ? '' : ' -DREALM_NO_TESTS=1'
+            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
 
             dir("build-macosx-${buildType}") {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
@@ -484,8 +519,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
                                     rm -rf *
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                                          -D REALM_VERSION=${gitDescribeVersion} \\
-                                          ${buildTests} -G Ninja ..
+                                          -D REALM_VERSION=${gitDescribeVersion}\\
+                                          ${buildTests}${cxx_flags} -G Ninja ..
                                 """
                         }
                     }
@@ -559,10 +594,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 15, unit: 'MINUTES') {
-                        runAndCollectWarnings(parser:'clang', script: """
-                                rm -rf build-*
-                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                            """)
+                        sh """
+                            rm -rf build-*
+                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                        """
                     }
                 }
             }
@@ -581,7 +616,7 @@ def doBuildCoverage() {
   return {
     node('docker') {
       getArchive()
-      docker.build('realm-core:snapshot').inside {
+      docker.build('realm-core-linux:18.04').inside {
         def workspace = pwd()
         sh """
           mkdir build

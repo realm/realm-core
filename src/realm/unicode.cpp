@@ -91,7 +91,6 @@ bool set_string_compare_method(string_compare_method_t method, StringCompareCall
     return true;
 }
 
-
 // clang-format off
 // Returns the number of bytes in a UTF-8 sequence whose leading byte is as specified.
 size_t sequence_length(char lead)
@@ -270,7 +269,6 @@ bool utf8_compare(StringData string1, StringData string2)
     return false;
 }
 
-
 // Here is a version for Windows that may be closer to what is ultimately needed.
 /*
 bool case_map(const char* begin, const char* end, StringBuffer& dest, bool upper)
@@ -376,7 +374,8 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // null-chacarcter, which is perfectly fine.
 
         wchar_t mapped_tmp[2];
-        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, 1, mapped_tmp, 2, nullptr, nullptr, 0);
+        LCMapStringEx(LOCALE_NAME_INVARIANT, upper ? LCMAP_UPPERCASE : LCMAP_LOWERCASE, tmp, 1, mapped_tmp, 2,
+                      nullptr, nullptr, 0);
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
         // to catch invalid UTF-8. Even though the documentation says

@@ -25,11 +25,11 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <thread>
 
 #include <realm/history.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"
@@ -72,651 +72,508 @@ using realm::test_util::crypt_key;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
-
-enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
-
-const int num_threads = 23;
-const int num_rounds = 2;
-
-const size_t max_blob_size = 32 * 1024; // 32 KiB
-
-const BinaryData EmptyNonNul = BinaryData("", 0);
-
-template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, MyEnum value, bool is_default)
+TEST_IF(Transactions_LargeMappingChange, REALM_ANDROID == 0 && TEST_DURATION > 0)
 {
-    set_int(column_ndx, row_ndx, value, is_default);
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    int data_size = 12 * 1024 * 1024;
+    {
+        TransactionRef tr = sg->start_write();
+        TableRef table = tr->add_table("test");
+        auto col = table->add_column(type_Binary, "binary");
+        char c = 'A';
+        for (int i = 0; i < 20; ++i) {
+            std::string str(data_size, c);
+            table->create_object().set(col, BinaryData(str));
+            c++;
+        }
+        tr->commit();
+    }
+    {
+        TransactionRef tr = sg->start_write();
+        TableRef table = tr->get_table("test");
+        auto col = table->get_column_key("binary");
+        char* data = new char[data_size];
+        for (int i = 0; i < data_size; i += 721) {
+            data[i] = i & 0xFF;
+        }
+        for (Obj& o : *table) {
+            o.set(col, BinaryData(data, data_size));
+            auto data2 = o.get<BinaryData>(col);
+            for (int k = 0; k < data_size; k += 721) {
+                const char* p = data2.data();
+                CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
+            }
+        }
+        delete[] data;
+        tr->commit();
+    }
+    {
+        TransactionRef tr = sg->start_read();
+        ConstTableRef table = tr->get_table("test");
+        auto col = table->get_column_key("binary");
+        for (auto& o : *table) {
+            auto data = o.get<BinaryData>(col);
+            for (int i = 0; i < data_size; i += 721) {
+                const char* p = data.data();
+                CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));
+            }
+        }
+    }
+}
+
+// This Header declaration must match the file format header declared in alloc_slab.hpp
+// (we cannot use the original one, as it is private, and I don't want make new friends)
+struct Header {
+    uint64_t m_top_ref[2]; // 2 * 8 bytes
+    // Info-block 8-bytes
+    uint8_t m_mnemonic[4];    // "T-DB"
+    uint8_t m_file_format[2]; // See `library_file_format`
+    uint8_t m_reserved;
+    // bit 0 of m_flags is used to select between the two top refs.
+    uint8_t m_flags;
+};
+
+TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    int data_size = 12 * 1024 * 1024;
+    {
+        TransactionRef g = sg->start_write();
+        TableRef tr = g->add_table("test");
+        auto col = tr->add_column(type_Binary, "binary");
+        char* data = new char[data_size];
+        for (int i = 0; i < data_size; i += 721) {
+            data[i] = i & 0xFF;
+        }
+        for (int i = 0; i < 20; ++i) {
+            auto obj = tr->create_object();
+            obj.set(col, BinaryData(data, data_size));
+            auto data2 = obj.get<BinaryData>(col);
+            for (int k = 0; k < data_size; k += 721) {
+                const char* p = data2.data();
+                CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
+            }
+        }
+        delete[] data;
+        g->commit();
+    }
+    sg->close();
+    {
+        util::File f(path, util::File::mode_Update);
+        util::File::Map<Header> headerMap(f, util::File::access_ReadWrite);
+        auto* header = headerMap.get_addr();
+        // at least one of the versions in the header must be 10.
+        CHECK(header->m_file_format[1] == 10 || header->m_file_format[0] == 10);
+        header->m_file_format[1] = header->m_file_format[0] = 9; // downgrade (both) to previous version
+        headerMap.sync();
+    }
+    sg = DB::create(path); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
+    {
+        // compat mapping is in effect for this part of the test
+        {
+            TransactionRef g = sg->start_read();
+            ConstTableRef tr = g->get_table("test");
+            auto col = tr->get_column_key("binary");
+            for (auto it = tr->begin(); it != tr->end(); ++it) {
+                auto data = it->get<BinaryData>(col);
+                for (int i = 0; i < data_size; i += 721) {
+                    const char* p = data.data();
+                    CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));
+                }
+            }
+        }
+        // grow the file further to trigger combined use of compatibility mapping and ordinary mappings
+        char* data = new char[data_size];
+        for (int i = 0; i < data_size; i += 721) {
+            data[i] = i & 0xFF;
+        }
+        auto g = sg->start_write();
+        auto tr = g->get_table("test");
+        auto col = tr->get_column_key("binary");
+        for (int i = 0; i < 10; ++i) {
+            auto obj = tr->create_object();
+            obj.set(col, BinaryData(data, data_size));
+            auto data2 = obj.get<BinaryData>(col);
+            for (int k = 0; k < data_size; k += 721) {
+                const char* p = data2.data();
+                CHECK_EQUAL((p[k] & 0xFF), (k & 0xFF));
+            }
+        }
+        delete[] data;
+        g->commit();
+    }
+    sg->close();           // file has been upgrade to version 10, so....
+    sg = DB::create(path); // when opened again, compatibility mapping is NOT in use:
+    {
+        TransactionRef g = sg->start_read();
+        ConstTableRef tr = g->get_table("test");
+        auto col = tr->get_column_key("binary");
+        for (auto it = tr->begin(); it != tr->end(); ++it) {
+            auto data = it->get<BinaryData>(col);
+            for (int i = 0; i < data_size; i += 721) {
+                const char* p = data.data();
+                CHECK_EQUAL((p[i] & 0xFF), (i & 0xFF));
+            }
+        }
+    }
+}
+
+TEST(Transactions_StateChanges)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TransactionRef writer = db->start_write();
+    TableRef tr = writer->add_table("hygge");
+    auto col = tr->add_column(type_Int, "hejsa");
+    auto lcol = tr->add_column_list(type_Int, "gurgle");
+    auto obj = tr->create_object().set_all(45);
+    Lst<int64_t> list = obj.get_list<int64_t>(lcol);
+    list.add(5);
+    list.add(7);
+    CHECK(!writer->is_frozen());
+    // verify that we cannot freeze a write transaction
+    CHECK_THROW(writer->freeze(), realm::LogicError);
+    writer->commit_and_continue_as_read();
+    // verify that we cannot modify data in a read transaction
+    // FIXME: Checks are not applied at group level yet.
+    // CHECK_THROW(writer->add_table("gylle"), realm::LogicError);
+    CHECK_THROW(obj.set(col, 100), realm::LogicError);
+    // verify that we can freeze a read transaction
+    TransactionRef frozen = writer->freeze();
+    CHECK(frozen->is_frozen());
+    // verify that we can handover an accessor directly to the frozen transaction.
+    auto frozen_obj = frozen->import_copy_of(obj);
+    // verify that we can read the correct value(s)
+    int64_t val = frozen_obj.get<int64_t>(col);
+    CHECK_EQUAL(45, val);
+    // FIXME: Why does  this cause a write?
+    auto list2 = frozen_obj.get_list<int64_t>(lcol);
+    CHECK_EQUAL(list2.get(0), 5);
+    CHECK_EQUAL(list2.get(1), 7);
+    // verify that we can't change it
+    CHECK_THROW(frozen_obj.set<int64_t>(col, 47), realm::LogicError);
+    // verify handover of a list
+    // FIXME: no change should be needed here
+    auto frozen_list = frozen->import_copy_of(list);
+    auto frozen_int_list = dynamic_cast<Lst<int64_t>*>(frozen_list.get());
+    CHECK(frozen_int_list);
+    CHECK_EQUAL(frozen_int_list->get(0), 5);
+    CHECK_EQUAL(frozen_int_list->get(1), 7);
+
+    // verify that a fresh read transaction is read only
+    TransactionRef reader = db->start_read();
+    tr = reader->get_table("hygge");
+    CHECK_THROW(tr->create_object(), realm::LogicError);
+    // ..but if promoted, becomes writable
+    reader->promote_to_write();
+    tr->create_object();
+    // ..and if rolled back, becomes read-only again
+    reader->rollback_and_continue_as_read();
+    CHECK_THROW(tr->create_object(), realm::LogicError);
 }
 
 namespace {
 
-constexpr size_t col_value = 0;
-constexpr size_t col_binary = 1;
-
-template <class T>
-void subsubtable_add_columns(T t)
+void writer_thread(TestContext& test_context, int runs, DBRef db, TableKey tk)
 {
-    t->add_column(type_Int, "value");
-    t->add_column(type_Binary, "binary");
-}
-
-constexpr size_t col_foo = 0;
-constexpr size_t col_bar = 1;
-
-template <class T>
-void subtable_add_columns(T t)
-{
-    t->add_column(type_Int, "foo");
-    DescriptorRef subdesc;
-    t->add_column(type_Table, "bar", &subdesc);
-    subsubtable_add_columns(subdesc);
-}
-
-
-constexpr size_t col_alpha = 0;
-constexpr size_t col_beta = 1;
-constexpr size_t col_gamma = 2;
-constexpr size_t col_delta = 3;
-constexpr size_t col_epsilon = 4;
-constexpr size_t col_zeta = 5;
-constexpr size_t col_eta = 6;
-constexpr size_t col_theta = 7;
-
-template <class T>
-void my_table_add_columns(T table)
-{
-    table->add_column(type_Int, "alpha");         // 0
-    table->add_column(type_Bool, "beta");         // 1
-    table->add_column(type_Int, "gamma");         // 2
-    table->add_column(type_OldDateTime, "delta"); // 3
-    table->add_column(type_String, "epsilon");    // 4
-    table->add_column(type_Binary, "zeta");       // 5
-    DescriptorRef subdesc;
-    table->add_column(type_Table, "eta", &subdesc); // 6
-    table->add_column(type_Mixed, "theta");         // 7
-
-    subtable_add_columns(subdesc);
-}
-
-void round(TestContext& test_context, SharedGroup& db, int index)
-{
-    // Testing all value types
-    {
-        WriteTransaction wt(db); // Write transaction #1
-        TableRef table = wt.get_or_add_table("my_table");
-        if (table->is_empty()) {
-            my_table_add_columns(table);
-
-            table->add_empty_row();
-            add(table, 0, false, moja, 0, "", EmptyNonNul, nullptr, Mixed(int64_t()));
-            char binary_data[] = {7, 6, 5, 7, 6, 5, 4, 3, 113};
-            add(table, 749321, true, kumi_na_tatu, 99992, "click", BinaryData(binary_data), nullptr, Mixed("fido"));
+    try {
+        for (int n = 0; n < runs; ++n) {
+            auto writer = db->start_write();
+            // writer->verify();
+            auto table = writer->get_table(tk);
+            auto obj = table->get_object(0);
+            auto cols = table->get_column_keys();
+            int64_t a = obj.get<int64_t>(cols[0]);
+            int64_t b = obj.get<int64_t>(cols[1]);
+            CHECK_EQUAL(a * a, b);
+            obj.set_all(a + 1, (a + 1) * (a + 1));
+            writer->commit();
         }
-        wt.commit();
     }
-
-    // Add more rows
-    {
-        WriteTransaction wt(db); // Write transaction #2
-        TableRef table = wt.get_table("my_table");
-        if (table->size() < 100) {
-            for (int i = 0; i < 10; ++i)
-                table->add_empty_row();
-        }
-        table->add_int(col_alpha, 0, 1);
-        wt.commit();
+    catch (std::runtime_error& e) {
+        std::cout << "gylle: " << e.what() << std::endl;
     }
-
-    // Testing empty transaction
-    {
-        WriteTransaction wt(db); // Write transaction #3
-        wt.commit();
+    catch (realm::LogicError& e) {
+        std::cout << "gylle2: " << e.what() << std::endl;
     }
-
-    // Testing subtables
-    {
-        WriteTransaction wt(db); // Write transaction #4
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        if (subtable->is_empty()) {
-            add(subtable, 0, nullptr);
-            add(subtable, 100, nullptr);
-            add(subtable, 0, nullptr);
-        }
-        table->add_int(col_alpha, 0, 1);
-        wt.commit();
-    }
-
-    // Testing subtables within subtables
-    {
-        WriteTransaction wt(db); // Write transaction #5
-        TableRef table = wt.get_table("my_table");
-        table->add_int(col_alpha, 0, 1);
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        subtable->add_int(col_foo, 0, 1);
-        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
-        for (int i = int(subsubtable->size()); i <= index; ++i)
-            subsubtable->add_empty_row();
-        table->add_int(col_alpha, 0, 1);
-        wt.commit();
-    }
-
-    // Testing remove row
-    {
-        WriteTransaction wt(db); // Write transaction #6
-        TableRef table = wt.get_table("my_table");
-        if (3 <= table->size()) {
-            if (table->get_int(col_alpha, 2) == 749321) {
-                table->remove(1);
-            }
-            else {
-                table->remove(2);
-            }
-        }
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        subtable->add_int(col_foo, 0, 1);
-        wt.commit();
-    }
-
-    // Testing read transaction
-    {
-        ReadTransaction rt(db);
-        ConstTableRef table = rt.get_table("my_table");
-        CHECK_EQUAL(749321, table->get_int(col_alpha, 1));
-        ConstTableRef subtable = table->get_subtable(col_eta, 0);
-        CHECK_EQUAL(100, subtable->get_int(col_foo, 1));
-    }
-
-    {
-        WriteTransaction wt(db); // Write transaction #7
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
-        subsubtable->set_int(col_value, index, index);
-        table->add_int(col_alpha, 0, 1);
-        subsubtable->add_int(col_value, index, 2);
-        subtable->add_int(col_foo, 0, 1);
-        subsubtable->add_int(col_value, index, 2);
-        wt.commit();
-    }
-
-    // Testing rollback
-    {
-        WriteTransaction wt(db); // Write transaction #8
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
-        table->add_int(col_alpha, 0, 1);
-        subsubtable->add_int(col_value, index, 2);
-        subtable->add_int(col_foo, 0, 1);
-        subsubtable->add_int(col_value, index, 2);
-        // Note: Implicit rollback
-    }
-
-    // Testing large chunks of data
-    {
-        WriteTransaction wt(db); // Write transaction #9
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
-        size_t size = ((512 + index % 1024) * 1024) % max_blob_size;
-        std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i = 0; i < size; ++i)
-            data[i] = static_cast<unsigned char>((i + index) * 677 % 256);
-        subsubtable->set_binary(col_binary, index, BinaryData(data.get(), size));
-        wt.commit();
-    }
-
-    {
-        WriteTransaction wt(db); // Write transaction #10
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        subtable->set_int(col_foo, 2, index * 677);
-        wt.commit();
-    }
-
-    {
-        WriteTransaction wt(db); // Write transaction #11
-        TableRef table = wt.get_table("my_table");
-        size_t size = ((512 + (333 + 677 * index) % 1024) * 1024) % max_blob_size;
-        std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i = 0; i < size; ++i)
-            data[i] = static_cast<unsigned char>((i + index + 73) * 677 % 256);
-        table->set_binary(col_zeta, index % 2, BinaryData(data.get(), size));
-        wt.commit();
-    }
-
-    {
-        WriteTransaction wt(db); // Write transaction #12
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_eta, 0);
-        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
-        subsubtable->add_int(col_value, index, 1000);
-        table->add_int(col_alpha, 0, -1);
-        subsubtable->add_int(col_value, index, -2);
-        subtable->add_int(col_foo, 0, -1);
-        subsubtable->add_int(col_value, index, -2);
-        wt.commit();
-    }
-
-    {
-        WriteTransaction wt(db); // Write transaction #13
-        TableRef table = wt.get_table("my_table");
-        size_t size = (512 + (333 + 677 * index) % 1024) * 327;
-        std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i = 0; i < size; ++i)
-            data[i] = static_cast<unsigned char>((i + index + 73) * 677 % 256);
-        table->set_binary(col_zeta, (index + 1) % 2, BinaryData(data.get(), size));
-        wt.commit();
-    }
-
-    // Testing subtables in mixed column
-    {
-        WriteTransaction wt(db); // Write transaction #14
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable;
-        if (table->get_mixed(col_theta, 1).get_type() == type_Table) {
-            subtable = table->get_subtable(col_theta, 1);
-        }
-        else {
-            table->clear_subtable(col_theta, 1);
-            subtable = table->get_subtable(col_theta, 1);
-            my_table_add_columns(subtable);
-            subtable->add_empty_row();
-            subtable->add_empty_row();
-        }
-        int n = 1 + 13 / (1 + index);
-        for (int i = 0; i < n; ++i) {
-            BinaryData bin("", 0);
-            Mixed mix = int64_t(i);
-            add(subtable, 0, false, moja, 0, "alpha", bin, nullptr, mix);
-            add(subtable, 1, false, mbili, 0, "beta", bin, nullptr, mix);
-            add(subtable, 2, false, tatu, 0, "gamma", bin, nullptr, mix);
-            add(subtable, 3, false, nne, 0, "delta", bin, nullptr, mix);
-            add(subtable, 4, false, tano, 0, "epsilon", bin, nullptr, mix);
-            add(subtable, 5, false, sita, 0, "zeta", bin, nullptr, mix);
-            add(subtable, 6, false, saba, 0, "eta", bin, nullptr, mix);
-            add(subtable, 7, false, nane, 0, "theta", bin, nullptr, mix);
-        }
-        wt.commit();
-    }
-
-    // Testing table optimization (unique strings enumeration)
-    {
-        WriteTransaction wt(db); // Write transaction #15
-        TableRef table = wt.get_table("my_table");
-        table->optimize();
-        TableRef subtable = table->get_subtable(col_theta, 1);
-        subtable->optimize();
-        wt.commit();
-    }
-
-    // Testing all mixed types
-    {
-        WriteTransaction wt(db); // Write transaction #16
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_theta, 1);
-        TableRef subsubtable;
-        if (subtable->get_mixed(col_theta, 0).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(col_theta, 0);
-        }
-        else {
-            subtable->clear_subtable(col_theta, 0);
-            subsubtable = subtable->get_subtable(col_theta, 0);
-            my_table_add_columns(subsubtable);
-        }
-        size_t size = (17 + 233 * index) % 523;
-        std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i = 0; i < size; ++i)
-            data[i] = static_cast<unsigned char>((i + index + 79) * 677 % 256);
-        BinaryData bin(data.get(), size);
-        add(subsubtable, 0, false, nne, 0, "", bin, nullptr, Mixed(int64_t(index * 13)));
-        add(subsubtable, 1, false, tano, 0, "", bin, nullptr, Mixed(index % 2 == 0 ? false : true));
-        add(subsubtable, 2, false, sita, 0, "", bin, nullptr, Mixed(OldDateTime(index * 13)));
-        add(subsubtable, 3, false, saba, 0, "", bin, nullptr, Mixed("click"));
-        add(subsubtable, 4, false, nane, 0, "", bin, nullptr, Mixed(bin));
-        wt.commit();
-    }
-
-    // Testing clearing of table with multiple subtables
-    {
-        WriteTransaction wt(db); // Write transaction #17
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_theta, 1);
-        TableRef subsubtable;
-        if (subtable->get_mixed(col_theta, 1).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(col_theta, 1);
-        }
-        else {
-            subtable->clear_subtable(col_theta, 1);
-            subsubtable = subtable->get_subtable(col_theta, 1);
-            subtable_add_columns(subsubtable);
-        }
-        int num = 8;
-        for (int i = 0; i < num; ++i)
-            add(subsubtable, i, nullptr);
-        std::vector<TableRef> subsubsubtables;
-        for (int i = 0; i < num; ++i)
-            subsubsubtables.push_back(subsubtable->get_subtable(col_bar, i));
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < num; j += 2) {
-                BinaryData bin("", 0);
-                add(subsubsubtables[j], (i - j) * index - 19, bin);
-            }
-        }
-        wt.commit();
-    }
-
-    {
-        WriteTransaction wt(db); // Write transaction #18
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_theta, 1);
-        TableRef subsubtable = subtable->get_subtable(col_theta, 1);
-        ;
-        subsubtable->clear();
-        wt.commit();
-    }
-
-    // Testing addition of an integer to all values in a column
-    {
-        WriteTransaction wt(db); // Write transaction #19
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_theta, 1);
-        TableRef subsubtable;
-        if (subtable->get_mixed(col_theta, 2).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(col_theta, 2);
-        }
-        else {
-            subtable->clear_subtable(col_theta, 2);
-            subsubtable = subtable->get_subtable(col_theta, 2);
-            subsubtable_add_columns(subsubtable);
-        }
-        int num = 9;
-        for (int i = 0; i < num; ++i)
-            add(subsubtable, i, BinaryData("", 0));
-        wt.commit();
-    }
-
-    // Testing addition of an index to a column
-    {
-        WriteTransaction wt(db); // Write transaction #20
-        TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(col_theta, 1);
-        TableRef subsubtable;
-        if (subtable->get_mixed(col_theta, 3).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(col_theta, 3);
-        }
-        else {
-            subtable->clear_subtable(col_theta, 3);
-            subsubtable = subtable->get_subtable(col_theta, 3);
-            subsubtable_add_columns(subsubtable);
-            // FIXME: Reenable this when it works!!!
-            // subsubtable->add_search_index(col_value);
-        }
-        int num = 9;
-        for (int i = 0; i < num; ++i)
-            add(subsubtable, i, BinaryData("", 0));
-        wt.commit();
+    catch (...) {
+        std::cout << "VERY GYLLE" << std::endl;
     }
 }
 
-
-void thread(TestContext& test_context, int index, std::string path)
+void verifier_thread(TestContext& test_context, int limit, DBRef db, TableKey tk)
 {
-    for (int i = 0; i < num_rounds; ++i) {
-        SharedGroup db(path);
-        round(test_context, db, index);
+    bool done = false;
+    while (!done) {
+        auto reader = db->start_read();
+        // reader->verify();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_column_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
     }
 }
 
-} // anonymous namespace
-
-
-TEST(Transactions_General)
+void verifier_thread_advance(TestContext& test_context, int limit, DBRef db, TableKey tk)
 {
-    SHARED_GROUP_TEST_PATH(path);
-
-    // Run N rounds in each thread
-    {
-        test_util::ThreadWrapper threads[num_threads];
-
-        // Start threads
-        for (int i = 0; i != num_threads; ++i)
-            threads[i].start([this, i, &path] { thread(test_context, i, path); });
-
-        // Wait for threads to finish
-        for (int i = 0; i != num_threads; ++i) {
-            bool thread_has_thrown = false;
-            std::string except_msg;
-            if (threads[i].join(except_msg)) {
-                std::cerr << "Exception thrown in thread " << i << ": " << except_msg << "\n";
-                thread_has_thrown = true;
-            }
-            CHECK(!thread_has_thrown);
-        }
+    auto reader = db->start_read();
+    bool done = false;
+    while (!done) {
+        reader->advance_read();
+        auto table = reader->get_table(tk);
+        auto obj = table->get_object(0);
+        auto cols = table->get_column_keys();
+        int64_t a = obj.get<int64_t>(cols[0]);
+        int64_t b = obj.get<int64_t>(cols[1]);
+        CHECK_EQUAL(a * a, b);
+        done = (a >= limit);
     }
-
-    // Verify database contents
-    size_t table1_theta_size = 0;
-    for (int i = 0; i != num_threads; ++i)
-        table1_theta_size += (1 + 13 / (1 + i)) * 8;
-    table1_theta_size *= num_rounds;
-    table1_theta_size += 2;
-
-    SharedGroup db(path);
-    ReadTransaction rt(db);
-    ConstTableRef table = rt.get_table("my_table");
-    CHECK(2 <= table->size());
-
-    CHECK_EQUAL(num_threads * num_rounds * 4, table->get_int(col_alpha, 0));
-    CHECK_EQUAL(false, table->get_bool(col_beta, 0));
-    CHECK_EQUAL(moja, table->get_int(col_gamma, 0));
-    CHECK_EQUAL(0, table->get_olddatetime(col_delta, 0));
-    CHECK_EQUAL("", table->get_string(col_epsilon, 0));
-    CHECK_EQUAL(3u, table->get_subtable(col_eta, 0)->size());
-    CHECK_EQUAL(0, table->get_mixed(col_theta, 0));
-
-    CHECK_EQUAL(749321, table->get_int(col_alpha, 1));
-    CHECK_EQUAL(true, table->get_bool(col_beta, 1));
-    CHECK_EQUAL(kumi_na_tatu, table->get_int(col_gamma, 1));
-    CHECK_EQUAL(99992, table->get_olddatetime(col_delta, 1));
-    CHECK_EQUAL("click", table->get_string(col_epsilon, 1));
-    CHECK_EQUAL(0u, table->get_subtable(col_eta, 1)->size());
-    CHECK_EQUAL(table1_theta_size, table->get_subtable_size(col_theta, 1));
-    CHECK_EQUAL(table->get_subtable(col_theta, 1)->get_column_name(0), "alpha");
-
-    {
-        ConstTableRef subtable = table->get_subtable(col_eta, 0);
-        CHECK_EQUAL(num_threads * num_rounds * 2, subtable->get_int(col_foo, 0));
-        CHECK_EQUAL(size_t(num_threads), subtable->get_subtable(col_bar, 0)->size());
-        CHECK_EQUAL(100, subtable->get_int(col_foo, 1));
-        CHECK_EQUAL(0u, subtable->get_subtable(col_bar, 1)->size());
-        CHECK_EQUAL(0u, subtable->get_subtable(col_bar, 2)->size());
-
-        ConstTableRef subsubtable = subtable->get_subtable(col_bar, 0);
-        for (int i = 0; i != num_threads; ++i) {
-            CHECK_EQUAL(1000 + i, subsubtable->get_int(col_value, i));
-            size_t size = ((512 + i % 1024) * 1024) % max_blob_size;
-            std::unique_ptr<char[]> data(new char[size]);
-            for (size_t j = 0; j != size; ++j)
-                data[j] = static_cast<unsigned char>((j + i) * 677 % 256);
-            CHECK_EQUAL(BinaryData(data.get(), size), subsubtable->get_binary(col_binary, i));
-        }
-    }
-
-    {
-        ConstTableRef subtable = table->get_subtable(col_theta, 1);
-        for (size_t i = 0; i < table1_theta_size; ++i) {
-            CHECK_EQUAL(false, subtable->get_bool(col_beta, i));
-            CHECK_EQUAL(0, subtable->get_olddatetime(col_delta, i));
-            CHECK_EQUAL(BinaryData("", 0), subtable->get_binary(col_zeta, i));
-            CHECK_EQUAL(0u, subtable->get_subtable(col_eta, i)->size());
-            if (4 <= i)
-                CHECK_EQUAL(type_Int, subtable->get_mixed(col_theta, i).get_type());
-        }
-        CHECK_EQUAL(size_t(num_threads * num_rounds * 5), subtable->get_subtable_size(col_theta, 0));
-        CHECK_EQUAL(subtable->get_subtable(col_theta, 0)->get_column_name(col_alpha), "alpha");
-        CHECK_EQUAL(0u, subtable->get_subtable_size(col_theta, 1));
-        CHECK_EQUAL(subtable->get_subtable(col_theta, 1)->get_column_name(col_foo), "foo");
-        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable->get_subtable_size(col_theta, 2));
-        CHECK_EQUAL(subtable->get_subtable(col_theta, 2)->get_column_name(col_value), "value");
-        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable->get_subtable_size(col_theta, 3));
-        CHECK_EQUAL(subtable->get_subtable(col_theta, 3)->get_column_name(col_value), "value");
-
-        ConstTableRef subsubtable = subtable->get_subtable(col_theta, 0);
-        for (int i = 0; i < num_threads * num_rounds; ++i) {
-            CHECK_EQUAL(0, subsubtable->get_int(col_alpha, 5 * i + 0));
-            CHECK_EQUAL(1, subsubtable->get_int(col_alpha, 5 * i + 1));
-            CHECK_EQUAL(2, subsubtable->get_int(col_alpha, 5 * i + 2));
-            CHECK_EQUAL(3, subsubtable->get_int(col_alpha, 5 * i + 3));
-            CHECK_EQUAL(4, subsubtable->get_int(col_alpha, 5 * i + 4));
-            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 0));
-            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 1));
-            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 2));
-            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 3));
-            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 4));
-            CHECK_EQUAL(nne, subsubtable->get_int(col_gamma, 5 * i + 0));
-            CHECK_EQUAL(tano, subsubtable->get_int(col_gamma, 5 * i + 1));
-            CHECK_EQUAL(sita, subsubtable->get_int(col_gamma, 5 * i + 2));
-            CHECK_EQUAL(saba, subsubtable->get_int(col_gamma, 5 * i + 3));
-            CHECK_EQUAL(nane, subsubtable->get_int(col_gamma, 5 * i + 4));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 0));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 1));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 2));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 3));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 4));
-            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 0));
-            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 1));
-            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 2));
-            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 3));
-            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 4));
-            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 0)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 1)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 2)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 3)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 4)->size());
-            CHECK_EQUAL("click", subsubtable->get_mixed(col_theta, 5 * i + 3).get_string());
-        }
-    }
-    // End of read transaction
+}
 }
 
-TEST(Transactions_RollbackAddRows)
+TEST(Transactions_Threaded)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
-    WriteTransaction wt(sg_w);
-    Group& g = wt.get_group();
+    DBRef db = DB::create(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+#if defined(_WIN32) || REALM_ANDROID || REALM_PLATFORM_APPLE
+    const int num_threads = 2;
+#else
+    const int num_threads = 20;
+#endif
+    const int num_iterations = 100;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * num_iterations, db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
 
-    g.insert_table(0, "t0");
-    g.get_table(0)->add_column(type_Int, "integers");
+TEST(Transactions_ThreadedAdvanceRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef db = DB::create(*hist_w);
+    TableKey tk;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column(type_Int, "my_col_1");
+        table->add_column(type_Int, "my_col_2");
+        table->create_object().set_all(1, 1);
+        tk = table->get_key();
+        wt->commit();
+    }
+#if defined(_WIN32) || REALM_ANDROID || REALM_PLATFORM_APPLE
+    const int num_threads = 2;
+#else
+    const int num_threads = 20;
+#endif
+    const int num_iterations = 100;
+    std::thread writers[num_threads];
+    std::thread verifiers[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        verifiers[i] =
+            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, db, tk); });
+        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, db, tk); });
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        writers[i].join();
+        verifiers[i].join();
+    }
+}
 
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-
-    g.get_table(0)->add_empty_row();
-    g.get_table(0)->add_row_with_key(0, 45);
-    Row r0 = g.get_table(0)->get(0);
-    Row r1 = g.get_table(0)->get(1);
-    CHECK(r0.is_attached());
-    CHECK(r1.is_attached());
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-
-    CHECK(!r0.is_attached());
-    CHECK(!r1.is_attached());
-    g.verify();
-
-    LangBindHelper::promote_to_write(sg_w);
-
-    CHECK_EQUAL(g.get_table(0)->size(), 0);
+TEST(Transactions_ListOfBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("my_table");
+        table->add_column_list(type_Binary, "list");
+        table->create_object();
+        wt->commit();
+    }
+    for (int iter = 0; iter < 1000; iter++) {
+        auto wt = db->start_write();
+        wt->verify();
+        auto table = wt->get_table("my_table");
+        auto col1 = table->get_column_key("list");
+        Obj obj = table->get_object(0);
+        auto list = obj.get_list<Binary>(col1);
+        std::string bin(15, 'z');
+        list.add(BinaryData(bin.data(), 15));
+        if (fastrand(100) < 5) {
+            size_t sz = list.size();
+            for (size_t i = 0; i < sz - 1; i++) {
+                list.remove(0);
+            }
+        }
+        wt->commit();
+        auto rt = db->start_read();
+        rt->verify();
+    }
 }
 
 
-// Check that the spec.enumkeys become detached when
+
+TEST(Transactions_RollbackCreateObject)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    TransactionRef tr = sg_w->start_write();
+
+    auto tk = tr->add_table("t0")->get_key();
+    auto col = tr->get_table(tk)->add_column(type_Int, "integers");
+
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+
+    tr->get_table(tk)->create_object(ObjKey(0)).set(col, 5);
+    auto o = tr->get_table(tk)->get_object(ObjKey(0));
+    CHECK_EQUAL(o.get<int64_t>(col), 5);
+
+    tr->rollback_and_continue_as_read();
+
+    CHECK_THROW(o.get<int64_t>(col), InvalidKey);
+    tr->verify();
+
+    tr->promote_to_write();
+
+    CHECK_EQUAL(tr->get_table(tk)->size(), 0);
+}
+
+TEST(Transactions_ObjectLifetime)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    TransactionRef tr = sg_w->start_write();
+
+    auto table = tr->add_table("t0");
+    Obj obj = table->create_object();
+
+    CHECK(obj.is_valid());
+    tr->commit();
+    CHECK_NOT(obj.is_valid());
+}
+
+TEST(Transactions_Continuous_ParallelWrites)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist);
+    TransactionRef t = sg->start_write();
+    auto _table = t->add_table("t0");
+    TableKey table_key = _table->get_key();
+    t->commit();
+
+    auto t0 = std::thread([&]() {
+        TransactionRef tr = sg->start_read();
+        tr->promote_to_write();
+        TableRef table = tr->get_table(table_key);
+        table->create_object();
+        tr->commit();
+    });
+    auto t1 = std::thread([&]() {
+        TransactionRef tr = sg->start_read();
+        tr->promote_to_write();
+        TableRef table = tr->get_table(table_key);
+        table->create_object();
+        tr->commit();
+    });
+    t0.join();
+    t1.join();
+}
+
+TEST(Transactions_Continuous_SerialWrites)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist);
+
+    TableKey table_key;
+    {
+        TransactionRef tr = sg->start_write();
+        auto table = tr->add_table("t0");
+        table_key = table->get_key();
+        tr->commit();
+    }
+
+    TransactionRef tr1 = sg->start_read();
+    TransactionRef tr2 = sg->start_read();
+    {
+        tr1->promote_to_write();
+        TableRef table = tr1->get_table(table_key);
+        table->create_object();
+        tr1->commit_and_continue_as_read();
+    }
+
+    {
+        tr2->promote_to_write();
+        TableRef table = tr2->get_table(table_key);
+        table->create_object();
+        tr2->commit_and_continue_as_read();
+    }
+}
+
+
+// Check that enumeration is gone after
 // rolling back the insertion of a string enum column
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_2(make_in_realm_history(path));
-    SharedGroup sg_w(*hist_w);
-    SharedGroup sg_2(*hist_2);
-    Group& g = const_cast<Group&>(sg_w.begin_read());
-    Group& g2 = const_cast<Group&>(sg_2.begin_read());
-    LangBindHelper::promote_to_write(sg_w);
+    auto sg_w = DB::create(*hist_w);
+    auto g = sg_w->start_write();
+    auto t = g->add_table("t1");
+    auto col = t->add_column(type_String, "t1_col0_string");
 
-    auto populate_with_string_enum = [](TableRef t) {
-        t->add_column(type_String, "t1_col0_string");
-        t->add_empty_row(3);
-        t->set_string(0, 0, "simple string");
-        t->set_string(0, 1, "duplicate");
-        t->set_string(0, 2, "duplicate");
-        bool force = true;
-        t->optimize(force); // upgrade to internal string enum column type
+    auto populate_with_string_enum = [&]() {
+        t->create_object().set_all("simple_string");
+        t->create_object().set_all("duplicate");
+        t->create_object().set_all("duplicate");
+        t->enumerate_string_column(col); // upgrade to internal string enum column type
+        CHECK(t->is_enumerated(col));
+        CHECK_EQUAL(t->get_num_unique_values(col), 2);
     };
 
-    g.add_table("t0");
-    g.add_table("t1");
+    g->commit_and_continue_as_read();
+    g->promote_to_write();
 
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
+    populate_with_string_enum();
 
-    populate_with_string_enum(g.get_table(1));
+    g->rollback_and_continue_as_read();
+    g->promote_to_write();
+    CHECK(!t->is_enumerated(col));
+    populate_with_string_enum();
 
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
+    t->begin()->set(col, "duplicate");
 
-    populate_with_string_enum(g.get_table(1));
-
-    g.get_table(1)->set_string(0, 0, "duplicate");
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::advance_read(sg_2);
-
-    CHECK_EQUAL(g2.get_table(1)->size(), 3);
-    CHECK_EQUAL(g2.get_table(1)->get_string(0, 2), "duplicate");
-
-    CHECK_EQUAL(g.size(), 2);
-    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
-    CHECK_EQUAL(g.get_table(1)->size(), 3);
-}
-
-// Check that the table.spec.subspec array becomes detached
-// after rolling back the insertion of a subspec type
-TEST(LangBindHelper_RollbackLinkInsert)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-
-    SharedGroup sg_w(*hist_w);
-    Group& g = const_cast<Group&>(sg_w.begin_read());
-    LangBindHelper::promote_to_write(sg_w);
-
-    g.add_table("t0");
-    g.add_table("t1");
-
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-
-    g.get_table(1)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(0));
-    // or
-    // g.get_table(0)->add_column_link(type_Link, "t0_col0_link", *g.get_table(1));
-
-    LangBindHelper::rollback_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-
-    g.add_table("t2");
-    g.get_table(1)->add_column_link(type_Link, "link", *g.get_table(0));
-    // or
-    // g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
-
-    g.add_table("t3");
-
-    CHECK_EQUAL(g.size(), 4);
-    CHECK_EQUAL(g.get_table(1)->get_column_count(), 1);
-    CHECK_EQUAL(g.get_table(1)->get_link_target(0), g.get_table(0));
+    g->commit_and_continue_as_read();
+    CHECK(t->is_enumerated(col));
 }
 
 #if 0

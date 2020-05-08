@@ -25,7 +25,7 @@
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/group_writer.hpp>
-#include <realm/group_shared.hpp>
+#include <realm/db.hpp>
 #include <realm/alloc_slab.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/metrics/metric_timer.hpp>
@@ -164,15 +164,19 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
 {
     m_map_windows.reserve(num_map_windows);
 #if REALM_IOS
-    m_window_alignment = 1 * 1024 * 1024;  // 1M
+    m_window_alignment = 1 * 1024 * 1024; // 1M
 #else
-    if (sizeof(int*) == 4) { // 32 bit address space
+    if (sizeof(int*) == 4) {                  // 32 bit address space
         m_window_alignment = 1 * 1024 * 1024; // 1M
-    } else {
+    }
+    else {
         // large address space - just choose a size so that we have a single window
         size_t total_size = m_alloc.get_total_size();
         size_t wanted_size = 1;
-        while (total_size) { total_size >>= 1; wanted_size <<= 1; }
+        while (total_size) {
+            total_size >>= 1;
+            wanted_size <<= 1;
+        }
         if (wanted_size < 1 * 1024 * 1024)
             wanted_size = 1 * 1024 * 1024; // minimum 1M
         m_window_alignment = wanted_size;
@@ -218,7 +222,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     }
 
     if (is_shared) {
-        SharedGroup::version_type initial_version = 0;
+        DB::version_type initial_version = 0;
 
         // Expand top array from 5 to 7 elements. Only nonshared Realms are
         // allowed to have less than 7 elements.
@@ -428,7 +432,8 @@ ref_type GroupWriter::write_group()
 
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after merge: " << m_free_positions.size()
-              << "   freelist space required: " << max_free_space_needed << std::endl << std::endl;
+              << "   freelist space required: " << max_free_space_needed << std::endl
+              << std::endl;
 #endif
     // Before we calculate the actual sizes of the free-list arrays, we must
     // make sure that the final adjustments of the free lists (i.e., the
@@ -780,8 +785,6 @@ GroupWriter::FreeListElement GroupWriter::reserve_free_space(size_t size)
 // extend_free_space may be needed, before an allocation can succeed.
 GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_size)
 {
-    SlabAlloc& alloc = m_group.m_alloc;
-
     // We need to consider the "logical" size of the file here, and not the real
     // size. The real size may have changed without the free space information
     // having been adjusted accordingly. This can happen, for example, if
@@ -789,14 +792,38 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     // extended the file size. It can also happen as part of initial file expansion
     // during attach_file().
     size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-    size_t new_file_size = logical_file_size;
-    if (REALM_UNLIKELY(int_add_with_overflow_detect(new_file_size, requested_size))) {
-        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size)
-                                      + " + " + util::to_string(requested_size));
+    // find minimal new size according to the following growth ratios:
+    // at least 100% (doubling) until we reach 1MB, then just grow with 1MB at a time
+    uint64_t minimal_new_size = logical_file_size;
+    constexpr uint64_t growth_boundary = 1024 * 1024; // 1MB
+    if (minimal_new_size < growth_boundary) {
+        minimal_new_size *= 2;
+    }
+    else {
+        minimal_new_size += growth_boundary;
+    }
+    // grow with at least the growth ratio, but if more is required, grow more
+    uint64_t required_new_size = logical_file_size + requested_size;
+    if (required_new_size > minimal_new_size) {
+        minimal_new_size = required_new_size;
+    }
+    // Ensure that minimal_new_size is less than 3 GB on a 32 bit device
+    if (minimal_new_size > (std::numeric_limits<size_t>::max() / 4 * 3)) {
+        throw MaximumFileSizeExceeded("GroupWriter cannot extend free space: " + util::to_string(logical_file_size) +
+                                      " + " + util::to_string(requested_size));
     }
 
-    if (!alloc.matches_section_boundary(new_file_size)) {
-        new_file_size = alloc.get_upper_section_boundary(new_file_size);
+    // We now know that it is safe to assign size to something of size_t
+    // and we know that the following adjustments are safe to perform
+    size_t new_file_size = static_cast<size_t>(minimal_new_size);
+
+    // align to page size, but do not cross a section boundary
+    size_t next_boundary = m_alloc.align_size_to_section_boundary(new_file_size);
+    new_file_size = util::round_up_to_page_size(new_file_size);
+    if (new_file_size > next_boundary) {
+        // we cannot cross a section boundary. In this case the allocation will
+        // likely fail, then retry and we'll allocate anew from the next section
+        new_file_size = next_boundary;
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.
@@ -814,8 +841,9 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size
               << std::endl;
 #endif
-    //    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
 
+    // as new_file_size is larger than logical_file_size, but known to
+    // be representable in a size_t, so is the result:
     size_t chunk_size = new_file_size - logical_file_size;
     REALM_ASSERT_RELEASE_EX(!(chunk_size & 7), chunk_size);
     REALM_ASSERT_RELEASE(chunk_size != 0);
@@ -827,7 +855,8 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     return it;
 }
 
-bool inline is_aligned(char* addr) {
+bool inline is_aligned(char* addr)
+{
     size_t as_binary = reinterpret_cast<size_t>(addr);
     return (as_binary & 7) == 0;
 }
@@ -859,7 +888,7 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = window->translate(pos);
     REALM_ASSERT_RELEASE(is_aligned(dest_addr));
- 
+
     uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);

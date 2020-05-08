@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <vector>
 
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
 #include <realm/query_conditions.hpp>
 
 #include "../util/verified_integer.hpp"
@@ -199,10 +199,8 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
         // before and after)
         size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
-        ref_type accu_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn accu(Allocator::get_default(), accu_ref);
-        QueryState<int64_t> state;
-        state.m_state = int64_t(&accu);
+        IntegerColumn accu(Allocator::get_default());
+        accu.create();
 
         for (size_t from = 0; from < LEN2; from++) {
             for (size_t to = from + 1; to <= LEN2; to++) {
@@ -211,7 +209,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     if (v[w] != LL_MIN) {
                         // LESS
                         a.set(match, v[w] - 1);
-                        state.init(act_ReturnFirst, &accu, size_t(-1));
+                        QueryState<int64_t> state(act_ReturnFirst, &accu, size_t(-1));
                         a.find(cond_Less, act_ReturnFirst, v[w], from, to, 0, &state);
                         size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
@@ -226,7 +224,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     if (v[w] != LL_MAX) {
                         // GREATER
                         a.set(match, v[w] + 1);
-                        state.init(act_ReturnFirst, &accu, size_t(-1));
+                        QueryState<int64_t> state(act_ReturnFirst, &accu, size_t(-1));
                         a.find(cond_Greater, act_ReturnFirst, v[w], from, to, 0, &state);
                         size_t f = to_size_t(state.m_state);
                         a.set(match, v[w]);
@@ -297,7 +295,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                             a.set(match + off, v[w] - 1);
 
                             accu.clear();
-                            state.init(act_FindAll, &accu, size_t(-1));
+                            QueryState<int64_t> state(act_FindAll, &accu, size_t(-1));
                             a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
 
                             a.set(match, v[w]);
@@ -324,7 +322,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                             a.set(match + off, v[w] + 1);
 
                             accu.clear();
-                            state.init(act_FindAll, &accu, size_t(-1));
+                            QueryState<int64_t> state(act_FindAll, &accu, size_t(-1));
                             a.find(cond_Greater, act_FindAll, v[w], from, to, 0, &state);
 
                             a.set(match, v[w]);
@@ -350,7 +348,7 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                             a.set(match + off, v[w] + 1);
 
                             accu.clear();
-                            state.init(act_FindAll, &accu, size_t(-1));
+                            QueryState<int64_t> state(act_FindAll, &accu, size_t(-1));
                             a.find(cond_Equal, act_FindAll, v[w] + 1, from, to, 0, &state);
 
                             a.set(match, v[w]);
@@ -382,8 +380,8 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
 
     Random random(seed);
     VerifiedInteger a(random);
-    ref_type res_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn res(Allocator::get_default(), res_ref);
+    IntegerColumn res(Allocator::get_default());
+    res.create();
 
     int trend = 5;
 
@@ -397,7 +395,6 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
             if (random.draw_int_mod(ITER_PER_BITWIDTH / 100) == 0) {
                 trend = random.draw_int_mod(10);
                 a.find_first(random.draw_int_bits<uint_fast64_t>(current_bitwidth));
-                a.find_all(res, random.draw_int_bits<uint_fast64_t>(current_bitwidth));
                 size_t start = random.draw_int_max(a.size());
                 a.sum(start, start + random.draw_int_max(a.size() - start));
                 a.maximum(start, start + random.draw_int_max(a.size() - start));

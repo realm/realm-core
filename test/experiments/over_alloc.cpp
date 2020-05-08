@@ -18,7 +18,6 @@
 
 #include <iostream>
 #include <realm.hpp>
-#include <realm/group_shared.hpp>
 #include <realm/util/file.hpp>
 
 using namespace realm;
@@ -42,7 +41,7 @@ int main()
     {
         File::try_remove("over_alloc_1.realm");
         File::try_remove("over_alloc_1.realm.lock");
-        SharedGroup db("over_alloc_1.realm");
+        DB db("over_alloc_1.realm");
         if (!db.is_valid())
             throw runtime_error("Failed to open database 1");
 
@@ -62,7 +61,7 @@ int main()
     {
         File::try_remove("over_alloc_2.realm");
         File::try_remove("over_alloc_2.realm.lock");
-        SharedGroup db("over_alloc_2.realm");
+        DB db("over_alloc_2.realm");
         if (!db.is_valid())
             throw runtime_error("Failed to open database 2");
 

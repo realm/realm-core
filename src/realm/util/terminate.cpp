@@ -109,7 +109,8 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {
     util::Backtrace::capture().print(ss);
 
-    ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info to help@realm.io.";
+    ss << "!!! IMPORTANT: Please send this log and info about Realm SDK version and other relevant reproduction info "
+          "to help@realm.io.";
     if (termination_notification_callback) {
         termination_notification_callback(ss.str().c_str());
     }
@@ -118,7 +119,6 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
         std::string thread_name;
         if (Thread::get_name(thread_name))
             std::cerr << "Thread name: " << thread_name << "\n";
-
     }
 
     please_report_this_error_to_help_at_realm_dot_io();

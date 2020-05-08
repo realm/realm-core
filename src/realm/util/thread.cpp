@@ -44,10 +44,10 @@
 #if !defined _WIN32 // 'robust' not supported by our windows pthreads port
 #if _POSIX_THREADS >= 200809L
 #ifdef __GNU_LIBRARY__
-#if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12
+#if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 12 && !REALM_ANDROID
 #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
 #endif
-#else
+#elif !REALM_ANDROID
 #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
 #endif
 #endif
@@ -101,15 +101,16 @@ void Thread::set_name(const std::string& name)
 }
 
 
-bool Thread::get_name(std::string& name)
+bool Thread::get_name(std::string& name) noexcept
 {
 #if (defined _GNU_SOURCE && !REALM_ANDROID) || REALM_PLATFORM_APPLE
     const size_t max = 64;
     char name_2[max];
     pthread_t id = pthread_self();
     int r = pthread_getname_np(id, name_2, max);
-    if (REALM_UNLIKELY(r != 0))
-        throw std::system_error(r, std::system_category(), "pthread_getname_np() failed");
+    if (REALM_UNLIKELY(r != 0)) {
+        return false;
+    }
     name_2[max - 1] = '\0';              // Eliminate any risk of buffer overrun in strlen().
     name.assign(name_2, strlen(name_2)); // Throws
     return true;

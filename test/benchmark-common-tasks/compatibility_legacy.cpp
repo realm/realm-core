@@ -18,27 +18,27 @@
 
 #include "compatibility.hpp"
 
-using realm::SharedGroup;
+using realm::DB;
 
 namespace compatibility {
 
-SharedGroup::DurabilityLevel durability(RealmDurability level)
+DB::DurabilityLevel durability(RealmDurability level)
 {
     switch (level) {
     case RealmDurability::Full:
-        return SharedGroup::durability_Full;
+        return DB::durability_Full;
     case RealmDurability::MemOnly:
-        return SharedGroup::durability_MemOnly;
+        return DB::durability_MemOnly;
     case RealmDurability::Async:
-        return SharedGroup::durability_Async;
+        return DB::durability_Async;
     }
     REALM_ASSERT(false); // unhandled case
-    return SharedGroup::durability_Full;
+    return DB::durability_Full;
 }
 
-SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
+DB* create_new_shared_group(std::string path, RealmDurability level, const char* key)
 {
-    return new SharedGroup(path, false, durability(level), key);
+    return new DB(path, false, durability(level), key);
 }
 
 } // namespace compatibility

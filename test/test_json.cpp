@@ -26,7 +26,6 @@
 #include <ostream>
 
 #include <realm.hpp>
-#include <realm/lang_bind_helper.hpp>
 
 #include "util/misc.hpp"
 #include "util/jsmn.hpp"
@@ -81,108 +80,70 @@ const bool generate_all = false;
 // All produced json is automatically checked for syntax regardless of
 // the setting of generate_all. This is done using the 'jsmn' parser.
 
-void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_subtab_sizes = false)
+void setup_multi_table(Table& table, size_t rows)
 {
     // Create table with all column types
-    {
-        DescriptorRef sub1;
-        DescriptorRef sub2;
-        table.add_column(type_Int, "int");                 //  0
-        table.add_column(type_Bool, "bool");               //  1
-        table.add_column(type_Timestamp, "date");          //  2
-        table.add_column(type_Float, "float");             //  3
-        table.add_column(type_Double, "double");           //  4
-        table.add_column(type_String, "string");           //  5
-        table.add_column(type_String, "string_long");      //  6
-        table.add_column(type_String, "string_big_blobs"); //  7
-        table.add_column(type_String, "string_enum");      //  8 - becomes StringEnumColumn
-        table.add_column(type_Binary, "binary");           //  9
-        table.add_column(type_Table, "integers", &sub1);   // 10
-        table.add_column(type_Table, "strings", &sub2);    // 11
-        sub1->add_column(type_Int, "sub_first");
-        sub2->add_column(type_String, "sub_second");
-    }
+    table.add_column(type_Int, "int");                                     //  0
+    table.add_column(type_Bool, "bool");                                   //  1
+    table.add_column(type_Timestamp, "date");                              //  2
+    table.add_column(type_Float, "float");                                 //  3
+    table.add_column(type_Double, "double");                               //  4
+    table.add_column(type_String, "string");                               //  5
+    table.add_column(type_String, "string_long");                          //  6
+    ColKey col_string_big = table.add_column(type_String, "string_big_blobs"); //  7
+    ColKey col_string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
+    ColKey col_binary = table.add_column(type_Binary, "binary");               //  9
+    ColKey col_int_list = table.add_column_list(type_Int, "integers");
+    ColKey col_string_list = table.add_column_list(type_String, "strings");
 
-    table.add_empty_row(rows);
-
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_int(0, i, int64_t(i * sign));
-    }
-    for (size_t i = 0; i < rows; ++i)
-        table.set_bool(1, i, (i % 2 ? true : false));
-    for (size_t i = 0; i < rows; ++i)
-        table.set_timestamp(2, i, Timestamp(12345, 0));
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_float(3, i, 123.456f * sign);
-    }
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_double(4, i, 9876.54321 * sign);
-    }
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
         std::stringstream out;
         out << "string" << i;
         strings.push_back(out.str());
     }
-    for (size_t i = 0; i < rows; ++i)
-        table.set_string(5, i, strings[i]);
     for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i % 2 == 0) ? 1 : -1;
         std::string long_str = strings[i] + " very long string.........";
-        table.set_string(6, i, long_str);
-    }
-    for (size_t i = 0; i < rows; ++i) {
+        auto obj = table.create_object().set_all(int64_t(i * sign), (i % 2 ? true : false), Timestamp{12345, 0},
+                                                 123.456f * sign, 9876.54321 * sign, strings[i], long_str);
         switch (i % 2) {
             case 0: {
                 std::string s = strings[i];
                 s += " very long string.........";
                 for (int j = 0; j != 4; ++j)
                     s += " big blobs big blobs big blobs"; // +30
-                table.set_string(7, i, s);
+                obj.set(col_string_big, s);
                 break;
             }
             case 1:
-                table.set_string(7, i, "");
+                obj.set(col_string_big, "");
                 break;
         }
-    }
-    for (size_t i = 0; i < rows; ++i) {
         switch (i % 3) {
             case 0:
-                table.set_string(8, i, "enum1");
+                obj.set(col_string_enum, "enum1");
                 break;
             case 1:
-                table.set_string(8, i, "enum2");
+                obj.set(col_string_enum, "enum2");
                 break;
             case 2:
-                table.set_string(8, i, "enum3");
+                obj.set(col_string_enum, "enum3");
                 break;
         }
-    }
-    for (size_t i = 0; i < rows; ++i)
-        table.set_binary(9, i, BinaryData("binary", 7));
-
-    for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i % 2 == 0) ? 1 : -1;
-        size_t n = sub_rows;
-        if (!fixed_subtab_sizes)
-            n += i;
-        for (size_t j = 0; j != n; ++j) {
-            TableRef sub_integers = table.get_subtable(10, i);
-            TableRef sub_strings = table.get_subtable(11, i);
-            int64_t val = -123 + i * j * 1234 * sign;
+        obj.set(col_binary, BinaryData("binary", 7));
+        auto int_list = obj.get_list<Int>(col_int_list);
+        auto str_list = obj.get_list<String>(col_string_list);
+        for (size_t n = 0; n < i % 5; n++) {
+            int64_t val = -123 + i * n * 1234 * sign;
             std::string str = "sub_" + util::to_string(val);
-            sub_integers->insert_empty_row(j);
-            sub_integers->set_int(0, j, val);
-            sub_strings->insert_empty_row(j);
-            sub_strings->set_string(0, j, str);
+            int_list.add(val);
+            str_list.add(str);
         }
     }
 
     // We also want a StringEnumColumn
-    table.optimize();
+    table.enumerate_string_column(col_string_enum);
 }
 
 bool json_test(std::string json, std::string expected_file, bool generate)
@@ -220,6 +181,8 @@ bool json_test(std::string json, std::string expected_file, bool generate)
             return false;
         getline(test_file, expected);
         if (json != expected) {
+            std::cout << json << std::endl;
+            std::cout << expected << std::endl;
             std::string path = "bad_" + file_name;
             File out(path, File::mode_Write);
             out.write(json);
@@ -234,11 +197,10 @@ bool json_test(std::string json, std::string expected_file, bool generate)
 TEST(Json_NoLinks)
 {
     Table table;
-    setup_multi_table(table, 15, 2);
+    setup_multi_table(table, 15);
 
     std::stringstream ss;
     table.to_json(ss);
-    // std::cout << ss.str();
     CHECK(json_test(ss.str(), "expect_json", generate_all));
 
     return;
@@ -258,7 +220,6 @@ link_depth >= 0:
 A link which isn't followed (bottom of link_depth has been met, or link has already been followed with
     link_depth = -1) is printed as a simple sequence of integers of row indexes in the link column.
 */
-
 TEST(Json_LinkList1)
 {
     // Basic non-cyclic LinkList test that also tests column and table renaming
@@ -279,46 +240,32 @@ TEST(Json_LinkList1)
     table3->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row(3);
-    table1->set_int(0, 0, 100);
-    table1->set_string(1, 0, "foo");
-    table1->set_int(0, 1, 200);
-    table1->set_string(1, 1, "!");
-    table1->set_int(0, 2, 300);
-    table1->set_string(1, 2, "bar");
+    auto obj0 = table1->create_object().set_all(100, "foo");
+    auto obj1 = table1->create_object().set_all(200, "!");
+    table1->create_object().set_all(300, "bar");
 
-    table2->add_empty_row(3);
-    table2->set_int(0, 0, 400);
-    table2->set_string(1, 0, "hello");
-    table2->set_int(0, 1, 500);
-    table2->set_string(1, 1, "world");
-    table2->set_int(0, 2, 600);
-    table2->set_string(1, 2, "!");
+    table2->create_object().set_all(400, "hello");
+    auto k21 = table2->create_object().set_all(500, "world").get_key();
+    auto k22 = table2->create_object().set_all(600, "!").get_key();
 
-    table3->add_empty_row(3);
-    table3->set_int(0, 0, 700);
-    table3->set_string(1, 0, "baz");
-    table3->set_int(0, 1, 800);
-    table3->set_string(1, 1, "test");
-    table3->set_int(0, 2, 900);
-    table3->set_string(1, 2, "hi");
+    auto k30 = table3->create_object().set_all(700, "baz").get_key();
+    table3->create_object().set_all(800, "test");
+    auto k32 = table3->create_object().set_all(900, "hi").get_key();
 
-    size_t col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
-    size_t col_link3 = table1->add_column_link(type_LinkList, "linkB", *table3);
+    ColKey col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    ColKey col_link3 = table1->add_column_link(type_LinkList, "linkB", *table3);
 
     // set some links
-    LinkViewRef links1;
+    auto ll0 = obj0.get_linklist(col_link2); // Links to table 2
+    ll0.add(k21);
 
-    links1 = table1->get_linklist(col_link2, 0);
-    links1->add(1);
+    auto ll1 = obj1.get_linklist(col_link2); // Links to table 2
+    ll1.add(k21);
+    ll1.add(k22);
 
-    links1 = table1->get_linklist(col_link2, 1);
-    links1->add(1);
-    links1->add(2);
-
-    links1 = table1->get_linklist(col_link3, 0);
-    links1->add(0);
-    links1->add(2);
+    auto ll2 = obj0.get_linklist(col_link3); // Links to table 3
+    ll2.add(k30);
+    ll2.add(k32);
 
     std::stringstream ss;
 
@@ -364,25 +311,20 @@ TEST(Json_LinkListCycle)
     table2->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row(2);
-    table1->set_string(0, 0, "hello");
-    table1->set_string(0, 1, "world");
+    auto t10 = table1->create_object().set_all("hello");
+    table1->create_object().set_all("world");
 
-    table2->add_empty_row(1);
-    table2->set_string(0, 0, "foo");
+    auto t20 = table2->create_object().set_all("foo");
 
-    size_t col_link1 = table1->add_column_link(type_LinkList, "linkA", *table2);
-    size_t col_link2 = table2->add_column_link(type_LinkList, "linkB", *table1);
+    auto col_link1 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    auto col_link2 = table2->add_column_link(type_LinkList, "linkB", *table1);
 
     // set some links
-    LinkViewRef links1;
-    LinkViewRef links2;
+    auto links1 = t10.get_linklist(col_link1);
+    links1.add(t20.get_key());
 
-    links1 = table1->get_linklist(col_link1, 0);
-    links1->add(0);
-
-    links2 = table2->get_linklist(col_link2, 0);
-    links2->add(0);
+    auto links2 = t20.get_linklist(col_link2);
+    links2.add(t10.get_key());
 
     // create json
 
@@ -425,19 +367,17 @@ TEST(Json_LinkCycles)
     table2->add_column(type_String, "str2");
 
     // add some rows
-    table1->add_empty_row(2);
-    table1->set_string(0, 0, "hello");
-    table1->set_string(0, 1, "world");
+    auto t10 = table1->create_object().set_all("hello");
+    table1->create_object().set_all("world");
 
-    table2->add_empty_row(1);
-    table2->set_string(0, 0, "foo");
+    auto t20 = table2->create_object().set_all("foo");
 
-    size_t col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
-    size_t col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
+    ColKey col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
+    ColKey col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
 
     // set some links
-    table1->set_link(col_link1, 0, 0);
-    table2->set_link(col_link2, 0, 0);
+    table1->begin()->set(col_link1, t20.get_key());
+    table2->begin()->set(col_link2, t10.get_key());
 
     std::stringstream ss;
 
@@ -492,19 +432,19 @@ TEST(Json_Nulls)
     TableRef table1 = group.add_table("table1");
 
     constexpr bool is_nullable = true;
-    size_t str_col_ndx = table1->add_column(type_String, "str_col", is_nullable);
-    size_t bool_col_ndx = table1->add_column(type_Bool, "bool_col", is_nullable);
-    size_t int_col_ndx = table1->add_column(type_Int, "int_col", is_nullable);
-    size_t timestamp_col_ndx = table1->add_column(type_Timestamp, "timestamp_col", is_nullable);
+    ColKey str_col_ndx = table1->add_column(type_String, "str_col", is_nullable);
+    ColKey bool_col_ndx = table1->add_column(type_Bool, "bool_col", is_nullable);
+    ColKey int_col_ndx = table1->add_column(type_Int, "int_col", is_nullable);
+    ColKey timestamp_col_ndx = table1->add_column(type_Timestamp, "timestamp_col", is_nullable);
 
     // add one row, populated manually
-    size_t row_1_ndx = table1->add_empty_row();
-    table1->set_string(str_col_ndx, row_1_ndx, "Hello");
-    table1->set_bool(bool_col_ndx, row_1_ndx, false);
-    table1->set_int(int_col_ndx, row_1_ndx, 1);
-    table1->set_timestamp(timestamp_col_ndx, row_1_ndx, Timestamp{1, 1});
+    auto obj = table1->create_object();
+    obj.set(str_col_ndx, "Hello");
+    obj.set(bool_col_ndx, false);
+    obj.set(int_col_ndx, 1);
+    obj.set(timestamp_col_ndx, Timestamp{1, 1});
     // add one row with default null values
-    table1->add_empty_row();
+    table1->create_object();
 
     std::stringstream ss;
     table1->to_json(ss);

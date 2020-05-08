@@ -19,14 +19,16 @@
 #include <algorithm>
 
 #include "verified_string.hpp"
+#include "realm/array_key.hpp"
 
 using namespace realm;
 using namespace realm::test_util;
 
 
 VerifiedString::VerifiedString()
-    : u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
+    : u(Allocator::get_default())
 {
+    u.create();
 }
 
 
@@ -112,35 +114,6 @@ size_t VerifiedString::size()
 {
     REALM_ASSERT(v.size() == u.size());
     return v.size();
-}
-
-// todo/fixme, end ignored
-void VerifiedString::find_all(IntegerColumn& c, StringData value, size_t start, size_t end)
-{
-    std::vector<std::string>::iterator ita = v.begin() + start;
-    std::vector<std::string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
-    std::vector<size_t> result;
-    while (ita != itb) {
-        ita = std::find(ita, itb, value);
-        size_t ndx = std::distance(v.begin(), ita);
-        if (ndx < v.size()) {
-            result.push_back(ndx);
-            ita++;
-        }
-    }
-
-    c.clear();
-
-    u.find_all(c, value);
-    size_t cs = c.size();
-    if (cs != result.size())
-        REALM_ASSERT(false);
-    for (size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != size_t(c.get(t)))
-            REALM_ASSERT(false);
-    }
-
-    return;
 }
 
 bool VerifiedString::verify()

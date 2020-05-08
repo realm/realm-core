@@ -4,9 +4,24 @@
 
 set -e
 
+FLAGS="$CFLAGS -O2 -D REALM_DEBUG=1 -D REALM_ENABLE_ASSERTIONS=1"
+
 mkdir build
 cd build
 
-cmake -D CMAKE_BUILD_TYPE=Debug -D REALM_ENABLE_ASSERTIONS=ON -D REALM_LIBFUZZER=ON -D REALM_MAX_BPNODE_SIZE=1000 -D REALM_ENABLE_ENCRYPTION=ON ..
-make -j4 realm-libfuzzer
-register-binary fuzzgroup test/fuzzy/realm-libfuzzer
+cmake \
+  -G Ninja \
+  -D REALM_LIBFUZZER=ON \
+  -D CMAKE_BUILD_TYPE=Debug \
+  -D REALM_ENABLE_ASSERTIONS=ON \
+  -D CMAKE_C_COMPILER=clang \
+  -D CMAKE_CXX_COMPILER=clang++ \
+  -D REALM_MAX_BPNODE_SIZE=1000 \
+  -D REALM_ENABLE_ENCRYPTION=ON \
+  -D CMAKE_CXX_FLAGS="${FLAGS}" \
+  -D CMAKE_C_FLAGS="${FLAGS}" \
+  ..
+
+ninja realm-libfuzzer
+
+upload-binary test/fuzzy/realm-libfuzzer

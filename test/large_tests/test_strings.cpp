@@ -16,7 +16,8 @@
  *
  **************************************************************************/
 
-#include <realm/column.hpp>
+#include <realm/column_integer.hpp>
+#include <realm/array_key.hpp>
 
 #include "../util/number_names.hpp"
 #include "../util/verified_string.hpp"
@@ -84,8 +85,8 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
     int seed = 123;
 
     VerifiedString a;
-    ref_type res_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn res(Allocator::get_default(), res_ref);
+    IntegerColumn res(Allocator::get_default());
+    res.create();
 
     Random random(seed);
     int trend = 5;
@@ -98,9 +99,7 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
         if (random.draw_int_mod(ITER / 100) == 0) {
             trend = random.draw_int_mod(10);
             std::string rand1(randstring(random));
-            std::string rand2(randstring(random));
             a.find_first(rand1);
-            a.find_all(res, rand2);
         }
 
         if (random.draw_int_mod(10) > trend && a.size() < ITER / 100) {

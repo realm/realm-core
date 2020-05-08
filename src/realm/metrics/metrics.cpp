@@ -100,7 +100,6 @@ std::unique_ptr<MetricTimer> Metrics::report_fsync_time(const Group& g)
         if (instance->m_pending_write) {
             return std::make_unique<MetricTimer>(instance->m_pending_write->m_fsync_time);
         }
-
     }
     return nullptr;
 }
@@ -113,7 +112,6 @@ std::unique_ptr<MetricTimer> Metrics::report_write_time(const Group& g)
         if (instance->m_pending_write) {
             return std::make_unique<MetricTimer>(instance->m_pending_write->m_write_time);
         }
-
     }
     return nullptr;
 }

@@ -26,6 +26,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -491,7 +492,7 @@ error:
 error:
     // LCOV_EXCL_START
     throw std::system_error(errno, std::system_category(), "read() failed");
-    // LCOV_EXCL_STOP
+// LCOV_EXCL_STOP
 #endif
 }
 
@@ -714,8 +715,8 @@ void File::prealloc(size_t size)
         new_size = static_cast<size_t>(data_size_to_encrypted_size(size));
         REALM_ASSERT(size == static_cast<size_t>(encrypted_size_to_data_size(new_size)));
         if (new_size < size) {
-            throw util::runtime_error("File size overflow: data_size_to_encrypted_size("
-                                      + realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
+            throw util::runtime_error("File size overflow: data_size_to_encrypted_size(" +
+                                      realm::util::to_string(size) + ") == " + realm::util::to_string(new_size));
         }
     }
 
@@ -756,7 +757,8 @@ void File::prealloc(size_t size)
     }
 #else // Non-atomic fallback
 #if REALM_PLATFORM_APPLE
-    // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and ftruncate().
+    // posix_fallocate() is not supported on MacOS or iOS, so use a combination of fcntl(F_PREALLOCATE) and
+    // ftruncate().
 
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) != 0) {
@@ -766,12 +768,13 @@ void File::prealloc(size_t size)
 
     size_t allocated_size;
     if (int_cast_with_overflow_detect(statbuf.st_blocks, allocated_size)) {
-        throw util::overflow_error("Overflow on block conversion to size_t " + realm::util::to_string(statbuf.st_blocks));
+        throw util::runtime_error("Overflow on block conversion to size_t " +
+                                  realm::util::to_string(statbuf.st_blocks));
     }
     if (int_multiply_with_overflow_detect(allocated_size, S_BLKSIZE)) {
-        throw util::overflow_error("Overflow computing existing file space allocation blocks: "
-                                   + realm::util::to_string(allocated_size)
-                                   + " block size: " + realm::util::to_string(S_BLKSIZE));
+        throw util::runtime_error(
+            "Overflow computing existing file space allocation blocks: " + realm::util::to_string(allocated_size) +
+            " block size: " + realm::util::to_string(S_BLKSIZE));
     }
 
     // Only attempt to preallocate space if there's not already sufficient free space in the file.
@@ -780,7 +783,7 @@ void File::prealloc(size_t size)
     if (new_size > allocated_size) {
 
         off_t to_allocate = static_cast<off_t>(new_size - statbuf.st_size);
-        fstore_t store = { F_ALLOCATEALL, F_PEOFPOSMODE, 0, to_allocate, 0 };
+        fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, to_allocate, 0};
         int ret = fcntl(m_fd, F_PREALLOCATE, &store);
         if (ret == -1) {
             int err = errno;
@@ -792,8 +795,10 @@ void File::prealloc(size_t size)
                 // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
                 // been reliable on HSF+).
                 consume_space_interlocked();
-            } else {
-                std::string msg = util::format("fcntl() inside prealloc() failed allocating %1 bytes, new_size=%2, cur_size=%3, allocated_size=%4, event: ",
+            }
+            else {
+                std::string msg = util::format("fcntl() inside prealloc() failed allocating %1 bytes, new_size=%2, "
+                                               "cur_size=%3, allocated_size=%4, event: ",
                                                to_allocate, new_size, statbuf.st_size, allocated_size);
                 msg += util::make_basic_system_error_code(err).message();
                 throw OutOfDiskSpace(msg);
@@ -818,7 +823,7 @@ void File::prealloc(size_t size)
     consume_space_interlocked();
 
 #else
-    #error Please check if/how your OS supports file preallocation
+#error Please check if/how your OS supports file preallocation
 #endif
 
 #endif // !(_POSIX_C_SOURCE >= 200112L)
@@ -1056,11 +1061,67 @@ void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) con
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
 }
 
+void* File::map_fixed(AccessMode a, void* address, size_t size, int /* map_flags */, size_t offset) const
+{
+    if (m_encryption_key.get()) {
+        // encryption enabled - this is not supported - see explanation in alloc_slab.cpp
+        REALM_ASSERT(false);
+    }
+#ifdef _WIN32
+    // windows, no encryption - this is not supported, see explanation in alloc_slab.cpp,
+    // above the method 'update_reader_view()'
+    REALM_ASSERT(false);
+    return nullptr;
+#else
+    // unencrypted - mmap part of already reserved space
+    return realm::util::mmap_fixed(m_fd, address, size, a, offset, m_encryption_key.get());
+#endif
+}
+
+void* File::map_reserve(AccessMode a, size_t size, size_t offset) const
+{
+    static_cast<void>(a); // FIXME: Consider removing this argument
+    return realm::util::mmap_reserve(m_fd, size, offset);
+}
+
 #if REALM_ENABLE_ENCRYPTION
 void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
 {
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
 }
+
+void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
+                      size_t offset) const
+{
+    if (m_encryption_key.get()) {
+        // encryption enabled - we shouldn't be here, all memory was allocated by reserve
+        REALM_ASSERT_RELEASE(false);
+    }
+#ifndef _WIN32
+    // no encryption. On Unixes, map relevant part of reserved virtual address range
+    return realm::util::mmap_fixed(m_fd, address, size, a, offset, nullptr, mapping);
+#else
+    // no encryption - unsupported on windows
+    REALM_ASSERT(false);
+    return nullptr;
+#endif
+}
+
+void* File::map_reserve(AccessMode a, size_t size, size_t offset, EncryptedFileMapping*& mapping) const
+{
+    if (m_encryption_key.get()) {
+        // encrypted file - just mmap it, the encryption layer handles if the mapping extends beyond eof
+        return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+    }
+#ifndef _WIN32
+    // not encrypted, do a proper reservation on Unixes'
+    return realm::util::mmap_reserve(m_fd, size, a, offset, nullptr, mapping);
+#else
+    // on windows, this is a no-op
+    return nullptr;
+#endif
+}
+
 #endif
 
 void File::unmap(void* addr, size_t size) noexcept
@@ -1269,7 +1330,7 @@ File::UniqueID File::get_unique_id() const
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
-        return {statbuf.st_dev, statbuf.st_ino};
+        return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
     throw std::system_error(errno, std::system_category(), "fstat() failed");
 #endif
@@ -1398,10 +1459,52 @@ void File::set_encryption_key(const char* key)
 #endif
 }
 
-const char* File::get_encryption_key()
+const char* File::get_encryption_key() const
 {
     return m_encryption_key.get();
 }
+
+void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
+{
+    REALM_ASSERT(!m_addr);
+#if REALM_ENABLE_ENCRYPTION
+    m_addr = f.map(a, size, m_encrypted_mapping, map_flags, offset);
+#else
+    m_addr = f.map(a, size, map_flags, offset);
+#endif
+    m_size = size;
+    m_fd = f.m_fd;
+    m_offset = offset;
+}
+
+
+void File::MapBase::unmap() noexcept
+{
+    if (!m_addr)
+        return;
+    REALM_ASSERT(m_size);
+    File::unmap(m_addr, m_size);
+    m_addr = nullptr;
+    m_size = 0;
+#if REALM_ENABLE_ENCRYPTION
+    m_encrypted_mapping = nullptr;
+#endif
+}
+
+void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
+{
+    REALM_ASSERT(m_addr);
+    m_addr = f.remap(m_addr, m_size, a, size, map_flags);
+    m_size = size;
+}
+
+void File::MapBase::sync()
+{
+    REALM_ASSERT(m_addr);
+
+    File::sync_map(m_fd, m_addr, m_size);
+}
+
 
 
 #ifndef _WIN32

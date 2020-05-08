@@ -47,66 +47,85 @@ bool get_range(size_t size, size_t& begin, size_t& end)
 
 void print_objects(ConstTableRef table, size_t begin, size_t end)
 {
-    printf("      ");
-    for (size_t col = 0; col < table->get_column_count(); col++) {
+    printf("                 Object key");
+    auto col_keys = table->get_column_keys();
+    for (auto col : col_keys) {
         printf("%21s", table->get_column_name(col).data());
     }
     printf("\n");
     for (size_t row = begin; row < end; row++) {
         printf("%5zu ", row);
-        for (size_t col = 0; col < table->get_column_count(); col++) {
-            if (table->is_null(col, row)) {
-                printf("                 null");
+        ConstObj obj = table->get_object(row);
+        printf(" %20zx", obj.get_key().value);
+        for (auto col : col_keys) {
+            auto col_type = table->get_column_type(col);
+            if (table->get_column_attr(col).test(col_attr_Nullable) && obj.is_null(col)) {
+                printf("               <null>");
                 continue;
             }
-            switch (table->get_column_type(col)) {
+            if (table->get_column_attr(col).test(col_attr_List) && col_type != type_LinkList) {
+                printf("               <list>");
+                continue;
+            }
+            switch (col_type) {
                 case type_Int:
-                    printf(" %20ld", table->get_int(col, row));
+                    printf(" %20ld", obj.get<Int>(col));
                     break;
                 case type_Bool:
-                    printf(" %20s", table->get_bool(col, row) ? "true" : "false");
+                    printf(" %20s", obj.get<Bool>(col) ? "true" : "false");
                     break;
                 case type_Float:
+                    printf(" %20f", obj.get<Float>(col));
                     break;
                 case type_Double:
+                    printf(" %20f", obj.get<Double>(col));
                     break;
                 case type_String: {
-                    std::string str = table->get_string(col, row);
+                    std::string str = obj.get<String>(col);
+                    if (str.size() == 0) {
+                        str = "<empty>";
+                    }
                     if (str.size() > 20) {
                         str = str.substr(0, 17) + "...";
                     }
                     printf(" %20s", str.c_str());
                     break;
                 }
+                case type_Binary: {
+                    auto bin = obj.get<Binary>(col);
+                    printf("   bin size: %8zu", bin.size());
+                    break;
+                }
                 case type_Timestamp: {
-                    auto value = table->get_timestamp(col, row);
-                    auto seconds = value.get_seconds();
+                    auto value = obj.get<Timestamp>(col);
+                    auto seconds = time_t(value.get_seconds());
                     auto tm = gmtime(&seconds);
                     printf("  %4d-%02d-%02d %02d:%02d:%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
                            tm->tm_hour, tm->tm_min, tm->tm_sec);
                     break;
                 }
                 case type_Link: {
-                    std::string link = "[" + std::to_string(table->get_link(col, row)) + "]";
-                    printf(" %20s", link.c_str());
+                    printf("      -> %12zx", obj.get<ObjKey>(col).value);
                     break;
                 }
                 case type_LinkList: {
-                    std::string links = "[";
-                    auto lv = table->get_linklist(col, row);
-                    auto sz = lv->size();
+                    std::stringstream links;
+                    links << "[" << std::hex;
+                    auto lv = obj.get_linklist(col);
+                    auto sz = lv.size();
                     if (sz > 0) {
-                        links += std::to_string(lv->m_row_indexes.get(0));
+                        links << lv.get(0).value;
                         for (size_t i = 1; i < sz; i++) {
-                            links += ("," + std::to_string(lv->m_row_indexes.get(i)));
+                            links << "," << lv.get(i).value;
                         }
                     }
-                    links += "]";
-                    if (links.size() > 20) {
-                        links = links.substr(0, 17) + "...";
+                    links << "]" << std::dec;
+                    std::string str = links.str();
+                    if (str.size() > 20) {
+                        str = str.substr(0, 17) + "...";
                     }
 
-                    printf(" %20s", links.c_str());
+                    printf(" %20s", str.c_str());
                     break;
                 }
                 default:
@@ -122,15 +141,14 @@ int main(int argc, char const* argv[])
 {
     if (argc > 1) {
         Group g(argv[1]);
-        g.verify();
-        auto nb_tables = g.size();
-        for (size_t i = 0; i < nb_tables; i++) {
-            std::cout << i << ". " << g.get_table_name(i) << " ";
+        auto table_keys = g.get_table_keys();
+        for (size_t i = 0; i < table_keys.size(); i++) {
+            std::cout << i << ". " << g.get_table_name(table_keys[i]) << " ";
         }
         std::cout << std::endl;
         size_t table_ndx;
         while (get_table_ndx(table_ndx)) {
-            auto table = g.get_table(table_ndx);
+            auto table = g.get_table(table_keys[table_ndx]);
             auto sz = table->size();
             size_t begin;
             size_t end;
