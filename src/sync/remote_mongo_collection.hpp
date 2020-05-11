@@ -82,7 +82,7 @@ public:
             }
             
             if (sort_bson) {
-                bson["sort_json"] = *sort_bson;
+                bson["sort"] = *sort_bson;
             }
         }
     };

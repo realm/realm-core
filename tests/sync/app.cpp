@@ -981,16 +981,23 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK((*object_id).to_string() != "");
         });
         
+        collection.insert_one(dog_document2,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+        });
+        
         collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
+            
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOptions options {
-            1, //document limit
-            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
-            util::Optional<bson::BsonDocument>({{"name", -1}}) //sort
+            2, //document limit
+            util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), //project
+            util::Optional<bson::BsonDocument>({{"breed", 1}}) //sort
         };
         
         collection.find(dog_document,
@@ -998,6 +1005,17 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*document_array).size() == 1);
+        });
+        
+        collection.find({{"name", "fido"}},
+                        options,
+                        [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*document_array).size() == 2);
+            auto french_bulldog = static_cast<bson::BsonDocument>((*document_array)[0]);
+            CHECK(french_bulldog["breed"] == "french bulldog");
+            auto king_charles = static_cast<bson::BsonDocument>((*document_array)[1]);
+            CHECK(king_charles["breed"] == "king charles");
         });
         
         collection.find_one(dog_document,
@@ -1015,7 +1033,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
             true // return new doc
@@ -1076,7 +1094,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 
         collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(count >= 1);
+            CHECK(count == 2);
+        });
+        
+        collection.count({{"breed", "french bulldog"}}, [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(count == 0);
         });
 
         collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<app::AppError> error) {

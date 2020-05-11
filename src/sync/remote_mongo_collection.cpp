@@ -204,7 +204,7 @@ void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
                                   std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
-    base_args["document"] = filter_bson;
+    base_args["query"] = filter_bson;
     
     if (limit != 0) {
         base_args["limit"] = limit;
