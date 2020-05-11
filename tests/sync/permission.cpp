@@ -22,7 +22,6 @@
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "sync/sync_permission.hpp"
 
 #include "sync_test_utils.hpp"
 #include "util/test_file.hpp"
@@ -30,33 +29,6 @@
 #include <unistd.h>
 
 using namespace realm;
-
-TEST_CASE("`Permission` class", "[sync]") {
-    SECTION("paths_are_equivalent() properly returns true") {
-        // Identical paths and identical users for tilde-paths.
-        CHECK(Permission::paths_are_equivalent("/~/foo", "/~/foo", "user1", "user1"));
-        // Identical paths for non-tilde paths.
-        CHECK(Permission::paths_are_equivalent("/user2/foo", "/user2/foo", "user1", "user1"));
-        CHECK(Permission::paths_are_equivalent("/user2/foo", "/user2/foo", "user1", "user2"));
-        // First path can be turned into second path.
-        CHECK(Permission::paths_are_equivalent("/~/foo", "/user1/foo", "user1", "user2"));
-        // Second path can be turned into first path.
-        CHECK(Permission::paths_are_equivalent("/user1/foo", "/~/foo", "user2", "user1"));
-    }
-
-    SECTION("paths_are_equivalent() properly returns false") {
-        // Different tilde-paths.
-        CHECK(!Permission::paths_are_equivalent("/~/foo", "/~/bar", "user1", "user1"));
-        // Different non-tilde paths.
-        CHECK(!Permission::paths_are_equivalent("/user1/foo", "/user2/bar", "user1", "user1"));
-        // Identical paths and different users for tilde-paths.
-        CHECK(!Permission::paths_are_equivalent("/~/foo", "/~/foo", "user1", "user2"));
-        // First path cannot be turned into second path.
-        CHECK(!Permission::paths_are_equivalent("/~/foo", "/user1/foo", "user2", "user2"));
-        // Second path cannot be turned into first path.
-        CHECK(!Permission::paths_are_equivalent("/user1/foo", "/~/foo", "user2", "user2"));
-    }
-}
 
 constexpr const char* result_sets_type_name = "__ResultSets";
 
