@@ -344,10 +344,6 @@ public:
     /// Add \a diff to all the elements in the specified index range.
     void adjust(size_t begin, size_t end, int_fast64_t diff);
 
-    /// Add signed \a diff to all elements that are greater than, or equal to \a
-    /// limit.
-    void adjust_ge(int_fast64_t limit, int_fast64_t diff);
-
     //@{
     /// This is similar in spirit to std::move() from `<algorithm>`.
     /// \a dest_begin must not be in the range [`begin`,`end`)
@@ -394,30 +390,6 @@ public:
     size_t lower_bound_int(int64_t value) const noexcept;
     size_t upper_bound_int(int64_t value) const noexcept;
     //@}
-
-    /// \brief Search the \c Array for a value greater or equal than \a target,
-    /// starting the search at the \a start index. If \a indirection is
-    /// provided, use it as a look-up table to iterate over the \c Array.
-    ///
-    /// If \a indirection is not provided, then the \c Array must be sorted in
-    /// ascending order. If \a indirection is provided, then its values should
-    /// point to indices in this \c Array in such a way that iteration happens
-    /// in ascending order.
-    ///
-    /// Behaviour is undefined if:
-    /// - a value in \a indirection is out of bounds for this \c Array;
-    /// - \a indirection does not contain at least as many elements as this \c
-    ///   Array;
-    /// - sorting conditions are not respected;
-    /// - \a start is greater than the number of elements in this \c Array or
-    ///   \a indirection (if provided).
-    ///
-    /// \param target the smallest value to search for
-    /// \param start the offset at which to start searching in the array
-    /// \param indirection an \c Array containing valid indices of values in
-    ///        this \c Array, sorted in ascending order
-    /// \return the index of the value if found, or realm::not_found otherwise
-    size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
 
     int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
     {
@@ -719,12 +691,6 @@ private:
 
     template <bool max, size_t w>
     bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
-
-    template <size_t w>
-    size_t find_gte(const int64_t target, size_t start, size_t end) const;
-
-    template <size_t w>
-    size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
 
 protected:
     /// It is an error to specify a non-zero value unless the width
