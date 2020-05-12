@@ -1127,10 +1127,10 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // 0. Special case: figure out if extension is to be done entirely within a single
         // existing mapping. This is the case if the new baseline (which must be larger
         // then the old baseline) is still below the old base of the slab area.
-        REALM_ASSERT(old_num_mappings > 0);
-        const auto earlier_last_index = old_num_mappings - 1;
-        MapEntry& cur_entry = m_mappings[earlier_last_index];
         if (file_size < old_slab_base) {
+            REALM_ASSERT(old_num_mappings > 0);
+            const auto earlier_last_index = old_num_mappings - 1;
+            MapEntry& cur_entry = m_mappings[earlier_last_index];
             const size_t section_start_offset = get_section_base(earlier_last_index);
             const size_t section_size = file_size - section_start_offset;
             requires_new_translation = true;
@@ -1147,6 +1147,9 @@ void SlabAlloc::update_reader_view(size_t file_size)
             // 1. figure out if there is a partially completed mapping, that we need to extend
             // to cover a full mapping section
             if (old_baseline < old_slab_base) {
+                REALM_ASSERT(old_num_mappings > 0);
+                const auto earlier_last_index = old_num_mappings - 1;
+                MapEntry& cur_entry = m_mappings[earlier_last_index];
                 const size_t section_start_offset = get_section_base(earlier_last_index);
                 const size_t section_size = old_slab_base - section_start_offset;
                 // we could not extend the old mapping, so replace it with a full, new one
