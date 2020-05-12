@@ -428,8 +428,11 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
     def cmakeDefinitions;
+    def warningFilters = [];
     if (isUWP) {
       cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
+      // warning on benchmark binaries that we don't care about
+      warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
     }
@@ -444,7 +447,13 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             dir('build-dir') {
                 bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
-                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}", name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}")
+                    runAndCollectWarnings(
+                        parser: 'msbuild',
+                        isWindows: true,
+                        script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
+                        name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
+                        filters: warningFilters
+                    )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
                 if (gitTag) {
