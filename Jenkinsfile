@@ -95,10 +95,11 @@ jobWrapper {
         }
     }
     stage('Checking') {
-        def linuxOptions = [
+        def buildOptions = [
             maxBpNodeSize: "1000",
             enableEncryption: "ON",
             enableSync: "OFF",
+            runTests: true,
         ]
         def linuxOptionsNoEncrypt = [
             maxBpNodeSize: "4",
@@ -107,11 +108,11 @@ jobWrapper {
         ]
 
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker(linuxOptions << [buildType : "Debug"]),
-            checkLinuxRelease       : doCheckInDocker(linuxOptions << [buildType : "Release"]),
-            checkLinuxDebug_Sync    : doCheckInDocker(linuxOptions << [buildType : "Debug", enableSync : "ON"]),
+            checkLinuxDebug         : doCheckInDocker(buildOptions << [buildType : "Debug"]),
+            checkLinuxRelease       : doCheckInDocker(buildOptions << [buildType : "Release"]),
+            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions << [buildType : "Debug", enableSync : "ON"]),
             checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
-            checkMacOsRelease       : doBuildMacOs('Release', true),
+            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions << [buildType : "Release"]),
             checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
@@ -523,14 +524,31 @@ def buildPerformance() {
   }
 }
 
-def doBuildMacOs(String buildType, boolean runTests) {
+def doBuildMacOs(Map options = [:]) {
+    def buildType = options.buildType;
     def sdk = 'macosx'
+
+    def cmakeOptions = [
+        CMAKE_BUILD_TYPE: options.buildType,
+        CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
+        REALM_ENABLE_SYNC: options.enableSync,
+    ]
+    if (!options.runTests) {
+        cmakeOptions << [
+            REALM_NO_TESTS: "ON",
+        ]
+    }
+    if (longRunningTests) {
+        cmakeOptions << [
+            CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
+        ]
+    }
+
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+
     return {
         node('osx') {
             getArchive()
-
-            def buildTests = runTests ? '' : ' -DREALM_NO_TESTS=1'
-            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
 
             dir("build-macosx-${buildType}") {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
@@ -540,12 +558,9 @@ def doBuildMacOs(String buildType, boolean runTests) {
                     retry(3) {
                         timeout(time: 2, unit: 'MINUTES') {
                             sh """
-                                    rm -rf *
-                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
-                                          -D CMAKE_BUILD_TYPE=${buildType} \\
-                                          -D REALM_VERSION=${gitDescribeVersion}\\
-                                          ${buildTests}${cxx_flags} -G Ninja ..
-                                """
+                                rm -rf *
+                                cmake ${cmakeDefinitions} -D REALM_VERSION=${gitDescribeVersion} -G Ninja ..
+                            """
                         }
                     }
 
@@ -563,11 +578,14 @@ def doBuildMacOs(String buildType, boolean runTests) {
             cocoaStashes << stashName
             publishingStashes << stashName
 
-            if (runTests) {
+            if (options.runTests) {
                 try {
+                    def environment = environment()
+                    environment << 'UNITTEST_PROGRESS=1'
+                    environment << 'CTEST_OUTPUT_ON_FAILURE=1'
                     dir("build-macosx-${buildType}") {
-                        withEnv(environment()) {
-                            sh 'UNITTEST_PROGRESS=1 ctest --output-on-failure'
+                        withEnv(environment) {
+                            sh 'ctest'
                         }
                     }
                 } finally {

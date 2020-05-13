@@ -116,7 +116,7 @@ set(SYNC_SERVER_HEADERS ${SERVER_INSTALL_HEADERS} ${SERVER_NOINST_HEADERS})
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     list(APPEND SERVER_SOURCES
-        sync/crypto_server_apple.mm
+        crypto_server_apple.mm
     )
     set(PLATFORM_LIBRARIES ${Foundation} ${Security})
 else()
