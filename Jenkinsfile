@@ -236,16 +236,11 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
             withEnv(environment) {
                 buildEnv.inside() {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        dir('build-dir') {
+                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja .."
+                            runAndCollectWarnings(script: "ninja", name: "linux-${buildType}-encrypt${enableEncryption}-BPNODESIZE_${maxBpNodeSize}")
+                            sh "./test/realm-tests"
+                        }
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -273,16 +268,11 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        dir('build-dir') {
+                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja .."
+                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}-${maxBpNodeSize}-${sanitizeMode}")
+                            sh "./test/realm-tests"
+                        }
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -328,9 +318,9 @@ def doBuildLinuxClang(String buildType) {
                    mkdir build-dir
                    cd build-dir
                    cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
-                   ninja
-                   cpack -G TGZ
                 """
+                runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}")
+                sh "cd build-dir && cpack -G TGZ"
             }
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
@@ -358,7 +348,7 @@ def doCheckValgrind() {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarnings(script: "cd build-dir && ninja", name: "linux-valgrind")
                         sh """
                             cd build-dir/test
                             valgrind --version
@@ -399,7 +389,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}", name: "android-armeabi-${abi}-${buildType}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
@@ -438,8 +428,11 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
     def cmakeDefinitions;
+    def warningFilters = [];
     if (isUWP) {
       cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
+      // warning on benchmark binaries that we don't care about
+      warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
     } else {
       cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
     }
@@ -454,7 +447,13 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             dir('build-dir') {
                 bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
-                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
+                    runAndCollectWarnings(
+                        parser: 'msbuild',
+                        isWindows: true,
+                        script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
+                        name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
+                        filters: warningFilters
+                    )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
                 if (gitTag) {
@@ -545,11 +544,11 @@ def doBuildMacOs(String buildType, boolean runTests) {
                         }
                     }
 
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-clang-${buildType}")
                 }
             }
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
-                runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build')
+                runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build', name: "osx-clang-xcrun-swift-${buildType}")
             }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
@@ -595,7 +594,7 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_BUILD_LIB_ONLY=ON \\
                                   -G Ninja ..
                         """
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-maccatalyst-${buildType}")
                 }
             }
 
@@ -673,7 +672,7 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
                             ..
                     """
 
-                    runAndCollectWarnings(script: "ninja")
+                    runAndCollectWarnings(script: "ninja", name: "linux-x_compile-${target}-${buildType}")
 
                     if (testOptions != null) {
                         if (testOptions.get('emulator')) {
@@ -746,7 +745,7 @@ def recordTests(tag) {
     def tests = readFile('build-dir/test/unit-test-report.xml')
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
-    junit 'build-dir/test/modified-test-report.xml'
+    junit testResults: 'build-dir/test/modified-test-report.xml'
 }
 
 def environment() {
