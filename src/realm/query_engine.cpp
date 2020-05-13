@@ -324,7 +324,7 @@ void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
         m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
     }
     if (bool(other->m_value)) {
-        m_needle_storage.push_back(StringBuffer());
+        m_needle_storage.push_back(util::StringBuffer());
         m_needle_storage.back().append(*other->m_value);
         m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
     }

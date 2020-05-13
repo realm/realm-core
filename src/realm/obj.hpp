@@ -396,7 +396,7 @@ template <>
 inline Obj& Obj::set(ColKey col_key, uint_fast64_t value, bool is_default)
 {
     int_fast64_t value_2 = 0;
-    if (REALM_UNLIKELY(int_cast_with_overflow_detect(value, value_2))) {
+    if (REALM_UNLIKELY(util::int_cast_with_overflow_detect(value, value_2))) {
         REALM_TERMINATE("Unsigned integer too big.");
     }
     return set(col_key, value_2, is_default);
@@ -427,31 +427,31 @@ inline Obj& Obj::set(ColKey col_key, realm::null, bool is_default)
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, Optional<bool> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, util::Optional<bool> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, Optional<int64_t> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, util::Optional<int64_t> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, Optional<float> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, util::Optional<float> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, Optional<double> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, util::Optional<double> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, Optional<ObjectId> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, util::Optional<ObjectId> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }

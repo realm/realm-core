@@ -546,7 +546,7 @@ public:
             insert_null(ndx);
         }
         else {
-            insert(ndx, val.get<typename RemoveOptional<T>::type>());
+            insert(ndx, val.get<typename util::RemoveOptional<T>::type>());
         }
     }
 
