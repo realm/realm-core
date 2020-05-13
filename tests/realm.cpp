@@ -23,14 +23,14 @@
 #include "util/test_utils.hpp"
 
 #include "binding_context.hpp"
+#include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "property.hpp"
 #include "results.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
-
-#include "impl/realm_coordinator.hpp"
+#include "util/scheduler.hpp"
 
 #include <realm/db.hpp>
 
@@ -387,14 +387,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }).join();
     }
 
-    SECTION("can use Realm with explicit execution context on different thread") {
-        config.execution_context = 1;
-        auto realm = Realm::get_shared_realm(config);
-        std::thread([&]{
-            REQUIRE_NOTHROW(realm->verify_thread());
-        }).join();
-    }
-
     SECTION("should not modify the schema when fetching from the cache") {
         auto realm = Realm::get_shared_realm(config);
         auto object_schema = &*realm->schema().find("object");
@@ -540,6 +532,7 @@ TEST_CASE("SharedRealm: notifications") {
 
     size_t change_count = 0;
     auto realm = Realm::get_shared_realm(config);
+    realm->read_group();
     realm->m_binding_context.reset(new Context{&change_count});
     realm->m_binding_context->realm = realm;
 
@@ -1036,7 +1029,11 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     public:
         WriteTransaction wt;
         ExternalWriter(Realm::Config const& config)
-        : m_realm(_impl::RealmCoordinator::get_coordinator(config.path)->get_realm(config, none))
+        : m_realm([&] {
+            auto c = config;
+            c.scheduler = util::Scheduler::get_frozen();
+            return _impl::RealmCoordinator::get_coordinator(c.path)->get_realm(c, util::none);
+        }())
         , wt(TestHelper::get_db(m_realm))
         {
         }
@@ -1053,12 +1050,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
     r->update_schema(schema);
 
-    SECTION("is empty after calling update_schema()") {
-        REQUIRE_FALSE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
-    }
-
-    Realm::get_shared_realm(config);
-    SECTION("is populated after getting another Realm without a schema specified") {
+    SECTION("is populated after calling update_schema()") {
         REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
         REQUIRE(cache_sv == 0);
         REQUIRE(cache_schema == schema);
@@ -1306,6 +1298,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     };
     config.schema_version = 1;
     auto r1 = Realm::get_shared_realm(config);
+    r1->read_group();
     r1->m_binding_context.reset(new Context(&schema_changed_called, &changed_fixed_schema));
 
     SECTION("Fixed schema") {
@@ -1440,6 +1433,7 @@ TEST_CASE("SharedRealm: compact on launch") {
     }
 
     SECTION("compact function does not get invoked if realm is open on another thread") {
+        config.scheduler = util::Scheduler::get_frozen();
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         std::thread([&]{
@@ -1576,7 +1570,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm();
+                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1641,7 +1635,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_end_notify_calls = 0;
             notification_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm();
+                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1690,7 +1684,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm();
+                auto r = coordinator->get_realm(util::Scheduler::get_frozen());
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -1714,7 +1708,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm();
+                auto r = coordinator->get_realm(util::Scheduler::get_frozen());
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -1849,35 +1843,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         util::EventLoop::main().run_until([&] { return called; });
     }
 
-    SECTION("does not check thread if resolved using an execution context") {
-        auto realm = Realm::get_shared_realm(std::move(ref), AbstractExecutionContextID(1));
-        REQUIRE_NOTHROW(realm->verify_thread());
-        std::thread([&] {
-            REQUIRE_NOTHROW(realm->verify_thread());
-        }).join();
-    }
-
-/*
-    SECTION("resolves to existing cached Realm for the thread if caching is enabled") {
-        auto r1 = Realm::get_shared_realm(config);
-        auto r2 = Realm::get_shared_realm(std::move(ref));
-        REQUIRE(r1 == r2);
-    }
-
-    SECTION("resolves to existing cached Realm for the execution context if caching is enabled") {
-        config.execution_context = AbstractExecutionContextID(1);
-        auto r1 = Realm::get_shared_realm(config);
-        config.execution_context = AbstractExecutionContextID(2);
-        auto r2 = Realm::get_shared_realm(config);
-        auto r3 = Realm::get_shared_realm(std::move(ref), AbstractExecutionContextID(1));
-        REQUIRE(r1 == r3);
-        REQUIRE(r1 != r2);
-        REQUIRE(r2 != r3);
-    }
-*/
-
     SECTION("resolves to a new Realm if caching is disabled") {
-        // Cache disabled for local realm, enabled for unbound
         auto r1 = Realm::get_shared_realm(config);
         auto r2 = Realm::get_shared_realm(std::move(ref));
         REQUIRE(r1 != r2);
@@ -1887,9 +1853,5 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         auto r3 = Realm::get_shared_realm(std::move(ref));
         REQUIRE(r1 != r3);
         REQUIRE(r2 != r3);
-
-        // New local with cache enabled should grab the resolved unbound
-        // auto r4 = Realm::get_shared_realm(config);
-        // REQUIRE(r4 == r2);
     }
 }

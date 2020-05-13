@@ -472,8 +472,15 @@ void SyncSession::handle_error(SyncError error)
             }
             break;
         case NextStateAfterError::inactive: {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            advance_state(lock, State::inactive);
+            if (error.is_client_reset_requested()) {
+                std::unique_lock<std::mutex> lock(m_state_mutex);
+                cancel_pending_waits(lock, error.error_code);
+            }
+
+            {
+                std::unique_lock<std::mutex> lock(m_state_mutex);
+                advance_state(lock, State::inactive);
+            }
             break;
         }
         case NextStateAfterError::error: {

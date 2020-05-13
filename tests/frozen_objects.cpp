@@ -61,7 +61,6 @@ public:
 using namespace realm;
 
 TEST_CASE("Construct frozen Realm") {
-
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -72,14 +71,14 @@ TEST_CASE("Construct frozen Realm") {
 
     SECTION("Create frozen Realm directly") {
         auto realm = Realm::get_shared_realm(config);
-        auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+        realm->read_group();
+        auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
         REQUIRE(frozen_realm->is_frozen());
-        REQUIRE(realm->current_transaction_version().value() == frozen_realm->current_transaction_version().value());
+        REQUIRE(realm->read_transaction_version() == *frozen_realm->current_transaction_version());
     }
 }
 
 TEST_CASE("Freeze Realm", "[freeze_realm]") {
-
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -89,7 +88,8 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
     };
 
     auto realm = Realm::get_shared_realm(config);
-    auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+    realm->read_group();
+    auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
 
     SECTION("is_frozen") {
         REQUIRE(frozen_realm->is_frozen());
@@ -129,7 +129,6 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
 }
 
 TEST_CASE("Freeze Results", "[freeze_results]") {
-
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -168,7 +167,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     realm->commit_transaction();
 
     Results results(realm, table);
-    auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+    auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
     Results frozen_results = results.freeze(frozen_realm);
 
     SECTION("is_frozen") {
@@ -203,7 +202,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(obj.is_valid());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 2);
-            REQUIRE(frozen_res.first().value().get<int64_t>(value_col) == 2);
+            REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 2);
         });
     }
 
@@ -237,7 +236,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(obj.is_valid());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<Int>(value_col) == 9);
-            REQUIRE(frozen_res.first().value().get<Int>(value_col) == 9);
+            REQUIRE(frozen_res.first()->get<Int>(value_col) == 9);
         });
     }
 
@@ -252,7 +251,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 3);
-            REQUIRE(frozen_res.first().value().get<int64_t>(value_col) == 3);
+            REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 3);
         });
     }
 
@@ -268,7 +267,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(o.is_frozen());
             REQUIRE(o.get_column_value<Int>("value") == 10);
             REQUIRE(frozen_res.get(0).get<Int>(linked_object_value_col) == 10);
-            REQUIRE(frozen_res.first().value().get<Int>(linked_object_value_col) == 10);
+            REQUIRE(frozen_res.first()->get<Int>(linked_object_value_col) == 10);
         });
     }
 
@@ -317,7 +316,7 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     realm->commit_transaction();
 
     Results results(realm, table);
-    auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+    auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
 
     std::shared_ptr<LnkLst> link_list = results.get(0).get_linklist_ptr(object_link_col);
     List frozen_link_list = List(realm, *link_list).freeze(frozen_realm);
@@ -394,7 +393,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     realm->commit_transaction();
 
     Results results(realm, table);
-    auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+    auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
     Object frozen_obj = Object(realm, table->get_object(0)).freeze(frozen_realm);
     CppContext ctx(frozen_realm);
 
