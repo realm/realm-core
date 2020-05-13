@@ -106,28 +106,30 @@ void ChangesetEncoder::append_value(const Instruction::Payload::Link& link)
 void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
 {
     using Type = Instruction::Payload::Type;
-    mpark::visit(util::overloaded{[&](mpark::monostate) {
-                                      append_value(Type::Null);
-                                  },
-                                  [&](int64_t value) {
-                                      append_value(Type::Int);
-                                      append_value(value);
-                                  },
-                                  [&](InternString str) {
-                                      // Note: Contextual difference. In payloads, Type::String denotes a
-                                      // StringBufferRange, but here it denotes to an InternString.
-                                      append_value(Type::String);
-                                      append_value(str);
-                                  },
-                                  [&](GlobalKey key) {
-                                      append_value(Type::GlobalKey);
-                                      append_value(key);
-                                  },
-                                  [&](ObjectId id) {
-                                      append_value(Type::ObjectId);
-                                      append_value(id);
-                                  }},
-                 pk);
+    auto append = util::overloaded{
+        [&](mpark::monostate) {
+            append_value(Type::Null);
+        },
+        [&](int64_t value) {
+            append_value(Type::Int);
+            append_value(value);
+        },
+        [&](InternString str) {
+            // Note: Contextual difference. In payloads, Type::String denotes a
+            // StringBufferRange, but here it denotes to an InternString.
+            append_value(Type::String);
+            append_value(str);
+        },
+        [&](GlobalKey key) {
+            append_value(Type::GlobalKey);
+            append_value(key);
+        },
+        [&](ObjectId id) {
+            append_value(Type::ObjectId);
+            append_value(id);
+        },
+    };
+    mpark::visit(std::move(append), pk);
 }
 
 void ChangesetEncoder::append_value(const Instruction::Path& path)

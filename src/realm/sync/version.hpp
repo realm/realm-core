@@ -3,10 +3,12 @@
 
 #include <realm/util/features.h>
 
+// clang-format off
 #define REALM_SYNC_VER_MAJOR 10
 #define REALM_SYNC_VER_MINOR 0
 #define REALM_SYNC_VER_PATCH 0 - alpha .12
 #define REALM_SYNC_PRODUCT_NAME "realm-sync"
+// clang-format on
 
 #define REALM_SYNC_VER_STRING                                                                                        \
     REALM_QUOTE(REALM_SYNC_VER_MAJOR) "." REALM_QUOTE(REALM_SYNC_VER_MINOR) "." REALM_QUOTE(REALM_SYNC_VER_PATCH)

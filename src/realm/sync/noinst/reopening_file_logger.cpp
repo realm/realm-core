@@ -33,9 +33,6 @@ void ReopeningFileLogger::do_log(util::Logger::Level level, std::string message)
 void ReopeningFileLogger::do_log_2(util::Logger::Level level, std::string message)
 {
     auto now = std::chrono::system_clock::now();
-    m_out << m_timestamp_formatter.format(now)
-          << ": "
-             ""
-          << get_level_prefix(level) << message << '\n'; // Throws
-    m_out.flush();                                       // Throws
+    m_out << m_timestamp_formatter.format(now) << ": " << get_level_prefix(level) << message << '\n'; // Throws
+    m_out.flush();                                                                                    // Throws
 }

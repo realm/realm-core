@@ -47,15 +47,17 @@ public:
     using file_ident_type = sync::file_ident_type;
     using version_type = sync::version_type;
 
+    // clang-format off
     using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion = sync::SaltedVersion;
-    using DownloadCursor = sync::DownloadCursor;
-    using UploadCursor = sync::UploadCursor;
-    using SyncProgress = sync::SyncProgress;
-    using VersionInfo = sync::VersionInfo;
-    using HistoryEntry = sync::HistoryEntry;
-    using Transformer = sync::Transformer;
-    using TableInfoCache = sync::TableInfoCache;
+    using SaltedVersion   = sync::SaltedVersion;
+    using DownloadCursor  = sync::DownloadCursor;
+    using UploadCursor    = sync::UploadCursor;
+    using SyncProgress    = sync::SyncProgress;
+    using VersionInfo     = sync::VersionInfo;
+    using HistoryEntry    = sync::HistoryEntry;
+    using Transformer     = sync::Transformer;
+    using TableInfoCache  = sync::TableInfoCache;
+    // clang-format on
 
     struct LocalChangeset {
         version_type version;
@@ -182,10 +184,12 @@ private:
         Arrays(Allocator&) noexcept;
     };
 
+    // clang-format off
+
     // Sizes of fixed-size arrays
-    static constexpr int s_root_size = 21;
-    static constexpr int s_cooked_history_size = 5;
-    static constexpr int s_schema_versions_size = 4;
+    static constexpr int s_root_size            = 21;
+    static constexpr int s_cooked_history_size  =  5;
+    static constexpr int s_schema_versions_size =  4;
 
     // Slots in root array of history compartment
     static constexpr int s_ct_history_iip = 0;                          // column ref
@@ -222,6 +226,8 @@ private:
     static constexpr int s_sv_library_versions_iip = 1;  // ref
     static constexpr int s_sv_snapshot_versions_iip = 2; // integer (version_type)
     static constexpr int s_sv_timestamps_iip = 3;        // integer (seconds since epoch)
+
+    // clang-format on
 
     // `progress_server_version` is the latest server version, V, that has been
     // integrated locally (client-side) prior to the currently bound snapshot,

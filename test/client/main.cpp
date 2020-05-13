@@ -262,6 +262,7 @@ int main(int argc, char* argv[])
     std::string server_url;
     bool have_server_url = false;
     std::string app_id;
+    std::string realm_name = "\"\""; // xjson
     bool app_id_specified = false;
     util::Logger::Level log_level = util::Logger::Level::info;
     util::Logger::Level sync_log_level = util::Logger::Level::warn;
@@ -370,6 +371,12 @@ int main(int argc, char* argv[])
             }
             else if (std::strcmp(arg, "--app-id") == 0) {
                 if (get_string_value(app_id)) {
+                    app_id_specified = true;
+                    continue;
+                }
+            }
+            else if (std::strcmp(arg, "--realm-name") == 0) {
+                if (get_string_value(realm_name)) {
                     app_id_specified = true;
                     continue;
                 }
@@ -716,12 +723,13 @@ int main(int argc, char* argv[])
             std::cerr << "Synopsis: " << prog
                       << "  PATH  [URL]\n"
                          "\n"
-                         "PATH is the local file-system path of a client-side Realm file, and URL is\n"
-                         "a reference to the corresponding server-side file. If the URL is not specified,\n"
-                         "no synchronization is done.\n"
+                         "PATH is the local file-system path of a client-side Realm file, and URL\n"
+                         "specifies the server address and protocol envelope. If the URL is not\n"
+                         "specified, no synchronization is done.\n"
                          "\n"
-                         "Certain substitution parameters, if found in PATH, URL, username (`--username`),\n"
-                         "or subscription queries (`--add-query`), will be replaced as follows:\n"
+                         "Certain substitution parameters, if found in PATH, URL, Realm identifier\n"
+                         "(`--realm-name`), username (`--username`), or subscription queries\n"
+                         "(`--add-query`), will be replaced as follows:\n"
                          "  @N    The numer of the curresponding peer (one-based) with leading zeroes.\n"
                          "  @I    The index of the curresponding peer (zero-based) without leading zeroes.\n"
                          "  @H    The host name as returned by the `hostname` command.\n"
@@ -735,6 +743,9 @@ int main(int argc, char* argv[])
                          "  --app-id             The Stitch application identifier (e.g. `foo-rfhxk`).\n"
                          "                       This will be used to construct HTTP request paths. See\n"
                          "                       also `--request-base-path`.\n"
+                         "  --realm-name         A string on xjson format that identifies a particular\n"
+                         "                       Realm on the server. The default value is \"\", i.e.,\n"
+                         "                       the empty string expressed in xjson format.\n"
                          "  -l, --log-level      Set the log level of the testing process. Valid values\n"
                          "                       are `all`, `trace`, `debug`, `detail`, `info`, `warn`,\n"
                          "                       `error`, `fatal`, and `off`. It is `info` by default.\n"
@@ -1115,29 +1126,33 @@ int main(int argc, char* argv[])
     }
     sync::Client client{config};
 
-    util::PrefixLogger auth_logger{"Auth: ", sync_base_logger};
-    bool auth_ssl = false;
-    std::string auth_address;
-    util::network::Endpoint::port_type auth_port = 0;
+    sync::ProtocolEnvelope protocol_envelope;
+    std::string server_address;
+    util::network::Endpoint::port_type server_port = 0;
     if (have_server_url) {
-        sync::ProtocolEnvelope protocol;
-        std::string path; // Dummy
-        if (!client.decompose_server_url(server_url, protocol, auth_address, auth_port, path))
+        std::string path;
+        bool good_url =
+            (client.decompose_server_url(server_url, protocol_envelope, server_address, server_port, path) &&
+             path == "/");
+        if (!good_url)
             throw sync::BadServerUrl{};
-        switch (protocol) {
-            case sync::ProtocolEnvelope::realm:
-            case sync::ProtocolEnvelope::ws:
-                break;
-            case sync::ProtocolEnvelope::realms:
-            case sync::ProtocolEnvelope::wss:
-                auth_ssl = true;
-                break;
-        }
     }
+
+    bool auth_ssl = false;
+    switch (protocol_envelope) {
+        case sync::ProtocolEnvelope::realm:
+        case sync::ProtocolEnvelope::ws:
+            break;
+        case sync::ProtocolEnvelope::realms:
+        case sync::ProtocolEnvelope::wss:
+            auth_ssl = true;
+            break;
+    }
+    util::PrefixLogger auth_logger{"Auth: ", sync_base_logger};
     sync::auth::Client::Config auth_config;
     auth_config.logger = &auth_logger;
     auth_config.request_base_path = request_base_path;
-    sync::auth::Client auth{auth_ssl, auth_address, auth_port, app_id, std::move(auth_config)};
+    sync::auth::Client auth{auth_ssl, server_address, server_port, app_id, std::move(auth_config)};
 
     MainEventLoop main_event_loop{client, interactive};
 
@@ -1178,12 +1193,11 @@ int main(int argc, char* argv[])
     // Compute peer-specific parameters
     struct PeerParams {
         std::string realm_path;
-        std::string server_url;
+        std::string realm_name;
         std::string username;
         std::vector<std::string> queries;
     };
     std::string host_name = util::network::host_name();
-    util::Uri server_url_2{server_url};
     std::unique_ptr<PeerParams[]> peer_params = std::make_unique<PeerParams[]>(num_peers);
     {
         int peer_ndx = 0;
@@ -1209,8 +1223,8 @@ int main(int argc, char* argv[])
                 return EXIT_FAILURE;
             }
         }
-        Substituter::Template virt_path_template;
-        if (!substituter.parse(server_url_2.get_path(), virt_path_template, logger))
+        Substituter::Template realm_name_template;
+        if (!substituter.parse(realm_name, realm_name_template, logger))
             return EXIT_FAILURE;
         Substituter::Template username_template;
         if (!substituter.parse(username, username_template, logger))
@@ -1226,9 +1240,7 @@ int main(int argc, char* argv[])
         for (int i = 0; i < num_peers; ++i) {
             peer_ndx = i;
             peer_params[i].realm_path = realm_path_template.expand();
-            util::Uri url = server_url_2;
-            url.set_path(virt_path_template.expand());
-            peer_params[i].server_url = url.recompose();
+            peer_params[i].realm_name = realm_name_template.expand();
             peer_params[i].username = username_template.expand();
             for (const auto& templ : query_templates)
                 peer_params[i].queries.push_back(templ.expand());
@@ -1349,7 +1361,8 @@ int main(int argc, char* argv[])
             }
             else {
                 std::string refresh_token; // Empty -> no refreshing
-                peers[i]->bind(peer_params[i].server_url, access_token, refresh_token);
+                peers[i]->bind(protocol_envelope, server_address, server_port, peer_params[i].realm_name,
+                               access_token, refresh_token);
                 peer_control_funcs.on_bound(i);
             }
         }
@@ -1367,9 +1380,10 @@ int main(int argc, char* argv[])
             on_sync_error(is_fatal);
             return;
         }
-        auto func = [i, &peers, &peer_params, &peer_control_funcs, access_token = std::move(access_token),
-                     refresh_token = std::move(refresh_token)] {
-            peers[i]->bind(peer_params[i].server_url, access_token, refresh_token);
+        auto func = [i, protocol_envelope, &server_address, server_port, &peers, &peer_params, &peer_control_funcs,
+                     access_token = std::move(access_token), refresh_token = std::move(refresh_token)] {
+            peers[i]->bind(protocol_envelope, server_address, server_port, peer_params[i].realm_name, access_token,
+                           refresh_token);
             peer_control_funcs.on_bound(i);
         };
         test_proc_service.post(func);

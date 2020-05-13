@@ -9,4 +9,6 @@ Tested with Helm 2.9.1 (https://github.com/helm/helm/releases/tag/v2.9.1).
 
 The fan-out dashboard is currently available on https://stats.realmlab.net/d/lJYvjQBiz/fan-out?orgId=1.
 
+To gain access to the Arena cluster, update your ~/.kube/config by running the script at https://arena.k8s.realmlab.net/kubeconfig.
+
 Kubernetes web interface: https://arena.k8s.realmlab.net/#!/deployment.

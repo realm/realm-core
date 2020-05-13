@@ -59,13 +59,16 @@ inline bool is_ssl(ProtocolEnvelope protocol) noexcept
 
 // These integer types are selected so that they accomodate the requirements of
 // the protocol specification (`/doc/protocol.md`).
-using file_ident_type = std::uint_fast64_t;
-using version_type = Replication::version_type;
-using salt_type = std::int_fast64_t;
-using timestamp_type = std::uint_fast64_t;
+//
+// clang-format off
+using file_ident_type    = std::uint_fast64_t;
+using version_type       = Replication::version_type;
+using salt_type          = std::int_fast64_t;
+using timestamp_type     = std::uint_fast64_t;
 using session_ident_type = std::uint_fast64_t;
 using request_ident_type = std::uint_fast64_t;
-using milliseconds_type = std::int_fast64_t;
+using milliseconds_type  = std::int_fast64_t;
+// clang-format on
 
 constexpr file_ident_type get_max_file_ident()
 {
@@ -174,49 +177,53 @@ struct SyncProgress {
 /// ATTENTION: Please remember to update is_session_level_error() when
 /// adding/removing error codes.
 enum class ProtocolError {
+    // clang-format off
+
     // Connection level and protocol errors
-    connection_closed = 100,           // Connection closed (no error)
-    other_error = 101,                 // Other connection level error
-    unknown_message = 102,             // Unknown type of input message
-    bad_syntax = 103,                  // Bad syntax in input message head
-    limits_exceeded = 104,             // Limits exceeded in input message
-    wrong_protocol_version = 105,      // Wrong protocol version (CLIENT) (obsolete)
-    bad_session_ident = 106,           // Bad session identifier in input message
-    reuse_of_session_ident = 107,      // Overlapping reuse of session identifier (BIND)
-    bound_in_other_session = 108,      // Client file bound in other session (IDENT)
-    bad_message_order = 109,           // Bad input message order
-    bad_decompression = 110,           // Error in decompression (UPLOAD)
-    bad_changeset_header_syntax = 111, // Bad syntax in a changeset header (UPLOAD)
-    bad_changeset_size = 112,          // Bad size specified in changeset header (UPLOAD)
-    bad_changesets = 113,              // Bad changesets (UPLOAD)
+    connection_closed            = 100, // Connection closed (no error)
+    other_error                  = 101, // Other connection level error
+    unknown_message              = 102, // Unknown type of input message
+    bad_syntax                   = 103, // Bad syntax in input message head
+    limits_exceeded              = 104, // Limits exceeded in input message
+    wrong_protocol_version       = 105, // Wrong protocol version (CLIENT) (obsolete)
+    bad_session_ident            = 106, // Bad session identifier in input message
+    reuse_of_session_ident       = 107, // Overlapping reuse of session identifier (BIND)
+    bound_in_other_session       = 108, // Client file bound in other session (IDENT)
+    bad_message_order            = 109, // Bad input message order
+    bad_decompression            = 110, // Error in decompression (UPLOAD)
+    bad_changeset_header_syntax  = 111, // Bad syntax in a changeset header (UPLOAD)
+    bad_changeset_size           = 112, // Bad size specified in changeset header (UPLOAD)
+    bad_changesets               = 113, // Bad changesets (UPLOAD)
 
     // Session level errors
-    session_closed = 200,              // Session closed (no error)
-    other_session_error = 201,         // Other session level error
-    token_expired = 202,               // Access token expired
-    bad_authentication = 203,          // Bad user authentication (BIND, REFRESH)
-    illegal_realm_path = 204,          // Illegal Realm path (BIND)
-    no_such_realm = 205,               // No such Realm (BIND)
-    permission_denied = 206,           // Permission denied (STATE_REQUEST, BIND, REFRESH)
-    bad_server_file_ident = 207,       // Bad server file identifier (IDENT) (obsolete!)
-    bad_client_file_ident = 208,       // Bad client file identifier (IDENT)
-    bad_server_version = 209,          // Bad server version (IDENT, UPLOAD, TRANSACT)
-    bad_client_version = 210,          // Bad client version (IDENT, UPLOAD)
-    diverging_histories = 211,         // Diverging histories (IDENT)
-    bad_changeset = 212,               // Bad changeset (UPLOAD)
-    superseded = 213,                  // Superseded by new session for same client-side file (deprecated)
-    disabled_session = 213,            // Alias for `superseded` (deprecated)
-    partial_sync_disabled = 214,       // Partial sync disabled (BIND, STATE_REQUEST)
-    unsupported_session_feature = 215, // Unsupported session-level feature
-    bad_origin_file_ident = 216,       // Bad origin file identifier (UPLOAD)
-    bad_client_file = 217,             // Synchronization no longer possible for client-side file
-    server_file_deleted = 218,         // Server file was deleted while session was bound to it
-    client_file_blacklisted = 219,     // Client file has been blacklisted (IDENT)
-    user_blacklisted = 220,            // User has been blacklisted (BIND)
-    transact_before_upload = 221,      // Serialized transaction before upload completion
-    client_file_expired = 222,         // Client file has expired
-    user_mismatch = 223,               // User mismatch for client file identifier (IDENT)
-    too_many_sessions = 224,           // Too many sessions in connection (BIND)
+    session_closed               = 200, // Session closed (no error)
+    other_session_error          = 201, // Other session level error
+    token_expired                = 202, // Access token expired
+    bad_authentication           = 203, // Bad user authentication (BIND, REFRESH)
+    illegal_realm_path           = 204, // Illegal Realm path (BIND)
+    no_such_realm                = 205, // No such Realm (BIND)
+    permission_denied            = 206, // Permission denied (STATE_REQUEST, BIND, REFRESH)
+    bad_server_file_ident        = 207, // Bad server file identifier (IDENT) (obsolete!)
+    bad_client_file_ident        = 208, // Bad client file identifier (IDENT)
+    bad_server_version           = 209, // Bad server version (IDENT, UPLOAD, TRANSACT)
+    bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
+    diverging_histories          = 211, // Diverging histories (IDENT)
+    bad_changeset                = 212, // Bad changeset (UPLOAD)
+    superseded                   = 213, // Superseded by new session for same client-side file (deprecated)
+    disabled_session             = 213, // Alias for `superseded` (deprecated)
+    partial_sync_disabled        = 214, // Partial sync disabled (BIND, STATE_REQUEST)
+    unsupported_session_feature  = 215, // Unsupported session-level feature
+    bad_origin_file_ident        = 216, // Bad origin file identifier (UPLOAD)
+    bad_client_file              = 217, // Synchronization no longer possible for client-side file
+    server_file_deleted          = 218, // Server file was deleted while session was bound to it
+    client_file_blacklisted      = 219, // Client file has been blacklisted (IDENT)
+    user_blacklisted             = 220, // User has been blacklisted (BIND)
+    transact_before_upload       = 221, // Serialized transaction before upload completion
+    client_file_expired          = 222, // Client file has expired
+    user_mismatch                = 223, // User mismatch for client file identifier (IDENT)
+    too_many_sessions            = 224, // Too many sessions in connection (BIND)
+
+    // clang-format on
 };
 
 constexpr bool is_session_level_error(ProtocolError);

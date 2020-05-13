@@ -24,8 +24,9 @@
 using namespace realm;
 using namespace _impl;
 
-using Connection = ClientImplBase::Connection;
-using Session = ClientImplBase::Session;
+// clang-format off
+using Connection      = ClientImplBase::Connection;
+using Session         = ClientImplBase::Session;
 using UploadChangeset = sync::ClientReplicationBase::UploadChangeset;
 
 // These are a work-around for a bug in MSVC. It cannot find in-class types
@@ -37,10 +38,11 @@ using session_ident_type = sync::session_ident_type;
 using request_ident_type = sync::request_ident_type;
 using SyncProgress = sync::SyncProgress;
 using ConnectionTerminationReason = ClientImplBase::ConnectionTerminationReason;
-using ProtocolEnvelope = ClientImplBase::ProtocolEnvelope;
-using OutputBuffer = ClientImplBase::OutputBuffer;
-using ProtocolError = ClientImplBase::ProtocolError;
-using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
+using ProtocolEnvelope            = ClientImplBase::ProtocolEnvelope;
+using OutputBuffer                = ClientImplBase::OutputBuffer;
+using ProtocolError               = ClientImplBase::ProtocolError;
+using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
+// clang-format on
 
 
 namespace {

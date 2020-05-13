@@ -76,8 +76,9 @@ using namespace realm;
 using namespace realm::sync;
 using util::Optional;
 
-using ServerHistory = _impl::ServerHistory;
-using ServerProtocol = _impl::ServerProtocol;
+// clang-format off
+using ServerHistory         = _impl::ServerHistory;
+using ServerProtocol        = _impl::ServerProtocol;
 using ServerFileAccessCache = _impl::ServerFileAccessCache;
 using ServerImplBase = _impl::ServerImplBase;
 
@@ -96,6 +97,7 @@ using CompactionControl = ServerHistory::CompactionControl;
 using UploadChangeset = ServerProtocol::UploadChangeset;
 using LastClientAccessesEntry = CompactionControl::LastClientAccessesEntry;
 using LastClientAccessesRange = CompactionControl::LastClientAccessesRange;
+// clang-format on
 
 
 using UploadChangesets = std::vector<UploadChangeset>;

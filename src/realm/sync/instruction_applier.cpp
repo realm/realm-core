@@ -41,29 +41,31 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
 
-    mpark::visit(util::overloaded{[&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-                                      if (spec.type == Instruction::Payload::Type::GlobalKey) {
-                                          log("sync::create_table(group, \"%1\");", table_name);
-                                          sync::create_table(m_transaction, table_name);
-                                      }
-                                      else {
-                                          if (!is_valid_key_type(spec.type)) {
-                                              bad_transaction_log("Invalid primary key type");
-                                          }
-                                          DataType pk_type = get_data_type(spec.type);
-                                          StringData pk_field = get_string(spec.field);
-                                          bool nullable = spec.nullable;
-                                          log("sync::create_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);",
-                                              table_name, pk_type, pk_field, nullable);
-                                          sync::create_table_with_primary_key(m_transaction, table_name, pk_type,
-                                                                              pk_field, nullable);
-                                      }
-                                  },
-                                  [&](const Instruction::AddTable::EmbeddedTable&) {
-                                      log("group.add_embedded_table(\"%1\");", table_name);
-                                      m_transaction.add_embedded_table(table_name);
-                                  }},
-                 instr.type);
+    auto add_table = util::overloaded{
+        [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
+            if (spec.type == Instruction::Payload::Type::GlobalKey) {
+                log("sync::create_table(group, \"%1\");", table_name);
+                sync::create_table(m_transaction, table_name);
+            }
+            else {
+                if (!is_valid_key_type(spec.type)) {
+                    bad_transaction_log("Invalid primary key type");
+                }
+                DataType pk_type = get_data_type(spec.type);
+                StringData pk_field = get_string(spec.field);
+                bool nullable = spec.nullable;
+                log("sync::create_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
+                    pk_field, nullable);
+                sync::create_table_with_primary_key(m_transaction, table_name, pk_type, pk_field, nullable);
+            }
+        },
+        [&](const Instruction::AddTable::EmbeddedTable&) {
+            log("group.add_embedded_table(\"%1\");", table_name);
+            m_transaction.add_embedded_table(table_name);
+        },
+    };
+
+    mpark::visit(std::move(add_table), instr.type);
 
     m_table_info_cache.clear();
 }
@@ -301,21 +303,21 @@ void InstructionApplier::operator()(const Instruction::Set& instr)
         info.nullable = table->is_nullable(col);
         info.is_embedded_link = (info.type == type_Link && table->get_link_target(col)->is_embedded());
 
-        auto setter = [&](auto&& val) {
-            using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
-            if constexpr (std::is_same_v<type, util::None>) {
+        auto setter = util::overloaded{
+            [&](const util::None&) {
                 obj.set_null(col, instr.is_default);
-            }
-            else if constexpr (std::is_same_v<type, Instruction::Payload::ObjectValue>) {
-                // Embedded object creation is not idempotent in Core.
+            },
+            [&](const Instruction::Payload::ObjectValue&) {
+                // FIXME: Embedded object creation is not idempotent in Core.
                 if (obj.is_null(col)) {
                     obj.create_and_set_linked_object(col);
                 }
-            }
-            else {
+            },
+            [&](const auto& val) {
                 obj.set(col, val, instr.is_default);
-            }
+            },
         };
+
         set_value(info, instr.value, std::move(setter), "Set");
     }
     else {
@@ -341,20 +343,21 @@ void InstructionApplier::operator()(const Instruction::Set& instr)
                                 list.size());
         }
 
-        auto setter = [&](auto&& val) {
-            using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
-            if constexpr (std::is_same_v<type, util::None>) {
+        auto setter = util::overloaded{
+            [&](const util::None&) {
                 list.set_null(ndx);
-            }
-            else if constexpr (std::is_same_v<type, Instruction::Payload::ObjectValue>) {
+            },
+            [&](const Instruction::Payload::ObjectValue&) {
                 // Embedded object creation is idempotent, and link lists cannot
                 // contain nulls, so this is a no-op.
-            }
-            else {
+            },
+            [&](const auto& val) {
+                using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
                 auto& lst = static_cast<Lst<type>&>(list);
                 lst.set(ndx, val);
-            }
+            },
         };
+
         set_value(info, instr.value, std::move(setter), "ArraySet");
     }
 }
@@ -445,21 +448,21 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 
     info.is_embedded_link = (info.type == type_Link && table->get_link_target(col)->is_embedded());
 
-    auto setter = [&](auto&& value) {
-        using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-        if constexpr (std::is_same_v<util::None, type>) {
+    auto setter = util::overloaded{
+        [&](const util::None&) {
             list.insert_null(instr.index());
-        }
-        else if constexpr (std::is_same_v<type, Instruction::Payload::ObjectValue>) {
+        },
+        [&](const Instruction::Payload::ObjectValue&) {
             auto& lst = static_cast<LnkLst&>(list);
             lst.create_and_insert_linked_object(instr.index());
-        }
-        else {
+        },
+        [&](const auto& value) {
+            using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
             auto& lst = static_cast<Lst<type>&>(list);
             lst.insert(instr.index(), value);
-        }
+        },
     };
-    set_value(info, instr.value, setter, "ArrayInsert");
+    set_value(info, instr.value, std::move(setter), "ArrayInsert");
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)

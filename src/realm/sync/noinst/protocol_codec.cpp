@@ -18,12 +18,10 @@ void ClientProtocol::make_bind_message(int protocol_version, OutputBuffer& out, 
                                        bool need_client_file_ident, bool is_subserver)
 {
     static_cast<void>(protocol_version);
-    out << "bind " << session_ident << " " << server_path.size()
-        << " "
-           ""
-        << signed_user_token.size() << " " << int(need_client_file_ident); // Throws
-    out << " " << int(is_subserver);                                       // Throws
-    out << "\n";                                                           // Throws
+    out << "bind " << session_ident << " " << server_path.size() << " " << signed_user_token.size() << " "
+        << int(need_client_file_ident); // Throws
+    out << " " << int(is_subserver);    // Throws
+    out << "\n";                        // Throws
     REALM_ASSERT(!out.fail());
 
     out.write(server_path.data(), server_path.size());             // Throws
@@ -41,28 +39,16 @@ void ClientProtocol::make_refresh_message(OutputBuffer& out, session_ident_type 
 void ClientProtocol::make_ident_message(OutputBuffer& out, session_ident_type session_ident,
                                         SaltedFileIdent client_file_ident, const SyncProgress& progress)
 {
-    out << "ident " << session_ident << " " << client_file_ident.ident
-        << " "
-           ""
-        << client_file_ident.salt << " " << progress.download.server_version
-        << " "
-           ""
-        << progress.download.last_integrated_client_version
-        << " "
-           ""
-        << progress.latest_server_version.version
-        << " "
-           ""
-        << progress.latest_server_version.salt << "\n"; // Throws
+    out << "ident " << session_ident << " " << client_file_ident.ident << " " << client_file_ident.salt << " "
+        << progress.download.server_version << " " << progress.download.last_integrated_client_version << " "
+        << progress.latest_server_version.version << " " << progress.latest_server_version.salt << "\n"; // Throws
     REALM_ASSERT(!out.fail());
 }
 
 void ClientProtocol::make_client_version_request_message(OutputBuffer& out, session_ident_type session_ident,
                                                          SaltedFileIdent client_file_ident)
 {
-    out << "client_version_request " << session_ident << " " << client_file_ident.ident
-        << " "
-           ""
+    out << "client_version_request " << session_ident << " " << client_file_ident.ident << " "
         << client_file_ident.salt << "\n"; // Throws
     REALM_ASSERT(!out.fail());
 }
@@ -74,21 +60,11 @@ void ClientProtocol::make_state_request_message(
     std::int_fast32_t min_history_schema_version, std::int_fast32_t max_history_schema_version)
 {
     static_cast<void>(protocol_version);
-    out << "state_request " << session_ident
-        << " "
-           ""
-        << partial_transfer_server_version.version
-        << " "
-           ""
-        << partial_transfer_server_version.salt << " " << offset
-        << " "
-           ""
-        << int(need_recent); // Throws
-    out << " " << min_file_format_version << " " << max_file_format_version
-        << " "
-           ""
-        << min_history_schema_version << " " << max_history_schema_version; // Throws
-    out << "\n";                                                            // Throws
+    out << "state_request " << session_ident << " " << partial_transfer_server_version.version << " "
+        << partial_transfer_server_version.salt << " " << offset << " " << int(need_recent); // Throws
+    out << " " << min_file_format_version << " " << max_file_format_version << " " << min_history_schema_version
+        << " " << max_history_schema_version; // Throws
+    out << "\n";                              // Throws
     REALM_ASSERT(!out.fail());
 }
 
@@ -108,11 +84,9 @@ void ClientProtocol::UploadMessageBuilder::add_changeset(version_type client_ver
                                                          file_ident_type origin_file_ident,
                                                          ChunkedBinaryData changeset)
 {
-    m_body_buffer << client_version << " " << server_version << " " << origin_timestamp
-                  << " "
-                     ""
-                  << origin_file_ident << " " << changeset.size() << " "; // Throws
-    changeset.write_to(m_body_buffer);                                    // Throws
+    m_body_buffer << client_version << " " << server_version << " " << origin_timestamp << " " << origin_file_ident
+                  << " " << changeset.size() << " "; // Throws
+    changeset.write_to(m_body_buffer);               // Throws
     REALM_ASSERT(!m_body_buffer.fail());
 
     ++m_num_changesets;
@@ -141,18 +115,10 @@ void ClientProtocol::UploadMessageBuilder::make_upload_message(int protocol_vers
         compressed_body_size = 0;
 
     // The header of the upload message.
-    out << "upload " << session_ident << " " << int(is_body_compressed)
-        << " "
-           ""
-        << body.size() << " " << compressed_body_size;
-    out << " " << progress_client_version
-        << " "
-           ""
-        << progress_server_version
-        << " "
-           ""
-        << locked_server_version; // Throws
-    out << "\n";                  // Throws
+    out << "upload " << session_ident << " " << int(is_body_compressed) << " " << body.size() << " "
+        << compressed_body_size;
+    out << " " << progress_client_version << " " << progress_server_version << " " << locked_server_version; // Throws
+    out << "\n";                                                                                             // Throws
 
     if (is_body_compressed)
         out.write(m_compression_buffer.data(), compressed_body_size); // Throws
@@ -199,10 +165,7 @@ void ServerProtocol::make_ident_message(int protocol_version, OutputBuffer& out,
                                         file_ident_type client_file_ident, salt_type client_file_ident_salt)
 {
     static_cast<void>(protocol_version);
-    out << "ident " << session_ident << " " << client_file_ident
-        << " "
-           ""
-        << client_file_ident_salt << "\n"; // Throws
+    out << "ident " << session_ident << " " << client_file_ident << " " << client_file_ident_salt << "\n"; // Throws
 }
 
 void ServerProtocol::make_client_version_message(OutputBuffer& out, session_ident_type session_ident,
@@ -272,22 +235,10 @@ void ServerProtocol::make_download_message(int protocol_version, OutputBuffer& o
 {
     static_cast<void>(protocol_version);
     // The header of the download message.
-    out << "download " << session_ident << " " << download_server_version
-        << " "
-           ""
-        << download_client_version << " " << latest_server_version
-        << " "
-           ""
-        << latest_server_version_salt << " " << upload_client_version
-        << " "
-           ""
-        << upload_server_version << " " << downloadable_bytes
-        << " "
-           ""
-        << int(body_is_compressed) << " " << uncompressed_body_size
-        << " "
-           ""
-        << compressed_body_size << "\n"; // Throws
+    out << "download " << session_ident << " " << download_server_version << " " << download_client_version << " "
+        << latest_server_version << " " << latest_server_version_salt << " " << upload_client_version << " "
+        << upload_server_version << " " << downloadable_bytes << " " << int(body_is_compressed) << " "
+        << uncompressed_body_size << " " << compressed_body_size << "\n"; // Throws
 
     std::size_t body_size = (body_is_compressed ? compressed_body_size : uncompressed_body_size);
     out.write(body, body_size);

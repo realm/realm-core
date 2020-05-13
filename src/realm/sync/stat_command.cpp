@@ -179,22 +179,24 @@ void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref, 
     std::size_t root_size = 23;
 
     // Slots in history root array
-    std::size_t changesets_iip = 0;
-    std::size_t reciprocal_transforms_iip = 1;
-    std::size_t remote_versions_iip = 2;
-    std::size_t origin_file_idents_iip = 3;
-    std::size_t origin_timestamps_iip = 4;
-    std::size_t progress_download_server_version_iip = 5;
-    std::size_t progress_download_client_version_iip = 6;
-    std::size_t progress_latest_server_version_iip = 7;
-    std::size_t progress_latest_server_version_salt_iip = 8;
-    std::size_t progress_upload_client_version_iip = 9;
-    std::size_t client_file_ident_iip = 11;
-    std::size_t client_file_ident_salt_iip = 12;
-    std::size_t cooked_changesets_iip = 18;
-    std::size_t cooked_base_index_iip = 19;
-    std::size_t cooked_intrachangeset_progress_iip = 20;
-    std::size_t ct_history_iip = 21;
+    // clang-format off
+    std::size_t changesets_iip                          =  0;
+    std::size_t reciprocal_transforms_iip               =  1;
+    std::size_t remote_versions_iip                     =  2;
+    std::size_t origin_file_idents_iip                  =  3;
+    std::size_t origin_timestamps_iip                   =  4;
+    std::size_t progress_download_server_version_iip    =  5;
+    std::size_t progress_download_client_version_iip    =  6;
+    std::size_t progress_latest_server_version_iip      =  7;
+    std::size_t progress_latest_server_version_salt_iip =  8;
+    std::size_t progress_upload_client_version_iip      =  9;
+    std::size_t client_file_ident_iip                   = 11;
+    std::size_t client_file_ident_salt_iip              = 12;
+    std::size_t cooked_changesets_iip                   = 18;
+    std::size_t cooked_base_index_iip                   = 19;
+    std::size_t cooked_intrachangeset_progress_iip      = 20;
+    std::size_t ct_history_iip                          = 21;
+    // clang-format on
 
     Array root{alloc};
     root.init_from_ref(history_root_ref);
@@ -274,6 +276,8 @@ void extract_client_history_info_1(Allocator& alloc, ref_type history_root_ref, 
 void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref, version_type snapshot_version,
                                    ClientHistoryInfo& info)
 {
+    // clang-format off
+
     // Sizes of fixed-size arrays
     std::size_t root_size = 21;
     std::size_t cooked_history_size = 5;
@@ -308,6 +312,8 @@ void extract_client_history_info_2(Allocator& alloc, ref_type history_root_ref, 
     std::size_t sv_library_versions_iip = 1;
     std::size_t sv_snapshot_versions_iip = 2;
     std::size_t sv_timestamps_iip = 3;
+
+    // clang-format on
 
     Array root{alloc};
     root.init_from_ref(history_root_ref);
@@ -478,6 +484,8 @@ struct ServerHistoryInfo {
 void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root_ref, int schema_version,
                                          version_type snapshot_version, ServerHistoryInfo& info)
 {
+    // clang-format off
+
     // Sizes of fixed-size arrays
     std::size_t root_size = 11;
     std::size_t sync_history_size = 6;
@@ -545,6 +553,8 @@ void extract_server_history_info_6_to_10(Allocator& alloc, ref_type history_root
     std::size_t sv_library_versions_iip = 1;
     std::size_t sv_snapshot_versions_iip = 2;
     std::size_t sv_timestamps_iip = 3;
+
+    // clang-format on
 
     Array root{alloc};
     root.init_from_ref(history_root_ref);
@@ -873,11 +883,8 @@ int main(int argc, char* argv[])
                     const ClientHistoryInfo::ContinuousTransactionsHistory& cth = info.ct_history;
                     std::cout << "      - Base version: " << cth.base_version << "\n";
                     std::cout << "      - Current version: " << cth.curr_version
-                              << " "
-                                 "(hard-linked to snapshot number)\n";
-                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size))
-                              << " "
-                                 "("
+                              << " (hard-linked to snapshot number)\n";
+                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size)) << " ("
                               << format_num_entries(cth.size) << ")\n";
                 }
                 std::cout << "    - Synchronization history:\n";
@@ -885,13 +892,8 @@ int main(int argc, char* argv[])
                     const ClientHistoryInfo::SynchronizationHistory& sh = info.sync_history;
                     std::cout << "      - Base version: " << sh.base_version << "\n";
                     std::cout << "      - Current version: " << sh.curr_version
-                              << " "
-                                 "(hard-linked to snapshot number)\n";
-                    std::cout << "      - Main history size: "
-                                 ""
-                              << format_byte_size(double(sh.main_aggr_size))
-                              << " "
-                                 "("
+                              << " (hard-linked to snapshot number)\n";
+                    std::cout << "      - Main history size: " << format_byte_size(double(sh.main_aggr_size)) << " ("
                               << format_num_history_entries(sh.size) << ")\n";
                     std::cout << "      - Reciprocal history size: "
                                  ""
@@ -902,32 +904,20 @@ int main(int argc, char* argv[])
                     const ClientHistoryInfo::ServerBinding& sb = *info.server_binding;
                     std::cout << "\n"
                                  "      - Client file identifier: "
-                              << sb.client_file_ident.ident
-                              << " "
-                                 "(salt="
-                              << sb.client_file_ident.salt
+                              << sb.client_file_ident.ident << " (salt=" << sb.client_file_ident.salt
                               << ")\n"
                                  "      - Latest known server version: "
-                                 ""
-                              << sb.latest_server_version.version
-                              << " "
-                                 "(salt="
-                              << sb.latest_server_version.salt
+                              << sb.latest_server_version.version << " (salt=" << sb.latest_server_version.salt
                               << ")\n"
                                  "      - Synchronization progress:\n"
                                  "        - Download (server version): "
-                                 ""
-                              << sb.download_progress.server_version
-                              << " "
-                                 "(last_integrated_client_version="
-                                 ""
+                              << sb.download_progress.server_version << " (last_integrated_client_version="
                               << sb.download_progress.last_integrated_client_version
                               << ")\n"
                                  "        - Upload (client version): "
                               << sb.upload_progress.client_version;
                     if (!sb.defective_upload_progress) {
                         std::cout << " (last_integrated_server_version="
-                                     ""
                                   << sb.upload_progress.last_integrated_server_version << ")";
                     }
                     std::cout << "\n";
@@ -940,18 +930,11 @@ int main(int argc, char* argv[])
                     const ClientHistoryInfo::CookedHistory& ch = *info.cooked_history;
                     std::cout << "\n"
                                  "      - Size (unconsumed): "
-                                 ""
-                              << format_byte_size(double(ch.aggr_size))
-                              << " "
-                                 "("
+                              << format_byte_size(double(ch.aggr_size)) << " ("
                               << format_num_unconsumed_changesets(ch.size)
                               << ")\n"
                                  "      - Progress: (changeset_index="
-                                 ""
-                              << ch.changeset_index
-                              << ", intrachangeset_progress="
-                                 ""
-                              << ch.intrachangeset_progress
+                              << ch.changeset_index << ", intrachangeset_progress=" << ch.intrachangeset_progress
                               << ")\n"
                                  "      - Base server version: "
                               << ch.base_server_version << "\n";
@@ -966,12 +949,8 @@ int main(int argc, char* argv[])
                         std::cout << "      - Version: " << entry.schema_version;
                         if (!entry.details_are_unknown) {
                             std::cout << " (sync_library_version=" << entry.library_version
-                                      << ", "
-                                         "snapshot_number="
-                                      << entry.snapshot_version
-                                      << ", "
-                                         "timestamp="
-                                      << format_timestamp(entry.timestamp) << ")";
+                                      << ", snapshot_number=" << entry.snapshot_version
+                                      << ", timestamp=" << format_timestamp(entry.timestamp) << ")";
                         }
                         else {
                             std::cout << " (details are unknown)";
@@ -999,11 +978,8 @@ int main(int argc, char* argv[])
                     const ServerHistoryInfo::ContinuousTransactionsHistory& cth = info.ct_history;
                     std::cout << "      - Base version: " << cth.base_version << "\n";
                     std::cout << "      - Current version: " << cth.curr_version
-                              << " "
-                                 "(hard-linked to snapshot number)\n";
-                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size))
-                              << " "
-                                 "("
+                              << " (hard-linked to snapshot number)\n";
+                    std::cout << "      - Size: " << format_byte_size(double(cth.aggr_size)) << " ("
                               << format_num_entries(cth.size) << ")\n";
                 }
                 std::cout << "    - Synchronization history:\n";
@@ -1014,9 +990,7 @@ int main(int argc, char* argv[])
                                  "(salt="
                               << sh.base_version.salt << ")\n";
                     std::cout << "      - Current version: " << sh.curr_version << "\n";
-                    std::cout << "      - Size: " << format_byte_size(double(sh.aggr_size))
-                              << " "
-                                 "("
+                    std::cout << "      - Size: " << format_byte_size(double(sh.aggr_size)) << " ("
                               << format_num_history_entries(sh.size) << ")\n";
                     std::cout << "      - Compacted until: " << sh.compacted_until << "\n";
                     std::cout << "      - Last compaction at: ";
@@ -1031,15 +1005,11 @@ int main(int argc, char* argv[])
                 std::cout << "    - Client files registry:\n";
                 {
                     const ServerHistoryInfo::ClientFiles& cf = info.client_files;
-                    std::cout << "      - Size: " << format_byte_size(double(cf.aggr_size))
-                              << " "
-                                 "("
+                    std::cout << "      - Size: " << format_byte_size(double(cf.aggr_size)) << " ("
                               << format_num_client_files(cf.size) << ")\n";
                     std::cout << "      - Reciprocal history size: "
                                  ""
-                              << format_byte_size(double(cf.recip_hist_aggr_size))
-                              << " "
-                                 "("
+                              << format_byte_size(double(cf.recip_hist_aggr_size)) << " ("
                               << format_byte_size(double(cf.recip_hist_aggr_size) / cf.size)
                               << " "
                                  "per client file)\n";
@@ -1049,20 +1019,13 @@ int main(int argc, char* argv[])
                     const ServerHistoryInfo::PartialSync& ps = *info.partial_sync;
                     std::cout << "\n"
                                  "      - Partial file identifier: "
-                                 ""
-                              << ps.partial_file_ident.ident
-                              << " "
-                                 "(salt="
-                              << ps.partial_file_ident.salt
+                              << ps.partial_file_ident.ident << " (salt=" << ps.partial_file_ident.salt
                               << ")\n"
                                  "      - Partial version: "
                               << ps.partial_version
                               << "\n"
                                  "      - Reference version: "
-                              << ps.reference_version.version
-                              << " "
-                                 "(salt="
-                              << ps.reference_version.salt << ")\n";
+                              << ps.reference_version.version << " (salt=" << ps.reference_version.salt << ")\n";
                 }
                 else {
                     std::cout << " None\n";
@@ -1074,12 +1037,8 @@ int main(int argc, char* argv[])
                         std::cout << "      - Version: " << entry.schema_version;
                         if (!entry.details_are_unknown) {
                             std::cout << " (sync_library_version=" << entry.library_version
-                                      << ", "
-                                         "snapshot_number="
-                                      << entry.snapshot_version
-                                      << ", "
-                                         "timestamp="
-                                      << format_timestamp(entry.timestamp) << ")";
+                                      << ", snapshot_number=" << entry.snapshot_version
+                                      << ", timestamp=" << format_timestamp(entry.timestamp) << ")";
                         }
                         else {
                             std::cout << " (details are unknown)";
@@ -1145,13 +1104,9 @@ int main(int argc, char* argv[])
     for (std::size_t i = 0; i < num_tables; ++i) {
         ConstTableRef table = group.get_table(table_keys[i]);
         StringData table_name = group.get_table_name(table_keys[i]);
-        std::cout << "    - Table: " << quoted(table_name)
-                  << ": "
-                     ""
-                  << format_aggregate_size({tables.get_as_ref(i)}, alloc)
-                  << " "
-                     "("
-                  << format_num_rows(table->size()) << ")\n";
+        std::cout << "    - Table: " << quoted(table_name) << ": "
+                  << format_aggregate_size({tables.get_as_ref(i)}, alloc) << " (" << format_num_rows(table->size())
+                  << ")\n";
         if (show_columns) {
             auto col_keys = table->get_column_keys();
             for (auto col : col_keys) {
@@ -1198,10 +1153,8 @@ int main(int argc, char* argv[])
                 ConstTableRef target_table = table->get_link_target(matches_col_key);
                 StringData query = obj.get<String>(query_col_key);
                 std::int_fast64_t status = obj.get<Int>(status_col_key);
-                std::cout << "      - Query: " << quoted(target_table->get_name())
-                          << ": "
-                             ""
-                          << query << " (status=" << status;
+                std::cout << "      - Query: " << quoted(target_table->get_name()) << ": " << query
+                          << " (status=" << status;
                 if (matches_count_col_key) {
                     std::int_fast64_t matches_count = obj.get<Int>(matches_count_col_key);
                     std::cout << ", matches_count=" << matches_count;

@@ -13,6 +13,7 @@
 #include <realm/util/quote.hpp>
 #include <realm/util/timestamp_formatter.hpp>
 #include <realm/util/load_file.hpp>
+#include <realm/list.hpp>
 #include <realm/group.hpp>
 #include <realm/sync/version.hpp>
 

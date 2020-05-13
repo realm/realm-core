@@ -181,7 +181,7 @@ inline void InstructionApplier::apply(const Changeset& log, util::Logger* logger
 }
 
 template <class... Params>
-void InstructionApplier::bad_transaction_log(const char* msg, Params&&... params) const
+REALM_NORETURN void InstructionApplier::bad_transaction_log(const char* msg, Params&&... params) const
 {
     // FIXME: Provide a way to format strings without going through a logger implementation.
     std::stringstream ss;

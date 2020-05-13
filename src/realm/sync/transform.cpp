@@ -169,15 +169,15 @@ struct TransformerImpl::Side {
         instr.path.m_path.clear();
         instr.path.m_path.reserve(other.path.size());
         for (auto& element : other.path.m_path) {
-            mpark::visit(util::overloaded{
-                             [&](uint32_t index) {
-                                 instr.path.m_path.push_back(index);
-                             },
-                             [&](InternString str) {
-                                 instr.path.m_path.push_back(adopt_string(other_side, str));
-                             },
-                         },
-                         element);
+            auto push = util::overloaded{
+                [&](uint32_t index) {
+                    instr.path.m_path.push_back(index);
+                },
+                [&](InternString str) {
+                    instr.path.m_path.push_back(adopt_string(other_side, str));
+                },
+            };
+            mpark::visit(push, element);
         }
     }
 
@@ -920,20 +920,20 @@ struct MergeUtils {
     bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
         noexcept
     {
-        return mpark::visit(util::overloaded{
-                                [&](uint32_t lhs, uint32_t rhs) {
-                                    return lhs == rhs;
-                                },
-                                [&](InternString lhs, InternString rhs) {
-                                    return same_string(lhs, rhs);
-                                },
-                                [&](auto&&, auto&&) {
-                                    // FIXME: Paths contain incompatible element types. Should we raise an
-                                    // error here?
-                                    return false;
-                                },
-                            },
-                            left, right);
+        auto pred = util::overloaded{
+            [&](uint32_t lhs, uint32_t rhs) {
+                return lhs == rhs;
+            },
+            [&](InternString lhs, InternString rhs) {
+                return same_string(lhs, rhs);
+            },
+            [&](auto&&, auto&&) {
+                // FIXME: Paths contain incompatible element types. Should we raise an
+                // error here?
+                return false;
+            },
+        };
+        return mpark::visit(pred, left, right);
     }
 
     bool same_path(const Instruction::Path& left, const Instruction::Path& right) const noexcept

@@ -2097,6 +2097,12 @@ namespace mpark {
       MPARK_INHERITING_CTOR(impl, super)
       using super::operator=;
 
+      impl(const impl&) = default;
+      impl(impl&&) = default;
+      ~impl() = default;
+      impl &operator=(const impl &) = default;
+      impl &operator=(impl &&) = default;
+
       template <std::size_t I, typename Arg>
       inline void assign(Arg &&arg) {
         this->assign_alt(access::base::get_alt<I>(*this),

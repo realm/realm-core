@@ -1106,36 +1106,38 @@ private:
 /// the application via the connection state change listeners of the affected
 /// sessions.
 enum class Client::Error {
-    connection_closed = 100,           ///< Connection closed (no error)
-    unknown_message = 101,             ///< Unknown type of input message
-    bad_syntax = 102,                  ///< Bad syntax in input message head
-    limits_exceeded = 103,             ///< Limits exceeded in input message
-    bad_session_ident = 104,           ///< Bad session identifier in input message
-    bad_message_order = 105,           ///< Bad input message order
-    bad_client_file_ident = 106,       ///< Bad client file identifier (IDENT)
-    bad_progress = 107,                ///< Bad progress information (DOWNLOAD)
+    // clang-format off
+    connection_closed           = 100, ///< Connection closed (no error)
+    unknown_message             = 101, ///< Unknown type of input message
+    bad_syntax                  = 102, ///< Bad syntax in input message head
+    limits_exceeded             = 103, ///< Limits exceeded in input message
+    bad_session_ident           = 104, ///< Bad session identifier in input message
+    bad_message_order           = 105, ///< Bad input message order
+    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
+    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
     bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size = 109,          ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident = 110,       ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version = 111,          ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset = 112,               ///< Bad changeset (DOWNLOAD)
-    bad_request_ident = 113,           ///< Bad request identifier (MARK)
-    bad_error_code = 114,              ///< Bad error code (ERROR),
-    bad_compression = 115,             ///< Bad compression (DOWNLOAD)
-    bad_client_version = 116,          ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected = 117,    ///< SSL server certificate rejected
-    pong_timeout = 118,                ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt = 119,  ///< Bad client file identifier salt (IDENT)
-    bad_file_ident = 120,              ///< Bad file identifier (ALLOC)
-    connect_timeout = 121,             ///< Sync connection was not fully established in time
-    bad_timestamp = 122,               ///< Bad timestamp (PONG)
-    bad_protocol_from_server = 123,    ///< Bad or missing protocol version information from server
-    client_too_old_for_server = 124,   ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server = 125,   ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed = 131,       ///< Failed to establish HTTP tunnel with configured proxy
+    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
+    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
+    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
+    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
+    bad_request_ident           = 113, ///< Bad request identifier (MARK)
+    bad_error_code              = 114, ///< Bad error code (ERROR),
+    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
+    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
+    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
+    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
+    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
+    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
+    connect_timeout             = 121, ///< Sync connection was not fully established in time
+    bad_timestamp               = 122, ///< Bad timestamp (PONG)
+    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
+    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
+    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
+    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
+    bad_state_message           = 127, ///< Bad values in state message (STATE)
+    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
+    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
+    // clang-format on
 };
 
 const std::error_category& client_error_category() noexcept;

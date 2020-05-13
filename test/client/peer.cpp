@@ -316,14 +316,14 @@ void Peer::prepare_receive_ptime_requests()
 }
 
 
-void Peer::bind(const std::string& server_url, const std::string& access_token, const std::string& refresh_token)
+void Peer::bind(ProtocolEnvelope protocol, const std::string& address, port_type port, const std::string& realm_name,
+                const std::string& access_token, const std::string& refresh_token)
 {
-    m_server_url = server_url;
     m_refresh_token = refresh_token;
     if (!m_refresh_token.empty())
         intitiate_access_token_refresh_wait();
     m_context.on_new_session();
-    m_session.bind(m_server_url, access_token);
+    m_session.bind(address, realm_name, access_token, port, protocol);
     m_session_is_bound = true;
 }
 

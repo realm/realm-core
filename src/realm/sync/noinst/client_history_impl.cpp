@@ -1553,29 +1553,31 @@ void ClientHistoryImpl::migrate_from_history_schema_version_1_to_2(int orig_sche
         const std::size_t root_size = 23;
 
         // Slots in root array of history compartment
-        std::size_t changesets_iip = 0;
-        std::size_t reciprocal_transforms_iip = 1;
-        std::size_t remote_versions_iip = 2;
-        std::size_t origin_file_idents_iip = 3;
-        std::size_t origin_timestamps_iip = 4;
-        std::size_t progress_download_server_version_iip = 5;
-        std::size_t progress_download_client_version_iip = 6;
-        std::size_t progress_latest_server_version_iip = 7;
-        std::size_t progress_latest_server_version_salt_iip = 8;
-        std::size_t progress_upload_client_version_iip = 9;
-        std::size_t progress_upload_server_version_iip = 10;
-        std::size_t client_file_ident_iip = 11;
-        std::size_t client_file_ident_salt_iip = 12;
-        std::size_t timestamp_threshold_iip = 13;
-        std::size_t progress_downloaded_bytes_iip = 14;
-        std::size_t progress_downloadable_bytes_iip = 15;
-        std::size_t progress_uploaded_bytes_iip = 16;
-        std::size_t progress_uploadable_bytes_iip = 17;
-        std::size_t cooked_changesets_iip = 18;
-        std::size_t cooked_base_index_iip = 19;
-        std::size_t cooked_intrachangeset_progress_iip = 20;
-        std::size_t ct_history_iip = 21;
-        std::size_t object_id_history_state_iip = 22;
+        // clang-format off
+        std::size_t changesets_iip                          =  0;
+        std::size_t reciprocal_transforms_iip               =  1;
+        std::size_t remote_versions_iip                     =  2;
+        std::size_t origin_file_idents_iip                  =  3;
+        std::size_t origin_timestamps_iip                   =  4;
+        std::size_t progress_download_server_version_iip    =  5;
+        std::size_t progress_download_client_version_iip    =  6;
+        std::size_t progress_latest_server_version_iip      =  7;
+        std::size_t progress_latest_server_version_salt_iip =  8;
+        std::size_t progress_upload_client_version_iip      =  9;
+        std::size_t progress_upload_server_version_iip      = 10;
+        std::size_t client_file_ident_iip                   = 11;
+        std::size_t client_file_ident_salt_iip              = 12;
+        std::size_t timestamp_threshold_iip                 = 13;
+        std::size_t progress_downloaded_bytes_iip           = 14;
+        std::size_t progress_downloadable_bytes_iip         = 15;
+        std::size_t progress_uploaded_bytes_iip             = 16;
+        std::size_t progress_uploadable_bytes_iip           = 17;
+        std::size_t cooked_changesets_iip                   = 18;
+        std::size_t cooked_base_index_iip                   = 19;
+        std::size_t cooked_intrachangeset_progress_iip      = 20;
+        std::size_t ct_history_iip                          = 21;
+        std::size_t object_id_history_state_iip             = 22;
+        // clang-format on
 
         if (root.size() != root_size)
             throw std::runtime_error{"Unexpected size of history root array"};

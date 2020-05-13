@@ -28,40 +28,44 @@ namespace {
 
 void parse_arguments(int argc, char* argv[], Configuration& configuration)
 {
-    static struct option long_options[] = {{"root", required_argument, nullptr, 'r'},
-                                           {"listen-address", required_argument, nullptr, 'L'},
-                                           {"listen-port", required_argument, nullptr, 'p'},
-                                           {"http-request-timeout", required_argument, nullptr, 'J'},
-                                           {"http-response-timeout", required_argument, nullptr, 'M'},
-                                           {"connection-reaper-timeout", required_argument, nullptr, 'i'},
-                                           {"connection-reaper-interval", required_argument, nullptr, 'd'},
-                                           {"soft-close-timeout", required_argument, nullptr, 'N'},
-                                           {"log-level", required_argument, nullptr, 'l'},
-                                           {"log-include-timestamp", no_argument, nullptr, 'Y'},
-                                           {"log-to-file", no_argument, nullptr, 'P'},
-                                           {"public-key", required_argument, nullptr, 'k'},
-                                           {"max-open-files", required_argument, nullptr, 'm'},
-                                           {"help", no_argument, nullptr, 'h'},
-                                           {"no-reuse-address", no_argument, nullptr, 'n'},
-                                           {"ssl", no_argument, nullptr, 's'},
-                                           {"ssl-certificate", required_argument, nullptr, 'C'},
-                                           {"ssl-private-key", required_argument, nullptr, 'K'},
-                                           {"listen-backlog", required_argument, nullptr, 'b'},
-                                           {"tcp-no-delay", no_argument, nullptr, 'D'},
-                                           {"log-lsof-period", required_argument, nullptr, 'f'},
-                                           {"history-ttl", required_argument, nullptr, 'H'},
-                                           {"compaction-interval", required_argument, nullptr, 'I'},
-                                           {"history-compaction-ignore-clients", no_argument, nullptr, 'q'},
-                                           {"encryption-key", required_argument, nullptr, 'e'},
-                                           {"max-upload-backlog", required_argument, nullptr, 'U'},
-                                           {"enable-download-bootstrap-cache", no_argument, nullptr, 'B'},
-                                           {"disable-sync-to-disk", no_argument, nullptr, 'A'},
-                                           {"max-protocol-version", required_argument, nullptr, 'o'},
-                                           {"disable-serial-transacts", no_argument, nullptr, 'c'},
-                                           {"disable-history-compaction", no_argument, nullptr, 'O'},
-                                           {"disable-download-compaction", no_argument, nullptr, 'Q'},
-                                           {"max-download-size", required_argument, nullptr, 'F'},
-                                           {nullptr, 0, nullptr, 0}};
+    static struct option long_options[] = {
+        // clang-format off
+        {"root",                                 required_argument, nullptr, 'r'},
+        {"listen-address",                       required_argument, nullptr, 'L'},
+        {"listen-port",                          required_argument, nullptr, 'p'},
+        {"http-request-timeout",                 required_argument, nullptr, 'J'},
+        {"http-response-timeout",                required_argument, nullptr, 'M'},
+        {"connection-reaper-timeout",            required_argument, nullptr, 'i'},
+        {"connection-reaper-interval",           required_argument, nullptr, 'd'},
+        {"soft-close-timeout",                   required_argument, nullptr, 'N'},
+        {"log-level",                            required_argument, nullptr, 'l'},
+        {"log-include-timestamp",                no_argument,       nullptr, 'Y'},
+        {"log-to-file",                          no_argument,       nullptr, 'P'},
+        {"public-key",                           required_argument, nullptr, 'k'},
+        {"max-open-files",                       required_argument, nullptr, 'm'},
+        {"help",                                 no_argument,       nullptr, 'h'},
+        {"no-reuse-address",                     no_argument,       nullptr, 'n'},
+        {"ssl",                                  no_argument,       nullptr, 's'},
+        {"ssl-certificate",                      required_argument, nullptr, 'C'},
+        {"ssl-private-key",                      required_argument, nullptr, 'K'},
+        {"listen-backlog",                       required_argument, nullptr, 'b'},
+        {"tcp-no-delay",                         no_argument,       nullptr, 'D'},
+        {"log-lsof-period",                      required_argument, nullptr, 'f'},
+        {"history-ttl",                          required_argument, nullptr, 'H'},
+        {"compaction-interval",                  required_argument, nullptr, 'I'},
+        {"history-compaction-ignore-clients",    no_argument,       nullptr, 'q'},
+        {"encryption-key",                       required_argument, nullptr, 'e'},
+        {"max-upload-backlog",                   required_argument, nullptr, 'U'},
+        {"enable-download-bootstrap-cache",      no_argument,       nullptr, 'B'},
+        {"disable-sync-to-disk",                 no_argument,       nullptr, 'A'},
+        {"max-protocol-version",                 required_argument, nullptr, 'o'},
+        {"disable-serial-transacts",             no_argument,       nullptr, 'c'},
+        {"disable-history-compaction",           no_argument,       nullptr, 'O'},
+        {"disable-download-compaction",          no_argument,       nullptr, 'Q'},
+        {"max-download-size",                    required_argument, nullptr, 'F'},
+        {nullptr,                                0,                 nullptr, 0}
+        // clang-format on
+    };
 
     static const char* opt_desc = "r:L:p:J:M:i:d:N:l:YPk:m:hnsC:K:b:DSu:t:f:H:I:qe:jRGEa:g:U:BA12:v:x:o:cOQF:";
 
@@ -616,105 +620,107 @@ std::string get_default_metrics_prefix()
 
 void show_help(const std::string& program_name)
 {
-    std::cerr << "Usage: " << program_name
-              << " [-r DIR] [OPTIONS]\n"
-                 "\n"
-                 "Arguments:\n"
-                 "\n"
-                 "  -r, --root PATH                The directory for server-side Realm files.\n"
-                 "  -k, --public-key PATH          The public key (PEM file) used to verify\n"
-                 "                                 access tokens sent by clients.\n"
-                 "\n"
-                 "Options:\n"
-                 "\n"
-                 "  -L, --listen-address ADDRESS   The listening address/interface. (default\n"
-                 "                                 127.0.0.1)\n"
-                 "  -p, --listen-port PORT         The listening port. (default 7800 for non-SSL,\n"
-                 "                                 and 7801 for SSL)\n"
-                 "  -J, --http-request-period NUM  The time, in milliseconds, allotted to the reception\n"
-                 "                                 of a complete HTTP request. This counts from the point\n"
-                 "                                 in time where the raw TCP connection is accepted by\n"
-                 "                                 the server, or, in case of HTTP pipelining, from the\n"
-                 "                                 point in time where writing of the previous response\n"
-                 "                                 completed. If this time is exceeded, the connection\n"
-                 "                                 will be terminated by the server. The default value is\n"
-                 "                                 60'000 (1 minute).\n"
-                 "  -M, --http-response-timeout NUM  The time, in milliseconds, allotted to the\n"
-                 "                                 transmission of the complete HTTP response. If this\n"
-                 "                                 time is exceeded, the connection will be terminated by\n"
-                 "                                 the server. The default value is 30'000 (30 seconds).\n"
-                 "  -i, --connection-reaper-timeout NUM  If no heartbeat, and no other message has been\n"
-                 "                                 received via a connection for a certain amount of\n"
-                 "                                 time, that connection will be discarded by the\n"
-                 "                                 connection reaper. This option specifies that amount\n"
-                 "                                 of time in milliseconds. The default value is 180'000\n"
-                 "                                 (3 minutes). See also\n"
-                 "                                 (`--connection-reaper-interval`).\n"
-                 "  -d, --connection-reaper-interval NUM  The time, in milæliseconds, between activations\n"
-                 "                                 of the connection reaper. On each activation, every\n"
-                 "                                 connection is checked for vitality (see\n"
-                 "                                 `--connection-reaper-timeout`). The default value is\n"
-                 "                                 60'000 (1 minute).\n"
-                 "  -N, --soft-close-timeout NUM   In some cases, the server attempts to send an ERROR\n"
-                 "                                 message to the client before closing the connection (a\n"
-                 "                                 soft close). The server will then wait for the client\n"
-                 "                                 to close the connection. This option specifies the\n"
-                 "                                 maximum amount of time in milliseconds, that the\n"
-                 "                                 server will wait before terminating the connection\n"
-                 "                                 itself. This counts from when writing of the ERROR\n"
-                 "                                 message is initiated. The default value is 30'000 (30\n"
-                 "                                 seconds).\n"
-                 "  -l, --log-level                Set log level. Valid values are 'all', 'trace',\n"
-                 "                                 'debug', 'detail', 'info', 'warn', 'error', 'fatal',\n"
-                 "                                 or 'off'. (default 'info')\n"
-                 "  -Y, --log-include-timestamp    Include timestamps in log messages.\n"
-                 "  -P, --log-to-file              Send log messages to `<root>/var/server.log` instead\n"
-                 "                                 of to STDERR (see `--root`).\n"
-                 "  -m, --max-open-files NUM       The maximum number of Realm files that the server will\n"
-                 "                                 have open concurrently (LRU cache). The default is 256.\n"
-                 "  -h, --help                     Display command-line synopsis followed by the\n"
-                 "                                 list of available options.\n"
-                 "  -n, --no-reuse-address         Disables immediate reuse of listening port.\n"
-                 "  -s, --ssl                      Communicate with clients over SSL (Secure Socket\n"
-                 "                                 Layer).\n"
-                 "  -C, --ssl-certificate PATH     The path of the certificate that will be sent to\n"
-                 "                                 clients during the SSL/TLS handshake.\n"
-                 "  -K, --ssl-private-key PATH     The path of the private key corresponding to the\n"
-                 "                                 certificate (`--ssl-certificate`).\n"
-                 "  -b, --listen-backlog NUM       The maximum number of connections that can be queued\n"
-                 "                                 up waiting to be accepted by this server.\n"
-                 "  -D, --tcp-no-delay             Disables the Nagle algorithm on all sockets accepted\n"
-                 "                                 by this server.\n"
-                 "  -f, --log-lsof-period NUM      The period in seconds of lsof output logging for\n"
-                 "                                 the server process.\n"
-                 "  -H, --history-ttl SECONDS      The time in seconds that clients can be offline\n"
-                 "                                 before having to perform a reset. Default is\n"
-                 "                                 forever (never reset).\n"
-                 "  -q, --history-compaction-ignore-clients\n"
-                 "                                 If specified, the determination of how far in-place\n"
-                 "                                 history compaction can proceed will be based entirely\n"
-                 "                                 on the history itself, and the 'last access'\n"
-                 "                                 timestamps of client file entries will be completely\n"
-                 "                                 ignored. This should only be done in emergency\n"
-                 "                                 situations. Expect it to cause expiration of client\n"
-                 "                                 files even when they have seen acitivity within the\n"
-                 "                                 specified time to live (`--history-ttl`).\n"
-                 "  -e, --encryption-key PATH      The 512 bit key used to encrypt Realms.\n"
-                 "  -U, --max-upload-backlog NUM   Sets the limit on the allowed accumulated size in\n"
-                 "                                 bytes of buffered incoming changesets waiting to be\n"
-                 "                                 processed. If set to zero, an implementation defined\n"
-                 "                                 default value will be chosen.\n"
-                 "  -B, --enable-download-bootstrap-cache  Makes the server cache the contents of the\n"
-                 "                                 DOWNLOAD message(s) used for client bootstrapping.\n"
-                 "  -A, --disable-sync-to-disk     Disable sync to disk (msync(), fsync()).\n"
-                 "  -o, --max-protocol-version     Maximum protocol version to allow during negotiation\n"
-                 "                                 with clients. Zero means unspecified. Default is zero.\n"
-                 "  -O, --disable-history-compaction  Disable in-place compaction of main synchronziation\n"
-                 "                                 history.\n"
-                 "  -Q, --disable-download-compaction\n"
-                 "                                 Disable compaction during download.\n"
-                 "  -F, --max-download-size        See `sync::Server::Config::max_download_size`.\n"
-                 "\n";
+    // clang-format off
+    std::cerr <<
+        "Usage: " << program_name << " [-r DIR] [OPTIONS]\n"
+        "\n"
+        "Arguments:\n"
+        "\n"
+        "  -r, --root PATH                The directory for server-side Realm files.\n"
+        "  -k, --public-key PATH          The public key (PEM file) used to verify\n"
+        "                                 access tokens sent by clients.\n"
+        "\n"
+        "Options:\n"
+        "\n"
+        "  -L, --listen-address ADDRESS   The listening address/interface. (default\n"
+        "                                 127.0.0.1)\n"
+        "  -p, --listen-port PORT         The listening port. (default 7800 for non-SSL,\n"
+        "                                 and 7801 for SSL)\n"
+        "  -J, --http-request-period NUM  The time, in milliseconds, allotted to the reception\n"
+        "                                 of a complete HTTP request. This counts from the point\n"
+        "                                 in time where the raw TCP connection is accepted by\n"
+        "                                 the server, or, in case of HTTP pipelining, from the\n"
+        "                                 point in time where writing of the previous response\n"
+        "                                 completed. If this time is exceeded, the connection\n"
+        "                                 will be terminated by the server. The default value is\n"
+        "                                 60'000 (1 minute).\n"
+        "  -M, --http-response-timeout NUM  The time, in milliseconds, allotted to the\n"
+        "                                 transmission of the complete HTTP response. If this\n"
+        "                                 time is exceeded, the connection will be terminated by\n"
+        "                                 the server. The default value is 30'000 (30 seconds).\n"
+        "  -i, --connection-reaper-timeout NUM  If no heartbeat, and no other message has been\n"
+        "                                 received via a connection for a certain amount of\n"
+        "                                 time, that connection will be discarded by the\n"
+        "                                 connection reaper. This option specifies that amount\n"
+        "                                 of time in milliseconds. The default value is 180'000\n"
+        "                                 (3 minutes). See also\n"
+        "                                 (`--connection-reaper-interval`).\n"
+        "  -d, --connection-reaper-interval NUM  The time, in milæliseconds, between activations\n"
+        "                                 of the connection reaper. On each activation, every\n"
+        "                                 connection is checked for vitality (see\n"
+        "                                 `--connection-reaper-timeout`). The default value is\n"
+        "                                 60'000 (1 minute).\n"
+        "  -N, --soft-close-timeout NUM   In some cases, the server attempts to send an ERROR\n"
+        "                                 message to the client before closing the connection (a\n"
+        "                                 soft close). The server will then wait for the client\n"
+        "                                 to close the connection. This option specifies the\n"
+        "                                 maximum amount of time in milliseconds, that the\n"
+        "                                 server will wait before terminating the connection\n"
+        "                                 itself. This counts from when writing of the ERROR\n"
+        "                                 message is initiated. The default value is 30'000 (30\n"
+        "                                 seconds).\n"
+        "  -l, --log-level                Set log level. Valid values are 'all', 'trace',\n"
+        "                                 'debug', 'detail', 'info', 'warn', 'error', 'fatal',\n"
+        "                                 or 'off'. (default 'info')\n"
+        "  -Y, --log-include-timestamp    Include timestamps in log messages.\n"
+        "  -P, --log-to-file              Send log messages to `<root>/var/server.log` instead\n"
+        "                                 of to STDERR (see `--root`).\n"
+        "  -m, --max-open-files NUM       The maximum number of Realm files that the server will\n"
+        "                                 have open concurrently (LRU cache). The default is 256.\n"
+        "  -h, --help                     Display command-line synopsis followed by the\n"
+        "                                 list of available options.\n"
+        "  -n, --no-reuse-address         Disables immediate reuse of listening port.\n"
+        "  -s, --ssl                      Communicate with clients over SSL (Secure Socket\n"
+        "                                 Layer).\n"
+        "  -C, --ssl-certificate PATH     The path of the certificate that will be sent to\n"
+        "                                 clients during the SSL/TLS handshake.\n"
+        "  -K, --ssl-private-key PATH     The path of the private key corresponding to the\n"
+        "                                 certificate (`--ssl-certificate`).\n"
+        "  -b, --listen-backlog NUM       The maximum number of connections that can be queued\n"
+        "                                 up waiting to be accepted by this server.\n"
+        "  -D, --tcp-no-delay             Disables the Nagle algorithm on all sockets accepted\n"
+        "                                 by this server.\n"
+        "  -f, --log-lsof-period NUM      The period in seconds of lsof output logging for\n"
+        "                                 the server process.\n"
+        "  -H, --history-ttl SECONDS      The time in seconds that clients can be offline\n"
+        "                                 before having to perform a reset. Default is\n"
+        "                                 forever (never reset).\n"
+        "  -q, --history-compaction-ignore-clients\n"
+        "                                 If specified, the determination of how far in-place\n"
+        "                                 history compaction can proceed will be based entirely\n"
+        "                                 on the history itself, and the 'last access'\n"
+        "                                 timestamps of client file entries will be completely\n"
+        "                                 ignored. This should only be done in emergency\n"
+        "                                 situations. Expect it to cause expiration of client\n"
+        "                                 files even when they have seen acitivity within the\n"
+        "                                 specified time to live (`--history-ttl`).\n"
+        "  -e, --encryption-key PATH      The 512 bit key used to encrypt Realms.\n"
+        "  -U, --max-upload-backlog NUM   Sets the limit on the allowed accumulated size in\n"
+        "                                 bytes of buffered incoming changesets waiting to be\n"
+        "                                 processed. If set to zero, an implementation defined\n"
+        "                                 default value will be chosen.\n"
+        "  -B, --enable-download-bootstrap-cache  Makes the server cache the contents of the\n"
+        "                                 DOWNLOAD message(s) used for client bootstrapping.\n"
+        "  -A, --disable-sync-to-disk     Disable sync to disk (msync(), fsync()).\n"
+        "  -o, --max-protocol-version     Maximum protocol version to allow during negotiation\n"
+        "                                 with clients. Zero means unspecified. Default is zero.\n"
+        "  -O, --disable-history-compaction  Disable in-place compaction of main synchronziation\n"
+        "                                 history.\n"
+        "  -Q, --disable-download-compaction\n"
+        "                                 Disable compaction during download.\n"
+        "  -F, --max-download-size        See `sync::Server::Config::max_download_size`.\n"
+        "\n";
+    // clang-format on
 }
 
 

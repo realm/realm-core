@@ -58,15 +58,15 @@ InternString Changeset::find_string(StringData string) const noexcept
 
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    return mpark::visit(overloaded{
-                            [&](InternString str) -> PrimaryKey {
-                                return get_string(str);
-                            },
-                            [&](auto&& otherwise) -> PrimaryKey {
-                                return otherwise;
-                            },
-                        },
-                        key);
+    auto get = overloaded{
+        [&](InternString str) -> PrimaryKey {
+            return get_string(str);
+        },
+        [&](auto&& otherwise) -> PrimaryKey {
+            return otherwise;
+        },
+    };
+    return mpark::visit(get, key);
 }
 
 bool Changeset::operator==(const Changeset& that) const noexcept
@@ -135,15 +135,15 @@ std::ostream& Changeset::print_path(std::ostream& os, const Instruction::Path& p
             os << '.';
         }
         first = false;
-        mpark::visit(overloaded{
-                         [&](uint32_t index) {
-                             os << index;
-                         },
-                         [&](InternString str) {
-                             os << get_string(str);
-                         },
-                     },
-                     element);
+        auto print = overloaded{
+            [&](uint32_t index) {
+                os << index;
+            },
+            [&](InternString str) {
+                os << get_string(str);
+            },
+        };
+        mpark::visit(print, element);
     }
     return os;
 }
@@ -285,17 +285,17 @@ void Changeset::Reflector::operator()(const Instruction::AddTable& p) const
 {
     m_tracer.name("AddTable");
     table_instr(p);
-    mpark::visit(util::overloaded{
-                     [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-                         m_tracer.field("pk_field", spec.field);
-                         m_tracer.field("pk_type", spec.type);
-                         m_tracer.field("pk_nullable", spec.nullable);
-                     },
-                     [&](const Instruction::AddTable::EmbeddedTable&) {
-                         m_tracer.field("embedded", true);
-                     },
-                 },
-                 p.type);
+    auto trace = util::overloaded{
+        [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
+            m_tracer.field("pk_field", spec.field);
+            m_tracer.field("pk_type", spec.type);
+            m_tracer.field("pk_nullable", spec.nullable);
+        },
+        [&](const Instruction::AddTable::EmbeddedTable&) {
+            m_tracer.field("embedded", true);
+        },
+    };
+    mpark::visit(trace, p.type);
 }
 
 void Changeset::Reflector::operator()(const Instruction::EraseTable& p) const
@@ -445,32 +445,32 @@ void Changeset::Printer::field(StringData n, Instruction::Payload::Type type)
 
 std::string Changeset::Printer::primary_key_to_string(const Instruction::PrimaryKey& key)
 {
-    return mpark::visit(overloaded{
-                            [&](const mpark::monostate&) {
-                                return std::string("NULL");
-                            },
-                            [&](int64_t value) {
-                                std::stringstream ss;
-                                ss << value;
-                                return ss.str();
-                            },
-                            [&](InternString str) {
-                                std::stringstream ss;
-                                ss << "\"" << m_changeset->get_string(str) << "\"";
-                                return ss.str();
-                            },
-                            [&](GlobalKey key) {
-                                std::stringstream ss;
-                                ss << key;
-                                return ss.str();
-                            },
-                            [&](ObjectId id) {
-                                std::stringstream ss;
-                                ss << id;
-                                return ss.str();
-                            },
-                        },
-                        key);
+    auto convert = overloaded{
+        [&](const mpark::monostate&) {
+            return std::string("NULL");
+        },
+        [&](int64_t value) {
+            std::stringstream ss;
+            ss << value;
+            return ss.str();
+        },
+        [&](InternString str) {
+            std::stringstream ss;
+            ss << "\"" << m_changeset->get_string(str) << "\"";
+            return ss.str();
+        },
+        [&](GlobalKey key) {
+            std::stringstream ss;
+            ss << key;
+            return ss.str();
+        },
+        [&](ObjectId id) {
+            std::stringstream ss;
+            ss << id;
+            return ss.str();
+        },
+    };
+    return mpark::visit(convert, key);
 }
 
 void Changeset::Printer::field(StringData n, const Instruction::PrimaryKey& key)
@@ -498,15 +498,15 @@ void Changeset::Printer::field(StringData n, const Instruction::Path& path)
         }
         first = false;
 
-        mpark::visit(util::overloaded{
-                         [&](InternString field) {
-                             ss << m_changeset->get_string(field);
-                         },
-                         [&](uint32_t index) {
-                             ss << index;
-                         },
-                     },
-                     element);
+        auto print = util::overloaded{
+            [&](InternString field) {
+                ss << m_changeset->get_string(field);
+            },
+            [&](uint32_t index) {
+                ss << index;
+            },
+        };
+        mpark::visit(print, element);
     }
     ss << "]";
     print_field(n, ss.str());

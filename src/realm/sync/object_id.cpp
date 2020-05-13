@@ -14,22 +14,24 @@ using namespace realm::sync;
 std::ostream& realm::sync::operator<<(std::ostream& os, format_pk fmt)
 {
     const auto& key = fmt.pk;
-    mpark::visit(util::overloaded{[&](mpark::monostate) {
-                                      os << "NULL";
-                                  },
-                                  [&](int64_t x) {
-                                      os << "Int(" << x << ")";
-                                  },
-                                  [&](StringData x) {
-                                      os << "\"" << x << "\"";
-                                  },
-                                  [&](GlobalKey x) {
-                                      os << "GlobalKey{" << x << "}";
-                                  },
-                                  [&](ObjectId x) {
-                                      os << "ObjectId{" << x << "}";
-                                  }},
-                 key);
+    auto formatter = util::overloaded{
+        [&](mpark::monostate) {
+            os << "NULL";
+        },
+        [&](int64_t x) {
+            os << "Int(" << x << ")";
+        },
+        [&](StringData x) {
+            os << "\"" << x << "\"";
+        },
+        [&](GlobalKey x) {
+            os << "GlobalKey{" << x << "}";
+        },
+        [&](ObjectId x) {
+            os << "ObjectId{" << x << "}";
+        },
+    };
+    mpark::visit(formatter, key);
     return os;
 }
 

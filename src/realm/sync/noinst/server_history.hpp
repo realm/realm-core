@@ -109,17 +109,19 @@ class ServerHistory : public sync::ClientReplicationBase,
                       public _impl::History,
                       public std::enable_shared_from_this<ServerHistory> {
 public:
-    using file_ident_type = sync::file_ident_type;
-    using version_type = sync::version_type;
-    using salt_type = sync::salt_type;
-    using timestamp_type = sync::timestamp_type;
-    using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion = sync::SaltedVersion;
-    using DownloadCursor = sync::DownloadCursor;
-    using UploadCursor = sync::UploadCursor;
-    using SyncProgress = sync::SyncProgress;
-    using HistoryEntry = sync::HistoryEntry;
-    using IntegrationError = sync::ClientReplicationBase::IntegrationError;
+    // clang-format off
+    using file_ident_type        = sync::file_ident_type;
+    using version_type           = sync::version_type;
+    using salt_type              = sync::salt_type;
+    using timestamp_type         = sync::timestamp_type;
+    using SaltedFileIdent        = sync::SaltedFileIdent;
+    using SaltedVersion          = sync::SaltedVersion;
+    using DownloadCursor         = sync::DownloadCursor;
+    using UploadCursor           = sync::UploadCursor;
+    using SyncProgress           = sync::SyncProgress;
+    using HistoryEntry           = sync::HistoryEntry;
+    using IntegrationError       = sync::ClientReplicationBase::IntegrationError;
+    // clang-format on
 
     enum class BootstrapError {
         no_error = 0,
@@ -142,12 +144,14 @@ public:
     //
     // CAUTION: The values of these are fixed by the history schema.
     enum class ClientType {
-        upstream = 0,  // Reachable via upstream server
-        self = 6,      // The file itself
-        indirect = 1,  // Client of subserver
-        legacy = 5,    // Precise type is unknown
-        regular = 2,   // Direct regular client
+        // clang-format off
+        upstream  = 0, // Reachable via upstream server
+        self      = 6, // The file itself
+        indirect  = 1, // Client of subserver
+        legacy    = 5, // Precise type is unknown
+        regular   = 2, // Direct regular client
         subserver = 4, // Direct subserver
+        // clang-format on
     };
 
     struct FileIdentAllocSlot {
@@ -513,6 +517,8 @@ private:
     class TransformHistoryImpl;
     class DiscardAccessorsGuard;
 
+    // clang-format off
+
     // Sizes of fixed-size arrays
     static constexpr int s_root_size = 11;
     static constexpr int s_client_files_size = 8;
@@ -574,6 +580,8 @@ private:
     static constexpr int s_sv_library_versions_iip = 1;  // ref
     static constexpr int s_sv_snapshot_versions_iip = 2; // integer (version_type)
     static constexpr int s_sv_timestamps_iip = 3;        // integer (seconds since epoch)
+
+    // clang-format on
 
     struct Accessors {
         Array root;

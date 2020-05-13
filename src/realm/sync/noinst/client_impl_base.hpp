@@ -34,16 +34,18 @@ public:
     class Connection;
     class Session;
 
-    using ReconnectMode = sync::Client::ReconnectMode;
+    // clang-format off
+    using ReconnectMode        = sync::Client::ReconnectMode;
     using RoundtripTimeHandler = sync::Client::RoundtripTimeHandler;
-    using ProtocolEnvelope = sync::ProtocolEnvelope;
-    using ProtocolError = sync::ProtocolError;
-    using port_type = sync::Session::port_type;
-    using version_type = sync::version_type;
-    using timestamp_type = sync::timestamp_type;
-    using SaltedVersion = sync::SaltedVersion;
-    using milliseconds_type = sync::milliseconds_type;
-    using OutputBuffer = util::ResettableExpandableBufferOutputStream;
+    using ProtocolEnvelope     = sync::ProtocolEnvelope;
+    using ProtocolError        = sync::ProtocolError;
+    using port_type            = sync::Session::port_type;
+    using version_type         = sync::version_type;
+    using timestamp_type       = sync::timestamp_type;
+    using SaltedVersion        = sync::SaltedVersion;
+    using milliseconds_type    = sync::milliseconds_type;
+    using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
+    // clang-format on
 
     using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
@@ -1545,8 +1547,9 @@ inline void ClientImplBase::Session::initiate_rebind()
 
 inline void ClientImplBase::Session::reset_protocol_state() noexcept
 {
-    m_enlisted_to_send = false;
-    m_bind_message_sent = false;
+    // clang-format off
+    m_enlisted_to_send                    = false;
+    m_bind_message_sent                   = false;
     m_client_version_request_message_sent = false;
     m_state_request_message_sent = false;
     m_ident_message_sent = false;
@@ -1558,7 +1561,8 @@ inline void ClientImplBase::Session::reset_protocol_state() noexcept
 
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
-    m_last_download_mark_sent = m_last_download_mark_received;
+    m_last_download_mark_sent          = m_last_download_mark_received;
+    // clang-format on
 }
 
 inline void ClientImplBase::Session::ensure_enlisted_to_send()

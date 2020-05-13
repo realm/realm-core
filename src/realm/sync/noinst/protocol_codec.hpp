@@ -28,18 +28,20 @@ namespace _impl {
 
 class ClientProtocol {
 public:
-    using file_ident_type = sync::file_ident_type;
-    using version_type = sync::version_type;
-    using salt_type = sync::salt_type;
-    using timestamp_type = sync::timestamp_type;
+    // clang-format off
+    using file_ident_type    = sync::file_ident_type;
+    using version_type       = sync::version_type;
+    using salt_type          = sync::salt_type;
+    using timestamp_type     = sync::timestamp_type;
     using session_ident_type = sync::session_ident_type;
     using request_ident_type = sync::request_ident_type;
-    using milliseconds_type = sync::milliseconds_type;
-    using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion = sync::SaltedVersion;
-    using DownloadCursor = sync::DownloadCursor;
-    using UploadCursor = sync::UploadCursor;
-    using SyncProgress = sync::SyncProgress;
+    using milliseconds_type  = sync::milliseconds_type;
+    using SaltedFileIdent    = sync::SaltedFileIdent;
+    using SaltedVersion      = sync::SaltedVersion;
+    using DownloadCursor     = sync::DownloadCursor;
+    using UploadCursor       = sync::UploadCursor;
+    using SyncProgress       = sync::SyncProgress;
+    // clang-format on
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using RemoteChangeset = sync::Transformer::RemoteChangeset;
@@ -47,14 +49,16 @@ public:
 
     // FIXME: No need to explicitly assign numbers to these
     enum class Error {
-        unknown_message = 101,             // Unknown type of input message
-        bad_syntax = 102,                  // Bad syntax in input message head
-        limits_exceeded = 103,             // Limits exceeded in input message
+        // clang-format off
+        unknown_message             = 101, // Unknown type of input message
+        bad_syntax                  = 102, // Bad syntax in input message head
+        limits_exceeded             = 103, // Limits exceeded in input message
         bad_changeset_header_syntax = 108, // Bad syntax in changeset header (DOWNLOAD)
-        bad_changeset_size = 109,          // Bad changeset size in changeset header (DOWNLOAD)
-        bad_server_version = 111,          // Bad server version in changeset header (DOWNLOAD)
-        bad_error_code = 114,              ///< Bad error code (ERROR)
-        bad_decompression = 115,           // Error in decompression (DOWNLOAD)
+        bad_changeset_size          = 109, // Bad changeset size in changeset header (DOWNLOAD)
+        bad_server_version          = 111, // Bad server version in changeset header (DOWNLOAD)
+        bad_error_code              = 114, ///< Bad error code (ERROR)
+        bad_decompression           = 115, // Error in decompression (DOWNLOAD)
+        // clang-format on
     };
 
 
@@ -456,27 +460,31 @@ private:
 
 class ServerProtocol {
 public:
-    using file_ident_type = sync::file_ident_type;
-    using version_type = sync::version_type;
-    using salt_type = sync::salt_type;
-    using timestamp_type = sync::timestamp_type;
+    // clang-format off
+    using file_ident_type    = sync::file_ident_type;
+    using version_type       = sync::version_type;
+    using salt_type          = sync::salt_type;
+    using timestamp_type     = sync::timestamp_type;
     using session_ident_type = sync::session_ident_type;
     using request_ident_type = sync::request_ident_type;
-    using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion = sync::SaltedVersion;
-    using milliseconds_type = sync::milliseconds_type;
-    using UploadCursor = sync::UploadCursor;
+    using SaltedFileIdent    = sync::SaltedFileIdent;
+    using SaltedVersion      = sync::SaltedVersion;
+    using milliseconds_type  = sync::milliseconds_type;
+    using UploadCursor       = sync::UploadCursor;
+    // clang-format on
 
     using OutputBuffer = util::ResettableExpandableBufferOutputStream;
 
     // FIXME: No need to explicitly assign numbers to these
     enum class Error {
-        unknown_message = 101,             // Unknown type of input message
-        bad_syntax = 102,                  // Bad syntax in input message head
-        limits_exceeded = 103,             // Limits exceeded in input message
-        bad_decompression = 104,           // Error in decompression (UPLOAD)
+        // clang-format off
+        unknown_message             = 101, // Unknown type of input message
+        bad_syntax                  = 102, // Bad syntax in input message head
+        limits_exceeded             = 103, // Limits exceeded in input message
+        bad_decompression           = 104, // Error in decompression (UPLOAD)
         bad_changeset_header_syntax = 105, // Bad syntax in changeset header (UPLOAD)
-        bad_changeset_size = 106,          // Changeset size doesn't fit in message (UPLOAD)
+        bad_changeset_size          = 106, // Changeset size doesn't fit in message (UPLOAD)
+        // clang-format on
     };
 
     // Messages sent by the server to the client
@@ -877,13 +885,14 @@ public:
     void insert_single_changeset_download_message(OutputBuffer&, const ChangesetInfo&, util::Logger&);
 
 private:
-    static constexpr std::size_t s_max_head_size = 256;
+    // clang-format off
+    static constexpr std::size_t s_max_head_size              =  256;
     static constexpr std::size_t s_max_signed_user_token_size = 2048;
-    static constexpr std::size_t s_max_client_info_size = 1024;
-    static constexpr std::size_t s_max_path_size = 1024;
-    static constexpr std::size_t s_max_changeset_size =
-        std::numeric_limits<std::size_t>::max(); // FIXME: What is a reasonable value here?
-    static constexpr std::size_t s_max_body_size = std::numeric_limits<std::size_t>::max();
+    static constexpr std::size_t s_max_client_info_size       = 1024;
+    static constexpr std::size_t s_max_path_size              = 1024;
+    static constexpr std::size_t s_max_changeset_size         = std::numeric_limits<std::size_t>::max(); // FIXME: What is a reasonable value here?
+    static constexpr std::size_t s_max_body_size              = std::numeric_limits<std::size_t>::max();
+    // clang-format on
 };
 
 // make_authorization_header() makes the value of the Authorization header used in the

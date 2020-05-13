@@ -43,10 +43,10 @@ EOF
 ^test/.*\.realm\.gz$
 EOF
     ) || exit 1
-    git ls-files "src/realm/" "src/dogless/" "src/dogless.hpp" "test/" "CMakeLists.txt" "dependencies.list" "tools/cmake/" "LICENSE" | grep -E -v -f "$dir_abs/tmp/realm-sync-excludes" >"$dir_abs/tmp/realm-sync-files" || exit 1
+    git ls-files "src/realm/" "src/dogless/" "src/dogless.hpp" "src/external/mpark/" "test/" "CMakeLists.txt" "dependencies.list" "tools/cmake/" "LICENSE" | grep -E -v -f "$dir_abs/tmp/realm-sync-excludes" >"$dir_abs/tmp/realm-sync-files" || exit 1
     n="$(wc -l <"$dir_abs/tmp/realm-sync-files")" || exit 1
     echo "Packaging sync library ($n files)"
     tar czf "$dir_abs/tmp/realm-sync.tgz" -T "$dir_abs/tmp/realm-sync-files" || exit 1
 ) || exit 1
 
-docker build --tag="sync-test-client" . || exit 1
+docker build --force-rm --tag="sync-test-client" . || exit 1

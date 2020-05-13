@@ -53,6 +53,8 @@ class Peer {
 public:
     class Context;
     enum class Error;
+    using ProtocolEnvelope = sync::ProtocolEnvelope;
+    using port_type = sync::Client::port_type;
     using milliseconds_type = sync::milliseconds_type;
     using BindCompletionHandler = void();
     using LevelDistr = std::uniform_int_distribution<int>;
@@ -69,7 +71,8 @@ public:
 
     /// If a refresh token is specified (nonempty), the access token will be
     /// periodically refreshed.
-    void bind(const std::string& server_url, const std::string& access_token, const std::string& refresh_token);
+    void bind(ProtocolEnvelope protocol, const std::string& address, port_type port, const std::string& realm_name,
+              const std::string& access_token, const std::string& refresh_token);
 
     struct TransactSpec {
         int num_blobs = 0;
@@ -111,7 +114,6 @@ private:
     std::unique_ptr<Replication> m_receive_history;
     DBRef m_receive_shared_group;
     TransactionRef m_receive_group = nullptr;
-    std::string m_server_url;
     std::string m_refresh_token;
     util::Optional<util::network::DeadlineTimer> m_access_token_refresh_timer;
     TableKey m_ptime_table_ndx = TableKey{};

@@ -17,20 +17,22 @@ using namespace realm;
 using namespace realm::sync;
 
 
-using ClientImplBase = _impl::ClientImplBase;
-using ClientFileAccessCache = _impl::ClientFileAccessCache;
-using SyncTransactReporter = ClientReplication::SyncTransactReporter;
-using ChangesetCooker = ClientReplication::ChangesetCooker;
-using SyncTransactCallback = Session::SyncTransactCallback;
-using ProgressHandler = Session::ProgressHandler;
-using WaitOperCompletionHandler = Session::WaitOperCompletionHandler;
-using SSLVerifyCallback = Session::SSLVerifyCallback;
-using ConnectionState = Session::ConnectionState;
-using ErrorInfo = Session::ErrorInfo;
-using ConnectionStateChangeListener = Session::ConnectionStateChangeListener;
-using port_type = Session::port_type;
-using connection_ident_type = std::int_fast64_t;
-using ProxyConfig = Session::Config::ProxyConfig;
+// clang-format off
+using ClientImplBase                  = _impl::ClientImplBase;
+using ClientFileAccessCache           = _impl::ClientFileAccessCache;
+using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
+using ChangesetCooker                 = ClientReplication::ChangesetCooker;
+using SyncTransactCallback            = Session::SyncTransactCallback;
+using ProgressHandler                 = Session::ProgressHandler;
+using WaitOperCompletionHandler       = Session::WaitOperCompletionHandler;
+using SSLVerifyCallback               = Session::SSLVerifyCallback;
+using ConnectionState                 = Session::ConnectionState;
+using ErrorInfo                       = Session::ErrorInfo;
+using ConnectionStateChangeListener   = Session::ConnectionStateChangeListener;
+using port_type                       = Session::port_type;
+using connection_ident_type           = std::int_fast64_t;
+using ProxyConfig                     = Session::Config::ProxyConfig;
+// clang-format on
 
 
 namespace {
@@ -710,21 +712,26 @@ void ClientImpl::run()
 ClientImplBase::Config ClientImpl::make_client_impl_base_config(Client::Config& config)
 {
     ClientImplBase::Config config_2;
-    config_2.user_agent_platform_info = std::move(config.user_agent_platform_info);
-    config_2.user_agent_application_info = std::move(config.user_agent_application_info);
-    config_2.logger = config.logger;
-    config_2.reconnect_mode = config.reconnect_mode;
-    config_2.connect_timeout = config.connect_timeout;
-    config_2.connection_linger_time = (config.one_connection_per_session ? 0 : config.connection_linger_time);
-    config_2.ping_keepalive_period = config.ping_keepalive_period;
-    config_2.pong_keepalive_timeout = config.pong_keepalive_timeout;
-    config_2.fast_reconnect_limit = config.fast_reconnect_limit;
+
+    // clang-format off
+    config_2.user_agent_platform_info        = std::move(config.user_agent_platform_info);
+    config_2.user_agent_application_info     = std::move(config.user_agent_application_info);
+    config_2.logger                          = config.logger;
+    config_2.reconnect_mode                  = config.reconnect_mode;
+    config_2.connect_timeout                 = config.connect_timeout;
+    config_2.connection_linger_time          = (config.one_connection_per_session ? 0 :
+                                                config.connection_linger_time);
+    config_2.ping_keepalive_period           = config.ping_keepalive_period;
+    config_2.pong_keepalive_timeout          = config.pong_keepalive_timeout;
+    config_2.fast_reconnect_limit            = config.fast_reconnect_limit;
     config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
-    config_2.dry_run = config.dry_run;
-    config_2.tcp_no_delay = config.tcp_no_delay;
-    config_2.enable_default_port_hack = config.enable_default_port_hack;
-    config_2.disable_upload_compaction = config.disable_upload_compaction;
-    config_2.roundtrip_time_handler = std::move(config.roundtrip_time_handler);
+    config_2.dry_run                         = config.dry_run;
+    config_2.tcp_no_delay                    = config.tcp_no_delay;
+    config_2.enable_default_port_hack        = config.enable_default_port_hack;
+    config_2.disable_upload_compaction       = config.disable_upload_compaction;
+    config_2.roundtrip_time_handler          = std::move(config.roundtrip_time_handler);
+    // clang-format on
+
     return config_2;
 }
 
