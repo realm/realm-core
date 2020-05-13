@@ -280,6 +280,17 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 }
             });
         }
+        SECTION("Doubly Nested Array 3") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ {\"KEY\": \"666\"}, {\"KEY\": \"666\"}, {}] }",
+                [](auto val) {;
+                    return val.size() == 3
+                        && val[0] == BsonDocument({{"KEY", "666"}})
+                        && val[1] == BsonDocument({{"KEY", "666"}})
+                        && val[2] == BsonDocument();
+                }
+            });
+        }
     }
 
     SECTION("Double type") {
