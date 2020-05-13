@@ -26,6 +26,8 @@
 namespace realm {
 namespace parser {
 
+using namespace util;
+
 SubqueryExpression::SubqueryExpression(Query& q, const std::string& key_path_string, const std::string& variable_name,
                                        parser::KeyPathMapping& mapping)
     : var_name(variable_name)

@@ -256,7 +256,7 @@ void SortDescriptor::execute(IndexPairs& v, const Sorter& predicate, const BaseD
 
 std::string LimitDescriptor::get_description(ConstTableRef) const
 {
-    return "LIMIT(" + serializer::print_value(m_limit) + ")";
+    return "LIMIT(" + util::serializer::print_value(m_limit) + ")";
 }
 
 std::unique_ptr<BaseDescriptor> LimitDescriptor::clone() const

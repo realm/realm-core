@@ -974,7 +974,7 @@ struct NullableVector {
         }
     }
 
-    void init(const std::vector<Optional<T>>& values)
+    void init(const std::vector<util::Optional<T>>& values)
     {
         size_t sz = values.size();
         init(sz);
@@ -1280,7 +1280,7 @@ public:
         ValueBase::m_values = values.size();
     }
 
-    void init(bool from_link_list, const std::vector<Optional<T>>& values)
+    void init(bool from_link_list, const std::vector<util::Optional<T>>& values)
     {
         m_storage.init(values);
         ValueBase::m_from_link_list = from_link_list;
@@ -3093,7 +3093,7 @@ public:
     {
         if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
             if (m_is_nullable_storage) {
-                evaluate<Optional<T>>(index, destination);
+                evaluate<util::Optional<T>>(index, destination);
                 return;
             }
         }
@@ -3186,7 +3186,7 @@ public:
     {
         if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
             if (this->m_is_nullable_storage) {
-                evaluate<Optional<T>>(index, destination);
+                evaluate<util::Optional<T>>(index, destination);
                 return;
             }
         }
@@ -3348,7 +3348,7 @@ public:
     {
         if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
             if (m_list.m_is_nullable_storage) {
-                evaluate<Optional<T>>(index, destination);
+                evaluate<util::Optional<T>>(index, destination);
                 return;
             }
         }
@@ -3972,7 +3972,7 @@ public:
         m_result = Derived::apply(m_result, value);
     }
 
-    void accumulate(Optional<T> value)
+    void accumulate(util::Optional<T> value)
     {
         if (value) {
             m_count++;

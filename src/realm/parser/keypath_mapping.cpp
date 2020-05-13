@@ -23,6 +23,8 @@
 namespace realm {
 namespace parser {
 
+using namespace realm::util;
+
 std::size_t TableAndColHash::operator()(const std::pair<ConstTableRef, std::string>& p) const
 {
     // in practice, table names are unique between tables and column names are unique within a table

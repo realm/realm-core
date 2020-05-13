@@ -1874,7 +1874,7 @@ public:
                 m_needles.insert(StringData()); // nulls
             }
             else {
-                m_needle_storage.emplace_back(StringBuffer());
+                m_needle_storage.emplace_back(util::StringBuffer());
                 m_needle_storage.back().append(it->data(), it->size());
                 m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
             }
@@ -1916,7 +1916,7 @@ private:
 
     size_t _find_first_local(size_t start, size_t end) override;
     std::unordered_set<StringData> m_needles;
-    std::vector<StringBuffer> m_needle_storage;
+    std::vector<util::StringBuffer> m_needle_storage;
 };
 
 
