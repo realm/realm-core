@@ -24,6 +24,8 @@ Realm Core is published under the Apache 2.0 license.
 North Korea, Sudan, Syria or the Crimea region, or to any other person that is
 not eligible to receive the product under U.S. law.**
 
+Please also see THIRD-PARTY-NOTICES for and licenses related to included third party libraries.
+
 ## Feedback
 
 Feedback to the Realm SDK's should be given in the respective SDK's github mentioned in the top of this readme. Anything else about the Realm Core, please create an [issue here](https://github.com/realm/realm-core/issues/new).

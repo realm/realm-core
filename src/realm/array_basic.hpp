@@ -110,10 +110,6 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create(Array::Type = type_Normal, bool context_flag = false);
 
-#ifdef REALM_DEBUG
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-#endif
-
 private:
     size_t find(T target, size_t begin, size_t end) const;
 

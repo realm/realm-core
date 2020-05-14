@@ -114,9 +114,6 @@ public:
     /// initialization value).
     static MemRef create_array(size_t size, Allocator&, BinaryData defaults);
 
-#ifdef REALM_DEBUG
-    void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
-#endif
     bool update_from_parent(size_t old_baseline) noexcept;
 
 private:
