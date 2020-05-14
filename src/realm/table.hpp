@@ -494,48 +494,6 @@ public:
     ColKey spec_ndx2colkey(size_t ndx) const;
     void report_invalid_key(ColKey col_key) const;
     size_t num_leaf_cols() const;
-    //@{
-    /// Find the lower/upper bound according to a column that is
-    /// already sorted in ascending order.
-    ///
-    /// For an integer column at index 0, and an integer value '`v`',
-    /// lower_bound_int(0,v) returns the index '`l`' of the first row
-    /// such that `get_int(0,l) &ge; v`, and upper_bound_int(0,v)
-    /// returns the index '`u`' of the first row such that
-    /// `get_int(0,u) &gt; v`. In both cases, if no such row is found,
-    /// the returned value is the number of rows in the table.
-    ///
-    ///     3 3 3 4 4 4 5 6 7 9 9 9
-    ///     ^     ^     ^     ^     ^
-    ///     |     |     |     |     |
-    ///     |     |     |     |      -- Lower and upper bound of 15
-    ///     |     |     |     |
-    ///     |     |     |      -- Lower and upper bound of 8
-    ///     |     |     |
-    ///     |     |      -- Upper bound of 4
-    ///     |     |
-    ///     |      -- Lower bound of 4
-    ///     |
-    ///      -- Lower and upper bound of 1
-    ///
-    /// These functions are similar to std::lower_bound() and
-    /// std::upper_bound().
-    ///
-    /// The string versions assume that the column is sorted according
-    /// to StringData::operator<().
-    ///
-    /// FIXME: Deprecate or change to return ObjKey.
-    size_t lower_bound_int(ColKey col_key, int64_t value) const noexcept;
-    size_t upper_bound_int(ColKey col_key, int64_t value) const noexcept;
-    size_t lower_bound_bool(ColKey col_key, bool value) const noexcept;
-    size_t upper_bound_bool(ColKey col_key, bool value) const noexcept;
-    size_t lower_bound_float(ColKey col_key, float value) const noexcept;
-    size_t upper_bound_float(ColKey col_key, float value) const noexcept;
-    size_t lower_bound_double(ColKey col_key, double value) const noexcept;
-    size_t upper_bound_double(ColKey col_key, double value) const noexcept;
-    size_t lower_bound_string(ColKey col_key, StringData value) const noexcept;
-    size_t upper_bound_string(ColKey col_key, StringData value) const noexcept;
-    //@}
 
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not

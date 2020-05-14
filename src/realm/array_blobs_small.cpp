@@ -218,24 +218,3 @@ StringData ArraySmallBlobs::get_string_legacy(size_t ndx) const
         return str;
     }
 }
-
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
-
-void ArraySmallBlobs::to_dot(std::ostream& out, bool, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    out << "subgraph cluster_binary" << ref << " {" << std::endl;
-    out << " label = \"ArrayBinary";
-    if (title.size() != 0)
-        out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
-
-    Array::to_dot(out, "binary_top");
-    m_offsets.to_dot(out, "offsets");
-    m_blob.to_dot(out, "blob");
-
-    out << "}" << std::endl;
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions

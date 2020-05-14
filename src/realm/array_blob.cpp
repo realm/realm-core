@@ -173,10 +173,9 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     return get_ref();
 }
 
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
-
 void ArrayBlob::verify() const
 {
+#ifdef REALM_DEBUG
     if (get_context_flag()) {
         REALM_ASSERT(has_refs());
         for (size_t i = 0; i < size(); ++i) {
@@ -190,37 +189,5 @@ void ArrayBlob::verify() const
     else {
         REALM_ASSERT(!has_refs());
     }
+#endif
 }
-
-void ArrayBlob::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    out << "</FONT></TD>" << std::endl;
-
-    // Values
-    out << "<TD>";
-    out << blob_size() << " bytes"; // TODO: write content
-    out << "</TD>" << std::endl;
-
-    out << "</TR></TABLE>>];" << std::endl;
-
-    if (title.size() != 0)
-        out << "}" << std::endl;
-
-    to_dot_parent_edge(out);
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions
