@@ -1534,12 +1534,6 @@ public:
         return m_cf_recip_hist_refs.get(child_ndx);
     }
 
-    std::pair<ref_type, std::size_t> get_to_dot_parent(std::size_t) const override final
-    {
-        REALM_ASSERT(false);
-        return {};
-    }
-
 private:
     BPlusTree<ref_type>& m_cf_recip_hist_refs;
     const std::size_t m_remote_file_index;
