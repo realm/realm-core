@@ -1172,7 +1172,7 @@ bool Parser::end_object()
         m_instructions.pop();
     }
     return true;
-};
+}
 
 /*!
  @brief the beginning of an array was read
@@ -1186,7 +1186,7 @@ bool Parser::start_array(std::size_t)
     m_marks.emplace(BsonArray());
 
     return true;
-};
+}
 
 /*!
  @brief the end of an array was read
@@ -1203,7 +1203,7 @@ bool Parser::end_array()
         m_instructions.pop();
     }
     return true;
-};
+}
 
 /*!
  @brief a parse error occurred
@@ -1215,7 +1215,7 @@ bool Parser::end_array()
 bool Parser::parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex)
 {
     throw ex;
-};
+}
 
 Bson Parser::parse(const std::string& json)
 {

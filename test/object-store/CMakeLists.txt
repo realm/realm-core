@@ -91,7 +91,9 @@ add_custom_command(TARGET tests POST_BUILD
 
 create_coverage_target(generate-coverage tests)
 
-add_test(NAME OSTests COMMAND tests)
+if (NOT REALM_TSAN)
+    add_test(NAME OSTests COMMAND tests)
+endif()
 
 add_subdirectory(notifications-fuzzer)
 add_subdirectory(benchmarks)

@@ -9,11 +9,14 @@ RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
 # Install clang and everything needed to build core
 RUN apt-get update \
     && apt-get install -y \
+       libcurl4-openssl-dev \
        libprocps-dev \
+       libuv1-dev \
        ninja-build \
        git \
        gnupg \
-       wget
+       wget \
+       zlib1g-dev
 
 # Setup the LLVM repository
 RUN echo deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main > /etc/apt/sources.list.d/clang.list

@@ -593,7 +593,7 @@ void Stream::ssl_set_host_name(const std::string& host_name, std::error_code& ec
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
-        int ret = SSL_set_tlsext_host_name(m_ssl, host_name.c_str());
+        auto ret = SSL_set_tlsext_host_name(m_ssl, host_name.c_str());
 #ifndef _WIN32
 #pragma GCC diagnostic pop
 #endif
@@ -612,7 +612,7 @@ void Stream::ssl_set_host_name(const std::string& host_name, std::error_code& ec
     {
         X509_VERIFY_PARAM* param = SSL_get0_param(m_ssl);
         X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-        int ret = X509_VERIFY_PARAM_set1_host(param, host_name.c_str(), 0);
+        auto ret = X509_VERIFY_PARAM_set1_host(param, host_name.c_str(), 0);
         if (ret == 0) {
             ec = std::error_code(int(ERR_get_error()), openssl_error_category);
             return;
@@ -631,6 +631,11 @@ void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>& cal
     SSL_set_verify(m_ssl, SSL_VERIFY_PEER, &Stream::verify_callback_using_delegate);
 }
 
+#ifndef _WIN32
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#endif
+
 #ifdef REALM_INCLUDE_CERTS
 void Stream::ssl_use_included_certificates(std::error_code&)
 {
@@ -638,11 +643,6 @@ void Stream::ssl_use_included_certificates(std::error_code&)
 
     SSL_set_verify(m_ssl, SSL_VERIFY_PEER, &Stream::verify_callback_using_root_certs);
 }
-
-#ifndef _WIN32
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
 
 int Stream::verify_callback_using_root_certs(int preverify_ok, X509_STORE_CTX* ctx)
 {

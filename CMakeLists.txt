@@ -31,11 +31,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(REALM_ENABLE_SYNC "Enable sync." OFF)
-if(REALM_ENABLE_SYNC)
-  add_definitions(-DREALM_ENABLE_SYNC)
-endif()
-
 if(ANDROID)
     # TODO: Core APIs should always built for internal usage. But there seems to be issues with cocoa. Enable it only for Android for now.
     set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -216,10 +211,6 @@ if(NOT REALM_PLATFORM OR REALM_PLATFORM STREQUAL "Node")
     endif()
 endif()
 
-if(REALM_ENABLE_SYNC)
-  find_package(ZLIB REQUIRED)
-endif()
-
 if(REALM_PLATFORM STREQUAL "Node")
     set(PLATFORM_DEFINES "REALM_PLATFORM_NODE=1")
     if(NOT UV_LIBRARY)
@@ -230,6 +221,7 @@ endif()
 check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 # Options (passed to CMake)
+option(REALM_ENABLE_SYNC "Enable synchronized realms." OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
@@ -246,6 +238,13 @@ endif()
 
 if(APPLE)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
+endif()
+
+if(REALM_ENABLE_SYNC)
+    find_package(ZLIB REQUIRED)
+    if (WIN32)
+        find_package(OpenSSL REQUIRED)
+    endif()
 endif()
 
 # Store configuration in header file

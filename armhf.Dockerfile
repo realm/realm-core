@@ -9,6 +9,7 @@ RUN apt-get install -y \
         libprocps-dev:armhf \
         libssl-dev:armhf \
         libz-dev:armhf \
+        libcurl4-openssl-dev:armhf \
         libasio-dev \
         ninja-build \
         qemu-user

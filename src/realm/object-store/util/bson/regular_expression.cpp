@@ -59,7 +59,7 @@ constexpr RegularExpression::Option RegularExpression::option_char_to_option(con
         default:
             throw std::runtime_error("invalid regex option type");
     }
-};
+}
 
 std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option)
 {

@@ -100,7 +100,7 @@ static void handle_default_response(const Response& response,
     else {
         return completion_block({});
     }
-};
+}
 
 // MARK: - Template specializations
 

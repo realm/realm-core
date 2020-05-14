@@ -128,8 +128,8 @@ jobWrapper {
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-            addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+            threadSanitizer         : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "thread"]),
+            addressSanitizer        : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "address"]),
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -276,32 +276,46 @@ def doCheckInDocker(Map options = [:]) {
     }
 }
 
-def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+def doCheckSanity(Map options = [:]) {
+    def privileged = '';
+
+    def cmakeOptions = [
+        CMAKE_BUILD_TYPE: options.buildType,
+        REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
+        REALM_ENABLE_SYNC: options.enableSync,
+    ]
+
+    if (options.sanitizeMode.contains('thread')) {
+        cmakeOptions << [
+            REALM_TSAN: "ON",
+        ]
+    }
+    else if (options.sanitizeMode.contains('address')) {
+        privileged = '--privileged'
+        cmakeOptions << [
+            REALM_ASAN: "ON",
+        ]
+    }
+
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+
     return {
         node('docker') {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
-            def sanitizeFlags = ''
-            def privileged = '';
             environment << 'UNITTEST_PROGRESS=1'
-            if (sanitizeMode.contains('thread')) {
-                sanitizeFlags = '-D REALM_TSAN=ON'
-            } else if (sanitizeMode.contains('address')) {
-                privileged = '--privileged'
-                sanitizeFlags = '-D REALM_ASAN=ON'
-            }
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
                         dir('build-dir') {
-                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja .."
-                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}-${maxBpNodeSize}-${sanitizeMode}")
-                            sh './test/realm-tests'
+                            sh "cmake ${cmakeDefinitions} -G Ninja .."
+                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${options.buildType}-${options.sanitizeMode}")
+                            sh 'ctest --output-on-failure'
                         }
 
                     } finally {
-                        recordTests("Linux-${buildType}")
+                        recordTests("Linux-${options.buildType}")
                     }
                 }
             }
