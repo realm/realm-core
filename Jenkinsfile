@@ -116,6 +116,7 @@ jobWrapper {
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -126,7 +127,6 @@ jobWrapper {
                 buildUwpx64Debug              : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                      : doBuildCoverage(),
-                performance                   : buildPerformance(),
                 // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
@@ -481,12 +481,39 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 }
 
+def optionalBuildPerformance(boolean force) {
+    if (force) {
+        return {
+            buildPerformance()
+        }
+    } else {
+        return {
+            def doPerformance = true
+            stage("Input") {
+                try {
+                    timeout(time: 10, unit: 'MINUTES') {
+                        script {
+                            input message: 'Build Performance?', ok: 'Yes'
+                        }
+                    }
+                } catch (err) { // manual abort or timeout
+                    println "Not building performance on this run: ${err}"
+                    doPerformance = false
+                }
+            }
+            if (doPerformance) {
+                stage("Build") {
+                    buildPerformance()
+                }
+            }
+        }
+    }
+}
 
 def buildPerformance() {
-  return {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
-    node('docker && brix && exclusive') {
+    node('brix && exclusive') {
       getArchive()
 
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
@@ -502,20 +529,19 @@ def buildPerformance() {
             cd test/bench
             mkdir -p core-benchmarks results
             ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
-            ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
           rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
-          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance Report'])
+          sh 'cd test/bench && ./parse_bench_hist.py --local-html results/ core-benchmarks/'
+          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance_Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
-                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
+                 "-d '{ \"body\": \"Check the performance result [here](${env.BUILD_URL}Performance_5fReport).\"}' " +
                  "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
           }
         }
       }
     }
-  }
 }
 
 def doBuildMacOs(String buildType, boolean runTests) {
