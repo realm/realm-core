@@ -36,7 +36,9 @@ public:
 
     RemoteMongoDatabase(const std::string& name, AppServiceClient& service)
         : name(name)
-        , m_service(service){};
+        , m_service(service)
+    {
+    }
 
     /// Gets a collection.
     /// @param collection_name The name of the collection to return

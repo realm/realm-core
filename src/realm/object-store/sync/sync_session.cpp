@@ -85,7 +85,7 @@ struct SyncSession::State {
     }
 
     // Perform any work needed to respond to the application regaining network connectivity.
-    virtual void handle_reconnect(std::unique_lock<std::mutex>&, SyncSession&) const {};
+    virtual void handle_reconnect(std::unique_lock<std::mutex>&, SyncSession&) const {}
 
     // The user that owns this session has been logged out, and the session should take appropriate action.
     virtual void log_out(std::unique_lock<std::mutex>&, SyncSession&) const {}
