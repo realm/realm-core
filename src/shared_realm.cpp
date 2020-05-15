@@ -882,7 +882,7 @@ void Realm::close()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
-    if (!m_config.immutable()) {
+    if (!m_config.immutable() && m_group) {
         transaction().close();
     }
 
