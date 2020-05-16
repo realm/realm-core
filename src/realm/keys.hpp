@@ -28,32 +28,32 @@ namespace realm {
 
 struct TableKey {
     static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
-    constexpr TableKey()
+    constexpr TableKey() noexcept
         : value(null_value)
     {
     }
-    explicit TableKey(uint32_t val)
+    explicit TableKey(uint32_t val) noexcept
         : value(val)
     {
     }
-    TableKey& operator=(uint32_t val)
+    TableKey& operator=(uint32_t val) noexcept
     {
         value = val;
         return *this;
     }
-    bool operator==(const TableKey& rhs) const
+    bool operator==(const TableKey& rhs) const noexcept
     {
         return value == rhs.value;
     }
-    bool operator!=(const TableKey& rhs) const
+    bool operator!=(const TableKey& rhs) const noexcept
     {
         return value != rhs.value;
     }
-    bool operator<(const TableKey& rhs) const
+    bool operator<(const TableKey& rhs) const noexcept
     {
         return value < rhs.value;
     }
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return value != null_value;
     }
@@ -92,57 +92,65 @@ struct ColKey {
         unsigned val;
     };
 
-    constexpr ColKey()
+    constexpr ColKey() noexcept
         : value(uint64_t(-1) >> 1) // free top bit
     {
     }
-    constexpr explicit ColKey(int64_t val)
+    constexpr explicit ColKey(int64_t val) noexcept
         : value(val)
     {
     }
-    explicit ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag)
+    explicit ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag) noexcept
         : ColKey((index.val & 0xFFFFUL) | ((type & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
                  ((tag & 0xFFFFFFFFUL) << 30))
     {
     }
-    ColKey& operator=(int64_t val)
+    bool is_nullable()
+    {
+        return get_attrs().test(col_attr_Nullable);
+    }
+    bool is_list()
+    {
+        return get_attrs().test(col_attr_List);
+    }
+    ColKey& operator=(int64_t val) noexcept
     {
         value = val;
         return *this;
     }
-    bool operator==(const ColKey& rhs) const
+    bool operator==(const ColKey& rhs) const noexcept
     {
         return value == rhs.value;
     }
-    bool operator!=(const ColKey& rhs) const
+    bool operator!=(const ColKey& rhs) const noexcept
     {
         return value != rhs.value;
     }
-    bool operator<(const ColKey& rhs) const
+    bool operator<(const ColKey& rhs) const noexcept
     {
         return value < rhs.value;
     }
-    bool operator>(const ColKey& rhs) const
+    bool operator>(const ColKey& rhs) const noexcept
     {
         return value > rhs.value;
     }
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return value != ColKey().value;
     }
-    Idx get_index() const
+    Idx get_index() const noexcept
     {
         return Idx{static_cast<unsigned>(value) & 0xFFFFU};
     }
-    ColumnType get_type() const
+    ColumnType get_type() const noexcept
     {
         return ColumnType((static_cast<unsigned>(value) >> 16) & 0x3F);
     }
-    ColumnAttrMask get_attrs() const
+    ColumnAttrMask get_attrs() const noexcept
     {
         return ColumnAttrMask((static_cast<unsigned>(value) >> 22) & 0xFF);
     }
-    unsigned get_tag() const
+    unsigned get_tag() const noexcept
     {
         return (value >> 30) & 0xFFFFFFFFUL;
     }
@@ -156,36 +164,44 @@ inline std::ostream& operator<<(std::ostream& os, ColKey ck)
 }
 
 struct ObjKey {
-    constexpr ObjKey()
+    constexpr ObjKey() noexcept
         : value(-1)
     {
     }
-    explicit constexpr ObjKey(int64_t val)
+    explicit constexpr ObjKey(int64_t val) noexcept
         : value(val)
     {
     }
-    ObjKey& operator=(int64_t val)
+    bool is_unresolved() const
+    {
+        return value <= -2;
+    }
+    ObjKey get_unresolved() const
+    {
+        return ObjKey(-2 - value);
+    }
+    ObjKey& operator=(int64_t val) noexcept
     {
         value = val;
         return *this;
     }
-    bool operator==(const ObjKey& rhs) const
+    bool operator==(const ObjKey& rhs) const noexcept
     {
         return value == rhs.value;
     }
-    bool operator!=(const ObjKey& rhs) const
+    bool operator!=(const ObjKey& rhs) const noexcept
     {
         return value != rhs.value;
     }
-    bool operator<(const ObjKey& rhs) const
+    bool operator<(const ObjKey& rhs) const noexcept
     {
         return value < rhs.value;
     }
-    bool operator>(const ObjKey& rhs) const
+    bool operator>(const ObjKey& rhs) const noexcept
     {
         return value > rhs.value;
     }
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return value != -1;
     }
@@ -193,10 +209,7 @@ struct ObjKey {
 
 private:
     // operator bool will enable casting to integer. Prevent this.
-    operator int64_t() const
-    {
-        return 0;
-    }
+    operator int64_t() const = delete;
 };
 
 class ObjKeys : public std::vector<ObjKey> {
@@ -237,13 +250,9 @@ inline std::string to_string(ColKey ck)
 namespace std {
 
 template <>
-
 struct hash<realm::ObjKey> {
-
     size_t operator()(realm::ObjKey key) const
-
     {
-
         return std::hash<uint64_t>{}(key.value);
     }
 };

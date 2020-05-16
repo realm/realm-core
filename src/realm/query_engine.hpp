@@ -95,7 +95,10 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_decimal128.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/array_list.hpp>
+#include <realm/array_bool.hpp>
 #include <realm/array_backlink.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/metrics/query_info.hpp>
@@ -135,6 +138,7 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
+using Evaluator = util::FunctionRef<bool(ConstObj& obj)>;
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -142,6 +146,12 @@ class ParentNode {
 public:
     ParentNode() = default;
     virtual ~ParentNode() = default;
+
+    virtual bool has_search_index() const
+    {
+        return false;
+    }
+    virtual void index_based_aggregate(size_t, Evaluator) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -211,6 +221,8 @@ public:
     virtual size_t find_first_local(size_t start, size_t end) = 0;
 
     virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
+    template <Action action>
+    void aggregate_local_prepare(DataType col_id, bool nullable);
 
     template <Action TAction, class LeafType>
     bool column_action_specialization(QueryStateBase* st, ArrayPayload* source_column, size_t r)
@@ -221,9 +233,8 @@ public:
         using TResult = typename AggregateResultType<TSourceValue, TAction>::result_type;
 
         // Sum of float column must accumulate in double
-        static_assert(!(TAction == act_Sum &&
-                        (std::is_same<TSourceValue, float>::value && !std::is_same<TResult, double>::value)),
-                      "");
+        static_assert(
+            !(TAction == act_Sum && (std::is_same_v<TSourceValue, float> && !std::is_same_v<TResult, double>)), "");
 
         TSourceValue av{};
         // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is
@@ -251,12 +262,7 @@ public:
             return m_child->validate();
     }
 
-    ParentNode(const ParentNode& from)
-        : ParentNode(from, nullptr)
-    {
-    }
-
-    ParentNode(const ParentNode& from, Transaction* tr);
+    ParentNode(const ParentNode& from);
 
     void add_child(std::unique_ptr<ParentNode> child)
     {
@@ -266,7 +272,7 @@ public:
             m_child = std::move(child);
     }
 
-    virtual std::unique_ptr<ParentNode> clone(Transaction* = nullptr) const = 0;
+    virtual std::unique_ptr<ParentNode> clone() const = 0;
 
     ColKey get_column_key(StringData column_name) const
     {
@@ -375,8 +381,8 @@ protected:
         m_condition_column_key = column_key;
     }
 
-    ColumnNodeBase(const ColumnNodeBase& from, Transaction* tr)
-        : ParentNode(from, tr)
+    ColumnNodeBase(const ColumnNodeBase& from)
+        : ParentNode(from)
         , m_last_local_match(from.m_last_local_match)
         , m_local_matches(from.m_local_matches)
         , m_local_limit(from.m_local_limit)
@@ -499,8 +505,8 @@ protected:
     {
     }
 
-    IntegerNodeBase(const ThisType& from, Transaction* tr)
-        : ColumnNodeBase(from, tr)
+    IntegerNodeBase(const ThisType& from)
+        : ColumnNodeBase(from)
         , m_value(from.m_value)
         , m_find_callback_specialized(from.m_find_callback_specialized)
     {
@@ -587,6 +593,8 @@ protected:
                 return get_specialized_callback_3<TAction, type_Double, TConditionFunction>(is_nullable);
             case type_Timestamp:
                 return get_specialized_callback_3<TAction, type_Timestamp, TConditionFunction>(is_nullable);
+            case type_Decimal:
+                return get_specialized_callback_3<TAction, type_Decimal, TConditionFunction>(is_nullable);
             default:
                 break;
         }
@@ -632,8 +640,8 @@ public:
         : BaseType(value, column_key)
     {
     }
-    IntegerNode(const IntegerNode& from, Transaction* tr)
-        : BaseType(from, tr)
+    IntegerNode(const IntegerNode& from)
+        : BaseType(from)
     {
     }
 
@@ -669,9 +677,9 @@ public:
         return TConditionFunction::description();
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new ThisType(*this, tr));
+        return std::unique_ptr<ParentNode>(new ThisType(*this));
     }
 };
 
@@ -716,9 +724,19 @@ public:
         m_needles.insert(other->m_value);
     }
 
-    bool has_search_index() const
+    bool has_search_index() const override
     {
         return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
+    }
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
+            auto obj = this->m_table->get_object(m_result[t]);
+            if (evaluator(obj)) {
+                --limit;
+            }
+        }
     }
 
     void aggregate_local_prepare(Action action, DataType col_id, bool is_nullable) override
@@ -814,9 +832,9 @@ public:
         return desc;
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new ThisType(*this, tr));
+        return std::unique_ptr<ParentNode>(new ThisType(*this));
     }
 
 private:
@@ -826,8 +844,8 @@ private:
     size_t m_result_get = 0;
     ObjKey m_last_start_key;
 
-    IntegerNode(const IntegerNode<LeafType, Equal>& from, Transaction* patches)
-        : BaseType(from, patches)
+    IntegerNode(const IntegerNode<LeafType, Equal>& from)
+        : BaseType(from)
         , m_needles(from.m_needles)
     {
     }
@@ -932,13 +950,13 @@ public:
         return TConditionFunction::description();
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new FloatDoubleNode(*this));
     }
 
-    FloatDoubleNode(const FloatDoubleNode& from, Transaction* tr)
-        : ParentNode(from, tr)
+    FloatDoubleNode(const FloatDoubleNode& from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -993,13 +1011,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new SizeNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new SizeNode(*this));
     }
 
-    SizeNode(const SizeNode& from, Transaction* tr)
-        : ParentNode(from, tr)
+    SizeNode(const SizeNode& from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -1059,13 +1077,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new SizeListNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new SizeListNode(*this));
     }
 
-    SizeListNode(const SizeListNode& from, Transaction* tr)
-        : ParentNode(from, tr)
+    SizeListNode(const SizeListNode& from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -1134,13 +1152,13 @@ public:
                TConditionFunction::description() + " " + util::serializer::print_value(BinaryNode::m_value.get());
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new BinaryNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new BinaryNode(*this));
     }
 
-    BinaryNode(const BinaryNode& from, Transaction* tr)
-        : ParentNode(from, tr)
+    BinaryNode(const BinaryNode& from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -1165,8 +1183,8 @@ public:
         m_condition_column_key = column;
     }
 
-    BoolNode(const BoolNode& from, Transaction* tr)
-        : ParentNode(from, tr)
+    BoolNode(const BoolNode& from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -1204,9 +1222,9 @@ public:
                TConditionFunction::description() + " " + util::serializer::print_value(m_value);
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new BoolNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new BoolNode(*this));
     }
 
 private:
@@ -1250,8 +1268,8 @@ public:
     }
 
 protected:
-    TimestampNodeBase(const TimestampNodeBase& from, Transaction* tr)
-        : ParentNode(from, tr)
+    TimestampNodeBase(const TimestampNodeBase& from)
+        : ParentNode(from)
         , m_value(from.m_value)
     {
     }
@@ -1281,9 +1299,190 @@ public:
                TConditionFunction::description() + " " + util::serializer::print_value(TimestampNode::m_value);
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new TimestampNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new TimestampNode(*this));
+    }
+
+protected:
+    TimestampNode(const TimestampNode& from, Transaction* tr)
+        : TimestampNodeBase(from, tr)
+    {
+    }
+};
+
+class DecimalNodeBase : public ParentNode {
+public:
+    using TConditionValue = Decimal128;
+    static const bool special_null_node = false;
+
+    DecimalNodeBase(Decimal128 v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    DecimalNodeBase(null, ColKey column)
+        : DecimalNodeBase(Decimal128{null()}, column)
+    {
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayDecimal128(m_table.unchecked_ptr()->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+protected:
+    DecimalNodeBase(const DecimalNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+    {
+    }
+
+    Decimal128 m_value;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayDecimal128), alignof(ArrayDecimal128)>::type;
+    using LeafPtr = std::unique_ptr<ArrayDecimal128, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayDecimal128* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class DecimalNode : public DecimalNodeBase {
+public:
+    using DecimalNodeBase::DecimalNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        bool value_is_null = m_value.is_null();
+        for (size_t i = start; i < end; i++) {
+            Decimal128 val = m_leaf_ptr->get(i);
+            if (cond(val, m_value, val.is_null(), value_is_null))
+                return i;
+        }
+        return realm::npos;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " + util::serializer::print_value(DecimalNode::m_value);
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new DecimalNode(*this));
+    }
+
+protected:
+    DecimalNode(const DecimalNode& from, Transaction* tr)
+        : DecimalNodeBase(from, tr)
+    {
+    }
+};
+
+class ObjectIdNodeBase : public ParentNode {
+public:
+    using TConditionValue = ObjectId;
+    static const bool special_null_node = false;
+
+    ObjectIdNodeBase(ObjectId v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    ObjectIdNodeBase(null, ColKey column)
+        : ObjectIdNodeBase(ObjectId{}, column)
+    {
+        m_value_is_null = true;
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayObjectIdNull(m_table.unchecked_ptr()->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+protected:
+    ObjectIdNodeBase(const ObjectIdNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+        , m_value_is_null(from.m_value_is_null)
+    {
+    }
+
+    ObjectId m_value;
+    bool m_value_is_null = false;
+    using LeafCacheStorage =
+        typename std::aligned_storage<sizeof(ArrayObjectIdNull), alignof(ArrayObjectIdNull)>::type;
+    using LeafPtr = std::unique_ptr<ArrayObjectIdNull, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayObjectIdNull* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class ObjectIdNode : public ObjectIdNodeBase {
+public:
+    using ObjectIdNodeBase::ObjectIdNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        for (size_t i = start; i < end; i++) {
+            util::Optional<ObjectId> val = m_leaf_ptr->get(i);
+            if (val) {
+                if (cond(*val, m_value, false, m_value_is_null))
+                    return i;
+            }
+            else {
+                if (cond(ObjectId{}, m_value, true, m_value_is_null))
+                    return i;
+            }
+        }
+        return realm::npos;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " +
+               (m_value_is_null ? util::serializer::print_value(realm::null())
+                                : util::serializer::print_value(ObjectIdNode::m_value));
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new ObjectIdNode(*this));
+    }
+
+protected:
+    ObjectIdNode(const ObjectIdNode& from, Transaction* tr)
+        : ObjectIdNode(from, tr)
+    {
     }
 };
 
@@ -1333,8 +1532,8 @@ public:
         m_array_ptr = nullptr;
     }
 
-    StringNodeBase(const StringNodeBase& from, Transaction* tr)
-        : ParentNode(from, tr)
+    StringNodeBase(const StringNodeBase& from)
+        : ParentNode(from)
         , m_value(from.m_value)
         , m_is_string_enum(from.m_is_string_enum)
     {
@@ -1417,13 +1616,13 @@ public:
         return TConditionFunction::description();
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this, tr));
+        return std::unique_ptr<ParentNode>(new StringNode<TConditionFunction>(*this));
     }
 
-    StringNode(const StringNode& from, Transaction* tr)
-        : StringNodeBase(from, tr)
+    StringNode(const StringNode& from)
+        : StringNodeBase(from)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
     {
@@ -1486,13 +1685,13 @@ public:
     }
 
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<Contains>(*this, tr));
+        return std::unique_ptr<ParentNode>(new StringNode<Contains>(*this));
     }
 
-    StringNode(const StringNode& from, Transaction* tr)
-        : StringNodeBase(from, tr)
+    StringNode(const StringNode& from)
+        : StringNodeBase(from)
         , m_charmap(from.m_charmap)
     {
     }
@@ -1568,13 +1767,13 @@ public:
         return ContainsIns::description();
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this, tr));
+        return std::unique_ptr<ParentNode>(new StringNode<ContainsIns>(*this));
     }
 
-    StringNode(const StringNode& from, Transaction* tr)
-        : StringNodeBase(from, tr)
+    StringNode(const StringNode& from)
+        : StringNodeBase(from)
         , m_charmap(from.m_charmap)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
@@ -1593,15 +1792,15 @@ public:
         : StringNodeBase(v, column)
     {
     }
-    StringNodeEqualBase(const StringNodeEqualBase& from, Transaction* tr)
-        : StringNodeBase(from, tr)
+    StringNodeEqualBase(const StringNodeEqualBase& from)
+        : StringNodeBase(from)
         , m_has_search_index(from.m_has_search_index)
     {
     }
 
     void init() override;
 
-    bool has_search_index() const
+    bool has_search_index() const override
     {
         return m_has_search_index;
     }
@@ -1660,15 +1859,15 @@ public:
 
     void consume_condition(StringNode<Equal>* other);
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, tr));
+        return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this));
     }
 
     std::string describe(util::serializer::SerialisationState& state) const override;
 
-    StringNode<Equal>(const StringNode& from, Transaction* tr)
-        : StringNodeEqualBase(from, tr)
+    StringNode<Equal>(const StringNode& from)
+        : StringNodeEqualBase(from)
     {
         for (auto it = from.m_needles.begin(); it != from.m_needles.end(); ++it) {
             if (it->data() == nullptr && it->size() == 0) {
@@ -1678,6 +1877,25 @@ public:
                 m_needle_storage.emplace_back(StringBuffer());
                 m_needle_storage.back().append(it->data(), it->size());
                 m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+            }
+        }
+    }
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        if (limit == 0)
+            return;
+        if (m_index_matches == nullptr) {
+            if (m_results_end) { // 1 result
+                auto obj = m_table->get_object(m_actual_key);
+                evaluator(obj);
+            }
+        }
+        else { // multiple results
+            for (size_t t = m_results_start; t < m_results_end && limit > 0; ++t) {
+                auto obj = m_table->get_object(ObjKey(m_index_matches->get(t)));
+                if (evaluator(obj)) {
+                    --limit;
+                }
             }
         }
     }
@@ -1732,7 +1950,6 @@ public:
         StringNodeBase::table_changed();
         m_has_search_index = m_table.unchecked_ptr()->has_search_index(m_condition_column_key);
     }
-
     void _search_index_init() override;
 
     virtual std::string describe_condition() const override
@@ -1740,16 +1957,26 @@ public:
         return EqualIns::description();
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new StringNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new StringNode(*this));
     }
 
-    StringNode(const StringNode& from, Transaction* tr)
-        : StringNodeEqualBase(from, tr)
+    StringNode(const StringNode& from)
+        : StringNodeEqualBase(from)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
     {
+    }
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
+            auto obj = m_table->get_object(m_index_matches[t]);
+            if (evaluator(obj)) {
+                --limit;
+            }
+        }
     }
 
 private:
@@ -1782,11 +2009,11 @@ public:
             m_conditions.emplace_back(std::move(condition));
     }
 
-    OrNode(const OrNode& other, Transaction* tr)
-        : ParentNode(other, tr)
+    OrNode(const OrNode& other)
+        : ParentNode(other)
     {
         for (const auto& condition : other.m_conditions) {
-            m_conditions.emplace_back(condition->clone(tr));
+            m_conditions.emplace_back(condition->clone());
         }
     }
 
@@ -1923,9 +2150,9 @@ public:
         return "";
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new OrNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new OrNode(*this));
     }
 
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
@@ -2040,14 +2267,14 @@ public:
     }
 
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new NotNode(*this, tr));
+        return std::unique_ptr<ParentNode>(new NotNode(*this));
     }
 
-    NotNode(const NotNode& from, Transaction* tr)
-        : ParentNode(from, tr)
-        , m_condition(from.m_condition ? from.m_condition->clone(tr) : nullptr)
+    NotNode(const NotNode& from)
+        : ParentNode(from)
+        , m_condition(from.m_condition ? from.m_condition->clone() : nullptr)
         , m_known_range_start(from.m_known_range_start)
         , m_known_range_end(from.m_known_range_end)
         , m_first_in_known_range(from.m_first_in_known_range)
@@ -2165,13 +2392,13 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this, tr));
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this));
     }
 
-    TwoColumnsNode(const TwoColumnsNode& from, Transaction* tr)
-        : ParentNode(from, tr)
+    TwoColumnsNode(const TwoColumnsNode& from)
+        : ParentNode(from)
         , m_condition_column_key1(from.m_condition_column_key1)
         , m_condition_column_key2(from.m_condition_column_key2)
     {
@@ -2207,10 +2434,10 @@ public:
 
     virtual std::string describe(util::serializer::SerialisationState& state) const override;
 
-    std::unique_ptr<ParentNode> clone(Transaction* tr) const override;
+    std::unique_ptr<ParentNode> clone() const override;
 
 private:
-    ExpressionNode(const ExpressionNode& from, Transaction* tr);
+    ExpressionNode(const ExpressionNode& from);
 
     std::unique_ptr<Expression> m_expression;
 };
@@ -2298,7 +2525,7 @@ public:
         return not_found;
     }
 
-    std::unique_ptr<ParentNode> clone(Transaction*) const override
+    std::unique_ptr<ParentNode> clone() const override
     {
         return std::unique_ptr<ParentNode>(new LinksToNode(*this));
     }
@@ -2317,7 +2544,7 @@ private:
 
 
     LinksToNode(const LinksToNode& source)
-        : ParentNode(source, nullptr)
+        : ParentNode(source)
         , m_target_keys(source.m_target_keys)
         , m_column_type(source.m_column_type)
     {

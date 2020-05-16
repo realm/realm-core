@@ -78,10 +78,12 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
     ConstObj obj = m_tables[column]->get_object(key);
     if (type == col_type_Link) {
         if (ObjKey k = obj.get<ObjKey>(m_link_column_keys[column])) {
-            if (last)
-                lm.consume(k);
-            else
-                map_links(column + 1, k, lm);
+            if (!k.is_unresolved()) {
+                if (last)
+                    lm.consume(k);
+                else
+                    map_links(column + 1, k, lm);
+            }
         }
     }
     else if (type == col_type_LinkList) {
@@ -89,13 +91,15 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
         size_t sz = linklist.size();
         for (size_t t = 0; t < sz; t++) {
             ObjKey k = linklist.get(t);
-            if (last) {
-                bool continue2 = lm.consume(k);
-                if (!continue2)
-                    return;
+            if (!k.is_unresolved()) {
+                if (last) {
+                    bool continue2 = lm.consume(k);
+                    if (!continue2)
+                        return;
+                }
+                else
+                    map_links(column + 1, k, lm);
             }
-            else
-                map_links(column + 1, k, lm);
         }
     }
     else if (type == col_type_BackLink) {
@@ -124,10 +128,12 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
     ColumnType type = m_link_types[column];
     if (type == col_type_Link) {
         if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
-            if (last)
-                lm.consume(k);
-            else
-                map_links(column + 1, k, lm);
+            if (!k.is_unresolved()) {
+                if (last)
+                    lm.consume(k);
+                else
+                    map_links(column + 1, k, lm);
+            }
         }
     }
     else if (type == col_type_LinkList) {
@@ -137,13 +143,15 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
             size_t sz = links.size();
             for (size_t t = 0; t < sz; t++) {
                 ObjKey k = links.get(t);
-                if (last) {
-                    bool continue2 = lm.consume(k);
-                    if (!continue2)
-                        return;
+                if (!k.is_unresolved()) {
+                    if (last) {
+                        bool continue2 = lm.consume(k);
+                        if (!continue2)
+                            return;
+                    }
+                    else
+                        map_links(column + 1, k, lm);
                 }
-                else
-                    map_links(column + 1, k, lm);
             }
         }
     }
@@ -254,7 +262,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
             ref_type val = 0;
             if (sz == 1) {
                 ConstObj obj = m_link_map.get_target_table()->get_object(links[0]);
-                val = to_ref(obj.get<int64_t>(m_column_key));
+                val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
             }
             destination.init(false, 1, val);
         }

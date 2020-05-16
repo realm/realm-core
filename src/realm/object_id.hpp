@@ -33,20 +33,22 @@ public:
     ObjectId() noexcept;
 
     /**
+     * Checks if the given string is a valid object id.
+     */
+    static bool is_valid_str(StringData) noexcept;
+
+    /**
      * Constructs an ObjectId from 24 hex characters.
      */
-    ObjectId(const char* init);
+    ObjectId(const char* init) noexcept;
+
+    // FIXME: remove this constructor
+    ObjectId(Timestamp d);
 
     /**
      * Constructs an ObjectId with the specified inputs, and a random number
      */
-    ObjectId(Timestamp d, int machine_id, int process_id);
-
-    /**
-     * Constructs an ObjectId with only the seconds part of the Timestamp
-     * and the remainder filled with zeros.
-     */
-    ObjectId(Timestamp d);
+    ObjectId(Timestamp d, int machine_id = 0, int process_id = 0) noexcept;
 
     /**
      * Generates a new ObjectId using the algorithm to attempt to avoid collisions.
@@ -80,9 +82,10 @@ public:
 
     Timestamp get_timestamp() const;
     std::string to_string() const;
+    size_t hash() const noexcept;
 
 private:
-    uint8_t m_bytes[12];
+    uint8_t m_bytes[12] = {};
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)
@@ -92,5 +95,15 @@ inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)
 }
 
 } // namespace realm
+
+namespace std {
+template <>
+struct hash<realm::ObjectId> {
+    size_t operator()(const realm::ObjectId& oid) const noexcept
+    {
+        return oid.hash();
+    }
+};
+} // namespace std
 
 #endif /* REALM_OBJECT_ID_HPP */

@@ -23,11 +23,13 @@
 #include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
 #include <realm/array_basic.hpp>
+#include <realm/array_integer.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_ref.hpp>
 #include <realm/array_object_id.hpp>
 #include <realm/array_decimal128.hpp>
 
@@ -142,7 +144,7 @@ protected:
     friend class Transaction;
 
 
-    const ConstObj* m_const_obj;
+    ConstObj* m_const_obj;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -150,11 +152,10 @@ protected:
     mutable uint_fast64_t m_content_version = 0;
     mutable uint_fast64_t m_last_content_version = 0;
 
-    ConstLstBase(ColKey col_key, const ConstObj* obj);
+    ConstLstBase(ColKey col_key, ConstObj* obj);
     virtual bool init_from_parent() const = 0;
 
     ref_type get_child_ref(size_t) const noexcept override;
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
     void update_if_needed() const
     {
@@ -356,7 +357,7 @@ public:
 
     T get(size_t ndx) const
     {
-        if (ndx >= size()) {
+        if (ndx >= ConstLstIf::size()) {
             throw std::out_of_range("Index out of range");
         }
         return m_tree->get(ndx);
@@ -371,7 +372,7 @@ public:
     }
     LstIterator<T> end() const
     {
-        return LstIterator<T>(this, size() + m_deleted.size());
+        return LstIterator<T>(this, ConstLstIf::size() + m_deleted.size());
     }
     size_t find_first(T value) const
     {
@@ -421,7 +422,7 @@ protected:
         }
     }
 
-    ConstLstIf(ConstLstIf&& other)
+    ConstLstIf(ConstLstIf&& other) noexcept
         : ConstLstBase(ColKey{}, nullptr)
         , m_tree(std::move(other.m_tree))
         , m_valid(other.m_valid)
@@ -432,6 +433,7 @@ protected:
     ConstLstIf& operator=(const ConstLstIf& other)
     {
         if (this != &other) {
+            *this->m_const_obj = *other.m_const_obj;
             m_valid = other.m_valid;
             m_col_key = other.m_col_key;
             m_deleted.clear();
@@ -448,7 +450,7 @@ protected:
         return *this;
     }
 
-    bool init_from_parent() const final
+    bool init_from_parent() const override
     {
         m_valid = m_tree->init_from_parent();
         update_content_version();
@@ -460,7 +462,7 @@ template <class T>
 class ConstLst : public ConstLstIf<T> {
 public:
     ConstLst(const ConstObj& owner, ColKey col_key);
-    ConstLst(ConstLst&& other)
+    ConstLst(ConstLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , ConstLstIf<T>(std::move(other))
         , m_obj(std::move(other.m_obj))
@@ -512,7 +514,7 @@ public:
     }
     Lst(const Obj& owner, ColKey col_key);
     Lst(const Lst& other);
-    Lst(Lst&& other);
+    Lst(Lst&& other) noexcept;
 
     Lst& operator=(const Lst& other);
     Lst& operator=(const BPlusTree<T>& other);
@@ -729,7 +731,7 @@ Lst<T>::Lst(const Lst<T>& other)
 }
 
 template <class T>
-Lst<T>::Lst(Lst<T>&& other)
+Lst<T>::Lst(Lst<T>&& other) noexcept
     : ConstLstBase(other.m_col_key, &m_obj)
     , ConstLstIf<T>(std::move(other))
     , m_obj(std::move(other.m_obj))
@@ -766,6 +768,11 @@ void Lst<ObjKey>::do_remove(size_t ndx);
 template <>
 void Lst<ObjKey>::clear();
 
+// Translate from userfacing index to internal index.
+size_t virtual2real(const std::vector<size_t>& vec, size_t ndx);
+// Scan through the list to find unresolved links
+void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
+
 class ConstLnkLst : public ConstLstIf<ObjKey> {
 public:
     ConstLnkLst()
@@ -780,14 +787,33 @@ public:
     {
         this->init_from_parent();
     }
-    ConstLnkLst(ConstLnkLst&& other)
+    ConstLnkLst(ConstLnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , ConstLstIf<ObjKey>(std::move(other))
         , m_obj(std::move(other.m_obj))
+        , m_unresolved(std::move(other.m_unresolved))
     {
     }
 
+    ConstLnkLst& operator=(const ConstLnkLst& other)
+    {
+        ConstLstIf<ObjKey>::operator=(other);
+        m_unresolved = other.m_unresolved;
+        return *this;
+    }
+
+    size_t size() const override
+    {
+        auto full_sz = ConstLstIf<ObjKey>::size();
+        return full_sz - m_unresolved.size();
+    }
+
     // Getting links
+    ObjKey get(size_t ndx) const
+    {
+        return ConstLstIf<ObjKey>::get(virtual2real(m_unresolved, ndx));
+    }
+
     ConstObj operator[](size_t link_ndx) const
     {
         return get_object(link_ndx);
@@ -800,32 +826,34 @@ public:
 
 private:
     ConstObj m_obj;
+    // Sorted set of indices containing unresolved links.
+    mutable std::vector<size_t> m_unresolved;
+    bool init_from_parent() const override;
 };
 
 class LnkLst : public Lst<ObjKey>, public ObjList {
 public:
     LnkLst()
         : ConstLstBase({}, &m_obj)
-        , ObjList(this->m_tree.get())
     {
     }
     LnkLst(const Obj& owner, ColKey col_key);
     LnkLst(const LnkLst& other)
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(other)
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , m_unresolved(other.m_unresolved)
     {
     }
-    LnkLst(LnkLst&& other)
+    LnkLst(LnkLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , Lst<ObjKey>(std::move(other))
-        , ObjList(this->m_tree.get(), m_obj.get_target_table(m_col_key))
+        , m_unresolved(std::move(other.m_unresolved))
     {
     }
     LnkLst& operator=(const LnkLst& other)
     {
         Lst<ObjKey>::operator=(other);
-        this->ObjList::assign(this->m_tree.get(), m_obj.get_target_table(m_col_key));
+        m_unresolved = other.m_unresolved;
         return *this;
     }
 
@@ -838,9 +866,9 @@ public:
             return std::make_unique<LnkLst>();
         }
     }
-    TableRef get_target_table() const
+    TableRef get_target_table() const override
     {
-        return m_table.cast_away_const();
+        return m_obj.get_target_table(m_col_key);
     }
     bool is_in_sync() const override
     {
@@ -848,10 +876,22 @@ public:
     }
     size_t size() const override
     {
-        return Lst<ObjKey>::size();
+        auto full_sz = Lst<ObjKey>::size();
+        return full_sz - m_unresolved.size();
     }
 
-    Obj get_object(size_t ndx);
+    bool has_unresolved() const noexcept
+    {
+        return !m_unresolved.empty();
+    }
+
+    bool is_obj_valid(size_t) const noexcept override
+    {
+        // A link list cannot contain null values
+        return true;
+    }
+
+    Obj get_object(size_t ndx) const override;
 
     Obj operator[](size_t ndx)
     {
@@ -860,8 +900,35 @@ public:
 
     using Lst<ObjKey>::find_first;
     using Lst<ObjKey>::find_all;
+    void add(ObjKey value)
+    {
+        insert(size(), value);
+    }
     void set(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
+    ObjKey get(size_t ndx) const
+    {
+        return Lst<ObjKey>::get(virtual2real(m_unresolved, ndx));
+    }
+    ObjKey get_key(size_t ndx) const override
+    {
+        return get(ndx);
+    }
+    void remove(size_t ndx)
+    {
+        Lst<ObjKey>::remove(virtual2real(m_unresolved, ndx));
+    }
+    void remove(size_t from, size_t to) override
+    {
+        while (from < to) {
+            remove(--to);
+        }
+    }
+    void clear() override
+    {
+        Lst<ObjKey>::clear();
+        m_unresolved.clear();
+    }
     // Create a new object in insert a link to it
     Obj create_and_insert_linked_object(size_t ndx);
     // Create a new object and link it. If an embedded object
@@ -882,8 +949,13 @@ private:
     friend class DB;
     friend class ConstTableView;
     friend class Query;
+
+    // Sorted set of indices containing unresolved links.
+    mutable std::vector<size_t> m_unresolved;
+
     void get_dependencies(TableVersions&) const override;
     void sync_if_needed() const override;
+    bool init_from_parent() const override;
 };
 
 template <typename U>

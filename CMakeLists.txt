@@ -18,12 +18,13 @@ include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
+include(CheckSymbolExists)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
 
 # Project-wide build flags
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(ANDROID)
@@ -103,11 +104,6 @@ if(ANDROID)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes")
 endif()
 
-# Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
-    $<$<CONFIG:Debug>:REALM_DEBUG=1>
-    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
-)
 set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
     $<$<CONFIG:MinSizeDebug>:-g>
 )
@@ -120,7 +116,12 @@ set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_definitions(-D_SCL_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
+    add_definitions(
+        /D_SCL_SECURE_NO_WARNINGS
+        /DWIN32_LEAN_AND_MEAN
+        /DUNICODE
+        /D_UNICODE
+    )
 endif()
 
 if(MSVC)
@@ -130,9 +131,24 @@ if(MSVC)
     add_definitions(
         /D_DISABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
     )
-    if(NOT WINDOWS_STORE)
-        # TODO: replace with CMAKE_MSVC_RUNTIME_LIBRARY once we switch to CMake 3.15 as the minimum
+    if(WINDOWS_STORE)
+        # Removing LNK4075 warnings for debug UWP builds
+        # "LNK4075: ignoring '/INCREMENTAL' due to '/OPT:ICF' specification"
+        # "LNK4075: ignoring '/INCREMENTAL' due to '/OPT:REF' specification"
+
+        # Optional verification checks since we don't know existing contents of variables below
+        string(REPLACE "/OPT:ICF " "/OPT:NOICF " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+        string(REPLACE "/OPT:REF " "/OPT:NOREF " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+        string(REPLACE "/INCREMENTAL:YES " "/INCREMENTAL:NO " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+        string(REPLACE "/INCREMENTAL " "/INCREMENTAL:NO " CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG}")
+
+        # Mandatory
+        set(CMAKE_MODULE_LINKER_FLAGS_DEBUG  "${CMAKE_MODULE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG     "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
+        set(CMAKE_SHARED_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
+    else()
         # Statically link the run-time library
+        # TODO: replace with CMAKE_MSVC_RUNTIME_LIBRARY once we switch to CMake 3.15 as the minimum
         # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
         # https://cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
         foreach(flag_var
@@ -150,13 +166,13 @@ if(MSVC)
                 string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
             endif()
         endforeach()
-
-        # Let the compiler optimize debug builds ever so slightly.
-        # /Ob1: This allows the compiler to inline functions marked __inline.
-        # /Oi:  This enables (faster) intrinsic functions.
-        string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-        string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
     endif()
+
+    # Let the compiler optimize debug builds ever so slightly.
+    # /Ob1: This allows the compiler to inline functions marked __inline.
+    # /Oi:  This enables (faster) intrinsic functions.
+    string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
 # Platform-specific build configuration
@@ -164,6 +180,14 @@ if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
     list(APPEND PLATFORM_LIBRARIES log android)
+endif()
+
+if(UNIX)
+    # Enable access to large file APIs, but don't make them the default.
+    add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
+    set(CMAKE_REQUIRED_DEFINITIONS "-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE")
+    # Use readdir64 if available.
+    check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
 # Find dependencies
@@ -212,14 +236,21 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS Core QueryParser NAMESPACE Realm:: FILE realm-config.cmake)
+export(TARGETS Storage QueryParser NAMESPACE RealmCore:: FILE RealmCoreTargets.cmake)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmCoreConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
-        NAMESPACE Realm::
-        FILE realm-config.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/realm
-        COMPONENT devel)
+        NAMESPACE RealmCore::
+        FILE RealmCoreTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore
+        COMPONENT devel
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake 
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore 
+        COMPONENT devel
+)
 
 # CPack
 set(CPACK_GENERATOR "TGZ")

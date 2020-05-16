@@ -110,10 +110,6 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create(Array::Type = type_Normal, bool context_flag = false);
 
-#ifdef REALM_DEBUG
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-#endif
-
 private:
     size_t find(T target, size_t begin, size_t end) const;
 
@@ -201,6 +197,81 @@ public:
     void find_all_null(IntegerColumn* result, size_t add_offset = 0, size_t begin = 0, size_t end = npos) const;
 };
 
+// Used only for Basic-types: currently float and double
+template <class R>
+class QueryState : public QueryStateBase {
+public:
+    R m_state;
+
+    template <Action action>
+    bool uses_val()
+    {
+        return (action == act_Max || action == act_Min || action == act_Sum);
+    }
+
+    QueryState(Action action, Array* = nullptr, size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        REALM_ASSERT((std::is_same<R, float>::value || std::is_same<R, double>::value));
+        if (action == act_Max)
+            m_state = -std::numeric_limits<R>::infinity();
+        else if (action == act_Min)
+            m_state = std::numeric_limits<R>::infinity();
+        else if (action == act_Sum)
+            m_state = 0.0;
+        else if (action == act_Count)
+            m_state = 0.0;
+        else {
+            REALM_ASSERT_DEBUG(false);
+        }
+    }
+
+    template <Action action, bool pattern, typename resulttype>
+    inline bool match(size_t index, uint64_t /*indexpattern*/, resulttype value)
+    {
+        if (pattern)
+            return false;
+
+        static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
+                      "Search action not supported");
+
+        if (action == act_Count) {
+            ++m_match_count;
+        }
+        else if (!null::is_null_float(value)) {
+            ++m_match_count;
+            if (action == act_Max) {
+                if (value > m_state) {
+                    m_state = value;
+                    if (m_key_values) {
+                        m_minmax_index = m_key_values->get(index) + m_key_offset;
+                    }
+                    else {
+                        m_minmax_index = int64_t(index);
+                    }
+                }
+            }
+            else if (action == act_Min) {
+                if (value < m_state) {
+                    m_state = value;
+                    if (m_key_values) {
+                        m_minmax_index = m_key_values->get(index) + m_key_offset;
+                    }
+                    else {
+                        m_minmax_index = int64_t(index);
+                    }
+                }
+            }
+            else if (action == act_Sum)
+                m_state += value;
+            else {
+                REALM_ASSERT_DEBUG(false);
+            }
+        }
+
+        return (m_limit > m_match_count);
+    }
+};
 
 // Class typedefs for BasicArray's: ArrayFloat and ArrayDouble
 typedef BasicArray<float> ArrayFloat;

@@ -1597,6 +1597,30 @@ TEST(Group_CascadeNotify_TreeCascade)
 }
 
 
+TEST(Group_ChangeEmbeddedness)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    TableRef parent = g.add_table("parent");
+    auto col = parent->add_column_link(type_Link, "child", *t);
+    auto p1 = parent->create_object();
+    auto p2 = parent->create_object();
+    auto p3 = parent->create_object();
+    auto obj1 = t->create_object();
+    auto obj2 = t->create_object();
+    auto obj3 = t->create_object();
+    p1.set(col, obj1.get_key());
+    p2.set(col, obj2.get_key());
+
+    CHECK(t->set_embedded(true));
+    CHECK(t->is_embedded());
+    CHECK(t->set_embedded(false));
+    p3.set(col, obj2.get_key());
+    CHECK_NOT(t->set_embedded(true));
+    CHECK_NOT(t->is_embedded());
+}
+
+
 TEST(Group_WriteEmpty)
 {
     GROUP_TEST_PATH(path_1);
@@ -1832,25 +1856,25 @@ TEST(Group_RemoveRecursive)
 TEST(Group_IntPrimaryKeyCol)
 {
     Group g;
-    TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary");
+    TableRef table = g.add_table_with_primary_key("class_foo", type_Int, "primary", true);
     ColKey primary_key_column = table->get_primary_key_column();
     CHECK(primary_key_column);
-    CHECK(table->has_search_index(primary_key_column));
+    CHECK_NOT(table->has_search_index(primary_key_column));
 
     auto obj = table->create_object_with_primary_key({1});
     CHECK_EQUAL(obj.get<Int>(primary_key_column), 1);
+    auto obj1 = table->create_object_with_primary_key({});
+    CHECK(obj1.is_null(primary_key_column));
+    CHECK_EQUAL(table->size(), 2);
 
     table->set_primary_key_column(ColKey{});
+    table->add_search_index(primary_key_column);
     CHECK(table->get_primary_key_column() == ColKey{});
     CHECK(table->has_search_index(primary_key_column));
-
-    table->remove_search_index(primary_key_column);
-    CHECK(table->get_primary_key_column() == ColKey{});
-    CHECK_NOT(table->has_search_index(primary_key_column));
 
     table->set_primary_key_column(primary_key_column);
     CHECK(table->get_primary_key_column() == primary_key_column);
-    CHECK(table->has_search_index(primary_key_column));
+    CHECK_NOT(table->has_search_index(primary_key_column));
 }
 
 TEST(Group_StringPrimaryKeyCol)
@@ -1865,10 +1889,10 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK_NOT(table->has_search_index(primary_key_column));
 
-    auto obj1 = table->create_object_with_primary_key({"Exactly!"}).set(col2, "first");
-    table->create_object_with_primary_key({"Paul"}).set(col2, "John");
-    table->create_object_with_primary_key({"John"}).set(col2, "Paul");
-    table->create_object_with_primary_key({"George"}).set(col2, "George");
+    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col2, "first"}});
+    table->create_object_with_primary_key("Paul", {{col2, "John"}});
+    table->create_object_with_primary_key("John", {{col2, "Paul"}});
+    table->create_object_with_primary_key("George", {{col2, "George"}});
     CHECK_EQUAL(obj1.get<String>(primary_key_column), "Exactly!");
     auto k = table->find_first(primary_key_column, StringData("Exactly!"));
     CHECK_EQUAL(k, obj1.get_key());

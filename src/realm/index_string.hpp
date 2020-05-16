@@ -221,9 +221,6 @@ public:
     template <class T>
     void verify_entries(const ClusterColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
-    void to_dot() const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-    void to_dot_2(std::ostream&, StringData title = StringData()) const;
 #endif
 
     typedef int32_t key_type;
@@ -309,8 +306,6 @@ private:
 
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& node, std::ostream&, int level);
-    static void array_to_dot(std::ostream&, const Array&);
-    static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());
 #endif
 };
 
@@ -336,7 +331,13 @@ private:
 // Implementation:
 
 template <class T>
-struct GetIndexData;
+struct GetIndexData {
+    static StringData get_index_data(Mixed, StringConversionBuffer&)
+    {
+        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index not supported
+        return {};
+    }
+};
 
 template <>
 struct GetIndexData<Timestamp> {
@@ -387,42 +388,6 @@ struct GetIndexData<util::Optional<T>> {
         if (value)
             return GetIndexData<T>::get_index_data(*value, buffer);
         return null{};
-    }
-};
-
-template <>
-struct GetIndexData<float> {
-    static StringData get_index_data(float, StringConversionBuffer&)
-    {
-        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
-        return {};
-    }
-};
-
-template <>
-struct GetIndexData<double> {
-    static StringData get_index_data(double, StringConversionBuffer&)
-    {
-        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
-        return {};
-    }
-};
-
-template <>
-struct GetIndexData<Decimal128> {
-    static StringData get_index_data(Decimal128&, StringConversionBuffer&)
-    {
-        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Decimal not supported
-        return {};
-    }
-};
-
-template <>
-struct GetIndexData<BinaryData> {
-    static StringData get_index_data(BinaryData, StringConversionBuffer&)
-    {
-        REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
-        return {};
     }
 };
 

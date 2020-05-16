@@ -278,7 +278,7 @@ public:
     {
         auto hist = std::make_unique<InRealmHistory>();
         hist->initialize(m_history.get_alloc());
-        return std::move(hist);
+        return hist;
     }
 
 private:

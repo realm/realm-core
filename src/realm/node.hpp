@@ -45,14 +45,10 @@ const size_t not_found = npos;
 /// modified.
 class ArrayParent {
 public:
-    virtual ~ArrayParent() noexcept
-    {
-    }
+    virtual ~ArrayParent() noexcept {}
 
     virtual ref_type get_child_ref(size_t child_ndx) const noexcept = 0;
     virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
-    // Used only by Array::to_dot().
-    virtual std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const = 0;
 };
 
 /// Provides access to individual array nodes of the database.
@@ -116,9 +112,7 @@ public:
     {
     }
 
-    virtual ~Node()
-    {
-    }
+    virtual ~Node() {}
 
     /**************************** Initializers *******************************/
 
@@ -129,7 +123,6 @@ public:
         char* header = mem.get_addr();
         m_ref = mem.get_ref();
         m_data = get_data_from_header(header);
-        m_width = get_width_from_header(header);
         m_size = get_size_from_header(header);
 
         return header;
@@ -199,13 +192,6 @@ public:
         return ref;
     }
 
-    /// The meaning of 'width' depends on the context in which this
-    /// array is used.
-    size_t get_width() const noexcept
-    {
-        return m_width;
-    }
-
     /***************************** modifiers *********************************/
 
     /// Detach from the underlying array node. This method has no effect if the
@@ -273,8 +259,7 @@ protected:
 
     size_t m_ref;
     Allocator& m_alloc;
-    size_t m_size = 0;         // Number of elements currently stored.
-    uint_least8_t m_width = 0; // Size of an element (meaning depend on type of array).
+    size_t m_size = 0; // Number of elements currently stored.
 
 #if REALM_ENABLE_MEMDEBUG
     // If m_no_relocation is false, then copy_on_write() will always relocate this array, regardless if it's
@@ -332,9 +317,7 @@ public:
     {
         return false;
     }
-    virtual void set_spec(Spec*, size_t) const
-    {
-    }
+    virtual void set_spec(Spec*, size_t) const {}
 };
 
 
@@ -353,6 +336,6 @@ inline void Node::init_header(char* header, bool is_inner_bptree_node, bool has_
     set_size_in_header(size, header);
     set_capacity_in_header(capacity, header);
 }
-}
+} // namespace realm
 
 #endif /* REALM_NODE_HPP */

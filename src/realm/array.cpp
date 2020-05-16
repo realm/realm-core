@@ -190,13 +190,9 @@
 using namespace realm;
 using namespace realm::util;
 
-void QueryStateBase::dyncast()
-{
-}
+void QueryStateBase::dyncast() {}
 
-ArrayPayload::~ArrayPayload()
-{
-}
+ArrayPayload::~ArrayPayload() {}
 
 size_t Array::bit_width(int64_t v)
 {
@@ -225,8 +221,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
     m_has_refs = get_hasrefs_from_header(header);
     m_context_flag = get_context_flag_from_header(header);
-
-    set_width(m_width);
+    update_width_cache_from_header();
 }
 
 bool Array::update_from_parent(size_t old_baseline) noexcept
@@ -370,13 +365,13 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
 
 void Array::move(Array& dst, size_t ndx)
 {
+    size_t dest_begin = dst.m_size;
     size_t nb_to_move = m_size - ndx;
     dst.copy_on_write();
     dst.ensure_minimum_width(this->m_ubound);
     dst.alloc(dst.m_size + nb_to_move, dst.m_width); // Make room for the new elements
 
     // cache variables used in tight loop
-    size_t dest_begin = dst.m_size;
     auto getter = m_getter;
     auto setter = dst.m_vtable->setter;
     size_t sz = m_size;
@@ -386,7 +381,6 @@ void Array::move(Array& dst, size_t ndx)
         (dst.*setter)(dest_begin++, v);
     }
 
-    dst.m_size += nb_to_move;
     truncate(ndx);
 }
 
@@ -461,35 +455,35 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-
-    Getter old_getter = m_getter; // Save old getter before potential width expansion
+    const auto old_width = m_width;
+    const auto old_size = m_size;
+    const Getter old_getter = m_getter; // Save old getter before potential width expansion
 
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
         size_t width = bit_width(value);
         REALM_ASSERT_DEBUG(width > m_width);
         alloc(m_size + 1, width); // Throws
-        set_width(width);
     }
     else {
         alloc(m_size + 1, m_width); // Throws
     }
 
     // Move values below insertion (may expand)
-    if (do_expand || m_width < 8) {
-        size_t i = m_size;
+    if (do_expand || old_width < 8) {
+        size_t i = old_size;
         while (i > ndx) {
             --i;
             int64_t v = (this->*old_getter)(i);
             (this->*(m_vtable->setter))(i + 1, v);
         }
     }
-    else if (ndx != m_size) {
+    else if (ndx != old_size) {
         // when byte sized and no expansion, use memmove
         // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
-        size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
+        size_t w = (old_width == 64) ? 8 : (old_width == 32) ? 4 : (old_width == 16) ? 2 : 1;
         char* src_begin = m_data + ndx * w;
-        char* src_end = m_data + m_size * w;
+        char* src_end = m_data + old_size * w;
         char* dst_end = src_end + w;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -506,10 +500,6 @@ void Array::insert(size_t ndx, int_fast64_t value)
             (this->*(m_vtable->setter))(i, v);
         }
     }
-
-    // Update size
-    // (no need to do it in header as it has been done by Alloc)
-    ++m_size;
 }
 
 
@@ -542,8 +532,8 @@ void Array::truncate(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        set_width(0);
         set_width_in_header(0, get_header());
+        update_width_cache_from_header();
     }
 }
 
@@ -575,8 +565,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        set_width(0);
         set_width_in_header(0, get_header());
+        update_width_cache_from_header();
     }
 }
 
@@ -585,12 +575,12 @@ void Array::do_ensure_minimum_width(int_fast64_t value)
 {
 
     // Make room for the new value
-    size_t width = bit_width(value);
+    const size_t width = bit_width(value);
+
     REALM_ASSERT_3(width, >, m_width);
 
     Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width);         // Throws
-    set_width(width);
 
     // Expand the old values
     size_t i = m_size;
@@ -608,172 +598,10 @@ void Array::set_all_to_zero()
 
     copy_on_write(); // Throws
 
-    set_width(0);
     set_width_in_header(0, get_header());
+    update_width_cache_from_header();
 }
 
-void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
-{
-    if (diff != 0) {
-        for (size_t i = 0, n = size(); i != n;) {
-            REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
-        }
-    }
-}
-
-template <size_t w>
-size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff)
-{
-    REALM_ASSERT_DEBUG(diff != 0);
-
-    for (size_t i = start; i != end; ++i) {
-        int_fast64_t v = get<w>(i);
-        if (v >= limit) {
-            int64_t shifted = v + diff;
-
-            // Make sure the new value can actually be stored. If this changes
-            // the width, return the current position to the caller so that it
-            // can switch to the appropriate specialization for the new width.
-            ensure_minimum_width(shifted); // Throws
-            copy_on_write();               // Throws
-            if (m_width != w)
-                return i;
-
-            set<w>(i, shifted);
-        }
-    }
-    return end;
-}
-
-
-// If indirection == nullptr, then return lowest 'i' for which for which this->get(i) >= target or -1 if none. If
-// indirection == nullptr then 'this' must be sorted increasingly.
-//
-// If indirection exists, then return lowest 'i' for which this->get(indirection->get(i)) >= target or -1 if none.
-// If indirection exists, then 'this' can be non-sorted, but 'indirection' must point into 'this' such that the values
-// pointed at are sorted increasingly
-//
-// This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-size_t Array::find_gte(const int64_t target, size_t start, size_t end) const
-{
-    switch (m_width) {
-        case 0:
-            return find_gte<0>(target, start, end);
-        case 1:
-            return find_gte<1>(target, start, end);
-        case 2:
-            return find_gte<2>(target, start, end);
-        case 4:
-            return find_gte<4>(target, start, end);
-        case 8:
-            return find_gte<8>(target, start, end);
-        case 16:
-            return find_gte<16>(target, start, end);
-        case 32:
-            return find_gte<32>(target, start, end);
-        case 64:
-            return find_gte<64>(target, start, end);
-        default:
-            return not_found;
-    }
-}
-
-template <size_t w>
-size_t Array::find_gte(const int64_t target, size_t start, size_t end) const
-{
-    REALM_ASSERT(start < size());
-
-    if (end > m_size) {
-        end = m_size;
-    }
-
-#ifdef REALM_DEBUG
-    // Reference implementation to illustrate and test behaviour
-    size_t ref = 0;
-    size_t idx;
-
-    for (idx = start; idx < end; ++idx) {
-        if (get(idx) >= target) {
-            ref = idx;
-            break;
-        }
-    }
-
-    if (idx == end) {
-        ref = not_found;
-    }
-#endif
-
-    size_t ret;
-
-    if (start >= end || target > ubound_for_width(w)) {
-        ret = not_found;
-        goto exit;
-    }
-
-    if (start + 2 < end) {
-        if (get<w>(start) >= target) {
-            ret = start;
-            goto exit;
-        }
-        ++start;
-        if (get<w>(start) >= target) {
-            ret = start;
-            goto exit;
-        }
-        ++start;
-    }
-
-    if (target > get<w>(end - 1)) {
-        ret = not_found;
-        goto exit;
-    }
-
-    size_t test_ndx;
-    test_ndx = 1;
-
-    for (size_t offset = start + test_ndx;; offset = start + test_ndx) {
-        if (offset < end && get<w>(offset) < target)
-            start += test_ndx;
-        else
-            break;
-
-        test_ndx *= 2;
-    }
-
-    size_t high;
-    high = start + test_ndx + 1;
-
-    if (high > end)
-        high = end;
-
-    start--;
-
-    // start of high
-
-    size_t orig_high;
-    orig_high = high;
-    while (high - start > 1) {
-        size_t probe = (start + high) / 2; // FIXME: see lower_bound() for better approach wrt overflow
-        int64_t v = get<w>(probe);
-        if (v < target)
-            start = probe;
-        else
-            high = probe;
-    }
-    if (high == orig_high)
-        ret = not_found;
-    else
-        ret = high;
-
-exit:
-
-#ifdef REALM_DEBUG
-    REALM_ASSERT_DEBUG(ref == ret);
-#endif
-
-    return ret;
-}
 
 size_t Array::first_set_bit(unsigned int v) const
 {
@@ -890,8 +718,10 @@ size_t find_zero(uint64_t v)
         }
     }
 
-    uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) -
-                                            1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask =
+        (width == 64
+             ? ~0ULL
+             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     while (eq == (((v >> (width * start)) & mask) != 0)) {
         start++;
     }
@@ -899,7 +729,7 @@ size_t find_zero(uint64_t v)
     return start;
 }
 
-} // anonymous namesapce
+} // namespace
 
 
 template <bool find_max, size_t w>
@@ -1478,12 +1308,6 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 
 int_fast64_t Array::lbound_for_width(size_t width) noexcept
 {
-    REALM_TEMPEX(return lbound_for_width, width, ());
-}
-
-template <size_t width>
-int_fast64_t Array::lbound_for_width() noexcept
-{
     if (width == 0) {
         return 0;
     }
@@ -1514,12 +1338,6 @@ int_fast64_t Array::lbound_for_width() noexcept
 }
 
 int_fast64_t Array::ubound_for_width(size_t width) noexcept
-{
-    REALM_TEMPEX(return ubound_for_width, width, ());
-}
-
-template <size_t width>
-int_fast64_t Array::ubound_for_width() noexcept
 {
     if (width == 0) {
         return 0;
@@ -1571,20 +1389,15 @@ struct Array::VTableForWidth {
 template <size_t width>
 const typename Array::VTableForWidth<width>::PopulatedVTable Array::VTableForWidth<width>::vtable;
 
-void Array::set_width(size_t width) noexcept
+void Array::update_width_cache_from_header() noexcept
 {
-    REALM_TEMPEX(set_width, width, ());
-}
-
-template <size_t width>
-void Array::set_width() noexcept
-{
-    m_lbound = lbound_for_width<width>();
-    m_ubound = ubound_for_width<width>();
+    auto width = get_width_from_header(get_header());
+    m_lbound = lbound_for_width(width);
+    m_ubound = ubound_for_width(width);
 
     m_width = width;
 
-    m_vtable = &VTableForWidth<width>::vtable;
+    REALM_TEMPEX(m_vtable = &VTableForWidth, width, ::vtable);
     m_getter = m_vtable->getter;
 }
 
@@ -1654,12 +1467,6 @@ void Array::set(size_t ndx, int64_t value)
 
 
 // LCOV_EXCL_START ignore debug functions
-
-std::pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
-{
-    return std::make_pair(get_ref(), ndx_in_parent);
-}
-
 
 #ifdef REALM_DEBUG
 template <class C, class T>
@@ -1775,271 +1582,6 @@ void Array::verify() const
     REALM_ASSERT_3(ref_in_parent, ==, m_ref);
 #endif
 }
-
-
-#ifdef REALM_DEBUG
-
-void Array::print() const
-{
-    std::cout << std::hex << get_ref() << std::dec << ": (" << size() << ") ";
-    for (size_t i = 0; i < size(); ++i) {
-        if (i)
-            std::cout << ", ";
-        std::cout << get(i);
-    }
-    std::cout << "\n";
-}
-
-namespace {
-
-typedef std::tuple<size_t, int, bool> VerifyBptreeResult;
-
-// Returns (num_elems, leaf-level, general_form)
-VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
-{
-    node.verify();
-
-    // This node must not be a leaf
-    REALM_ASSERT_3(node.get_type(), ==, Array::type_InnerBptreeNode);
-
-    REALM_ASSERT_3(node.size(), >=, 2);
-    size_t num_children = node.size() - 2;
-
-    // Verify invar:bptree-nonempty-inner
-    REALM_ASSERT_3(num_children, >=, 1);
-
-    Allocator& alloc = node.get_alloc();
-    Array offsets(alloc);
-    size_t elems_per_child = 0;
-    bool general_form;
-    {
-        int_fast64_t first_value = node.get(0);
-        general_form = first_value % 2 == 0;
-        if (general_form) {
-            offsets.init_from_ref(to_ref(first_value));
-            offsets.verify();
-            REALM_ASSERT_3(offsets.get_type(), ==, Array::type_Normal);
-            REALM_ASSERT_3(offsets.size(), ==, num_children - 1);
-        }
-        else {
-            REALM_ASSERT(!int_cast_with_overflow_detect(first_value / 2, elems_per_child));
-        }
-    }
-
-    size_t num_elems = 0;
-    int leaf_level_of_children = -1;
-    for (size_t i = 0; i < num_children; ++i) {
-        ref_type child_ref = node.get_as_ref(1 + i);
-        char* child_header = alloc.translate(child_ref);
-        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
-        size_t elems_in_child;
-        int leaf_level_of_child;
-        if (child_is_leaf) {
-            elems_in_child = (*leaf_verifier)(MemRef(child_header, child_ref, alloc), alloc);
-            // Verify invar:bptree-nonempty-leaf
-            REALM_ASSERT_3(elems_in_child, >=, 1);
-            leaf_level_of_child = 0;
-        }
-        else {
-            Array child(alloc);
-            child.init_from_ref(child_ref);
-            VerifyBptreeResult r = verify_bptree(child, leaf_verifier);
-            elems_in_child = std::get<0>(r);
-            leaf_level_of_child = std::get<1>(r);
-            // Verify invar:bptree-node-form
-            bool child_on_general_form = std::get<2>(r);
-            REALM_ASSERT(general_form || !child_on_general_form);
-        }
-        if (i == 0)
-            leaf_level_of_children = leaf_level_of_child;
-        // Verify invar:bptree-leaf-depth
-        REALM_ASSERT_3(leaf_level_of_child, ==, leaf_level_of_children);
-        // Check integrity of aggregated per-child element counts
-        REALM_ASSERT(!int_add_with_overflow_detect(num_elems, elems_in_child));
-        if (general_form) {
-            if (i < num_children - 1)
-                REALM_ASSERT(int_equal_to(num_elems, offsets.get(i)));
-        }
-        else { // Compact form
-            if (i < num_children - 1) {
-                REALM_ASSERT(elems_in_child == elems_per_child);
-            }
-            else {
-                REALM_ASSERT(elems_in_child <= elems_per_child);
-            }
-        }
-    }
-    REALM_ASSERT_3(leaf_level_of_children, !=, -1);
-    {
-        int_fast64_t last_value = node.back();
-        REALM_ASSERT_3(last_value % 2, !=, 0);
-        size_t total_elems = 0;
-        REALM_ASSERT(!int_cast_with_overflow_detect(last_value / 2, total_elems));
-        REALM_ASSERT_3(num_elems, ==, total_elems);
-    }
-    return std::make_tuple(num_elems, 1 + leaf_level_of_children, general_form);
-}
-
-} // anonymous namespace
-
-void Array::verify_bptree(LeafVerifier leaf_verifier) const
-{
-    ::verify_bptree(*this, leaf_verifier);
-}
-
-
-void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_dumper) const
-{
-    bool root_is_leaf = !is_inner_bptree_node();
-    if (root_is_leaf) {
-        (*leaf_dumper)(get_mem(), m_alloc, out, level);
-        return;
-    }
-
-    int indent = level * 2;
-    out << std::setw(indent) << ""
-        << "Inner node (B+ tree) (ref: " << get_ref() << ")\n";
-
-    size_t num_elems_in_subtree = size_t(back() / 2);
-    out << std::setw(indent) << ""
-        << "  Number of elements in subtree: " << num_elems_in_subtree << "\n";
-
-    bool compact_form = front() % 2 != 0;
-    if (compact_form) {
-        size_t elems_per_child = size_t(front() / 2);
-        out << std::setw(indent) << ""
-            << "  Compact form (elements per child: " << elems_per_child << ")\n";
-    }
-    else { // General form
-        Array offsets(m_alloc);
-        offsets.init_from_ref(to_ref(front()));
-        out << std::setw(indent) << ""
-            << "  General form (offsets_ref: " << offsets.get_ref() << ", ";
-        if (offsets.is_empty()) {
-            out << "no offsets";
-        }
-        else {
-            out << "offsets: ";
-            for (size_t i = 0; i != offsets.size(); ++i) {
-                if (i != 0)
-                    out << ", ";
-                out << offsets.get(i);
-            }
-        }
-        out << ")\n";
-    }
-
-    size_t num_children = size() - 2;
-    size_t child_ref_begin = 1;
-    size_t child_ref_end = 1 + num_children;
-    for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
-        Array child(m_alloc);
-        child.init_from_ref(get_as_ref(i));
-        child.dump_bptree_structure(out, level + 1, leaf_dumper);
-    }
-}
-
-void Array::bptree_to_dot(std::ostream& out, ToDotHandler& handler) const
-{
-    bool root_is_leaf = !is_inner_bptree_node();
-    if (root_is_leaf) {
-        handler.to_dot(get_mem(), get_parent(), get_ndx_in_parent(), out);
-        return;
-    }
-
-    ref_type ref = get_ref();
-    out << "subgraph cluster_inner_pbtree_node" << ref << " {" << std::endl;
-    out << " label = \"\";" << std::endl;
-
-    to_dot(out);
-
-    int_fast64_t first_value = get(0);
-    if (first_value % 2 == 0) {
-        // On general form / has 'offsets' array
-        Array offsets(m_alloc);
-        offsets.init_from_ref(to_ref(first_value));
-        offsets.set_parent(const_cast<Array*>(this), 0);
-        offsets.to_dot(out, "Offsets");
-    }
-
-    out << "}" << std::endl;
-
-    size_t num_children = size() - 2;
-    size_t child_ref_begin = 1;
-    size_t child_ref_end = 1 + num_children;
-    for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
-        Array child(m_alloc);
-        child.init_from_ref(get_as_ref(i));
-        child.set_parent(const_cast<Array*>(this), i);
-        child.bptree_to_dot(out, handler);
-    }
-}
-
-
-void Array::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    if (m_is_inner_bptree_node)
-        out << "IsNode<BR/>";
-    if (m_has_refs)
-        out << "HasRefs<BR/>";
-    if (m_context_flag)
-        out << "ContextFlag<BR/>";
-    out << "</FONT></TD>" << std::endl;
-
-    // Values
-    for (size_t i = 0; i < m_size; ++i) {
-        int64_t v = get(i);
-        if (m_has_refs) {
-            // zero-refs and refs that are not 64-aligned do not point to sub-trees
-            if (v == 0)
-                out << "<TD>none";
-            else if (v & 0x1)
-                out << "<TD BGCOLOR=\"grey90\">" << (uint64_t(v) >> 1);
-            else
-                out << "<TD PORT=\"" << i << "\">";
-        }
-        else {
-            out << "<TD>" << v;
-        }
-        out << "</TD>" << std::endl;
-    }
-
-    out << "</TR></TABLE>>];" << std::endl;
-
-    if (title.size() != 0)
-        out << "}" << std::endl;
-
-    to_dot_parent_edge(out);
-}
-
-void Array::to_dot_parent_edge(std::ostream& out) const
-{
-    if (ArrayParent* parent = get_parent()) {
-        size_t ndx_in_parent = get_ndx_in_parent();
-        std::pair<ref_type, size_t> p = parent->get_to_dot_parent(ndx_in_parent);
-        ref_type real_parent_ref = p.first;
-        size_t ndx_in_real_parent = p.second;
-        out << "n" << std::hex << real_parent_ref << std::dec << ":" << ndx_in_real_parent << " -> n" << std::hex
-            << get_ref() << std::dec << std::endl;
-    }
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions
-
 
 size_t Array::lower_bound_int(int64_t value) const noexcept
 {

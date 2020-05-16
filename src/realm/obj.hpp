@@ -97,6 +97,11 @@ public:
     void check_valid() const;
     // Delete object from table. Object is invalid afterwards.
     void remove();
+    // Invalidate
+    //  - this turns the object into a tombstone if links to the object exist.
+    //  - deletes the object is no links to the object exist.
+    //  - To be used by the Sync client.
+    void invalidate();
 
     template <typename U>
     U get(ColKey col_key) const;
@@ -108,6 +113,7 @@ public:
     {
         return get<U>(get_column_key(col_name));
     }
+    bool is_unresolved(ColKey col_key) const;
     ConstObj get_linked_object(ColKey link_col_key) const;
     int cmp(const ConstObj& other, ColKey col_key) const;
 
@@ -135,7 +141,7 @@ public:
         return is_null(get_column_key(col_name));
     }
     bool has_backlinks(bool only_strong_links) const;
-    size_t get_backlink_count(bool only_strong_links = false) const;
+    size_t get_backlink_count() const;
     size_t get_backlink_count(const Table& origin, ColKey origin_col_key) const;
     ObjKey get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const;
     TableView get_backlink_view(TableRef src_table, ColKey src_col_key);
@@ -237,6 +243,7 @@ protected:
     int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
+    ObjKey get_unfiltered_link(ColKey col_key) const;
 };
 
 
@@ -260,7 +267,7 @@ public:
     // object is already set, we throw LogicError (to prevent
     // dangling objects, since they do not delete automatically
     // if they are not embedded...)
-    Obj create_and_set_linked_object(ColKey col_key);
+    Obj create_and_set_linked_object(ColKey col_key, bool is_default = false);
     // Clear all fields of a linked object returning it to its
     // default state. If the object does not exist, create a
     // new object and link it. (To Be Implemented)
@@ -314,6 +321,7 @@ public:
     LnkLst get_linklist(StringData col_name) const;
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
+    void assign_pk_and_backlinks(const ConstObj& other);
 
 private:
     friend class ArrayBacklink;
@@ -438,6 +446,12 @@ inline Obj& Obj::set(ColKey col_key, Optional<float> value, bool is_default)
 
 template <>
 inline Obj& Obj::set(ColKey col_key, Optional<double> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, Optional<ObjectId> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }

@@ -447,10 +447,27 @@ DataType Spec::get_public_column_type(size_t ndx) const noexcept
     return DataType(type);
 }
 
+namespace {
+
+template <class T>
+bool compare(const T& a, const T& b)
+{
+    if (a.size() != b.size())
+        return false;
+
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (b.get(i) != a.get(i))
+            return false;
+    }
+
+    return true;
+}
+
+} // namespace
 
 bool Spec::operator==(const Spec& spec) const noexcept
 {
-    if (!m_attr.compare(spec.m_attr))
+    if (!compare(m_attr, spec.m_attr))
         return false;
     if (!m_names.compare_string(spec.m_names))
         return false;
@@ -502,11 +519,9 @@ ColKey Spec::get_key(size_t column_ndx) const
     return ColKey(m_keys.get(column_ndx));
 }
 
-
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
-
 void Spec::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT(m_names.size() == get_public_column_count());
     REALM_ASSERT(m_types.size() == get_column_count());
     REALM_ASSERT(m_attr.size() == get_column_count());
@@ -514,27 +529,5 @@ void Spec::verify() const
     REALM_ASSERT(m_types.get_ref() == m_top.get_as_ref(0));
     REALM_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
     REALM_ASSERT(m_attr.get_ref() == m_top.get_as_ref(2));
+#endif
 }
-
-
-void Spec::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type top_ref = m_top.get_ref();
-
-    out << "subgraph cluster_specset" << top_ref << " {" << std::endl;
-    out << " label = \"specset " << title << "\";" << std::endl;
-
-    std::string types_name = "types (" + util::to_string(m_types.size()) + ")";
-    std::string names_name = "names (" + util::to_string(m_names.size()) + ")";
-    std::string attr_name = "attrs (" + util::to_string(m_attr.size()) + ")";
-
-    m_top.to_dot(out);
-    m_types.to_dot(out, types_name);
-    m_names.to_dot(out, names_name);
-    m_attr.to_dot(out, attr_name);
-
-    out << "}" << std::endl;
-}
-
-
-#endif // LCOV_EXCL_STOP ignore debug functions

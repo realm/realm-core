@@ -17,9 +17,11 @@
  **************************************************************************/
 
 #include <realm/object_id.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
-#include <chrono>
 #include <atomic>
+#include <cctype>
+#include <chrono>
 #include <random>
 
 using namespace std::chrono;
@@ -47,15 +49,16 @@ static const char hex_digits[] = "0123456789abcdef";
 
 namespace realm {
 
-ObjectId::ObjectId() noexcept
+bool ObjectId::is_valid_str(StringData str) noexcept
 {
-    memset(m_bytes, 0, sizeof(m_bytes));
+    return str.size() == 24 &&
+           std::all_of(str.data(), str.data() + str.size(), [](unsigned char c) { return std::isxdigit(c); });
 }
 
-ObjectId::ObjectId(const char* init)
+ObjectId::ObjectId(const char* init) noexcept
 {
     char buf[3];
-    REALM_ASSERT(strlen(init) == 24);
+    REALM_ASSERT(is_valid_str(init));
 
     buf[2] = '\0';
 
@@ -67,7 +70,7 @@ ObjectId::ObjectId(const char* init)
     }
 }
 
-ObjectId::ObjectId(Timestamp d, int machine_id, int process_id)
+ObjectId::ObjectId(Timestamp d, int machine_id, int process_id) noexcept
 {
     auto sec = uint32_t(d.get_seconds());
     // Store in big endian so that memcmp can be used for comparison
@@ -122,6 +125,11 @@ std::string ObjectId::to_string() const
         ret += hex_digits[m_bytes[i] & 0xf];
     }
     return ret;
+}
+
+size_t ObjectId::hash() const noexcept
+{
+    return murmur2_or_cityhash(m_bytes, sizeof(m_bytes));
 }
 
 

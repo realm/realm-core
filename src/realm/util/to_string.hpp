@@ -72,6 +72,11 @@ public:
         , m_int(value)
     {
     }
+    Printable(double value)
+        : m_type(Type::Double)
+        , m_double(value)
+    {
+    }
     Printable(const char* value)
         : m_type(Type::String)
         , m_string(value)
@@ -94,12 +99,14 @@ private:
         Bool,
         Int,
         Uint,
+        Double,
         String,
     } m_type;
 
     union {
         uintmax_t m_uint;
         intmax_t m_int;
+        double m_double;
         const char* m_string;
     };
 };

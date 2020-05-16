@@ -44,9 +44,10 @@ using namespace std::chrono;
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 // #include <valgrind/callgrind.h>
-// #define PERFORMACE_TESTING
+//#define PERFORMACE_TESTING
 
 using namespace realm;
 using namespace realm::util;
@@ -1302,16 +1303,33 @@ T nan(const char* tag)
     i += *tag;
     return type_punning<T>(i);
 }
+template <>
+Decimal128 nan(const char* init)
+{
+    return Decimal128::nan(init);
+}
+
+template <typename T>
+inline bool isnan(T val)
+{
+    return std::isnan(val);
+}
+inline bool isnan(Decimal128 val)
+{
+    return val.is_nan();
+}
+
 } // namespace realm
 
-TEST_TYPES(Table_SortFloat, float, double)
+TEST_TYPES(Table_SortFloat, float, double, Decimal128)
 {
     Table table;
-    auto col = table.add_column(std::is_same<TEST_TYPE, float>::value ? type_Float : type_Double, "value", true);
+    DataType type = ColumnTypeTraits<TEST_TYPE>::id;
+    auto col = table.add_column(type, "value", true);
     ObjKeys keys;
     table.create_objects(900, keys);
     for (size_t i = 0; i < keys.size(); i += 3) {
-        table.get_object(keys[i]).set(col, static_cast<TEST_TYPE>(-500.0 + i));
+        table.get_object(keys[i]).set(col, TEST_TYPE(-500.0 + i));
         table.get_object(keys[i + 1]).set_null(col);
         const char nan_tag[] = {char('0' + i % 10), 0};
         table.get_object(keys[i + 2]).set(col, realm::nan<TEST_TYPE>(nan_tag));
@@ -1320,32 +1338,32 @@ TEST_TYPES(Table_SortFloat, float, double)
     TableView sorted = table.get_sorted_view(SortDescriptor{{{col}}, {true}});
     CHECK_EQUAL(table.size(), sorted.size());
 
-    // nans should appear first (because the tag is less than the tag we use for nulls),
-    // followed by nulls, folllowed by the rest of the values in ascending order
+    // nulls should appear first,
+    // followed by nans, folllowed by the rest of the values in ascending order
     for (size_t i = 0; i < 300; ++i) {
         CHECK(sorted.get(i).is_null(col));
     }
     for (size_t i = 300; i < 600; ++i) {
-        CHECK(std::isnan(sorted.get(i).get<TEST_TYPE>(col)));
+        CHECK(realm::isnan(sorted.get(i).get<TEST_TYPE>(col)));
     }
     for (size_t i = 600; i + 1 < 900; ++i) {
         CHECK_GREATER(sorted.get(i + 1).get<TEST_TYPE>(col), sorted.get(i).get<TEST_TYPE>(col));
     }
 }
 
-TEST(Table_Multi_Sort)
+TEST_TYPES(Table_Multi_Sort, int64_t, float, double, Decimal128)
 {
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first");
-    auto col_int1 = table.add_column(type_Int, "second");
+    auto col_0 = table.add_column(ColumnTypeTraits<TEST_TYPE>::id, "first");
+    auto col_1 = table.add_column(ColumnTypeTraits<TEST_TYPE>::id, "second");
 
-    table.create_object(ObjKey(0)).set_all(1, 10);
-    table.create_object(ObjKey(1)).set_all(2, 10);
-    table.create_object(ObjKey(2)).set_all(0, 10);
-    table.create_object(ObjKey(3)).set_all(2, 14);
-    table.create_object(ObjKey(4)).set_all(1, 14);
+    table.create_object(ObjKey(0)).set_all(TEST_TYPE(1), TEST_TYPE(10));
+    table.create_object(ObjKey(1)).set_all(TEST_TYPE(2), TEST_TYPE(10));
+    table.create_object(ObjKey(2)).set_all(TEST_TYPE(0), TEST_TYPE(10));
+    table.create_object(ObjKey(3)).set_all(TEST_TYPE(2), TEST_TYPE(14));
+    table.create_object(ObjKey(4)).set_all(TEST_TYPE(1), TEST_TYPE(14));
 
-    std::vector<std::vector<ColKey>> col_ndx1 = {{col_int0}, {col_int1}};
+    std::vector<std::vector<ColKey>> col_ndx1 = {{col_0}, {col_1}};
     std::vector<bool> asc = {true, true};
 
     // (0, 10); (1, 10); (1, 14); (2, 10); (2; 14)
@@ -1357,7 +1375,7 @@ TEST(Table_Multi_Sort)
     CHECK_EQUAL(ObjKey(1), v_sorted1.get_key(3));
     CHECK_EQUAL(ObjKey(3), v_sorted1.get_key(4));
 
-    std::vector<std::vector<ColKey>> col_ndx2 = {{col_int1}, {col_int0}};
+    std::vector<std::vector<ColKey>> col_ndx2 = {{col_1}, {col_0}};
 
     // (0, 10); (1, 10); (2, 10); (1, 14); (2, 14)
     TableView v_sorted2 = table.get_sorted_view(SortDescriptor{col_ndx2, asc});
@@ -2027,22 +2045,26 @@ TEST(Table_Aggregates)
     auto float_col = table.add_column(type_Float, "c_float");
     auto double_col = table.add_column(type_Double, "c_double");
     auto str_col = table.add_column(type_String, "c_string");
+    auto decimal_col = table.add_column(type_Decimal, "c_decimal");
     int64_t i_sum = 0;
     double f_sum = 0;
     double d_sum = 0;
+    Decimal128 decimal_sum(0);
 
     for (int i = 0; i < TBL_SIZE; i++) {
-        table.create_object().set_all(5987654, 4.0f, 3.0, "Hello");
+        table.create_object().set_all(5987654, 4.0f, 3.0, "Hello", Decimal128(7.7));
         i_sum += 5987654;
         f_sum += 4.0f;
         d_sum += 3.0;
+        decimal_sum += Decimal128(7.7);
     }
-    table.create_object().set_all(1, 1.1f, 1.2, "Hi");
-    table.create_object().set_all(987654321, 11.0f, 12.0, "Goodbye");
-    table.create_object().set_all(5, 4.0f, 3.0, "Hey");
+    table.create_object().set_all(1, 1.1f, 1.2, "Hi", Decimal128(8.9));
+    table.create_object().set_all(987654321, 11.0f, 12.0, "Goodbye", Decimal128(10.1));
+    table.create_object().set_all(5, 4.0f, 3.0, "Hey", Decimal128("1.12e23"));
     i_sum += 1 + 987654321 + 5;
     f_sum += double(1.1f) + double(11.0f) + double(4.0f);
     d_sum += 1.2 + 12.0 + 3.0;
+    decimal_sum += Decimal128(8.9) + Decimal128(10.1) + Decimal128("1.12e23");
     double size = TBL_SIZE + 3;
 
     double epsilon = std::numeric_limits<double>::epsilon();
@@ -2052,22 +2074,59 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(1, table.count_float(float_col, 11.0f));
     CHECK_EQUAL(1, table.count_double(double_col, 12.0));
     CHECK_EQUAL(1, table.count_string(str_col, "Goodbye"));
+    CHECK_EQUAL(1, table.count_decimal(decimal_col, Decimal128("1.12e23")));
+    ObjKey ret;
     // minimum
-    CHECK_EQUAL(1, table.minimum_int(int_col));
-    CHECK_EQUAL(1.1f, table.minimum_float(float_col));
-    CHECK_EQUAL(1.2, table.minimum_double(double_col));
+    CHECK_EQUAL(1, table.minimum_int(int_col, &ret));
+    CHECK(ret && table.get_object(ret).get<Int>(int_col) == 1);
+    ret = ObjKey();
+    CHECK_EQUAL(1.1f, table.minimum_float(float_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Float>(float_col), 1.1f);
+    ret = ObjKey();
+    CHECK_EQUAL(1.2, table.minimum_double(double_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Double>(double_col), 1.2);
+    ret = ObjKey();
+    CHECK_EQUAL(Decimal128(7.7), table.minimum_decimal(decimal_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Decimal128>(decimal_col), Decimal128(7.7));
+
     // maximum
-    CHECK_EQUAL(987654321, table.maximum_int(int_col));
-    CHECK_EQUAL(11.0f, table.maximum_float(float_col));
-    CHECK_EQUAL(12.0, table.maximum_double(double_col));
+    ret = ObjKey();
+    CHECK_EQUAL(987654321, table.maximum_int(int_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(table.get_object(ret).get<Int>(int_col), 987654321);
+    ret = ObjKey();
+    CHECK_EQUAL(11.0f, table.maximum_float(float_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(11.0f, table.get_object(ret).get<Float>(float_col));
+    ret = ObjKey();
+    CHECK_EQUAL(12.0, table.maximum_double(double_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(12.0, table.get_object(ret).get<Double>(double_col));
+    ret = ObjKey();
+    CHECK_EQUAL(Decimal128("1.12e23"), table.maximum_decimal(decimal_col, &ret));
+    CHECK(ret);
+    CHECK_EQUAL(Decimal128("1.12e23"), table.get_object(ret).get<Decimal128>(decimal_col));
     // sum
     CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(int_col)), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(float_col), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(double_col), 10 * epsilon);
+    CHECK_EQUAL(decimal_sum, table.sum_decimal(decimal_col));
     // average
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col), 10 * epsilon);
+    size_t count = realm::npos;
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col, &count), 10 * epsilon);
+    CHECK_EQUAL(count, size);
+    count = realm::npos;
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col, &count), 10 * epsilon);
+    CHECK_EQUAL(count, size);
+    count = realm::npos;
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col, &count), 10 * epsilon);
+    CHECK_EQUAL(count, size);
+    count = realm::npos;
+    CHECK_EQUAL(decimal_sum / Decimal128(size), table.average_decimal(decimal_col, &count));
+    CHECK_EQUAL(count, size);
 }
 
 TEST(Table_Aggregates2)
@@ -2292,6 +2351,30 @@ TEST(Table_AddColumnWithThreeLevelBptree)
     table.verify();
 }
 
+TEST(Table_DeleteObjectsInFirstCluster)
+{
+    // Designed to exercise logic if cluster size is 4
+    Table table;
+    table.add_column(type_Int, "int0");
+
+    ObjKeys keys;
+    table.create_objects(32, keys);
+
+    // delete objects in first cluster
+    table.remove_object(keys[2]);
+    table.remove_object(keys[1]);
+    table.remove_object(keys[3]);
+    table.remove_object(keys[0]);
+
+    table.create_object(ObjKey(1)); // Must not throw
+
+    // Replace root node
+    while (table.size() > 16)
+        table.begin()->remove();
+
+    // table.dump_objects();
+    table.create_object(ObjKey(1)); // Must not throw
+}
 
 TEST(Table_ClearWithTwoLevelBptree)
 {
@@ -2735,7 +2818,7 @@ TEST(Table_object_basic)
 
     table.create_object(ObjKey(5)).set_all(100, 7);
     CHECK_EQUAL(table.size(), 1);
-    CHECK_THROW(table.create_object(ObjKey(5)), InvalidKey);
+    CHECK_THROW(table.create_object(ObjKey(5)), KeyAlreadyUsed);
     CHECK_EQUAL(table.size(), 1);
     table.create_object(ObjKey(2));
     Obj x = table.create_object(ObjKey(7));
@@ -2871,7 +2954,7 @@ TEST(Table_object_basic)
 
     // Check that accessing a removed object will throw
     table.remove_object(ObjKey(5));
-    CHECK_THROW(y.get<int64_t>(intnull_col), InvalidKey);
+    CHECK_THROW(y.get<int64_t>(intnull_col), KeyNotFound);
 
     CHECK(table.get_object(ObjKey(8)).is_null(intnull_col));
 }
@@ -2979,16 +3062,34 @@ TEST(Table_list_basic)
     table.remove_object(ObjKey(5));
 }
 
-TEST_TYPES(Table_list_nullable, int64_t, float, double)
+template <typename T>
+struct NullableTypeConverter {
+    using NullableType = util::Optional<T>;
+    static bool is_null(NullableType t)
+    {
+        return !bool(t);
+    }
+};
+
+template <>
+struct NullableTypeConverter<Decimal128> {
+    using NullableType = Decimal128;
+    static bool is_null(Decimal128 val)
+    {
+        return val.is_null();
+    }
+};
+
+TEST_TYPES(Table_list_nullable, int64_t, float, double, Decimal128)
 {
     Table table;
     auto list_col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "int_list", true);
-    ColumnSumType<TEST_TYPE> sum = 0;
+    ColumnSumType<TEST_TYPE> sum = TEST_TYPE(0);
 
     {
         Obj obj = table.create_object(ObjKey(5));
         CHECK_NOT(obj.is_null(list_col));
-        auto list = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         CHECK_NOT(obj.is_null(list_col));
         CHECK(list.is_empty());
         for (int i = 0; i < 100; i++) {
@@ -2999,36 +3100,36 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double)
     }
     {
         Obj obj = table.get_object(ObjKey(5));
-        auto list1 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list1 = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         CHECK_EQUAL(list1.size(), 100);
-        CHECK_EQUAL(list1.get(0), 1000);
-        CHECK_EQUAL(list1.get(99), 1099);
+        CHECK_EQUAL(list1.get(0), TEST_TYPE(1000));
+        CHECK_EQUAL(list1.get(99), TEST_TYPE(1099));
         CHECK_NOT(list1.is_null(0));
         auto list_base = obj.get_listbase_ptr(list_col);
         CHECK_EQUAL(list_base->size(), 100);
         CHECK_NOT(list_base->is_null(0));
-        CHECK(dynamic_cast<Lst<util::Optional<TEST_TYPE>>*>(list_base.get()));
+        CHECK(dynamic_cast<Lst<typename NullableTypeConverter<TEST_TYPE>::NullableType>*>(list_base.get()));
 
         CHECK_EQUAL(list1.sum(), sum);
         CHECK_EQUAL(list1.max(), TEST_TYPE(1099));
         CHECK_EQUAL(list1.min(), TEST_TYPE(1000));
-        CHECK_EQUAL(list1.avg(), double(sum) / 100);
+        CHECK_EQUAL(list1.avg(), typename ColumnTypeTraits<TEST_TYPE>::average_type(sum) / 100);
 
-        auto list2 = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list2 = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         list2.set(50, TEST_TYPE(747));
-        CHECK_EQUAL(list1.get(50), 747);
+        CHECK_EQUAL(list1.get(50), TEST_TYPE(747));
         list1.set_null(50);
-        CHECK_NOT(list1.get(50));
+        CHECK(NullableTypeConverter<TEST_TYPE>::is_null(list1.get(50)));
         list1.resize(101);
-        CHECK_NOT(list1.get(100));
+        CHECK(NullableTypeConverter<TEST_TYPE>::is_null(list1.get(100)));
     }
     {
         Obj obj = table.create_object(ObjKey(7));
-        auto list = obj.get_list<util::Optional<TEST_TYPE>>(list_col);
+        auto list = obj.get_list<typename NullableTypeConverter<TEST_TYPE>::NullableType>(list_col);
         list.resize(10);
         CHECK_EQUAL(list.size(), 10);
         for (int i = 0; i < 10; i++) {
-            CHECK_NOT(list.get(i));
+            CHECK(NullableTypeConverter<TEST_TYPE>::is_null(list.get(i)));
         }
     }
     table.remove_object(ObjKey(5));
@@ -3223,18 +3324,23 @@ TEST(Table_ListOfPrimitives)
     CHECK_NOT(timestamp_list.is_attached());
 }
 
-TEST(Table_ListOfPrimitivesSort)
+TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
+           Optional<float>, Optional<double>, Optional<ObjectId>)
 {
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+
     Group g;
     TableRef t = g.add_table("table");
-    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
 
     auto obj = t->create_object();
-    auto list = obj.get_list<Int>(int_col);
+    auto list = obj.get_list<TEST_TYPE>(col);
 
-    std::vector<int64_t> values = {9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22};
+    std::vector<TEST_TYPE> values =
+        values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     std::vector<size_t> indices;
-    obj.set_list_values(int_col, values);
+    obj.set_list_values(col, values);
 
     CHECK(list.has_changed());
     CHECK_NOT(list.has_changed());
@@ -3245,41 +3351,45 @@ TEST(Table_ListOfPrimitivesSort)
             CHECK_EQUAL(values[i], list.get(indices[i]));
         }
     };
-    std::sort(values.begin(), values.end(), std::less<int64_t>());
+    std::sort(values.begin(), values.end(), ::less());
     list.sort(indices);
     cmp();
-    std::sort(values.begin(), values.end(), std::greater<int64_t>());
+    std::sort(values.begin(), values.end(), ::greater());
     list.sort(indices, false);
     cmp();
     CHECK_NOT(list.has_changed());
 
-    values.push_back(6);
-    list.add(6);
+    TEST_TYPE new_value = convert_for_test<underlying_type>(6);
+    values.push_back(new_value);
+    list.add(new_value);
     CHECK(list.has_changed());
-    std::sort(values.begin(), values.end(), std::less<int64_t>());
+    std::sort(values.begin(), values.end(), ::less());
     list.sort(indices);
     cmp();
 
     values.resize(7);
-    obj.set_list_values(int_col, values);
-    std::sort(values.begin(), values.end(), std::greater<int64_t>());
+    obj.set_list_values(col, values);
+    std::sort(values.begin(), values.end(), ::greater());
     list.sort(indices, false);
     cmp();
 }
 
-TEST(Table_ListOfPrimitivesDistinct)
+TEST_TYPES(Table_ListOfPrimitivesDistinct, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
+           Optional<float>, Optional<double>, Optional<ObjectId>)
 {
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey int_col = t->add_column_list(type_Int, "integers");
+    ColKey col = t->add_column_list(ColumnTypeTraits<underlying_type>::id, "values", is_optional);
 
     auto obj = t->create_object();
-    auto list = obj.get_list<Int>(int_col);
+    auto list = obj.get_list<TEST_TYPE>(col);
 
-    std::vector<int64_t> values = {9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5};
-    std::vector<int64_t> distinct_values = {9, 4, 2, 7, 8, 11, 5};
+    std::vector<TEST_TYPE> values = values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5});
+    std::vector<TEST_TYPE> distinct_values = values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 8, 11, 5});
     std::vector<size_t> indices;
-    obj.set_list_values(int_col, values);
+    obj.set_list_values(col, values);
 
     auto cmp = [&]() {
         CHECK_EQUAL(distinct_values.size(), indices.size());
@@ -3291,10 +3401,10 @@ TEST(Table_ListOfPrimitivesDistinct)
     list.distinct(indices);
     cmp();
     list.distinct(indices, true);
-    std::sort(distinct_values.begin(), distinct_values.end(), std::less<int64_t>());
+    std::sort(distinct_values.begin(), distinct_values.end(), std::less<TEST_TYPE>());
     cmp();
     list.distinct(indices, false);
-    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<int64_t>());
+    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<TEST_TYPE>());
     cmp();
 }
 
@@ -3457,14 +3567,15 @@ TEST(Table_QuickSort2)
 TEST(Table_object_sequential)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 10000000;
+    int nb_rows = 10'000'000;
     int num_runs = 1;
 #else
-    int nb_rows = 1024;
+    int nb_rows = 100'000;
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
 
@@ -3493,7 +3604,12 @@ TEST(Table_object_sequential)
         CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
     }
-
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
     {
         ReadTransaction rt(sg);
         auto table = rt.get_table("test");
@@ -3601,17 +3717,18 @@ TEST(Table_object_sequential)
 TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
-    size_t rows = 100000;
+    size_t rows = 1'000'000;
     int runs = 100;     // runs for building scenario
 #else
-    size_t rows = 50000;
-    int runs = 1;
+    size_t rows = 100'000;
+    int runs = 100;
 #endif
     int64_t next_key = 0;
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3643,10 +3760,16 @@ TEST(Table_object_seq_rnd)
     // scenario established!
     int nb_rows = int(key_values.size());
 #ifdef PERFORMACE_TESTING
-    int num_runs = 100; // runs for timing access
+    int num_runs = 10; // runs for timing access
 #else
     int num_runs = 1; // runs for timing access
 #endif
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    }
     std::cout << "Scenario has " << nb_rows << " rows. Timing...." << std::endl;
     {
         ReadTransaction rt(sg);
@@ -3710,14 +3833,15 @@ TEST(Table_object_seq_rnd)
 TEST(Table_object_random)
 {
 #ifdef PERFORMACE_TESTING
-    int nb_rows = 100000;
-    int num_runs = 100;
+    int nb_rows = 1'000'000;
+    int num_runs = 10;
 #else
-    int nb_rows = 1024;
+    int nb_rows = 100'000;
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    DBRef sg = DB::create(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;
@@ -3762,6 +3886,12 @@ TEST(Table_object_random)
 
         CHECK_EQUAL(table->size(), nb_rows);
         wt.commit();
+    }
+    {
+        auto t1 = steady_clock::now();
+        sg->compact();
+        auto t2 = steady_clock::now();
+        std::cout << "  compaction time: " << duration_cast<milliseconds>(t2 - t1).count() << " ms" << std::endl;
     }
 
     {
@@ -4270,7 +4400,7 @@ struct Tester {
 
     static void run(DBRef db, realm::DataType type)
     {
-    	auto trans = db->start_write();
+        auto trans = db->start_write();
         auto table = trans->add_table("my_table");
         col = table->add_column(type, "name", nullable);
         table->add_search_index(col);
@@ -4372,10 +4502,9 @@ TEST(Table_search_index_fuzzer)
     // nullable:  If the columns must be is nullable or not
     // Obj::set() will be automatically be called with set<RemoveOptional<T>>()
 
-	SHARED_GROUP_TEST_PATH(path);
-	std::unique_ptr<Replication> hist(make_in_realm_history(path));
-	auto db = DB::create(*hist);
-	//auto db = DB::create(path);
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    auto db = DB::create(*hist);
     Tester<bool, false>::run(db, type_Bool);
     Tester<Optional<bool>, true>::run(db, type_Bool);
 
@@ -4428,132 +4557,94 @@ TEST(Table_KeysRow)
     CHECK_EQUAL(i, ObjKey(9));
 }
 
-template<typename T> T generate_value() { return test_util::random_int<T>(); }
-
-template<> StringData generate_value()
+template <typename T>
+T generate_value()
 {
-	char* str = new char[32];
-	for (int j = 0; j < 31; ++j) str[j] = test_util::random_int<char>();
-	str[31] = 0;
-	return StringData(str, 32);
+    return test_util::random_int<T>();
 }
 
-template<> BinaryData generate_value()
+template <>
+std::string generate_value()
 {
-	char* str = new char[32];
-	for (int j = 0; j < 31; ++j) str[j] = test_util::random_int<char>();
-	str[31] = 0;
-	return BinaryData(str, 32);
+    std::string str;
+    str.resize(31);
+    std::generate<std::string::iterator, char (*)()>(str.begin(), str.end(), &test_util::random_int<char>);
+    return str;
 }
 
 template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
 template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
 template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
 template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
+template <>
+Decimal128 generate_value()
+{
+    return Decimal128(test_util::random_int<int>(-100000, 100000));
+}
+template <>
+ObjectId generate_value()
+{
+    return ObjectId::gen();
+}
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
 template <typename T>
 struct managed {
     T value;
-    managed(const T& v)
-        : value(v)
-    {
-    }
 };
 
-template <>
-struct managed<StringData> {
-    StringData value;
-    char* memory;
-    ~managed()
+template <typename T>
+struct ManagedStorage {
+    std::string storage;
+    T value;
+
+    ManagedStorage() {}
+    ManagedStorage(null) {}
+    ManagedStorage(std::string&& v)
+        : storage(std::move(v))
+        , value(storage)
     {
-        delete[] memory;
     }
-    void copy(const StringData& v)
+    ManagedStorage(const ManagedStorage& other)
     {
-        if (v.size()) {
-            auto sz = v.size();
-            const char* data = v.data();
-            memory = new char[sz];
-            for (size_t i = 0; i < sz; ++i)
-                memory[i] = data[i];
-            value = StringData(memory, sz);
+        *this = other;
+    }
+    ManagedStorage(ManagedStorage&& other)
+    {
+        *this = std::move(other);
+    }
+
+    ManagedStorage(T v)
+    {
+        if (v) {
+            if (v.size()) {
+                storage.assign(v.data(), v.data() + v.size());
+            }
+            value = T(storage);
         }
-        else if (v.data()) {
-            memory = nullptr;
-            value = StringData("", 0);
-        }
-        else {
-            memory = nullptr;
-            value = StringData();
-        }
     }
-    managed(const StringData& v)
+    ManagedStorage& operator=(const ManagedStorage& other)
     {
-        copy(v);
+        storage = other.storage;
+        value = other.value ? T(storage) : T();
+        return *this;
     }
-    managed(const managed<StringData>& v)
+    ManagedStorage& operator=(ManagedStorage&& other)
     {
-        copy(v.value);
-    }
-    managed(managed<StringData>&& v)
-    {
-        copy(v.value);
-    }
-    managed<StringData>& operator=(const managed<StringData>& v)
-    {
-        delete[] memory;
-        copy(v.value);
+        storage = std::move(other.storage);
+        value = other.value ? T(storage) : T();
         return *this;
     }
 };
 
 template <>
-struct managed<BinaryData> {
-    BinaryData value;
-    char* memory;
-    ~managed()
-    {
-        delete[] memory;
-    }
-    void copy(const BinaryData& v)
-    {
-        if (v.size()) {
-            auto sz = v.size();
-            const char* data = v.data();
-            memory = new char[sz];
-            for (size_t i = 0; i < sz; ++i)
-                memory[i] = data[i];
-            value = BinaryData(memory, sz);
-        }
-        else if (v.data()) {
-            memory = nullptr;
-            value = BinaryData("", 0);
-        }
-        else {
-            memory = nullptr;
-            value = BinaryData();
-        }
-    }
-    managed(const BinaryData& v)
-    {
-        copy(v);
-    }
-    managed(const managed<BinaryData>& v)
-    {
-        copy(v.value);
-    }
-    managed(managed<BinaryData>&& v)
-    {
-        copy(v.value);
-    }
-    managed<Binary>& operator=(const managed<BinaryData>& v)
-    {
-        delete[] memory;
-        copy(v.value);
-        return *this;
-    }
+struct managed<StringData> : ManagedStorage<StringData> {
+    using ManagedStorage::ManagedStorage;
+};
+template <>
+struct managed<BinaryData> : ManagedStorage<BinaryData> {
+    using ManagedStorage::ManagedStorage;
 };
 
 
@@ -4565,14 +4656,15 @@ void check_values(TestContext& test_context, Lst<T>& lst, std::vector<managed<T>
         CHECK_EQUAL(lst.get(j), reference[j].value);
 }
 
-template<typename T> struct generator {
+template <typename T>
+struct generator {
     static managed<T> get(bool optional)
     {
         if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<T>(T());
+            return managed<T>{T()};
         }
         else {
-            return managed<T>(generate_value<T>());
+            return managed<T>{generate_value<T>()};
         }
     }
 };
@@ -4582,13 +4674,10 @@ struct generator<StringData> {
     static managed<StringData> get(bool optional)
     {
         if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<StringData>(StringData());
+            return managed<StringData>(null());
         }
         else {
-            StringData v = generate_value<StringData>();
-            managed<StringData> rv(v);
-            delete[] v.data();
-            return rv;
+            return generate_value<std::string>();
         }
     }
 };
@@ -4598,24 +4687,30 @@ struct generator<BinaryData> {
     static managed<BinaryData> get(bool optional)
     {
         if (optional && (test_util::random_int<int>() % 10) == 0) {
-            return managed<BinaryData>(BinaryData());
+            return managed<BinaryData>(null());
         }
         else {
-            BinaryData v = generate_value<BinaryData>();
-            managed<BinaryData> rv(v);
-            delete[] v.data();
-            return rv;
+            return generate_value<std::string>();
         }
     }
 };
 
-template<typename T> struct generator<Optional<T>> {
+template <>
+struct generator<ObjectId> {
+    static managed<ObjectId> get(bool)
+    {
+        return managed<ObjectId>{generate_value<ObjectId>()};
+    }
+};
+
+template <typename T>
+struct generator<Optional<T>> {
     static managed<Optional<T>> get(bool)
     {
         if ((test_util::random_int<int>() % 10) == 0)
-            return managed<Optional<T>>(Optional<T>());
+            return managed<Optional<T>>{Optional<T>()};
         else
-            return managed<Optional<T>>(Optional<T>(generate_value<T>()));
+            return managed<Optional<T>>{generate_value<T>()};
     }
 };
 
@@ -4627,7 +4722,9 @@ template <>
 struct generator<Optional<BinaryData>> {
 };
 
-template<typename T> void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
+template <typename T>
+void test_lists(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false)
+{
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col = table->add_column_list(type_id, "the column", optional);
@@ -4678,27 +4775,166 @@ template<typename T> void test_lists(TestContext& test_context, DBRef sg, const 
     t->rollback();
 }
 
-TEST(List_Ops) {
+TEST(List_Ops)
+{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-	test_lists<int64_t>(test_context, sg, type_Int);
-	test_lists<StringData>(test_context, sg, type_String);
-	test_lists<BinaryData>(test_context, sg, type_Binary);
-	test_lists<bool>(test_context, sg, type_Bool);
-	test_lists<float>(test_context, sg, type_Float);
-	test_lists<double>(test_context, sg, type_Double);
-	test_lists<Timestamp>(test_context, sg, type_Timestamp);
+    test_lists<int64_t>(test_context, sg, type_Int);
+    test_lists<StringData>(test_context, sg, type_String);
+    test_lists<BinaryData>(test_context, sg, type_Binary);
+    test_lists<bool>(test_context, sg, type_Bool);
+    test_lists<float>(test_context, sg, type_Float);
+    test_lists<double>(test_context, sg, type_Double);
+    test_lists<Timestamp>(test_context, sg, type_Timestamp);
+    test_lists<Decimal128>(test_context, sg, type_Decimal);
+    test_lists<ObjectId>(test_context, sg, type_ObjectId);
 
-	test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
-	test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
-	test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-	test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
-	test_lists<Optional<float>>(test_context, sg, type_Float, true);
-	test_lists<Optional<double>>(test_context, sg, type_Double, true);
-	test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
+    test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
+    test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
+    test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
+    test_lists<Optional<float>>(test_context, sg, type_Float, true);
+    test_lists<Optional<double>>(test_context, sg, type_Double, true);
+    test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_lists<Decimal128>(test_context, sg, type_Decimal, true);
+    test_lists<ObjectId>(test_context, sg, type_ObjectId, true);
+}
+
+template <typename T, typename U = T>
+void test_lists_numeric_agg(TestContext& test_context, DBRef sg, const realm::DataType type_id, U null_value = U{},
+                            bool optional = false)
+{
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col = table->add_column_list(type_id, "the column", optional);
+    Obj o = table->create_object();
+    Lst<T> lst = o.get_list<T>(col);
+    for (int j = -1000; j < 1000; ++j) {
+        T value = T(j);
+        lst.add(value);
+    }
+    if (optional) {
+        // given that sum/avg do not count nulls and min/max ignore nulls,
+        // adding any number of null values should not affect the results of any aggregates
+        for (size_t i = 0; i < 1000; ++i) {
+            lst.add(null_value);
+        }
+    }
+    for (int j = -1000; j < 1000; ++j) {
+        CHECK_EQUAL(lst.get(j + 1000), T(j));
+    }
+    {
+        size_t ret_ndx = realm::npos;
+        Mixed min = lst.min(&ret_ndx);
+        CHECK(!min.is_null());
+        CHECK_EQUAL(ret_ndx, 0);
+        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(-1000));
+        Mixed max = lst.max(&ret_ndx);
+        CHECK(!max.is_null());
+        CHECK_EQUAL(ret_ndx, 1999);
+        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(999));
+        size_t ret_count = 0;
+        Mixed sum = lst.sum(&ret_count);
+        CHECK(!sum.is_null());
+        CHECK_EQUAL(ret_count, 2000);
+        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(-1000));
+        Mixed avg = lst.avg(&ret_count);
+        CHECK(!avg.is_null());
+        CHECK_EQUAL(ret_count, 2000);
+        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), (ColumnAverageType<T>(-1000) / ColumnAverageType<T>(2000)));
+    }
+
+    lst.clear();
+    CHECK_EQUAL(lst.size(), 0);
+    {
+        size_t ret_ndx = realm::npos;
+        Mixed min = lst.min(&ret_ndx);
+        CHECK_EQUAL(ret_ndx, realm::npos);
+        ret_ndx = realm::npos;
+        Mixed max = lst.max(&ret_ndx);
+        CHECK_EQUAL(ret_ndx, realm::npos);
+        size_t ret_count = realm::npos;
+        Mixed sum = lst.sum(&ret_count);
+        CHECK_EQUAL(ret_count, 0);
+        ret_count = realm::npos;
+        Mixed avg = lst.avg(&ret_count);
+        CHECK_EQUAL(ret_count, 0);
+    }
+
+    lst.add(T(1));
+    {
+        size_t ret_ndx = realm::npos;
+        Mixed min = lst.min(&ret_ndx);
+        CHECK(!min.is_null());
+        CHECK_EQUAL(ret_ndx, 0);
+        CHECK_EQUAL(min.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        Mixed max = lst.max(&ret_ndx);
+        CHECK(!max.is_null());
+        CHECK_EQUAL(ret_ndx, 0);
+        CHECK_EQUAL(max.get<ColumnMinMaxType<T>>(), ColumnMinMaxType<T>(1));
+        size_t ret_count = 0;
+        Mixed sum = lst.sum(&ret_count);
+        CHECK(!sum.is_null());
+        CHECK_EQUAL(ret_count, 1);
+        CHECK_EQUAL(sum.get<ColumnSumType<T>>(), ColumnSumType<T>(1));
+        Mixed avg = lst.avg(&ret_count);
+        CHECK(!avg.is_null());
+        CHECK_EQUAL(ret_count, 1);
+        CHECK_EQUAL(avg.get<ColumnAverageType<T>>(), ColumnAverageType<T>(1));
+    }
+
+    t->rollback();
+}
+
+TEST(List_AggOps)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+
+    test_lists_numeric_agg<int64_t>(test_context, sg, type_Int);
+    test_lists_numeric_agg<float>(test_context, sg, type_Float);
+    test_lists_numeric_agg<double>(test_context, sg, type_Double);
+    test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal);
+
+    test_lists_numeric_agg<Optional<int64_t>>(test_context, sg, type_Int, Optional<int64_t>{}, true);
+    test_lists_numeric_agg<float>(test_context, sg, type_Float, realm::null::get_null_float<float>(), true);
+    test_lists_numeric_agg<double>(test_context, sg, type_Double, realm::null::get_null_float<double>(), true);
+    test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
+}
+
+TEST(List_DecimalMinMax)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto t = sg->start_write();
+    auto table = t->add_table("the_table");
+    auto col = table->add_column_list(type_Decimal, "the column");
+    Obj o = table->create_object();
+    Lst<Decimal128> lst = o.get_list<Decimal128>(col);
+    std::string larger_than_max_int64_t = "123.45e99";
+    lst.add(Decimal128(larger_than_max_int64_t));
+    CHECK_EQUAL(lst.size(), 1);
+    CHECK_EQUAL(lst.get(0), Decimal128(larger_than_max_int64_t));
+    size_t min_ndx = realm::npos;
+    Mixed min = lst.min(&min_ndx);
+    CHECK_EQUAL(min_ndx, 0);
+    CHECK_EQUAL(min.get<Decimal128>(), Decimal128(larger_than_max_int64_t));
+    lst.clear();
+    CHECK_EQUAL(lst.size(), 0);
+    std::string smaller_than_min_int64_t = "-123.45e99";
+    lst.add(Decimal128(smaller_than_min_int64_t));
+    CHECK_EQUAL(lst.size(), 1);
+    CHECK_EQUAL(lst.get(0), Decimal128(smaller_than_min_int64_t));
+    size_t max_ndx = realm::npos;
+    Mixed max = lst.max(&max_ndx);
+    CHECK_EQUAL(max_ndx, 0);
+    CHECK_EQUAL(max.get<Decimal128>(), Decimal128(smaller_than_min_int64_t));
 }
 
 template <typename T>
@@ -4715,7 +4951,9 @@ void check_table_values(TestContext& test_context, TableRef t, ColKey col, std::
     }
 }
 
-template<typename T> void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false) {
+template <typename T>
+void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type_id, bool optional = false)
+{
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col = table->add_column(type_id, "the column", optional);
@@ -4725,19 +4963,19 @@ template<typename T> void test_tables(TestContext& test_context, DBRef sg, const
     for (int j = 0; j < 1000; ++j) {
         managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
-        reference.insert(std::pair<int, managed<T>>(j, value));
+        reference[j] = std::move(value);
     }
     // insert elements 10000 - 10999
     for (int j = 10000; j < 11000; ++j) {
         managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
-        reference.insert(std::pair<int, managed<T>>(j, value));
+        reference[j] = std::move(value);
     }
     // insert in between previous groups
     for (int j = 4000; j < 7000; ++j) {
         managed<T> value = generator<T>::get(optional);
         Obj o = table->create_object(ObjKey(j)).set_all(value.value);
-        reference.insert(std::pair<int, managed<T>>(j, value));
+        reference[j] = std::move(value);
     }
     check_table_values(test_context, table, col, reference);
 
@@ -4772,21 +5010,25 @@ TEST(Table_Ops)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-	test_tables<int64_t>(test_context, sg, type_Int);
-	test_tables<StringData>(test_context, sg, type_String);
-	test_tables<BinaryData>(test_context, sg, type_Binary);
-	test_tables<bool>(test_context, sg, type_Bool);
-	test_tables<float>(test_context, sg, type_Float);
-	test_tables<double>(test_context, sg, type_Double);
-	test_tables<Timestamp>(test_context, sg, type_Timestamp);
+    test_tables<int64_t>(test_context, sg, type_Int);
+    test_tables<StringData>(test_context, sg, type_String);
+    test_tables<BinaryData>(test_context, sg, type_Binary);
+    test_tables<bool>(test_context, sg, type_Bool);
+    test_tables<float>(test_context, sg, type_Float);
+    test_tables<double>(test_context, sg, type_Double);
+    test_tables<Timestamp>(test_context, sg, type_Timestamp);
+    test_tables<Decimal128>(test_context, sg, type_Decimal);
+    test_tables<ObjectId>(test_context, sg, type_ObjectId);
 
-	test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
-	test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
-	test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-	test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
-	test_tables<Optional<float>>(test_context, sg, type_Float, true);
-	test_tables<Optional<double>>(test_context, sg, type_Double, true);
-	test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
+    test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
+    test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
+    test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
+    test_tables<Optional<float>>(test_context, sg, type_Float, true);
+    test_tables<Optional<double>>(test_context, sg, type_Double, true);
+    test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_tables<Decimal128>(test_context, sg, type_Decimal, true);
+    test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
 }
 
 template <typename TFrom, typename TTo>
@@ -4808,7 +5050,7 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
             table->create_object(ObjKey(j)).set_all(value.value); // <-- so set_all works even if it doesn't set all?
         TTo conv_value = copier(
             value.value, to_nullable); // one may argue that using the same converter for ref and dut is.. mmmh...
-        reference.insert(std::pair<int, managed<TTo>>(j, managed<TTo>(conv_value)));
+        reference[j] = managed<TTo>{conv_value};
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
     if (type_id == type_String) {
@@ -4835,7 +5077,7 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
         managed<TFrom> value = generator<TFrom>::get(from_nullable);
         from_lst.add(value.value);
         TTo conv_value = copier(value.value, to_nullable);
-        reference.push_back(conv_value);
+        reference.push_back(managed<TTo>{conv_value});
     }
     auto col_to = table->set_nullability(col_from, to_nullable, false);
     Lst<TTo> to_lst = o.get_list<TTo>(col_to);
@@ -4890,19 +5132,23 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
     test_dynamic_conversion_combi<double>(test_context, sg, type_Double);
     test_dynamic_conversion_combi<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_combi<ObjectId>(test_context, sg, type_ObjectId);
 
     test_dynamic_conversion_combi_sametype<StringData>(test_context, sg, type_String);
     test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
     // lists...:
     test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
     test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
     test_dynamic_conversion_list_combi<double>(test_context, sg, type_Double);
     test_dynamic_conversion_list_combi<bool>(test_context, sg, type_Bool);
+    test_dynamic_conversion_list_combi<ObjectId>(test_context, sg, type_ObjectId);
 
     test_dynamic_conversion_list_combi_sametype<StringData>(test_context, sg, type_String);
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
+    test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
 }
 
 /*
@@ -5082,6 +5328,11 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     parent_ll.create_and_set_linked_object(1); // implicitly remove entry for 02
     CHECK(!o2.is_valid());
     CHECK(table->size() == 4);
+    parent_ll.clear();
+    CHECK(table->size() == 0);
+    parent_ll.create_and_insert_linked_object(0);
+    parent_ll.create_and_insert_linked_object(1);
+    CHECK(table->size() == 2);
     o.remove();
     CHECK(table->size() == 0);
     tr->commit();
@@ -5193,6 +5444,7 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
     parent->clear();
     CHECK(calls == 2);
+    CHECK_EQUAL(parent->size(), 0);
     tr->commit();
 }
 

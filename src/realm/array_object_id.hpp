@@ -199,6 +199,7 @@ public:
     }
     void set_null(size_t ndx)
     {
+        copy_on_write();
         auto pos = get_pos(ndx);
         pos.set_value(this, null_oid);
         pos.set_null(this, true);

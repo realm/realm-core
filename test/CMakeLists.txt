@@ -45,6 +45,7 @@ set(NORMAL_TESTS
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_unresolved_links.cpp
     test_metrics.cpp
     test_global_key.cpp
     test_object_id.cpp
@@ -64,6 +65,7 @@ set(NORMAL_TESTS
     test_util_any.cpp
     test_util_backtrace.cpp
     test_util_base64.cpp
+    test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
     test_util_inspect.cpp
@@ -92,6 +94,7 @@ set(REALM_TEST_HEADERS
     test_all.hpp
     test_string_types.hpp
     test_table_helper.hpp
+    test_types_helper.hpp
     testsettings.hpp
 ) # REALM_TEST_HEADERS
 
@@ -137,6 +140,27 @@ endif()
 target_link_libraries(CoreTests
                       TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
+
+if(WINDOWS_STORE)
+    set_target_properties(CoreTests PROPERTIES
+        VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.17134.0
+        CXX_STANDARD 17 # the test runner needs to call Windows APIs with C++/WinRT which needs C++ 17
+    )
+
+    file(GLOB UWP_ASSETS "${CMAKE_ROOT}/Templates/Windows/*")
+    
+    set(UWP_SOURCES
+        Package.appxmanifest
+        ${UWP_ASSETS}
+        ${REQUIRED_TEST_FILES}
+    )
+
+    target_sources(CoreTests PRIVATE ${UWP_SOURCES})
+    set_property(SOURCE ${UWP_SOURCES} PROPERTY VS_DEPLOYMENT_CONTENT 1)
+
+    set_property(SOURCE ${UWP_ASSETS} PROPERTY VS_DEPLOYMENT_LOCATION "Assets")
+    set_property(SOURCE ${REQUIRED_TEST_FILES} PROPERTY VS_DEPLOYMENT_LOCATION "TestAssets")
+endif()
 
 if(UNIX AND NOT APPLE)
     # This enables symbols in backtraces

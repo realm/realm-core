@@ -19,6 +19,8 @@
 #ifndef REALM_DECIMAL_HPP
 #define REALM_DECIMAL_HPP
 
+#include <realm/string_data.hpp>
+
 #include <string>
 #include <cstring>
 
@@ -45,14 +47,17 @@ public:
     explicit Decimal128(double);
     Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
-    explicit Decimal128(const std::string&);
+    explicit Decimal128(StringData);
     explicit Decimal128(Bid128 val)
     {
         m_value = val;
     }
     Decimal128(null) noexcept;
+    static Decimal128 nan(const char*);
+    static bool is_valid_str(StringData) noexcept;
 
     bool is_null() const;
+    bool is_nan() const;
 
     bool operator==(const Decimal128& rhs) const;
     bool operator!=(const Decimal128& rhs) const;
@@ -60,6 +65,8 @@ public:
     bool operator>(const Decimal128& rhs) const;
     bool operator<=(const Decimal128& rhs) const;
     bool operator>=(const Decimal128& rhs) const;
+
+    int compare(const Decimal128& rhs) const;
 
     Decimal128 operator/(int64_t div) const;
     Decimal128 operator/(size_t div) const;
@@ -79,12 +86,18 @@ public:
     {
         return &m_value;
     }
+    Bid128* raw()
+    {
+        return &m_value;
+    }
     void unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept;
 
 private:
     Bid128 m_value;
 
-    void from_string(const char* ps);
+    enum class ParseError { None, Invalid, TooLongBeforeRadix, TooLong };
+
+    ParseError from_string(const char* ps) noexcept;
     void from_int64_t(int64_t val);
 };
 
@@ -95,5 +108,28 @@ inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)
 }
 
 } // namespace realm
+
+namespace std {
+template <>
+struct numeric_limits<realm::Decimal128> {
+    static constexpr bool is_integer = false;
+    static realm::Decimal128 lowest() noexcept
+    {
+        return realm::Decimal128("-Inf");
+    }
+    static realm::Decimal128 max() noexcept
+    {
+        return realm::Decimal128("+Inf");
+    }
+};
+
+template <>
+struct hash<realm::Decimal128> {
+    size_t operator()(const realm::Decimal128& d) const noexcept
+    {
+        return static_cast<size_t>(d.raw()->w[0] ^ d.raw()->w[1]);
+    }
+};
+} // namespace std
 
 #endif /* REALM_DECIMAL_HPP */

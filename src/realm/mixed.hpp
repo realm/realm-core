@@ -24,7 +24,6 @@
 #include <cstddef> // size_t
 #include <cstring>
 
-#include <realm/unicode.hpp>
 #include <realm/keys.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
@@ -103,15 +102,18 @@ namespace realm {
 /// \sa StringData
 class Mixed {
 public:
-    Mixed() noexcept : m_type(0)
+    Mixed() noexcept
+        : m_type(0)
     {
     }
 
-    Mixed(util::None) noexcept : Mixed()
+    Mixed(util::None) noexcept
+        : Mixed()
     {
     }
 
-    Mixed(int i) noexcept : Mixed(int64_t(i))
+    Mixed(int i) noexcept
+        : Mixed(int64_t(i))
     {
     }
     Mixed(int64_t) noexcept;
@@ -132,13 +134,16 @@ public:
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(char* c_str) noexcept : Mixed(StringData(c_str))
+    Mixed(char* c_str) noexcept
+        : Mixed(StringData(c_str))
     {
     }
-    Mixed(const char* c_str) noexcept : Mixed(StringData(c_str))
+    Mixed(const char* c_str) noexcept
+        : Mixed(StringData(c_str))
     {
     }
-    Mixed(const std::string& s) noexcept : Mixed(StringData(s))
+    Mixed(const std::string& s) noexcept
+        : Mixed(StringData(s))
     {
     }
 
@@ -174,10 +179,17 @@ public:
     {
         return compare(other) != 0;
     }
+    bool operator<(const Mixed& other) const
+    {
+        return compare(other) < 0;
+    }
+    bool operator>(const Mixed& other) const
+    {
+        return compare(other) > 0;
+    }
 
 private:
-    template <class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
+    friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
 
     uint32_t m_type;
     union {
@@ -445,166 +457,7 @@ inline bool Mixed::is_null() const
     return (m_type == 0);
 }
 
-namespace _impl {
-inline int compare_string(StringData a, StringData b)
-{
-    if (a == b)
-        return 0;
-    return utf8_compare(a, b) ? -1 : 1;
-}
-
-template <int>
-struct IntTypeForSize;
-template <>
-struct IntTypeForSize<1> {
-    using type = uint8_t;
-};
-template <>
-struct IntTypeForSize<2> {
-    using type = uint16_t;
-};
-template <>
-struct IntTypeForSize<4> {
-    using type = uint32_t;
-};
-template <>
-struct IntTypeForSize<8> {
-    using type = uint64_t;
-};
-
-template <typename Float>
-inline int compare_float(Float a_raw, Float b_raw)
-{
-    bool a_nan = std::isnan(a_raw);
-    bool b_nan = std::isnan(b_raw);
-    if (!a_nan && !b_nan) {
-        // Just compare as IEEE floats
-        return a_raw == b_raw ? 0 : a_raw < b_raw ? -1 : 1;
-    }
-    if (a_nan && b_nan) {
-        // Compare the nan values as unsigned
-        using IntType = typename _impl::IntTypeForSize<sizeof(Float)>::type;
-        IntType a = 0, b = 0;
-        memcpy(&a, &a_raw, sizeof(Float));
-        memcpy(&b, &b_raw, sizeof(Float));
-        return a == b ? 0 : a < b ? -1 : 1;
-    }
-    // One is nan, the other is not
-    // nans are treated as being less than all non-nan values
-    return a_nan ? -1 : 1;
-}
-} // namespace _impl
-
-inline int Mixed::compare(const Mixed& b) const
-{
-    // nulls are treated as being less than all other values
-    if (is_null()) {
-        return b.is_null() ? 0 : -1;
-    }
-    if (b.is_null())
-        return 1;
-
-    switch (get_type()) {
-        case type_Int:
-            if (get<int64_t>() > b.get<int64_t>())
-                return 1;
-            else if (get<int64_t>() < b.get<int64_t>())
-                return -1;
-            break;
-        case type_String:
-            return _impl::compare_string(get<StringData>(), b.get<StringData>());
-            break;
-        case type_Float:
-            return _impl::compare_float(get<float>(), b.get<float>());
-        case type_Double:
-            return _impl::compare_float(get<double>(), b.get<double>());
-        case type_Bool:
-            if (get<bool>() > b.get<bool>())
-                return 1;
-            else if (get<bool>() < b.get<bool>())
-                return -1;
-            break;
-        case type_Timestamp:
-            if (get<Timestamp>() > b.get<Timestamp>())
-                return 1;
-            else if (get<Timestamp>() < b.get<Timestamp>())
-                return -1;
-            break;
-        case type_ObjectId: {
-            auto l = get<ObjectId>();
-            auto r = b.get<ObjectId>();
-            if (l > r)
-                return 1;
-            else if (l < r)
-                return -1;
-            break;
-        }
-        case type_Link:
-            if (get<ObjKey>() > b.get<ObjKey>())
-                return 1;
-            else if (get<ObjKey>() < b.get<ObjKey>())
-                return -1;
-            break;
-        default:
-            REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
-            break;
-    }
-
-    return 0;
-}
-
-// LCOV_EXCL_START
-template <class Ch, class Tr>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
-{
-    out << "Mixed(";
-    if (m.is_null()) {
-        out << "null";
-    }
-    else {
-        switch (m.get_type()) {
-            case type_Int:
-                out << m.int_val;
-                break;
-            case type_Bool:
-                out << (m.bool_val ? "true" : "false");
-                break;
-            case type_Float:
-                out << m.float_val;
-                break;
-            case type_Double:
-                out << m.double_val;
-                break;
-            case type_String:
-                out << m.string_val;
-                break;
-            case type_Binary:
-                out << m.binary_val;
-                break;
-            case type_Timestamp:
-                out << m.date_val;
-                break;
-            case type_Decimal:
-                out << m.decimal_val;
-                break;
-            case type_ObjectId: {
-                out << m.get<ObjectId>();
-                break;
-            }
-            case type_Link:
-                out << ObjKey(m.int_val);
-                break;
-            case type_OldDateTime:
-            case type_OldTable:
-            case type_OldMixed:
-            case type_LinkList:
-                REALM_ASSERT(false);
-        }
-    }
-    out << ")";
-    return out;
-}
-// LCOV_EXCL_STOP
+std::ostream& operator<<(std::ostream& out, const Mixed& m);
 
 } // namespace realm
 

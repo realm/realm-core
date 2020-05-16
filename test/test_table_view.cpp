@@ -726,6 +726,33 @@ NONCONCURRENT_TEST(TableView_StringSort)
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 }
 
+TEST(TableView_BinarySort)
+{
+    Table t;
+    auto col_bin = t.add_column(type_Binary, "bin", true);
+    auto col_rank = t.add_column(type_Int, "rank");
+
+    const char b1[] = {1, 2, 3, 4, 5};
+    const char b2[] = {1, 2, 0, 4, 5};
+    const char b3[] = {1, 2, 3, 4};
+    const char b4[] = {1, 2, 3, 4, 5, 6};
+
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b1, sizeof(b1))}, {col_rank, 4}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b2, sizeof(b2))}, {col_rank, 2}});
+    t.create_object(ObjKey{}, {{col_rank, 1}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b3, sizeof(b3))}, {col_rank, 3}});
+    t.create_object(ObjKey{}, {{col_bin, BinaryData(b4, sizeof(b4))}, {col_rank, 5}});
+
+    TableView tv = t.where().find_all();
+    tv.sort(col_bin);
+    int64_t rank = 0;
+    for (size_t n = 0; n < tv.size(); n++) {
+        auto this_rank = tv.get_object(n).get<Int>(col_rank);
+        CHECK_GREATER(this_rank, rank);
+        rank = this_rank;
+    }
+}
+
 
 TEST(TableView_FloatDoubleSort)
 {
@@ -2772,15 +2799,23 @@ TEST(TableView_SortNull)
     auto col_double = table.add_column(type_Double, "double", true);
     auto col_str = table.add_column(type_String, "string", true);
     auto col_date = table.add_column(type_Timestamp, "date", true);
+    auto col_oid = table.add_column(type_ObjectId, "oid", true);
+    auto col_decimal = table.add_column(type_Decimal, "decimal", true);
+    auto col_int2 = table.add_column(type_Int, "int2", true);
 
     std::vector<ObjKey> keys;
-    auto k = table.create_object().set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1)).get_key();
+    auto k = table.create_object()
+                 .set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1), ObjectId("000000000000000000000001"),
+                          Decimal128("1"), 1)
+                 .get_key();
     keys.push_back(k);
     auto all_cols = table.get_column_keys();
     int i = 0;
     for (auto col : all_cols) {
         Obj o = table.create_object();
-        o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i));
+        std::string oid_init = "00000000000000000000000" + util::to_string(i);
+        o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i),
+                  ObjectId(oid_init.c_str()), Decimal128(i), 1);
         // Set one field to Null. This element must come first when sorting by this column
         o.set_null(col);
         keys.push_back(o.get_key());
@@ -2805,6 +2840,12 @@ TEST(TableView_SortNull)
     CHECK_EQUAL(tv.get_object(0).get_key(), keys[5]);
     tv.sort(col_date);
     CHECK_EQUAL(tv.get_object(0).get_key(), keys[6]);
+    tv.sort(col_oid);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[7]);
+    tv.sort(col_decimal);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[8]);
+    tv.sort(col_int2);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[9]);
 }
 
 // Verify that copy-constructed and copy-assigned TableViews work normally.

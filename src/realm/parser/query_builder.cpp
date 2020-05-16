@@ -36,8 +36,9 @@ using namespace query_builder;
 namespace {
 
 
-template<typename T, parser::Expression::KeyPathOp OpType>
-void do_add_null_comparison_to_query(Query &, Predicate::Operator, const CollectionOperatorExpression<OpType> &)
+template <typename T, parser::Expression::KeyPathOp OpType, typename ExpressionType>
+void do_add_null_comparison_to_query(Query&, Predicate::Operator,
+                                     const CollectionOperatorExpression<OpType, ExpressionType>&)
 {
     throw std::logic_error("Comparing a collection aggregate operation to 'null' is not supported.");
 }
@@ -66,19 +67,45 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
     }
 }
 
+template <typename T>
+void do_add_null_comparison_to_query(Query& query, Predicate::Operator op, const PrimitiveListExpression& expr)
+{
+    Columns<Lst<T>> column = expr.value_of_type_for_query<T>();
+    switch (op) {
+        case Predicate::Operator::NotEqual:
+            query.and_query(column != realm::null());
+            break;
+        case Predicate::Operator::In:
+            REALM_FALLTHROUGH;
+        case Predicate::Operator::Equal:
+            query.and_query(column == realm::null());
+            break;
+        default:
+            throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
+    }
+}
+
+template <>
+void do_add_null_comparison_to_query<Link>(Query&, Predicate::Operator, const PrimitiveListExpression&)
+{
+    throw std::logic_error("Invalid query, list of primitive links is not a valid Realm contruct");
+}
+
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
-    realm_precondition(expr.link_chain.size() == 1, "KeyPath queries not supported for object comparisons.");
+    REALM_ASSERT_DEBUG(!expr.dest_type_is_backlink()); // this case should be handled at a higher layer
     switch (op) {
         case Predicate::Operator::NotEqual:
             query.Not();
             REALM_FALLTHROUGH;
         case Predicate::Operator::In:
             REALM_FALLTHROUGH;
-        case Predicate::Operator::Equal:
-            query.and_query(query.get_table()->column<Link>(expr.get_dest_col_key()).is_null());
+        case Predicate::Operator::Equal: {
+            Columns<Link> column = expr.value_of_type_for_query<Link>();
+            query.and_query(column == realm::null());
             break;
+        }
         default:
             throw std::logic_error("Only 'equal' and 'not equal' operators supported for object comparison.");
     }
@@ -133,84 +160,120 @@ void add_bool_constraint_to_query(Query &query, Predicate::Operator operatorType
     }
 }
 
-void add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<String>&& column,
-                                    StringData&& value)
+std::string operator_description(const Predicate::Operator& op)
+{
+    switch (op) {
+        case Predicate::Operator::None:
+            return "NONE";
+        case realm::parser::Predicate::Operator::Equal:
+            return "==";
+        case realm::parser::Predicate::Operator::NotEqual:
+            return "!=";
+        case realm::parser::Predicate::Operator::LessThan:
+            return "<";
+        case realm::parser::Predicate::Operator::LessThanOrEqual:
+            return "<=";
+        case realm::parser::Predicate::Operator::GreaterThan:
+            return ">";
+        case realm::parser::Predicate::Operator::GreaterThanOrEqual:
+            return ">=";
+        case realm::parser::Predicate::Operator::BeginsWith:
+            return "BEGINSWITH";
+        case realm::parser::Predicate::Operator::EndsWith:
+            return "ENDSWITH";
+        case realm::parser::Predicate::Operator::Contains:
+            return "CONTAINS";
+        case realm::parser::Predicate::Operator::Like:
+            return "LIKE";
+        case realm::parser::Predicate::Operator::In:
+            return "IN";
+    }
+    REALM_ASSERT_DEBUG(false);
+    return "";
+}
+
+// (string column OR list of primitive strings) vs (string literal OR string column)
+template <typename LHS, typename RHS>
+std::enable_if_t<realm::is_any<LHS, Columns<String>, Columns<Lst<String>>>::value &&
+                     realm::is_any<RHS, StringData, Columns<String>>::value,
+                 void>
+add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, LHS&& lhs, RHS&& rhs)
 {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
-            query.and_query(column.begins_with(value, case_sensitive));
+            query.and_query(lhs.begins_with(rhs, case_sensitive));
             break;
         case Predicate::Operator::EndsWith:
-            query.and_query(column.ends_with(value, case_sensitive));
+            query.and_query(lhs.ends_with(rhs, case_sensitive));
             break;
         case Predicate::Operator::Contains:
-            query.and_query(column.contains(value, case_sensitive));
+            query.and_query(lhs.contains(rhs, case_sensitive));
             break;
         case Predicate::Operator::Equal:
-            query.and_query(column.equal(value, case_sensitive));
+            query.and_query(lhs.equal(rhs, case_sensitive));
             break;
         case Predicate::Operator::NotEqual:
-            query.and_query(column.not_equal(value, case_sensitive));
+            query.and_query(lhs.not_equal(rhs, case_sensitive));
             break;
         case Predicate::Operator::Like:
-            query.and_query(column.like(value, case_sensitive));
+            query.and_query(lhs.like(rhs, case_sensitive));
             break;
         default:
-            throw std::logic_error("Unsupported operator for string queries.");
+            throw std::logic_error(
+                util::format("Unsupported operator '%1' for string queries.", operator_description(cmp.op)));
     }
 }
 
-void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, StringData&& value,
-                                    Columns<String>&& column)
+// ((string literal) vs (string column OR list of primitive strings)) OR ((string column) vs (list of primitive
+// strings column))
+template <typename LHS, typename RHS>
+std::enable_if_t<(realm::is_any<LHS, StringData>::value &&
+                  realm::is_any<RHS, Columns<String>, Columns<Lst<String>>>::value) ||
+                     (std::is_same_v<LHS, Columns<String>> && std::is_same_v<RHS, Columns<Lst<String>>>),
+                 void>
+add_string_constraint_to_query(Query& query, const Predicate::Comparison& cmp, LHS&& lhs, RHS&& rhs)
 {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::In:
             REALM_FALLTHROUGH;
         case Predicate::Operator::Equal:
-            query.and_query(column.equal(value, case_sensitive));
+            query.and_query(rhs.equal(lhs, case_sensitive));
             break;
         case Predicate::Operator::NotEqual:
-            query.and_query(column.not_equal(value, case_sensitive));
+            query.and_query(rhs.not_equal(lhs, case_sensitive));
             break;
             // operators CONTAINS, BEGINSWITH, ENDSWITH, LIKE are not supported in this direction
             // These queries are not the same: "'asdf' CONTAINS string_property" vs "string_property CONTAINS 'asdf'"
         default:
-            throw std::logic_error("Unsupported operator for keypath substring queries.");
+            throw std::logic_error(
+                util::format("Unsupported query comparison '%1' for a single string vs a string property.",
+                             operator_description(cmp.op)));
     }
 }
 
-void add_string_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, Columns<String>&& lhs_col,
-                                    Columns<String>&& rhs_col)
+void add_string_constraint_to_query(Query&, const Predicate::Comparison&, Columns<Lst<String>>&&,
+                                    Columns<Lst<String>>&&)
 {
-    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
-    switch (cmp.op) {
-        case Predicate::Operator::BeginsWith:
-            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::EndsWith:
-            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Contains:
-            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Equal:
-            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::NotEqual:
-            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Like:
-            query.and_query(lhs_col.like(rhs_col, case_sensitive));
-            break;
-        default:
-            throw std::logic_error("Unsupported operator for string queries.");
-    }
+    throw std::logic_error("Comparing two primitive string lists against each other is not implemented yet.");
 }
 
-void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Binary>&& column,
-                                    BinaryData&& value)
+
+template <typename LHS, typename RHS>
+std::enable_if_t<(std::is_same_v<LHS, Columns<Lst<BinaryData>>> && std::is_same_v<RHS, Columns<Lst<BinaryData>>>),
+                 void>
+add_binary_constraint_to_query(Query&, const Predicate::Comparison&, RHS&&, LHS&&)
+{
+    throw std::logic_error("Unsupported operation for binary comparison.");
+}
+
+// (column OR list of primitives) vs (literal OR column)
+template <typename LHS, typename RHS>
+std::enable_if_t<realm::is_any<LHS, Columns<BinaryData>, Columns<Lst<BinaryData>>>::value &&
+                     realm::is_any<RHS, BinaryData, Columns<BinaryData>>::value,
+                 void>
+add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, LHS&& column, RHS&& value)
 {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
@@ -237,8 +300,13 @@ void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& c
     }
 }
 
-void add_binary_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, BinaryData&& value,
-                                    Columns<Binary>&& column)
+// ((literal value) vs (column OR list of primitive)) OR ((column) vs (list of primitive column))
+template <typename LHS, typename RHS>
+std::enable_if_t<(realm::is_any<LHS, BinaryData>::value &&
+                  realm::is_any<RHS, Columns<BinaryData>, Columns<Lst<BinaryData>>>::value) ||
+                     (std::is_same_v<LHS, Columns<BinaryData>> && std::is_same_v<RHS, Columns<Lst<BinaryData>>>),
+                 void>
+add_binary_constraint_to_query(realm::Query& query, const Predicate::Comparison& cmp, LHS&& value, RHS&& column)
 {
     switch (cmp.op) {
         case Predicate::Operator::In:
@@ -251,31 +319,6 @@ void add_binary_constraint_to_query(realm::Query& query, const Predicate::Compar
             break;
         default:
             throw std::logic_error("Substring comparison not supported for keypath substrings.");
-    }
-}
-
-void add_binary_constraint_to_query(Query& query, const Predicate::Comparison& cmp, Columns<Binary>&& lhs_col,
-                                    Columns<Binary>&& rhs_col)
-{
-    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
-    switch (cmp.op) {
-        case Predicate::Operator::BeginsWith:
-            query.and_query(lhs_col.begins_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::EndsWith:
-            query.and_query(lhs_col.ends_with(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Contains:
-            query.and_query(lhs_col.contains(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::Equal:
-            query.and_query(lhs_col.equal(rhs_col, case_sensitive));
-            break;
-        case Predicate::Operator::NotEqual:
-            query.and_query(lhs_col.not_equal(rhs_col, case_sensitive));
-            break;
-        default:
-            throw std::logic_error("Unsupported operator for binary queries.");
     }
 }
 
@@ -364,9 +407,8 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
             add_link_constraint_to_query(query, cmp.op, lhs, rhs);
             break;
         case type_ObjectId:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                             lhs. template value_of_type_for_query<ObjectId>(),
-                                             rhs. template value_of_type_for_query<ObjectId>());
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
+                                            rhs.template value_of_type_for_query<ObjectId>());
             break;
         case type_Decimal:
             add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Decimal128>(),
@@ -392,7 +434,12 @@ template <class T>
 void do_add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp, const T& expr, DataType type,
                                      NullLocation location)
 {
-    if (type == type_LinkList) { // this handles backlinks as well since they are set to type LinkList
+    if constexpr (std::is_same_v<T, PropertyExpression>) {
+        if (expr.dest_type_is_backlink()) {
+            throw std::logic_error("Comparing linking object properties to 'null' is not supported");
+        }
+    }
+    if (type == type_LinkList) {
         throw std::logic_error("Comparing a list property to 'null' is not supported");
     }
     switch (type) {
@@ -453,17 +500,37 @@ void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp
             do_add_null_comparison_to_query(query, cmp, exp.get_property(), exp.get_property().get_dest_type(),
                                             location);
             break;
+        case ExpressionContainer::ExpressionInternal::exp_PrimitiveList:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_list(),
+                                            exp.get_primitive_list().get_dest_type(), location);
+            break;
         case ExpressionContainer::ExpressionInternal::exp_OpMin:
-            do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_min(), exp.get_min().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpMax:
-            do_add_null_comparison_to_query(query, cmp, exp.get_max(), exp.get_max().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_max(), exp.get_max().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpSum:
-            do_add_null_comparison_to_query(query, cmp, exp.get_sum(), exp.get_sum().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_sum(), exp.get_sum().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_OpAvg:
-            do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().post_link_col_type, location);
+            do_add_null_comparison_to_query(query, cmp, exp.get_avg(), exp.get_avg().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpMinPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_min(),
+                                            exp.get_primitive_min().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpMaxPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_max(),
+                                            exp.get_primitive_max().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpSumPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_sum(),
+                                            exp.get_primitive_sum().operative_col_type, location);
+            break;
+        case ExpressionContainer::ExpressionInternal::exp_OpAvgPrimitive:
+            do_add_null_comparison_to_query(query, cmp, exp.get_primitive_avg(),
+                                            exp.get_primitive_avg().operative_col_type, location);
             break;
         case ExpressionContainer::ExpressionInternal::exp_SubQuery:
             REALM_FALLTHROUGH;
@@ -474,7 +541,13 @@ void add_null_comparison_to_query(Query& query, const Predicate::Comparison& cmp
         case ExpressionContainer::ExpressionInternal::exp_OpSizeString:
             REALM_FALLTHROUGH;
         case ExpressionContainer::ExpressionInternal::exp_OpSizeBinary:
+            REALM_FALLTHROUGH;
+        case ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive:
             throw std::runtime_error("Invalid predicate: comparison between 'null' and @size or @count");
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSizeStringPrimitive:
+            REALM_FALLTHROUGH;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSizeBinaryPrimitive:
+            throw std::runtime_error("Invalid predicate: comparison between primitive list '.length' and 'null'");
     }
 }
 
@@ -515,6 +588,30 @@ void internal_add_comparison_to_query(Query& query, LHS_T& lhs, const Predicate:
             return;
         case realm::parser::ExpressionContainer::ExpressionInternal::exp_SubQuery:
             do_add_comparison_to_query(query, cmp, lhs, rhs.get_subexpression(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_PrimitiveList:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_list(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMinPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_min(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMaxPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_max(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSumPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_sum(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpAvgPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_avg(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_count(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSizeStringPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_string_length(), comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSizeBinaryPrimitive:
+            do_add_comparison_to_query(query, cmp, lhs, rhs.get_primitive_binary_length(), comparison_type);
             return;
     }
 }
@@ -557,145 +654,109 @@ void add_comparison_to_query(Query& query, ExpressionContainer& lhs, const Predi
         case realm::parser::ExpressionContainer::ExpressionInternal::exp_SubQuery:
             internal_add_comparison_to_query(query, lhs.get_subexpression(), cmp, rhs, comparison_type);
             return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_PrimitiveList:
+            internal_add_comparison_to_query(query, lhs.get_primitive_list(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMinPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_min(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpMaxPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_max(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSumPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_sum(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpAvgPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_avg(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpCountPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_count(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSizeStringPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_string_length(), cmp, rhs, comparison_type);
+            return;
+        case realm::parser::ExpressionContainer::ExpressionInternal::exp_OpSizeBinaryPrimitive:
+            internal_add_comparison_to_query(query, lhs.get_primitive_binary_length(), cmp, rhs, comparison_type);
+            return;
     }
 }
 
-
-std::pair<std::string, std::string> separate_list_parts(PropertyExpression& pe)
+// precheck some expressions to make sure we support them and if not, provide a meaningful error message
+void preprocess_for_comparison_types(Predicate::Comparison& cmpr, ExpressionContainer& lhs, ExpressionContainer& rhs)
 {
-    std::string pre_and_list = "";
-    std::string post_list = "";
-    bool past_list = false;
-    for (KeyPathElement& e : pe.link_chain) {
-        std::string cur_name;
-        if (e.is_backlink) {
-            cur_name = std::string("@links") + util::serializer::value_separator + std::string(e.table->get_name()) +
-                       util::serializer::value_separator + std::string(e.table->get_column_name(e.col_key));
+    auto get_cmp_type_name = [&](parser::Expression::ComparisonType compare_type) {
+        if (compare_type == parser::Expression::ComparisonType::Any) {
+            return util::format("'%1' or 'SOME'", comparison_type_to_str(parser::Expression::ComparisonType::Any));
         }
-        else {
-            cur_name = e.table->get_column_name(e.col_key);
-        }
-        if (!past_list) {
-            if (!pre_and_list.empty()) {
-                pre_and_list += util::serializer::value_separator;
-            }
-            pre_and_list += cur_name;
-        }
-        else {
-            realm_precondition(
-                !e.is_backlink && e.col_type != type_LinkList,
-                util::format(
-                    "The keypath after '%1' must not contain any additional list properties, but '%2' is a list.",
-                    pre_and_list, cur_name));
-            if (!post_list.empty()) {
-                post_list += util::serializer::value_separator;
-            }
-            post_list += cur_name;
-        }
-        if (e.is_backlink || e.col_type == type_LinkList) {
-            past_list = true;
-        }
-    }
-    return {pre_and_list, post_list};
-}
-
-
-// some query types are not supported in core but can be produced by a transformation:
-// "ALL path.to.list.property >= 20"    --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count ==
-// path.to.list.@count"
-// "NONE path.to.list.property >= 20"   --> "SUBQUERY(path.to.list, $x, $x.property >= 20).@count == 0"
-void preprocess_for_comparison_types(Query& query, Predicate::Comparison& cmpr, ExpressionContainer& lhs,
-                                     ExpressionContainer& rhs, Arguments& args, parser::KeyPathMapping& mapping)
-{
-    auto get_cmp_type_name = [&]() {
-        if (cmpr.compare_type == Predicate::ComparisonType::Any) {
-            return util::format("'%1' or 'SOME'", comparison_type_to_str(Predicate::ComparisonType::Any));
-        }
-        return util::format("'%1'", comparison_type_to_str(cmpr.compare_type));
+        return util::format("'%1'", comparison_type_to_str(compare_type));
     };
 
-    if (cmpr.compare_type != Predicate::ComparisonType::Unspecified) {
-        realm_precondition(
-            lhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
-            util::format("The expression after %1 must be a keypath containing a list", get_cmp_type_name()));
+    auto verify_comparison_type = [&](ExpressionContainer expression,
+                                      parser::Expression::ComparisonType compare_type) {
         size_t list_count = 0;
-        for (KeyPathElement e : lhs.get_property().link_chain) {
-            if (e.col_type == type_LinkList || e.is_backlink) {
+        size_t primitive_list_count = 0;
+        std::vector<KeyPathElement> link_chain = expression.get_keypaths();
+        for (KeyPathElement e : link_chain) {
+            if (e.col_key.get_type() == col_type_LinkList ||
+                e.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                 list_count++;
             }
+            else if (e.is_list_of_primitives()) {
+                primitive_list_count++;
+            }
         }
-        realm_precondition(list_count > 0,
-                           util::format("The keypath following %1 must contain a list", get_cmp_type_name()));
-        realm_precondition(list_count == 1,
-                           util::format("The keypath following %1 must contain only one list", get_cmp_type_name()));
-    }
-
-    if (cmpr.compare_type == Predicate::ComparisonType::All || cmpr.compare_type == Predicate::ComparisonType::None) {
-        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Value,
-                           util::format("The comparison in an %1 clause must be between a keypath and a value",
-                                        get_cmp_type_name()));
-
-        parser::Expression exp(parser::Expression::Type::SubQuery);
-        std::pair<std::string, std::string> path_parts = separate_list_parts(lhs.get_property());
-        exp.subquery_path = path_parts.first;
-
-        util::serializer::SerialisationState temp_state;
-        std::string var_name;
-        for (var_name = temp_state.get_variable_name(query.get_table());
-             mapping.has_mapping(query.get_table(), var_name);
-             var_name = temp_state.get_variable_name(query.get_table())) {
-            temp_state.subquery_prefix_list.push_back(var_name);
+        if (compare_type != parser::Expression::ComparisonType::Unspecified) {
+            realm_precondition(
+                expression.type == ExpressionContainer::ExpressionInternal::exp_Property ||
+                    expression.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList ||
+                    expression.type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinaryPrimitive ||
+                    expression.type == ExpressionContainer::ExpressionInternal::exp_OpSizeStringPrimitive,
+                util::format("The expression after %1 must be a keypath containing a list",
+                             get_cmp_type_name(compare_type)));
+            realm_precondition(
+                list_count > 0 || primitive_list_count > 0,
+                util::format("The keypath following %1 must contain a list", get_cmp_type_name(compare_type)));
+            realm_precondition(
+                list_count == 1 || primitive_list_count == 1,
+                util::format("The keypath following %1 must contain only one list", get_cmp_type_name(compare_type)));
         }
+    };
 
-        exp.subquery_var = var_name;
-        exp.subquery = std::make_shared<Predicate>(Predicate::Type::Comparison);
-        exp.subquery->cmpr.expr[0] = parser::Expression(
-            parser::Expression::Type::KeyPath, var_name + util::serializer::value_separator + path_parts.second);
-        exp.subquery->cmpr.op = cmpr.op;
-        exp.subquery->cmpr.option = cmpr.option;
-        exp.subquery->cmpr.expr[1] = cmpr.expr[1];
-        cmpr.expr[0] = exp;
+    verify_comparison_type(lhs, cmpr.expr[0].comparison_type);
+    verify_comparison_type(rhs, cmpr.expr[1].comparison_type);
 
-        lhs = ExpressionContainer(query, cmpr.expr[0], args, mapping);
-        cmpr.op = parser::Predicate::Operator::Equal;
-        cmpr.option = parser::Predicate::OperatorOption::None;
-
-        if (cmpr.compare_type == Predicate::ComparisonType::All) {
-            cmpr.expr[1] = parser::Expression(path_parts.first, parser::Expression::KeyPathOp::Count, "");
-            rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
-        }
-        else if (cmpr.compare_type == Predicate::ComparisonType::None) {
-            cmpr.expr[1] = parser::Expression(parser::Expression::Type::Number, "0");
-            rhs = ExpressionContainer(query, cmpr.expr[1], args, mapping);
-        }
-        else {
-            REALM_UNREACHABLE();
-        }
+    if (lhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList &&
+        rhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList) {
+        throw std::logic_error(
+            util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
+                         cmpr.expr[0].s, cmpr.expr[1].s));
     }
 
     // Check that operator "IN" has a RHS keypath which is a list
     if (cmpr.op == Predicate::Operator::In) {
-        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Property,
+        realm_precondition(rhs.type == ExpressionContainer::ExpressionInternal::exp_Property ||
+                               rhs.type == ExpressionContainer::ExpressionInternal::exp_PrimitiveList ||
+                               rhs.type == ExpressionContainer::ExpressionInternal::exp_OpSizeStringPrimitive ||
+                               rhs.type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinaryPrimitive,
                            "The expression following 'IN' must be a keypath to a list");
         auto get_list_count = [](const std::vector<KeyPathElement>& target_link_chain) {
             size_t list_count = 0;
             for (KeyPathElement e : target_link_chain) {
-                if (e.col_type == type_LinkList || e.is_backlink) {
+                if (e.col_key.get_type() == col_type_LinkList || e.is_list_of_primitives() ||
+                    e.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                     list_count++;
                 }
             }
             return list_count;
         };
-        if (lhs.type == ExpressionContainer::ExpressionInternal::exp_Property) {
-            // For list vs list comparisons, all the right code paths are hooked up, but we just don't define the
-            // actual behaviour, see the FIXME in query_expressions.hpp in Value::compare about many-to-many links
-            // Without this check here, we would assert in debug mode and always return false in release mode.
-            size_t lhs_list_count = get_list_count(lhs.get_property().link_chain);
-            realm_precondition(lhs_list_count == 0, "The keypath preceeding 'IN' must not contain a list, list vs "
-                                                    "list comparisons are not currently supported");
-        }
+        // For list vs list comparisons, all the right code paths are hooked up, but we just don't define the
+        // actual behaviour, see the FIXME in query_expressions.hpp in Value::compare about many-to-many links
+        // Without this check here, we would assert in debug mode and always return false in release mode.
+        size_t lhs_list_count = get_list_count(lhs.get_keypaths());
+        realm_precondition(lhs_list_count == 0, "The keypath preceeding 'IN' must not contain a list, list vs "
+                                                "list comparisons are not currently supported");
 
-        size_t rhs_list_count = get_list_count(rhs.get_property().link_chain);
+        size_t rhs_list_count = get_list_count(rhs.get_keypaths());
         realm_precondition(rhs_list_count > 0, "The keypath following 'IN' must contain a list");
         realm_precondition(rhs_list_count == 1, "The keypath following 'IN' must contain only one list");
     }
@@ -719,7 +780,7 @@ void add_comparison_to_query(Query& query, const Predicate& pred, Arguments& arg
     ExpressionContainer lhs(query, cmpr.expr[0], args, mapping);
     ExpressionContainer rhs(query, cmpr.expr[1], args, mapping);
 
-    preprocess_for_comparison_types(query, cmpr, lhs, rhs, args, mapping);
+    preprocess_for_comparison_types(cmpr, lhs, rhs);
 
     if (lhs.is_null()) {
         add_null_comparison_to_query(query, cmpr, rhs, NullLocation::NullOnLHS);
@@ -859,7 +920,8 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 while (index < path.size()) {
                     KeyPathElement element = mapping.process_next_path(cur_table, path, index); // throws if invalid
                     // backlinks use type_LinkList since list operations apply to them (and is_backlink is set)
-                    if (element.col_type != type_Link && element.col_type != type_LinkList) {
+                    if (element.col_key.get_type() != col_type_Link &&
+                        element.col_key.get_type() != col_type_LinkList) {
                         throw InvalidPathError(
                             util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
                                          element.table->get_column_name(element.col_key),
@@ -878,7 +940,7 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                         cur_table = element.table; // advance through backlink
                     }
                     ConstTableRef tr;
-                    if (element.is_backlink) {
+                    if (element.operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
                         tr = element.table;
                         links.push_back(LinkPathPart(element.col_key, tr));
                     }

@@ -25,5 +25,8 @@ set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_RelWithDebInfo "armv7 arm64")
 set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeRel "armv7 arm64")
 
 set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=iphone*] "YES")
+set(CMAKE_XCODE_ATTRIBUTE_REALM_ALIGN_FLAG "")
+set(CMAKE_XCODE_ATTRIBUTE_REALM_ALIGN_FLAG[arch=armv7] "-fno-aligned-new")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $(REALM_ALIGN_FLAG)")
 
 set_bitcode_attributes()

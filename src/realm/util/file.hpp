@@ -32,17 +32,6 @@
 #include <dirent.h> // POSIX.1-2001
 #endif
 
-#if defined(_MSC_VER) && _MSC_VER >= 1900 // compiling with at least Visual Studio 2015
-#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING // switch to <filesystem> once we switch to C++17
-#include <experimental/filesystem>
-namespace std {
-    namespace filesystem = std::experimental::filesystem::v1;
-}
-#define REALM_HAVE_STD_FILESYSTEM 1
-#else
-#define REALM_HAVE_STD_FILESYSTEM 0
-#endif
-
 #include <realm/utilities.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/backtrace.hpp>
@@ -50,6 +39,17 @@ namespace std {
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
+#if defined(_MSVC_LANG) && _MSVC_LANG >= 201703L // compiling with MSVC and C++ 17
+#include <filesystem>
+#define REALM_HAVE_STD_FILESYSTEM 1
+#if REALM_UWP
+// workaround for linker issue described in https://github.com/microsoft/STL/issues/322
+// remove once the Windows SDK or STL fixes this.
+#pragma comment(lib, "onecoreuap.lib")
+#endif
+#else
+#define REALM_HAVE_STD_FILESYSTEM 0
+#endif
 
 namespace realm {
 namespace util {
@@ -717,7 +717,7 @@ public:
     Map& operator=(const Map&) = delete;
 
     /// Move the mapping from another Map object to this Map object
-    File::Map<T>& operator=(File::Map<T>&& other)
+    File::Map<T>& operator=(File::Map<T>&& other) noexcept
     {
         if (m_addr)
             unmap();
@@ -733,6 +733,10 @@ public:
         other.m_encrypted_mapping = nullptr;
 #endif
         return *this;
+    }
+    Map(Map&& other) noexcept
+    {
+        *this = std::move(other);
     }
 
     /// See File::map().

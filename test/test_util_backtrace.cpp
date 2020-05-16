@@ -18,8 +18,11 @@ TEST(Backtrace_LogicError)
         throw_logic_error(LogicError::string_too_big);
     }
     catch (const LogicError& err) {
-#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID)
-        CHECK(StringData{err.what()}.contains("throw_logic_error"));
+        // arm requires -funwind-tables to make backtraces, and that increases binary size.
+#if REALM_PLATFORM_APPLE || (defined(__linux__) && !REALM_ANDROID && !defined(__arm__))
+        if (!CHECK(StringData{err.what()}.contains("throw_logic_error")))
+            std::cout << err.what() << std::endl;
+
 #endif
         LogicError copy = err;
         CHECK_EQUAL(StringData{copy.what()}, StringData{err.what()});
