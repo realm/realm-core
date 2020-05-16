@@ -91,18 +91,6 @@ ObjectId::ObjectId(Timestamp d, int machine_id, int process_id) noexcept
     m_bytes[11] = r & 0xff;
 }
 
-ObjectId::ObjectId(Timestamp d)
-{
-    memset(m_bytes, 0, sizeof(m_bytes));
-
-    auto sec = uint32_t(d.get_seconds());
-    // Store in big endian so that memcmp can be used for comparison
-    m_bytes[0] = sec >> 24;
-    m_bytes[1] = (sec >> 16) & 0xff;
-    m_bytes[2] = (sec >> 8) & 0xff;
-    m_bytes[3] = sec & 0xff;
-}
-
 ObjectId ObjectId::gen()
 {
     return ObjectId(Timestamp(::time(nullptr), 0), g_gen_state.machine_id, g_gen_state.process_id);

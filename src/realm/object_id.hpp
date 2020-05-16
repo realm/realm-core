@@ -30,7 +30,7 @@ public:
     /**
      * Constructs an ObjectId with all bytes 0x00.
      */
-    ObjectId() noexcept;
+    ObjectId() noexcept = default;
 
     /**
      * Checks if the given string is a valid object id.
@@ -41,9 +41,6 @@ public:
      * Constructs an ObjectId from 24 hex characters.
      */
     ObjectId(const char* init) noexcept;
-
-    // FIXME: remove this constructor
-    ObjectId(Timestamp d);
 
     /**
      * Constructs an ObjectId with the specified inputs, and a random number
@@ -78,6 +75,10 @@ public:
     bool operator<=(const ObjectId& other) const
     {
         return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) <= 0;
+    }
+    operator Timestamp() const
+    {
+        return get_timestamp();
     }
 
     Timestamp get_timestamp() const;

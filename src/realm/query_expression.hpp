@@ -2316,12 +2316,11 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Value<T>& d = static_cast<Value<T>&>(destination);
-
         if (links_exist()) {
             REALM_ASSERT(m_leaf_ptr == nullptr);
 
             if (m_link_map.only_unary_links()) {
+                Value<T> d;
                 d.init(false, 1);
                 d.m_storage.set_null(0);
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
@@ -2340,6 +2339,7 @@ public:
                         d.m_storage.set(0, obj.get<T>(m_column_key));
                     }
                 }
+                destination.import(d);
             }
             else {
                 std::vector<ObjKey> links = m_link_map.get_links(index);
@@ -2364,6 +2364,7 @@ public:
         }
         else {
             REALM_ASSERT(m_leaf_ptr != nullptr);
+            Value<T> d(false /*not from link list*/, destination.m_values);
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
                 if (m_leaf_ptr->is_null(index + t)) {
@@ -2373,6 +2374,7 @@ public:
                     d.m_storage.set(t, T(m_leaf_ptr->get(index + t)));
                 }
             }
+            destination.import(d);
         }
     }
 

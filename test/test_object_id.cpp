@@ -329,21 +329,12 @@ TEST(ObjectId_Query)
     }
 }
 
-ONLY(ObjectId_QueryTimestamp)
+TEST(ObjectId_QueryTimestamp)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
     auto now = std::chrono::steady_clock::now();
     std::vector<Timestamp> times = {{0, 0}, {1, 1}, {2, 2}};
-    //    Timestamp t0(0, 0);
-    //    Timestamp t1(1, 1);
-    //    Timestamp t2(2, 2);
-    //    ObjectId o0(t0);
-    //    ObjectId o01(t0, 1, 1);
-    //    ObjectId o1(t1);
-    //    ObjectId o11(t1, 1, 1);
-    //    ObjectId o2(t2);
-    //    ObjectId o21(t2, 2, 2);
 
     {
         auto wt = db->start_write();
