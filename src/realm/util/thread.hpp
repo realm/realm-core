@@ -41,6 +41,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/terminate.hpp>
 #include <memory>
+#include <stdexcept>
 
 #include <atomic>
 
