@@ -3445,10 +3445,10 @@ public:
             // Not a Link column
             size_t colsize = leaf->size();
 
-            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
-            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
-            // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
+            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage.
             if constexpr (std::is_same_v<U, int64_t>) {
+                // If it's an integer leaf, then it contains the method get_chunk() which copies
+                // these values in a super fast way (only feasible if more than chunk_size in column)
                 if (index + ValueBase::chunk_size <= colsize) {
                     // If you want to modify 'chunk_size' then update Array::get_chunk()
                     REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
