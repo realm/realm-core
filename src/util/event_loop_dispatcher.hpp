@@ -54,11 +54,11 @@ public:
     EventLoopDispatcher(std::function<void(Args...)> func)
     : m_state(std::make_shared<State>(std::move(func)))
     {
-        m_scheduler->set_notify_callback([state = m_state, this] {
+        m_scheduler->set_notify_callback([state = m_state] {
             std::unique_lock<std::mutex> lock(state->mutex);
             while (!state->invocations.empty()) {
                 auto& tuple = state->invocations.front();
-                std::apply(m_state->func, std::move(tuple));
+                std::apply(state->func, std::move(tuple));
                 state->invocations.pop();
             }
 
