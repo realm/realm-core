@@ -58,7 +58,7 @@ public:
             std::unique_lock<std::mutex> lock(state->mutex);
             while (!state->invocations.empty()) {
                 auto& tuple = state->invocations.front();
-                _apply_polyfill::apply(std::move(tuple), state->func);
+                std::apply(state->func, std::move(tuple));
                 state->invocations.pop();
             }
 
