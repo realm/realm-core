@@ -55,6 +55,8 @@ public:
         ColKey idx_profile;
         // The current state of this user.
         ColKey idx_state;
+        // The device id of this user.
+        ColKey idx_device_id;
     };
 
     // Cannot be set after creation.
@@ -71,6 +73,9 @@ public:
 
     util::Optional<std::string> access_token() const;
     void set_access_token(util::Optional<std::string>);
+    
+    std::string device_id() const;
+    void set_device_id(const std::string&);
 
     void set_user_profile(const SyncUserProfile&);
 

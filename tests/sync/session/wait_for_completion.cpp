@@ -31,7 +31,8 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         return;
 
     const std::string dummy_auth_url = "https://realm.example.org";
-
+    const std::string dummy_device_id = "123400000000000000000000";
+    
     SyncServer server{false};
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server, "", SyncManager::MetadataMode::NoMetadata);
@@ -40,7 +41,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     SECTION("works properly when called after the session is bound") {
         server.start();
-        auto user = SyncManager::shared().get_user("user-async-wait-download-1", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        auto user = SyncManager::shared().get_user("user-async-wait-download-1", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/async-wait-download-1",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -54,7 +55,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     SECTION("works properly when called on a logged-out session") {
         server.start();
         const auto user_id = "user-async-wait-download-3";
-        auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/user-async-wait-download-3",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -68,7 +69,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Now, wait for the completion handler to be called.
         EventLoop::main().run_until([&] { return handler_called == true; });
@@ -76,7 +77,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
-        auto user = SyncManager::shared().get_user("user-async-wait-download-4", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        auto user = SyncManager::shared().get_user("user-async-wait-download-4", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         std::atomic<int> error_count(0);
         std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-download-4",
                                                             [&](auto, auto) { ++error_count; });
@@ -99,6 +100,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         return;
 
     const std::string dummy_auth_url = "https://realm.example.org";
+    const std::string dummy_device_id = "123400000000000000000000";
 
     SyncServer server{false};
     // Disable file-related functionality and metadata functionality for testing purposes.
@@ -108,7 +110,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     SECTION("works properly when called after the session is bound") {
         server.start();
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-1", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        auto user = SyncManager::shared().get_user("user-async-wait-upload-1", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/async-wait-upload-1",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -122,7 +124,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     SECTION("works properly when called on a logged-out session") {
         server.start();
         const auto user_id = "user-async-wait-upload-3";
-        auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        auto user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/user-async-wait-upload-3",
                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -136,7 +138,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
-        user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        user = SyncManager::shared().get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         // Now, wait for the completion handler to be called.
         EventLoop::main().run_until([&] { return handler_called == true; });
@@ -144,7 +146,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
 
     SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
-        auto user = SyncManager::shared().get_user("user-async-wait-upload-4", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url);
+        auto user = SyncManager::shared().get_user("user-async-wait-upload-4", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         std::atomic<int> error_count(0);
         std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-upload-4",
                                                             [&](auto, auto) { ++error_count; });

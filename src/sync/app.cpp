@@ -97,6 +97,18 @@ App::App(const Config& config)
 {
     REALM_ASSERT(m_config.transport_generator);
 
+    if (m_config.platform.empty()) {
+        throw std::runtime_error("You must specify the Platform in App::Config");
+    }
+    
+    if (m_config.platform_version.empty()) {
+        throw std::runtime_error("You must specify the Platform Version in App::Config");
+    }
+    
+    if (m_config.sdk_version.empty()) {
+        throw std::runtime_error("You must specify the SDK Version in App::Config");
+    }
+
     // change the scheme in the base url to ws from http to satisfy the sync client
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -559,6 +571,22 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     do_authenticated_request(req, sync_user, profile_handler);
 }
 
+void App::attach_auth_options(bson::BsonDocument& body)
+{
+    bson::BsonDocument options;
+    
+    if (m_config.local_app_version) {
+        options["appVersion"] = *m_config.local_app_version;
+    }
+    
+    options["appId"] = m_config.app_id;
+    options["platform"] = m_config.platform;
+    options["platformVersion"] = m_config.platform_version;
+    options["sdkVersion"] = m_config.sdk_version;
+
+    body["options"] = bson::BsonDocument({{"device", options}});
+}
+
 void App::log_in_with_credentials(const AppCredentials& credentials,
                                   const std::shared_ptr<SyncUser> linking_user,
                                   std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
@@ -589,7 +617,8 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                 sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
                                                                   value_from_json<std::string>(json, "refresh_token"),
                                                                   value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string());
+                                                                  credentials.provider_as_string(),
+                                                                  value_from_json<std::string>(json, "device_id"));
             }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
@@ -597,13 +626,20 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         App::get_profile(linking_user ? linking_user : sync_user, completion_block);
     };
+    
+    bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
+    bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
+    attach_auth_options(body);
+    
+    std::stringstream s;
+    s << bson::Bson(body);
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
         get_request_headers(linking_user, RequestTokenType::AccessToken),
-        credentials.serialize_as_json()
+        s.str()
     }, handler);
 }
 

@@ -164,7 +164,8 @@ public:
     std::shared_ptr<SyncUser> get_user(const std::string& id,
                                        const std::string provider_type,
                                        std::string refresh_token,
-                                       std::string access_token);
+                                       std::string access_token,
+                                       std::string device_id);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const;
