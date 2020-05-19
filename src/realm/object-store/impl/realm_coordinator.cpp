@@ -435,7 +435,7 @@ void RealmCoordinator::open_db()
         return open_db();
     }
 #if REALM_ENABLE_SYNC
-    catch (IncompatibleHistories const& ex) {
+    catch (IncompatibleHistories const&) {
         translate_file_exception(m_config.path, m_config.immutable()); // Throws
     }
 #endif // REALM_ENABLE_SYNC

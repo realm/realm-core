@@ -596,16 +596,6 @@ int test_all(int argc, char* argv[], util::Logger* logger, bool disable_all_sync
     path += "\\TestAssets\\";
     set_test_resource_path(path);
     set_test_path_prefix(path);
-#else
-    // Set CurrentDirectory to the same directory as the binary, so that we can run the unit test suite with no
-    // problems regardless if we use the Visual Studio IDE or command line
-    wchar_t dest[MAX_PATH];
-    DWORD length = GetModuleFileName(NULL, dest, MAX_PATH);
-    PathCchRemoveFileSpec(dest, MAX_PATH);
-    SetCurrentDirectory(dest);
-
-    set_test_resource_path("../");
-    set_test_path_prefix("../");
 #endif
 #endif
 

@@ -274,7 +274,7 @@ protected:
         m_storage_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
     }
 
-    inline uint_fast64_t get_content_version() noexcept
+    REALM_NOINLINE_IF_32BIT inline uint_fast64_t get_content_version() noexcept
     {
         return m_content_versioning_counter.load(std::memory_order_acquire);
     }
@@ -284,7 +284,7 @@ protected:
         return m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel) + 1;
     }
 
-    inline uint_fast64_t get_instance_version() noexcept
+    REALM_NOINLINE_IF_32BIT inline uint_fast64_t get_instance_version() noexcept
     {
         return m_instance_versioning_counter.load(std::memory_order_relaxed);
     }

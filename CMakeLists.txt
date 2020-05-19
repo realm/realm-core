@@ -244,6 +244,7 @@ if(REALM_ENABLE_SYNC)
     find_package(ZLIB REQUIRED)
     if (WIN32)
         find_package(OpenSSL REQUIRED)
+        set(REALM_HAVE_OPENSSL "1")
     endif()
 endif()
 

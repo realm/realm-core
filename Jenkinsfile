@@ -123,7 +123,8 @@ jobWrapper {
             checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions << [buildType : "Release"]),
             checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
-            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
+            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', false),
+            checkARMDebugUWP        : doBuildWindows('Debug', true, 'ARM', false),
             iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
@@ -467,25 +468,50 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
-    def cmakeDefinitions;
     def warningFilters = [];
-    if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
-      // warning on benchmark binaries that we don't care about
-      warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
+    def cpackSystemName = "${isUWP ? 'UWP' : 'Windows'}-${platform}"
+    def arch = platform.toLowerCase()
+    if (arch == 'win32') {
+      arch = 'x86'
+    }
+    if (arch == 'win64') {
+      arch = 'x64'
+    }
+    def triplet = "${arch}-${isUWP ? 'uwp' : 'windows'}-static"
+
+    def cmakeOptions = [
+      CMAKE_GENERATOR_PLATFORM: platform,
+      CMAKE_BUILD_TYPE: buildType,
+      REALM_ENABLE_SYNC: "ON",
+      CPACK_SYSTEM_NAME: cpackSystemName,
+      CMAKE_TOOLCHAIN_FILE: "c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+      VCPKG_TARGET_TRIPLET: triplet,
+    ]
+
+     if (isUWP) {
+      cmakeOptions << [
+        CMAKE_SYSTEM_NAME: 'WindowsStore',
+        CMAKE_SYSTEM_VERSION: '10.0',
+      ]
     } else {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+      cmakeOptions << [
+        CMAKE_SYSTEM_VERSION: '8.1',
+      ]
     }
     if (!runTests) {
-      cmakeDefinitions += ' -DREALM_NO_TESTS=1'
+      cmakeOptions << [
+        REALM_NO_TESTS: '1',
+      ]
     }
+    
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
         node('windows') {
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
+                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(
                         parser: 'msbuild',
@@ -496,9 +522,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
+                archiveArtifacts('*.tar.gz')
                 if (gitTag) {
                     def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                    archiveArtifacts('*.tar.gz')
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -511,6 +537,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         bat '''
                           mkdir %TMP%
                           realm-tests.exe --no-error-exit-code
+                          realm-sync-tests.exe --no-error-exit-code
                           rmdir /Q /S %TMP%
                         '''
                     }

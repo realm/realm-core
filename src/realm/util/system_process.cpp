@@ -364,12 +364,24 @@ auto sys_proc::copy_local_environment() -> Environment
         throw std::runtime_error("Not yet implemented");
 
 #else // defined _WIN32 && !REALM_UWP
+    auto wstring_to_utf8 = [](wchar_t* w_str) {
+        // First get the number of chars needed for output buffer
+        int chars_num = WideCharToMultiByte(CP_UTF8, 0, w_str, -1, nullptr, 0, nullptr, nullptr);
+        char* str = new char[chars_num];
+        // Then convert
+        WideCharToMultiByte(CP_UTF8, 0, w_str, -1, str, chars_num, nullptr, nullptr);
+        std::string result{str};
+        delete[] str;
 
-    char* env_2 = GetEnvironmentStringsA();
-    if (REALM_UNLIKELY(!env_2))
+        return result;
+    };
+
+    wchar_t* w_env = GetEnvironmentStringsW();
+    if (REALM_UNLIKELY(!w_env))
         throw std::runtime_error("GetEnvironmentStringsA() failed");
     try {
-        for (char* i = env_2; *i; ++i) {
+        std::string env_2 = wstring_to_utf8(w_env);
+        for (char* i = env_2.data(); *i; ++i) {
             char* j_1 = i;
             char* j_2 = std::strchr(j_1, '=');
             if (!j_2)
@@ -379,10 +391,10 @@ auto sys_proc::copy_local_environment() -> Environment
             std::string value{j_2 + 1, i};           // Throws
             env[std::move(name)] = std::move(value); // Throws
         }
-        FreeEnvironmentStringsA(env_2);
+        FreeEnvironmentStringsW(w_env);
     }
     catch (...) {
-        FreeEnvironmentStringsA(env_2);
+        FreeEnvironmentStringsW(w_env);
         throw;
     }
 

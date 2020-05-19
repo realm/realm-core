@@ -292,6 +292,12 @@
 #define REALM_ARCHITECTURE_X86_64 0
 #endif
 
+#if defined REALM_ARCHITECTURE_X86_32 && defined REALM_WINDOWS
+#define REALM_NOINLINE_IF_32BIT REALM_NOINLINE
+#else
+#define REALM_NOINLINE_IF_32BIT
+#endif
+
 // Address Sanitizer
 #if defined(__has_feature) // Clang
 #  if __has_feature(address_sanitizer)

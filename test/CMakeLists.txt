@@ -109,14 +109,6 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
     set(EXTRA_TEST_CFLAGS ${PROCPS_INCLUDE_DIR})
 endif()
 
-# Resources required for running the tests
-file(GLOB REQUIRED_TEST_FILES
-     "*.json"
-     "*.realm"
-     "expect_string.txt")
-file(COPY ${REQUIRED_TEST_FILES}
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
 # FIXME: Benchmarks
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
@@ -141,6 +133,18 @@ endif()
 target_link_libraries(CoreTests
                       TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
 )
+
+# Resources required for running the tests
+file(GLOB REQUIRED_TEST_FILES
+     "*.json"
+     "*.realm"
+     "expect_string.txt")
+
+add_custom_command(
+	TARGET CoreTests POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${REQUIRED_TEST_FILES}
+    $<TARGET_FILE_DIR:CoreTests>)
 
 if(WINDOWS_STORE)
     set_target_properties(CoreTests PROPERTIES
