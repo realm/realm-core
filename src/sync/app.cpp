@@ -898,7 +898,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         try {
             nlohmann::json json = nlohmann::json::parse(response.body);
             auto access_token = value_from_json<std::string>(json, "access_token");
-            sync_user->update_access_token(access_token);
+            sync_user->update_access_token(std::move(access_token));
         } catch (const AppError& err) {
             return completion_block(err);
         }
@@ -944,16 +944,17 @@ void App::call_function(std::shared_ptr<SyncUser> user,
 
     std::stringstream s;
     s << bson::Bson(args);
-
-    Request req;
-    req.method = HttpMethod::post;
-    req.url = route;
-    req.body = s.str();
     
-
-    do_authenticated_request(req,
-                             user,
-                             handler);
+    do_authenticated_request(Request {
+        HttpMethod::post,
+        route,
+        m_request_timeout_ms,
+        {},
+        s.str(),
+        false
+    },
+    user,
+    handler);
 }
 
 void App::call_function(std::shared_ptr<SyncUser> user,

@@ -116,11 +116,11 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             auto refresh_token = user_data.refresh_token();
             auto access_token = user_data.access_token();
             auto device_id = user_data.device_id();
-            if (refresh_token && access_token) {
+            if (!refresh_token.empty() && !access_token.empty()) {
                 users_to_add.push_back(UserCreationData{
                     user_data.identity(),
-                    std::move(*refresh_token),
-                    std::move(*access_token),
+                    std::move(refresh_token),
+                    std::move(access_token),
                     user_data.provider_type(),
                     user_data.identities(),
                     user_data.state(),

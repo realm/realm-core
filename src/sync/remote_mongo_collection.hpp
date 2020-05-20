@@ -106,7 +106,7 @@ public:
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
     /// @param options `RemoteFindOptions` to use when executing the command.
-    /// @param completion_block The resulting json array as a string or error if one occurs
+    /// @param completion_block The resulting bson array of documents or error if one occurs
     void find(const bson::BsonDocument& filter_bson,
               RemoteFindOptions options,
               std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
@@ -117,7 +117,7 @@ public:
     void find(const bson::BsonDocument& filter_bson,
               std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
 
-    /// Returns one document as a json string from a collection or view which matches the
+    /// Returns one document from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
     /// returns the first document according to the query's sort order or natural
     /// order.
@@ -128,7 +128,7 @@ public:
                   RemoteFindOptions options,
                   std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
-    /// Returns one document as a json string from a collection or view which matches the
+    /// Returns one document from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
     /// returns the first document according to the query's sort order or natural
     /// order.
@@ -138,9 +138,9 @@ public:
                   std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Runs an aggregation framework pipeline against this collection.
-    /// @param pipline A bson array made up of `Documents` containing the pipeline of aggregation operations to perform.
-    /// @param completion_block The resulting json string or error if one occurs
-    void aggregate(const bson::BsonArray& pipline,
+    /// @param pipeline A bson array made up of `Documents` containing the pipeline of aggregation operations to perform.
+    /// @param completion_block The resulting bson array of documents or error if one occurs
+    void aggregate(const bson::BsonArray& pipeline,
                    std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.

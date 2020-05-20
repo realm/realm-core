@@ -55,14 +55,15 @@ static std::vector<std::string> split_token(const std::string& jwt) {
     return parts;
 }
 
-RealmJWT::RealmJWT(const std::string& token)
+RealmJWT::RealmJWT(std::string&& token)
 {
-    auto parts = split_token(token);
+    this->token = std::move(token);
+
+    auto parts = split_token(this->token);
 
     auto json_str = base64_decode(parts[1]);
     auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
-    this->token = token;
     this->expires_at = static_cast<int64_t>(json["exp"]);
     this->issued_at = static_cast<int64_t>(json["iat"]);
 
@@ -169,7 +170,7 @@ std::shared_ptr<SyncSession> SyncUser::session_for_on_disk_path(const std::strin
     return locked;
 }
 
-void SyncUser::update_refresh_token(std::string token)
+void SyncUser::update_refresh_token(std::string&& token)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
@@ -178,11 +179,11 @@ void SyncUser::update_refresh_token(std::string token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_refresh_token = token;
+                m_refresh_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_refresh_token = token;
+                m_refresh_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -197,7 +198,7 @@ void SyncUser::update_refresh_token(std::string token)
 
         SyncManager::shared().perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-            metadata->set_refresh_token(token);
+            metadata->set_refresh_token(m_refresh_token.token);
         });
     }
     // (Re)activate all pending sessions.
@@ -208,7 +209,7 @@ void SyncUser::update_refresh_token(std::string token)
     }
 }
 
-void SyncUser::update_access_token(std::string token)
+void SyncUser::update_access_token(std::string&& token)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
@@ -217,11 +218,11 @@ void SyncUser::update_access_token(std::string token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_access_token = token;
+                m_access_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_access_token = token;
+                m_access_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -236,7 +237,7 @@ void SyncUser::update_access_token(std::string token)
 
         SyncManager::shared().perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-            metadata->set_access_token(token);
+            metadata->set_access_token(m_access_token.token);
         });
     }
 

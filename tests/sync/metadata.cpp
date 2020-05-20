@@ -123,7 +123,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(md_2->identity() == identity_2);
                 CHECK(md_2->local_uuid() == identity_2);
                 CHECK(md_2->provider_type() == provider_type);
-                CHECK(!md_2->access_token());
+                CHECK(md_2->access_token().empty());
                 CHECK(md_2->is_valid());
             }
 
@@ -183,7 +183,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
                 CHECK(md_2->identity() == identity_2);
                 CHECK(md_2->local_uuid() == identity_2);
                 CHECK(md_2->provider_type() == provider_type);
-                CHECK(!md_2->access_token());
+                CHECK(md_2->access_token().empty());
                 CHECK(md_2->is_valid());
             }
 
@@ -211,7 +211,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->identity() == identity);
         REQUIRE(user_metadata->provider_type() == provider_type);
-        REQUIRE(user_metadata->access_token() == none);
+        REQUIRE(user_metadata->access_token().empty());
     }
 
     SECTION("properly reflects updating state") {
@@ -496,7 +496,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         REQUIRE(bool(user_metadata));
         CHECK(user_metadata->identity() == identity);
         CHECK(user_metadata->provider_type() == auth_url);
-        CHECK(user_metadata->access_token() == none);
+        CHECK(user_metadata->access_token().empty());
         CHECK(user_metadata->is_valid());
         // Reopen the metadata file with the same key.
         SyncMetadataManager manager_2(metadata_path, true, key);

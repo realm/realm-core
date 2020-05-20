@@ -59,7 +59,7 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
-    RealmJWT(const std::string& token);
+    RealmJWT(std::string&& token);
 
     bool operator==(const RealmJWT& other) const
     {
@@ -149,11 +149,11 @@ public:
 
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_refresh_token(std::string token);
+    void update_refresh_token(std::string&& token);
 
     // Update the user's access token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_access_token(std::string token);
+    void update_access_token(std::string&& token);
 
     // Update the user's profile.
     void update_user_profile(const SyncUserProfile& profile);
