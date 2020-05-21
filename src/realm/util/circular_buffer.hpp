@@ -236,9 +236,13 @@ void swap(CircularBuffer<T>&, CircularBuffer<T>&) noexcept;
 
 template <class T>
 template <class U>
-class CircularBuffer<T>::Iter : public std::iterator<std::random_access_iterator_tag, U> {
+class CircularBuffer<T>::Iter {
 public:
     using difference_type = std::ptrdiff_t;
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = U;
+    using pointer = U*;
+    using reference = U&;
 
     Iter() noexcept {}
 
@@ -258,18 +262,18 @@ public:
         return *this;
     }
 
-    U& operator*() const noexcept
+    reference operator*() const noexcept
     {
         T* memory = m_buffer->get_memory_ptr();
         return memory[m_index];
     }
 
-    U* operator->() const noexcept
+    pointer operator->() const noexcept
     {
         return &operator*();
     }
 
-    U& operator[](difference_type i) const noexcept
+    reference operator[](difference_type i) const noexcept
     {
         Iter j = *this;
         j += i;

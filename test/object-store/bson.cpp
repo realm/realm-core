@@ -200,7 +200,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]")
 
     SECTION("Double type")
     {
-        static float epsilon = 0.000000001;
+        static float epsilon = 0.000000001f;
 
         SECTION("+1.0")
         {

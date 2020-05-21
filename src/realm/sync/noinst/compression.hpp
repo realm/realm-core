@@ -194,8 +194,8 @@ std::error_code integrate_compressed_blocks_in_realm_file(const char* blocks, si
 /// receiving side.
 ///
 /// The arguments and return value have the same meaning as in compress_file().
-std::error_code compress_file_in_blocks(const char* src_path, const char* dst_path, util::File::SizeType& src_size,
-                                        util::File::SizeType& dst_size);
+std::error_code compress_file_in_blocks(const char* src_path, const char* dst_path, size_t& src_size,
+                                        size_t& dst_size);
 
 // decompress_file_from_blocks performs the inverse operation of compress_file_in_blocks().
 // The arguments have the same meaning as in compress_file_in_blocks().

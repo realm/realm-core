@@ -538,6 +538,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                           mkdir %TMP%
                           realm-tests.exe --no-error-exit-code
                           realm-sync-tests.exe --no-error-exit-code
+                          copy unit-test-report.xml ..
                           rmdir /Q /S %TMP%
                         '''
                     }

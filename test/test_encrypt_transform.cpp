@@ -45,7 +45,7 @@ bool verify_populated(DBRef& sg)
     for (auto& o : *t) {
         StringData sd = o.get<String>(str_col_ndx);
         int64_t length = o.get<Int>(int_col_ndx);
-        std::string expected(length, 'a');
+        std::string expected(size_t(length), 'a');
         if (sd != expected)
             return false;
     }

@@ -270,7 +270,7 @@ TEST_IF(Sync_HistoryMigration, false)
             if (history_schema_version != client_schema_version)
                 throw std::runtime_error{"Bad history schema version for client-side file"};
         }
-        catch (const FileFormatUpgradeRequired& e) {
+        catch (const FileFormatUpgradeRequired&) {
             // File formats prior to 10 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification
@@ -291,7 +291,7 @@ TEST_IF(Sync_HistoryMigration, false)
             if (history_schema_version != server_schema_version)
                 throw std::runtime_error{"Bad history schema version for server-side file"};
         }
-        catch (const FileFormatUpgradeRequired& e) {
+        catch (const FileFormatUpgradeRequired&) {
             // File formats prior to 10 cannot be opened in read-only mode
         }
         // History migration is a side-effect of verification

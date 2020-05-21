@@ -64,7 +64,7 @@ public:
 
     version_type get_history_entry(version_type version, HistoryEntry& entry) const noexcept
     {
-        entry = m_entries.at(version - s_initial_version - 1);
+        entry = m_entries.at(size_t(version - s_initial_version - 1));
         version_type prev_version = (version == 2 ? 0 : version - 1);
         return prev_version;
     }
@@ -302,7 +302,7 @@ private:
                 return ChunkedBinaryData{BinaryData{transform}};
             }
         }
-        const HistoryEntry& entry = m_entries.at(version - s_initial_version - 1);
+        const HistoryEntry& entry = m_entries.at(size_t(version - s_initial_version - 1));
         return entry.changeset;
     }
 

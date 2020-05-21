@@ -755,7 +755,7 @@ void ServerHistory::add_client_file(salt_type file_ident_salt, file_ident_type p
     }
     std::int_fast64_t client_version = 0;
     std::int_fast64_t recip_hist_base_version = 0;
-    std::int_fast64_t recip_hist_ref = 0;
+    ref_type recip_hist_ref = 0;
     std::int_fast64_t last_seen_timestamp = 0;
     std::int_fast64_t locked_server_version = 0;
     if (is_direct_client(client_type)) {
@@ -1268,8 +1268,8 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
         auto now_3 = std::time_t(now_2.count());
         auto max_time_to_live = std::time_t(m_compaction_ttl.count());
         REALM_ASSERT(can_compact_until_version >= compacted_until_version);
-        std::size_t num_entries = (can_compact_until_version - compacted_until_version);
-        std::size_t offset = std::size_t(compacted_until_version - m_history_base_version);
+        auto num_entries = size_t(can_compact_until_version - compacted_until_version);
+        auto offset = size_t(compacted_until_version - m_history_base_version);
         for (std::size_t i = 0; i < num_entries; ++i) {
             std::size_t history_entry_index = offset + i;
             auto timestamp = timestamp_type(m_acc->sh_timestamps.get(history_entry_index));
@@ -1335,8 +1335,8 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
 
     // Chunk compactions to limit memory usage.
     while (compaction_begin_version < can_compact_until_version) {
-        std::size_t num_compactable_changesets_this_iteration =
-            num_compactable_changesets - (compaction_begin_version - m_history_base_version);
+        auto num_compactable_changesets_this_iteration =
+            size_t(num_compactable_changesets - (compaction_begin_version - m_history_base_version));
         std::vector<Changeset> compact_bootstrap_changesets;
         compact_bootstrap_changesets.resize(num_compactable_changesets_this_iteration); // Throws
         version_type begin_version = compaction_begin_version;
@@ -1349,11 +1349,11 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
             // Get attributes for the changeset
             changeset.version = server_version;
             changeset.last_integrated_remote_version =
-                version_type(m_acc->sh_client_versions.get(server_version - 1 - m_history_base_version));
+                version_type(m_acc->sh_client_versions.get(size_t(server_version - 1 - m_history_base_version)));
             changeset.origin_timestamp =
-                timestamp_type(m_acc->sh_timestamps.get(server_version - 1 - m_history_base_version));
+                timestamp_type(m_acc->sh_timestamps.get(size_t(server_version - 1 - m_history_base_version)));
             changeset.origin_file_ident =
-                file_ident_type(m_acc->sh_origin_files.get(server_version - 1 - m_history_base_version));
+                file_ident_type(m_acc->sh_origin_files.get(size_t(server_version - 1 - m_history_base_version)));
 
             // Get the changeset itself
             ChunkedBinaryData data = get_changeset(server_version);
@@ -1376,7 +1376,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
             encode_changeset(compact_bootstrap_changesets[i], buffer);
             after_size += buffer.size();
             version_type server_version = begin_version + i + 1;
-            m_acc->sh_changesets.set(server_version - 1, BinaryData{buffer.data(), buffer.size()}); // Throws
+            m_acc->sh_changesets.set(size_t(server_version - 1), BinaryData{buffer.data(), buffer.size()}); // Throws
         }
         compaction_begin_version = end_version;
     }
