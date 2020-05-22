@@ -189,8 +189,14 @@ public:
     void clear() noexcept;
 
     // An iterator over the individual indices in the set rather than the ranges
-    class IndexIterator : public std::iterator<std::forward_iterator_tag, size_t> {
+    class IndexIterator {
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = size_t;
+        using difference_type = ptrdiff_t;
+        using pointer = const value_type*;
+        using reference = const value_type&;
+
         IndexIterator(IndexSet::const_iterator it) : m_iterator(it) { }
         size_t operator*() const noexcept { return m_iterator->first + m_offset; }
         bool operator==(IndexIterator const& it) const noexcept { return m_iterator == it.m_iterator; }
