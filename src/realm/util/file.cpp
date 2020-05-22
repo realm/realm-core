@@ -784,16 +784,20 @@ void File::prealloc(size_t size)
 
         off_t to_allocate = static_cast<off_t>(new_size - statbuf.st_size);
         fstore_t store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, to_allocate, 0};
-        int ret = fcntl(m_fd, F_PREALLOCATE, &store);
+        int ret = 0;
+        do {
+            ret = fcntl(m_fd, F_PREALLOCATE, &store);
+        } while (ret == -1 && errno == EINTR);
         if (ret == -1) {
             int err = errno;
 
-            if (err == EINVAL) {
+            if (err == EINVAL || err == ENOTSUP) {
                 // There's a timing sensitive bug on APFS which causes fcntl to sometimes throw EINVAL.
                 // This might not be the case, but we'll fall back and attempt to manually allocate all the requested
                 // space. Worst case, this might also fail, but there is also a chance it will succeed. We don't
                 // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
                 // been reliable on HSF+).
+                // err will be ENOTSUP on non-supported file systems such as ExFAT
                 consume_space_interlocked();
             }
             else {
