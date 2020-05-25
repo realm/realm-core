@@ -138,7 +138,7 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
-using Evaluator = util::FunctionRef<bool(ConstObj& obj)>;
+using Evaluator = util::FunctionRef<bool(const Obj& obj)>;
 
 class ParentNode {
     typedef ParentNode ThisType;
@@ -175,7 +175,7 @@ public:
 
     size_t find_first(size_t start, size_t end);
 
-    bool match(ConstObj& obj);
+    bool match(const Obj& obj);
 
     virtual void init()
     {

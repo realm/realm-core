@@ -782,7 +782,7 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
     REALM_ASSERT(should_emit);
 
     ColKey pk_col = table.get_primary_key_column();
-    ConstObj obj = table.get_object(key);
+    const Obj obj = table.get_object(key);
     if (pk_col) {
         DataType pk_type = table.get_column_type(pk_col);
         if (obj.is_null(pk_col)) {
@@ -828,7 +828,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
             instr.path.m_path.reserve(size * 2);
         };
 
-        auto visitor = [&](const ConstObj& path_obj, ColKey next_field, size_t index) {
+        auto visitor = [&](const Obj& path_obj, ColKey next_field, size_t index) {
             auto element_table = path_obj.get_table();
             if (element_table->is_embedded()) {
                 StringData field_name = element_table->get_column_name(next_field);

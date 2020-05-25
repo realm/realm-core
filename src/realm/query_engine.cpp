@@ -67,7 +67,7 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
-bool ParentNode::match(ConstObj& obj)
+bool ParentNode::match(const Obj& obj)
 {
     auto cb = [this](const Cluster* cluster, size_t row) {
         set_cluster(cluster);

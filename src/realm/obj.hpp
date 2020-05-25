@@ -56,20 +56,30 @@ using LnkLstPtr = std::unique_ptr<LnkLst>;
 using ConstLnkLstPtr = std::unique_ptr<const LnkLst>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
-class ConstObj {
+class Obj {
 public:
-    ConstObj()
+    Obj()
         : m_table(nullptr)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
         , m_valid(false)
     {
     }
-    ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx);
+    Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
+
+    TableRef get_table()
+    {
+        return m_table.cast_away_const();
+    }
+
+    ConstTableRef get_table() const
+    {
+        return m_table;
+    }
 
     Allocator& get_alloc() const;
 
-    bool operator==(const ConstObj& other) const;
+    bool operator==(const Obj& other) const;
 
     ObjKey get_key() const
     {
@@ -77,11 +87,6 @@ public:
     }
 
     GlobalKey get_object_id() const;
-
-    ConstTableRef get_table() const
-    {
-        return m_table;
-    }
 
     Replication* get_replication() const;
 
@@ -114,24 +119,7 @@ public:
         return get<U>(get_column_key(col_name));
     }
     bool is_unresolved(ColKey col_key) const;
-    ConstObj get_linked_object(ColKey link_col_key) const;
-    int cmp(const ConstObj& other, ColKey col_key) const;
-
-    template <typename U>
-    ConstLst<U> get_list(ColKey col_key) const;
-    template <typename U>
-    ConstLstPtr<U> get_list_ptr(ColKey col_key) const;
-    template <typename U>
-    ConstLst<U> get_list(StringData col_name) const
-    {
-        return get_list<U>(get_column_key(col_name));
-    }
-
-    ConstLnkLst get_linklist(ColKey col_key) const;
-    ConstLnkLstPtr get_linklist_ptr(ColKey col_key) const;
-    ConstLnkLst get_linklist(StringData col_name) const;
-
-    ConstLstBasePtr get_listbase_ptr(ColKey col_key) const;
+    int cmp(const Obj& other, ColKey col_key) const;
 
     size_t get_link_count(ColKey col_key) const;
 
@@ -184,7 +172,7 @@ public:
     Path get_path() const;
 
     // Get the fat path to this object expressed as a vector of fat path elements.
-    // each Fat path elements include a ConstObj allowing for low cost access to the
+    // each Fat path elements include a Obj allowing for low cost access to the
     // objects data.
     // For a top-level object, the returned vector will be empty.
     // For an embedded object, the vector has the top object as first element,
@@ -198,67 +186,9 @@ public:
     // Then there is one call for each object on that path, starting with the top level object
     // The embedded object itself is not considered part of the path.
     // Note: You should never provide the path_index for calls to traverse_path.
-    using Visitor = std::function<void(const ConstObj&, ColKey, size_t)>;
+    using Visitor = std::function<void(const Obj&, ColKey, size_t)>;
     using PathSizer = std::function<void(size_t)>;
     void traverse_path(Visitor v, PathSizer ps, size_t path_index = 0) const;
-
-
-protected:
-    friend class Obj;
-    friend class ColumnListBase;
-    friend class ConstLstBase;
-    friend class ConstLnkLst;
-    friend class LnkLst;
-    friend class LinkMap;
-    friend class ConstTableView;
-    friend class Transaction;
-    friend struct ClusterNode::IteratorState;
-
-    mutable ConstTableRef m_table;
-    ObjKey m_key;
-    mutable MemRef m_mem;
-    mutable size_t m_row_ndx;
-    mutable uint64_t m_storage_version;
-    mutable bool m_valid;
-
-    Allocator& _get_alloc() const;
-    bool update() const;
-    // update if needed - with and without check of table instance version:
-    bool update_if_needed() const;
-    bool _update_if_needed() const; // no check, use only when already checked
-    template <class T>
-    bool do_is_null(ColKey::Idx col_ndx) const;
-
-    const ClusterTree* get_tree_top() const;
-    ColKey get_column_key(StringData col_name) const;
-    TableKey get_table_key() const;
-    TableRef get_target_table(ColKey col_key) const;
-    const Spec& get_spec() const;
-
-    template <typename U>
-    U _get(ColKey::Idx col_ndx) const;
-
-    template <class T>
-    int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
-    int cmp(const ConstObj& other, ColKey::Idx col_ndx) const;
-    ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
-    std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
-    ObjKey get_unfiltered_link(ColKey col_key) const;
-};
-
-
-class Obj : public ConstObj {
-public:
-    Obj()
-    {
-    }
-    Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
-
-    TableRef get_table() const
-    {
-        return m_table.cast_away_const();
-    }
-
 
     template <typename U>
     Obj& set(ColKey col_key, U value, bool is_default = false);
@@ -301,9 +231,9 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
-    void assign(const ConstObj& other);
+    void assign(const Obj& other);
 
-    Obj get_linked_object(ColKey link_col_key);
+    Obj get_linked_object(ColKey link_col_key) const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
@@ -321,23 +251,55 @@ public:
     LnkLst get_linklist(StringData col_name) const;
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
-    void assign_pk_and_backlinks(const ConstObj& other);
+    void assign_pk_and_backlinks(const Obj& other);
 
 private:
     friend class ArrayBacklink;
     friend class CascadeState;
     friend class Cluster;
+    friend class ColumnListBase;
+    friend class ConstLnkLst;
     friend class ConstLstBase;
-    friend class ConstObj;
+    friend class ConstTableView;
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class LinkMap;
     friend class Table;
+    friend class Transaction;
+    friend struct ClusterNode::IteratorState;
 
-    Obj(const ConstObj& other)
-        : ConstObj(other)
-    {
-    }
+    mutable TableRef m_table;
+    ObjKey m_key;
+    mutable MemRef m_mem;
+    mutable size_t m_row_ndx;
+    mutable uint64_t m_storage_version;
+    mutable bool m_valid;
+
+    Allocator& _get_alloc() const;
+    bool update() const;
+    // update if needed - with and without check of table instance version:
+    bool update_if_needed() const;
+    bool _update_if_needed() const; // no check, use only when already checked
+    template <class T>
+    bool do_is_null(ColKey::Idx col_ndx) const;
+
+    const ClusterTree* get_tree_top() const;
+    ColKey get_column_key(StringData col_name) const;
+    TableKey get_table_key() const;
+    TableRef get_target_table(ColKey col_key) const;
+    const Spec& get_spec() const;
+
+    template <typename U>
+    U _get(ColKey::Idx col_ndx) const;
+
+    template <class T>
+    int cmp(const Obj& other, ColKey::Idx col_ndx) const;
+    int cmp(const Obj& other, ColKey::Idx col_ndx) const;
+    ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
+    std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
+    ObjKey get_unfiltered_link(ColKey col_key) const;
+
     template <class Val>
     Obj& _set(size_t col_ndx, Val v);
     template <class Head, class... Tail>
@@ -363,21 +325,16 @@ private:
     inline void set_spec(T&, ColKey);
 };
 
-struct ConstObj::FatPathElement {
-    ConstObj obj;   // Object which embeds...
+struct Obj::FatPathElement {
+    Obj obj;        // Object which embeds...
     ColKey col_key; // Column holding link or link list which embeds...
     size_t index;   // index into link list (or 0)
 };
 
-struct ConstObj::PathElement {
+struct Obj::PathElement {
     ColKey col_key; // Column holding link or link list which embeds...
     size_t index;   // index into link list (or 0)
 };
-
-inline Obj Obj::get_linked_object(ColKey link_col_key)
-{
-    return ConstObj::get_linked_object(link_col_key);
-}
 
 template <>
 Obj& Obj::set(ColKey, int64_t value, bool is_default);

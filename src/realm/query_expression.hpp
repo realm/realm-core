@@ -2183,7 +2183,7 @@ private:
     const ArrayPayload* m_leaf_ptr = nullptr;
 
     template <class>
-    friend Query compare(const Subexpr2<Link>&, const ConstObj&);
+    friend Query compare(const Subexpr2<Link>&, const Obj&);
 };
 
 template <class T, class S, class I>
@@ -2300,7 +2300,7 @@ public:
                 d.m_storage.set_null(0);
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
                 if (link_translation_key) {
-                    ConstObj obj = m_link_map.get_target_table()->get_object(link_translation_key);
+                    const Obj obj = m_link_map.get_target_table()->get_object(link_translation_key);
                     if constexpr (std::is_same_v<T, ObjectId>) {
                         auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
                         if (opt_val) {
@@ -2319,7 +2319,7 @@ public:
                 std::vector<ObjKey> links = m_link_map.get_links(index);
                 Value<T> v = make_value_for_link<T>(false /*only_unary_links*/, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
-                    ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
+                    const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
                     if constexpr (std::is_same_v<T, ObjectId>) {
                         auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
                         if (opt_val) {
@@ -2746,7 +2746,7 @@ public:
         }
         else {
             ObjKey key(m_keys->get(index) + m_offset);
-            ConstObj obj = m_link_map.get_base_table()->get_object(key);
+            const Obj obj = m_link_map.get_base_table()->get_object(key);
             count = obj.get_backlink_count();
         }
         destination.import(Value<Int>(false, 1, count));
@@ -3396,7 +3396,7 @@ private:
 };
 
 template <class Operator>
-Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
+Query compare(const Subexpr2<Link>& left, const Obj& obj)
 {
     static_assert(std::is_same_v<Operator, Equal> || std::is_same_v<Operator, NotEqual>,
                   "Links can only be compared for equality.");
@@ -3427,19 +3427,19 @@ Query compare(const Subexpr2<Link>& left, const ConstObj& obj)
     return make_expression<Compare<Operator, ObjKey>>(left.clone(), make_subexpr<KeyValue>(obj.get_key()));
 }
 
-inline Query operator==(const Subexpr2<Link>& left, const ConstObj& row)
+inline Query operator==(const Subexpr2<Link>& left, const Obj& row)
 {
     return compare<Equal>(left, row);
 }
-inline Query operator!=(const Subexpr2<Link>& left, const ConstObj& row)
+inline Query operator!=(const Subexpr2<Link>& left, const Obj& row)
 {
     return compare<NotEqual>(left, row);
 }
-inline Query operator==(const ConstObj& row, const Subexpr2<Link>& right)
+inline Query operator==(const Obj& row, const Subexpr2<Link>& right)
 {
     return compare<Equal>(right, row);
 }
-inline Query operator!=(const ConstObj& row, const Subexpr2<Link>& right)
+inline Query operator!=(const Obj& row, const Subexpr2<Link>& right)
 {
     return compare<NotEqual>(right, row);
 }
@@ -3593,7 +3593,7 @@ public:
                                                                                  links.size());
 
             for (size_t t = 0; t < links.size(); t++) {
-                ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
+                const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
                 if (obj.is_null(m_column_key))
                     v.m_storage.set_null(t);
                 else
@@ -3907,7 +3907,7 @@ public:
         m_query.init();
 
         size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, ObjKey k) {
-            ConstObj obj = m_link_map.get_target_table()->get_object(k);
+            const Obj obj = m_link_map.get_target_table()->get_object(k);
             return running_count + m_query.eval_object(obj);
         });
 
