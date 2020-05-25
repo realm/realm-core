@@ -110,7 +110,7 @@ CollectionBase::CollectionBase(const Obj& owner, ColKey col_key)
     : m_obj(owner)
     , m_col_key(col_key)
 {
-    if (!col_key.get_attrs().test(col_attr_List)) {
+    if (!(col_key.get_attrs().test(col_attr_List) || col_key.get_attrs().test(col_attr_Set))) {
         throw LogicError(LogicError::list_type_mismatch);
     }
     m_nullable = col_key.is_nullable();

@@ -66,7 +66,10 @@ enum ColumnAttr {
     col_attr_Nullable = 16,
 
     /// Each element is a list of values
-    col_attr_List = 32
+    col_attr_List = 32,
+
+    /// Each element is a set of values
+    col_attr_Set = 64
 };
 
 class ColumnAttrMask {

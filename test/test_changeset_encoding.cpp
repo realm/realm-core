@@ -97,7 +97,7 @@ TEST(ChangesetEncoding_CreateObject)
 TEST(ChangesetEncoding_Set_Field)
 {
     Changeset changeset;
-    Set instr;
+    sync::instr::Set instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
@@ -113,7 +113,7 @@ TEST(ChangesetEncoding_Set_Field)
 TEST(ChangesetEncoding_Set_Deep)
 {
     Changeset changeset;
-    Set instr;
+    sync::instr::Set instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
@@ -132,7 +132,7 @@ TEST(ChangesetEncoding_Set_Deep)
 TEST(ChangesetEncoding_Set_ArraySet)
 {
     Changeset changeset;
-    Set instr;
+    sync::instr::Set instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
@@ -150,7 +150,7 @@ TEST(ChangesetEncoding_Set_ArraySet)
 TEST(ChangesetEncoding_Set_ArraySet_Deep)
 {
     Changeset changeset;
-    Set instr;
+    sync::instr::Set instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");

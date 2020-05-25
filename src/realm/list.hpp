@@ -269,12 +269,12 @@ public:
         , m_ndx(ndx)
     {
     }
-    pointer operator->()
+    pointer operator->() const
     {
         m_val = m_list->get(m_list->adjust(m_ndx));
         return &m_val;
     }
-    reference operator*()
+    reference operator*() const
     {
         return *operator->();
     }
@@ -290,19 +290,21 @@ public:
         return tmp;
     }
 
-    bool operator!=(const LstIterator& rhs)
+    bool operator!=(const LstIterator& rhs) const
     {
         return m_ndx != rhs.m_ndx;
     }
 
-    bool operator==(const LstIterator& rhs)
+    bool operator==(const LstIterator& rhs) const
     {
         return m_ndx == rhs.m_ndx;
     }
 
 private:
     friend class Lst<T>;
-    T m_val;
+    friend class Set<T>;
+
+    mutable T m_val;
     const Collection<T>* m_list;
     size_t m_ndx;
 };
@@ -466,6 +468,13 @@ protected:
         update_content_version();
         return m_valid;
     }
+
+    void ensure_writeable()
+    {
+        if (m_obj.ensure_writeable()) {
+            init_from_parent();
+        }
+    }
 };
 
 /*
@@ -559,7 +568,7 @@ public:
 
     void insert(size_t ndx, T value);
 
-    T remove(LstIterator<T>& it)
+    T remove(const LstIterator<T>& it)
     {
         return remove(CollectionBase::adjust(it.m_ndx));
     }
@@ -577,7 +586,7 @@ public:
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (from != to) {
-            ensure_writeable();
+            this->ensure_writeable();
             if (Replication* repl = this->m_obj.get_replication()) {
                 CollectionBase::move_repl(repl, from, to);
             }
@@ -615,7 +624,7 @@ public:
     {
         ensure_created();
         update_if_needed();
-        ensure_writeable();
+        this->ensure_writeable();
         if (size() > 0) {
             if (Replication* repl = this->m_obj.get_replication()) {
                 CollectionBase::clear_repl(repl);
@@ -637,12 +646,6 @@ protected:
     {
         if (!Collection<T>::m_valid && m_obj.is_valid()) {
             create();
-        }
-    }
-    void ensure_writeable()
-    {
-        if (m_obj.ensure_writeable()) {
-            init_from_parent();
         }
     }
     void do_set(size_t ndx, T value)
@@ -693,7 +696,7 @@ T Lst<T>::set(size_t ndx, T value)
     // get will check for ndx out of bounds
     T old = get(ndx);
     if (old != value) {
-        ensure_writeable();
+        this->ensure_writeable();
         do_set(ndx, value);
         m_obj.bump_content_version();
     }
@@ -707,7 +710,7 @@ template <class T>
 T Lst<T>::remove(size_t ndx)
 {
     REALM_ASSERT_DEBUG(!update_if_needed());
-    ensure_writeable();
+    this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
         CollectionBase::erase_repl(repl, ndx);
     }
@@ -731,7 +734,7 @@ void Lst<T>::insert(size_t ndx, T value)
     if (ndx > m_tree->size()) {
         throw std::out_of_range("Index out of range");
     }
-    ensure_writeable();
+    this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
         insert_repl(repl, ndx, value);
     }

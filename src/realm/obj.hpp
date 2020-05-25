@@ -44,6 +44,9 @@ using LstBasePtr = std::unique_ptr<LstBase>;
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 
+template <class>
+class Set;
+
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
@@ -240,6 +243,10 @@ public:
     LnkLst get_linklist(StringData col_name) const;
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
+
+    template <typename U>
+    Set<U> get_set(ColKey col_key) const;
+
     void assign_pk_and_backlinks(const Obj& other);
 
 private:
@@ -250,9 +257,13 @@ private:
     friend class CollectionBase;
     friend class ConstTableView;
     template <class>
+    friend class Collection;
+    template <class>
     friend class Lst;
     friend class LnkLst;
     friend class LinkMap;
+    template <class>
+    friend class Set;
     friend class Table;
     friend class Transaction;
     friend struct ClusterNode::IteratorState;

@@ -333,6 +333,15 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
+ColKey Table::add_column_set(DataType type, StringData name)
+{
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_Set);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
+}
+
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))

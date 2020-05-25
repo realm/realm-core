@@ -125,6 +125,7 @@ public:
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
+    ColKey add_column_set(DataType type, StringData name);
 
     ColKey add_column_link(DataType type, StringData name, Table& target);
 

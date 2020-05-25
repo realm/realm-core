@@ -47,6 +47,7 @@ set(CORE_TEST_SOURCES
     test_link_query_view.cpp
     test_links.cpp
     test_typed_links.cpp
+    test_set.cpp
     test_unresolved_links.cpp
     test_metrics.cpp
     test_global_key.cpp
