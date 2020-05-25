@@ -178,6 +178,9 @@ if(MSVC)
     # /Oi:  This enables (faster) intrinsic functions.
     string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
     string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
+
+    # Prevent warnings abount non-existing .pdb files
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /ignore:4099")
 endif()
 
 # Platform-specific build configuration

@@ -17,6 +17,7 @@
 #include <functional>
 #include <algorithm>
 #include <atomic>
+#include <thread>
 
 #include <realm/sync/encrypt/fingerprint.hpp>
 #include <realm/util/value_reset_guard.hpp>
@@ -33,7 +34,6 @@
 #include <realm/util/parent_dir.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/scratch_allocator.hpp>
-#include <realm/util/system_process.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/json_parser.hpp>

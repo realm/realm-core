@@ -122,11 +122,12 @@ jobWrapper {
             checkLinuxDebug_Sync    : doCheckInDocker(buildOptions << [buildType : "Debug", enableSync : "ON"]),
             checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions << [buildType : "Release"]),
-            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
-            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', false),
-            checkARMDebugUWP        : doBuildWindows('Debug', true, 'ARM', false),
-            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
+            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+            buildiosDebug           : doBuildAppleDevice('ios', 'MinSizeDebug'),
+            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "thread"]),
@@ -137,7 +138,7 @@ jobWrapper {
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
                 checkMacOsDebug               : doBuildMacOs('Debug', true),
-                buildUwpx64Debug              : doBuildWindows('Debug', true, 'x64', false),
+                buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                      : doBuildCoverage(),
                 performance                   : buildPerformance(),
@@ -493,6 +494,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
         CMAKE_SYSTEM_NAME: 'WindowsStore',
         CMAKE_SYSTEM_VERSION: '10.0',
       ]
+      warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
     } else {
       cmakeOptions << [
         CMAKE_SYSTEM_VERSION: '8.1',
@@ -700,7 +702,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 20, unit: 'MINUTES') {
+                    timeout(time: 30, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}

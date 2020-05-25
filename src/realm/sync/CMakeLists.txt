@@ -44,7 +44,6 @@ set(SERVER_SOURCES
     metrics.cpp
     server_configuration.cpp
     server.cpp
-    ../util/system_process.cpp
 )
 
 set(SERVER_INSTALL_HEADERS

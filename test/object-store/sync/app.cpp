@@ -1294,8 +1294,7 @@ private:
                             {"data", profile_0}})
                 .dump();
 
-        Response resp{200, 0, {}, response};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_login(const Request request, std::function<void(Response)> completion_block)
@@ -1303,7 +1302,7 @@ private:
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
-        // CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", provider_type}}));
+        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", provider_type}}));
         CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({{"access_token", access_token},
@@ -1312,8 +1311,7 @@ private:
                                                {"device_id", "Panda Bear"}})
                                    .dump();
 
-        Response resp{200, 0, {}, response};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_location(const Request request, std::function<void(Response)> completion_block)
@@ -1327,23 +1325,21 @@ private:
                                                {"location", "matter"}})
                                    .dump();
 
-        Response resp{200, 0, {}, response};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_create_api_key(const Request request, std::function<void(Response)> completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
-        // CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
+        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
         CHECK(request.timeout_ms == 60000);
 
         std::string response =
             nlohmann::json({{"_id", api_key_id}, {"key", api_key}, {"name", api_key_name}, {"disabled", false}})
                 .dump();
 
-        Response resp{200, 0, {}, response};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_fetch_api_key(const Request request, std::function<void(Response)> completion_block)
@@ -1357,8 +1353,7 @@ private:
         std::string response =
             nlohmann::json({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}}).dump();
 
-        Response resp{200, 0, {}, response};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, response});
     }
 
     void handle_fetch_api_keys(const Request request, std::function<void(Response)> completion_block)
@@ -1374,8 +1369,7 @@ private:
             elements.push_back({{"_id", api_key_id}, {"name", api_key_name}, {"disabled", false}});
         }
 
-        Response resp{200, 0, {}, nlohmann::json(elements).dump()};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
     void handle_token_refresh(const Request request, std::function<void(Response)> completion_block)
@@ -1389,8 +1383,7 @@ private:
         auto elements = std::vector<nlohmann::json>();
         nlohmann::json json{{"access_token", access_token}};
 
-        Response resp{200, 0, {}, json.dump()};
-        completion_block(resp);
+        completion_block(Response{200, 0, {}, json.dump()});
     }
 
 public:
@@ -1403,8 +1396,7 @@ public:
             handle_profile(request, completion_block);
         }
         else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
-            Response resp{200, 0, {}, ""};
-            completion_block(resp);
+            completion_block(Response{200, 0, {}, ""});
         }
         else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
             handle_create_api_key(request, completion_block);
@@ -1423,8 +1415,7 @@ public:
             handle_location(request, completion_block);
         }
         else {
-            Response resp{200, 0, {}, "something arbitrary"};
-            completion_block(resp);
+            completion_block(Response{200, 0, {}, "something arbitrary"});
         }
     }
 };
