@@ -789,24 +789,18 @@ void File::prealloc(size_t size)
             ret = fcntl(m_fd, F_PREALLOCATE, &store);
         } while (ret == -1 && errno == EINTR);
         if (ret == -1) {
-            int err = errno;
-
-            if (err == EINVAL || err == ENOTSUP) {
-                // There's a timing sensitive bug on APFS which causes fcntl to sometimes throw EINVAL.
-                // This might not be the case, but we'll fall back and attempt to manually allocate all the requested
-                // space. Worst case, this might also fail, but there is also a chance it will succeed. We don't
-                // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
-                // been reliable on HSF+).
-                // err will be ENOTSUP on non-supported file systems such as ExFAT
-                consume_space_interlocked();
-            }
-            else {
-                std::string msg = util::format("fcntl() inside prealloc() failed allocating %1 bytes, new_size=%2, "
-                                               "cur_size=%3, allocated_size=%4, event: ",
-                                               to_allocate, new_size, statbuf.st_size, allocated_size);
-                msg += util::make_basic_system_error_code(err).message();
-                throw OutOfDiskSpace(msg);
-            }
+            // Consider fcntl() as an optimization on Apple devices, where if it fails,
+            // we fall back to manually consuming space which is slower but may succeed in some
+            // cases where fcntl fails. Some known cases are:
+            // 1) There's a timing sensitive bug on APFS which causes fcntl to sometimes throw EINVAL.
+            // This might not be the case, but we'll fall back and attempt to manually allocate all the requested
+            // space. Worst case, this might also fail, but there is also a chance it will succeed. We don't
+            // call this in the first place because using fcntl(F_PREALLOCATE) will be faster if it works (it has
+            // been reliable on HSF+).
+            // 2) fcntl will fail with ENOTSUP on non-supported file systems such as ExFAT. In this case
+            // the fallback should succeed.
+            // 3) if there is some other error such as no space left (ENOSPC) we will expect to fail again later
+            consume_space_interlocked();
         }
     }
 
