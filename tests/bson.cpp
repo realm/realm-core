@@ -18,8 +18,6 @@
 
 #include <stdio.h>
 #include <json.hpp>
-#include <variant>
-#include <any>
 
 #include "catch2/catch.hpp"
 #include "util/test_utils.hpp"
@@ -40,7 +38,7 @@ static inline std::string remove_whitespace(const char* c) {
  ======== BSON CORPUS ========
  */
 template <typename T>
-using CorpusCheck = std::function<bool(T)>;
+using CorpusCheck = void(*)(T);
 
 template <typename T>
 struct CorpusEntry {
@@ -53,9 +51,9 @@ template <typename T>
 static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry) {
     std::string canonical_extjson = remove_whitespace(entry.canonical_extjson);
     auto val = static_cast<BsonDocument>(bson::parse(canonical_extjson));
-    auto test_value = val[test_key];
+    auto& test_value = val[test_key];
     REQUIRE(bson::holds_alternative<T>(test_value));
-    CHECK(entry.check((T)test_value));
+    entry.check((T)test_value);
     if (!entry.lossy) {
         std::stringstream s;
         s << val;
@@ -105,25 +103,28 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Empty") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : []}",
-                [](auto val) { return val.empty(); }
+                [](auto val) { CHECK(val.empty()); }
             });
         }
         SECTION("Single Element Array") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}]}",
-                [](auto val) { return (int32_t)val[0] == 10; }
+                [](auto val) { CHECK((int32_t)val[0] == 10); }
             });
         }
         SECTION("Single Element Boolean Array") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [true]}",
-                [](auto val) { return (bool)val[0]; }
+                [](auto val) { CHECK((bool)val[0]); }
             });
         }
         SECTION("Multi Element Array") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}, {\"$numberInt\": \"20\"}]}",
-                [](auto val) { return (int32_t)val[0] == 10 && (int32_t)val[1] == 20; }
+                [](auto val) {
+                    CHECK((int32_t)val[0] == 10);
+                    CHECK((int32_t)val[1] == 20);
+                }
             });
         }
     }
@@ -132,14 +133,14 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("subtype 0x00 (Zero-length)") {
             run_corpus<std::vector<char>>("x", {
                 "{\"x\" : { \"$binary\" : {\"base64\" : \"\", \"subType\" : \"00\"}}}",
-                [](auto val) { return val == std::vector<char>(); }
+                [](auto val) { CHECK(val == std::vector<char>()); }
             });
         }
         SECTION("subtype 0x00 (Zero-length, keys reversed)") {
             run_corpus<std::vector<char>>("x", {
 
                 "{\"x\" : { \"$binary\" : {\"base64\" : \"\", \"subType\" : \"00\"}}}",
-                [](auto val) { return val == std::vector<char>(); }
+                [](auto val) { CHECK(val == std::vector<char>()); }
             });
         }
 
@@ -148,7 +149,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 "{\"x\" : { \"$binary\" : {\"base64\" : \"//8=\", \"subType\" : \"00\"}}}",
                 [](auto val) {
                     std::string bin = "//8=";
-                    return val == std::vector<char>(bin.begin(), bin.end());
+                    CHECK(val == std::vector<char>(bin.begin(), bin.end()));
                 }
             });
         }
@@ -158,44 +159,53 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("True") {
             run_corpus<bool>("b", {
                 "{\"b\" : true}",
-                [](auto val) { return val; }
+                [](auto val) { CHECK(val); }
             });
         }
 
         SECTION("False") {
             run_corpus<bool>("b", {
                 "{\"b\" : false}",
-                [](auto val) { return !val; }
+                [](auto val) { CHECK(!val); }
             });
         }
     }
 
     SECTION("DateTime") {
         SECTION("epoch") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"0\"}}}",
                 [](auto val) {
-                    return val.seconds_since_epoch == 0;
+                    CHECK(val.get_seconds() == 0);
+                    CHECK(val.get_nanoseconds() == 0);
                 }
             });
         }
         SECTION("positive ms") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"1356351330501\"}}}",
-                [](auto val) { return val.seconds_since_epoch == 1356351330501; }
+                [](auto val) {
+                    CHECK(val.get_seconds() == 1356351330501 / 1000);
+                    CHECK(val.get_nanoseconds() == 501000000);
+                }
             });
         }
         SECTION("negative") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"-284643869501\"}}}",
-                [](auto val) { return val.seconds_since_epoch == -284643869501;
+                [](auto val) {
+                    CHECK(val.get_seconds() == -284643869501 / 1000);
+                    CHECK(val.get_nanoseconds() == -501000000);
                 }
             });
         }
         SECTION("Y10K") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\":{\"$date\":{\"$numberLong\":\"253402300800000\"}}}",
-                [](auto val) { return val.seconds_since_epoch == 253402300800000; }
+                [](auto val) {
+                    CHECK(val.get_seconds() == 253402300800000 / 1000);
+                    CHECK(val.get_nanoseconds() == 0);
+                }
             });
         };
     }
@@ -204,33 +214,33 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Special - Canonical NaN") {
             run_corpus<Decimal128>("d", {
                 "{\"d\" : {\"$numberDecimal\" : \"NaN\"}}",
-                [](auto val) { return val.is_nan();  }
+                [](auto val) { CHECK(val.is_nan());  }
             });
         }
 
         SECTION("Special - Canonical Positive Infinity") {
             run_corpus<Decimal128>("d", {
                 "{\"d\" : {\"$numberDecimal\" : \"Infinity\"}}",
-                [](auto val) { return val == Decimal128("Infinity"); }
+                [](auto val) { CHECK(val == Decimal128("Infinity")); }
             });
         }
         SECTION("Special - Canonical Negative Infinity") {
             run_corpus<Decimal128>("d", {
                 "{\"d\" : {\"$numberDecimal\" : \"-Infinity\"}}",
-                [](auto val) { return val == Decimal128("-Infinity"); }
+                [](auto val) { CHECK(val == Decimal128("-Infinity")); }
             });
         }
         SECTION("Regular - Smallest") {
             run_corpus<Decimal128>("d", {
                 "{\"d\" : {\"$numberDecimal\" : \"1.234E-3\"}}",
-                [](auto val) { return val == Decimal128("0.001234"); }
+                [](auto val) { CHECK(val == Decimal128("0.001234")); }
             });
         }
 
         SECTION("Regular - 0.1") {
             run_corpus<Decimal128>("d", {
                 "{\"d\" : {\"$numberDecimal\" : \"1E-1\"}}",
-                [](auto val) { return val == Decimal128("0.1"); }
+                [](auto val) { CHECK(val == Decimal128("0.1")); }
             });
         };
     }
@@ -239,26 +249,73 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Empty subdoc") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {}}",
-                [](auto val) { return val.empty(); }
+                [](auto val) { CHECK(val.empty()); }
             });
         }
         SECTION("Empty-string key subdoc") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {\"\" : \"b\"}}",
-                [](auto val) { return (std::string)val[""] == "b"; }
+                [](auto val) { CHECK((std::string)val[""] == "b"); }
             });
         }
         SECTION("Single-character key subdoc") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {\"a\" : \"b\"}}",
-                [](auto val) { return (std::string)val["a"] == "b"; }
+                [](auto val) { CHECK((std::string)val["a"] == "b"); }
+            });
+        }
+        SECTION("Nested Objects") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": "world", "_id": {"$oid": "5ec38e1e693f9e61e968f701"}}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 2);
+                    CHECK(inner["hello"].operator const std::string&() == "world");
+                    CHECK(inner["_id"].operator ObjectId() == ObjectId("5ec38e1e693f9e61e968f701"));
+                }
+            });
+        }
+        SECTION("Nested Objects 2") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": {"$numberInt": "42"}}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 1);
+                    CHECK(inner["hello"].operator int32_t() == 42);
+                }
+            });
+        }
+        SECTION("Nested Objects 3") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": "world"}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 1);
+                    CHECK(inner["hello"].operator const std::string&() == "world");
+                }
+            });
+        }
+        SECTION("Nested Objects 3") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": "world", "hello_2": "world_2"}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 2);
+                    CHECK(inner["hello"].operator const std::string&() == "world");
+                    CHECK(inner["hello_2"].operator const std::string&() == "world_2");
+                }
             });
         }
         SECTION("Nested Array Empty Objects") {
             run_corpus<BsonArray>("value", {
                 "{\"value\": [ {}, {} ] }",
                 [](auto val) {;
-                    return static_cast<BsonDocument>(val[0]).size() == 0 && static_cast<BsonDocument>(val[1]).size() == 0;
+                    CHECK(static_cast<BsonDocument>(val[0]).size() == 0);
+                    CHECK(static_cast<BsonDocument>(val[1]).size() == 0);
                 }
             });
         }
@@ -267,7 +324,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 "{\"value\": [ [ {\"$numberInt\": \"1\"}, true, {\"$numberInt\": \"3\"} ] ] }",
                 [](auto val) {;
                     const BsonArray sub_array = static_cast<BsonArray>(val[0]);
-                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == true && sub_array[2] == 3;
+                    CHECK(sub_array.size() == 3);
+                    CHECK(sub_array[0] == 1);
+                    CHECK(sub_array[1] == true);
+                    CHECK(sub_array[2] == 3);
                 }
             });
         }
@@ -276,7 +336,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 "{\"value\": [ [ {\"$numberInt\": \"1\"}, \"Realm\", {\"$numberInt\": \"3\"} ] ] }",
                 [](auto val) {;
                     const BsonArray sub_array = static_cast<BsonArray>(val[0]);
-                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == "Realm" && sub_array[2] == 3;
+                    CHECK(sub_array.size() == 3);
+                    CHECK(sub_array[0] == 1);
+                    CHECK(sub_array[1] == "Realm");
+                    CHECK(sub_array[2] == 3);
                 }
             });
         }
@@ -284,10 +347,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<BsonArray>("value", {
                 "{\"value\": [ {\"KEY\": \"666\"}, {\"KEY\": \"666\"}, {}] }",
                 [](auto val) {;
-                    return val.size() == 3
-                        && val[0] == BsonDocument({{"KEY", "666"}})
-                        && val[1] == BsonDocument({{"KEY", "666"}})
-                        && val[2] == BsonDocument();
+                    CHECK(val.size() == 3);
+                    CHECK(val[0] == BsonDocument({{"KEY", "666"}}));
+                    CHECK(val[1] == BsonDocument({{"KEY", "666"}}));
+                    CHECK(val[2] == BsonDocument());
                 }
             });
         }
@@ -299,72 +362,72 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("+1.0") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"1\"}}",
-                [](auto val) { return abs(val - 1.0) < epsilon; }
+                [](auto val) { CHECK(abs(val - 1.0) < epsilon); }
             });
         }
         SECTION("-1.0") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"-1\"}}",
-                [](auto val) { return abs(val - -1.0) < epsilon; }
+                [](auto val) { CHECK(abs(val - -1.0) < epsilon); }
             });
         }
         SECTION("+1.0001220703125") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"1.0001220703125\"}}",
-                [](auto val) { return abs(val - 1.0001220703125) < epsilon; },
+                [](auto val) { CHECK(abs(val - 1.0001220703125) < epsilon); },
                 true
             });
         }
         SECTION("-1.0001220703125") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"-1.0001220703125\"}}",
-                [](auto val) { return abs(val - -1.0001220703125) < epsilon; },
+                [](auto val) { CHECK(abs(val - -1.0001220703125) < epsilon); },
                 true
             });
         }
         SECTION("1.2345678921232E+18") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"1.2345678921232E+18\"}}",
-                [](auto val) { return abs(val - 1.2345678921232E+18) < epsilon; },
+                [](auto val) { CHECK(abs(val - 1.2345678921232E+18) < epsilon); },
                 true
             });
         }
         SECTION("-1.2345678921232E+18") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"-1.2345678921232E+18\"}}",
-                [](auto val) { return abs(val - -1.2345678921232E+18) < epsilon; },
+                [](auto val) { CHECK(abs(val - -1.2345678921232E+18) < epsilon); },
                 true
             });
         }
         SECTION("0.0") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"0\"}}",
-                [](auto val) { return abs(val - 0.0) < epsilon; }
+                [](auto val) { CHECK(abs(val - 0.0) < epsilon); }
 
             });
         }
         SECTION("-0.0") {
             run_corpus<double>("d", {
                 "{\"d\" : {\"$numberDouble\": \"-0\"}}",
-                [](auto val) { return abs(val - -0.0) < epsilon; }
+                [](auto val) { CHECK(abs(val - -0.0) < epsilon); }
             });
         }
         SECTION("NaN") {
             run_corpus<double>("d", {
                 "{\"d\": {\"$numberDouble\": \"NaN\"}}",
-                [](auto val) { return std::isnan(val); }
+                [](auto val) { CHECK(std::isnan(val)); }
             });
         }
         SECTION("Inf") {
             run_corpus<double>("d", {
                 "{\"d\": {\"$numberDouble\": \"Infinity\"}}",
-                [](auto val) { return val == std::numeric_limits<double>::infinity(); }
+                [](auto val) { CHECK(val == std::numeric_limits<double>::infinity()); }
             });
         }
         SECTION("-Inf") {
             run_corpus<double>("d", {
                 "{\"d\": {\"$numberDouble\": \"-Infinity\"}}",
-                [](auto val) { return val == (-1 * std::numeric_limits<double>::infinity()); }
+                [](auto val) { CHECK(val == (-1 * std::numeric_limits<double>::infinity())); }
             });
         }
     }
@@ -373,31 +436,31 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("MinValue") {
             run_corpus<int32_t>("i", {
                 "{\"i\" : {\"$numberInt\": \"-2147483648\"}}",
-                [](auto val) { return val == -2147483648; }
+                [](auto val) { CHECK(val == -2147483648); }
             });
         }
         SECTION("MaxValue") {
             run_corpus<int32_t>("i", {
                 "{\"i\" : {\"$numberInt\": \"2147483647\"}}",
-                [](auto val) { return val == 2147483647; }
+                [](auto val) { CHECK(val == 2147483647); }
             });
         }
         SECTION("-1") {
             run_corpus<int32_t>("i", {
                 "{\"i\" : {\"$numberInt\": \"-1\"}}",
-                [](auto val) { return val == -1; }
+                [](auto val) { CHECK(val == -1); }
             });
         }
         SECTION("0") {
             run_corpus<int32_t>("i", {
                 "{\"i\" : {\"$numberInt\": \"0\"}}",
-                [](auto val) { return val == 0; }
+                [](auto val) { CHECK(val == 0); }
             });
         }
         SECTION("1") {
             run_corpus<int32_t>("i", {
                 "{\"i\" : {\"$numberInt\": \"1\"}}",
-                [](auto val) { return val == 1; }
+                [](auto val) { CHECK(val == 1); }
             });
         }
     }
@@ -406,31 +469,31 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("MinValue") {
             run_corpus<int64_t>("a", {
                 "{\"a\" : {\"$numberLong\" : \"-9223372036854775808\"}}",
-                [](auto val) { return val == LLONG_MIN; }
+                [](auto val) { CHECK(val == LLONG_MIN); }
             });
         }
         SECTION("MaxValue") {
             run_corpus<int64_t>("a", {
                 "{\"a\" : {\"$numberLong\" : \"9223372036854775807\"}}",
-                [](auto val) { return val == LLONG_MAX; }
+                [](auto val) { CHECK(val == LLONG_MAX); }
             });
         }
         SECTION("-1") {
             run_corpus<int64_t>("a", {
                 "{\"a\" : {\"$numberLong\" : \"-1\"}}",
-                [](auto val) { return val == -1; }
+                [](auto val) { CHECK(val == -1); }
             });
         }
         SECTION("0") {
             run_corpus<int64_t>("a", {
                 "{\"a\" : {\"$numberLong\" : \"0\"}}",
-                [](auto val) { return val == 0; }
+                [](auto val) { CHECK(val == 0); }
             });
         }
         SECTION("1") {
             run_corpus<int64_t>("a", {
                 "{\"a\" : {\"$numberLong\" : \"1\"}}",
-                [](auto val) { return val == 1; }
+                [](auto val) { CHECK(val == 1); }
             });
         }
     }
@@ -438,14 +501,14 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
     SECTION("Maxkey type") {
         run_corpus<MaxKey>("a", {
                 "{\"a\" : {\"$maxKey\" : 1}}",
-                [](auto val) { return val == max_key; }
+                [](auto val) { CHECK(val == max_key); }
         });
     }
 
     SECTION("Minkey type") {
         run_corpus<MinKey>("a", {
                 "{\"a\" : {\"$minKey\" : 1}}",
-                [](auto val) { return val == min_key; }
+                [](auto val) { CHECK(val == min_key); }
         });
     }
 
@@ -467,11 +530,11 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 {"foo", std::string("bar") }
             }},
             { "Array", BsonArray {1, 2, 3, 4, 5} },
-            { "Timestamp", Timestamp(42, 1) },
+            { "Timestamp", MongoTimestamp(42, 1) },
             { "Regex", RegularExpression("pattern", "") },
-            { "DatetimeEpoch", Datetime(0) },
-            { "DatetimePositive", Datetime(INT_MAX) },
-            { "DatetimeNegative", Datetime(INT_MIN) },
+            { "DatetimeEpoch", realm::Timestamp(0, 0) },
+            { "DatetimePositive", realm::Timestamp(INT_MAX/1000, 647000000) },
+            { "DatetimeNegative", realm::Timestamp(INT_MIN/1000, -648000000) },
             { "True", true },
             { "False", false },
             { "Minkey", min_key },
@@ -488,7 +551,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
     SECTION("Null type") {
         run_corpus<realm::util::None>("a", {
             "{\"a\" : null}",
-            [](auto) { return true; }
+            [](auto) { CHECK(true); }
         });
     }
 
@@ -496,19 +559,19 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("All zeroes") {
             run_corpus<ObjectId>("a", {
                 "{\"a\" : {\"$oid\" : \"000000000000000000000000\"}}",
-                [](auto val) { return val == ObjectId("000000000000000000000000"); }
+                [](auto val) { CHECK(val == ObjectId("000000000000000000000000")); }
             });
         }
         SECTION("All ones") {
             run_corpus<ObjectId>("a", {
                 "{\"a\" : {\"$oid\" : \"ffffffffffffffffffffffff\"}}",
-                [](auto val) { return val == ObjectId("ffffffffffffffffffffffff"); }
+                [](auto val) { CHECK(val == ObjectId("ffffffffffffffffffffffff")); }
             });
         }
         SECTION("Random") {
             run_corpus<ObjectId>("a", {
                 "{\"a\" : {\"$oid\" : \"56e1fc72e0c917e9c4714161\"}}",
-                [](auto val) { return val == ObjectId("56e1fc72e0c917e9c4714161"); }
+                [](auto val) { CHECK(val == ObjectId("56e1fc72e0c917e9c4714161")); }
             });
         }
     }
@@ -517,22 +580,22 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("empty regex with no options") {
             run_corpus<RegularExpression>("a", {
                 "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"\", \"options\" : \"\"}}}",
-                [](auto val) { return val == RegularExpression(); }
+                [](auto val) { CHECK(val == RegularExpression()); }
             });
         }
         SECTION("regex without options") {
             run_corpus<RegularExpression>("a", {
                 "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"abc\", \"options\" : \"\"}}}",
-                [](auto val) { return val == RegularExpression("abc", ""); }
+                [](auto val) { CHECK(val == RegularExpression("abc", "")); }
             });
         }
         SECTION("regex with options") {
             run_corpus<RegularExpression>("a", {
                 "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"abc\", \"options\" : \"im\"}}}",
                 [](auto val) {
-                    return val.pattern() == "abc"
-                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
-                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None);
+                    CHECK(val.pattern() == "abc");
+                    CHECK(((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None));
+                    CHECK(((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None));
                 }
             });
         }
@@ -540,9 +603,9 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<RegularExpression>("a", {
                 "{\"a\" : {\"$regularExpression\" : {\"options\" : \"im\", \"pattern\": \"abc\"}}}",
                 [](auto val) {
-                    return val.pattern() == "abc"
-                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
-                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None);
+                    CHECK(val.pattern() == "abc");
+                    CHECK(((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None));
+                    CHECK(((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None));
                 },
                 true
             });
@@ -551,9 +614,9 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<RegularExpression>("a", {
                 "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"ab/cd\", \"options\" : \"im\"}}}",
                 [](auto val) {
-                    return val.pattern() == "ab/cd"
-                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
-                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None);
+                    CHECK(val.pattern() == "ab/cd");
+                    CHECK(((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None));
+                    CHECK(((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None));
                 }
             });
         }
@@ -561,10 +624,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<RegularExpression>("a", {
                 "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"abc\", \"options\" : \"mix\"}}}",
                 [](auto val) {
-                    return val.pattern() == "abc"
-                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
-                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None)
-                    && ((val.options() & RegularExpression::Option::Extended) != RegularExpression::Option::None);
+                    CHECK(val.pattern() == "abc");
+                    CHECK(((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None));
+                    CHECK(((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None));
+                    CHECK(((val.options() & RegularExpression::Option::Extended) != RegularExpression::Option::None));
                 },
                 true
             });
@@ -573,9 +636,9 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<RegularExpression>("$regex", {
                 "{\"$regex\" : {\"$regularExpression\" : { \"pattern\": \"pattern\", \"options\" : \"ix\"}}}",
                 [](auto val) {
-                    return val.pattern() == "pattern"
-                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
-                    && ((val.options() & RegularExpression::Option::Extended) != RegularExpression::Option::None);
+                    CHECK(val.pattern() == "pattern");
+                    CHECK(((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None));
+                    CHECK(((val.options() & RegularExpression::Option::Extended) != RegularExpression::Option::None));
                 }
             });
         }
@@ -585,46 +648,51 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Empty string") {
             run_corpus<std::string>("a", {
                 "{\"a\" : \"\"}",
-                [](auto val) { return val.empty(); }
+                [](auto val) { CHECK(val.empty()); }
             });
         }
         SECTION("Single character") {
             run_corpus<std::string>("a", {
                 "{\"a\" : \"b\"}",
-                [](auto val) { return val == "b"; }
+                [](auto val) { CHECK(val == "b"); }
             });
         }
         SECTION("Multi-character") {
             run_corpus<std::string>("a", {
                 "{\"a\" : \"abababababab\"}",
-                [](auto val) { return val == "abababababab"; }
+                [](auto val) { CHECK(val == "abababababab"); }
             });
         }
     }
-
-    // Note that the mapping from Bson Timestamp to realm::Timestamp drops
-    // the increment value of the Bson Timestamp. Bson Timestamp is an
-    // internal type that is not meant to be sent over the wire, but we
-    // will still offer partial support.
+    
     SECTION("Timestamp") {
         SECTION("Timestamp: (123456789, 42)") {
-            run_corpus<realm::Timestamp>("a", {
+            run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42} } }",
-                [](auto val) { return val.get_seconds() == 123456789 && val.get_nanoseconds() == 1; },
+                [](auto val) {
+                    CHECK(val.seconds == 123456789);
+                    CHECK(val.increment == 42);
+                },
                 true
             });
         }
         SECTION("Timestamp: (123456789, 42) (keys reversed)") {
-            run_corpus<realm::Timestamp>("a", {
+            run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"i\" : 42, \"t\" : 123456789} } }",
-                [](auto val) { return val.get_seconds() == 123456789 && val.get_nanoseconds() == 1; },
+                [](auto val) {
+                    CHECK(val.seconds == 123456789);
+                    CHECK(val.increment == 42);
+                },
                 true
             });
         }
         SECTION("Timestamp with high-order bit set on both seconds and increment") {
-            run_corpus<realm::Timestamp>("a", {
+            run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"t\" : 4294967295, \"i\" :  4294967295} } }",
-                [](auto val) { return val.get_seconds() == 4294967295 && val.get_nanoseconds() == 1; },
+                [](auto val) {
+                    CHECK(val.seconds == 4294967295);
+                    CHECK(val.increment == 4294967295);
+                },
                 true
             });
         }

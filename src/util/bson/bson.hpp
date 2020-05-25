@@ -23,7 +23,7 @@
 #include "util/bson/regular_expression.hpp"
 #include "util/bson/min_key.hpp"
 #include "util/bson/max_key.hpp"
-#include "util/bson/datetime.hpp"
+#include "util/bson/mongo_timestamp.hpp"
 
 #include <realm/binary_data.hpp>
 #include <realm/timestamp.hpp>
@@ -71,8 +71,8 @@ public:
     Bson(double) noexcept;
     Bson(MinKey) noexcept;
     Bson(MaxKey) noexcept;
-    Bson(Datetime) noexcept;
-    Bson(Timestamp) noexcept;
+    Bson(MongoTimestamp) noexcept;
+    Bson(realm::Timestamp) noexcept;
     Bson(Decimal128) noexcept;
     Bson(ObjectId) noexcept;
 
@@ -145,16 +145,16 @@ public:
         return binary_val;
     }
 
-    explicit operator Datetime() const
-    {
-        REALM_ASSERT(m_type == Bson::Type::Datetime);
-        return date_val;
-    }
-
-    explicit operator Timestamp() const
+    explicit operator MongoTimestamp() const
     {
         REALM_ASSERT(m_type == Bson::Type::Timestamp);
         return time_val;
+    }
+
+    explicit operator realm::Timestamp() const
+    {
+        REALM_ASSERT(m_type == Bson::Type::Datetime);
+        return date_val;
     }
 
     explicit operator ObjectId() const
@@ -215,12 +215,12 @@ private:
         int64_t int64_val;
         bool bool_val;
         double double_val;
-        Timestamp time_val;
+        MongoTimestamp time_val;
         ObjectId oid_val;
         Decimal128 decimal_val;
         MaxKey max_key_val;
         MinKey min_key_val;
-        Datetime date_val;
+        realm::Timestamp date_val;
         // ref types
         RegularExpression regex_val;
         std::string string_val;
@@ -289,16 +289,16 @@ inline Bson::Bson(std::string&& v) noexcept
     new (&string_val) std::string(std::move(v));
 }
 
-inline Bson::Bson(Datetime v) noexcept
-{
-    m_type = Bson::Type::Datetime;
-    date_val = v;
-}
-
-inline Bson::Bson(Timestamp v) noexcept
+inline Bson::Bson(MongoTimestamp v) noexcept
 {
     m_type = Bson::Type::Timestamp;
     time_val = v;
+}
+
+inline Bson::Bson(realm::Timestamp v) noexcept
+{
+    m_type = Bson::Type::Datetime;
+    date_val = v;
 }
 
 inline Bson::Bson(Decimal128 v) noexcept

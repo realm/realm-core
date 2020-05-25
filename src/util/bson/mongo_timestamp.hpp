@@ -16,13 +16,32 @@
 *
 **************************************************************************/
 
-#include "util/bson/datetime.hpp"
+#ifndef REALM_BSON_DATETIME_HPP
+#define REALM_BSON_DATETIME_HPP
+
+#include <cstdint>
 
 namespace realm {
 namespace bson {
 
-Datetime::Datetime(time_t epoch) : seconds_since_epoch(epoch) {
-}
+struct MongoTimestamp {
+    MongoTimestamp(uint32_t seconds, uint32_t increment) :seconds(seconds), increment(increment) {}
+
+    friend bool inline operator==(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
+    {
+        return lhs.seconds == rhs.seconds && lhs.increment == rhs.increment;
+    }
+
+    friend bool inline operator!=(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    uint32_t seconds;
+    uint32_t increment;
+};
 
 } // namespace bson
 } // namespace realm
+
+#endif /* datetime_hpp */
