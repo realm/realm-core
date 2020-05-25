@@ -415,7 +415,7 @@ private:
     util::RaceDetector m_race_detector;
 
     friend class Table;
-    friend class ConstObj;
+    friend class Obj;
     friend class Query;
     friend class DB;
     friend class ObjList;

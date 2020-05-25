@@ -2575,7 +2575,7 @@ TransactionRef DB::start_write(bool nonblocking)
     return TransactionRef(tr, TransactionDeleter);
 }
 
-Obj Transaction::import_copy_of(const ConstObj& original)
+Obj Transaction::import_copy_of(const Obj& original)
 {
     if (bool(original) && original.is_valid()) {
         TableKey tk = original.get_table_key();

@@ -75,7 +75,7 @@ void LinkMap::map_links(size_t column, ObjKey key, LinkMapFunction& lm) const
 {
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
-    ConstObj obj = m_tables[column]->get_object(key);
+    const Obj obj = m_tables[column]->get_object(key);
     if (type == col_type_Link) {
         if (ObjKey k = obj.get<ObjKey>(m_link_column_keys[column])) {
             if (!k.is_unresolved()) {
@@ -190,7 +190,7 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
         auto forward_type = link_table->get_column_type(link_col_ndx);
 
         for (auto k : keys) {
-            ConstObj o = link_table.unchecked_ptr()->get_object(k);
+            const Obj o = link_table.unchecked_ptr()->get_object(k);
             if (forward_type == type_Link) {
                 ret.push_back(o.get<ObjKey>(link_col_ndx));
             }
@@ -207,7 +207,7 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
     else {
         auto target = m_tables[column + 1];
         for (auto k : keys) {
-            ConstObj o = target->get_object(k);
+            const Obj o = target->get_object(k);
             auto cnt = o.get_backlink_count(*origin, origin_col);
             for (size_t i = 0; i < cnt; i++) {
                 ret.push_back(o.get_backlink(*origin, origin_col, i));
@@ -261,7 +261,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         if (m_link_map.only_unary_links()) {
             ref_type val = 0;
             if (sz == 1) {
-                ConstObj obj = m_link_map.get_target_table()->get_object(links[0]);
+                const Obj obj = m_link_map.get_target_table()->get_object(links[0]);
                 val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
             }
             destination.init(false, 1, val);
@@ -269,7 +269,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         else {
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
+                const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
                 ref_type val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
                 destination.m_storage.set(t, val);
             }

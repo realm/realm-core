@@ -144,7 +144,7 @@ protected:
     friend class Transaction;
 
 
-    ConstObj* m_const_obj;
+    Obj* m_const_obj;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -152,7 +152,7 @@ protected:
     mutable uint_fast64_t m_content_version = 0;
     mutable uint_fast64_t m_last_content_version = 0;
 
-    ConstLstBase(ColKey col_key, ConstObj* obj);
+    ConstLstBase(ColKey col_key, Obj* obj);
     virtual bool init_from_parent() const = 0;
 
     ref_type get_child_ref(size_t) const noexcept override;
@@ -318,7 +318,7 @@ inline void check_column_type<ObjKey>(ColKey col)
 }
 
 /// This class defines the interface to ConstList, except for the constructor
-/// The ConstList class has the ConstObj member m_obj, which should not be
+/// The ConstList class has the Obj member m_obj, which should not be
 /// inherited from Lst<T>.
 template <class T>
 class ConstLstIf : public virtual ConstLstBase {
@@ -461,7 +461,7 @@ protected:
 template <class T>
 class ConstLst : public ConstLstIf<T> {
 public:
-    ConstLst(const ConstObj& owner, ColKey col_key);
+    ConstLst(const Obj& owner, ColKey col_key);
     ConstLst(ConstLst&& other) noexcept
         : ConstLstBase(other.m_col_key, &m_obj)
         , ConstLstIf<T>(std::move(other))
@@ -471,7 +471,7 @@ public:
     }
 
 private:
-    ConstObj m_obj;
+    Obj m_obj;
     void update_child_ref(size_t, ref_type) override
     {
     }
@@ -488,9 +488,9 @@ public:
     virtual ~LstBase()
     {
     }
-    auto clone() const
+    LstBasePtr clone() const
     {
-        return static_cast<const Obj*>(m_const_obj)->get_listbase_ptr(m_col_key);
+        return m_const_obj->get_listbase_ptr(m_col_key);
     }
     virtual void set_null(size_t ndx) = 0;
     virtual void insert_null(size_t ndx) = 0;
@@ -780,7 +780,7 @@ public:
     {
     }
 
-    ConstLnkLst(const ConstObj& obj, ColKey col_key)
+    ConstLnkLst(const Obj& obj, ColKey col_key)
         : ConstLstBase(col_key, &m_obj)
         , ConstLstIf<ObjKey>(obj.get_alloc())
         , m_obj(obj)
@@ -814,18 +814,18 @@ public:
         return ConstLstIf<ObjKey>::get(virtual2real(m_unresolved, ndx));
     }
 
-    ConstObj operator[](size_t link_ndx) const
+    Obj operator[](size_t link_ndx) const
     {
         return get_object(link_ndx);
     }
-    ConstObj get_object(size_t link_ndx) const;
+    Obj get_object(size_t link_ndx) const;
 
     void update_child_ref(size_t, ref_type) override
     {
     }
 
 private:
-    ConstObj m_obj;
+    Obj m_obj;
     // Sorted set of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
     bool init_from_parent() const override;
@@ -958,18 +958,6 @@ private:
     bool init_from_parent() const override;
 };
 
-template <typename U>
-ConstLst<U> ConstObj::get_list(ColKey col_key) const
-{
-    return ConstLst<U>(*this, col_key);
-}
-
-template <typename U>
-ConstLstPtr<U> ConstObj::get_list_ptr(ColKey col_key) const
-{
-    Obj obj(*this);
-    return std::const_pointer_cast<const Lst<U>>(obj.get_list_ptr<U>(col_key));
-}
 
 template <typename U>
 Lst<U> Obj::get_list(ColKey col_key) const
@@ -987,22 +975,6 @@ template <>
 inline LstPtr<ObjKey> Obj::get_list_ptr(ColKey col_key) const
 {
     return get_linklist_ptr(col_key);
-}
-
-inline ConstLnkLst ConstObj::get_linklist(ColKey col_key) const
-{
-    return ConstLnkLst(*this, col_key);
-}
-
-inline ConstLnkLst ConstObj::get_linklist(StringData col_name) const
-{
-    return get_linklist(get_column_key(col_name));
-}
-
-inline ConstLnkLstPtr ConstObj::get_linklist_ptr(ColKey col_key) const
-{
-    Obj obj(*this);
-    return obj.get_linklist_ptr(col_key);
 }
 
 inline LnkLst Obj::get_linklist(ColKey col_key) const

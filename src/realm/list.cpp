@@ -36,71 +36,6 @@
 
 namespace realm {
 
-ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
-{
-    auto attr = get_table()->get_column_attr(col_key);
-    REALM_ASSERT(attr.test(col_attr_List));
-    bool nullable = attr.test(col_attr_Nullable);
-
-    switch (get_table()->get_column_type(col_key)) {
-        case type_Int: {
-            if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Int>>>(*this, col_key);
-            else
-                return std::make_unique<ConstLst<Int>>(*this, col_key);
-        }
-        case type_Bool: {
-            if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Bool>>>(*this, col_key);
-            else
-                return std::make_unique<ConstLst<Bool>>(*this, col_key);
-        }
-        case type_Float: {
-            if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Float>>>(*this, col_key);
-            else
-                return std::make_unique<ConstLst<Float>>(*this, col_key);
-        }
-        case type_Double: {
-            if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Double>>>(*this, col_key);
-            else
-                return std::make_unique<ConstLst<Double>>(*this, col_key);
-        }
-        case type_String: {
-            return std::make_unique<ConstLst<String>>(*this, col_key);
-        }
-        case type_Binary: {
-            return std::make_unique<ConstLst<Binary>>(*this, col_key);
-        }
-        case type_Timestamp: {
-            return std::make_unique<ConstLst<Timestamp>>(*this, col_key);
-        }
-        case type_Decimal: {
-            return std::make_unique<ConstLst<Decimal128>>(*this, col_key);
-        }
-        case type_ObjectId: {
-            if (nullable) {
-                return std::make_unique<ConstLst<util::Optional<ObjectId>>>(*this, col_key);
-            }
-            else {
-                return std::make_unique<ConstLst<ObjectId>>(*this, col_key);
-            }
-        }
-        case type_LinkList: {
-            const ConstLstBase* clb = get_linklist_ptr(col_key).release();
-            return ConstLstBasePtr(const_cast<ConstLstBase*>(clb));
-        }
-        case type_Link:
-        case type_OldDateTime:
-        case type_OldTable:
-        case type_OldMixed:
-            REALM_ASSERT(false);
-            break;
-    }
-    return {};
-}
-
 LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 {
     auto attr = get_table()->get_column_attr(col_key);
@@ -164,7 +99,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-ConstLstBase::ConstLstBase(ColKey col_key, ConstObj* obj)
+ConstLstBase::ConstLstBase(ColKey col_key, Obj* obj)
     : m_const_obj(obj)
     , m_col_key(col_key)
 {
@@ -174,7 +109,7 @@ ConstLstBase::ConstLstBase(ColKey col_key, ConstObj* obj)
 }
 
 template <class T>
-ConstLst<T>::ConstLst(const ConstObj& obj, ColKey col_key)
+ConstLst<T>::ConstLst(const Obj& obj, ColKey col_key)
     : ConstLstBase(col_key, &m_obj)
     , ConstLstIf<T>(obj.get_alloc())
     , m_obj(obj)
@@ -391,21 +326,21 @@ void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 
 /************************* template instantiations ***************************/
 
-template ConstLst<int64_t>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<Int>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<bool>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<bool>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<float>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<float>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<double>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<double>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<BinaryData>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<Timestamp>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<ObjKey>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<Decimal128>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<ObjectId>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<ObjectId>>::ConstLst(const ConstObj& obj, ColKey col_key);
+template ConstLst<int64_t>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<util::Optional<Int>>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<bool>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<util::Optional<bool>>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<float>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<util::Optional<float>>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<double>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<util::Optional<double>>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<StringData>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<BinaryData>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<Timestamp>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<ObjKey>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<Decimal128>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<ObjectId>::ConstLst(const Obj& obj, ColKey col_key);
+template ConstLst<util::Optional<ObjectId>>::ConstLst(const Obj& obj, ColKey col_key);
 
 template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
@@ -423,7 +358,7 @@ template Lst<Decimal128>::Lst(const Obj& obj, ColKey col_key);
 template Lst<ObjectId>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<ObjectId>>::Lst(const Obj& obj, ColKey col_key);
 
-ConstObj ConstLnkLst::get_object(size_t link_ndx) const
+Obj ConstLnkLst::get_object(size_t link_ndx) const
 {
     return m_const_obj->get_target_table(m_col_key)->get_object(get(link_ndx));
 }

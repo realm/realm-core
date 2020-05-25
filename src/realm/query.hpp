@@ -300,7 +300,7 @@ public:
     std::string get_description() const;
     std::string get_description(util::serializer::SerialisationState& state) const;
 
-    bool eval_object(ConstObj& obj) const;
+    bool eval_object(const Obj& obj) const;
 
 private:
     void create();

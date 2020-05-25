@@ -39,9 +39,9 @@
 
 namespace realm {
 
-/********************************* ConstObj **********************************/
+/********************************* Obj **********************************/
 
-ConstObj::ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx)
+Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     : m_table(table)
     , m_key(key)
     , m_mem(mem)
@@ -51,12 +51,12 @@ ConstObj::ConstObj(ConstTableRef table, MemRef mem, ObjKey key, size_t row_ndx)
     m_storage_version = get_alloc().get_storage_version();
 }
 
-GlobalKey ConstObj::get_object_id() const
+GlobalKey Obj::get_object_id() const
 {
     return m_table->get_object_id(m_key);
 }
 
-const ClusterTree* ConstObj::get_tree_top() const
+const ClusterTree* Obj::get_tree_top() const
 {
     if (m_key.is_unresolved()) {
         return m_table.unchecked_ptr()->m_tombstones.get();
@@ -66,7 +66,7 @@ const ClusterTree* ConstObj::get_tree_top() const
     }
 }
 
-Allocator& ConstObj::get_alloc() const
+Allocator& Obj::get_alloc() const
 {
     // Do a "checked" deref to table to ensure the instance_version is correct.
     // Even if removed from the public API, this should *not* be optimized away,
@@ -75,25 +75,25 @@ Allocator& ConstObj::get_alloc() const
     return m_table->m_alloc;
 }
 
-Allocator& ConstObj::_get_alloc() const
+Allocator& Obj::_get_alloc() const
 {
     // Bypass check of table instance version. To be used only in contexts,
     // where instance version match has already been established (e.g _get<>)
     return m_table.unchecked_ptr()->m_alloc;
 }
 
-const Spec& ConstObj::get_spec() const
+const Spec& Obj::get_spec() const
 {
     return m_table.unchecked_ptr()->m_spec;
 }
 
-Replication* ConstObj::get_replication() const
+Replication* Obj::get_replication() const
 {
     return m_table->get_repl();
 }
 
 template <class T>
-inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx) const
+inline int Obj::cmp(const Obj& other, ColKey::Idx col_ndx) const
 {
     T val1 = _get<T>(col_ndx);
     T val2 = other._get<T>(col_ndx);
@@ -106,7 +106,7 @@ inline int ConstObj::cmp(const ConstObj& other, ColKey::Idx col_ndx) const
     return 0;
 }
 
-int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
+int Obj::cmp(const Obj& other, ColKey col_key) const
 {
     other.check_valid();
     ColKey::Idx col_ndx = col_key.get_index();
@@ -151,7 +151,7 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
     return 0;
 }
 
-bool ConstObj::operator==(const ConstObj& other) const
+bool Obj::operator==(const Obj& other) const
 {
     size_t col_cnt = get_spec().get_public_column_count();
     while (col_cnt--) {
@@ -163,7 +163,7 @@ bool ConstObj::operator==(const ConstObj& other) const
     return true;
 }
 
-bool ConstObj::is_valid() const
+bool Obj::is_valid() const
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid)
@@ -173,33 +173,33 @@ bool ConstObj::is_valid() const
     return m_valid;
 }
 
-void ConstObj::check_valid() const
+void Obj::check_valid() const
 {
     if (!is_valid())
         throw std::runtime_error("Object not alive");
 }
 
-void ConstObj::remove()
+void Obj::remove()
 {
     m_table.cast_away_const()->remove_object(m_key);
 }
 
-void ConstObj::invalidate()
+void Obj::invalidate()
 {
     m_table.cast_away_const()->invalidate_object(m_key);
 }
 
-ColKey ConstObj::get_column_key(StringData col_name) const
+ColKey Obj::get_column_key(StringData col_name) const
 {
     return get_table()->get_column_key(col_name);
 }
 
-TableKey ConstObj::get_table_key() const
+TableKey Obj::get_table_key() const
 {
     return get_table()->get_key();
 }
 
-TableRef ConstObj::get_target_table(ColKey col_key) const
+TableRef Obj::get_target_table(ColKey col_key) const
 {
     if (m_table) {
         return _impl::TableFriend::get_opposite_link_table(*m_table.unchecked_ptr(), col_key);
@@ -209,15 +209,10 @@ TableRef ConstObj::get_target_table(ColKey col_key) const
     }
 }
 
-Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
-    : ConstObj(table, mem, key, row_ndx)
-{
-}
-
-inline bool ConstObj::update() const
+inline bool Obj::update() const
 {
     // Get a new object from key
-    ConstObj new_obj = get_tree_top()->get(m_key);
+    Obj new_obj = get_tree_top()->get(m_key);
 
     bool changes = (m_mem.get_addr() != new_obj.m_mem.get_addr()) || (m_row_ndx != new_obj.m_row_ndx);
     if (changes) {
@@ -230,7 +225,7 @@ inline bool ConstObj::update() const
     return changes;
 }
 
-inline bool ConstObj::_update_if_needed() const
+inline bool Obj::_update_if_needed() const
 {
     auto current_version = _get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
@@ -239,7 +234,7 @@ inline bool ConstObj::_update_if_needed() const
     return false;
 }
 
-bool ConstObj::update_if_needed() const
+bool Obj::update_if_needed() const
 {
     auto current_version = get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
@@ -249,7 +244,7 @@ bool ConstObj::update_if_needed() const
 }
 
 template <class T>
-T ConstObj::get(ColKey col_key) const
+T Obj::get(ColKey col_key) const
 {
     m_table->report_invalid_key(col_key);
     ColumnType type = col_key.get_type();
@@ -259,7 +254,7 @@ T ConstObj::get(ColKey col_key) const
 }
 
 template <class T>
-T ConstObj::_get(ColKey::Idx col_ndx) const
+T Obj::_get(ColKey::Idx col_ndx) const
 {
     _update_if_needed();
 
@@ -271,7 +266,7 @@ T ConstObj::_get(ColKey::Idx col_ndx) const
 }
 
 template <>
-ObjKey ConstObj::_get<ObjKey>(ColKey::Idx col_ndx) const
+ObjKey Obj::_get<ObjKey>(ColKey::Idx col_ndx) const
 {
     _update_if_needed();
 
@@ -283,7 +278,7 @@ ObjKey ConstObj::_get<ObjKey>(ColKey::Idx col_ndx) const
     return k.is_unresolved() ? ObjKey{} : k;
 }
 
-bool ConstObj::is_unresolved(ColKey col_key) const
+bool Obj::is_unresolved(ColKey col_key) const
 {
     m_table->report_invalid_key(col_key);
     ColumnType type = col_key.get_type();
@@ -294,7 +289,7 @@ bool ConstObj::is_unresolved(ColKey col_key) const
     return get_unfiltered_link(col_key).is_unresolved();
 }
 
-ObjKey ConstObj::get_unfiltered_link(ColKey col_key) const
+ObjKey Obj::get_unfiltered_link(ColKey col_key) const
 {
     ArrayKey values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_key.get_index().val + 1));
@@ -304,7 +299,7 @@ ObjKey ConstObj::get_unfiltered_link(ColKey col_key) const
 }
 
 template <>
-int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
+int64_t Obj::_get<int64_t>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
     auto& alloc = _get_alloc();
@@ -321,7 +316,7 @@ int64_t ConstObj::_get<int64_t>(ColKey::Idx col_ndx) const
 }
 
 template <>
-int64_t ConstObj::get<int64_t>(ColKey col_key) const
+int64_t Obj::get<int64_t>(ColKey col_key) const
 {
     m_table->report_invalid_key(col_key);
     ColumnType type = col_key.get_type();
@@ -340,7 +335,7 @@ int64_t ConstObj::get<int64_t>(ColKey col_key) const
 }
 
 template <>
-bool ConstObj::get<bool>(ColKey col_key) const
+bool Obj::get<bool>(ColKey col_key) const
 {
     m_table->report_invalid_key(col_key);
     ColumnType type = col_key.get_type();
@@ -359,7 +354,7 @@ bool ConstObj::get<bool>(ColKey col_key) const
 }
 
 template <>
-StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
+StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
     auto& alloc = _get_alloc();
@@ -384,7 +379,7 @@ StringData ConstObj::_get<StringData>(ColKey::Idx col_ndx) const
 }
 
 template <>
-BinaryData ConstObj::_get<BinaryData>(ColKey::Idx col_ndx) const
+BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
 {
     // manual inline of is_in_sync():
     auto& alloc = _get_alloc();
@@ -397,7 +392,7 @@ BinaryData ConstObj::_get<BinaryData>(ColKey::Idx col_ndx) const
     return ArrayBinary::get(alloc.translate(ref), m_row_ndx, alloc);
 }
 
-Mixed ConstObj::get_any(ColKey col_key) const
+Mixed Obj::get_any(ColKey col_key) const
 {
     m_table->report_invalid_key(col_key);
     auto col_ndx = col_key.get_index();
@@ -438,17 +433,17 @@ Mixed ConstObj::get_any(ColKey col_key) const
 
 /* FIXME: Make this one fast too!
 template <>
-ObjKey ConstObj::_get(size_t col_ndx) const
+ObjKey Obj::_get(size_t col_ndx) const
 {
     return ObjKey(_get<int64_t>(col_ndx));
 }
 */
 
-ConstObj ConstObj::get_linked_object(ColKey link_col_key) const
+Obj Obj::get_linked_object(ColKey link_col_key) const
 {
     TableRef target_table = get_target_table(link_col_key);
     ObjKey key = get<ObjKey>(link_col_key);
-    ConstObj obj;
+    Obj obj;
     if (key) {
         obj = target_table->get_object(key);
     }
@@ -456,7 +451,7 @@ ConstObj ConstObj::get_linked_object(ColKey link_col_key) const
 }
 
 template <class T>
-inline bool ConstObj::do_is_null(ColKey::Idx col_ndx) const
+inline bool Obj::do_is_null(ColKey::Idx col_ndx) const
 {
     T values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
@@ -465,7 +460,7 @@ inline bool ConstObj::do_is_null(ColKey::Idx col_ndx) const
 }
 
 template <>
-inline bool ConstObj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
+inline bool Obj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
 {
     ArrayString values(get_alloc());
     ref_type ref = to_ref(Array::get(m_mem.get_addr(), col_ndx.val + 1));
@@ -474,12 +469,12 @@ inline bool ConstObj::do_is_null<ArrayString>(ColKey::Idx col_ndx) const
     return values.is_null(m_row_ndx);
 }
 
-size_t ConstObj::get_link_count(ColKey col_key) const
+size_t Obj::get_link_count(ColKey col_key) const
 {
     return get_list<ObjKey>(col_key).size();
 }
 
-bool ConstObj::is_null(ColKey col_key) const
+bool Obj::is_null(ColKey col_key) const
 {
     update_if_needed();
     ColumnAttrMask attr = col_key.get_attrs();
@@ -517,7 +512,7 @@ bool ConstObj::is_null(ColKey col_key) const
 
 
 // Figure out if this object has any remaining backlinkss
-bool ConstObj::has_backlinks(bool only_strong_links) const
+bool Obj::has_backlinks(bool only_strong_links) const
 {
     const Table& target_table = *m_table;
 
@@ -539,7 +534,7 @@ bool ConstObj::has_backlinks(bool only_strong_links) const
     return m_table->for_each_backlink_column(look_for_backlinks);
 }
 
-size_t ConstObj::get_backlink_count() const
+size_t Obj::get_backlink_count() const
 {
     const Table& target_table = *m_table;
     size_t cnt = 0;
@@ -554,7 +549,7 @@ size_t ConstObj::get_backlink_count() const
     return cnt;
 }
 
-size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
+size_t Obj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
 {
     update_if_needed();
 
@@ -575,20 +570,20 @@ size_t ConstObj::get_backlink_count(const Table& origin, ColKey origin_col_key) 
     return cnt;
 }
 
-ObjKey ConstObj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
+ObjKey Obj::get_backlink(const Table& origin, ColKey origin_col_key, size_t backlink_ndx) const
 {
     ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
     return get_backlink(backlink_col_key, backlink_ndx);
 }
 
-TableView ConstObj::get_backlink_view(TableRef src_table, ColKey src_col_key)
+TableView Obj::get_backlink_view(TableRef src_table, ColKey src_col_key)
 {
     TableView tv(src_table, src_col_key, *this);
     tv.do_sync();
     return tv;
 }
 
-ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
+ObjKey Obj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 {
     get_table()->report_invalid_key(backlink_col);
     Allocator& alloc = get_alloc();
@@ -601,7 +596,7 @@ ObjKey ConstObj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
     return backlinks.get_backlink(m_row_ndx, backlink_ndx);
 }
 
-std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
+std::vector<ObjKey> Obj::get_all_backlinks(ColKey backlink_col) const
 {
     get_table()->report_invalid_key(backlink_col);
     Allocator& alloc = get_alloc();
@@ -621,7 +616,7 @@ std::vector<ObjKey> ConstObj::get_all_backlinks(ColKey backlink_col) const
     return vec;
 }
 
-void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
+void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
 {
     if (m_table->is_embedded()) {
         REALM_ASSERT(get_backlink_count() == 1);
@@ -629,11 +624,11 @@ void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
             std::vector<ObjKey> backlinks = get_all_backlinks(col_key);
             if (backlinks.size() == 1) {
                 TableRef tr = m_table->get_opposite_table(col_key);
-                ConstObj obj = tr->get_object(backlinks[0]); // always the first (and only)
+                Obj obj = tr->get_object(backlinks[0]); // always the first (and only)
                 auto next_col_key = m_table->get_opposite_column(col_key);
                 size_t index = 0;
                 if (next_col_key.get_attrs().test(col_attr_List)) {
-                    ConstLnkLst ll = obj.get_linklist(next_col_key);
+                    auto ll = obj.get_linklist(next_col_key);
                     while (ll.get(index) != get_key()) {
                         index++;
                         REALM_ASSERT(ll.size() > index);
@@ -651,21 +646,23 @@ void ConstObj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
     }
 }
 
-ConstObj::FatPath ConstObj::get_fat_path() const
+Obj::FatPath Obj::get_fat_path() const
 {
     FatPath result;
     auto sizer = [&](size_t size) { result.reserve(size); };
-    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void { result.push_back({o2, col, idx}); };
+    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
+        result.push_back({o2, col, idx});
+    };
     traverse_path(step, sizer);
     return result;
 }
 
-ConstObj::Path ConstObj::get_path() const
+Obj::Path Obj::get_path() const
 {
     Path result;
     bool top_done = false;
     auto sizer = [&](size_t size) { result.path_from_top.reserve(size); };
-    auto step = [&](const ConstObj& o2, ColKey col, size_t idx) -> void {
+    auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
         if (!top_done) {
             top_done = true;
             result.top_table = o2.get_table()->get_key();
@@ -763,8 +760,8 @@ void out_mixed(std::ostream& out, const Mixed& val)
 
 } // anonymous namespace
 
-void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-                       std::vector<ColKey>& followed) const
+void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+                  std::vector<ColKey>& followed) const
 {
     StringData name = "_key";
     if (renames[name] != "")
@@ -853,7 +850,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
     out << "}";
 }
 
-std::string ConstObj::to_string() const
+std::string Obj::to_string() const
 {
     std::ostringstream ostr;
     to_json(ostr, 0, nullptr);
@@ -1354,7 +1351,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
     return false;
 }
 
-void Obj::assign(const ConstObj& other)
+void Obj::assign(const Obj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());
     auto cols = m_table->get_column_keys();
@@ -1419,7 +1416,7 @@ void Obj::assign(const ConstObj& other)
 }
 
 
-void Obj::assign_pk_and_backlinks(const ConstObj& other)
+void Obj::assign_pk_and_backlinks(const Obj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());
     if (auto col_pk = m_table->get_primary_key_column()) {
@@ -1450,19 +1447,19 @@ void Obj::assign_pk_and_backlinks(const ConstObj& other)
     m_table->for_each_backlink_column(copy_links);
 }
 
-template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey col_key) const;
-template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;
-template float ConstObj::get<float>(ColKey col_key) const;
-template util::Optional<float> ConstObj::get<util::Optional<float>>(ColKey col_key) const;
-template double ConstObj::get<double>(ColKey col_key) const;
-template util::Optional<double> ConstObj::get<util::Optional<double>>(ColKey col_key) const;
-template StringData ConstObj::get<StringData>(ColKey col_key) const;
-template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
-template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
-template ObjectId ConstObj::get<ObjectId>(ColKey col_key) const;
-template util::Optional<ObjectId> ConstObj::get<util::Optional<ObjectId>>(ColKey col_key) const;
-template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
-template Decimal128 ConstObj::get<Decimal128>(ColKey col_key) const;
+template util::Optional<int64_t> Obj::get<util::Optional<int64_t>>(ColKey col_key) const;
+template util::Optional<Bool> Obj::get<util::Optional<Bool>>(ColKey col_key) const;
+template float Obj::get<float>(ColKey col_key) const;
+template util::Optional<float> Obj::get<util::Optional<float>>(ColKey col_key) const;
+template double Obj::get<double>(ColKey col_key) const;
+template util::Optional<double> Obj::get<util::Optional<double>>(ColKey col_key) const;
+template StringData Obj::get<StringData>(ColKey col_key) const;
+template BinaryData Obj::get<BinaryData>(ColKey col_key) const;
+template Timestamp Obj::get<Timestamp>(ColKey col_key) const;
+template ObjectId Obj::get<ObjectId>(ColKey col_key) const;
+template util::Optional<ObjectId> Obj::get<util::Optional<ObjectId>>(ColKey col_key) const;
+template ObjKey Obj::get<ObjKey>(ColKey col_key) const;
+template Decimal128 Obj::get<Decimal128>(ColKey col_key) const;
 
 template Obj& Obj::set<bool>(ColKey, bool, bool);
 template Obj& Obj::set<float>(ColKey, float, bool);

@@ -594,7 +594,7 @@ public:
     _impl::History* get_history() const;
 
     // direct handover of accessor instances
-    Obj import_copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
+    Obj import_copy_of(const Obj& original);
     TableRef import_copy_of(const ConstTableRef original);
     LnkLst import_copy_of(const ConstLnkLst& original);
     LstBasePtr import_copy_of(const LstBase& original);

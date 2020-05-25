@@ -915,7 +915,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 // Aggregates =================================================================================
 
-bool Query::eval_object(ConstObj& obj) const
+bool Query::eval_object(const Obj& obj) const
 {
     if (has_conditions())
         return root_node()->match(obj);
@@ -945,7 +945,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             auto pn = root_node();
             auto node = pn->m_children[find_best_node(pn)];
             if (node->has_search_index()) {
-                node->index_based_aggregate(size_t(-1), [&](ConstObj& obj) -> bool {
+                node->index_based_aggregate(size_t(-1), [&](const Obj& obj) -> bool {
                     if (eval_object(obj)) {
                         st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                         return true;
@@ -980,7 +980,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
-                ConstObj obj = m_view->get_object(t);
+                const Obj obj = m_view->get_object(t);
                 if (eval_object(obj)) {
                     st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                 }
@@ -1325,7 +1325,7 @@ ObjKey Query::find()
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            ConstObj obj = m_view->get_object(i);
+            const Obj obj = m_view->get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1366,7 +1366,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (end == size_t(-1))
             end = m_view->size();
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
-            ConstObj obj = m_view->get_object(t);
+            const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
@@ -1410,7 +1410,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
                 auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
                 KeyColumn& refs = ret.m_key_values;
-                node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+                node->index_based_aggregate(limit, [&](const Obj& obj) -> bool {
                     auto key = obj.get_key();
                     if (begin_key && key < begin_key)
                         return false;
@@ -1491,7 +1491,7 @@ size_t Query::do_count(size_t limit) const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz && cnt < limit; t++) {
-            ConstObj obj = m_view->get_object(t);
+            const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 cnt++;
             }
@@ -1502,7 +1502,7 @@ size_t Query::do_count(size_t limit) const
         auto pn = root_node();
         auto node = pn->m_children[find_best_node(pn)];
         if (node->has_search_index()) {
-            node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+            node->index_based_aggregate(limit, [&](const Obj& obj) -> bool {
                 if (eval_object(obj)) {
                     ++counter;
                     return true;
