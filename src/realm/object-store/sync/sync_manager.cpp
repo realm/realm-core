@@ -82,7 +82,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
                                                                        m_config.custom_encryption_key);
         }
-        catch (RealmFileException const& ex) {
+        catch (RealmFileException const&) {
             if (m_config.reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
                 m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
                                                                            std::move(m_config.custom_encryption_key));

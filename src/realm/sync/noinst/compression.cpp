@@ -670,8 +670,8 @@ std::error_code compression::integrate_compressed_blocks_in_realm_file(
     return std::error_code{};
 }
 
-std::error_code compression::compress_file_in_blocks(const char* src_path, const char* dst_path,
-                                                     util::File::SizeType& src_size, util::File::SizeType& dst_size)
+std::error_code compression::compress_file_in_blocks(const char* src_path, const char* dst_path, size_t& src_size,
+                                                     size_t& dst_size)
 {
     util::File src_file;
     try {
@@ -680,7 +680,7 @@ std::error_code compression::compress_file_in_blocks(const char* src_path, const
     catch (util::File::AccessError&) {
         return compression::error::source_file_is_not_readable;
     }
-    src_size = src_file.get_size();
+    src_size = size_t(src_file.get_size());
 
     util::File dst_file;
     try {
@@ -763,7 +763,7 @@ std::error_code compression::compress_file_in_blocks(const char* src_path, const
 
     deflateEnd(&strm);
 
-    dst_size = dst_file.get_size();
+    dst_size = size_t(dst_file.get_size());
 
     return std::error_code{};
 }

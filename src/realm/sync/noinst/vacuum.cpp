@@ -81,7 +81,7 @@ struct PlainVacuumFile : Vacuum::VacuumFile {
         }
         // Get "after" size
         File f{m_path, File::mode_Read};
-        results.after_size = f.get_size();
+        results.after_size = size_t(f.get_size());
     }
 };
 
@@ -123,7 +123,7 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
         }
         // Get "after" size
         File f{m_path, File::mode_Read};
-        results.after_size = f.get_size();
+        results.after_size = size_t(f.get_size());
     }
 
     ClientReplication* m_client_history = nullptr;
@@ -212,7 +212,7 @@ struct SyncServerVacuumFile : Vacuum::VacuumFile, _impl::ServerHistory::DummyCom
         }
         // Get "after" size
         File f{m_path, File::mode_Read};
-        results.after_size = f.get_size();
+        results.after_size = size_t(f.get_size());
     }
 
     ServerHistoryContext m_context;
@@ -288,7 +288,7 @@ Vacuum::Results Vacuum::vacuum(const std::string& path)
     // "Before" file size
     {
         File f{path, File::mode_Read}; // Throws
-        results.before_size = f.get_size();
+        results.before_size = size_t(f.get_size());
     }
 
     const char* encryption_key = nullptr;
@@ -311,7 +311,7 @@ Vacuum::Results Vacuum::dry_run(const std::string& path)
     // "Before" file size
     {
         File f{path, File::mode_Read}; // Throws
-        results.before_size = f.get_size();
+        results.before_size = size_t(f.get_size());
     }
 
     const char* encryption_key = nullptr;

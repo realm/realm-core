@@ -187,7 +187,7 @@ size_t compress_and_decompress_file(test_util::unit_test::TestContext& test_cont
     CHECK_EQUAL(size_1, size_2);
     CHECK(files_compare_equal(path, path_2));
 
-    return size_1;
+    return size_t(size_1);
 }
 
 size_t compress_and_decompress_file_in_blocks(test_util::unit_test::TestContext& test_context,
@@ -196,8 +196,8 @@ size_t compress_and_decompress_file_in_blocks(test_util::unit_test::TestContext&
     std::string path_1 = path + ".1";
     std::string path_2 = path + ".2";
 
-    util::File::SizeType size_0;
-    util::File::SizeType size_1;
+    size_t size_0;
+    size_t size_1;
     std::error_code ec = compression::compress_file_in_blocks(path.c_str(), path_1.c_str(), size_0, size_1);
     CHECK_NOT(ec);
     CHECK(!files_compare_equal(path, path_1));
@@ -297,15 +297,15 @@ TEST(Compression_Compressible_Data_Small)
 // uncompressed data are tested including sizes above 4GB.
 TEST_IF(Compression_Compressible_Data_Large, false)
 {
-    size_t uncompressed_sizes[] = {(size_t(1) << 32) - 1, (size_t(1) << 32) + 500, size_t(1) << 33};
+    uint64_t uncompressed_sizes[] = {(uint64_t(1) << 32) - 1, (uint64_t(1) << 32) + 500, uint64_t(1) << 33};
     size_t num_sizes = sizeof(uncompressed_sizes) / sizeof(uncompressed_sizes[0]);
 
     for (size_t i = 0; i < num_sizes; ++i) {
-        size_t uncompressed_size = uncompressed_sizes[i];
+        uint64_t uncompressed_size = uncompressed_sizes[i];
 
-        const std::unique_ptr<char[]> content = generate_compressible_data(uncompressed_size);
+        const std::unique_ptr<char[]> content = generate_compressible_data(size_t(uncompressed_size));
 
-        compress_decompress_compare(test_context, uncompressed_size, content.get());
+        compress_decompress_compare(test_context, size_t(uncompressed_size), content.get());
     }
 }
 
@@ -330,15 +330,15 @@ TEST(Compression_Non_Compressible_Data_Small)
 // above 4GB.
 TEST_IF(Compression_Non_Compressible_Data_Large, false)
 {
-    size_t uncompressed_sizes[] = {(size_t(1) << 32) - 1, (size_t(1) << 32) + 100};
+    uint64_t uncompressed_sizes[] = {(uint64_t(1) << 32) - 1, (uint64_t(1) << 32) + 100};
     size_t num_sizes = sizeof(uncompressed_sizes) / sizeof(uncompressed_sizes[0]);
 
     for (size_t i = 0; i < num_sizes; ++i) {
-        size_t uncompressed_size = uncompressed_sizes[i];
+        uint64_t uncompressed_size = uncompressed_sizes[i];
 
-        const std::unique_ptr<char[]> content = generate_non_compressible_data(uncompressed_size);
+        const std::unique_ptr<char[]> content = generate_non_compressible_data(size_t(uncompressed_size));
 
-        compress_decompress_compare(test_context, uncompressed_size, content.get());
+        compress_decompress_compare(test_context, size_t(uncompressed_size), content.get());
     }
 }
 
@@ -357,11 +357,11 @@ TEST(Compression_Allocate_And_Compress_Small)
 // function for data of size larger than 4GB.
 TEST_IF(Compression_Allocate_And_Compress_Large, false)
 {
-    size_t uncompressed_size = (size_t(1) << 32) + 100;
+    uint64_t uncompressed_size = (uint64_t(1) << 32) + 100;
 
-    const std::unique_ptr<char[]> content = generate_compressible_data(uncompressed_size);
+    const std::unique_ptr<char[]> content = generate_compressible_data(size_t(uncompressed_size));
 
-    allocate_and_compress_decompress_compare(test_context, uncompressed_size, content.get());
+    allocate_and_compress_decompress_compare(test_context, size_t(uncompressed_size), content.get());
 }
 
 TEST(Compression_File_1)
@@ -421,8 +421,8 @@ TEST(Compression_RealmBlocksSmall)
     size_t data_size = 1;
     make_data_in_realm(src_path, data_size);
 
-    util::File::SizeType src_size;
-    util::File::SizeType blocks_size;
+    size_t src_size;
+    size_t blocks_size;
 
     std::error_code ec;
 
@@ -477,8 +477,8 @@ TEST(Compression_RealmBlocksLarge)
     size_t data_size = 1 << 20;
     make_data_in_realm(src_path, data_size);
 
-    util::File::SizeType src_size;
-    util::File::SizeType blocks_size;
+    size_t src_size;
+    size_t blocks_size;
 
     std::error_code ec;
 
@@ -533,8 +533,8 @@ TEST(Compression_RealmBlocksUnencryptedSplit)
     size_t data_size = 1 << 16;
     make_data_in_realm(src_path, data_size);
 
-    util::File::SizeType src_size;
-    util::File::SizeType blocks_size;
+    size_t src_size;
+    size_t blocks_size;
 
     std::error_code ec = compression::compress_file_in_blocks(
         std::string(src_path).c_str(), std::string(blocks_path).c_str(), src_size, blocks_size);
@@ -599,8 +599,8 @@ TEST(Compression_ExtractBlocksUnencrypted)
     size_t data_size = 1 << 20;
     make_data_in_realm(src_path, data_size);
 
-    util::File::SizeType src_size;
-    util::File::SizeType blocks_size;
+    size_t src_size;
+    size_t blocks_size;
 
     std::error_code ec = compression::compress_file_in_blocks(
         std::string(src_path).c_str(), std::string(blocks_path).c_str(), src_size, blocks_size);

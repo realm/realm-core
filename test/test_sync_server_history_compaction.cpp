@@ -525,7 +525,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
         std::string server_realm_path = std::string{dir} + "/test.realm";
         {
             util::File server_realm{server_realm_path, util::File::mode_Read};
-            size_t file_size = server_realm.get_size();
+            auto file_size = server_realm.get_size();
             std::cout << "Server Realm Size: " << file_size
                       << " "
                          "(compaction_enabled = "
@@ -548,7 +548,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
             sg->close();
 
             util::File server_realm{server_realm_path, util::File::mode_Read};
-            size_t file_size = server_realm.get_size();
+            auto file_size = server_realm.get_size();
             std::cout << "Server Realm Size after compact(): " << file_size << "\n";
         }
     };

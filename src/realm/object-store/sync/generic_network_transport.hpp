@@ -175,7 +175,7 @@ struct Request {
     /**
      * The HTTP method of this request.
      */
-    HttpMethod method;
+    HttpMethod method = HttpMethod::get;
 
     /**
      * The URL to which this request will be made.
@@ -186,7 +186,7 @@ struct Request {
      * The number of milliseconds that the underlying transport should spend on an HTTP round trip before failing with
      * an error.
      */
-    uint64_t timeout_ms;
+    uint64_t timeout_ms = 0;
 
     /**
      * The HTTP headers of this request.
@@ -199,7 +199,7 @@ struct Request {
     std::string body;
 
     /// Indicates if the request uses the refresh token or the access token
-    bool uses_refresh_token;
+    bool uses_refresh_token = false;
 };
 
 /**

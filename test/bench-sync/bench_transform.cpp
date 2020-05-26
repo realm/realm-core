@@ -2,6 +2,7 @@
 #include "../util/dump_changesets.hpp"
 #include "../util/timer.hpp"
 #include "../util/test_path.hpp"
+#include "../util/unit_test.hpp"
 #include "../test_all.hpp"
 
 #if REALM_ENABLE_ENCRYPTION

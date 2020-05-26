@@ -122,10 +122,12 @@ jobWrapper {
             checkLinuxDebug_Sync    : doCheckInDocker(buildOptions << [buildType : "Debug", enableSync : "ON"]),
             checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions << [buildType : "Release"]),
-            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
-            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
-            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
+            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+            buildiosDebug           : doBuildAppleDevice('ios', 'MinSizeDebug'),
+            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "thread"]),
@@ -136,7 +138,7 @@ jobWrapper {
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
                 checkMacOsDebug               : doBuildMacOs('Debug', true),
-                buildUwpx64Debug              : doBuildWindows('Debug', true, 'x64', false),
+                buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                      : doBuildCoverage(),
                 performance                   : buildPerformance(),
@@ -467,25 +469,51 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
-    def cmakeDefinitions;
     def warningFilters = [];
-    if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
-      // warning on benchmark binaries that we don't care about
+    def cpackSystemName = "${isUWP ? 'UWP' : 'Windows'}-${platform}"
+    def arch = platform.toLowerCase()
+    if (arch == 'win32') {
+      arch = 'x86'
+    }
+    if (arch == 'win64') {
+      arch = 'x64'
+    }
+    def triplet = "${arch}-${isUWP ? 'uwp' : 'windows'}-static"
+
+    def cmakeOptions = [
+      CMAKE_GENERATOR_PLATFORM: platform,
+      CMAKE_BUILD_TYPE: buildType,
+      REALM_ENABLE_SYNC: "ON",
+      CPACK_SYSTEM_NAME: cpackSystemName,
+      CMAKE_TOOLCHAIN_FILE: "c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+      VCPKG_TARGET_TRIPLET: triplet,
+    ]
+
+     if (isUWP) {
+      cmakeOptions << [
+        CMAKE_SYSTEM_NAME: 'WindowsStore',
+        CMAKE_SYSTEM_VERSION: '10.0',
+      ]
       warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
     } else {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+      cmakeOptions << [
+        CMAKE_SYSTEM_VERSION: '8.1',
+      ]
     }
     if (!runTests) {
-      cmakeDefinitions += ' -DREALM_NO_TESTS=1'
+      cmakeOptions << [
+        REALM_NO_TESTS: '1',
+      ]
     }
+    
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
         node('windows') {
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
+                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(
                         parser: 'msbuild',
@@ -496,9 +524,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
+                archiveArtifacts('*.tar.gz')
                 if (gitTag) {
                     def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                    archiveArtifacts('*.tar.gz')
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -511,6 +539,8 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         bat '''
                           mkdir %TMP%
                           realm-tests.exe --no-error-exit-code
+                          realm-sync-tests.exe --no-error-exit-code
+                          copy unit-test-report.xml ..
                           rmdir /Q /S %TMP%
                         '''
                     }
@@ -672,7 +702,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 20, unit: 'MINUTES') {
+                    timeout(time: 30, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}

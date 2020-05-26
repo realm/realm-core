@@ -3798,7 +3798,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
 TEST_IF(Sync_4GB_Messages, false)
 {
     // The changeset will be slightly larger.
-    const size_t approximate_changeset_size = size_t(1) << 32;
+    const uint64_t approximate_changeset_size = uint64_t(1) << 32;
 
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3818,7 +3818,7 @@ TEST_IF(Sync_4GB_Messages, false)
     auto sg_1 = DB::create(*history_1);
 
     const size_t single_object_data_size = size_t(1e7); // 10 MB which is below the 16 MB limit
-    const size_t num_objects = approximate_changeset_size / single_object_data_size + 1;
+    const size_t num_objects = size_t(approximate_changeset_size / single_object_data_size + 1);
 
     const std::string str_a(single_object_data_size, 'a');
     BinaryData bd_a(str_a.data(), single_object_data_size);

@@ -35,7 +35,9 @@
 #include <atomic>
 #include <chrono>
 #include <fstream>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 using namespace realm;
 using namespace realm::util;
