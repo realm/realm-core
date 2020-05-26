@@ -224,7 +224,7 @@ endif()
 check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 # Options (passed to CMake)
-option(REALM_ENABLE_SYNC "Enable synchronized realms." OFF)
+option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
