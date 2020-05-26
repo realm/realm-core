@@ -46,6 +46,7 @@
 #ifndef _WIN32
 
 #if REALM_HAVE_EPOLL
+#include <linux/version.h>
 #include <sys/epoll.h>
 #elif REALM_HAVE_KQUEUE
 #include <sys/types.h>

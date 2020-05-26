@@ -30,24 +30,6 @@
 #include <realm/util/basic_system_errors.hpp>
 #include <realm/util/backtrace.hpp>
 
-// Linux epoll
-//
-// Require Linux kernel version >= 2.6.27 such that we have epoll_create1(),
-// `O_CLOEXEC`, and `EPOLLRDHUP`.
-#if defined(__linux__) && !REALM_ANDROID
-#include <linux/version.h>
-#if !defined(REALM_HAVE_EPOLL)
-#if !defined(REALM_DISABLE_UTIL_NETWORK_EPOLL)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
-#define REALM_HAVE_EPOLL 1
-#endif
-#endif
-#endif
-#endif
-#if !defined(REALM_HAVE_EPOLL)
-#define REALM_HAVE_EPOLL 0
-#endif
-
 // FreeBSD Kqueue.
 //
 // Available on Mac OS X, FreeBSD, NetBSD, OpenBSD

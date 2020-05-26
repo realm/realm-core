@@ -418,7 +418,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_NO_TESTS=1"
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -431,7 +431,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}", name: "android-armeabi-${abi}-${buildType}")
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_ENABLE_SYNC=0", name: "android-armeabi-${abi}-${buildType}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
@@ -611,7 +611,7 @@ def doBuildMacOs(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('osx') {
+        node('osx_pro') {
             getArchive()
 
             dir("build-macosx-${buildType}") {
@@ -697,7 +697,7 @@ def doBuildMacOsCatalyst(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('osx') {
+        node('osx_pro') {
             getArchive()
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {

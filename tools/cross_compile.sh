@@ -106,6 +106,7 @@ else
                ONLY_ACTIVE_ARCH=NO
     mkdir -p "src/realm/${BUILD_TYPE}"
     mkdir -p "src/realm/parser/${BUILD_TYPE}"
+    mkdir -p "src/realm/sync/${BUILD_TYPE}"
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
@@ -114,5 +115,9 @@ else
          -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
          "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+    lipo -create \
+         -output "src/realm/sync/${BUILD_TYPE}/librealm-sync${suffix}.a" \
+         "src/realm/sync/${BUILD_TYPE}-${SDK}os/librealm-sync${suffix}.a" \
+         "src/realm/sync/${BUILD_TYPE}-${SDK}simulator/librealm-sync${suffix}.a"
     cpack -C "${BUILD_TYPE}" || exit 1
 fi
