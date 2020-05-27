@@ -225,7 +225,7 @@ void make_data_in_realm(const std::string& realm_path, size_t data_size,
     tr->add_column(type_Binary, "binary column");
     std::unique_ptr<char[]> data = generate_non_compressible_data(data_size);
     BinaryData bd(data.get(), data_size);
-    sync::create_object(wt, *tr).set_all(bd);
+    tr->create_object().set_all(bd);
     wt.commit();
 }
 

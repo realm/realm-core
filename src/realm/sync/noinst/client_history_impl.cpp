@@ -369,7 +369,6 @@ void ClientHistoryImpl::set_client_file_ident(SaltedFileIdent client_file_ident,
     version_type local_version = wt->get_version();
     ensure_updated(local_version); // Throws
     prepare_for_write();           // Throws
-    TableInfoCache table_info_cache{*wt};
 
     Array& root = m_arrays->root;
     wt->set_sync_file_id(client_file_ident.ident);
@@ -385,7 +384,7 @@ void ClientHistoryImpl::set_client_file_ident(SaltedFileIdent client_file_ident,
         // made, which never have an impact on accessors. However, notifications
         // will not be triggered for those updates either.
         sync::TempShortCircuitReplication tscr{*this};
-        fix_up_client_file_ident_in_stored_changesets(*wt, table_info_cache, client_file_ident.ident); // Throws
+        fix_up_client_file_ident_in_stored_changesets(*wt, client_file_ident.ident); // Throws
     }
 
     // Note: This transaction produces an empty changeset. Empty changesets are
@@ -521,8 +520,6 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
         ensure_no_cooked_history(); // Throws
     }
 
-    TableInfoCache table_info_cache{*transact};
-
     REALM_ASSERT(transact->get_sync_file_id() != 0);
 
     std::vector<char> assembled_transformed_changeset;
@@ -576,7 +573,7 @@ bool ClientHistoryImpl::integrate_server_changesets(const SyncProgress& progress
                 }
             }
 
-            sync::InstructionApplier applier{*transact, table_info_cache};
+            sync::InstructionApplier applier{*transact};
             {
                 sync::TempShortCircuitReplication tscr{*this};
                 applier.apply(changesets[i], &logger); // Throws
@@ -1405,7 +1402,7 @@ void ClientHistoryImpl::update_cooked_progress(CookedProgress progress)
     }
 }
 
-void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transaction& group, TableInfoCache&,
+void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transaction& group,
                                                                       file_ident_type client_file_ident)
 {
     // Must be in write transaction!

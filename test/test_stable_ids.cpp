@@ -113,32 +113,32 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
         WriteTransaction wt{sg};
         TableRef t0 = sync::create_table(wt, "class_t0");
 
-        sync::create_object(wt, *t0);
-        sync::create_object(wt, *t0);
+        auto obj0 = t0->create_object();
+        auto obj1 = t0->create_object();
 
         // Object IDs should be peerID plus a sequence number
-        CHECK_EQUAL(object_id_for_row(wt, *t0, (t0->begin() + 0)->get_key()), GlobalKey(client_file_ident, 0));
-        CHECK_EQUAL(object_id_for_row(wt, *t0, (t0->begin() + 1)->get_key()), GlobalKey(client_file_ident, 1));
+        CHECK_EQUAL(obj0.get_object_id(), GlobalKey(client_file_ident, 0));
+        CHECK_EQUAL(obj1.get_object_id(), GlobalKey(client_file_ident, 1));
     }
 
     // Tables with integer primary keys:
     {
         WriteTransaction wt{sg};
         TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
-        sync::create_object_with_primary_key(wt, *t1, 123);
+        auto obj0 = t1->create_object_with_primary_key(123);
 
         GlobalKey expected_object_id(123);
-        CHECK_EQUAL(object_id_for_row(wt, *t1, (t1->begin() + 0)->get_key()), expected_object_id);
+        CHECK_EQUAL(obj0.get_object_id(), expected_object_id);
     }
 
     // Tables with string primary keys:
     {
         WriteTransaction wt{sg};
         TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_String, "pk");
-        sync::create_object_with_primary_key(wt, *t2, "foo");
+        auto obj0 = t2->create_object_with_primary_key("foo");
 
         GlobalKey expected_object_id("foo");
-        CHECK_EQUAL(object_id_for_row(wt, *t2, (t2->begin() + 0)->get_key()), expected_object_id);
+        CHECK_EQUAL(obj0.get_object_id(), expected_object_id);
     }
 
     // Attempting to create a table that already exists is a no-op if the same primary key name, type and nullability
@@ -180,13 +180,13 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         TableRef t1 = sync::create_table(wt, "class_t1");
         link_col = t0->add_column_link(type_Link, "link", *t1);
 
-        ObjKey t1_k1 = sync::create_object(wt, *t1).get_key();
-        ObjKey t0_k1 = sync::create_object(wt, *t0).set(link_col, t1_k1).get_key();
-        ObjKey t0_k2 = sync::create_object(wt, *t0).get_key();
+        Obj t1_k1 = t1->create_object();
+        Obj t0_k1 = t0->create_object().set(link_col, t1_k1.get_key());
+        Obj t0_k2 = t0->create_object();
 
         // Object IDs should be peerID plus a sequence number
-        CHECK_EQUAL(object_id_for_row(wt, *t0, t0_k1), GlobalKey(0, 0));
-        CHECK_EQUAL(object_id_for_row(wt, *t0, t0_k2), GlobalKey(0, 1));
+        CHECK_EQUAL(t0_k1.get_object_id(), GlobalKey(0, 0));
+        CHECK_EQUAL(t0_k2.get_object_id(), GlobalKey(0, 1));
         wt.commit();
     }
 
@@ -210,15 +210,15 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         ConstTableRef t0 = rt.get_table("class_t0");
         ConstTableRef t1 = rt.get_table("class_t1");
         auto it = t0->begin();
-        GlobalKey oid0 = sync::object_id_for_row(rt, *t0, it->get_key());
+        GlobalKey oid0 = it->get_object_id();
         ObjKey link_ndx = it->get<ObjKey>(link_col);
         ++it;
-        GlobalKey oid1 = sync::object_id_for_row(rt, *t0, it->get_key());
+        GlobalKey oid1 = it->get_object_id();
         CHECK_EQUAL(oid0, GlobalKey(1, 0));
         CHECK_EQUAL(oid1, GlobalKey(1, 1));
-        GlobalKey oid2 = sync::object_id_for_row(rt, *t1, link_ndx);
+        GlobalKey oid2 = t1->get_object_id(link_ndx);
         CHECK_EQUAL(oid2.hi(), 1);
-        CHECK_EQUAL(oid2, sync::object_id_for_row(rt, *t1, t1->begin()->get_key()));
+        CHECK_EQUAL(oid2, t1->begin()->get_object_id());
     }
 
     // Replay the transaction to see that the instructions were modified.
@@ -228,8 +228,7 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         DBRef sg_2 = DB::create(*history_2);
 
         WriteTransaction wt{sg_2};
-        TableInfoCache table_info_cache{wt};
-        InstructionApplier applier{wt, table_info_cache};
+        InstructionApplier applier{wt};
         applier.apply(result, &test_context.logger);
         wt.commit();
 
@@ -238,15 +237,15 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         ConstTableRef t0 = rt.get_table("class_t0");
         ConstTableRef t1 = rt.get_table("class_t1");
         auto it = t0->begin();
-        GlobalKey oid0 = sync::object_id_for_row(rt, *t0, it->get_key());
+        GlobalKey oid0 = it->get_object_id();
         ObjKey link_ndx = it->get<ObjKey>(link_col);
         ++it;
-        GlobalKey oid1 = sync::object_id_for_row(rt, *t0, it->get_key());
+        GlobalKey oid1 = it->get_object_id();
         CHECK_EQUAL(oid0, GlobalKey(1, 0));
         CHECK_EQUAL(oid1, GlobalKey(1, 1));
-        GlobalKey oid2 = sync::object_id_for_row(rt, *t1, link_ndx);
+        GlobalKey oid2 = t1->get_object_id(link_ndx);
         CHECK_EQUAL(oid2.hi(), 1);
-        CHECK_EQUAL(oid2, sync::object_id_for_row(rt, *t1, t1->begin()->get_key()));
+        CHECK_EQUAL(oid2, t1->begin()->get_object_id());
     }
 }
 
@@ -258,8 +257,8 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
         TableRef t0 = sync::create_table(wt, "class_t0");
-        sync::create_object(wt, *t0);
-        sync::create_object(wt, *t0);
+        t0->create_object();
+        t0->create_object();
         CHECK_EQUAL(t0->size(), 2);
         wt.commit();
     }
@@ -268,8 +267,8 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
         DBRef sg = DB::create(*history);
         WriteTransaction wt{sg};
         TableRef t0 = sync::create_table(wt, "class_t0");
-        sync::create_object(wt, *t0);
-        sync::create_object(wt, *t0);
+        t0->create_object();
+        t0->create_object();
         CHECK_EQUAL(t0->size(), 4);
         wt.commit();
     }

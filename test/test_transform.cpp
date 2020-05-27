@@ -254,9 +254,9 @@ TEST(Transform_LinkListSet_vs_MoveLastOver)
     client_2->create_schema(create_schema);
 
     client_1->transaction([](Peer& p) {
-        sync::create_object(*p.group, *p.table("class_foo"));
-        ObjKey foo1 = sync::create_object(*p.group, *p.table("class_foo")).get_key();
-        auto ll = sync::create_object(*p.group, *p.table("class_bar")).get_linklist("ll");
+        p.table("class_foo")->create_object();
+        ObjKey foo1 = p.table("class_foo")->create_object().get_key();
+        auto ll = p.table("class_bar")->create_object().get_linklist("ll");
         ll.insert(0, foo1);
     });
 
@@ -297,9 +297,9 @@ TEST(Transform_LinkListInsert_vs_MoveLastOver)
     client_2->create_schema(create_schema);
 
     client_1->transaction([](Peer& p) {
-        sync::create_object(*p.group, *p.table("class_foo"));
-        sync::create_object(*p.group, *p.table("class_foo"));
-        sync::create_object(*p.group, *p.table("class_bar"));
+        p.table("class_foo")->create_object();
+        p.table("class_foo")->create_object();
+        p.table("class_bar")->create_object();
         auto ll = p.table("class_bar")->begin()->get_linklist("ll");
     });
 
@@ -343,9 +343,9 @@ TEST(Transform_Experiment)
     client_1->transaction([&](Peer& c1) {
         TableRef t = c1.table("class_t");
         TableRef t2 = c1.table("class_t2");
-        sync::create_object(*c1.group, *t);
-        sync::create_object(*c1.group, *t2);
-        sync::create_object(*c1.group, *t2);
+        t->create_object();
+        t2->create_object();
+        t2->create_object();
         (t->begin() + 0)->get_linklist("ll").add(t2->begin()->get_key());
         (t->begin() + 0)->get_linklist("ll").add(t2->begin()->get_key());
     });
@@ -395,9 +395,9 @@ TEST(Transform_SelectLinkList)
     client_2->create_schema(schema);
 
     client_1->transaction([&](Peer& c1) {
-        sync::create_object(*c1.group, *c1.table("class_t2"));
-        sync::create_object(*c1.group, *c1.table("class_t"));
-        sync::create_object(*c1.group, *c1.table("class_t"));
+        c1.table("class_t2")->create_object();
+        c1.table("class_t")->create_object();
+        c1.table("class_t")->create_object();
     });
 
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -445,12 +445,12 @@ TEST(Transform_InsertRows)
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
     client_1->start_transaction();
-    sync::create_object(*client_1->group, *client_1->table("class_t"));
+    client_1->table("class_t")->create_object();
     client_1->table("class_t")->begin()->set("i", 123);
     client_1->commit();
 
     client_2->start_transaction();
-    sync::create_object(*client_2->group, *client_2->table("class_t"));
+    client_2->table("class_t")->create_object();
     client_2->table("class_t")->begin()->set("i", 456);
     client_2->commit();
 
@@ -484,18 +484,18 @@ TEST(Transform_AdjustSetLinkPayload)
     client_1->transaction([](Peer& client_1) {
         TableRef t = client_1.table("class_t");
         TableRef l = client_1.table("class_l");
-        sync::create_object(*client_1.group, *t);
+        t->create_object();
         t->begin()->set("i", 123);
-        sync::create_object(*client_1.group, *l);
+        l->create_object();
         l->begin()->set("l", t->begin()->get_key());
     });
 
     client_2->transaction([](Peer& client_2) {
         TableRef t = client_2.table("class_t");
         TableRef l = client_2.table("class_l");
-        sync::create_object(*client_2.group, *t);
+        t->create_object();
         t->begin()->set("i", 456);
-        sync::create_object(*client_2.group, *client_2.table("class_l"));
+        client_2.table("class_l")->create_object();
         l->begin()->set("l", t->begin()->get_key());
     });
 
@@ -536,17 +536,17 @@ TEST(Transform_AdjustLinkListSetPayload)
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
     client_1->transaction([](Peer& client_1) {
-        sync::create_object(*client_1.group, *client_1.table("class_t"));
+        client_1.table("class_t")->create_object();
         client_1.table("class_t")->begin()->set("i", 123);
-        sync::create_object(*client_1.group, *client_1.table("class_ll"));
+        client_1.table("class_ll")->create_object();
         LnkLst ll = client_1.table("class_ll")->begin()->get_linklist("ll");
         ll.add((ll.get_target_table()->begin() + 0)->get_key());
     });
 
     client_2->transaction([](Peer& client_2) {
-        sync::create_object(*client_2.group, *client_2.table("class_t"));
+        client_2.table("class_t")->create_object();
         client_2.table("class_t")->begin()->set("i", 456);
-        sync::create_object(*client_2.group, *client_2.table("class_ll"));
+        client_2.table("class_ll")->create_object();
         LnkLst ll = client_2.table("class_ll")->begin()->get_linklist("ll");
         ll.add((ll.get_target_table()->begin() + 0)->get_key());
     });
@@ -581,15 +581,15 @@ TEST(Transform_MergeInsertSetAndErase)
     client_2->create_schema(schema);
 
     client_1->transaction([](Peer& client_1) {
-        sync::create_object(*client_1.group, *client_1.table("class_t"));
-        sync::create_object(*client_1.group, *client_1.table("class_t"));
+        client_1.table("class_t")->create_object();
+        client_1.table("class_t")->create_object();
         client_1.table("class_t")->begin()->set("i", 123);
         client_1.table("class_t")->get_object(1).set("i", 456);
     });
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
     client_1->transaction([](Peer& client_1) {
-        sync::create_object(*client_1.group, *client_1.table("class_t"));
+        client_1.table("class_t")->create_object();
         client_1.table("class_t")->get_object(2).set("i", 789);
     });
 
@@ -629,13 +629,13 @@ TEST(Transform_MergeSetLinkAndMoveLastOver)
     client_1->create_schema(schema);
     client_2->create_schema(schema);
     client_1->transaction([](Peer& client_1) {
-        sync::create_object(*client_1.group, *client_1.table("class_t")).set("i", 123);
+        client_1.table("class_t")->create_object().set("i", 123);
     });
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
     client_1->transaction([](Peer& client_1) {
         auto k = client_1.table("class_t")->begin()->get_key();
-        sync::create_object(*client_1.group, *client_1.table("class_l")).set("l", k);
+        client_1.table("class_l")->create_object().set("l", k);
     });
 
     client_2->transaction([](Peer& client_2) {
@@ -678,7 +678,7 @@ TEST(Transform_MergeSetDefault)
 
     client_1->transaction([&](Peer& client_1) {
         TableRef t = client_1.table("class_t");
-        sync::create_object_with_primary_key(*client_1.group, *t, 123);
+        t->create_object_with_primary_key(123);
         bool is_default = false;
         t->begin()->set("j", 456, is_default);
     });
@@ -688,7 +688,7 @@ TEST(Transform_MergeSetDefault)
 
     client_2->transaction([&](Peer& client_2) {
         TableRef t = client_2.table("class_t");
-        sync::create_object_with_primary_key(*client_2.group, *t, 123);
+        t->create_object_with_primary_key(123);
         bool is_default = true;
         t->begin()->set("j", 789, is_default);
     });
@@ -730,9 +730,9 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
     client_1->transaction([](Peer& client_1) {
         TableRef t = client_1.table("class_t");
         TableRef t2 = client_1.table("class_t2");
-        sync::create_object_with_primary_key(*client_1.group, *t, 123);
+        t->create_object_with_primary_key(123);
         t->begin()->set("s", "a");
-        sync::create_object(*client_1.group, *t2);
+        t2->create_object();
         t2->begin()->set("i2", 1);
         (t->begin() + 0)->get_linklist("ll").add(t2->begin()->get_key());
     });
@@ -742,9 +742,9 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
     client_2->transaction([](Peer& client_2) {
         TableRef t = client_2.table("class_t");
         TableRef t2 = client_2.table("class_t2");
-        sync::create_object_with_primary_key(*client_2.group, *t, 123);
+        t->create_object_with_primary_key(123);
         t->begin()->set("s", "bb");
-        sync::create_object(*client_2.group, *t2);
+        t2->create_object();
         t2->begin()->set("i2", 2);
         auto ll = (t->begin() + 0)->get_linklist("ll");
         ll.add(ll.get_target_table()->begin()->get_key());
@@ -756,7 +756,7 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
     client_1->transaction([](Peer& client_1) {
         TableRef t = client_1.table("class_t");
         TableRef t2 = client_1.table("class_t2");
-        auto k = sync::create_object(*client_1.group, *t2).set("i2", 3).get_key();
+        auto k = t2->create_object().set("i2", 3).get_key();
         (t->begin() + 0)->get_linklist("ll").add(k);
     });
 
@@ -795,7 +795,7 @@ TEST(Transform_AddInteger)
     client_2->create_schema(schema);
 
     client_1->transaction([](Peer& client_1) {
-        sync::create_object(*client_1.group, *client_1.table("class_t"));
+        client_1.table("class_t")->create_object();
     });
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
@@ -861,7 +861,7 @@ TEST(Transform_AddIntegerSetNull)
     client_2->create_schema(schema);
 
     client_1->transaction([](Peer& client_1) {
-        sync::create_object(*client_1.group, *client_1.table("class_t"));
+        client_1.table("class_t")->create_object();
     });
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
@@ -910,14 +910,14 @@ TEST(Transform_EraseSelectedLinkView)
         TableRef target = sync::create_table(tr, "class_target");
         origin->add_column_link(type_LinkList, "ll", *target);
         target->add_column(type_Int, "");
-        sync::create_object(tr, *origin);
-        sync::create_object(tr, *origin);
-        sync::create_object(tr, *target);
-        sync::create_object(tr, *target);
-        sync::create_object(tr, *target);
-        sync::create_object(tr, *target);
-        sync::create_object(tr, *target);
-        sync::create_object(tr, *target);
+        origin->create_object();
+        origin->create_object();
+        target->create_object();
+        target->create_object();
+        target->create_object();
+        target->create_object();
+        target->create_object();
+        target->create_object();
         LnkLst link_list = (origin->begin() + 1)->get_linklist("ll");
         link_list.add(target->begin()->get_key());
         link_list.add((target->begin() + 1)->get_key());
@@ -1049,7 +1049,7 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
     for (int i = 0; i < nrows_1; ++i) {
         if (!one_change_set)
             client_1->start_transaction();
-        Obj obj = sync::create_object(*client_1->group, *client_1->table(table_name_1));
+        Obj obj = client_1->table(table_name_1)->create_object();
         if (fill_rows)
             obj.set("int column", 10 * i + 1);
         if (!one_change_set)
@@ -1065,7 +1065,7 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
     for (int i = 0; i < nrows_2; ++i) {
         if (!one_change_set)
             client_2->start_transaction();
-        Obj obj = sync::create_object(*client_2->group, *client_2->table(table_name_2));
+        Obj obj = client_2->table(table_name_2)->create_object();
         if (fill_rows)
             obj.set("int column", 10 * i + 2);
         if (!one_change_set)
@@ -1145,7 +1145,7 @@ double timer_multi_clients(TestContext& test_context, const std::string path_add
         std::unique_ptr<Peer>& client = clients[i];
         client->start_transaction();
         for (int i = 0; i < nrows; ++i)
-            sync::create_object(*client->group, *client->table(table_name));
+            client->table(table_name)->create_object();
         client->commit();
     }
 
@@ -1205,7 +1205,7 @@ double timer_integrate_change_sets(TestContext& test_context, const std::string 
     for (uint_fast64_t i = 0; i < n_change_sets_server; ++i) {
         client_1->start_transaction();
         for (uint_fast64_t j = 0; j < n_instr_server; ++j) {
-            sync::create_object(*client_1->group, *client_1->table(table_name));
+            client_1->table(table_name)->create_object();
         }
         client_1->commit();
     }
@@ -1215,7 +1215,7 @@ double timer_integrate_change_sets(TestContext& test_context, const std::string 
     for (uint_fast64_t i = 0; i < n_change_sets_client; ++i) {
         client_2->start_transaction();
         for (uint_fast64_t j = 0; j < n_instr_client; ++j) {
-            sync::create_object(*client_2->group, *client_2->table(table_name));
+            client_2->table(table_name)->create_object();
         }
         client_2->commit();
     }
@@ -1420,8 +1420,8 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
         TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
         TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
         a->add_column_link(type_LinkList, "ll", *b);
-        Obj a_obj = sync::create_object_with_primary_key(*c.group, *a, 123);
-        Obj b_obj = sync::create_object_with_primary_key(*c.group, *b, 456);
+        Obj a_obj = a->create_object_with_primary_key(123);
+        Obj b_obj = b->create_object_with_primary_key(456);
         a_obj.get_linklist("ll").add(b_obj.get_key());
     });
 
@@ -1429,8 +1429,8 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
         TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
         TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
         a->add_column_link(type_LinkList, "ll", *b);
-        Obj a_obj = sync::create_object_with_primary_key(*c.group, *a, 123);
-        Obj b_obj = sync::create_object_with_primary_key(*c.group, *b, 456);
+        Obj a_obj = a->create_object_with_primary_key(123);
+        Obj b_obj = b->create_object_with_primary_key(456);
         a_obj.get_linklist("ll").add(b_obj.get_key());
     });
 
@@ -1455,9 +1455,9 @@ TEST(Transform_ArrayInsert_EraseObject)
         TableRef source = sync::create_table(*c.group, "class_source");
         TableRef target = sync::create_table(*c.group, "class_target");
         source->add_column_link(type_LinkList, "ll", *target);
-        sync::create_object(*c.group, *source);
-        k0 = sync::create_object(*c.group, *target).get_key();
-        k1 = sync::create_object(*c.group, *target).get_key();
+        source->create_object();
+        k0 = target->create_object().get_key();
+        k1 = target->create_object().get_key();
     });
 
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -1496,7 +1496,7 @@ TEST(Transform_ArrayClearVsArrayClear_TimestampBased)
     client_1->transaction([&](Peer& c) {
         TableRef table = sync::create_table(*c.group, "class_table");
         col_ints = table->add_column_list(type_Int, "ints");
-        auto obj = sync::create_object(*c.group, *table);
+        auto obj = table->create_object();
         auto ints = obj.get_list<int64_t>("ints");
         ints.insert(0, 1);
         ints.insert(1, 2);
@@ -1568,7 +1568,7 @@ TEST(Transform_CreateEraseCreateSequencePreservesObject)
         client_1->transaction([&](Peer& c) {
             auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
             table->add_column(type_Int, "int");
-            auto obj = sync::create_object_with_primary_key(*c.group, *table, 123);
+            auto obj = table->create_object_with_primary_key(123);
             obj.set<int64_t>("int", 0);
         });
 
@@ -1579,10 +1579,10 @@ TEST(Transform_CreateEraseCreateSequencePreservesObject)
             TableRef table = c.group->get_table("class_table");
             auto obj = *table->begin();
             obj.remove();
-            obj = sync::create_object_with_primary_key(*c.group, *table, 123);
+            obj = table->create_object_with_primary_key(123);
             obj.set<int64_t>("int", 1);
             obj.remove();
-            obj = sync::create_object_with_primary_key(*c.group, *table, 123);
+            obj = table->create_object_with_primary_key(123);
             obj.set<int64_t>("int", 11);
         });
 
@@ -1591,7 +1591,7 @@ TEST(Transform_CreateEraseCreateSequencePreservesObject)
             TableRef table = c.group->get_table("class_table");
             auto obj = *table->begin();
             obj.remove();
-            obj = sync::create_object_with_primary_key(*c.group, *table, 123);
+            obj = table->create_object_with_primary_key(123);
             obj.set<int64_t>("int", 2);
         });
 
@@ -1627,7 +1627,7 @@ TEST(Transform_AddIntegerSurvivesSetNull)
             auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
             const bool nullable = true;
             table->add_column(type_Int, "int", nullable);
-            auto obj = sync::create_object_with_primary_key(*c.group, *table, 0);
+            auto obj = table->create_object_with_primary_key(0);
             obj.set<int64_t>("int", 0);
         });
 
@@ -1703,7 +1703,7 @@ TEST(Transform_AddIntegerSurvivesSetDefault)
         client_1->transaction([&](Peer& c) {
             auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
             table->add_column(type_Int, "int");
-            auto obj = sync::create_object_with_primary_key(*c.group, *table, 0);
+            auto obj = table->create_object_with_primary_key(0);
         });
 
         it.sync_all();
@@ -1759,7 +1759,7 @@ TEST(Transform_AddIntegerSurvivesSetDefault_NoRegularSets)
         client_1->transaction([&](Peer& c) {
             auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
             table->add_column(type_Int, "int");
-            auto obj = sync::create_object_with_primary_key(*c.group, *table, 0);
+            auto obj = table->create_object_with_primary_key(0);
         });
 
         it.sync_all();
@@ -1816,8 +1816,8 @@ TEST(Transform_DanglingLinks)
             auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
             auto table2 = sync::create_table_with_primary_key(tr, "class_table2", type_Int, "pk");
             table->add_column_link(type_LinkList, "links", *table2);
-            auto obj = sync::create_object_with_primary_key(tr, *table, 0);
-            auto obj2 = sync::create_object_with_primary_key(tr, *table2, 0);
+            auto obj = table->create_object_with_primary_key(0);
+            auto obj2 = table2->create_object_with_primary_key(0);
             obj.get_linklist("links").insert(0, obj2.get_key());
         });
 

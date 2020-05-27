@@ -24,7 +24,7 @@ void populate(DBRef& sg)
     for (size_t i = 0; i < num_rows; ++i) {
         std::string payload(i, 'a');
         StringData payload_sg(payload);
-        create_object(wt, *t).set_all(payload_sg, int64_t(i));
+        t->create_object().set_all(payload_sg, int64_t(i));
     }
     wt.commit();
 }
@@ -158,10 +158,10 @@ TEST_IF(EncryptTransform_ServerHistory, false)
             TableRef persons = create_table(wt, "class_persons");
             col_ndx_person_name = persons->add_column(type_String, "name");
             col_ndx_person_age = persons->add_column(type_Int, "age");
-            create_object(wt, *persons).set_all("Adam", 28);
-            create_object(wt, *persons).set_all("Frank", 30);
-            create_object(wt, *persons).set_all("Ben", 28);
-            create_object(wt, *persons).set_all("Bobby", 5);
+            persons->create_object().set_all("Adam", 28);
+            persons->create_object().set_all("Frank", 30);
+            persons->create_object().set_all("Ben", 28);
+            persons->create_object().set_all("Bobby", 5);
             version_type new_version = wt.commit();
             reference_session.nonsync_transact_notify(new_version);
         }
@@ -189,11 +189,10 @@ TEST_IF(EncryptTransform_ServerHistory, false)
             col_ndx_result_set_matches_property = result_sets->get_column_key("matches_property");
             // 0 = uninitialized, 1 = initialized, -1 = query parsing failed
             result_sets->add_column_link(type_LinkList, "people", *people);
-            Obj res = create_object(wt, *result_sets);
-            obj_key = res.get_key();
+            Obj res = result_sets->create_object();
             res.set(col_ndx_result_set_query, "age < 10");
             res.set(col_ndx_result_set_matches_property, "people");
-            result_set = object_id_for_row(wt, *result_sets, obj_key);
+            result_set = res.get_object_id();
             version_type new_version = wt.commit();
             partial_session.nonsync_transact_notify(new_version);
         }

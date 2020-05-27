@@ -26,7 +26,7 @@ TEST(EmbeddedObjects_Basic)
     client_1->transaction([&](auto& c) {
         auto& tr = *c.group;
         auto top = tr.get_table("class_Top");
-        auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+        auto top_obj = top->create_object_with_primary_key(123);
         auto sub_col = top->get_column_key("sub");
         top_obj.create_and_set_linked_object(sub_col).set("i", 1);
     });
@@ -57,7 +57,7 @@ TEST(EmbeddedObjects_ArrayOfObjects)
     client_1->transaction([&](auto& c) {
         auto& tr = *c.group;
         auto top = tr.get_table("class_Top");
-        auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+        auto top_obj = top->create_object_with_primary_key(123);
         auto sub_col = top->get_column_key("sub");
         auto obj_list = top_obj.get_linklist(sub_col);
         for (size_t i = 0; i < 10; ++i) {
@@ -98,7 +98,7 @@ TEST(EmbeddedObjects_NestedArray)
         int64_t message = 0;
 
         for (int64_t i = 0; i < 10; ++i) {
-            auto thread = sync::create_object_with_primary_key(tr, *threads, i);
+            auto thread = threads->create_object_with_primary_key(i);
             auto top_comments = thread.get_linklist("comments");
             for (size_t j = 0; j < 2; ++j) {
                 auto comment_j = top_comments.create_and_insert_linked_object(j);
@@ -154,7 +154,7 @@ TEST(EmbeddedObjects_ImplicitErase)
         client_1->transaction([&](auto& c) {
             auto& tr = *c.group;
             TableRef top = tr.get_table("class_Top");
-            auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+            auto top_obj = top->create_object_with_primary_key(123);
             top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
         });
 
@@ -163,7 +163,7 @@ TEST(EmbeddedObjects_ImplicitErase)
         client_2->transaction([&](auto& c) {
             auto& tr = *c.group;
             TableRef top = tr.get_table("class_Top");
-            auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+            auto top_obj = top->create_object_with_primary_key(123);
             bool is_default = false;
             top_obj.set_null("sub", is_default);
         });
@@ -204,7 +204,7 @@ TEST(EmbeddedObjects_SetDefaultNullIgnored)
         client_1->transaction([&](auto& c) {
             auto& tr = *c.group;
             TableRef top = tr.get_table("class_Top");
-            auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+            auto top_obj = top->create_object_with_primary_key(123);
             top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
         });
 
@@ -213,7 +213,7 @@ TEST(EmbeddedObjects_SetDefaultNullIgnored)
         client_2->transaction([&](auto& c) {
             auto& tr = *c.group;
             TableRef top = tr.get_table("class_Top");
-            auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+            auto top_obj = top->create_object_with_primary_key(123);
             bool is_default = true;
             top_obj.set_null("sub", is_default);
         });
@@ -248,7 +248,7 @@ TEST(EmbeddedObjects_DiscardThroughImplicitErase)
             top->add_column_link(type_Link, "sub", *sub);
             sub->add_column(type_Int, "i");
 
-            auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+            auto top_obj = top->create_object_with_primary_key(123);
             auto sub_obj = top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
         });
 
@@ -298,7 +298,7 @@ TEST(EmbeddedObjects_AdjustPathOnInsert)
         sub->add_column_link(type_LinkList, "sub", *sub);
         sub->add_column(type_Int, "i");
 
-        auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+        auto top_obj = top->create_object_with_primary_key(123);
         auto top_list = top_obj.get_linklist("sub");
         auto sub_obj = top_list.create_and_insert_linked_object(0);
         sub_obj.set("i", 0);
@@ -372,7 +372,7 @@ TEST(EmbeddedObjects_AdjustPathOnErase)
         sub->add_column_link(type_LinkList, "sub", *sub);
         sub->add_column(type_Int, "i");
 
-        auto top_obj = sync::create_object_with_primary_key(tr, *top, 123);
+        auto top_obj = top->create_object_with_primary_key(123);
         auto top_list = top_obj.get_linklist("sub");
         auto sub_obj = top_list.create_and_insert_linked_object(0);
         sub_obj.set("i", 0);
@@ -448,7 +448,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject)
             auto embedded = tr.add_embedded_table("class_embedded");
             embedded->add_column(type_Int, "int");
             table->add_column_link(type_Link, "embedded", *embedded);
-            auto obj = sync::create_object_with_primary_key(tr, *table, 123);
+            auto obj = table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
 
@@ -516,7 +516,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject_Nested)
             embedded->add_column(type_Int, "int");
             embedded->add_column_link(type_Link, "embedded", *embedded);
             table->add_column_link(type_Link, "embedded", *embedded);
-            auto obj = sync::create_object_with_primary_key(tr, *table, 123);
+            auto obj = table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
 

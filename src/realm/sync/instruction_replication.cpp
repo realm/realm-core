@@ -27,15 +27,12 @@ void SyncReplication::reset()
     m_last_class_name = InternString::npos;
     m_last_primary_key = Instruction::PrimaryKey();
     m_last_field_name = InternString::npos;
-
-    m_cache->clear();
 }
 
 void SyncReplication::do_initiate_transact(Group& group, version_type current_version, bool history_updated)
 {
     TrivialReplication::do_initiate_transact(group, current_version, history_updated);
-    Transaction& transaction = dynamic_cast<Transaction&>(group); // FIXME: Is this safe?
-    m_cache.reset(new TableInfoCache{transaction});
+    m_transaction = dynamic_cast<Transaction*>(&group); // FIXME: Is this safe?
     reset();
 }
 
@@ -160,8 +157,7 @@ void SyncReplication::create_object(const Table* table, GlobalKey oid)
 
     TrivialReplication::create_object(table, oid);
     if (select_table(*table)) {
-        const auto& info = m_cache->get_table_info(*table);
-        if (info.primary_key_col) {
+        if (table->get_primary_key_column()) {
             // Trying to create object without a primary key in a table that
             // has a primary key column.
             unsupported_instruction();
@@ -229,14 +225,13 @@ void SyncReplication::erase_group_level_table(TableKey table_key, size_t num_tab
 {
     TrivialReplication::erase_group_level_table(table_key, num_tables);
 
-    StringData table_name = m_cache->m_transaction.get_table_name(table_key);
+    StringData table_name = m_transaction->get_table_name(table_key);
 
     bool is_class = table_name.begins_with("class_");
 
     if (is_class) {
         REALM_ASSERT(table_name == m_table_being_erased);
         m_table_being_erased.clear();
-        m_cache->clear(); // FIXME: Harsh, but rare.
 
         if (!m_short_circuit) {
             Instruction::EraseTable instr;
@@ -273,9 +268,6 @@ void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType
             instr.link_target_table = m_encoder.intern_string("");
         }
         emit(instr);
-
-        // Invalidate cache
-        m_cache->m_table_info.erase(table->get_key());
     }
 }
 
@@ -289,9 +281,8 @@ void SyncReplication::erase_column(const Table* table, ColKey col_ndx)
             // EraseTable.
             return;
         }
-        auto& info = m_cache->get_table_info(*table);
         // Not allowed to remove PK/OID columns!
-        REALM_ASSERT(col_ndx != info.primary_key_col);
+        REALM_ASSERT(col_ndx != table->get_primary_key_column());
         Instruction::EraseColumn instr;
         instr.table = m_last_class_name;
         instr.field = m_encoder.intern_string(table->get_column_name(col_ndx));
@@ -354,7 +345,7 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
     TrivialReplication::add_int(table, col, ndx, value);
 
     if (select_table(*table)) {
-        REALM_ASSERT(col != m_cache->get_table_info(*table).primary_key_col);
+        REALM_ASSERT(col != table->get_primary_key_column());
 
         Instruction::AddInteger instr;
         populate_path_instr(instr, *table, ndx, col);
@@ -668,8 +659,6 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 
     // FIXME: This probably belongs in a function similar to sync::create_object().
     if (table->get_name().begins_with("class_")) {
-        if (is_short_circuited())
-            m_cache->clear_last_object(*table);
     }
 
     if (select_table(*table)) {
@@ -677,7 +666,6 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
         instr.table = m_last_class_name;
         instr.object = primary_key_for_object(*table, row_ndx);
         emit(instr);
-        m_cache->clear_last_object(*table);
     }
 }
 

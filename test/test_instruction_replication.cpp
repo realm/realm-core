@@ -44,8 +44,7 @@ struct Fixture {
         sync::parse_changeset(stream, result);
 
         WriteTransaction wt{sg_2};
-        TableInfoCache table_info_cache{wt};
-        InstructionApplier applier{wt, table_info_cache};
+        InstructionApplier applier{wt};
         applier.apply(result, &test_context.logger);
         wt.commit();
     }
@@ -137,7 +136,7 @@ TEST(InstructionReplication_CreateObject)
         WriteTransaction wt{fixture.sg_1};
         TableRef foo = sync::create_table(wt, "class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        sync::create_object(wt, *foo).set(col_ndx, 123);
+        foo->create_object().set(col_ndx, 123);
         wt.commit();
     }
     fixture.replay_transactions();
@@ -159,7 +158,7 @@ TEST(InstructionReplication_CreateObjectNullStringPK)
         WriteTransaction wt{fixture.sg_1};
         bool nullable = true;
         TableRef foo = sync::create_table_with_primary_key(wt, "class_foo", type_String, "pk", nullable);
-        Obj obj = sync::create_object_with_primary_key(wt, *foo, StringData{});
+        Obj obj = foo->create_object_with_primary_key(StringData{});
         ColKey col_ndx = foo->get_column_key("pk");
         CHECK(obj.is_null(col_ndx));
         wt.commit();
@@ -341,11 +340,11 @@ TEST(InstructionReplication_SetLink)
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_l = bar->add_column_link(type_Link, "l", *foo);
 
-        auto foo_1 = sync::create_object(wt, *foo).set(foo_i, 123).get_key();
-        auto foo_2 = sync::create_object(wt, *foo).set(foo_i, 456).get_key();
+        auto foo_1 = foo->create_object().set(foo_i, 123).get_key();
+        auto foo_2 = foo->create_object().set(foo_i, 456).get_key();
 
-        sync::create_object(wt, *bar).set(bar_l, foo_1);
-        sync::create_object(wt, *bar).set(bar_l, foo_2);
+        bar->create_object().set(bar_l, foo_1);
+        bar->create_object().set(bar_l, foo_2);
 
 
         wt.commit();
@@ -377,7 +376,7 @@ TEST(InstructionReplication_AddInteger)
         WriteTransaction wt{fixture.sg_1};
         TableRef foo = sync::create_table(wt, "class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        sync::create_object(wt, *foo).add_int(col_ndx, 123);
+        foo->create_object().add_int(col_ndx, 123);
         wt.commit();
     }
     fixture.replay_transactions();
@@ -436,11 +435,11 @@ TEST(InstructionReplication_LinkLists)
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_ll = bar->add_column_link(type_LinkList, "ll", *foo);
 
-        ObjKey foo_1 = sync::create_object(wt, *foo).set(foo_i, 123).get_key();
-        ObjKey foo_2 = sync::create_object(wt, *foo).set(foo_i, 456).get_key();
+        ObjKey foo_1 = foo->create_object().set(foo_i, 123).get_key();
+        ObjKey foo_2 = foo->create_object().set(foo_i, 456).get_key();
 
-        Obj bar_1 = sync::create_object(wt, *bar);
-        Obj bar_2 = sync::create_object(wt, *bar);
+        Obj bar_1 = bar->create_object();
+        Obj bar_2 = bar->create_object();
 
         bar_1.get_linklist(bar_ll).insert(0, foo_1);
         bar_1.get_linklist(bar_ll).insert(1, foo_1);
@@ -486,15 +485,15 @@ TEST(InstructionReplication_NullablePrimaryKeys)
         TableRef t = sync::create_table_with_primary_key(wt, "class_t", type_Int, "pk", nullable);
         ColKey col_ndx = t->add_column(type_Int, "i");
 
-        sync::create_object_with_primary_key(wt, *t, 123).set(col_ndx, 123);
+        t->create_object_with_primary_key(123).set(col_ndx, 123);
         ObjKey first = t->find_first<util::Optional<int64_t>>(t->get_primary_key_column(), 123);
         REALM_ASSERT(first);
 
-        sync::create_object_with_primary_key(wt, *t, util::none).set(col_ndx, 456);
+        t->create_object_with_primary_key(util::none).set(col_ndx, 456);
         ObjKey second = t->find_first_null(t->get_primary_key_column());
         REALM_ASSERT(second);
 
-        sync::create_object_with_primary_key(wt, *t, 789).set(col_ndx, 789);
+        t->create_object_with_primary_key(789).set(col_ndx, 789);
         ObjKey third = t->find_first<util::Optional<int64_t>>(t->get_primary_key_column(), 789);
         REALM_ASSERT(third);
 

@@ -19,13 +19,11 @@ namespace client_reset {
 //
 // The result is that src group is unchanged and the dst group is equal to src
 // when this function returns.
-void transfer_group(const Transaction& tr_src, const sync::TableInfoCache& table_info_cache_src, Transaction& tr_dst,
-                    sync::TableInfoCache& table_info_cache_dst, util::Logger& logger);
+void transfer_group(const Transaction& tr_src, Transaction& tr_dst, util::Logger& logger);
 
 // recover_schema() transfers all tables and columns that exist in src but not
 // in dst into dst. Nothing is erased in dst.
-void recover_schema(const Transaction& group_src, const sync::TableInfoCache& table_info_cache_src,
-                    Transaction& group_dst, util::Logger& logger);
+void recover_schema(const Transaction& group_src, Transaction& group_dst, util::Logger& logger);
 
 // preform_client_reset_diff() takes the Realm performs a client reset on
 // the Realm in 'path_local' given the Realm 'path_remote' as the source of truth.

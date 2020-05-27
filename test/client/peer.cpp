@@ -350,7 +350,7 @@ void Peer::perform_transaction(BinaryData blob, TransactSpec& spec)
                 num_add = spec.num_blobs - int(table->size());
             }
             for (int i = 0; i < num_add; ++i)
-                sync::create_object(wt, *table);
+                table->create_object();
             std::size_t num_rows = table->size();
             BinaryData blob_2 = blob;
             if (blob_2.is_null())
@@ -480,7 +480,7 @@ void Peer::generate_queryable(const std::string& class_name, int n, LevelDistr l
         }
         for (int i = 0; i < n; ++i) {
             int level_2 = level_distr(m_context.test_proc_random);
-            sync::create_object(wt, *queryable).set(level_ndx, level_2).set(text_ndx, text);
+            queryable->create_object().set(level_ndx, level_2).set(text_ndx, text);
         }
         new_version = wt.commit();
     }
@@ -529,9 +529,7 @@ void Peer::add_query(const std::string& class_name, const std::string& query)
         }
         ColKey col_ndx_query = result_sets->get_column_key("query");
         ColKey col_ndx_matches_property = result_sets->get_column_key("matches_property");
-        sync::create_object(wt, *result_sets)
-            .set(col_ndx_query, query)
-            .set(col_ndx_matches_property, matches_column_name);
+        result_sets->create_object().set(col_ndx_query, query).set(col_ndx_matches_property, matches_column_name);
         new_version = wt.commit();
     }
     if (m_session_is_bound)
@@ -773,7 +771,7 @@ void Peer::do_send_ptime_request(WriteTransaction& wt)
 {
     TableRef table = do_ensure_ptime_class(wt);
     milliseconds_type timestamp = _impl::realtime_clock_now();
-    sync::create_object(wt, *table).set("originator", m_originator_ident).set("timestamp", std::int64_t(timestamp));
+    table->create_object().set("originator", m_originator_ident).set("timestamp", std::int64_t(timestamp));
 }
 
 

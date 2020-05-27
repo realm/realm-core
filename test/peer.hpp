@@ -481,7 +481,6 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
 
     TempDisableReplication tdr(sg);
     TransactionRef transact = sg.start_write(); // Throws
-    sync::TableInfoCache table_info_cache{*transact};
     version_type local_version = transact->get_version_of_current_transaction().version;
     REALM_ASSERT(local_version == s_initial_version + m_entries.size());
 
@@ -505,7 +504,7 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     util::AppendBuffer<char> assembled_transformed_changeset;
 
     for (size_t i = 0; i < num_changesets; ++i) {
-        sync::InstructionApplier applier{*transact, table_info_cache};
+        sync::InstructionApplier applier{*transact};
         applier.apply(changesets[i], logger);
 
         transact->verify();
