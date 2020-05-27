@@ -117,21 +117,8 @@ jobWrapper {
         ]
 
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker(buildOptions << [buildType : "Debug"]),
-            checkLinuxRelease       : doCheckInDocker(buildOptions << [buildType : "Release"]),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions << [buildType : "Debug", enableSync : "ON"]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions << [buildType : "Release"]),
-            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
-            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
             buildiosDebug           : doBuildAppleDevice('ios', 'MinSizeDebug'),
-            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
-            checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "thread"]),
-            addressSanitizer        : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "address"]),
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -611,7 +598,7 @@ def doBuildMacOs(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('osx_pro') {
+        node('macos') {
             getArchive()
 
             dir("build-macosx-${buildType}") {
@@ -697,7 +684,7 @@ def doBuildMacOsCatalyst(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('osx_pro') {
+        node('macos') {
             getArchive()
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
