@@ -48,27 +48,5 @@ set_target_properties(
 )
 
 target_link_libraries(
-    Dogless ${ASIO_LIBRARIES} RealmCore::Storage
-)
-
-install(
-  FILES ${DOGLESS_HEADERS}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dogless
-  COMPONENT devel)
-
-install(
-  FILES ../dogless.hpp
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  COMPONENT devel)
-
-install(
-  FILES ${UTILS_HEADERS}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dogless/utils
-  COMPONENT devel)
-
-install(
-  TARGETS Dogless
-  EXPORT Sync
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel
+    Dogless ${ASIO_LIBRARIES} Storage
 )

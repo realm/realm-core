@@ -44,7 +44,7 @@
 #include <realm/util/substitute.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/json_parser.hpp>
-#include <realm/impl/clock.hpp>
+#include <realm/sync/impl/clock.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>

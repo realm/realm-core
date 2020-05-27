@@ -25,6 +25,7 @@ include(CodeCoverage)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
+set(PROJECT_VERSION ${DEP_VERSION})
 
 # Project-wide build flags
 set(CMAKE_CXX_STANDARD 17)
@@ -113,7 +114,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
     $<$<CONFIG:MinSizeDebug>:-g>
 )
 
-set(OPENSSL_VERSION "1.1.1b")
+set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
@@ -223,14 +224,23 @@ endif()
 
 check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
+if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
+    set(REALM_INCLUDE_CERTS_DEFAULT ON)
+else()
+    set(REALM_INCLUDE_CERTS_DEFAULT OFF)
+endif()
+
 # Options (passed to CMake)
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
+option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
+option(REALM_BUILD_DOGLESS "Build server with support for emitting statsd" OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 option(REALM_VALGRIND "Tell the test suite we are running with valgrind" OFF)
 option(REALM_METRICS "Enable various metric tracking" ON)
+option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" REALM_INCLUDE_CERTS_DEFAULT)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
@@ -273,10 +283,18 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 # Include additional CMakeLists
 add_subdirectory(src)
 
+if (REALM_BUILD_DOGLESS)
+    set(REALM_HAVE_DOGLESS "1")
+    add_subdirectory(src/dogless)
+endif()
+
 # Enable CTest and include unit tests
 if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
     enable_testing()
     add_subdirectory(test)
+    if (REALM_BUILD_TEST_CLIENT)
+        add_subdirectory(test/client)
+    endif()
 endif()
 
 # Install the licence and changelog files

@@ -30,7 +30,7 @@ namespace {
 #ifdef REALM_INCLUDE_CERTS
 
 const char* root_certs[] = {
-#include <realm/noinst/root_certs.hpp>
+#include <realm/sync/noinst/root_certs.hpp>
 };
 
 bool verify_certificate_from_root_cert(const char* root_cert, X509* server_cert)

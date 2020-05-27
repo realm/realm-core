@@ -33,7 +33,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
-#include <realm/impl/clock.hpp>
+#include <realm/sync/impl/clock.hpp>
 #include <realm/db.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
