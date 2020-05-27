@@ -85,6 +85,59 @@ public:
         m_scheduler->notify();
     }
 };
+
+namespace _impl::ForEventLoopDispatcher {
+template <typename Sig>
+struct ExtractSignatureImpl {};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...)> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) &> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const &> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) & noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const & noexcept> {
+    using signature = void(Args...);
+};
+// Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
+// from something with that anyway.
+
+template <typename T>
+using ExtractSignature = typename ExtractSignatureImpl<T>::signature;
+} // namespace _impl::ForEventLoopDispatcher
+
+// Deduction guide for function pointers.
+template<typename... Args>
+EventLoopDispatcher(void(*)(Args...)) -> EventLoopDispatcher<void(Args...)>;
+
+// Deduction guide for callable objects, such as lambdas. Only supports types with a non-overloaded, non-templated
+// call operator, so no polymorphic (auto argument) lambdas.
+template<typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
+EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
+
+
 } // namespace util
 } // namespace realm
 
