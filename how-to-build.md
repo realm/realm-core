@@ -2,11 +2,11 @@ This file explains how to build and install the Realm core library.
 
 ## Prerequisites
 
-To build the Realm core library, you need CMake 3.4 or newer and a
+To build the Realm core library, you need CMake 3.15 or newer and a
 standard set of build tools. This includes a C/C++ compiler and a
 build system like GNU make. Realm is thoroughly tested with both GCC
-and Clang. It is known to work with GCC 4.9 and newer, as well as with
-Clang 3.9 (Apple Clang 8.0) and newer. Your compiler must support C++14.
+and Clang. It is known to work with GCC 8.3 and newer, as well as with
+Clang 9 and newer. Your compiler must support C++17.
 
 To run the benchmarking suite (make benchmark) on Linux, you will need
 the development part of the 'procps' library.
@@ -14,26 +14,15 @@ the development part of the 'procps' library.
 The following is a suggestion of how to install the prerequisites on
 each of our major platforms:
 
-### Linux Mint 18-18.2, Ubuntu 16.04
+### Linux Mint 19, Ubuntu 18.04
 
     sudo apt-get install build-essential
-    sudo apt-get install libprocps4-dev
+    sudo apt-get install libcurl4-openssl-dev 
+    sudo apt-get install libuv1-dev
+    sudo apt-get install libprocps-dev
     sudo apt-get install libssl-dev
+    sudo apt-get install zlib1g-dev
     sudo apt-get install cmake
-
-### Linux Mint 17-17.3, Ubuntu 14.04
-
-    sudo apt-get install build-essential
-    sudo apt-get install libprocps3-dev
-    sudo apt-get install libssl-dev
-    sudo apt-get install cmake3
-
-### Fedora 24, 25, 26
-
-    sudo dnf install gcc-c++
-    sudo dnf install procps-devel
-    sudo dnf install openssl-devel
-    sudo dnf install cmake
 
 ### OS X 10.10, 10.11, 10.12
 
@@ -51,7 +40,7 @@ package manager called brew. See https://brew.sh for install instructions.
 On Windows, navigate to the following websites in your browser
 to download the appropriate installers.
 
-- Visual Studio 2017: https://www.visualstudio.com/
+- Visual Studio 2019: https://www.visualstudio.com/
 - CMake: https://cmake.org/download/
 
 ## Configure, build & test
@@ -92,17 +81,9 @@ of the name of the tarball produced - it's optional.
 
 The core library comes with a suite of unit tests. You can run the unit tests like this:
 
-    cd build-dir/test
-    ./realm-tests
+    cd build.debug
+    ctest
     
-or run both unit tests and performance tests with just:
-
-    ctest
-
-or run both unit tests and performance tests with just:
-
-    ctest
-
 There are a number of environment variable that can be use the customize the
 execution. For example, here is how to run only the `Foo` test and those whose
 names start with `Bar`, then how run all tests whose names start with `Foo`,
