@@ -762,8 +762,8 @@ void Table::do_erase_root_column(ColKey col_key)
         delete m_index_accessors[col_ndx];
         m_index_accessors[col_ndx] = nullptr;
     }
-    m_opposite_table.set(col_ndx, 0);
-    m_opposite_column.set(col_ndx, 0);
+    m_opposite_table.set(col_ndx, TableKey().value);
+    m_opposite_column.set(col_ndx, ColKey().value);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
     if (m_tombstones)
