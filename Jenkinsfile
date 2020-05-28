@@ -314,13 +314,11 @@ def doBuildLinuxClang(String buildType) {
         node('docker') {
             getArchive()
             docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
-                sh """
-                   mkdir build-dir
-                   cd build-dir
-                   cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
-                """
-                runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}")
-                sh "cd build-dir && cpack -G TGZ"
+                dir('build-dir') {
+                    sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
+                    runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}")
+                    sh 'cpack -G TGZ'
+                }
             }
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
@@ -636,12 +634,12 @@ def doBuildMacOsCatalyst(String buildType) {
 
 def doBuildAppleDevice(String sdk, String buildType) {
     return {
-        node('osx') {
+        node('osx_pro') {
             getArchive()
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 15, unit: 'MINUTES') {
+                    timeout(time: 30, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
