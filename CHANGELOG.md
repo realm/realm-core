@@ -4,8 +4,7 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
  
 ### Breaking changes
 * None.
