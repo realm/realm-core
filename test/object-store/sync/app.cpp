@@ -30,6 +30,7 @@
 
 using namespace realm;
 using namespace realm::app;
+using util::Optional;
 
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1

@@ -105,13 +105,13 @@ public:
     /// @param options `RemoteFindOptions` to use when executing the command.
     /// @param completion_block The resulting json array as a string or error if one occurs
     void find(const std::string& filter_json, RemoteFindOptions options,
-              std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+              std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
     /// @param completion_block The resulting json array as a string or error if one occurs
     void find(const std::string& filter_json,
-              std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+              std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Returns one document as a json string from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
@@ -121,7 +121,7 @@ public:
     /// @param options `RemoteFindOptions` to use when executing the command.
     /// @param completion_block The resulting json string or error if one occurs
     void find_one(const std::string& filter_json, RemoteFindOptions options,
-                  std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+                  std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Returns one document as a json string from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
@@ -130,14 +130,14 @@ public:
     /// @param filter_json A `Document` as a json string that should match the query.
     /// @param completion_block The resulting json string or error if one occurs
     void find_one(const std::string& filter_json,
-                  std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+                  std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Runs an aggregation framework pipeline against this collection.
     /// @param pipline A `Document` array made up of jsons strings containing the pipeline of aggregation operations
     /// to perform.
     /// @param completion_block The resulting json string or error if one occurs
     void aggregate(std::vector<std::string> pipline,
-                   std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+                   std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
@@ -158,7 +158,7 @@ public:
     /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the
     /// inserted object on sucess
     void insert_one(const std::string& value_json,
-                    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+                    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
@@ -223,9 +223,10 @@ public:
     /// @param update_json  A `Document` as a json string describing the update.
     /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to update a document.
-    void find_one_and_update(const std::string& filter_json, const std::string& update_json,
-                             RemoteFindOneAndModifyOptions options,
-                             std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+    void
+    find_one_and_update(const std::string& filter_json, const std::string& update_json,
+                        RemoteFindOneAndModifyOptions options,
+                        std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Updates a single document in a collection based on a query filter and
     /// returns the document in either its pre-update or post-update form. Unlike
@@ -236,8 +237,9 @@ public:
     /// @param filter_json  A `Document` as a json string that should match the query.
     /// @param update_json  A `Document` as a json string describing the update.
     /// @param completion_block The result of the attempt to update a document.
-    void find_one_and_update(const std::string& filter_json, const std::string& update_json,
-                             std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+    void
+    find_one_and_update(const std::string& filter_json, const std::string& update_json,
+                        std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -249,9 +251,10 @@ public:
     /// @param replacement_json  A `Document` describing the update.
     /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to replace a document.
-    void find_one_and_replace(const std::string& filter_json, const std::string& replacement_json,
-                              RemoteFindOneAndModifyOptions options,
-                              std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+    void
+    find_one_and_replace(const std::string& filter_json, const std::string& replacement_json,
+                         RemoteFindOneAndModifyOptions options,
+                         std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -262,8 +265,9 @@ public:
     /// @param filter_json  A `Document` that should match the query.
     /// @param replacement_json  A `Document` describing the update.
     /// @param completion_block The result of the attempt to replace a document.
-    void find_one_and_replace(const std::string& filter_json, const std::string& replacement_json,
-                              std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
+    void
+    find_one_and_replace(const std::string& filter_json, const std::string& replacement_json,
+                         std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before

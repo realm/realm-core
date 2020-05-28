@@ -98,7 +98,7 @@ Results& Results::operator=(Results&&) = default;
 
 Results::Mode Results::get_mode() const noexcept
 {
-    CheckedUniqueLock lock(m_mutex);
+    util::CheckedUniqueLock lock(m_mutex);
     return m_mode;
 }
 

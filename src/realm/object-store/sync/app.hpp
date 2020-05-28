@@ -113,14 +113,14 @@ public:
         /// Fetches the user API keys associated with the current user.
         /// @param completion_block A callback to be invoked once the call is complete.
         void fetch_api_keys(std::shared_ptr<SyncUser> user,
-                            std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
+                            std::function<void(std::vector<UserAPIKey>, util::Optional<AppError>)> completion_block);
 
         /// Deletes a user API key associated with the current user.
         /// @param id The id of the API key to delete.
         /// @param user The user to perform this operation.
         /// @param completion_block A callback to be invoked once the call is complete.
         void delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                            std::function<void(Optional<AppError>)> completion_block);
+                            std::function<void(util::Optional<AppError>)> completion_block);
 
         /// Enables a user API key associated with the current user.
         /// @param id The id of the API key to enable.
@@ -217,8 +217,9 @@ public:
     ///
     /// @param credentials A `SyncCredentials` object representing the user to log in.
     /// @param completion_block A callback block to be invoked once the log in completes.
-    void log_in_with_credentials(const AppCredentials& credentials,
-                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block);
+    void log_in_with_credentials(
+        const AppCredentials& credentials,
+        std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
 
     /// Logout the current user.
     void log_out(std::function<void(util::Optional<AppError>)>);

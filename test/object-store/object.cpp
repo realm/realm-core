@@ -37,6 +37,7 @@
 #include <cstdint>
 
 using namespace realm;
+using util::any_cast;
 
 namespace {
 using AnyDict = std::map<std::string, util::Any>;
@@ -842,7 +843,7 @@ TEST_CASE("object")
             REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
             REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
             REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
+            REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
                     ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
 
@@ -860,7 +861,7 @@ TEST_CASE("object")
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
+                        .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
                     Decimal128("1.23e45"));
 
@@ -917,7 +918,7 @@ TEST_CASE("object")
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).get<Timestamp>(0) ==
                     Timestamp());
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<Optional<ObjectId>>(0) == util::none);
+                        .get<util::Optional<ObjectId>>(0) == util::none);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) ==
                     Decimal128(realm::null()));
 
@@ -929,7 +930,7 @@ TEST_CASE("object")
             REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 3.3);
             REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "hello");
             REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(10, 20));
-            REQUIRE(any_cast<Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
+            REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
                     ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
 
@@ -947,7 +948,7 @@ TEST_CASE("object")
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).get<StringData>(0) == "a");
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array"))
-                        .get<Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
+                        .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
                     Decimal128("1.23e45"));
         }

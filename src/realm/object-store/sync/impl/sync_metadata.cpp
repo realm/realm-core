@@ -128,7 +128,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     config.schema_mode = SchemaMode::Automatic;
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
-        encryption_key = keychain::metadata_realm_encryption_key(File::exists(path));
+        encryption_key = keychain::metadata_realm_encryption_key(util::File::exists(path));
     }
 #endif
     if (should_encrypt) {
@@ -204,7 +204,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         if (table->is_empty()) {
             realm->begin_transaction();
             if (table->is_empty()) {
-                auto uuid = uuid_string();
+                auto uuid = util::uuid_string();
                 table->create_object().set(m_client_schema.idx_uuid, uuid);
                 realm->commit_transaction();
                 return uuid;
