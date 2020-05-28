@@ -60,7 +60,7 @@ public:
                                                  const Property& prop,
                                                  size_t /* property_index */) const
     {
-        auto const& v = any_cast<AnyDict&>(dict);
+        auto const& v = util::any_cast<AnyDict&>(dict);
         auto it = v.find(prop.name);
         return it == v.end() ? util::none : util::make_optional(it->second);
     }
@@ -80,14 +80,14 @@ public:
     // Invoke `fn` with each of the values from an enumerable type
     template<typename Func>
     void enumerate_list(util::Any& value, Func&& fn) {
-        for (auto&& v : any_cast<AnyVector&>(value))
+        for (auto&& v : util::any_cast<AnyVector&>(value))
             fn(v);
     }
 
     // Determine if `value` boxes the same List as `list`
     bool is_same_list(List const& list, util::Any const& value)
     {
-        if (auto list2 = any_cast<List>(&value))
+        if (auto list2 = util::any_cast<List>(&value))
             return list == *list2;
         return false;
     }
@@ -132,7 +132,7 @@ public:
     // is true, `current_row` may hold a reference to the object that should
     // be compared against.
     template<typename T>
-    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const { return any_cast<T>(v); }
+    T unbox(util::Any& v, CreatePolicy = CreatePolicy::Skip, ObjKey /*current_row*/ = ObjKey()) const { return util::any_cast<T>(v); }
 
     Obj create_embedded_object();
 
@@ -172,7 +172,7 @@ inline StringData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
         return StringData();
-    auto& value = any_cast<std::string&>(v);
+    auto& value = util::any_cast<std::string&>(v);
     return StringData(value.c_str(), value.size());
 }
 
@@ -181,16 +181,16 @@ inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (!v.has_value())
         return BinaryData();
-    auto& value = any_cast<std::string&>(v);
+    auto& value = util::any_cast<std::string&>(v);
     return BinaryData(value.c_str(), value.size());
 }
 
 template<>
 inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_obj) const
 {
-    if (auto object = any_cast<Object>(&v))
+    if (auto object = util::any_cast<Object>(&v))
         return object->obj();
-    if (auto obj = any_cast<Obj>(&v))
+    if (auto obj = util::any_cast<Obj>(&v))
         return *obj;
     if (!policy.create)
         return Obj();

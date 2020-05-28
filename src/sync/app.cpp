@@ -29,6 +29,8 @@
 namespace realm {
 namespace app {
 
+using util::Optional;
+
 // MARK: - Helpers
 // wrap an optional json key into the Optional type
 template <typename T>

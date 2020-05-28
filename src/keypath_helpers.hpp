@@ -80,7 +80,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
             if (!element.table->is_link_type(element.col_key.get_type()) && element.col_key.get_type() != col_type_BackLink) {
                 throw InvalidPathError(util::format("Property '%1' is not a link in object of type '%2' in 'INCLUDE' clause",
                                                     element.table->get_column_name(element.col_key),
-                                                    get_printable_table_name(*element.table)));
+                                                    util::get_printable_table_name(*element.table)));
             }
             if (element.table == cur_table) {
                 if (!element.col_key) {

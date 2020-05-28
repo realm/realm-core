@@ -31,6 +31,8 @@
 
 using namespace realm;
 using namespace realm::app;
+using util::any_cast;
+using util::Optional;
 
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
@@ -61,7 +63,7 @@ static std::string get_runtime_app_id(std::string config_path)
 {
     static std::string cached_app_id;
     if (cached_app_id.empty()) {
-        File config(config_path);
+        util::File config(config_path);
         std::string contents;
         contents.resize(config.get_size());
         config.read(contents.data(), config.get_size());
@@ -1508,7 +1510,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
             factory,
             util::none,
             util::none,
-            Optional<std::string>("A Local App Version"),
+            util::Optional<std::string>("A Local App Version"),
             util::none,
             "Object Store Platform Tests",
             "Object Store Platform Version Blah",
@@ -1518,7 +1520,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         auto app = App(config);
         bool processed = false;
         app.log_in_with_credentials(AppCredentials::anonymous(),
-            [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            [&](std::shared_ptr<SyncUser> user, util::Optional<app::AppError> error) {
                 CHECK(!user);
                 CHECK(error);
                 CHECK(error->is_custom_error());
@@ -1819,7 +1821,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         factory,
         util::none,
         util::none,
-        Optional<std::string>("A Local App Version"),
+        util::Optional<std::string>("A Local App Version"),
         util::none,
         "Object Store Platform Tests",
         "Object Store Platform Version Blah",
@@ -1834,7 +1836,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         bool processed = false;
 
         app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                    [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
             CHECK(user);
             CHECK(!error);
 
@@ -1884,7 +1886,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             factory,
             util::none,
             util::none,
-            Optional<std::string>("A Local App Version"),
+            util::Optional<std::string>("A Local App Version"),
             util::none,
             "Object Store Platform Tests",
             "Object Store Platform Version Blah",
@@ -1921,7 +1923,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         factory,
         util::none,
         util::none,
-        Optional<std::string>("A Local App Version"),
+        util::Optional<std::string>("A Local App Version"),
         util::none,
         "Object Store Platform Tests",
         "Object Store Platform Version Blah",
@@ -1942,7 +1944,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
 
     SECTION("create api key") {
         app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name, logged_in_user,
-                                                                            [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+                                                                            [&](App::UserAPIKey user_api_key, util::Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_key.disabled == false);
             CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
@@ -1953,7 +1955,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     
     SECTION("fetch api key") {
         app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id, logged_in_user,
-                                                                           [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+                                                                           [&](App::UserAPIKey user_api_key, util::Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_key.disabled == false);
             CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
@@ -1963,7 +1965,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     
     SECTION("fetch api keys") {
         app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys(logged_in_user,
-                                                                            [&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
+                                                                            [&](std::vector<App::UserAPIKey> user_api_keys, util::Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_keys.size() == 2);
             for(auto user_api_key : user_api_keys) {

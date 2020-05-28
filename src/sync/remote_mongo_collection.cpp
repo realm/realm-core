@@ -53,7 +53,7 @@ static void handle_update_response(util::Optional<AppError> error,
         auto matched_count = static_cast<int32_t>(document["matchedCount"]);
         auto modified_count = static_cast<int32_t>(document["modifiedCount"]);
 
-        Optional<ObjectId> upserted_id;
+        util::Optional<ObjectId> upserted_id;
         auto it = document.find("upsertedId");
         if (it != document.end()) {
             upserted_id = static_cast<ObjectId>(document["upsertedId"]);

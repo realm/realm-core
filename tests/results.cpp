@@ -71,6 +71,7 @@ struct StringMaker<realm::util::Optional<realm::util::Any>> {
 
 using namespace realm;
 using namespace std::string_literals;
+using util::any_cast;
 
 namespace {
     using AnyDict = std::map<std::string, util::Any>;
