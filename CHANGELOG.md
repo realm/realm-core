@@ -1,19 +1,13 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 10.0.0-alpha.9 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Embedded objects would in some cases not be deleted when parent object was deleted.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* 'using namespace realm::util' removed from header. This means that this namespace is no longer used automatically.
+* Some unused functionality has been removed.
 
 ----------------------------------------------
 
