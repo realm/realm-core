@@ -840,16 +840,16 @@ void App::handle_auth_failure(const AppError& error,
                               std::shared_ptr<SyncUser> sync_user,
                               std::function<void (Response)> completion_block) const
 {
-    auto transport_generator = m_config.transport_generator();
-    auto access_token_handler = [&transport_generator,
-                                 &request,
+    auto access_token_handler = [this,
+                                 request,
                                  completion_block,
                                  response,
                                  sync_user](const Optional<AppError>& error) {
         if (!error) {
             // assign the new access_token to the auth header
-            request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
-            transport_generator->send_request_to_server(request, completion_block);
+            Request newRequest = request;
+            newRequest.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
+            m_config.transport_generator()->send_request_to_server(newRequest, completion_block);
         } else {
             // pass the error back up the chain
             completion_block(response);
