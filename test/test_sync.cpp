@@ -1090,7 +1090,7 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1153,7 +1153,7 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1218,7 +1218,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1281,7 +1281,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1340,7 +1340,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             fixture.stop();
@@ -1401,7 +1401,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
             bool is_fatal = error_info->is_fatal;
-            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::bad_changeset);
+            CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
             error_did_occur = true;

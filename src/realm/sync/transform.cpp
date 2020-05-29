@@ -1333,7 +1333,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                        << "' on one side,"
                           "but primary key '"
                        << right_pk_name << "' on the other.";
-                    throw TransformError(ss.str());
+                    throw SchemaMismatchError(ss.str());
                 }
 
                 if (left_spec->type != right_spec->type) {
@@ -1341,27 +1341,27 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
                        << "', which is of type " << get_type_name(left_spec->type) << " on one side and type "
                        << get_type_name(right_spec->type) << " on the other.";
-                    throw TransformError(ss.str());
+                    throw SchemaMismatchError(ss.str());
                 }
 
                 if (left_spec->nullable != right_spec->nullable) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
                        << "', which is nullable on one side, but not the other";
-                    throw TransformError(ss.str());
+                    throw SchemaMismatchError(ss.str());
                 }
             }
             else {
                 std::stringstream ss;
                 ss << "Schema mismatch: '" << left_name << "' has a primary key on one side, but not on the other.";
-                throw TransformError(ss.str());
+                throw SchemaMismatchError(ss.str());
             }
         }
         else if (mpark::get_if<Instruction::AddTable::EmbeddedTable>(&left.type)) {
             if (!mpark::get_if<Instruction::AddTable::EmbeddedTable>(&right.type)) {
                 std::stringstream ss;
                 ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other";
-                throw TransformError(ss.str());
+                throw SchemaMismatchError(ss.str());
             }
         }
 
@@ -1658,21 +1658,21 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
                << "' is of type " << get_type_name(left.type) << " on one side and type " << get_type_name(right.type)
                << " on the other.";
-            throw TransformError(ss.str());
+            throw SchemaMismatchError(ss.str());
         }
 
         if (left.nullable != right.nullable) {
             std::stringstream ss;
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
                << "' is nullable on one side and not on the other.";
-            throw TransformError(ss.str());
+            throw SchemaMismatchError(ss.str());
         }
 
         if (left.list != right.list) {
             std::stringstream ss;
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
                << "' is a list on one side and not on the other.";
-            throw TransformError(ss.str());
+            throw SchemaMismatchError(ss.str());
         }
 
         if (left.type == Instruction::Payload::Type::Link) {
@@ -1683,7 +1683,7 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
                 ss << "Schema mismatch: Link property '" << left_name << "' in class '"
                    << left_side.get_string(left.table) << "' points to class '" << left_target
                    << "' on one side and to '" << right_target << "' on the other.";
-                throw TransformError(ss.str());
+                throw SchemaMismatchError(ss.str());
             }
         }
 
