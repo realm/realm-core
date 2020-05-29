@@ -123,7 +123,7 @@ public:
     void reset();
 
 private:
-    using Storage = _impl::OptionalStorage<T>;
+    using Storage = realm::_impl::OptionalStorage<T>;
     using Storage::m_engaged;
     using Storage::m_value;
 

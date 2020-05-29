@@ -251,7 +251,7 @@ inline bool int_greater_than(A a, B b) noexcept
 template <class A, class B>
 inline bool int_greater_than_or_equal(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
+    return !realm::_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
 }
 
 template <class L, class R>
