@@ -137,8 +137,10 @@ public:
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             } else if (request.method == HttpMethod::put) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             } else if (request.method == HttpMethod::del) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             }
 
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
@@ -1475,6 +1477,146 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                                            Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(deleted_count >= 1);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: push notifications", "[sync][app]") {
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    
+    auto app = App::get_shared_app(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    
+    app->provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error);
+                    });
+    
+    std::shared_ptr<SyncUser> sync_user;
+    
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        REQUIRE(user);
+        CHECK(!error);
+        sync_user = user;
+    });
+    
+    SECTION("register") {
+        bool processed;
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                                  sync_user,
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+
+    SECTION("register twice") {
+        // registering the same device twice should not result in an error
+        bool processed;
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             sync_user,
+                                                             [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             sync_user,
+                                                             [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+                
+        CHECK(processed);
+    }
+    
+    SECTION("deregister") {
+        bool processed;
+
+        app->push_notification_client("gcm").deregister_device("hello",
+                                                                  sync_user,
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        CHECK(processed);
+    }
+    
+    SECTION("deregister with an unregistered user") {
+        bool processed;
+
+        app->push_notification_client("gcm").deregister_device("helloooo",
+                                                                  sync_user,
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        CHECK(processed);
+    }
+    
+    SECTION("register with unavailable service") {
+        bool processed;
+
+        app->push_notification_client("gcm_blah").deregister_device("hello",
+                                                                    sync_user,
+                                                                    [&](Optional<app::AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "service not found: 'gcm_blah'");
+            processed = true;
+        });
+        CHECK(processed);
+    }
+    
+    SECTION("register with logged out user") {
+        bool processed;
+        
+        app->log_out([=](util::Optional<AppError> error){
+            CHECK(!error);
+        });
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             sync_user,
+                                                             [&](Optional<app::AppError> error) {
+            REQUIRE(error);
+            processed = true;
+        });
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             nullptr,
+                                                             [&](Optional<app::AppError> error) {
+            REQUIRE(error);
             processed = true;
         });
         

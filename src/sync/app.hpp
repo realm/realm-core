@@ -22,6 +22,7 @@
 #include "sync/auth_request_client.hpp"
 #include "sync/app_service_client.hpp"
 #include "sync/app_credentials.hpp"
+#include "sync/push_client.hpp"
 #include "sync/generic_network_transport.hpp"
 
 #include <realm/object_id.hpp>
@@ -344,6 +345,9 @@ public:
     {
         call_function(current_user(), name, args_bson, completion_block);
     }
+    
+    // MARK: Push notification client
+    PushClient push_notification_client(const std::string& service_name);
     
 private:
     friend class Internal;

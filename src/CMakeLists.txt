@@ -102,6 +102,7 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_client.hpp
         sync/remote_mongo_collection.hpp
         sync/remote_mongo_database.hpp
+        sync/push_client.hpp
 
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
@@ -123,6 +124,7 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_client.cpp
         sync/remote_mongo_collection.cpp
         sync/remote_mongo_database.cpp
+        sync/push_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp

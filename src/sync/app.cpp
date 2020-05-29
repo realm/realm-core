@@ -1001,5 +1001,13 @@ RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
     return RemoteMongoClient(shared_from_this(), service_name);
 }
 
+PushClient App::push_notification_client(const std::string& service_name)
+{
+    return PushClient(service_name,
+                      m_config.app_id,
+                      m_request_timeout_ms,
+                      shared_from_this());
+}
+
 } // namespace app
 } // namespace realm
