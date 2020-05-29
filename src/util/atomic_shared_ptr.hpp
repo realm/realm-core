@@ -45,7 +45,7 @@ namespace util {
 // lock-free iff the underlying shared_ptr implementation supports atomic
 // operations. Currently the only implemented operation other than copy/move
 // construction/assignment is exchange().
-template<typename T, bool = _impl::HasAtomicPtrOps<std::shared_ptr<T>>::value>
+template<typename T, bool = realm::_impl::HasAtomicPtrOps<std::shared_ptr<T>>::value>
 class AtomicSharedPtr;
 
 template<typename T>
