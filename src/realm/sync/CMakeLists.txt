@@ -29,7 +29,7 @@ set(SYNC_SOURCES
     transform.cpp
     ../util/network_ssl.cpp
     ../util/network.cpp
-    
+
 )
 
 set(SERVER_SOURCES
@@ -246,6 +246,12 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
                           OUTPUT_NAME "realm-server-index"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     target_link_libraries(ServerIndexCommand SyncServer Storage)
+
+    add_executable(PrintChangesetCommand print_changeset_command.cpp)
+    set_target_properties(PrintChangesetCommand PROPERTIES
+                          OUTPUT_NAME "realm-print-changeset"
+                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+    target_link_libraries(PrintChangesetCommand Sync Storage)
 
     install(
         TARGETS
