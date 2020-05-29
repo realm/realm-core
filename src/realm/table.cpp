@@ -1267,7 +1267,10 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
 
-        REALM_ASSERT(col_refs.get(col_ndx));
+        if (!col_refs.get(col_ndx)) {
+            // This column has been migrated
+            continue;
+        }
 
         if (attr.test(col_attr_List) && col_type != col_type_LinkList) {
             list_acc = std::make_unique<BPlusTree<int64_t>>(m_alloc);
@@ -1428,15 +1431,16 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         }
     }
 
-    // Destroy values in the old columns
-    for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-        col_refs.set(col_ndx, 0);
-    }
-
     if (!has_link_columns) {
         // No link columns to update - mark that we are done with this table
         finalize_migration();
+    }
+    else {
+        // Destroy values in the old columns that has been copied
+        for (auto col_ndx : cols_to_destroy) {
+            Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
+            col_refs.set(col_ndx, 0);
+        }
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
