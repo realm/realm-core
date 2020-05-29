@@ -391,7 +391,7 @@ util::Optional<Mixed> List::max(ColKey col) const
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "max");
     }
-    return out_ndx == not_found ? none : make_optional(result);
+    return out_ndx == not_found ? none : util::make_optional(result);
 }
 
 util::Optional<Mixed> List::min(ColKey col) const
@@ -404,7 +404,7 @@ util::Optional<Mixed> List::min(ColKey col) const
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "min");
     }
-    return out_ndx == not_found ? none : make_optional(result);
+    return out_ndx == not_found ? none : util::make_optional(result);
 }
 
 Mixed List::sum(ColKey col) const

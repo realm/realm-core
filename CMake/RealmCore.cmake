@@ -338,7 +338,8 @@ macro(build_realm_sync)
     # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
     # configure time, when they'd otherwise not be created until we download and build sync.
     file(MAKE_DIRECTORY ${SOURCE_DIR}/src)
-    set_property(TARGET realm-sync PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${SOURCE_DIR}/src)
+    file(MAKE_DIRECTORY ${SOURCE_DIR}/src/external)
+    set_property(TARGET realm-sync PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${SOURCE_DIR}/src ${SOURCE_DIR}/src/external)
 
     # Sync server library is built as part of the sync library build
     set(sync_server_library_debug "${sync_debug_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm-server-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")

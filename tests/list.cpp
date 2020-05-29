@@ -38,6 +38,7 @@
 #include <cstdint>
 
 using namespace realm;
+using util::any_cast;
 
 TEST_CASE("list") {
     InMemoryTestFile config;

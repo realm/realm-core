@@ -23,6 +23,7 @@
 
 using namespace realm;
 using namespace realm::_impl;
+using namespace realm::util;
 
 static std::wstring create_condvar_sharedmemory_name(std::string realm_path) {
     std::replace(realm_path.begin(), realm_path.end(), '\\', '/');

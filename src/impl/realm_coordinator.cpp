@@ -232,7 +232,7 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version,
-                                    CheckedUniqueLock& realm_lock)
+                                    util::CheckedUniqueLock& realm_lock)
 {
     open_db();
 
@@ -577,7 +577,7 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
             coordinator->m_notifier = nullptr;
 
             // Gather a list of all of the realms which will be removed
-            CheckedLockGuard lock(coordinator->m_realm_mutex);
+            util::CheckedLockGuard lock(coordinator->m_realm_mutex);
             for (auto& weak_realm_notifier : coordinator->m_weak_realm_notifiers) {
                 if (auto realm = weak_realm_notifier.realm()) {
                     realms_to_close.push_back(realm);

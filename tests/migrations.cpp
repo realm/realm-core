@@ -37,6 +37,7 @@
 
 using namespace realm;
 using IsEmbedded = ObjectSchema::IsEmbedded;
+using util::any_cast;
 
 #define VERIFY_SCHEMA(r, m) verify_schema((r), __LINE__, m)
 
@@ -1531,7 +1532,7 @@ TEST_CASE("migration: ResetFile") {
         util::File::get_unique_id(config.path, id);
         return id.inode;
     };
-    File holder(config.path, File::mode_Write);
+    util::File holder(config.path, util::File::mode_Write);
 #endif
 
     {

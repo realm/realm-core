@@ -162,7 +162,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::make_dir(config.path + ".note");
         auto realm = Realm::get_shared_realm(config);
         auto fallback_file = util::format("%1realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
-        REQUIRE(File::exists(fallback_file));
+        REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
         realm::util::remove_dir_recursive(fallback_dir);
     }
@@ -182,7 +182,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::make_dir(config.path + ".note");
         auto realm = Realm::get_shared_realm(config);
         auto fallback_file = util::format("%1/realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
-        REQUIRE(File::exists(fallback_file));
+        REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
         realm::util::remove_dir_recursive(fallback_dir);
     }
@@ -302,7 +302,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
         // create an empty file
-        File(config.path, File::mode_Write);
+        util::File(config.path, util::File::mode_Write);
 
         // open the empty file, but don't initialize the schema
         Realm::Config config_without_schema = config;
@@ -1414,14 +1414,14 @@ TEST_CASE("SharedRealm: compact on launch") {
 
     SECTION("compact reduces the file size") {
         // Confirm expected sizes before and after opening the Realm
-        size_t size_before = size_t(File(config.path).get_size());
+        size_t size_before = size_t(util::File(config.path).get_size());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         r->close();
-        REQUIRE(size_t(File(config.path).get_size()) == size_before); // File size after returning false
+        REQUIRE(size_t(util::File(config.path).get_size()) == size_before); // File size after returning false
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 3);
-        REQUIRE(size_t(File(config.path).get_size()) < size_before); // File size after returning true
+        REQUIRE(size_t(util::File(config.path).get_size()) < size_before); // File size after returning true
 
         // Validate that the file still contains what it should
         REQUIRE(r->read_group().get_table("class_object")->size() == count);

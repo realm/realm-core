@@ -27,7 +27,7 @@
 
 namespace realm {
 namespace app {
-static Optional<AppError> check_for_errors(const Response& response)
+static util::Optional<AppError> check_for_errors(const Response& response)
 {
     bool http_status_code_is_fatal = response.http_status_code >= 300 ||
         (response.http_status_code < 200 && response.http_status_code != 0);
