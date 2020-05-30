@@ -384,7 +384,7 @@ private:
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
     void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
-                              std::function<void(util::Optional<AppError>)> completion_block) const;
+                              std::function<void(util::Optional<AppError>)> completion_block);
 
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
@@ -398,11 +398,17 @@ private:
                              const Response& response,
                              Request request,
                              std::shared_ptr<SyncUser> sync_user,
-                             std::function<void (Response)> completion_block) const;
+                             std::function<void (Response)> completion_block);
 
     std::string url_for_path(const std::string& path) const override;
 
     void init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block);
+    
+    /// Performs a request to the Stitch server. This request does not contain authentication state.
+    /// @param request The request to be performed
+    /// @param completion_block Returns the response from the server
+    void do_request(Request request,
+                    std::function<void (Response)> completion_block);
     
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed

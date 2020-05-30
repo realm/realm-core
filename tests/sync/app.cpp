@@ -2017,6 +2017,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
                         completion_block({
                             200, 0, {}, user_profile_json().dump()
                         });
+                    } else {
+                        completion_block({
+                            200, 0, {}, nlohmann::json({
+                            {"deployment_model", "this"},
+                            {"hostname", "field"},
+                            {"ws_hostname", "shouldn't"},
+                            {"location", "matter"}}).dump()
+                        });
                     }
                 }
             };

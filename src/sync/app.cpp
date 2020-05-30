@@ -159,7 +159,7 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
         { "password", password }
     };
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->do_request(Request {
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
@@ -184,7 +184,7 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
         { "tokenId", token_id }
     };
     
-    m_parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->do_request(Request {
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
@@ -207,7 +207,7 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
         { "email", email }
     };
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->do_request(Request {
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
@@ -230,7 +230,7 @@ void App::UsernamePasswordProviderClient::send_reset_password_email(const std::s
         { "email", email }
     };
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->do_request(Request {
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
@@ -257,7 +257,7 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
         { "token_id", token_id }
     };
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->do_request(Request {
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
@@ -287,7 +287,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     std::stringstream body;
     body << bson::Bson(arg);
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->do_request(Request {
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
@@ -636,7 +636,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     std::stringstream s;
     s << bson::Bson(body);
 
-    m_config.transport_generator()->send_request_to_server({
+    do_request({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
@@ -808,31 +808,34 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
     });
 }
 
-void App::do_authenticated_request(Request request,
-                                   std::shared_ptr<SyncUser> sync_user,
-                                   std::function<void (Response)> completion_block)
+void App::do_request(Request request,
+                     std::function<void (Response)> completion_block)
 {
-    request.timeout_ms = m_request_timeout_ms;
-    request.headers = get_request_headers(sync_user,
-                                          request.uses_refresh_token ?
-                                          RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
-    
-    init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
-                                                                   const util::Optional<Response> response) {
+    request.timeout_ms = default_timeout_ms;
+    init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
+                                                        const util::Optional<Response> response) {
         if (error) {
             return completion_block(*response);
         }
 
-        auto handler = [completion_block, request, sync_user, this](const Response& response) {
-            if (auto error = check_for_errors(response)) {
-                App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
-            } else {
-                completion_block(response);
-            }
-        };
+        m_config.transport_generator()->send_request_to_server(request, completion_block);
+    });
+}
 
-
-        m_config.transport_generator()->send_request_to_server(request, handler);
+void App::do_authenticated_request(Request request,
+                                   std::shared_ptr<SyncUser> sync_user,
+                                   std::function<void (Response)> completion_block)
+{
+    request.headers = get_request_headers(sync_user,
+                                          request.uses_refresh_token ?
+                                          RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
+    
+    do_request(request, [completion_block, request, sync_user, this](Response response) {
+        if (auto error = check_for_errors(response)) {
+            App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
+        } else {
+            completion_block(response);
+        }
     });
 }
 
@@ -840,7 +843,7 @@ void App::handle_auth_failure(const AppError& error,
                               const Response& response,
                               Request request,
                               std::shared_ptr<SyncUser> sync_user,
-                              std::function<void (Response)> completion_block) const
+                              std::function<void (Response)> completion_block)
 {
     auto access_token_handler = [this,
                                  request,
@@ -877,7 +880,7 @@ void App::handle_auth_failure(const AppError& error,
 
 /// MARK: - refresh access token
 void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
-                               std::function<void(Optional<AppError>)> completion_block) const
+                               std::function<void(Optional<AppError>)> completion_block)
 {
     if (!sync_user) {
         completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
@@ -910,7 +913,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
 
     std::string route = util::format("%1/auth/session", m_base_route);
 
-    m_config.transport_generator()->send_request_to_server({
+    do_request(Request {
         HttpMethod::post,
         route,
         m_request_timeout_ms,
