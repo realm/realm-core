@@ -49,8 +49,10 @@ private:
     friend class App;
 
     RemoteMongoClient(std::shared_ptr<AppServiceClient> service, std::string service_name)
-    : m_service(service)
-    , m_service_name(service_name) {}
+        : m_service(service)
+        , m_service_name(service_name)
+    {
+    }
 
     std::shared_ptr<AppServiceClient> m_service;
     std::string m_service_name;

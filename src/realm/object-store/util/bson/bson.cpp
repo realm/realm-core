@@ -52,12 +52,14 @@ Bson::Bson(const Bson& v)
     *this = v;
 }
 
-Bson::Bson(Bson&& v) noexcept {
+Bson::Bson(Bson&& v) noexcept
+{
     m_type = Type::Null;
     *this = std::move(v);
 }
 
-Bson& Bson::operator=(Bson&& v) noexcept {
+Bson& Bson::operator=(Bson&& v) noexcept
+{
     if (this == &v)
         return *this;
 
@@ -118,7 +120,8 @@ Bson& Bson::operator=(Bson&& v) noexcept {
     return *this;
 }
 
-Bson& Bson::operator=(const Bson& v) {
+Bson& Bson::operator=(const Bson& v)
+{
     if (&v == this)
         return *this;
 
@@ -542,41 +545,44 @@ protected:
         {
             if (m_type == DOCUMENT) {
                 document.reset();
-            } else {
+            }
+            else {
                 array.reset();
             }
         }
 
         BsonContainer(const BsonDocument& v)
-        : m_type(DOCUMENT)
-        , document(new BsonDocument(v))
+            : m_type(DOCUMENT)
+            , document(new BsonDocument(v))
         {
         }
 
         BsonContainer(const BsonArray& v)
-        : m_type(ARRAY)
-        , array(new BsonArray(v))
+            : m_type(ARRAY)
+            , array(new BsonArray(v))
         {
         }
 
         BsonContainer(BsonDocument&& v)
-        : m_type(DOCUMENT)
-        , document(new BsonDocument(std::move(v)))
+            : m_type(DOCUMENT)
+            , document(new BsonDocument(std::move(v)))
         {
         }
 
         BsonContainer(BsonArray&& v)
-        : m_type(ARRAY)
-        , array(new BsonArray(std::move(v)))
+            : m_type(ARRAY)
+            , array(new BsonArray(std::move(v)))
         {
         }
 
-        explicit operator BsonDocument&&() noexcept {
+        explicit operator BsonDocument &&() noexcept
+        {
             REALM_ASSERT(is_document());
             return std::move(*document);
         }
 
-        explicit operator BsonArray&&() noexcept {
+        explicit operator BsonArray &&() noexcept
+        {
             REALM_ASSERT(is_array());
             return std::move(*array);
         }
@@ -590,10 +596,12 @@ protected:
             return m_type == DOCUMENT;
         }
 
-        void push_back(const std::string& key, Bson&& value) {
+        void push_back(const std::string& key, Bson&& value)
+        {
             if (m_type == DOCUMENT) {
                 (*document)[key] = std::move(value);
-            } else {
+            }
+            else {
                 array->emplace_back(value);
             }
         }
@@ -675,7 +683,8 @@ static std::map<std::string, Parser::State> bson_type_for_key = {
     {key_binary, Parser::State::Binary}};
 // clang-format on
 
-Parser::Parser() {
+Parser::Parser()
+{
     // use a vector container to hold any fragmented values
     m_marks.emplace(BsonArray());
 }
@@ -684,7 +693,8 @@ Parser::Parser() {
  @brief a null value was read
  @return whether parsing should proceed
  */
-bool Parser::null() {
+bool Parser::null()
+{
     if (m_instructions.size()) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
@@ -705,7 +715,8 @@ bool Parser::null() {
  @param[in] val  boolean value
  @return whether parsing should proceed
  */
-bool Parser::boolean(bool val) {
+bool Parser::boolean(bool val)
+{
     if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
@@ -726,7 +737,8 @@ bool Parser::boolean(bool val) {
  @param[in] val  integer value
  @return whether parsing should proceed
  */
-bool Parser::number_integer(number_integer_t val) {
+bool Parser::number_integer(number_integer_t val)
+{
     if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
@@ -770,7 +782,8 @@ bool Parser::number_unsigned(number_unsigned_t val)
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back(instruction.key, Timestamp(0, 1));
                 instruction.type = State::Timestamp;
             }
@@ -785,7 +798,8 @@ bool Parser::number_unsigned(number_unsigned_t val)
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back(instruction.key, Timestamp(val, 0));
                 instruction.type = State::Timestamp;
             }
@@ -797,7 +811,8 @@ bool Parser::number_unsigned(number_unsigned_t val)
     return true;
 }
 
-bool Parser::number_float(number_float_t val, const string_t&) {
+bool Parser::number_float(number_float_t val, const string_t&)
+{
     if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
@@ -819,7 +834,8 @@ bool Parser::number_float(number_float_t val, const string_t&) {
  @return whether parsing should proceed
  @note It is safe to move the passed string.
  */
-bool Parser::string(string_t& val) {
+bool Parser::string(string_t& val)
+{
     if (!m_instructions.size()) {
         m_marks.top().push_back("", std::string(val.begin(), val.end()));
         return false;
@@ -870,7 +886,8 @@ bool Parser::string(string_t& val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back(instruction.key, RegularExpression(val, ""));
             }
 
@@ -885,7 +902,8 @@ bool Parser::string(string_t& val) {
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
-            } else {
+            }
+            else {
                 m_marks.top().push_back(instruction.key, RegularExpression("", val));
             }
 
@@ -997,7 +1015,8 @@ bool Parser::key(string_t& val)
     return true;
 }
 
-bool Parser::start_object(std::size_t) {
+bool Parser::start_object(std::size_t)
+{
     if (!m_instructions.empty()) {
         auto top = m_instructions.top();
 
@@ -1055,15 +1074,13 @@ bool Parser::end_object()
     return true;
 }
 
-bool Parser::start_array(std::size_t) {
+bool Parser::start_array(std::size_t)
+{
     if (m_marks.size() > 1) {
         m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
     }
 
-    m_instructions.push({
-        State::StartArray,
-        m_instructions.size() ? m_instructions.top().key : ""
-    });
+    m_instructions.push({State::StartArray, m_instructions.size() ? m_instructions.top().key : ""});
 
     m_marks.emplace(BsonArray());
     return true;
@@ -1073,7 +1090,8 @@ bool Parser::start_array(std::size_t) {
  @brief the end of an array was read
  @return whether parsing should proceed
  */
-bool Parser::end_array() {
+bool Parser::end_array()
+{
     if (m_marks.size() > 2) {
         BsonArray container = static_cast<BsonArray>(m_marks.top());
         m_marks.pop();
@@ -1086,9 +1104,8 @@ bool Parser::end_array() {
     return true;
 }
 
-bool Parser::parse_error(std::size_t,
-                         const std::string&,
-                         const nlohmann::detail::exception& ex) {
+bool Parser::parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex)
+{
     throw ex;
 }
 
@@ -1099,7 +1116,8 @@ Bson Parser::parse(const std::string& json)
         BsonContainer& top = m_marks.top();
         if (top.is_document()) {
             return static_cast<BsonDocument>(m_marks.top());
-        } else {
+        }
+        else {
             return static_cast<BsonArray>(top);
         }
     }

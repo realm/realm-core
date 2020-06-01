@@ -41,7 +41,7 @@ public:
     {
         return m_name;
     }
-    
+
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
@@ -53,12 +53,12 @@ public:
     RemoteMongoCollection operator[](const std::string& collection_name);
 
 private:
-    RemoteMongoDatabase(std::string name,
-                        std::shared_ptr<AppServiceClient> service,
-                        std::string service_name)
-    : m_name(name)
-    , m_service(service)
-    , m_service_name(service_name) { };
+    RemoteMongoDatabase(std::string name, std::shared_ptr<AppServiceClient> service, std::string service_name)
+        : m_name(name)
+        , m_service(service)
+        , m_service_name(service_name)
+    {
+    }
 
     friend class RemoteMongoClient;
 

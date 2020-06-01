@@ -37,12 +37,7 @@ namespace app {
 
 enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2 };
 
-enum class JSONErrorCode {
-    bad_token = 1,
-    malformed_json = 2,
-    missing_json_key = 3,
-    bad_bson_parse = 4
-};
+enum class JSONErrorCode { bad_token = 1, malformed_json = 2, missing_json_key = 3, bad_bson_parse = 4 };
 
 enum class ServiceErrorCode {
     missing_auth_req = 1,
@@ -151,7 +146,6 @@ struct AppError {
     {
         return error_code.category() == client_error_category();
     }
-
 };
 
 std::ostream& operator<<(std::ostream& os, AppError error);

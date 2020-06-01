@@ -210,10 +210,9 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
         {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
 }
 
-void App::UsernamePasswordProviderClient::call_reset_password_function(const std::string& email,
-                                                                       const std::string& password,
-                                                                       const bson::BsonArray& args,
-                                                                       std::function<void(Optional<AppError>)> completion_block)
+void App::UsernamePasswordProviderClient::call_reset_password_function(
+    const std::string& email, const std::string& password, const bson::BsonArray& args,
+    std::function<void(Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
     std::string route =
@@ -223,22 +222,13 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         handle_default_response(response, completion_block);
     };
 
-    bson::BsonDocument arg = {
-        { "email", email },
-        { "password", password },
-        { "arguments", args }
-    };
+    bson::BsonDocument arg = {{"email", email}, {"password", password}, {"arguments", args}};
 
     std::stringstream body;
     body << bson::Bson(arg);
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::post,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(),
-        body.str()
-    }, handler);
+    m_parent->m_config.transport_generator()->send_request_to_server(
+        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.str()}, handler);
 }
 
 // MARK: - UserAPIKeyProviderClient
@@ -809,12 +799,9 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         handler);
 }
 
-void App::call_function(std::shared_ptr<SyncUser> user,
-                        const std::string& name,
-                        const bson::BsonArray& args_bson,
+void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
                         const util::Optional<std::string>& service_name,
-                        std::function<void (util::Optional<AppError>,
-                                            util::Optional<bson::Bson>)> completion_block)
+                        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -826,10 +813,7 @@ void App::call_function(std::shared_ptr<SyncUser> user,
 
     std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
 
-    bson::BsonDocument args {
-        { "arguments", args_bson },
-        { "name", name }
-    };
+    bson::BsonDocument args{{"arguments", args_bson}, {"name", name}};
 
     if (service_name) {
         args["service"] = *service_name;
@@ -838,52 +822,31 @@ void App::call_function(std::shared_ptr<SyncUser> user,
     std::stringstream s;
     s << bson::Bson(args);
 
-    Request request {
-        .method = HttpMethod::post,
-        .url = route,
-        .body = s.str()
-    };
+    Request request;
+    request.method = HttpMethod::post;
+    request.url = route;
+    request.body = s.str();
 
-    do_authenticated_request(request,
-                             user,
-                             handler);
+    do_authenticated_request(request, user, handler);
 }
 
-void App::call_function(std::shared_ptr<SyncUser> user,
-                        const std::string& name,
-                        const bson::BsonArray& args_bson,
-                        std::function<void (util::Optional<AppError>,
-                                            util::Optional<bson::Bson>)> completion_block)
+void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
+                        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
-    call_function(user,
-                  name,
-                  args_bson,
-                  util::none,
-                  completion_block);
+    call_function(user, name, args_bson, util::none, completion_block);
 }
 
-void App::call_function(const std::string& name,
-                        const bson::BsonArray& args_bson,
+void App::call_function(const std::string& name, const bson::BsonArray& args_bson,
                         const util::Optional<std::string>& service_name,
-                        std::function<void (util::Optional<AppError>,
-                                            util::Optional<bson::Bson>)> completion_block)
+                        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
-    call_function(SyncManager::shared().get_current_user(),
-                  name,
-                  args_bson,
-                  service_name,
-                  completion_block);
+    call_function(SyncManager::shared().get_current_user(), name, args_bson, service_name, completion_block);
 }
 
-void App::call_function(const std::string& name,
-                        const bson::BsonArray& args_bson,
-                        std::function<void (util::Optional<AppError>,
-                                            util::Optional<bson::Bson>)> completion_block)
+void App::call_function(const std::string& name, const bson::BsonArray& args_bson,
+                        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
-    call_function(SyncManager::shared().get_current_user(),
-                  name,
-                  args_bson,
-                  completion_block);
+    call_function(SyncManager::shared().get_current_user(), name, args_bson, completion_block);
 }
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
