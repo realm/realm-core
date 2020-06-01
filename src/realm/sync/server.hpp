@@ -260,7 +260,7 @@ public:
         const Clock* history_compaction_clock = nullptr;
 
         /// An optional 64 byte key to encrypt all files with.
-        Optional<std::array<char, 64>> encryption_key;
+        util::Optional<std::array<char, 64>> encryption_key;
 
         /// Make the server reject sessions associated with these client files.
         ClientFileBlacklists client_file_blacklists;

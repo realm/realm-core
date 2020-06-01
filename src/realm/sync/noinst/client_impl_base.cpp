@@ -23,6 +23,7 @@
 
 using namespace realm;
 using namespace _impl;
+using namespace realm::util;
 
 // clang-format off
 using Connection      = ClientImplBase::Connection;

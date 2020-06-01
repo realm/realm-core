@@ -74,7 +74,7 @@
 
 using namespace realm;
 using namespace realm::sync;
-using util::Optional;
+using namespace realm::util;
 
 // clang-format off
 using ServerHistory         = _impl::ServerHistory;

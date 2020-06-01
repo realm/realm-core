@@ -662,7 +662,7 @@ public:
                     return;
                 REALM_ASSERT(error);
                 unit_test::TestContext& test_context = m_test_context;
-                Logger& logger = test_context.logger;
+                util::Logger& logger = test_context.logger;
                 logger.error("Client disconnect: %1: %2 (is_fatal=%3)", error->error_code, error->detailed_message,
                              error->is_fatal);
                 bool client_error_occurred = true;
@@ -760,7 +760,7 @@ public:
     HTTPStatus send_http_compact_request(int server_index, std::string signed_user_token = g_signed_test_user_token)
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Post;
+        request.method = util::HTTPMethod::Post;
         request.path = "/api/compact";
         if (!signed_user_token.empty())
             request.headers["Authorization"] = _impl::make_authorization_header(signed_user_token);
@@ -771,7 +771,7 @@ public:
                                         std::string signed_user_token = g_signed_test_user_token)
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Delete;
+        request.method = util::HTTPMethod::Delete;
         request.path = "/api/realm" + virt_path;
         request.headers["Authorization"] = _impl::make_authorization_header(signed_user_token);
         return send_http_request(server_index, request);
@@ -807,7 +807,7 @@ private:
     std::vector<uint_least64_t> m_allow_server_errors;
     FakeClock m_fake_token_expiration_clock;
 
-    static Optional<std::array<char, 64>> make_crypt_key(const std::string& key)
+    static util::Optional<std::array<char, 64>> make_crypt_key(const std::string& key)
     {
         if (!key.empty()) {
             if (key.size() != 64)

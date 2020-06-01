@@ -1079,19 +1079,19 @@ int main(int argc, char* argv[])
 #endif // _WIN32
     }
 
-    if (allow_core_dump && util::system_has_rlimit(Resource::core_dump_size))
-        util::set_soft_rlimit(Resource::core_dump_size, -1);
+    if (allow_core_dump && util::system_has_rlimit(util::Resource::core_dump_size))
+        util::set_soft_rlimit(util::Resource::core_dump_size, -1);
 
     util::Thread::set_name("main");
-    std::unique_ptr<Logger> root_logger;
+    std::unique_ptr<util::Logger> root_logger;
     if (log_timestamps) {
-        TimestampStderrLogger::Config config;
-        config.precision = TimestampStderrLogger::Precision::milliseconds;
+        util::TimestampStderrLogger::Config config;
+        config.precision = util::TimestampStderrLogger::Precision::milliseconds;
         config.format = "%FT%T";
-        root_logger = std::make_unique<TimestampStderrLogger>(std::move(config));
+        root_logger = std::make_unique<util::TimestampStderrLogger>(std::move(config));
     }
     else {
-        root_logger = std::make_unique<StderrLogger>();
+        root_logger = std::make_unique<util::StderrLogger>();
     }
     util::ThreadSafeLogger logger{*root_logger, log_level};
     logger.info("Test client started");

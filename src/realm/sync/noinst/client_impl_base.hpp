@@ -294,10 +294,11 @@ public:
     void async_read(char*, std::size_t, ReadCompletionHandler) override;
     void async_read_until(char*, std::size_t, char, ReadCompletionHandler) override;
     void async_write(const char*, std::size_t, WriteCompletionHandler) override;
-    void websocket_handshake_completion_handler(const HTTPHeaders&) override;
+    void websocket_handshake_completion_handler(const util::HTTPHeaders&) override;
     void websocket_read_error_handler(std::error_code) override;
     void websocket_write_error_handler(std::error_code) override;
-    void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*, const util::StringView*) override;
+    void websocket_handshake_error_handler(std::error_code, const util::HTTPHeaders*,
+                                           const util::StringView*) override;
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
     bool websocket_pong_message_received(const char*, std::size_t) override;
@@ -306,8 +307,8 @@ protected:
     /// The application must ensure that the specified client object is kept
     /// alive at least until the connection object is destroyed.
     Connection(ClientImplBase&, std::string logger_prefix, ProtocolEnvelope, std::string address, port_type port,
-               bool verify_servers_ssl_certificate, Optional<std::string> ssl_trust_certificate_path,
-               std::function<SSLVerifyCallback>, Optional<ProxyConfig>, ReconnectInfo);
+               bool verify_servers_ssl_certificate, util::Optional<std::string> ssl_trust_certificate_path,
+               std::function<SSLVerifyCallback>, util::Optional<ProxyConfig>, ReconnectInfo);
     virtual ~Connection();
 
     template <class H>
@@ -359,7 +360,7 @@ protected:
 
     /// The application can override this function to set custom headers. The
     /// default implementation sets no headers.
-    virtual void set_http_request_headers(HTTPHeaders&);
+    virtual void set_http_request_headers(util::HTTPHeaders&);
 
 private:
     using SyncProgress = sync::SyncProgress;
@@ -377,10 +378,10 @@ private:
     const port_type m_port;
     const std::string m_http_host; // Contents of `Host:` request header
     const bool m_verify_servers_ssl_certificate;
-    const Optional<std::string> m_ssl_trust_certificate_path;
+    const util::Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SSLVerifyCallback> m_ssl_verify_callback;
-    const Optional<ProxyConfig> m_proxy_config;
-    util::Optional<HTTPClient<Connection>> m_proxy_client;
+    const util::Optional<ProxyConfig> m_proxy_config;
+    util::Optional<util::HTTPClient<Connection>> m_proxy_client;
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
 

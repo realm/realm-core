@@ -65,6 +65,7 @@ const util::AllocationMetricName g_transform_metric_scope{"transform"};
 
 using namespace realm;
 using namespace realm::sync;
+using namespace realm::util;
 
 namespace _impl {
 

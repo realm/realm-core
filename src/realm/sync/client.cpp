@@ -15,6 +15,7 @@
 
 using namespace realm;
 using namespace realm::sync;
+using namespace realm::util;
 
 
 // clang-format off

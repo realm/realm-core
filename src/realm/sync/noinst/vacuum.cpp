@@ -10,6 +10,7 @@
 using namespace realm;
 using namespace realm::sync;
 using namespace realm::_impl;
+using realm::util::File;
 
 // FIXME: This constexpr check belongs in Core's version.hpp
 static constexpr bool core_version_at_least(int major, int minor, int patch)

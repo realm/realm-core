@@ -10,7 +10,7 @@ using namespace realm;
 using namespace realm::sync;
 
 struct ChangesetParser::State {
-    using StringBuffer = util::BasicStringBuffer<MeteredAllocator>;
+    using StringBuffer = util::BasicStringBuffer<util::MeteredAllocator>;
 
     _impl::NoCopyInputStream& m_input;
     InstructionHandler& m_handler;

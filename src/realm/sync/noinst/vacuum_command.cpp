@@ -66,7 +66,7 @@ void usage(const char* program_name)
 }
 
 struct Configuration {
-    Logger::Level log_level = Logger::Level::info;
+    util::Logger::Level log_level = util::Logger::Level::info;
     bool dry_run = false;
     bool prompt = true;
     Vacuum::Options options;
@@ -293,7 +293,7 @@ int main(int argc, char* argv[])
 
     size_t errors_seen = 0;
 
-    StderrLogger logger;
+    util::StderrLogger logger;
     logger.set_level_threshold(config.log_level);
     Vacuum vacuum{logger, config.options};
     for (auto& file : config.files) {

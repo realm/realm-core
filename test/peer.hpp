@@ -105,7 +105,7 @@ public:
 
         if (!is_short_circuited()) {
             auto& buffer = get_instruction_encoder().buffer();
-            m_incoming_changeset = util::make_unique<char[], DefaultAllocator>(buffer.size()); // Throws
+            m_incoming_changeset = util::make_unique<char[], util::DefaultAllocator>(buffer.size()); // Throws
             std::copy(buffer.data(), buffer.data() + buffer.size(), m_incoming_changeset.get());
 
             m_incoming_entry.origin_timestamp = m_current_time;
@@ -248,7 +248,7 @@ public:
         , m_write_history(std::make_unique<History>(*this)) // Throws
         , m_local_file_ident(local_file_ident)
         , m_transformer(std::make_unique<TransformerImpl>(changeset_dump_dir_gen)) // Throws
-        , m_incoming_changeset(nullptr, STLDeleter<char[]>{DefaultAllocator::get_default()})
+        , m_incoming_changeset(nullptr, util::STLDeleter<char[]>{util::DefaultAllocator::get_default()})
     {
     }
 
@@ -281,13 +281,13 @@ private:
     const file_ident_type m_local_file_ident;
     const std::unique_ptr<TransformerImpl> m_transformer;
     timestamp_type m_current_time = 0;
-    std::unique_ptr<char[], STLDeleter<char[]>> m_incoming_changeset;
+    std::unique_ptr<char[], util::STLDeleter<char[]>> m_incoming_changeset;
     std::unique_ptr<char[]> m_incoming_core_changeset;
     HistoryEntry m_incoming_entry;
     std::vector<std::unique_ptr<char[]>> m_sync_entries;
     std::vector<std::unique_ptr<char[]>> m_core_entries;
     std::vector<HistoryEntry> m_entries;
-    std::vector<std::unique_ptr<char[], STLDeleter<char[]>>> m_entries_data_owner;
+    std::vector<std::unique_ptr<char[], util::STLDeleter<char[]>>> m_entries_data_owner;
     std::map<version_type, std::map<file_ident_type, std::string>> m_reciprocal_transforms;
     bool m_disable_compaction = false;
 

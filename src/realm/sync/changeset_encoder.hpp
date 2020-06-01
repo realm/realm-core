@@ -10,7 +10,7 @@ namespace realm {
 namespace sync {
 
 struct ChangesetEncoder : InstructionHandler {
-    using Buffer = util::AppendBuffer<char, MeteredAllocator>;
+    using Buffer = util::AppendBuffer<char, util::MeteredAllocator>;
 
     Buffer release() noexcept;
     void reset() noexcept;

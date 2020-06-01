@@ -54,7 +54,7 @@ private:
     const std::string m_partially_downloaded_realm_path;
     util::Optional<std::array<char, 64>> m_encryption_key;
 #if REALM_ENABLE_ENCRYPTION
-    std::unique_ptr<AESCryptor> m_aes_cryptor;
+    std::unique_ptr<util::AESCryptor> m_aes_cryptor;
 #endif
 
     bool m_complete = false;

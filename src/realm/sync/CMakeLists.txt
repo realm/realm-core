@@ -191,6 +191,10 @@ install(FILES ${UTIL_METERED_INSTALL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util/metered
         COMPONENT devel)
 
+install(FILES ../../external/mpark/variant.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/mpark
+        COMPONENT devel)
+
 if(REALM_BUILD_COMMANDLINE_TOOLS)
     add_executable(SyncWorker sync/server_command.cpp)
     set_target_properties(SyncWorker PROPERTIES

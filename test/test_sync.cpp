@@ -2448,7 +2448,7 @@ TEST(Sync_HttpApi)
     // url = /api/ok
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/ok";
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
@@ -2460,7 +2460,7 @@ TEST(Sync_HttpApi)
     // url = /api/x
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/x";
         HTTPRequestClient client(logger, endpoint, request);
         client.fetch_response();
@@ -2472,7 +2472,7 @@ TEST(Sync_HttpApi)
     // url = /api/x with admin access token
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/x";
         request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
@@ -2484,7 +2484,7 @@ TEST(Sync_HttpApi)
     // url = /api/info with admin access token
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/info";
         request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
@@ -2500,7 +2500,7 @@ TEST(Sync_HttpApi)
     // url = /api/info with non-admin access token
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/info";
         request.headers["Authorization"] = _impl::make_authorization_header(g_user_0_token);
         HTTPRequestClient client(logger, endpoint, request);
@@ -2545,7 +2545,7 @@ TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
     // Correct authorization header.
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/info";
         request.headers["X-Alternative-Name"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
@@ -2561,7 +2561,7 @@ TEST(Sync_HttpApiWithCustomAuthorizationHeaderName)
     // Incorrect authorization header.
     {
         util::HTTPRequest request;
-        request.method = HTTPMethod::Get;
+        request.method = util::HTTPMethod::Get;
         request.path = "/api/info";
         request.headers["Authorization"] = _impl::make_authorization_header(g_signed_test_user_token);
         HTTPRequestClient client(logger, endpoint, request);
@@ -6002,9 +6002,9 @@ TEST(Sync_ServerDiscardDeadConnections)
         using syserr = util::error::basic_system_errors;
         bool valid_error = (util::MiscExtErrors::end_of_input == ec) ||
                            (util::MiscExtErrors::premature_end_of_input == ec) ||
-                           (make_basic_system_error_code(syserr::connection_reset) ==
-                            ec) || // FIXME: this is the error on Windows. is it correct?
-                           (make_basic_system_error_code(syserr::connection_aborted) == ec);
+                           // FIXME: this is the error on Windows. is it correct?
+                           (util::make_basic_system_error_code(syserr::connection_reset) == ec) ||
+                           (util::make_basic_system_error_code(syserr::connection_aborted) == ec);
         CHECK(valid_error);
         bowl.add_stone();
     };
@@ -7005,7 +7005,7 @@ TEST_IF(Sync_Issue2104, false)
 
     // Save a snapshot of the server Realm file.
     std::string realm_path = "issue_2104_server.realm";
-    std::string realm_path_copy = File::resolve("issue_2104.realm", dir);
+    std::string realm_path_copy = util::File::resolve("issue_2104.realm", dir);
     util::File::copy(realm_path, realm_path_copy);
 
     std::string changeset_hex = "3F 00 07 41 42 43 44 61 74 61 3F 01 02 69 64 3F 02 09 41 6C 69 67 6E 6D 65 6E 74 3F "

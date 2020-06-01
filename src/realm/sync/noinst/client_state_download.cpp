@@ -65,7 +65,7 @@ ClientStateDownload::ClientStateDownload(util::Logger& logger, const std::string
     logger.debug("Create ClientStateDownload, realm_path = %1, metadata_dir = %2", realm_path, metadata_dir);
 #ifdef REALM_ENABLE_ENCRYPTION
     if (m_encryption_key)
-        m_aes_cryptor.reset(new AESCryptor(reinterpret_cast<unsigned char*>(m_encryption_key->data())));
+        m_aes_cryptor.reset(new util::AESCryptor(reinterpret_cast<unsigned char*>(m_encryption_key->data())));
 #else
     REALM_ASSERT(!encryption_key);
 #endif

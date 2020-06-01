@@ -50,7 +50,7 @@ private:
     long m_num_open_files = 0;
 
     const long m_max_open_files;
-    const Optional<std::array<char, 64>> m_encryption_key;
+    const util::Optional<std::array<char, 64>> m_encryption_key;
     util::Logger& m_logger;
     ServerHistory::Context& m_history_context;
     sync::Metrics* m_metrics;
