@@ -76,8 +76,13 @@ const static uint64_t default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 
+SharedApp App::get_shared_app(const Config& config)
+{
+    return std::make_shared<App>(config);
+}
+
 App::App(const Config& config)
-    : m_config(config)
+    : m_config(std::move(config))
     , m_base_url(config.base_url.value_or(default_base_url))
     , m_base_route(m_base_url + base_path)
     , m_app_route(m_base_route + app_path + "/" + config.app_id)
@@ -205,9 +210,10 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
         {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
 }
 
-void App::UsernamePasswordProviderClient::call_reset_password_function(
-    const std::string& email, const std::string& password, const std::string& args,
-    std::function<void(Optional<AppError>)> completion_block)
+void App::UsernamePasswordProviderClient::call_reset_password_function(const std::string& email,
+                                                                       const std::string& password,
+                                                                       const bson::BsonArray& args,
+                                                                       std::function<void(Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
     std::string route =
@@ -217,10 +223,22 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(
         handle_default_response(response, completion_block);
     };
 
-    nlohmann::json body = {{"email", email}, {"password", password}, {"arguments", nlohmann::json::parse(args)}};
+    bson::BsonDocument arg = {
+        { "email", email },
+        { "password", password },
+        { "arguments", args }
+    };
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
+    std::stringstream body;
+    body << bson::Bson(arg);
+
+    m_parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
+        body.str()
+    }, handler);
 }
 
 // MARK: - UserAPIKeyProviderClient
@@ -791,10 +809,86 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         handler);
 }
 
+void App::call_function(std::shared_ptr<SyncUser> user,
+                        const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        const util::Optional<std::string>& service_name,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block)
+{
+    auto handler = [completion_block](const Response& response) {
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error, util::none);
+        }
+
+        completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
+    };
+
+    std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
+
+    bson::BsonDocument args {
+        { "arguments", args_bson },
+        { "name", name }
+    };
+
+    if (service_name) {
+        args["service"] = *service_name;
+    }
+
+    std::stringstream s;
+    s << bson::Bson(args);
+
+    Request request {
+        .method = HttpMethod::post,
+        .url = route,
+        .body = s.str()
+    };
+
+    do_authenticated_request(request,
+                             user,
+                             handler);
+}
+
+void App::call_function(std::shared_ptr<SyncUser> user,
+                        const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block)
+{
+    call_function(user,
+                  name,
+                  args_bson,
+                  util::none,
+                  completion_block);
+}
+
+void App::call_function(const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        const util::Optional<std::string>& service_name,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block)
+{
+    call_function(SyncManager::shared().get_current_user(),
+                  name,
+                  args_bson,
+                  service_name,
+                  completion_block);
+}
+
+void App::call_function(const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block)
+{
+    call_function(SyncManager::shared().get_current_user(),
+                  name,
+                  args_bson,
+                  completion_block);
+}
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 {
-    return RemoteMongoClient(AppServiceClient(service_name, m_base_route, m_config.app_id, *this));
+    return RemoteMongoClient(shared_from_this(), service_name);
 }
 
 } // namespace app

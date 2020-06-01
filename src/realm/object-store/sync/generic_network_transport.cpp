@@ -34,6 +34,8 @@ std::string get_error_message(JSONErrorCode error)
             return "malformed json";
         case JSONErrorCode::missing_json_key:
             return "missing json key";
+        case JSONErrorCode::bad_bson_parse:
+            return "bad bson parse";
     }
     return "unknown";
 }
@@ -51,7 +53,6 @@ struct JSONErrorCategory : public std::error_category {
 };
 
 JSONErrorCategory g_json_error_category;
-
 
 static const std::map<std::string, ServiceErrorCode> service_error_map = {
     {"MissingAuthReq", ServiceErrorCode::missing_auth_req},
