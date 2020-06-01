@@ -24,8 +24,9 @@ namespace app {
 // FIXME: This class has alot of json parsing with hardcoded strings,
 // this will go away with a subsequent PR that replaces JSON with BSON
 
-static void handle_response(util::Optional<AppError> error, util::Optional<std::string> value,
-                            std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+static void
+handle_response(util::Optional<AppError> error, util::Optional<std::string> value,
+                std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     if (value && !error) {
         // response can be a http 200 and return "null" in the body
@@ -105,7 +106,7 @@ static void handle_update_response(
 
 void RemoteMongoCollection::find(
     const std::string& filter_json, RemoteFindOptions options,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -138,14 +139,14 @@ void RemoteMongoCollection::find(
 
 void RemoteMongoCollection::find(
     const std::string& filter_json,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find(filter_json, {}, completion_block);
 }
 
 void RemoteMongoCollection::find_one(
     const std::string& filter_json, RemoteFindOptions options,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
 
     try {
@@ -179,14 +180,14 @@ void RemoteMongoCollection::find_one(
 
 void RemoteMongoCollection::find_one(
     const std::string& filter_json,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find_one(filter_json, {}, completion_block);
 }
 
 void RemoteMongoCollection::insert_one(
     const std::string& value_json,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -208,7 +209,7 @@ void RemoteMongoCollection::insert_one(
 
 void RemoteMongoCollection::aggregate(
     std::vector<std::string> pipline,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto pipelines = nlohmann::json::array();
@@ -407,7 +408,7 @@ void RemoteMongoCollection::update_many(
 void RemoteMongoCollection::find_one_and_update(
     const std::string& filter_json, const std::string& update_json,
     RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -430,7 +431,7 @@ void RemoteMongoCollection::find_one_and_update(
 
 void RemoteMongoCollection::find_one_and_update(
     const std::string& filter_json, const std::string& update_json,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_update(filter_json, update_json, {}, completion_block);
 }
@@ -438,7 +439,7 @@ void RemoteMongoCollection::find_one_and_update(
 void RemoteMongoCollection::find_one_and_replace(
     const std::string& filter_json, const std::string& replacement_json,
     RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -461,7 +462,7 @@ void RemoteMongoCollection::find_one_and_replace(
 
 void RemoteMongoCollection::find_one_and_replace(
     const std::string& filter_json, const std::string& replacement_json,
-    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+    std::function<void(util::Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_replace(filter_json, replacement_json, {}, completion_block);
 }
