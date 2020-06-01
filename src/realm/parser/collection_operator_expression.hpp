@@ -75,9 +75,9 @@ template <typename RetType, parser::Expression::KeyPathOp AggOpType, typename Ex
 struct CollectionOperatorGetter {
     static Columns<RetType> convert(const CollectionOperatorExpression<AggOpType, ExpressionType>& op)
     {
-        throw std::runtime_error(util::format("Predicate error: comparison of type '%1' with result of '%2' is not supported.",
-                                              type_to_str<RetType>(),
-                                              collection_operator_to_str(op.operation_type)));
+        throw std::runtime_error(
+            util::format("Predicate error: comparison of type '%1' with result of '%2' is not supported.",
+                         util::type_to_str<RetType>(), util::collection_operator_to_str(op.operation_type)));
     }
 };
 
@@ -308,6 +308,8 @@ template <parser::Expression::KeyPathOp OpType>
 void do_init(CollectionOperatorExpression<OpType, PropertyExpression>& expression, std::string suffix_path,
              parser::KeyPathMapping& mapping)
 {
+    using namespace util;
+
     const bool requires_suffix_path = !(
         OpType == parser::Expression::KeyPathOp::SizeString || OpType == parser::Expression::KeyPathOp::SizeBinary ||
         OpType == parser::Expression::KeyPathOp::Count || OpType == parser::Expression::KeyPathOp::BacklinkCount);
@@ -334,7 +336,7 @@ void do_init(CollectionOperatorExpression<OpType, PropertyExpression>& expressio
             post_link_table = expression.pe.get_dest_table()->get_link_target(expression.pe.get_dest_col_key());
         }
         REALM_ASSERT(post_link_table);
-        StringData printable_post_link_table_name = get_printable_table_name(*post_link_table);
+        StringData printable_post_link_table_name = util::get_printable_table_name(*post_link_table);
 
         KeyPath suffix_key_path = key_path_from_string(suffix_path);
 

@@ -615,7 +615,7 @@ private:
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
-    bool m_has_any_embedded_objects = false;
+    util::Optional<bool> m_has_any_embedded_objects;
     TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
@@ -671,6 +671,7 @@ private:
     ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name);
     void do_erase_root_column(ColKey col_key);
 
+    bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     void do_set_primary_key_column(ColKey col_key);
     void validate_column_is_unique(ColKey col_key) const;

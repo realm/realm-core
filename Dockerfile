@@ -15,7 +15,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libuv1-dev \
     libprocps-dev \
     ninja-build \
-    python-matplotlib \
     pkg-config \
     python-matplotlib \
     s3cmd \

@@ -157,8 +157,6 @@ const char* comparison_type_to_str(parser::Expression::ComparisonType type)
     return "";
 }
 
-using KeyPath = std::vector<std::string>;
-
 KeyPath key_path_from_string(const std::string &s) {
     std::stringstream ss(s);
     std::string item;

@@ -24,6 +24,8 @@
 namespace realm {
 namespace parser {
 
+using namespace util;
+
 ExpressionComparisonType convert(parser::Expression::ComparisonType type)
 {
     switch (type) {

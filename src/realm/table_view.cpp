@@ -564,7 +564,7 @@ void ConstTableView::sort(SortDescriptor order)
 
 void ConstTableView::do_sync()
 {
-    CriticalSection cs(m_race_detector);
+    util::CriticalSection cs(m_race_detector);
     // This TableView can be "born" from 4 different sources:
     // - LinkView
     // - Query::find_all()

@@ -4,8 +4,7 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
  
 ### Breaking changes
 * None.
@@ -13,7 +12,20 @@
 -----------
 
 ### Internals
-* None.
+* Work around an issue with MSVC in Visual Studio 2019 where Release optimizations crash the compiler because of a regression in 64bit atomic loads on 32bit Windows.
+
+----------------------------------------------
+
+# 10.0.0-alpha.9 Release notes
+
+### Fixed
+* Embedded objects would in some cases not be deleted when parent object was deleted.
+ 
+-----------
+
+### Internals
+* 'using namespace realm::util' removed from header. This means that this namespace is no longer used automatically.
+* Some unused functionality has been removed.
 
 ----------------------------------------------
 

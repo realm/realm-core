@@ -5286,19 +5286,39 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    auto tr = sg->start_write();
-    auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
-    CHECK_THROW(table->create_object(), LogicError);
-    auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
-    Obj o = parent->create_object();
-    Obj o2 = o.create_and_set_linked_object(ck);
-    o2.create_and_set_linked_object(col_recurse);
-    CHECK(table->size() == 2);
-    o.set(ck, ObjKey());
-    CHECK(table->size() == 0);
-    tr->commit();
+    {
+        auto tr = sg->start_write();
+        auto table = tr->add_embedded_table("myEmbeddedStuff");
+        auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
+        CHECK_THROW(table->create_object(), LogicError);
+        auto parent = tr->add_table("myParentStuff");
+        auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
+        Obj o = parent->create_object();
+        Obj o2 = o.create_and_set_linked_object(ck);
+        o2.create_and_set_linked_object(col_recurse);
+        CHECK(table->size() == 2);
+        tr->commit();
+    }
+    {
+        auto tr = sg->start_write();
+        auto table = tr->get_table("myEmbeddedStuff");
+        auto parent = tr->get_table("myParentStuff");
+        CHECK(table->size() == 2);
+        auto first = parent->begin();
+        first->set("theGreatColumn", ObjKey());
+        CHECK(table->size() == 0);
+        // do not commit
+    }
+    {
+        auto tr = sg->start_write();
+        auto table = tr->get_table("myEmbeddedStuff");
+        auto parent = tr->get_table("myParentStuff");
+        CHECK(table->size() == 2);
+        auto first = parent->begin();
+        first->remove();
+        CHECK(table->size() == 0);
+        // do not commit
+    }
 }
 
 TEST(Table_EmbeddedObjectCreateAndDestroyList)

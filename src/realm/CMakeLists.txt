@@ -114,6 +114,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_key.hpp
     array_list.hpp
     array_object_id.hpp
+    array_ref.hpp
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp

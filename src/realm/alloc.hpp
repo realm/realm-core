@@ -35,9 +35,9 @@
 // Temporary workaround for
 // https://developercommunity.visualstudio.com/content/problem/994075/64-bit-atomic-load-ices-cl-1924-with-o2-ob1.html
 #if defined REALM_ARCHITECTURE_X86_32 && defined REALM_WINDOWS
-#define WORKAROUND_MSVC_BUG REALM_NOINLINE
+#define REALM_WORKAROUND_MSVC_BUG REALM_NOINLINE
 #else
-#define WORKAROUND_MSVC_BUG
+#define REALM_WORKAROUND_MSVC_BUG
 #endif
 
 namespace realm {
@@ -282,7 +282,7 @@ protected:
         m_storage_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
     }
 
-    WORKAROUND_MSVC_BUG inline uint_fast64_t get_content_version() noexcept
+    REALM_WORKAROUND_MSVC_BUG inline uint_fast64_t get_content_version() noexcept
     {
         return m_content_versioning_counter.load(std::memory_order_acquire);
     }
@@ -292,7 +292,7 @@ protected:
         return m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel) + 1;
     }
 
-    WORKAROUND_MSVC_BUG inline uint_fast64_t get_instance_version() noexcept
+    REALM_WORKAROUND_MSVC_BUG inline uint_fast64_t get_instance_version() noexcept
     {
         return m_instance_versioning_counter.load(std::memory_order_relaxed);
     }

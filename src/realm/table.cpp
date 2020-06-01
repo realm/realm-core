@@ -345,7 +345,7 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
 
-    m_has_any_embedded_objects |= target.is_embedded();
+    m_has_any_embedded_objects.reset();
 
     ColumnAttrMask attr;
     if (type == type_Link)
@@ -406,6 +406,7 @@ void Table::remove_column(ColKey col_key)
         do_set_primary_key_column(ColKey());
     }
     erase_root_column(col_key); // Throws
+    m_has_any_embedded_objects.reset();
 }
 
 
@@ -512,6 +513,8 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
         m_is_embedded = flags & 0x1;
     }
+    m_has_any_embedded_objects.reset();
+
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
@@ -1699,7 +1702,7 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
-    if (m_has_any_embedded_objects || (g && g->has_cascade_notification_handler())) {
+    if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         std::for_each(vec.begin(), vec.end(),
                       [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
@@ -2314,16 +2317,7 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             m_is_embedded = false;
         }
         refresh_content_version();
-        m_has_any_embedded_objects = false;
-        for_each_public_column([&](ColKey col_key) {
-            auto target_table_key = get_opposite_table_key(col_key);
-            if (target_table_key) {
-                auto target_table = get_parent_group()->get_table(target_table_key);
-                m_has_any_embedded_objects |= target_table->is_embedded();
-                return true; // early out
-            }
-            return false;
-        });
+        m_has_any_embedded_objects.reset();
     }
     m_alloc.bump_storage_version();
 }
@@ -3000,7 +2994,7 @@ void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
-    if (m_has_any_embedded_objects || (g && g->has_cascade_notification_handler())) {
+    if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
         nullify_links(state);
@@ -3534,6 +3528,25 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         add_search_index(new_col);
 
     return new_col;
+}
+
+bool Table::has_any_embedded_objects()
+{
+    if (!m_has_any_embedded_objects) {
+        m_has_any_embedded_objects = false;
+        for_each_public_column([&](ColKey col_key) {
+            auto target_table_key = get_opposite_table_key(col_key);
+            if (target_table_key) {
+                auto target_table = get_parent_group()->get_table(target_table_key);
+                if (target_table->is_embedded()) {
+                    m_has_any_embedded_objects = true;
+                }
+                return true; // early out
+            }
+            return false;
+        });
+    }
+    return *m_has_any_embedded_objects;
 }
 
 void Table::set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column)
