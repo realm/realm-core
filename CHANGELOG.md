@@ -7,6 +7,7 @@
 * Fixed opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
 * Fixed wrong initialization of (part of) the Table accessor. ([#3701](https://github.com/realm/realm-core/issues/3701)). This bug may have caused a faulty file format upgrade to v6 or v10.
 * Fixed incorrect results when querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
+* Fixed potential issue that could occur when the upgrade process was interrupted. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
 
 ### Breaking changes
 * None.
