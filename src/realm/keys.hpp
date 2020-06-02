@@ -197,9 +197,17 @@ struct ObjKey {
     {
         return value < rhs.value;
     }
+    bool operator<=(const ObjKey& rhs) const noexcept
+    {
+        return value <= rhs.value;
+    }
     bool operator>(const ObjKey& rhs) const noexcept
     {
         return value > rhs.value;
+    }
+    bool operator>=(const ObjKey& rhs) const noexcept
+    {
+        return value >= rhs.value;
     }
     explicit operator bool() const noexcept
     {

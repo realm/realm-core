@@ -482,7 +482,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, TableKey().value, m_top.get_alloc());
         m_opposite_table.init_from_mem(mem);
         m_opposite_table.update_parent();
-        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, TableKey().value, m_top.get_alloc());
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, ColKey().value, m_top.get_alloc());
         m_opposite_column.init_from_mem(mem);
         m_opposite_column.update_parent();
     }
@@ -934,6 +934,7 @@ void Table::migrate_indexes(util::FunctionRef<void()> commit_and_continue)
 // This is information about origin/target tables in relation to links
 // This information is now held in "opposite" arrays directly in Table structure
 // At the same time the backlink columns are destroyed
+// If there is no subspec, this stage is done
 void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
 {
     if (!m_spec.has_subspec())
@@ -989,10 +990,14 @@ void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
     commit_and_continue();
 }
 
-
+// When pk_col value is 1, links have been converted.
+// pk_col value will be set back to 0 when all objects are migrated.
 void Table::convert_links_from_ndx_to_key(util::FunctionRef<void()> commit_and_continue)
 {
-    if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
+    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
+    bool done = m_top.get(top_position_for_pk_col);
+
+    if (top_ref && !done) {
         bool changes = false;
         Array col_refs(m_alloc);
         col_refs.set_parent(&m_top, top_position_for_columns);
@@ -1052,6 +1057,8 @@ void Table::convert_links_from_ndx_to_key(util::FunctionRef<void()> commit_and_c
         for_each_public_column(convert_links);
 
         if (changes) {
+            m_top.set(top_position_for_pk_col, 1); // Mark that we are done with this step
+
             commit_and_continue();
         }
     }
@@ -1301,7 +1308,10 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
 
-        REALM_ASSERT(col_refs.get(col_ndx));
+        if (!col_refs.get(col_ndx)) {
+            // This column has been migrated
+            continue;
+        }
 
         if (attr.test(col_attr_List) && col_type != col_type_LinkList) {
             list_acc = std::make_unique<BPlusTree<int64_t>>(m_alloc);
@@ -1418,7 +1428,7 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         if (obj_key.value > max_key_value) {
             max_key_value = obj_key.value;
         }
-        Obj obj = create_object(obj_key, init_values);
+        Obj obj = m_clusters.insert(obj_key, init_values);
 
         // Then update possible list types
         for (auto& it : list_accessors) {
@@ -1462,15 +1472,16 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         }
     }
 
-    // Destroy values in the old columns
-    for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-        col_refs.set(col_ndx, 0);
-    }
-
     if (!has_link_columns) {
         // No link columns to update - mark that we are done with this table
         finalize_migration();
+    }
+    else {
+        // Destroy values in the old columns that has been copied
+        for (auto col_ndx : cols_to_destroy) {
+            Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
+            col_refs.set(col_ndx, 0);
+        }
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
@@ -1571,6 +1582,7 @@ void Table::finalize_migration()
     if (ref) {
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
+        m_top.set(top_position_for_pk_col, 0);
     }
     if (m_spec.get_public_column_count() > 0 && m_spec.get_column_name(0) == "!OID") {
         remove_column(m_spec.get_key(0));

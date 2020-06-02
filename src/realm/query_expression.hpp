@@ -4390,10 +4390,17 @@ public:
     size_t find_first(size_t start, size_t end) const override
     {
         if (m_has_matches) {
-            if (m_index_get < m_index_end && start < end) {
-                ObjKey first_key = m_cluster->get_real_key(start);
-                auto actual_key = m_matches[m_index_get];
+            if (m_index_end == 0 || start >= end)
+                return not_found;
 
+            ObjKey first_key = m_cluster->get_real_key(start);
+            ObjKey actual_key;
+
+            // Sequential lookup optimization: when the query isn't constrained
+            // to a LnkLst we'll get find_first() requests in ascending order,
+            // so we can do a simple linear scan.
+            if (m_index_get < m_index_end && m_matches[m_index_get] <= first_key) {
+                actual_key = m_matches[m_index_get];
                 // skip through keys which are in "earlier" leafs than the one selected by start..end:
                 while (first_key > actual_key) {
                     m_index_get++;
@@ -4401,15 +4408,23 @@ public:
                         return not_found;
                     actual_key = m_matches[m_index_get];
                 }
-                // if actual key is bigger than last key, it is not in this leaf
-                ObjKey last_key = m_cluster->get_real_key(end - 1);
-                if (actual_key > last_key)
-                    return not_found;
-
-                // key is known to be in this leaf, so find key whithin leaf keys
-                return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
             }
-            return not_found;
+            // Otherwise if we get requests out of order we have to do a more
+            // expensive binary search
+            else {
+                auto it = std::lower_bound(m_matches.begin(), m_matches.end(), first_key);
+                if (it == m_matches.end())
+                    return not_found;
+                actual_key = *it;
+            }
+
+            // if actual key is bigger than last key, it is not in this leaf
+            ObjKey last_key = start + 1 == end ? first_key : m_cluster->get_real_key(end - 1);
+            if (actual_key > last_key)
+                return not_found;
+
+            // key is known to be in this leaf, so find key whithin leaf keys
+            return m_cluster->lower_bound_key(ObjKey(actual_key.value - m_cluster->get_offset()));
         }
 
         size_t match;
