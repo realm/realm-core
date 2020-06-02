@@ -479,10 +479,10 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         MemRef mem = Array::create_array(Array::type_HasRefs, context_flag, nb_columns, 0, m_top.get_alloc());
         m_index_refs.init_from_mem(mem);
         m_index_refs.update_parent();
-        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, 0, m_top.get_alloc());
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, TableKey().value, m_top.get_alloc());
         m_opposite_table.init_from_mem(mem);
         m_opposite_table.update_parent();
-        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, 0, m_top.get_alloc());
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, TableKey().value, m_top.get_alloc());
         m_opposite_column.init_from_mem(mem);
         m_opposite_column.update_parent();
     }
@@ -765,8 +765,8 @@ void Table::do_erase_root_column(ColKey col_key)
         delete m_index_accessors[col_ndx];
         m_index_accessors[col_ndx] = nullptr;
     }
-    m_opposite_table.set(col_ndx, 0);
-    m_opposite_column.set(col_ndx, 0);
+    m_opposite_table.set(col_ndx, TableKey().value);
+    m_opposite_column.set(col_ndx, ColKey().value);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
     if (m_tombstones)
@@ -3536,7 +3536,7 @@ bool Table::has_any_embedded_objects()
         m_has_any_embedded_objects = false;
         for_each_public_column([&](ColKey col_key) {
             auto target_table_key = get_opposite_table_key(col_key);
-            if (target_table_key) {
+            if (target_table_key && is_link_type(col_key.get_type())) {
                 auto target_table = get_parent_group()->get_table(target_table_key);
                 if (target_table->is_embedded()) {
                     m_has_any_embedded_objects = true;
