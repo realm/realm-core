@@ -78,7 +78,7 @@ public:
             }
             
             if (projection_bson) {
-                bson["project"] = *projection_bson;
+                bson["projection"] = *projection_bson;
             }
             
             if (sort_bson) {
@@ -286,7 +286,7 @@ public:
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              RemoteFindOneAndModifyOptions options,
-                             std::function<void(util::Optional<AppError>)> completion_block);
+                             std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before
@@ -297,7 +297,7 @@ public:
     /// @param filter_bson  A `Document` that should match the query.
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
-                             std::function<void(util::Optional<AppError>)> completion_block);
+                             std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
 
 private:
     friend class RemoteMongoDatabase;
