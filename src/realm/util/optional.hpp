@@ -77,7 +77,7 @@ namespace util {
 
 // Note: Should conform with the future std::optional.
 template <class T>
-class Optional : private _impl::OptionalStorage<T> {
+class Optional : private realm::_impl::OptionalStorage<T> {
 public:
     using value_type = T;
 
