@@ -1,16 +1,10 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.6 Release notes
 
 ### Fixed
-* Fixed opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
-* Fixed wrong initialization of (part of) the Table accessor. ([#3701](https://github.com/realm/realm-core/issues/3701)). This bug may have caused a faulty file format upgrade to v6 or v10.
-* Fixed incorrect results when querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
-* Fixed potential issue that could occur when the upgrade process was interrupted. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
-
-### Breaking changes
-* None.
+* When opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT, you may get 'Operation not supported' exception. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
+* After upgrading of a realm file, you may at some point receive a 'NoSuchTable' exception. ([#3701](https://github.com/realm/realm-core/issues/3701), since 6.0.0)
+* If the upgrade process was interrupted/killed for various reasons, the following run could stop with some assertions failing. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
+* When querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table, you may get incorrect results. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
 
 -----------
 
