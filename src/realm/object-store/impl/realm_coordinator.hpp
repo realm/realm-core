@@ -60,7 +60,8 @@ public:
     // can be read from any thread.
     std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    std::shared_ptr<Realm> get_realm() REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
+    std::shared_ptr<Realm> get_realm(std::shared_ptr<util::Scheduler> = nullptr)
+        REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 #if REALM_ENABLE_SYNC
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is not already present, it will be fully downloaded before being returned.
@@ -80,7 +81,7 @@ public:
 
     // Bind an unbound Realm to a specific execution context. The Realm must
     // be managed by this coordinator.
-    void bind_to_context(Realm& realm, AnyExecutionContextID) REQUIRES(!m_realm_mutex);
+    void bind_to_context(Realm& realm) REQUIRES(!m_realm_mutex);
 
     Realm::Config get_config() const
     {
@@ -248,7 +249,7 @@ private:
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void create_sync_session(bool force_client_resync);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
-                      util::CheckedUniqueLock& realm_lock, bool bind_to_context = true) REQUIRES(m_realm_mutex);
+                      util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
     void run_async_notifiers() REQUIRES(!m_notifier_mutex);
     void advance_helper_shared_group_to_latest();
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);

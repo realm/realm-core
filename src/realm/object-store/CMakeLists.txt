@@ -20,12 +20,12 @@ set(SOURCES
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
+    util/scheduler.cpp
     util/uuid.cpp)
 
 set(HEADERS
     binding_callback_thread_observer.hpp
     collection_notifications.hpp
-    execution_context_id.hpp
     feature_checks.hpp
     index_set.hpp
     keypath_helpers.hpp
@@ -58,17 +58,17 @@ set(HEADERS
     impl/transact_log_handler.hpp
     impl/weak_realm_notifier.hpp
 
-    util/android/event_loop_signal.hpp
-    util/apple/event_loop_signal.hpp
-    util/generic/event_loop_signal.hpp
-    util/uv/event_loop_signal.hpp
+    util/android/scheduler.hpp
+    util/apple/scheduler.hpp
+    util/generic/scheduler.hpp
+    util/uv/scheduler.hpp
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/checked_mutex.hpp
     util/copyable_atomic.hpp
     util/event_loop_dispatcher.hpp
-    util/event_loop_signal.hpp
+    util/scheduler.hpp
     util/tagged_bool.hpp
     util/uuid.hpp)
 
@@ -80,10 +80,6 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
 else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
-endif()
-
-if(NOT APPLE AND NOT REALM_PLATFORM STREQUAL "Android")
-    list(APPEND SOURCES util/generic/event_loop_signal.cpp)
 endif()
 
 set(INCLUDE_DIRS
