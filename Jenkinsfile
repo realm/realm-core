@@ -5,6 +5,7 @@
 cocoaStashes = []
 androidStashes = []
 publishingStashes = []
+dependencies = null
 
 tokens = "${env.JOB_NAME}".tokenize('/')
 org = tokens[tokens.size()-3]
@@ -97,12 +98,14 @@ jobWrapper {
 
     stage('Checking') {
         def buildOptions = [
+            buildType : "Debug",
             maxBpNodeSize: "1000",
             enableEncryption: "ON",
             enableSync: "OFF",
             runTests: true,
         ]
         def linuxOptionsNoEncrypt = [
+            buildType : "Debug",
             maxBpNodeSize: "4",
             enableEncryption: "OFF",
             enableSync: "OFF",
@@ -117,11 +120,11 @@ jobWrapper {
         ]
 
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker(buildOptions << [buildType : "Debug"]),
-            checkLinuxRelease       : doCheckInDocker(buildOptions << [buildType : "Release"]),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions << [buildType : "Debug", enableSync : "ON"]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(linuxOptionsNoEncrypt << [buildType : "Debug"]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions << [buildType : "Release"]),
+            checkLinuxDebug         : doCheckInDocker(buildOptions),
+            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: "4", buildType : "Release"]),
+            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync : "ON"]),
+            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: "OFF"]),
+            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
@@ -130,8 +133,8 @@ jobWrapper {
             buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "thread"]),
-            addressSanitizer        : doCheckSanity(buildOptions << [buildType : "Debug", sanitizeMode : "address"]),
+            threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
+            addressSanitizer        : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "address"]),
             performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
@@ -247,6 +250,12 @@ def doCheckInDocker(Map options = [:]) {
         REALM_ENABLE_ENCRYPTION: options.enableEncryption,
         REALM_ENABLE_SYNC: options.enableSync,
     ]
+    if (options.enableSync == "ON") {
+        cmakeOptions << [
+            REALM_ENABLE_AUTH_TESTS: "ON",
+            REALM_MONGODB_ENDPOINT: "http://mongodb-realm:9090",
+        ]
+    }
     if (longRunningTests) {
         cmakeOptions << [
             CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
@@ -258,21 +267,39 @@ def doCheckInDocker(Map options = [:]) {
     return {
         node('docker') {
             getArchive()
+            def sourcesDir = pwd()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                buildEnv.inside() {
-                    try {
-                        dir('build-dir') {
-                            sh "cmake ${cmakeDefinitions} -G Ninja .."
-                            runAndCollectWarnings(script: "ninja", name: "linux-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}")
-                            sh 'ctest --output-on-failure'
+
+            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/stitch.json\""
+
+            def buildSteps = { String dockerArgs = "" ->
+                withEnv(environment) {
+                    buildEnv.inside("${dockerArgs}") {
+                        try {
+                            dir('build-dir') {
+                                sh "cmake ${cmakeDefinitions} -G Ninja .."
+                                runAndCollectWarnings(script: "ninja", name: "linux-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}")
+                                sh 'ctest --output-on-failure'
+                            }
+                        } finally {
+                            recordTests("Linux-${options.buildType}")
                         }
-                    } finally {
-                        recordTests("Linux-${options.buildType}")
                     }
                 }
+            }
+            
+            if (options.enableSync == "ON") {
+                // stitch images are auto-published every day to our CI
+                // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
+                // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
+                // if there's really a new feature you need from the latest stitch, upgrade this manually
+                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/test/object-store/mongodb"]) { networkName ->
+                    buildSteps("--network=${networkName}")
+                }
+            } else {
+                buildSteps("")
             }
         }
     }
