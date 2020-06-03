@@ -105,7 +105,8 @@ struct SyncError {
                 || error_code == ProtocolError::bad_client_file_ident
                 || error_code == ProtocolError::bad_server_version
                 || error_code == ProtocolError::diverging_histories
-                || error_code == ProtocolError::client_file_expired);
+                || error_code == ProtocolError::client_file_expired
+                || error_code == ProtocolError::invalid_schema_change);
     }
 };
 
