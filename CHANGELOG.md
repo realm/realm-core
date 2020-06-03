@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 10.0.0-beta.1 Release notes
 
 ### Enhancements
 * Validation errors when opening a DB now provide more information about the invalid values
@@ -9,9 +9,6 @@
 * If the upgrade process was interrupted/killed for various reasons, the following run could stop with some assertions failing. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
 * When querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table, you may get incorrect results. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
