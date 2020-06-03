@@ -1597,4 +1597,10 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+TEST(Upgrade_jed)
+{
+    auto hist = make_in_realm_history("/home/joergen/default.realm");
+    auto db = DB::create(*hist);
+}
+
 #endif // TEST_GROUP
