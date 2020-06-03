@@ -332,6 +332,9 @@ private:
 
     void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
 
+    typedef std::function<void(util::Optional<app::AppError>)> RefreshHandler;
+    RefreshHandler m_handle_refresh;
+    
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;

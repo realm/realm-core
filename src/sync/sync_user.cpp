@@ -405,7 +405,14 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
     s_binding_context_factory = std::move(factory);
 }
+
+void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
+{
+    SyncManager::shared().app()->refresh_custom_data(shared_from_this(), [completion_block](util::Optional<app::AppError> error){
+        completion_block(error);
+    });
 }
+} // namespace realm
 
 namespace std {
 size_t hash<realm::SyncUserIdentity>::operator()(const realm::SyncUserIdentity& k) const
