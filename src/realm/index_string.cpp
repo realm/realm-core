@@ -56,7 +56,7 @@ bool ClusterColumn::is_nullable() const
 
 StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buffer) const
 {
-    ConstObj obj = m_cluster_tree->get(key);
+    const Obj obj{m_cluster_tree->get(key)};
     DataType type = get_data_type();
 
     if (type == type_Int) {

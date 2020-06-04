@@ -141,10 +141,10 @@ bool table_has_primary_key(const TableInfoCache&, const Table&);
 /// the server has not been contacted yet (`has_globally_stable_object_ids()`
 /// returns false), an exception is thrown.
 GlobalKey object_id_for_row(const TableInfoCache&, const Table&, ObjKey);
-GlobalKey object_id_for_row(const TableInfoCache&, const ConstObj&);
+GlobalKey object_id_for_row(const TableInfoCache&, const Obj&);
 
 PrimaryKey primary_key_for_row(const Table&, ObjKey);
-PrimaryKey primary_key_for_row(const ConstObj&);
+PrimaryKey primary_key_for_row(const Obj&);
 
 /// Get the index of the row with the object ID.
 ///
@@ -153,8 +153,7 @@ ObjKey row_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
 Obj obj_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
 
 ObjKey row_for_primary_key(const Table&, PrimaryKey);
-ConstObj obj_for_primary_key(const Table&, PrimaryKey);
-Obj obj_for_primary_key(Table&, PrimaryKey);
+Obj obj_for_primary_key(const Table&, PrimaryKey);
 
 //@{
 /// Add a row to the table and populate the object ID with an appropriate value.

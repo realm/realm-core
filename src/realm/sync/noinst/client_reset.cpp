@@ -30,7 +30,7 @@ struct ClientResetFailed {
 
 // Takes two lists, src and dst, and makes dst equal src. src is unchanged.
 template <class T>
-bool _copy_list(ConstLst<T>& src, Lst<T>& dst)
+bool _copy_list(Lst<T>& src, Lst<T>& dst)
 {
     // The two arrays are compared by finding the longest common prefix and
     // suffix.  The middle section differs between them and is made equal by
@@ -87,14 +87,14 @@ bool _copy_list(ConstLst<T>& src, Lst<T>& dst)
 }
 
 template <class T>
-bool _copy_list(const ConstObj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+bool _copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 {
     auto src = src_obj.get_list<T>(src_col);
     auto dst = dst_obj.get_list<T>(dst_col);
     return _copy_list(src, dst);
 }
 
-bool copy_list(const ConstObj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
+bool copy_list(const Obj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst_col)
 {
     switch (src_col.get_type()) {
         case col_type_Int:
@@ -123,7 +123,7 @@ bool copy_list(const ConstObj& src_obj, ColKey src_col, Obj& dst_obj, ColKey dst
     return false;
 }
 
-bool copy_linklist(ConstLnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_ndx)
+bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)> convert_ndx)
 {
     // This function ensures that the link list in ll_dst is equal to the
     // link list in ll_src with equality defined by the conversion function
@@ -1143,7 +1143,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                          table_src->size(), table_src->get_column_count());
         }
 
-        for (const ConstObj& src : *table_src) {
+        for (const Obj& src : *table_src) {
             auto oid = sync::object_id_for_row(table_info_cache_src, src);
             auto dst = obj_for_object_id(table_info_cache_dst, *table_dst, oid);
             REALM_ASSERT(dst);

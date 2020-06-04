@@ -170,7 +170,7 @@ public:
     /// Construct empty view, ready for addition of row indices.
     ConstTableView(ConstTableRef parent);
     ConstTableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t limit);
-    ConstTableView(ConstTableRef parent, ColKey column, const ConstObj& obj);
+    ConstTableView(ConstTableRef parent, ColKey column, const Obj& obj);
     ConstTableView(ConstTableRef parent, ConstLnkLstPtr link_list);
 
     enum DistinctViewTag { DistinctView };
@@ -516,7 +516,7 @@ inline ConstTableView::ConstTableView(ConstTableRef parent, Query& query, size_t
     m_key_values.create();
 }
 
-inline ConstTableView::ConstTableView(ConstTableRef src_table, ColKey src_column_key, const ConstObj& obj)
+inline ConstTableView::ConstTableView(ConstTableRef src_table, ColKey src_column_key, const Obj& obj)
     : m_table(src_table) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj_key(obj.get_key())
@@ -675,7 +675,7 @@ ConstTableView ObjList::find_all(ColKey column_key, T value) const
 {
     ConstTableView tv(get_target_table());
     auto& keys = tv.m_key_values;
-    for_each([column_key, value, &keys](ConstObj& o) {
+    for_each([column_key, value, &keys](const Obj& o) {
         if (o.get<T>(column_key) == value) {
             keys.add(o.get_key());
         }

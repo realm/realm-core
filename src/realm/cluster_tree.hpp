@@ -127,14 +127,10 @@ public:
     void erase(ObjKey k, CascadeState& state);
     // Check if an object with given key exists
     bool is_valid(ObjKey k) const;
-    // Lookup and return read-only object
-    ConstObj get(ObjKey k) const;
     // Lookup and return object
-    Obj get(ObjKey k);
-    // Lookup ContsObj by index
-    ConstObj get(size_t ndx) const;
+    Obj get(ObjKey k) const;
     // Lookup Obj by index
-    Obj get(size_t ndx);
+    Obj get(size_t ndx) const;
     // Get logical index of object identified by k
     size_t get_ndx(ObjKey k) const;
     // Find the leaf containing the requested object
@@ -153,7 +149,6 @@ public:
     void verify() const;
 
 private:
-    friend class ConstObj;
     friend class Obj;
     friend class Cluster;
     friend class ClusterNodeInner;

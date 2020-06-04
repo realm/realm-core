@@ -30,7 +30,7 @@ namespace realm {
 
 class Spec;
 class Table;
-class ConstObj;
+class Obj;
 class Cluster;
 class ClusterNodeInner;
 class ClusterTree;
@@ -67,7 +67,7 @@ public:
         }
         IteratorState(const IteratorState&);
         void clear();
-        void init(const ConstObj&);
+        void init(const Obj&);
 
         Cluster& m_current_leaf;
         int64_t m_key_offset = 0;
