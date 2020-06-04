@@ -234,21 +234,12 @@ public:
         return m_clusters.is_valid(key);
     }
     GlobalKey get_object_id(ObjKey key) const;
-    Obj get_object(ObjKey key)
+    Obj get_object(ObjKey key) const
     {
         REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
-    ConstObj get_object(ObjKey key) const
-    {
-        REALM_ASSERT(!key.is_unresolved());
-        return m_clusters.get(key);
-    }
-    Obj get_object(size_t ndx)
-    {
-        return m_clusters.get(ndx);
-    }
-    ConstObj get_object(size_t ndx) const
+    Obj get_object(size_t ndx) const
     {
         return m_clusters.get(ndx);
     }
@@ -280,7 +271,7 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     void invalidate_object(ObjKey key);
-    ConstObj get_tombstone(ObjKey key) const
+    Obj get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
         REALM_ASSERT(m_tombstones);

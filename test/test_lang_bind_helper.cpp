@@ -1105,8 +1105,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
     // Grab references to the LinkViews
     auto origin = rt->get_table("origin");
     auto col_link = origin->get_column_key("list");
-    ConstObj obj0 = origin->get_object(ObjKey(0));
-    ConstObj obj1 = origin->get_object(ObjKey(1));
+    const Obj obj0 = origin->get_object(ObjKey(0));
+    const Obj obj1 = origin->get_object(ObjKey(1));
 
     auto ll1 = obj0.get_linklist(col_link); // lv1[0] -> target[1]
     auto ll2 = obj1.get_linklist(col_link); // lv2[0] -> target[2]
@@ -1467,7 +1467,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     auto target = rt->get_table("target");
 
     ObjKey target_key0, target_key1;
-    ConstObj target_obj0, target_obj1;
+    Obj target_obj0, target_obj1;
 
     auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
@@ -1546,7 +1546,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     auto target = rt->get_table("target");
 
     ObjKey target_key0, target_key1;
-    ConstObj target_obj0, target_obj1;
+    Obj target_obj0, target_obj1;
 
     auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
@@ -4299,7 +4299,7 @@ TEST(LangBindHelper_HandoverDistinctView)
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
     TransactionRef reader;
     std::unique_ptr<ConstTableView> tv2;
-    ConstObj obj2b;
+    Obj obj2b;
     {
         {
             TableView tv1;
@@ -5533,7 +5533,7 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1.size(), i);
 }
 
-#ifdef LEGACY_TESTS // FIXME: Requires get_at() method to be available on ConstObj.
+#ifdef LEGACY_TESTS // FIXME: Requires get_at() method to be available on Obj.
 ONLY(LangBindHelper_BigBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5742,8 +5742,8 @@ TEST(LangBindHelper_RemoveObject)
 
     rt->advance_read();
     auto table = rt->get_table("Foo");
-    ConstObj o1 = table->get_object(ObjKey(123));
-    ConstObj o2 = table->get_object(ObjKey(456));
+    const Obj o1 = table->get_object(ObjKey(123));
+    const Obj o2 = table->get_object(ObjKey(456));
     CHECK_EQUAL(o1.get<int64_t>(col), 1);
     CHECK_EQUAL(o2.get<int64_t>(col), 2);
 
@@ -5836,7 +5836,7 @@ TEST(LangBindHelper_AdvanceReadCluster)
     auto table = rt->get_table("Foo");
     auto col = table->get_column_key("int");
     for (int64_t i = 0; i < 100; i++) {
-        ConstObj o = table->get_object(ObjKey(i));
+        const Obj o = table->get_object(ObjKey(i));
         CHECK_EQUAL(o.get<int64_t>(col), i);
     }
 }

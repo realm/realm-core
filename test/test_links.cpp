@@ -438,7 +438,7 @@ TEST(Links_LinkList_TableOps)
     target->create_object().set_all("test2", 2, false, int64_t(Tue));
     target->create_object().set_all("test3", 3, true, int64_t(Wed));
 
-    ConstObj obj1 = origin->create_object();
+    const Obj obj1 = origin->create_object();
     CHECK(obj1.get_list<ObjKey>(col_link).is_empty());
     CHECK_EQUAL(0, obj1.get_link_count(col_link));
 
@@ -1019,10 +1019,10 @@ TEST(Links_Transactions)
     auto rt = db->start_read();
     ConstTableRef owners = rt->get_table("owners");
     ConstTableRef dogs = rt->get_table("dogs");
-    ConstObj tim = owners->get_object(tim_key);
+    const Obj tim = owners->get_object(tim_key);
     CHECK_NOT(tim.is_null(dog_col));
     CHECK_EQUAL(harvey_key, tim.get<ObjKey>(dog_col));
-    ConstObj harvey = dogs->get_object(harvey_key);
+    const Obj harvey = dogs->get_object(harvey_key);
     CHECK_EQUAL(harvey.get_backlink_count(), 1);
 
     {

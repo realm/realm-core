@@ -428,9 +428,9 @@ TEST(Unresolved_CondensedIndices)
 
     CHECK_EQUAL(obj789.get_linklist("t2s").size(), 1);
 
-    ConstObj const_obj789 = obj789;
-    ConstLnkLst list1 = const_obj789.get_linklist("t2s");
-    ConstLnkLst list2;
+    const Obj const_obj789 = obj789;
+    LnkLst list1 = const_obj789.get_linklist("t2s");
+    LnkLst list2;
     CHECK_EQUAL(list1.size(), 1);
     CHECK_EQUAL(list1.get_object(0).get_key(), obj456.get_key());
     list2 = list1;

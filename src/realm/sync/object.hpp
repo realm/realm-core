@@ -150,8 +150,7 @@ PrimaryKey primary_key_for_row(const ConstObj&);
 ///
 /// \returns realm::npos if the object does not exist in the table.
 ObjKey row_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
-Obj obj_for_object_id(const TableInfoCache&, Table&, GlobalKey);
-ConstObj obj_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
+Obj obj_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
 
 ObjKey row_for_primary_key(const Table&, PrimaryKey);
 ConstObj obj_for_primary_key(const Table&, PrimaryKey);

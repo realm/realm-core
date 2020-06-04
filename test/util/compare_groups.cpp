@@ -191,8 +191,7 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
     return equal;
 }
 
-bool compare_objects(const ConstObj& obj_1, const ConstObj& obj_2, const std::vector<Column>& columns,
-                     util::Logger& logger)
+bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Column>& columns, util::Logger& logger)
 {
     bool equal = true;
     auto ptable_1 = obj_1.get_table();
@@ -345,8 +344,8 @@ bool compare_objects(const ConstObj& obj_1, const ConstObj& obj_2, const std::ve
                         }
                         else {
                             if (is_embedded) {
-                                ConstObj embedded_1 = target_table_1->get_object(link_1);
-                                ConstObj embedded_2 = target_table_2->get_object(link_2);
+                                const Obj embedded_1 = target_table_1->get_object(link_1);
+                                const Obj embedded_2 = target_table_2->get_object(link_2);
                                 // Skip ID comparison for embedded objects, because
                                 // they are only identified by their position in the
                                 // database.
@@ -516,8 +515,8 @@ bool compare_objects(const ConstObj& obj_1, const ConstObj& obj_2, const std::ve
                     }
 
                     if (is_embedded) {
-                        ConstObj embedded_1 = target_table_1->get_object(link_1);
-                        ConstObj embedded_2 = target_table_2->get_object(link_2);
+                        const Obj embedded_1 = target_table_1->get_object(link_1);
+                        const Obj embedded_2 = target_table_2->get_object(link_2);
                         // Skip ID comparison for embedded objects, because
                         // they are only identified by their position in the
                         // database.
@@ -559,8 +558,8 @@ bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& t
     // Note: This is ensured by the inventory handling in compare_tables().
     REALM_ASSERT(row_1);
     REALM_ASSERT(row_2);
-    ConstObj obj_1 = table_1.get_object(row_1);
-    ConstObj obj_2 = table_2.get_object(row_2);
+    const Obj obj_1 = table_1.get_object(row_1);
+    const Obj obj_2 = table_2.get_object(row_2);
     return compare_objects(obj_1, obj_2, columns, logger);
 }
 
@@ -595,7 +594,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
     // Compare row sets
     using Objects = std::set<sync::PrimaryKey>;
     auto make_inventory = [](const Table& table, Objects& objects) {
-        for (ConstObj obj : table) {
+        for (const Obj obj : table) {
             auto oid = sync::primary_key_for_row(obj);
             objects.insert(oid);
         }

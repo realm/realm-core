@@ -388,7 +388,7 @@ TEST(ClientResetDiff_2)
             CHECK_EQUAL(get_val("bbb"), 2);
             CHECK_EQUAL(get_val("ccc"), 3);
             GlobalKey oid("ddd");
-            ConstObj obj = obj_for_object_id(table_info_cache, *table, oid);
+            const Obj obj = obj_for_object_id(table_info_cache, *table, oid);
             CHECK(obj.is_null(col_ndx));
         }
 
@@ -746,8 +746,8 @@ TEST(ClientResetDiff_ClientVersion)
 
             GlobalKey oid_a("aaa");
             GlobalKey oid_b("bbb");
-            ConstObj obj_a = obj_for_object_id(table_info_cache, *table, oid_a);
-            ConstObj obj_b = obj_for_object_id(table_info_cache, *table, oid_b);
+            const Obj obj_a = obj_for_object_id(table_info_cache, *table, oid_a);
+            const Obj obj_b = obj_for_object_id(table_info_cache, *table, oid_b);
 
             CHECK_EQUAL(obj_a.get<Int>(col_int), 500);
             CHECK_EQUAL(obj_b.get<Int>(col_int), 400);
@@ -1010,9 +1010,9 @@ TEST(ClientResetDiff_NonSyncTables)
                 GlobalKey oid_a("aaa");
                 GlobalKey oid_b("bbb");
                 GlobalKey oid_c("ccc");
-                ConstObj obj_a = sync::obj_for_object_id(table_info_cache, *table, oid_a);
-                ConstObj obj_b = sync::obj_for_object_id(table_info_cache, *table, oid_b);
-                ConstObj obj_c = sync::obj_for_object_id(table_info_cache, *table, oid_c);
+                const Obj obj_a = sync::obj_for_object_id(table_info_cache, *table, oid_a);
+                const Obj obj_b = sync::obj_for_object_id(table_info_cache, *table, oid_b);
+                const Obj obj_c = sync::obj_for_object_id(table_info_cache, *table, oid_c);
 
                 CHECK_EQUAL(obj_a.get<ObjKey>(col_link), obj_b.get_key());
                 CHECK_EQUAL(obj_b.get<ObjKey>(col_link), obj_a.get_key());

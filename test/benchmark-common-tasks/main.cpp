@@ -1478,7 +1478,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         ConstTableRef table = m_tr->get_table(name());
         size_t target_row = rand() % table->size();
 #ifdef REALM_CLUSTER_IF
-        ConstObj obj = table->get_object(m_keys[target_row]);
+        Obj obj = table->get_object(m_keys[target_row]);
         StringData target_str = obj.get<String>(m_col);
 #else
         StringData target_str = table->get_string(0, target_row);

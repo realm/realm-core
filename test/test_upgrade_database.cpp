@@ -1333,15 +1333,15 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(t->has_search_index(col_string), false);
         CHECK_EQUAL(t->has_search_index(col_string_i), true);
 
-        ConstObj obj0 = t->get_object(ObjKey(0));
+        const Obj obj0 = t->get_object(ObjKey(0));
         CHECK(obj0.is_null(col_int_null));
         CHECK(obj0.is_null(col_bool_null));
 
-        ConstObj obj17 = t->get_object(ObjKey(17));
-        ConstObj obj18 = t->get_object(ObjKey(18));
-        ConstObj obj23 = t->get_object(ObjKey(23));
-        ConstObj obj27 = t->get_object(ObjKey(27));
-        ConstObj obj = t->get_object(ObjKey(insert_pos));
+        const Obj obj17 = t->get_object(ObjKey(17));
+        const Obj obj18 = t->get_object(ObjKey(18));
+        const Obj obj23 = t->get_object(ObjKey(23));
+        const Obj obj27 = t->get_object(ObjKey(27));
+        const Obj obj = t->get_object(ObjKey(insert_pos));
 
         CHECK_EQUAL(obj17.get<Int>(col_int), 17);
         CHECK_EQUAL(obj17.get<util::Optional<Int>>(col_int_null), 17);
@@ -1380,7 +1380,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(obj27.get_backlink(*t, col_link, 0), obj17.get_key());
         auto ll = obj27.get_linklist(col_linklist);
         CHECK_EQUAL(ll.size(), 7);
-        ConstObj linked_obj = ll.get_object(0);
+        const Obj linked_obj = ll.get_object(0);
         CHECK_EQUAL(linked_obj.get_key(), ObjKey(12));
         size_t expected_back_link_count = (REALM_MAX_BPNODE_SIZE == 4) ? 1 : 4;
         CHECK_EQUAL(linked_obj.get_backlink_count(*t, col_linklist), expected_back_link_count);
@@ -1389,7 +1389,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
                     "This is a rather long string, that should not be very much shorter");
         CHECK_EQUAL(obj.get<Binary>(col_binary), BinaryData("", 0));
 
-        ConstObj obj14 = o->get_object(14);
+        const Obj obj14 = o->get_object(14);
 
         auto str_list = obj14.get_list<String>(col_str_list);
         CHECK_EQUAL(str_list.size(), 3);

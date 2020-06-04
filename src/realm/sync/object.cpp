@@ -196,26 +196,7 @@ ObjKey row_for_object_id(const TableInfoCache& cache, const Table& table, Global
     return info.last_obj_key;
 }
 
-Obj obj_for_object_id(const TableInfoCache& cache, Table& table, GlobalKey id)
-{
-    const auto& info = cache.get_table_info(table);
-    ObjKey key = (info.last_object_id == id) ? info.last_obj_key : table.get_objkey(id);
-
-    try {
-        auto obj = table.get_object(key);
-        info.last_object_id = id;
-        info.last_obj_key = key;
-        REALM_ASSERT_DEBUG(info.last_obj_key == table.get_objkey(id));
-        return obj;
-    }
-    catch (const KeyNotFound&) {
-        info.last_obj_key = ObjKey();
-        info.last_object_id = {};
-    }
-    return {};
-}
-
-ConstObj obj_for_object_id(const TableInfoCache& cache, const Table& table, GlobalKey id)
+Obj obj_for_object_id(const TableInfoCache& cache, const Table& table, GlobalKey id)
 {
     const auto& info = cache.get_table_info(table);
     ObjKey key = (info.last_object_id == id) ? info.last_obj_key : table.get_objkey(id);
