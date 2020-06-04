@@ -1984,10 +1984,16 @@ static nlohmann::json user_profile_json(std::string user_id = random_string(15),
 // MARK: - Unit Tests
 
 class UnitTestTransport : public GenericNetworkTransport {
+    std::string m_provider_type;
 
 public:
+    UnitTestTransport(const std::string& provider_type = "anon-user")
+    : m_provider_type(provider_type)
+    {
+    }
+
     static std::string access_token;
-    static std::string provider_type;
+
     static const std::string api_key;
     static const std::string api_key_id;
     static const std::string api_key_name;
@@ -1996,6 +2002,10 @@ public:
     static const std::string identity_0_id;
     static const std::string identity_1_id;
 
+    void set_provider_type(const std::string& provider_type)
+    {
+        m_provider_type = provider_type;
+    }
 private:
     void handle_profile(const Request request,
                         std::function<void (Response)> completion_block)
@@ -2011,7 +2021,7 @@ private:
             {"identities", {
                 {
                     {"id", identity_0_id},
-                    {"provider_type", provider_type},
+                    {"provider_type", m_provider_type},
                     {"provider_id", "lol"}
                 },
                 {
@@ -2031,19 +2041,16 @@ private:
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
-
-        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({
-            {"provider", provider_type},
-            {"options", {
-                {"device", {
-                    {"appId", app_name},
-                    {"appVersion", "A Local App Version"},
-                    {"platform", "Object Store Platform Tests"},
-                    {"platformVersion", "Object Store Platform Version Blah"},
-                    {"sdkVersion", "An sdk version"}
-                }}
+        CHECK(nlohmann::json::parse(request.body)["options"] == nlohmann::json({
+            {"device", {
+                {"appId", app_name},
+                {"appVersion", "A Local App Version"},
+                {"platform", "Object Store Platform Tests"},
+                {"platformVersion", "Object Store Platform Version Blah"},
+                {"sdkVersion", "An sdk version"}
             }}
         }));
+
         CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
@@ -2198,7 +2205,6 @@ const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
 const std::string UnitTestTransport::api_key_name = "some_api_key_name";
 const std::string UnitTestTransport::auth_route = "https://mongodb.com/unittests";
 const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
-std::string UnitTestTransport::provider_type = "anon-user";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
@@ -2455,15 +2461,7 @@ TEST_CASE("app: user_semantics", "[app]") {
     SECTION("current user is updated on login") {
         const auto user1 = login_user_anonymous();
         CHECK(app.current_user()->identity() == user1->identity());
-        const auto user2 = login_user_anonymous();
-        CHECK(app.current_user()->identity() == user2->identity());
-        CHECK(user1->identity() != user2->identity());
-    }
-
-    SECTION("current user is updated on login") {
-        const auto user1 = login_user_anonymous();
-        CHECK(app.current_user()->identity() == user1->identity());
-        const auto user2 = login_user_anonymous();
+        const auto user2 = login_user_email_pass();
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
     }
@@ -2479,12 +2477,16 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
-        app.log_out([&](auto){});
-        CHECK(app.current_user()->identity() == user1->identity());
+        // shuold reuse existing session
+        const auto user3 = login_user_anonymous();
+        CHECK(user3->identity() == user1->identity());
 
-        CHECK(app.all_users().size() == 2);
+        app.log_out([&](auto){});
+        
+        CHECK(app.current_user()->identity() == user2->identity());
+
+        CHECK(app.all_users().size() == 1);
         CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedOut);
     }
 
     SECTION("anon users are removed on logout") {
@@ -2494,15 +2496,12 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         const auto user2 = login_user_anonymous();
         CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users().size() == 1);
         CHECK(app.current_user()->identity() == user2->identity());
-        CHECK(user1->identity() != user2->identity());
+        CHECK(user1->identity() == user2->identity());
 
         app.log_out([&](auto){});
-        CHECK(app.current_user()->identity() == user1->identity());
-
-        CHECK(app.all_users().size() == 1);
-        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users().size() == 0);
     }
 
     SECTION("logout user") {
@@ -2676,9 +2675,8 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 }
 
 TEST_CASE("app: switch user", "[sync][app]") {
-        
     std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
-        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport("local-userpass"));
     };
 
     auto config = App::Config {
@@ -2709,7 +2707,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         CHECK(SyncManager::shared().all_users().size() == 0);
 
         // Log in user 1
-        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password("test@10gen.com", "password"),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(SyncManager::shared().get_current_user() == user);
@@ -2717,7 +2715,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         });
         
         // Log in user 2
-        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password("test2@10gen.com", "password"),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(SyncManager::shared().get_current_user() == user);
@@ -2743,7 +2741,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         CHECK(SyncManager::shared().all_users().size() == 0);
 
         // Log in user 1
-        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password("test@10gen.com", "password"),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             user_a = user;
             CHECK(!error);
@@ -2756,17 +2754,17 @@ TEST_CASE("app: switch user", "[sync][app]") {
         });
 
         CHECK(SyncManager::shared().get_current_user() == nullptr);
-        CHECK(user_a->state() == SyncUser::State::Removed);
+        CHECK(user_a->state() == SyncUser::State::LoggedOut);
 
         // Log in user 2
-        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password("test2@10gen.com", "password"),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             user_b = user;
             CHECK(!error);
         });
         
         CHECK(SyncManager::shared().get_current_user() == user_b);
-        CHECK(SyncManager::shared().all_users().size() == 1);
+        CHECK(SyncManager::shared().all_users().size() == 2);
 
         try {
             auto user = app.switch_user(user_a);

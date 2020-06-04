@@ -636,6 +636,17 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     std::stringstream s;
     s << bson::Bson(body);
 
+    // if we try logging in with an anonymous user while there
+    // is already an anonymous session active, reuse it
+    if (credentials.provider() == AuthProvider::ANONYMOUS) {
+        for (auto user : realm::SyncManager::shared().all_users()) {
+            if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
+                completion_block(switch_user(user), util::none);
+                return;
+            }
+        }
+    }
+    
     do_request({
         HttpMethod::post,
         route,
