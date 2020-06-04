@@ -213,7 +213,7 @@ void ClusterNode::IteratorState::clear()
     m_current_index = size_t(-1);
 }
 
-void ClusterNode::IteratorState::init(const ConstObj& obj)
+void ClusterNode::IteratorState::init(const Obj& obj)
 {
     m_current_leaf.init(obj.m_mem);
     m_current_index = obj.m_row_ndx;
@@ -2167,31 +2167,14 @@ bool ClusterTree::is_valid(ObjKey k) const
     return m_root->try_get(k, state);
 }
 
-ConstObj ClusterTree::get(ObjKey k) const
-{
-    ClusterNode::State state;
-    m_root->get(k, state);
-    return ConstObj(get_table_ref(), state.mem, k, state.index);
-}
-
-Obj ClusterTree::get(ObjKey k)
+Obj ClusterTree::get(ObjKey k) const
 {
     ClusterNode::State state;
     m_root->get(k, state);
     return Obj(get_table_ref(), state.mem, k, state.index);
 }
 
-ConstObj ClusterTree::get(size_t ndx) const
-{
-    if (ndx >= m_size) {
-        throw std::out_of_range("Object was deleted");
-    }
-    ClusterNode::State state;
-    ObjKey k = m_root->get(ndx, state);
-    return ConstObj(get_table_ref(), state.mem, k, state.index);
-}
-
-Obj ClusterTree::get(size_t ndx)
+Obj ClusterTree::get(size_t ndx) const
 {
     if (ndx >= m_size) {
         throw std::out_of_range("Object was deleted");

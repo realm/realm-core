@@ -128,7 +128,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
         return false;
     };
 
-    ConstObj obj = table.get_object(ObjKey(obj_key));
+    const Obj obj = table.get_object(ObjKey(obj_key));
     auto linked_object_changed = [&](OutgoingLink const& link) {
         if (already_checking(link.col_key))
             return false;

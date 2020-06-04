@@ -140,7 +140,7 @@ GlobalKey object_id_for_row(const TableInfoCache& cache, const Table& table, Obj
     return info.last_object_id;
 }
 
-GlobalKey object_id_for_row(const TableInfoCache& cache, const ConstObj& obj)
+GlobalKey object_id_for_row(const TableInfoCache& cache, const Obj& obj)
 {
     return object_id_for_row(cache, *obj.get_table(), obj.get_key());
 }
@@ -151,7 +151,7 @@ PrimaryKey primary_key_for_row(const Table& table, ObjKey key)
     return primary_key_for_row(obj);
 }
 
-PrimaryKey primary_key_for_row(const ConstObj& obj)
+PrimaryKey primary_key_for_row(const Obj& obj)
 {
     auto table = obj.get_table();
     ColKey pk_col = table->get_primary_key_column();
@@ -265,16 +265,10 @@ ObjKey row_for_primary_key(const Table& table, PrimaryKey key)
     else {
         REALM_TERMINATE("row_for_primary_key() with primary key, expected GlobalKey");
     }
+    return {};
 }
 
-ConstObj obj_for_primary_key(const Table& table, PrimaryKey key)
-{
-    ObjKey obj_key = row_for_primary_key(table, key);
-    REALM_ASSERT(obj_key);
-    return table.get_object(obj_key);
-}
-
-Obj obj_for_primary_key(Table& table, PrimaryKey key)
+Obj obj_for_primary_key(const Table& table, PrimaryKey key)
 {
     ObjKey obj_key = row_for_primary_key(table, key);
     REALM_ASSERT(obj_key);

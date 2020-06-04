@@ -53,7 +53,7 @@ void ArrayKeyBase<0>::verify() const
 
     TableRef target_table = origin_table->get_opposite_table(link_col_key);
 
-    auto verify_link = [origin_table, link_col_key, origin_key](ConstObj& target_obj) {
+    auto verify_link = [origin_table, link_col_key, origin_key](const Obj& target_obj) {
         auto cnt = target_obj.get_backlink_count(*origin_table, link_col_key);
         for (size_t i = 0; i < cnt; i++) {
             if (target_obj.get_backlink(*origin_table, link_col_key, i) == origin_key)
@@ -65,8 +65,8 @@ void ArrayKeyBase<0>::verify() const
     // Verify that forward link has a corresponding backlink
     for (size_t i = 0; i < size(); ++i) {
         if (ObjKey target_key = get(i)) {
-            ConstObj target_obj = target_key.is_unresolved() ? target_table->get_tombstone(target_key)
-                                                             : target_table->get_object(target_key);
+            auto target_obj = target_key.is_unresolved() ? target_table->get_tombstone(target_key)
+                                                         : target_table->get_object(target_key);
             verify_link(target_obj);
         }
     }
@@ -86,7 +86,7 @@ void ArrayKeyBase<1>::verify() const
 
     ConstTableRef target_table = origin_table->get_opposite_table(link_col_key);
 
-    auto verify_link = [origin_table, link_col_key](ConstObj& target_obj, ObjKey origin_key) {
+    auto verify_link = [origin_table, link_col_key](const Obj& target_obj, ObjKey origin_key) {
         auto cnt = target_obj.get_backlink_count(*origin_table, link_col_key);
         for (size_t i = 0; i < cnt; i++) {
             if (target_obj.get_backlink(*origin_table, link_col_key, i) == origin_key)
@@ -100,8 +100,8 @@ void ArrayKeyBase<1>::verify() const
         if (ObjKey target_key = get(i)) {
             ObjKey origin_key = cluster->get_real_key(i);
 
-            ConstObj target_obj = target_key.is_unresolved() ? target_table->get_tombstone(target_key)
-                                                             : target_table->get_object(target_key);
+            auto target_obj = target_key.is_unresolved() ? target_table->get_tombstone(target_key)
+                                                         : target_table->get_object(target_key);
             verify_link(target_obj, origin_key);
         }
     }

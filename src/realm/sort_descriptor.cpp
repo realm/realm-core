@@ -181,7 +181,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
             size_t index_in_view = index.index_in_view;
             ObjKey translated_key = index.key_for_object;
             for (size_t j = 0; j + 1 < sz; ++j) {
-                ConstObj obj = tables[j]->get_object(translated_key);
+                const Obj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the ColumnsDescriptor
                 if (obj.is_null(columns[j])) {
                     is_null[index_in_view] = true;
@@ -307,8 +307,8 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
                 key_i = m_columns[t].translated_keys[i.index_in_view];
                 key_j = m_columns[t].translated_keys[j.index_in_view];
             }
-            ConstObj obj_i = m_columns[t].table->get_object(key_i);
-            ConstObj obj_j = m_columns[t].table->get_object(key_j);
+            const Obj obj_i = m_columns[t].table->get_object(key_i);
+            const Obj obj_j = m_columns[t].table->get_object(key_j);
 
             c = obj_i.cmp(obj_j, m_columns[t].col_key);
         }

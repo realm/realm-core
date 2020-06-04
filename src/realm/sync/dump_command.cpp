@@ -71,8 +71,8 @@ public:
     std::string format_link_list(const ConstLnkLst&);
 
     template <DataType>
-    std::string format_cell(ConstObj& obj, ColKey col_key);
-    std::string format_cell_list(ConstObj& obj, ColKey col_key);
+    std::string format_cell(const Obj& obj, ColKey col_key);
+    std::string format_cell_list(const Obj& obj, ColKey col_key);
 
     template <DataType>
     void format_column(const Table&, ColKey col_ndx, TextColumn&);
@@ -178,79 +178,79 @@ std::string Formatter::format_link_list(const ConstLnkLst& list)
 }
 
 template <DataType>
-inline std::string Formatter::format_cell(ConstObj&, ColKey)
+inline std::string Formatter::format_cell(const Obj&, ColKey)
 {
     return "unknown";
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Int>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Int>(const Obj& obj, ColKey col_key)
 {
     return format_value(obj.get<Int>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Bool>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Bool>(const Obj& obj, ColKey col_key)
 {
     return format_value(obj.get<bool>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Float>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Float>(const Obj& obj, ColKey col_key)
 {
     return format_value(obj.get<float>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Double>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Double>(const Obj& obj, ColKey col_key)
 {
     return format_value(obj.get<double>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_String>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_String>(const Obj& obj, ColKey col_key)
 {
     return format_string(obj.get<String>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Binary>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Binary>(const Obj& obj, ColKey col_key)
 {
     return format_binary(obj.get<Binary>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Timestamp>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Timestamp>(const Obj& obj, ColKey col_key)
 {
     return format_timestamp(obj.get<Timestamp>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_ObjectId>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_ObjectId>(const Obj& obj, ColKey col_key)
 {
     return format_object_id(obj.get<ObjectId>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Decimal>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Decimal>(const Obj& obj, ColKey col_key)
 {
     return format_decimal(obj.get<Decimal128>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_Link>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_Link>(const Obj& obj, ColKey col_key)
 {
     return format_link(obj.get<ObjKey>(col_key));
 }
 
 template <>
-inline std::string Formatter::format_cell<type_LinkList>(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell<type_LinkList>(const Obj& obj, ColKey col_key)
 {
     auto ll = obj.get_linklist(col_key);
     return format_link_list(ll);
 }
 
-inline std::string Formatter::format_cell_list(ConstObj& obj, ColKey col_key)
+inline std::string Formatter::format_cell_list(const Obj& obj, ColKey col_key)
 {
     auto ll = obj.get_listbase_ptr(col_key);
     return format_list(*ll);
@@ -271,7 +271,7 @@ void Formatter::format_column(const Table& table, ColKey col_ndx, TextColumn& co
         end = m_offset + m_limit;
     }
     for (std::size_t i = m_offset; i < end; ++i) {
-        ConstObj obj = table.get_object(i);
+        const Obj obj = table.get_object(i);
         if (obj.is_null(col_ndx)) {
             col.push_back("null");
         }
@@ -295,7 +295,7 @@ void Formatter::format_column_list(const Table& table, ColKey col_ndx, TextColum
         end = m_offset + m_limit;
     }
     for (std::size_t i = m_offset; i < end; ++i) {
-        ConstObj obj = table.get_object(i);
+        const Obj obj = table.get_object(i);
         col.push_back(format_cell_list(obj, col_ndx));
     }
 }

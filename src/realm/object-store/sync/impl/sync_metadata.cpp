@@ -453,7 +453,7 @@ util::Optional<std::string> SyncUserMetadata::access_token() const
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
-inline SyncUserIdentity user_identity_from_obj(const ConstObj& obj)
+inline SyncUserIdentity user_identity_from_obj(const Obj& obj)
 {
     return SyncUserIdentity(obj.get<String>(c_sync_user_id), obj.get<String>(c_sync_provider_type));
 }
