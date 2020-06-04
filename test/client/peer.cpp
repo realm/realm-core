@@ -642,7 +642,7 @@ void Peer::dump_result_sets()
         else if (status > 0) { // Initialized
             std::size_t num_links = link_list.size();
             for (std::size_t j = 0; j < num_links; ++j) {
-                ConstObj row = link_list.get_object(j);
+                const Obj row = link_list.get_object(j);
                 size_t col_i = 0;
                 for (ColKey k : target_table.get_column_keys()) {
                     if (col_i++ > 0)
@@ -708,7 +708,7 @@ void Peer::receive(VersionID)
         ColKey col_client_id = table->get_column_key("client_id");
         ColKey col_timestamp = table->get_column_key("timestamp");
         for (ObjKey row_key : new_rows) {
-            ConstObj obj = table->get_object(row_key);
+            const Obj obj = table->get_object(row_key);
             std::int_fast64_t originator_ident = obj.get<int64_t>(col_client_id);
             if (originator_ident != m_originator_ident)
                 continue;

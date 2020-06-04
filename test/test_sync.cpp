@@ -3350,7 +3350,7 @@ TEST(Sync_MultipleServers)
                 ConstTableRef table = rt_0.get_table("class_table");
                 if (CHECK(table)) {
                     std::set<std::tuple<int, int, int>> rows;
-                    for (ConstObj obj : *table) {
+                    for (const Obj obj : *table) {
                         int server_index = int(obj.get<int64_t>("server_index"));
                         int realm_index = int(obj.get<int64_t>("realm_index"));
                         int file_index = int(obj.get<int64_t>("file_index"));
@@ -5627,12 +5627,12 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
     ConstTableRef table = group.get_table("class_table name");
     CHECK_EQUAL(table->size(), 8);
     {
-        ConstObj obj = *table->begin();
+        const Obj obj = *table->begin();
         ChunkedBinaryData cb{obj.get<BinaryData>("column name")};
         CHECK((cb.size() == binary_sizes[0] && cb[0] == 'a') || (cb.size() == binary_sizes[4] && cb[0] == 'e'));
     }
     {
-        ConstObj obj = *(table->begin() + 7);
+        const Obj obj = *(table->begin() + 7);
         ChunkedBinaryData cb{obj.get<BinaryData>("column name")};
         CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') || (cb.size() == binary_sizes[7] && cb[0] == 'h'));
     }
@@ -5793,12 +5793,12 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
     ConstTableRef table = group.get_table("class_table name");
     CHECK_EQUAL(table->size(), 8);
     {
-        ConstObj obj = *table->begin();
+        const Obj obj = *table->begin();
         ChunkedBinaryData cb(obj.get<BinaryData>("column name"));
         CHECK((cb.size() == binary_sizes[0] && cb[0] == 'a') || (cb.size() == binary_sizes[4] && cb[0] == 'e'));
     }
     {
-        ConstObj obj = *(table->begin() + 7);
+        const Obj obj = *(table->begin() + 7);
         ChunkedBinaryData cb(obj.get<BinaryData>("column name"));
         CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') || (cb.size() == binary_sizes[7] && cb[0] == 'h'));
     }
@@ -6576,7 +6576,7 @@ TEST(Sync_MultipleContainerColumns)
         CHECK(compare_groups(rt_1, rt_2));
 
         ConstTableRef table = rt_1.get_table("class_Table");
-        ConstObj row = *table->begin();
+        const Obj row = *table->begin();
         auto array1 = row.get_list<StringData>("array1");
         auto array2 = row.get_list<StringData>("array2");
         CHECK_EQUAL(array1.size(), 1);

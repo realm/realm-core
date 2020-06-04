@@ -525,9 +525,9 @@ TEST(InstructionReplication_NullablePrimaryKeys)
         CHECK(second_key);
         CHECK(third_key);
 
-        ConstObj first = t->get_object(first_key);
-        ConstObj second = t->get_object(second_key);
-        ConstObj third = t->get_object(third_key);
+        const Obj first = t->get_object(first_key);
+        const Obj second = t->get_object(second_key);
+        const Obj third = t->get_object(third_key);
 
         CHECK_EQUAL(first.get<int64_t>(col_ndx), 123);
         CHECK_EQUAL(second.get<int64_t>(col_ndx), 456);

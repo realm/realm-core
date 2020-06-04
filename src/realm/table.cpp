@@ -2742,7 +2742,7 @@ GlobalKey Table::get_object_id(ObjKey key) const
 {
     auto col = get_primary_key_column();
     if (col) {
-        ConstObj obj = get_object(key);
+        const Obj obj = get_object(key);
         auto val = obj.get_any(col);
         return {val};
     }

@@ -3618,7 +3618,7 @@ TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(i));
+                const Obj o = table->get_object(ObjKey(i));
             }
         }
 
@@ -3636,7 +3636,7 @@ TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(i));
+                const Obj o = table->get_object(ObjKey(i));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
         }
@@ -3655,7 +3655,7 @@ TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(i));
+                const Obj o = table->get_object(ObjKey(i));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
@@ -3779,7 +3779,7 @@ TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -3797,7 +3797,7 @@ TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
             }
         }
@@ -3816,7 +3816,7 @@ TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
                 CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
             }
@@ -3902,7 +3902,7 @@ TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -3920,7 +3920,7 @@ TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
         }
@@ -3939,7 +3939,7 @@ TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
@@ -5470,7 +5470,9 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
 TEST(Table_EmbeddedObjectPath)
 {
-    auto collect_path = [](const ConstObj& o) { return o.get_fat_path(); };
+    auto collect_path = [](const Obj& o) {
+        return o.get_fat_path();
+    };
 
     SHARED_GROUP_TEST_PATH(path);
 
