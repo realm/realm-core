@@ -189,6 +189,11 @@ public:
 
     std::string refresh_token() const;
     
+    RealmJWT refresh_jwt() const
+    {
+        return m_refresh_token;
+    }
+    
     std::string device_id() const;
     
     bool has_device_id() const;
