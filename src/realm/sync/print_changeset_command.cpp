@@ -8,16 +8,16 @@
 #include <fstream>
 #include <iomanip>
 
-void usage(const char* prog) {
+void usage(const char* prog)
+{
     std::cout << "Usage: " << prog << " [OPTIONS] <files>\n";
-    std::cout << "\n" <<
-        "    -x    Interpret contents of input file as hex words (\"3F 00 04 ...\") (default)\n"
-        "    -h    Display this help screen.\n"
-    ;
+    std::cout << "\n"
+              << "    -x    Interpret contents of input file as hex words (\"3F 00 04 ...\") (default)\n"
+                 "    -h    Display this help screen.\n";
     std::cout << "\n";
 }
 
-int main(int argc, char const *argv[])
+int main(int argc, char const* argv[])
 {
     // Process command line
     bool hex_mode = true;
@@ -73,7 +73,8 @@ int main(int argc, char const *argv[])
             if (!(file >> std::hex >> byte)) {
                 break;
             }
-            if (byte < std::numeric_limits<unsigned char>::min() || byte > std::numeric_limits<unsigned char>::max()) {
+            if (byte < std::numeric_limits<unsigned char>::min() ||
+                byte > std::numeric_limits<unsigned char>::max()) {
                 std::cerr << "Invalid byte.\n";
                 errors = true;
                 continue;
