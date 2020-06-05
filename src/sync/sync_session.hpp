@@ -310,7 +310,7 @@ private:
     }
     // }
     
-    static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
+    static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::weak_ptr<SyncSession>);
     
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
     
