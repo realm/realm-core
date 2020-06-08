@@ -588,6 +588,7 @@ private:
     ///    8th   History type         (optional)             4
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
+    ///   11th   Sync File Id         (optional)            10
     ///
     /// </pre>
     ///
@@ -601,10 +602,9 @@ private:
     /// are present, and the size of `m_top` is 5. In files updated by way of a
     /// transaction (SharedGroup::commit()), the 4th, 5th, 6th, and 7th entry
     /// are present, and the size of `m_top` is 7. In files that contain a
-    /// changeset history, the 8th, 9th, and 10th entry are present, except that
-    /// if the file was opened in nonshared mode (via Group::open()), and the
-    /// file format remains at 6 (not previously upgraded to 7 or later), then
-    /// the 10th entry will be absent.
+    /// changeset history, the 8th, 9th, and 10th entry are present. The 11th entry
+    /// will be present if the file is syncked and the client has received a client
+    /// file id from the server.
     ///
     /// When a group accessor is attached to a newly created file or an empty
     /// memory buffer where there is no top array yet, `m_top`, `m_tables`, and
@@ -1105,31 +1105,6 @@ inline void Group::send_schema_change_notification() const
         m_schema_change_handler();
 }
 
-inline void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version,
-                                                int& history_type, int& history_schema_version) noexcept
-{
-    using version_type = _impl::History::version_type;
-    version_type version_2 = 0;
-    int history_type_2 = 0;
-    int history_schema_version_2 = 0;
-    if (top.is_attached()) {
-        if (top.size() > s_version_ndx) {
-            version_2 = version_type(top.get_as_ref_or_tagged(s_version_ndx).get_as_int());
-        }
-        if (top.size() > s_hist_version_ndx) {
-            history_type_2 = int(top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
-            history_schema_version_2 = int(top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
-        }
-    }
-    // Version 0 is not a legal initial version, so it has to be set to 1
-    // instead.
-    if (version_2 == 0)
-        version_2 = 1;
-    version = version_2;
-    history_type = history_type_2;
-    history_schema_version = history_schema_version_2;
-}
-
 inline ref_type Group::get_history_ref(const Array& top) noexcept
 {
     bool has_history = (top.is_attached() && top.size() > s_hist_type_ndx);
@@ -1137,17 +1112,6 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
         // This function is only used is shared mode (from SharedGroup)
         REALM_ASSERT(top.size() > s_hist_version_ndx);
         return top.get_as_ref(s_hist_ref_ndx);
-    }
-    return 0;
-}
-
-inline int Group::get_history_schema_version() noexcept
-{
-    bool has_history = (m_top.is_attached() && m_top.size() > s_hist_type_ndx);
-    if (has_history) {
-        // This function is only used is shared mode (from SharedGroup)
-        REALM_ASSERT(m_top.size() > s_hist_version_ndx);
-        return int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
     }
     return 0;
 }
@@ -1161,9 +1125,9 @@ inline void Group::set_sync_file_id(uint64_t id)
 
 inline void Group::set_history_schema_version(int version)
 {
-    // This function is only used is shared mode (from SharedGroup)
-    REALM_ASSERT(m_top.size() >= 10);
-    m_top.set(9, RefOrTagged::make_tagged(unsigned(version))); // Throws
+    while (m_top.size() < s_hist_version_ndx + 1)
+        m_top.add(0);
+    m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(unsigned(version))); // Throws
 }
 
 template <class Accessor>

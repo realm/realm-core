@@ -319,6 +319,42 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
     return 10;
 }
 
+void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
+                                         int& history_schema_version) noexcept
+{
+    using version_type = _impl::History::version_type;
+    version_type version_2 = 0;
+    int history_type_2 = 0;
+    int history_schema_version_2 = 0;
+    if (top.is_attached()) {
+        if (top.size() > s_version_ndx) {
+            version_2 = version_type(top.get_as_ref_or_tagged(s_version_ndx).get_as_int());
+        }
+        if (top.size() > s_hist_type_ndx) {
+            history_type_2 = int(top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
+        }
+        if (top.size() > s_hist_version_ndx) {
+            history_schema_version_2 = int(top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
+        }
+    }
+    // Version 0 is not a legal initial version, so it has to be set to 1
+    // instead.
+    if (version_2 == 0)
+        version_2 = 1;
+    version = version_2;
+    history_type = history_type_2;
+    history_schema_version = history_schema_version_2;
+}
+
+int Group::get_history_schema_version() noexcept
+{
+    bool history_schema_version = (m_top.is_attached() && m_top.size() > s_hist_version_ndx);
+    if (history_schema_version) {
+        return int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
+    }
+    return 0;
+}
+
 uint64_t Group::get_sync_file_id() const noexcept
 {
     if (m_top.is_attached() && m_top.size() > s_sync_file_id_ndx) {
