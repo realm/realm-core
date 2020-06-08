@@ -995,48 +995,44 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                     [&](Optional<app::AppError> error) {
                         CHECK(!error);
                     });
-    
+
     app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
                                  [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
         REQUIRE(user);
         CHECK(!error);
         loginOk = true;
     });
-    
+
     dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
-    
-    
+
     dog_collection.delete_many(dog_document2, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
-    
+
     dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
-    
+
     dog_collection.delete_many(person_document, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
-    
+
     dog_collection.delete_many(person_document2, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
-    
+
     SECTION("insert") {
-        
         bool processed = false;
         ObjectId dog_object_id;
         ObjectId dog2_object_id;
 
-// the test is correct, but uncovers a bug upstream so is disabled until we
-// can run against a patched stitch image: https://jira.mongodb.org/browse/REALMC-5901
-//        dog_collection.insert_one(bad_document,
-//                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
-//            CHECK(error);
-//            CHECK(!object_id);
-//        });
+        dog_collection.insert_one(bad_document,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(error);
+            CHECK(!object_id);
+        });
 
         dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
@@ -1307,18 +1303,18 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!document);
             processed = true;
         });
-        
-        // FIXME: Enable once server bug is fixed
-//        dog_collection.find_one_and_update({{"name", "invalid name"}}, {{}}, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-//            REQUIRE(error);
-//            CHECK(error->message == "insert not permitted");
-//            CHECK(!document);
-//            processed = true;
-//        });
+        CHECK(processed);
+        processed = false;
 
+        dog_collection.find_one_and_update({{"name", "invalid name"}}, {{}}, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "insert not permitted");
+            CHECK(!document);
+            processed = true;
+        });
         CHECK(processed);
     }
-    
+
     SECTION("update") {
         bool processed = false;
         ObjectId dog_object_id;
