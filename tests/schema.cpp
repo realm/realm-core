@@ -293,7 +293,7 @@ TEST_CASE("Schema") {
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.array' of type 'array' has unknown object type 'invalid target'");
         }
 
-        SECTION("rejects link properties from embedded to top-level") {
+        SECTION("allows link properties from embedded to top-level") {
             Schema schema = {
                 {"target", {
                     {"value", PropertyType::Int}
@@ -302,10 +302,10 @@ TEST_CASE("Schema") {
                     {"link", PropertyType::Object|PropertyType::Nullable, "target"}
                 }}
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'origin.link' of type 'object' cannot link to top-level object type 'target'");
+            REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects array properties from embedded to top-level") {
+        SECTION("allows array properties from embedded to top-level") {
             Schema schema = {
                 {"target", {
                     {"value", PropertyType::Int}
@@ -314,7 +314,7 @@ TEST_CASE("Schema") {
                     {"array", PropertyType::Array|PropertyType::Object, "target"}
                 }}
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'origin.array' of type 'array' cannot link to top-level object type 'target'");
+            REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("allows linking objects from embedded to top-level") {

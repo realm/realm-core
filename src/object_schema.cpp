@@ -257,15 +257,8 @@ static void validate_property(Schema const& schema,
                                 object_name, prop.name, string_for_property_type(prop.type), prop.object_type);
         return;
     }
-    if (prop.type != PropertyType::LinkingObjects) {
-        if (parent_object_schema.is_embedded && !it->is_embedded) {
-            exceptions.emplace_back("Property '%1.%2' of type '%3' cannot link to top-level object type '%4'",
-                                    object_name, prop.name, string_for_property_type(prop.type), prop.object_type);
-            return;
-        }
-
+    if (prop.type != PropertyType::LinkingObjects)
         return;
-    }
 
     const Property *origin_property = it->property_for_name(prop.link_origin_property_name);
     if (!origin_property) {
