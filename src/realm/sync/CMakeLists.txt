@@ -29,7 +29,7 @@ set(SYNC_SOURCES
     transform.cpp
     ../util/network_ssl.cpp
     ../util/network.cpp
-    
+
 )
 
 set(SERVER_SOURCES
@@ -196,7 +196,7 @@ install(FILES ../../external/mpark/variant.hpp
         COMPONENT devel)
 
 if(REALM_BUILD_COMMANDLINE_TOOLS)
-    add_executable(SyncWorker sync/server_command.cpp)
+    add_executable(SyncWorker server_command.cpp)
     set_target_properties(SyncWorker PROPERTIES
                           OUTPUT_NAME "realm-sync-worker"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
@@ -214,13 +214,13 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     target_link_libraries(EncryptionTransformer SyncServer Storage)
 
-    add_executable(DumpCommand sync/dump_command.cpp)
+    add_executable(DumpCommand dump_command.cpp)
     set_target_properties(DumpCommand PROPERTIES
                           OUTPUT_NAME "realm-dump"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 		  target_link_libraries(DumpCommand Sync Storage)
 
-    add_executable(StatCommand sync/stat_command.cpp)
+    add_executable(StatCommand stat_command.cpp)
     set_target_properties(StatCommand PROPERTIES
                           OUTPUT_NAME "realm-stat"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
@@ -233,23 +233,29 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
     #                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     # target_link_libraries(HistCommand Sync Storage)
 
-    add_executable(RealmUpgrade EXCLUDE_FROM_ALL sync/realm_upgrade.cpp)
+    add_executable(RealmUpgrade EXCLUDE_FROM_ALL realm_upgrade.cpp)
     set_target_properties(RealmUpgrade PROPERTIES
                           OUTPUT_NAME "realm-upgrade-6"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     target_link_libraries(RealmUpgrade Sync SyncServer Storage)
 
-    add_executable(VerifyServerFileCommand sync/verify_server_file_command.cpp)
+    add_executable(VerifyServerFileCommand verify_server_file_command.cpp)
     set_target_properties(VerifyServerFileCommand PROPERTIES
                           OUTPUT_NAME "realm-verify-server-file"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     target_link_libraries(VerifyServerFileCommand SyncServer Storage)
 
-    add_executable(ServerIndexCommand sync/server_index_command.cpp)
+    add_executable(ServerIndexCommand server_index_command.cpp)
     set_target_properties(ServerIndexCommand PROPERTIES
                           OUTPUT_NAME "realm-server-index"
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     target_link_libraries(ServerIndexCommand SyncServer Storage)
+
+    add_executable(PrintChangesetCommand print_changeset_command.cpp)
+    set_target_properties(PrintChangesetCommand PROPERTIES
+                          OUTPUT_NAME "realm-print-changeset"
+                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+    target_link_libraries(PrintChangesetCommand Sync Storage)
 
     install(
         TARGETS
