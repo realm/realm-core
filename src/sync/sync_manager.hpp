@@ -40,6 +40,7 @@ class SyncUser;
 class SyncFileManager;
 class SyncMetadataManager;
 class SyncFileActionMetadata;
+class SyncAppMetadata;
 
 namespace _impl {
 struct SyncClient;
@@ -202,6 +203,9 @@ public:
     // calling this method.
     void reset_for_testing();
 
+    // Get the app metadata for the active app.
+    util::Optional<SyncAppMetadata> app_metadata() const;
+    
     std::shared_ptr<app::App> app() const {
         return m_app;
     }

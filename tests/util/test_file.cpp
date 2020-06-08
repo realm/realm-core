@@ -123,6 +123,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     schema_mode = SchemaMode::Additive;
 }
 
+// MARK: - SyncServer
 SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir)
 : m_local_root_dir(local_dir.empty() ? util::make_temp_dir() : local_dir)
 , m_server(m_local_root_dir, util::none, ([&] {
@@ -212,20 +213,18 @@ std::error_code wait_for_download(Realm& realm)
     return wait_for_session(realm, &SyncSession::wait_for_download_completion);
 }
 
-TestSyncManager::TestSyncManager(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
-{
-    configure(base_url, base_path, mode);
-}
+// MARK: - TestSyncManager
 
-TestSyncManager::~TestSyncManager()
-{
-    SyncManager::shared().reset_for_testing();
-}
-
-void TestSyncManager::configure(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
+TestSyncManager::TestSyncManager(const std::string& base_url,
+                                 std::string const& base_path,
+                                 SyncManager::MetadataMode mode,
+                                 bool should_teardown_test_directory)
+: m_should_teardown_test_directory(should_teardown_test_directory)
 {
     SyncClientConfig config;
-    config.base_file_path = base_path.empty() ? tmp_dir() : base_path;
+    m_base_file_path = base_path.empty() ? tmp_dir() + random_string(10) : base_path;
+    util::try_make_dir(m_base_file_path);
+    config.base_file_path = m_base_file_path;
     config.metadata_mode = mode;
 #if TEST_ENABLE_SYNC_LOGGING
     config.log_level = util::Logger::Level::all;
@@ -233,6 +232,7 @@ void TestSyncManager::configure(const std::string& base_url, std::string const& 
     config.log_level = util::Logger::Level::off;
 #endif
     app::App::Config app_config;
+    app_config.app_id = "app_id";
     app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); };
     app_config.base_url = base_url;
     app_config.platform = "OS Test Platform";
@@ -242,6 +242,31 @@ void TestSyncManager::configure(const std::string& base_url, std::string const& 
     app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), base_url + "/realm-sync");
 }
 
+TestSyncManager::~TestSyncManager()
+{
+    SyncManager::shared().reset_for_testing();
+    if (m_should_teardown_test_directory && !m_base_file_path.empty() && util::File::exists(m_base_file_path))
+        util::remove_dir_recursive(m_base_file_path);
+}
+
+TestSyncManager::TestSyncManager(const app::App::Config& config, bool should_teardown_test_dir, realm::SyncManager::MetadataMode mode)
+: m_should_teardown_test_directory(should_teardown_test_dir)
+{
+    SyncClientConfig s_config;
+    m_base_file_path = tmp_dir() + config.app_id;
+    // create the directory heirarchy for easy cleanup later
+    util::try_make_dir(m_base_file_path);
+    s_config.base_file_path = m_base_file_path;
+    s_config.metadata_mode = mode;
+    #if TEST_ENABLE_SYNC_LOGGING
+        s_config.log_level = util::Logger::Level::all;
+    #else
+        s_config.log_level = util::Logger::Level::off;
+    #endif
+    SyncManager::shared().configure(s_config, config);
+    app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), config.base_url.value_or("") + "/realm-sync");
+}
+
 std::shared_ptr<app::App> TestSyncManager::app() const {
     return SyncManager::shared().app();
 }
@@ -249,6 +274,7 @@ std::shared_ptr<app::App> TestSyncManager::app() const {
 #endif // REALM_ENABLE_SYNC
 
 #if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
+// MARK: - TsanNotifyWorker
 // A helper which synchronously runs on_change() on a fixed background thread
 // so that ThreadSanitizer can potentially detect issues
 // This deliberately uses an unsafe spinlock for synchronization to ensure that

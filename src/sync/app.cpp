@@ -23,8 +23,10 @@
 #include "sync/sync_manager.hpp"
 #include "sync/remote_mongo_client.hpp"
 #include "sync/app_utils.hpp"
+#include "sync/impl/sync_metadata.hpp"
 
 #include <json.hpp>
+#include <string>
 
 namespace realm {
 namespace app {
@@ -132,7 +134,7 @@ static void handle_default_response(const Response& response,
 template<>
 App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordProviderClient>()
 {
-    return App::UsernamePasswordProviderClient(this);
+    return App::UsernamePasswordProviderClient(shared_from_this());
 }
 
 template<>
@@ -778,7 +780,7 @@ std::string App::url_for_path(const std::string& path="") const
 // FIXME: This passes back the response to bubble up any potential errors, making this somewhat leaky
 void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block)
 {
-    if (m_metadata) {
+    if (SyncManager::shared().app_metadata()) {
         return completion_block(util::none, util::none);
     }
 
@@ -800,17 +802,18 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
         }
 
         try {
-            this->m_metadata = AppMetadata(value_from_json<std::string>(json, "deployment_model"),
-                                           value_from_json<std::string>(json, "location"),
-                                           value_from_json<std::string>(json, "hostname"),
-                                           value_from_json<std::string>(json, "ws_hostname"));
-
-            m_base_route = m_metadata->m_hostname + base_path;
+            SyncManager::shared().perform_metadata_update([json](const SyncMetadataManager& manager){
+                manager.set_app_metadata(value_from_json<std::string>(json, "deployment_model"),
+                                         value_from_json<std::string>(json, "location"),
+                                         value_from_json<std::string>(json, "hostname"),
+                                         value_from_json<std::string>(json, "ws_hostname"));
+            });
+            auto metadata = SyncManager::shared().app_metadata();
+            m_base_route = metadata->hostname + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
             m_auth_route = m_app_route + auth_path;
-            m_sync_route = m_metadata->m_ws_hostname + base_path + this_app_path + sync_path;
-
+            m_sync_route = metadata->ws_hostname + base_path + this_app_path + sync_path;
         } catch (const AppError& err) {
             return completion_block(err, response);
         }
@@ -823,14 +826,27 @@ void App::do_request(Request request,
                      std::function<void (Response)> completion_block)
 {
     request.timeout_ms = default_timeout_ms;
-    init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
-                                                        const util::Optional<Response> response) {
-        if (error) {
-            return completion_block(*response);
-        }
-
+    
+    // if we do not have metadata yet, we need to initialize it
+    if (!SyncManager::shared().app_metadata()) {
+        init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
+                                                            const util::Optional<Response> response) mutable {
+            if (error) {
+                return completion_block(*response);
+            }
+            
+            // if this is the first time we have received app metadata, the
+            // original request will not have the correct URL hostname for
+            // non global deployments.
+            if (SyncManager::shared().app_metadata()->deployment_model != "GLOBAL" && request.url.rfind(m_base_url, 0) != std::string::npos) {
+                request.url.replace(0, m_base_url.size(), SyncManager::shared().app_metadata()->hostname);
+            }
+            
+            m_config.transport_generator()->send_request_to_server(request, completion_block);
+        });
+    } else {
         m_config.transport_generator()->send_request_to_server(request, completion_block);
-    });
+    }
 }
 
 void App::do_authenticated_request(Request request,

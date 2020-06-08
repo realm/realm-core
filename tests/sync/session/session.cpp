@@ -356,8 +356,6 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser) {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
-
     // Server is initially stopped so we can control when the session exits the dying state.
     SyncServer server(false);
     TestSyncManager init_sync_manager(server);

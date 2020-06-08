@@ -43,13 +43,12 @@ using namespace realm::util;
 static const std::string dummy_auth_url = "https://realm.example.org";
 static const std::string dummy_device_id = "123400000000000000000000";
 
-static const std::string base_path = tmp_dir() + "realm_objectstore_sync_connection_state_changes/";
+static const std::string base_path = tmp_dir() + "realm_objectstore_sync_connection_state_changes";
 
 TEST_CASE("sync: Connection state changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    reset_test_directory(base_path);
     SyncServer server;
     TestSyncManager init_sync_manager(server, base_path);
     auto user = SyncManager::shared().get_user("user",
