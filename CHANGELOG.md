@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 10.0.0-test.1 Release notes
 
 ### Enhancements
 * None.
