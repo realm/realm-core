@@ -1870,10 +1870,7 @@ TEST(Transform_DanglingLinks)
         CHECK_EQUAL(links.size(), 0);
 
         // ... But the real list should contain 1 tombstone.
-        //
-        // FIXME: `Obj` does not provide a method to get a `Lst<ObjKey>` that
-        // isn't actually a `LnkLst`.
-        auto keys = ConstLst<ObjKey>(obj, table->get_column_key("links"));
+        auto keys = obj.get_list<ObjKey>(table->get_column_key("links"));
         CHECK_EQUAL(keys.size(), 1);
     });
 }

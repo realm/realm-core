@@ -2593,9 +2593,9 @@ TableRef Transaction::import_copy_of(ConstTableRef original)
     return get_table(tk);
 }
 
-LnkLst Transaction::import_copy_of(const ConstLnkLst& original)
+LnkLst Transaction::import_copy_of(const LnkLst& original)
 {
-    if (Obj obj = import_copy_of(*original.m_const_obj)) {
+    if (Obj obj = import_copy_of(original.m_obj)) {
         ColKey ck = original.m_col_key;
         return obj.get_linklist(ck);
     }
@@ -2604,7 +2604,7 @@ LnkLst Transaction::import_copy_of(const ConstLnkLst& original)
 
 LstBasePtr Transaction::import_copy_of(const LstBase& original)
 {
-    if (Obj obj = import_copy_of(*original.m_const_obj)) {
+    if (Obj obj = import_copy_of(original.m_obj)) {
         ColKey ck = original.get_col_key();
         return obj.get_listbase_ptr(ck);
     }
@@ -2615,25 +2615,12 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    if (Obj obj = import_copy_of(*original->m_const_obj)) {
-        ColKey ck = original->m_col_key;
-        return obj.get_linklist_ptr(ck);
-
-    }
-    return std::make_unique<LnkLst>();
-}
-
-LnkLstPtr Transaction::import_copy_of(const ConstLnkLstPtr& original)
-{
-    if (!bool(original))
-        return nullptr;
-    if (Obj obj = import_copy_of(*original->m_const_obj)) {
+    if (Obj obj = import_copy_of(original->m_obj)) {
         ColKey ck = original->m_col_key;
         return obj.get_linklist_ptr(ck);
     }
     return std::make_unique<LnkLst>();
 }
-
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)
 {

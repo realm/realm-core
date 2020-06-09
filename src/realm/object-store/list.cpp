@@ -191,7 +191,7 @@ size_t List::find(Obj const& o) const
         return not_found;
     validate(o);
 
-    return as<Obj>().ConstLstIf<ObjKey>::find_first(o.get_key());
+    return as<Obj>().find_first(o.get_key());
 }
 
 size_t List::find(Query&& q) const
@@ -199,7 +199,7 @@ size_t List::find(Query&& q) const
     verify_attached();
     if (m_type == PropertyType::Object) {
         ObjKey key = get_query().and_query(std::move(q)).find();
-        return key ? as<Obj>().ConstLstIf<ObjKey>::find_first(key) : not_found;
+        return key ? as<Obj>().find_first(key) : not_found;
     }
     throw std::runtime_error("not implemented");
 }

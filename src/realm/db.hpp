@@ -596,10 +596,9 @@ public:
     // direct handover of accessor instances
     Obj import_copy_of(const Obj& original);
     TableRef import_copy_of(const ConstTableRef original);
-    LnkLst import_copy_of(const ConstLnkLst& original);
+    LnkLst import_copy_of(const LnkLst& original);
     LstBasePtr import_copy_of(const LstBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
-    LnkLstPtr import_copy_of(const ConstLnkLstPtr& original);
 
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);

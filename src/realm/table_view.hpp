@@ -171,7 +171,7 @@ public:
     ConstTableView(ConstTableRef parent);
     ConstTableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t limit);
     ConstTableView(ConstTableRef parent, ColKey column, const Obj& obj);
-    ConstTableView(ConstTableRef parent, ConstLnkLstPtr link_list);
+    ConstTableView(ConstTableRef parent, LnkLstPtr link_list);
 
     enum DistinctViewTag { DistinctView };
     ConstTableView(DistinctViewTag, ConstTableRef parent, ColKey column_key);
@@ -387,7 +387,7 @@ protected:
     ConstTableRef m_linked_table;
 
     // If this TableView was created from a LnkLst, then this reference points to it. Otherwise it's 0
-    mutable ConstLnkLstPtr m_linklist_source;
+    mutable LnkLstPtr m_linklist_source;
 
     // m_distinct_column_source != ColKey() if this view was created from distinct values in a column of m_table.
     ColKey m_distinct_column_source;
@@ -480,7 +480,7 @@ public:
 private:
     TableView(TableRef parent);
     TableView(TableRef parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(TableRef parent, ConstLnkLstPtr);
+    TableView(TableRef parent, LnkLstPtr);
     TableView(DistinctViewTag, TableRef parent, ColKey column_key);
 
     friend class ConstTableView;
@@ -542,7 +542,7 @@ inline ConstTableView::ConstTableView(DistinctViewTag, ConstTableRef parent, Col
     }
 }
 
-inline ConstTableView::ConstTableView(ConstTableRef parent, ConstLnkLstPtr link_list)
+inline ConstTableView::ConstTableView(ConstTableRef parent, LnkLstPtr link_list)
     : m_table(parent) // Throws
     , m_linklist_source(std::move(link_list))
     , m_key_values(Allocator::get_default())
@@ -700,7 +700,7 @@ inline TableView::TableView(TableRef parent, Query& query, size_t start, size_t 
 {
 }
 
-inline TableView::TableView(TableRef parent, ConstLnkLstPtr link_list)
+inline TableView::TableView(TableRef parent, LnkLstPtr link_list)
     : ConstTableView(parent, std::move(link_list))
 {
 }
