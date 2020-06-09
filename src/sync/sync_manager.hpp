@@ -32,6 +32,8 @@
 #include <mutex>
 #include <unordered_map>
 
+struct TestSyncManager;
+
 namespace realm {
 
 struct SyncConfig;
@@ -95,6 +97,7 @@ struct SyncClientConfig {
 
 class SyncManager {
 friend class SyncSession;
+friend struct ::TestSyncManager;
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
 

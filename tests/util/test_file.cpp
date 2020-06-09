@@ -249,7 +249,9 @@ TestSyncManager::~TestSyncManager()
         util::remove_dir_recursive(m_base_file_path);
 }
 
-TestSyncManager::TestSyncManager(const app::App::Config& config, bool should_teardown_test_dir, realm::SyncManager::MetadataMode mode)
+TestSyncManager::TestSyncManager(const app::App::Config& config,
+                                 bool should_teardown_test_dir,
+                                 realm::SyncManager::MetadataMode mode)
 : m_should_teardown_test_directory(should_teardown_test_dir)
 {
     SyncClientConfig s_config;
@@ -264,6 +266,8 @@ TestSyncManager::TestSyncManager(const app::App::Config& config, bool should_tea
         s_config.log_level = util::Logger::Level::off;
     #endif
     SyncManager::shared().configure(s_config, config);
+    // initialize sync client
+    SyncManager::shared().get_sync_client();
     app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), config.base_url.value_or("") + "/realm-sync");
 }
 

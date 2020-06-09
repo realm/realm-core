@@ -3367,6 +3367,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
 
 TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_hostname = "proto://host:1234";
+    static const auto test_ws_hostname = "wsproto://host:1234";
     
     std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
         struct transport : GenericNetworkTransport {
@@ -3381,7 +3382,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
                         {"deployment_model", "LOCAL"},
                         {"location", "IE"},
                         {"hostname", test_hostname},
-                        {"ws_hostname", "ws://localhost:9090"}
+                        {"ws_hostname", test_ws_hostname}
                     }).dump()});
                 } else if (request.url.find("functions/call") != std::string::npos) {
                     std::cout<<request.url<<std::endl;
@@ -3404,15 +3405,19 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
         "An sdk version"
     };
 
+    TestSyncManager sync_manager(config);
     {
-        TestSyncManager sync_manager(config, false);
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
             REQUIRE(!error);
         });
     }
     {
-        TestSyncManager sync_manager(config);
+        SyncManager::shared().configure({}, config);
+        REQUIRE(App::OnlyForTesting::sync_route(*SyncManager::shared().app()).rfind(test_ws_hostname, 0) != std::string::npos);
+    }
+    {
+        SyncManager::shared().configure({}, config);
         auto app = sync_manager.app();
         app->call_function("function", {}, [](auto error, auto){
             REQUIRE(!error);

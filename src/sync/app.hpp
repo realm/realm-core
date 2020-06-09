@@ -289,6 +289,10 @@ public:
     // Expose some internal functionality to testing code.
     class OnlyForTesting {
     public:
+        static const std::string& sync_route(const App& app) {
+            return app.m_sync_route;
+        }
+        
         static void set_sync_route(App& app, std::string sync_route) {
             app.m_sync_route = std::move(sync_route);
         }

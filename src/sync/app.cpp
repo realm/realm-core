@@ -104,11 +104,11 @@ App::App(const Config& config)
     if (m_config.platform.empty()) {
         throw std::runtime_error("You must specify the Platform in App::Config");
     }
-    
+
     if (m_config.platform_version.empty()) {
         throw std::runtime_error("You must specify the Platform Version in App::Config");
     }
-    
+
     if (m_config.sdk_version.empty()) {
         throw std::runtime_error("You must specify the SDK Version in App::Config");
     }
@@ -117,6 +117,14 @@ App::App(const Config& config)
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
         m_sync_route.replace(uri_scheme_start, 4, "ws");
+
+    if (auto metadata = SyncManager::shared().app_metadata()) {
+        m_base_route = metadata->hostname + base_path;
+        std::string this_app_path = app_path + "/" + m_config.app_id;
+        m_app_route = m_base_route + this_app_path;
+        m_auth_route = m_app_route + auth_path;
+        m_sync_route = metadata->ws_hostname + base_path + this_app_path + sync_path;
+    }
 }
 
 static void handle_default_response(const Response& response,

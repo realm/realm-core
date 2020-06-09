@@ -41,11 +41,16 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Config> app_config)
 {
+    auto defer = util::make_scope_exit([this, app_config]() noexcept {
+        if (app_config) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_app = std::make_shared<app::App>(*app_config);
+        }
+    });
+
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
-        if (app_config)
-            m_app = std::make_shared<app::App>(*app_config);
         if (m_sync_client)
             return;
     }
@@ -59,8 +64,6 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         SyncUser::State state;
         std::string device_id;
     };
-
-    
     
     std::vector<UserCreationData> users_to_add;
     {
@@ -606,6 +609,8 @@ std::string SyncManager::client_uuid() const
 
 util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
 {
-    REALM_ASSERT(m_metadata_manager);
+    if (!m_metadata_manager) {
+        return util::none;
+    }
     return m_metadata_manager->get_app_metadata();
 }

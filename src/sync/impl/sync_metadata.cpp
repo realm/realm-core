@@ -463,10 +463,10 @@ void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
     if (m_app_metadata) {
         return;
     }
-    
+
     auto realm = get_realm();
     auto& schema = m_app_metadata_schema;
-    
+
     realm->begin_transaction();
     
     auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
