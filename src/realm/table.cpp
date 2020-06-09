@@ -809,7 +809,8 @@ bool Table::set_embedded(bool embedded)
 
         if (has_backlink_columns) {
             for (auto o : *this) {
-                if (o.get_backlink_count() > 1) {
+                // each object should be owned by one and only one parent
+                if (o.get_backlink_count() != 1) {
                     return false;
                 }
             }
