@@ -80,7 +80,6 @@ inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
 
 class ConstLstBase : public ArrayParent {
 public:
-    ConstLstBase(ConstLstBase&&) = delete;
     virtual ~ConstLstBase();
     /*
      * Operations that makes sense without knowing the specific type
@@ -109,11 +108,11 @@ public:
     }
     ObjKey get_key() const
     {
-        return m_const_obj->get_key();
+        return m_obj.get_key();
     }
     bool is_attached() const
     {
-        return m_const_obj->is_valid();
+        return m_obj.is_valid();
     }
     bool has_changed() const
     {
@@ -124,9 +123,13 @@ public:
         }
         return false;
     }
+    void update_child_ref(size_t, ref_type new_ref) override
+    {
+        m_obj.set_int(ConstLstBase::m_col_key, from_ref(new_ref));
+    }
     ConstTableRef get_table() const
     {
-        return m_const_obj->get_table();
+        return m_obj.get_table();
     }
     ColKey get_col_key() const
     {
@@ -144,7 +147,7 @@ protected:
     friend class Transaction;
 
 
-    Obj* m_const_obj;
+    Obj m_obj;
     ColKey m_col_key;
     bool m_nullable = false;
 
@@ -152,21 +155,34 @@ protected:
     mutable uint_fast64_t m_content_version = 0;
     mutable uint_fast64_t m_last_content_version = 0;
 
-    ConstLstBase(ColKey col_key, Obj* obj);
+    ConstLstBase() = default;
+    ConstLstBase(bool)
+    {
+        REALM_ASSERT(false);
+    }
+    ConstLstBase(const Obj& owner, ColKey col_key);
+    ConstLstBase& operator=(const ConstLstBase& other)
+    {
+        m_obj = other.m_obj;
+        m_col_key = other.m_col_key;
+        m_nullable = other.m_nullable;
+        return *this;
+    }
+
     virtual bool init_from_parent() const = 0;
 
     ref_type get_child_ref(size_t) const noexcept override;
 
     void update_if_needed() const
     {
-        auto content_version = m_const_obj->get_alloc().get_content_version();
-        if (m_const_obj->update_if_needed() || content_version != m_content_version) {
+        auto content_version = m_obj.get_alloc().get_content_version();
+        if (m_obj.update_if_needed() || content_version != m_content_version) {
             init_from_parent();
         }
     }
     void update_content_version() const
     {
-        m_content_version = m_const_obj->get_alloc().get_content_version();
+        m_content_version = m_obj.get_alloc().get_content_version();
     }
     // Increase index by one. I we land on and index that is deleted, keep
     // increasing until we get to a valid entry.
@@ -233,6 +249,10 @@ protected:
  * There is no overhead compared to the alternative where operator* would have
  * to return T by value.
  */
+
+template <class>
+class ConstLstIf;
+
 template <class T>
 class LstIterator {
 public:
@@ -395,13 +415,10 @@ protected:
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
     mutable bool m_valid = false;
 
-    ConstLstIf()
-        : ConstLstBase(ColKey{}, nullptr)
-    {
-    }
+    ConstLstIf() = default;
 
     ConstLstIf(Allocator& alloc)
-        : ConstLstBase(ColKey{}, nullptr)
+        : ConstLstBase(false)
         , m_tree(new BPlusTree<T>(alloc))
     {
         check_column_type<T>(m_col_key);
@@ -410,7 +427,7 @@ protected:
     }
 
     ConstLstIf(const ConstLstIf& other)
-        : ConstLstBase(other.m_col_key, nullptr)
+        : ConstLstBase(false)
         , m_valid(other.m_valid)
     {
         if (other.m_tree) {
@@ -422,20 +439,11 @@ protected:
         }
     }
 
-    ConstLstIf(ConstLstIf&& other) noexcept
-        : ConstLstBase(ColKey{}, nullptr)
-        , m_tree(std::move(other.m_tree))
-        , m_valid(other.m_valid)
-    {
-        m_tree->set_parent(this, 0);
-    }
-
     ConstLstIf& operator=(const ConstLstIf& other)
     {
         if (this != &other) {
-            *this->m_const_obj = *other.m_const_obj;
+            ConstLstBase::operator=(other);
             m_valid = other.m_valid;
-            m_col_key = other.m_col_key;
             m_deleted.clear();
             m_tree = nullptr;
 
@@ -458,31 +466,13 @@ protected:
     }
 };
 
-template <class T>
-class ConstLst : public ConstLstIf<T> {
-public:
-    ConstLst(const Obj& owner, ColKey col_key);
-    ConstLst(ConstLst&& other) noexcept
-        : ConstLstBase(other.m_col_key, &m_obj)
-        , ConstLstIf<T>(std::move(other))
-        , m_obj(std::move(other.m_obj))
-    {
-        ConstLstBase::m_nullable = other.ConstLstBase::m_nullable;
-    }
-
-private:
-    Obj m_obj;
-    void update_child_ref(size_t, ref_type) override
-    {
-    }
-};
 /*
  * This class defines a virtual interface to a writable list
  */
 class LstBase : public virtual ConstLstBase {
 public:
     LstBase()
-        : ConstLstBase(ColKey{}, nullptr)
+        : ConstLstBase(false)
     {
     }
     virtual ~LstBase()
@@ -490,7 +480,7 @@ public:
     }
     LstBasePtr clone() const
     {
-        return m_const_obj->get_listbase_ptr(m_col_key);
+        return m_obj.get_listbase_ptr(m_col_key);
     }
     virtual void set_null(size_t ndx) = 0;
     virtual void insert_null(size_t ndx) = 0;
@@ -508,21 +498,13 @@ public:
     using ConstLstIf<T>::m_tree;
     using ConstLstIf<T>::get;
 
-    Lst()
-        : ConstLstBase({}, &m_obj)
-    {
-    }
+    Lst() = default;
+
     Lst(const Obj& owner, ColKey col_key);
     Lst(const Lst& other);
-    Lst(Lst&& other) noexcept;
 
     Lst& operator=(const Lst& other);
     Lst& operator=(const BPlusTree<T>& other);
-
-    void update_child_ref(size_t, ref_type new_ref) override
-    {
-        m_obj.set_int(ConstLstBase::m_col_key, from_ref(new_ref));
-    }
 
     void create()
     {
@@ -580,7 +562,7 @@ public:
             do_set(ndx, value);
             m_obj.bump_content_version();
         }
-        if (Replication* repl = this->m_const_obj->get_replication()) {
+        if (Replication* repl = this->m_obj.get_replication()) {
             set_repl(repl, ndx, value);
         }
         return old;
@@ -598,7 +580,7 @@ public:
             throw std::out_of_range("Index out of range");
         }
         ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_replication()) {
+        if (Replication* repl = this->m_obj.get_replication()) {
             insert_repl(repl, ndx, value);
         }
         do_insert(ndx, value);
@@ -614,7 +596,7 @@ public:
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
         ensure_writeable();
-        if (Replication* repl = this->m_const_obj->get_replication()) {
+        if (Replication* repl = this->m_obj.get_replication()) {
             ConstLstBase::erase_repl(repl, ndx);
         }
         T old = get(ndx);
@@ -637,7 +619,7 @@ public:
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (from != to) {
             ensure_writeable();
-            if (Replication* repl = this->m_const_obj->get_replication()) {
+            if (Replication* repl = this->m_obj.get_replication()) {
                 ConstLstBase::move_repl(repl, from, to);
             }
             if (to > from) {
@@ -662,7 +644,7 @@ public:
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (ndx1 != ndx2) {
-            if (Replication* repl = this->m_const_obj->get_replication()) {
+            if (Replication* repl = this->m_obj.get_replication()) {
                 ConstLstBase::swap_repl(repl, ndx1, ndx2);
             }
             m_tree->swap(ndx1, ndx2);
@@ -676,7 +658,7 @@ public:
         update_if_needed();
         ensure_writeable();
         if (size() > 0) {
-            if (Replication* repl = this->m_const_obj->get_replication()) {
+            if (Replication* repl = this->m_obj.get_replication()) {
                 ConstLstBase::clear_repl(repl);
             }
             m_tree->clear();
@@ -685,7 +667,6 @@ public:
     }
 
 protected:
-    Obj m_obj;
     bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
@@ -723,28 +704,15 @@ protected:
 
 template <class T>
 Lst<T>::Lst(const Lst<T>& other)
-    : ConstLstBase(other.m_col_key, &m_obj)
+    : ConstLstBase(other)
     , ConstLstIf<T>(other)
-    , m_obj(other.m_obj)
 {
-    m_nullable = other.m_nullable;
-}
-
-template <class T>
-Lst<T>::Lst(Lst<T>&& other) noexcept
-    : ConstLstBase(other.m_col_key, &m_obj)
-    , ConstLstIf<T>(std::move(other))
-    , m_obj(std::move(other.m_obj))
-{
-    m_nullable = other.m_nullable;
 }
 
 template <class T>
 Lst<T>& Lst<T>::operator=(const Lst& other)
 {
     ConstLstIf<T>::operator=(other);
-    m_obj = other.m_obj;
-    m_nullable = other.m_nullable;
     return *this;
 }
 
@@ -773,81 +741,16 @@ size_t virtual2real(const std::vector<size_t>& vec, size_t ndx);
 // Scan through the list to find unresolved links
 void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
 
-class ConstLnkLst : public ConstLstIf<ObjKey> {
-public:
-    ConstLnkLst()
-        : ConstLstBase({}, &m_obj)
-    {
-    }
-
-    ConstLnkLst(const Obj& obj, ColKey col_key)
-        : ConstLstBase(col_key, &m_obj)
-        , ConstLstIf<ObjKey>(obj.get_alloc())
-        , m_obj(obj)
-    {
-        this->init_from_parent();
-    }
-    ConstLnkLst(ConstLnkLst&& other) noexcept
-        : ConstLstBase(other.m_col_key, &m_obj)
-        , ConstLstIf<ObjKey>(std::move(other))
-        , m_obj(std::move(other.m_obj))
-        , m_unresolved(std::move(other.m_unresolved))
-    {
-    }
-
-    ConstLnkLst& operator=(const ConstLnkLst& other)
-    {
-        ConstLstIf<ObjKey>::operator=(other);
-        m_unresolved = other.m_unresolved;
-        return *this;
-    }
-
-    size_t size() const override
-    {
-        auto full_sz = ConstLstIf<ObjKey>::size();
-        return full_sz - m_unresolved.size();
-    }
-
-    // Getting links
-    ObjKey get(size_t ndx) const
-    {
-        return ConstLstIf<ObjKey>::get(virtual2real(m_unresolved, ndx));
-    }
-
-    Obj operator[](size_t link_ndx) const
-    {
-        return get_object(link_ndx);
-    }
-    Obj get_object(size_t link_ndx) const;
-
-    void update_child_ref(size_t, ref_type) override
-    {
-    }
-
-private:
-    Obj m_obj;
-    // Sorted set of indices containing unresolved links.
-    mutable std::vector<size_t> m_unresolved;
-    bool init_from_parent() const override;
-};
 
 class LnkLst : public Lst<ObjKey>, public ObjList {
 public:
-    LnkLst()
-        : ConstLstBase({}, &m_obj)
-    {
-    }
+    LnkLst() = default;
+
     LnkLst(const Obj& owner, ColKey col_key);
     LnkLst(const LnkLst& other)
-        : ConstLstBase(other.m_col_key, &m_obj)
+        : ConstLstBase(other)
         , Lst<ObjKey>(other)
         , m_unresolved(other.m_unresolved)
-    {
-    }
-    LnkLst(LnkLst&& other) noexcept
-        : ConstLstBase(other.m_col_key, &m_obj)
-        , Lst<ObjKey>(std::move(other))
-        , m_unresolved(std::move(other.m_unresolved))
     {
     }
     LnkLst& operator=(const LnkLst& other)
@@ -946,7 +849,6 @@ public:
     void remove_all_target_rows();
 
 private:
-    friend class DB;
     friend class ConstTableView;
     friend class Query;
 

@@ -99,23 +99,14 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-ConstLstBase::ConstLstBase(ColKey col_key, Obj* obj)
-    : m_const_obj(obj)
+ConstLstBase::ConstLstBase(const Obj& owner, ColKey col_key)
+    : m_obj(owner)
     , m_col_key(col_key)
 {
     if (!col_key.get_attrs().test(col_attr_List)) {
         throw LogicError(LogicError::list_type_mismatch);
     }
-}
-
-template <class T>
-ConstLst<T>::ConstLst(const Obj& obj, ColKey col_key)
-    : ConstLstBase(col_key, &m_obj)
-    , ConstLstIf<T>(obj.get_alloc())
-    , m_obj(obj)
-{
-    this->m_nullable = obj.get_table()->is_nullable(col_key);
-    this->init_from_parent();
+    m_nullable = col_key.is_nullable();
 }
 
 ConstLstBase::~ConstLstBase()
@@ -125,7 +116,7 @@ ConstLstBase::~ConstLstBase()
 ref_type ConstLstBase::get_child_ref(size_t) const noexcept
 {
     try {
-        return to_ref(m_const_obj->_get<int64_t>(m_col_key.get_index()));
+        return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
     }
     catch (const KeyNotFound&) {
         return ref_type(0);
@@ -158,12 +149,10 @@ void ConstLstBase::clear_repl(Replication* repl) const
 
 template <class T>
 Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : ConstLstBase(col_key, &m_obj)
+    : ConstLstBase(obj, col_key)
     , ConstLstIf<T>(obj.get_alloc())
-    , m_obj(obj)
 {
     if (m_obj) {
-        this->m_nullable = col_key.get_attrs().test(col_attr_Nullable);
         ConstLstIf<T>::init_from_parent();
     }
 }
@@ -326,22 +315,6 @@ void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 
 /************************* template instantiations ***************************/
 
-template ConstLst<int64_t>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<util::Optional<Int>>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<bool>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<util::Optional<bool>>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<float>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<util::Optional<float>>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<double>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<util::Optional<double>>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<StringData>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<BinaryData>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<Timestamp>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<ObjKey>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<Decimal128>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<ObjectId>::ConstLst(const Obj& obj, ColKey col_key);
-template ConstLst<util::Optional<ObjectId>>::ConstLst(const Obj& obj, ColKey col_key);
-
 template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
 template Lst<bool>::Lst(const Obj& obj, ColKey col_key);
@@ -357,19 +330,6 @@ template Lst<ObjKey>::Lst(const Obj& obj, ColKey col_key);
 template Lst<Decimal128>::Lst(const Obj& obj, ColKey col_key);
 template Lst<ObjectId>::Lst(const Obj& obj, ColKey col_key);
 template Lst<util::Optional<ObjectId>>::Lst(const Obj& obj, ColKey col_key);
-
-Obj ConstLnkLst::get_object(size_t link_ndx) const
-{
-    return m_const_obj->get_target_table(m_col_key)->get_object(get(link_ndx));
-}
-
-bool ConstLnkLst::init_from_parent() const
-{
-    ConstLstIf<ObjKey>::init_from_parent();
-    update_unresolved(m_unresolved, *m_tree);
-
-    return m_valid;
-}
 
 /********************************* Lst<Key> *********************************/
 
@@ -452,7 +412,7 @@ void Lst<ObjKey>::clear()
         auto origin_table = m_obj.get_table();
         TableRef target_table = m_obj.get_target_table(m_col_key);
 
-        if (Replication* repl = m_const_obj->get_replication())
+        if (Replication* repl = m_obj.get_replication())
             repl->list_clear(*this); // Throws
 
         if (!target_table->is_embedded()) {
@@ -602,7 +562,7 @@ void LnkLst::remove_all_target_rows()
 }
 
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
-    : ConstLstBase(col_key, &m_obj)
+    : ConstLstBase(owner, col_key)
     , Lst<ObjKey>(owner, col_key)
 {
     update_unresolved(m_unresolved, *m_tree);

@@ -39,21 +39,13 @@ template <class>
 class ConstLstIf;
 
 template <class>
-class ConstLst;
-
-template <class>
 class Lst;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
-template <class T>
-using ConstLstPtr = std::unique_ptr<const Lst<T>>;
-using ConstLstBasePtr = std::unique_ptr<ConstLstBase>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 
 class LnkLst;
-class ConstLnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
-using ConstLnkLstPtr = std::unique_ptr<const LnkLst>;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
@@ -258,7 +250,6 @@ private:
     friend class CascadeState;
     friend class Cluster;
     friend class ColumnListBase;
-    friend class ConstLnkLst;
     friend class ConstLstBase;
     friend class ConstTableView;
     template <class>
