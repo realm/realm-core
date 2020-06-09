@@ -133,7 +133,7 @@ public:
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have at most 1 backlink. Return value
+    // not have a primary key and all objects must have exactly 1 backlink. Return value
     // indicates if the conversion was done
     bool set_embedded(bool embedded);
     //@}
