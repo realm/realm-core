@@ -154,9 +154,14 @@ jobWrapper {
 
     if (isPublishingRun) {
         stage('BuildPackages') {
+            def buildOptions = [
+                enableSync: "ON",
+                runTests: false,
+            ]
+
             parallelExecutors = [
-                buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
-                buildMacOsRelease   : doBuildMacOs('Release', false),
+                buildMacOsDebug     : doBuildMacOs(buildOptions + [buildType : "MinSizeDebug"]),
+                buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
                 buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
