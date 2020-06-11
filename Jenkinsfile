@@ -213,16 +213,18 @@ jobWrapper {
         stage('Aggregate') {
             parallel (
                 cocoa: {
-                    node('docker') {
+                    node('osx') {
                         getArchive()
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
                         }
                         sh 'tools/build-cocoa.sh'
+                        archiveArtifacts('realm-core-cocoa*.tar.gz')
                         archiveArtifacts('realm-core-cocoa*.tar.xz')
-                        def stashName = 'cocoa'
-                        stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                        publishingStashes << stashName
+                        stash includes: 'realm-core-cocoa*.tar.xz', name: "cocoa-xz"
+                        stash includes: 'realm-core-cocoa*.tar.gz', name: "cocoa-gz"
+                        publishingStashes << "cocoa-xz"
+                        publishingStashes << "cocoa-gz"
                     }
                 },
                 android: {

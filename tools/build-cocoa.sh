@@ -75,6 +75,9 @@ mkdir core
 filename="build-macosx-Release/realm-core-Release-${VERSION}-macosx-devel.tar.gz"
 tar -C core -zxvf "${filename}" include doc
 
+# Overwrite version.txt
+echo ${VERSION} > core/version.txt
+
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
@@ -83,6 +86,10 @@ for bt in "${BUILD_TYPES[@]}"; do
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
         tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
         mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${p}${suffix}.a"
+        tar -C core -zxvf "${filename}" "lib/librealm-sync${suffix}.a"
+        libtool -static -o core/librealm-${p}${suffix}.a \
+            core/librealm-${p}${suffix}.a \
+            core/lib/librealm-sync${suffix}.a
         rm -rf core/lib
     done
 done
@@ -92,7 +99,9 @@ if [[ ! -z $COPY ]]; then
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
 else
-    v=$(git describe --tags)
-    rm -f "realm-core-cocoa-${v}.tar.xz"
-    tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
+    rm -f "realm-core-cocoa-${VERSION}.tar.xz"
+    # .tar.gz package is used by realm-js, which uses the parser
+    tar -czvf "realm-core-cocoa-${VERSION}.tar.gz" core
+    # .tar.xz package is used by cocoa, which doesn't use the parser
+    tar -cJvf "realm-core-cocoa-${VERSION}.tar.xz" --exclude 'librealm-parser*' core
 fi
