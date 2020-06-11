@@ -317,7 +317,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, T value, _
 }
 
 template <class T>
-void SyncReplication::list_set(const ConstLstBase& list, size_t ndx, T value)
+void SyncReplication::list_set(const CollectionBase& list, size_t ndx, T value)
 {
     if (select_list(list)) {
         Instruction::Set instr;
@@ -330,7 +330,7 @@ void SyncReplication::list_set(const ConstLstBase& list, size_t ndx, T value)
 }
 
 template <class T>
-void SyncReplication::list_insert(const ConstLstBase& list, size_t ndx, T value)
+void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, T value)
 {
     if (select_list(list)) {
         auto sz = uint32_t(list.size());
@@ -506,67 +506,67 @@ void SyncReplication::erase_substring(const Table*, ColKey, ObjKey, size_t, size
     unsupported_instruction();
 }
 
-void SyncReplication::list_set_null(const ConstLstBase& list, size_t ndx)
+void SyncReplication::list_set_null(const CollectionBase& list, size_t ndx)
 {
     TrivialReplication::list_set_null(list, ndx);
     list_set(list, ndx, util::none);
 }
 
-void SyncReplication::list_set_int(const ConstLstBase& list, size_t ndx, int64_t value)
+void SyncReplication::list_set_int(const CollectionBase& list, size_t ndx, int64_t value)
 {
     TrivialReplication::list_set_int(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_bool(const ConstLstBase& list, size_t ndx, bool value)
+void SyncReplication::list_set_bool(const CollectionBase& list, size_t ndx, bool value)
 {
     TrivialReplication::list_set_bool(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_float(const ConstLstBase& list, size_t ndx, float value)
+void SyncReplication::list_set_float(const CollectionBase& list, size_t ndx, float value)
 {
     TrivialReplication::list_set_float(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_double(const ConstLstBase& list, size_t ndx, double value)
+void SyncReplication::list_set_double(const CollectionBase& list, size_t ndx, double value)
 {
     TrivialReplication::list_set_double(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_string(const ConstLstBase& list, size_t ndx, StringData value)
+void SyncReplication::list_set_string(const CollectionBase& list, size_t ndx, StringData value)
 {
     TrivialReplication::list_set_string(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_binary(const ConstLstBase& list, size_t ndx, BinaryData value)
+void SyncReplication::list_set_binary(const CollectionBase& list, size_t ndx, BinaryData value)
 {
     TrivialReplication::list_set_binary(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_timestamp(const ConstLstBase& list, size_t ndx, Timestamp value)
+void SyncReplication::list_set_timestamp(const CollectionBase& list, size_t ndx, Timestamp value)
 {
     TrivialReplication::list_set_timestamp(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_object_id(const ConstLstBase& list, size_t ndx, ObjectId value)
+void SyncReplication::list_set_object_id(const CollectionBase& list, size_t ndx, ObjectId value)
 {
     TrivialReplication::list_set_object_id(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_decimal(const ConstLstBase& list, size_t ndx, Decimal128 value)
+void SyncReplication::list_set_decimal(const CollectionBase& list, size_t ndx, Decimal128 value)
 {
     TrivialReplication::list_set_decimal(list, ndx, value);
     list_set(list, ndx, value);
 }
 
-void SyncReplication::list_set_typed_link(const ConstLstBase& list, size_t ndx, ObjLink value)
+void SyncReplication::list_set_typed_link(const CollectionBase& list, size_t ndx, ObjLink value)
 {
     TrivialReplication::list_set_typed_link(list, ndx, value);
 
@@ -628,67 +628,67 @@ void SyncReplication::list_set_link(const Lst<ObjKey>& list, size_t ndx, ObjKey 
     }
 }
 
-void SyncReplication::list_insert_null(const ConstLstBase& list, size_t ndx)
+void SyncReplication::list_insert_null(const CollectionBase& list, size_t ndx)
 {
     TrivialReplication::list_insert_null(list, ndx);
     list_insert(list, ndx, util::none);
 }
 
-void SyncReplication::list_insert_int(const ConstLstBase& list, size_t ndx, int64_t value)
+void SyncReplication::list_insert_int(const CollectionBase& list, size_t ndx, int64_t value)
 {
     TrivialReplication::list_insert_int(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_bool(const ConstLstBase& list, size_t ndx, bool value)
+void SyncReplication::list_insert_bool(const CollectionBase& list, size_t ndx, bool value)
 {
     TrivialReplication::list_insert_bool(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_float(const ConstLstBase& list, size_t ndx, float value)
+void SyncReplication::list_insert_float(const CollectionBase& list, size_t ndx, float value)
 {
     TrivialReplication::list_insert_float(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_double(const ConstLstBase& list, size_t ndx, double value)
+void SyncReplication::list_insert_double(const CollectionBase& list, size_t ndx, double value)
 {
     TrivialReplication::list_insert_double(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_string(const ConstLstBase& list, size_t ndx, StringData value)
+void SyncReplication::list_insert_string(const CollectionBase& list, size_t ndx, StringData value)
 {
     TrivialReplication::list_insert_string(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_binary(const ConstLstBase& list, size_t ndx, BinaryData value)
+void SyncReplication::list_insert_binary(const CollectionBase& list, size_t ndx, BinaryData value)
 {
     TrivialReplication::list_insert_binary(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_timestamp(const ConstLstBase& list, size_t ndx, Timestamp value)
+void SyncReplication::list_insert_timestamp(const CollectionBase& list, size_t ndx, Timestamp value)
 {
     TrivialReplication::list_insert_timestamp(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_object_id(const ConstLstBase& list, size_t ndx, ObjectId value)
+void SyncReplication::list_insert_object_id(const CollectionBase& list, size_t ndx, ObjectId value)
 {
     TrivialReplication::list_insert_object_id(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_decimal(const ConstLstBase& list, size_t ndx, Decimal128 value)
+void SyncReplication::list_insert_decimal(const CollectionBase& list, size_t ndx, Decimal128 value)
 {
     TrivialReplication::list_insert_decimal(list, ndx, value);
     list_insert(list, ndx, value);
 }
 
-void SyncReplication::list_insert_typed_link(const ConstLstBase& list, size_t ndx, ObjLink value)
+void SyncReplication::list_insert_typed_link(const CollectionBase& list, size_t ndx, ObjLink value)
 {
     TrivialReplication::list_insert_typed_link(list, ndx, value);
 
@@ -755,7 +755,7 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 }
 
 
-void SyncReplication::list_move(const ConstLstBase& view, size_t from_ndx, size_t to_ndx)
+void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, size_t to_ndx)
 {
     TrivialReplication::list_move(view, from_ndx, to_ndx);
     if (select_list(view)) {
@@ -766,7 +766,7 @@ void SyncReplication::list_move(const ConstLstBase& view, size_t from_ndx, size_
     }
 }
 
-void SyncReplication::list_erase(const ConstLstBase& view, size_t ndx)
+void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
 {
     size_t prior_size = view.size();
     TrivialReplication::list_erase(view, ndx);
@@ -778,7 +778,7 @@ void SyncReplication::list_erase(const ConstLstBase& view, size_t ndx)
     }
 }
 
-void SyncReplication::list_clear(const ConstLstBase& view)
+void SyncReplication::list_clear(const CollectionBase& view)
 {
     size_t prior_size = view.size();
     TrivialReplication::list_clear(view);
@@ -844,7 +844,7 @@ bool SyncReplication::select_table(const Table& table)
     }
 }
 
-bool SyncReplication::select_list(const ConstLstBase& view)
+bool SyncReplication::select_list(const CollectionBase& view)
 {
     return select_table(*view.get_table());
 }
@@ -951,7 +951,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     }
 }
 
-void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const ConstLstBase& list)
+void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
 {
     ConstTableRef source_table = list.get_table();
     ObjKey source_obj = list.get_key();
@@ -959,7 +959,8 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     populate_path_instr(instr, *source_table, source_obj, source_field);
 }
 
-void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const ConstLstBase& list, uint32_t ndx)
+void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list,
+                                          uint32_t ndx)
 {
     populate_path_instr(instr, list);
     instr.path.m_path.push_back(ndx);

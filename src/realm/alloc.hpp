@@ -310,7 +310,7 @@ private:
     friend class Group;
     friend class WrappedAllocator;
     friend class Obj;
-    friend class ConstLstBase;
+    friend class CollectionBase;
 };
 
 
