@@ -874,6 +874,8 @@ int Stream::bio_destroy(BIO*) noexcept
 
 #elif REALM_HAVE_SECURE_TRANSPORT
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations" // FIXME: Should this be removed at some point?
+
 void Context::ssl_init() {}
 
 void Context::ssl_destroy() noexcept
@@ -909,7 +911,7 @@ util::CFPtr<CFArrayRef> Context::load_pem_file(const std::string& path, SecKeych
     // If we don't need to import it into a keychain, try to interpret the data
     // as a certificate directly. This only works for DER files, so we fall back
     // to SecItemImport() on platforms which support that if this fails.
-    if (!keychain) {
+    if (keychain == nullptr) {
         if (auto certificate = adoptCF(SecCertificateCreateWithData(NULL, contentsCF.get()))) {
             auto ref = certificate.get();
             return adoptCF(CFArrayCreate(nullptr, const_cast<const void**>(reinterpret_cast<void**>(&ref)), 1,
