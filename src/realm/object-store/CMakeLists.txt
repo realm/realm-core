@@ -102,6 +102,7 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_client.hpp
         sync/remote_mongo_collection.hpp
         sync/remote_mongo_database.hpp
+        sync/push_client.hpp
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
@@ -110,7 +111,7 @@ if(REALM_ENABLE_SYNC)
         util/bson/max_key.hpp
         util/bson/regular_expression.hpp
         util/bson/indexed_map.hpp
-        util/bson/datetime.hpp)
+        util/bson/mongo_timestamp.hpp)
     list(APPEND SOURCES
         sync/app.cpp
         sync/app_credentials.cpp
@@ -122,11 +123,11 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_client.cpp
         sync/remote_mongo_collection.cpp
         sync/remote_mongo_database.cpp
+        sync/push_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp
-        util/bson/regular_expression.cpp
-        util/bson/datetime.cpp)
+        util/bson/regular_expression.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp

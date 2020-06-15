@@ -32,8 +32,19 @@ static util::Optional<AppError> check_for_errors(const Response& response)
     bool http_status_code_is_fatal =
         response.http_status_code >= 300 || (response.http_status_code < 200 && response.http_status_code != 0);
 
+    auto find_case_insensitive_header = [&response](const std::string& needle) {
+        for (auto it = response.headers.begin(); it != response.headers.end(); ++it) {
+            if (std::equal(it->first.begin(), it->first.end(), needle.begin(), needle.end(), [](char a, char b) {
+                    return tolower(a) == tolower(b);
+                })) {
+                return it;
+            }
+        }
+        return response.headers.end();
+    };
+
     try {
-        auto ct = response.headers.find("Content-Type");
+        auto ct = find_case_insensitive_header("content-type");
         if (ct != response.headers.end() && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");

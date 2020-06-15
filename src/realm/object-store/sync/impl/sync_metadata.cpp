@@ -45,6 +45,7 @@ static const char* const c_sync_refresh_token = "refresh_token";
 static const char* const c_sync_access_token = "access_token";
 static const char* const c_sync_identities = "identities";
 static const char* const c_sync_state = "state";
+static const char* const c_sync_device_id = "device_id";
 
 static const char* const c_sync_profile = "profile";
 static const char* const c_sync_profile_name = "name";
@@ -93,7 +94,8 @@ realm::Schema make_schema()
                     {c_sync_access_token, PropertyType::String | PropertyType::Nullable},
                     {c_sync_identities, PropertyType::Object | PropertyType::Array, c_sync_identityMetadata},
                     {c_sync_profile, PropertyType::Object | PropertyType::Nullable, c_sync_profile},
-                    {c_sync_state, PropertyType::Int}}},
+                    {c_sync_state, PropertyType::Int},
+                    {c_sync_device_id, PropertyType::String}}},
                   {c_sync_fileActionMetadata,
                    {
                        {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -118,7 +120,7 @@ namespace realm {
 SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 3;
+    constexpr uint64_t SCHEMA_VERSION = 4;
 
     Realm::Config config;
     config.automatic_change_notifications = false;
@@ -173,7 +175,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key, object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key, object_schema->persisted_properties[7].column_key,
-        object_schema->persisted_properties[8].column_key};
+        object_schema->persisted_properties[8].column_key, object_schema->persisted_properties[9].column_key};
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {
@@ -436,21 +438,29 @@ std::string SyncUserMetadata::local_uuid() const
     return m_obj.get<String>(m_schema.idx_local_uuid);
 }
 
-util::Optional<std::string> SyncUserMetadata::refresh_token() const
+std::string SyncUserMetadata::refresh_token() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     m_realm->refresh();
     StringData result = m_obj.get<String>(m_schema.idx_refresh_token);
-    return result.is_null() ? util::none : util::make_optional(std::string(result));
+    return result.is_null() ? "" : std::string(result);
 }
 
-util::Optional<std::string> SyncUserMetadata::access_token() const
+std::string SyncUserMetadata::access_token() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     StringData result = m_obj.get<String>(m_schema.idx_access_token);
-    return result.is_null() ? util::none : util::make_optional(std::string(result));
+    return result.is_null() ? "" : std::string(result);
+}
+
+std::string SyncUserMetadata::device_id() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    StringData result = m_obj.get<String>(m_schema.idx_device_id);
+    return result.is_null() ? "" : std::string(result);
 }
 
 inline SyncUserIdentity user_identity_from_obj(const Obj& obj)
@@ -483,7 +493,7 @@ std::string SyncUserMetadata::provider_type() const
     return m_obj.get<String>(m_schema.idx_provider_type);
 }
 
-void SyncUserMetadata::set_refresh_token(util::Optional<std::string> refresh_token)
+void SyncUserMetadata::set_refresh_token(const std::string& refresh_token)
 {
     if (m_invalid)
         return;
@@ -491,7 +501,7 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> refresh_tok
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set<String>(m_schema.idx_refresh_token, *refresh_token);
+    m_obj.set<String>(m_schema.idx_refresh_token, refresh_token);
     m_realm->commit_transaction();
 }
 
@@ -530,7 +540,7 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
+void SyncUserMetadata::set_access_token(const std::string& user_token)
 {
     if (m_invalid)
         return;
@@ -538,7 +548,19 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set(m_schema.idx_access_token, *user_token);
+    m_obj.set(m_schema.idx_access_token, user_token);
+    m_realm->commit_transaction();
+}
+
+void SyncUserMetadata::set_device_id(const std::string& device_id)
+{
+    if (m_invalid)
+        return;
+
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_obj.set(m_schema.idx_device_id, device_id);
     m_realm->commit_transaction();
 }
 
