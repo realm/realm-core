@@ -7,8 +7,8 @@
 #include <iosfwd> // string conversion, debug prints
 #include <memory> // shared_ptr
 #include <type_traits>
-#include <mpark/variant.hpp>
 
+#include <external/mpark/variant.hpp>
 #include <realm/util/string_buffer.hpp>
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>

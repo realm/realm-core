@@ -222,6 +222,7 @@ enum class ProtocolError {
     client_file_expired          = 222, // Client file has expired
     user_mismatch                = 223, // User mismatch for client file identifier (IDENT)
     too_many_sessions            = 224, // Too many sessions in connection (BIND)
+    invalid_schema_change        = 225, // Invalid schema change (UPLOAD)
 
     // clang-format on
 };

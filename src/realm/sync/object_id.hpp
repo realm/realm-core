@@ -24,8 +24,8 @@
 #include <iosfwd> // operator<<
 #include <map>
 #include <set>
-#include <mpark/variant.hpp>
 
+#include <external/mpark/variant.hpp>
 #include <realm/global_key.hpp>
 #include <realm/string_data.hpp>
 #include <realm/data_type.hpp>

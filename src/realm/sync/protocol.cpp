@@ -109,6 +109,8 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "User mismatch for client file identifier (IDENT)";
         case ProtocolError::too_many_sessions:
             return "Too many sessions in connection (BIND)";
+        case ProtocolError::invalid_schema_change:
+            return "Invalid schema change (UPLOAD)";
     }
     return nullptr;
 }

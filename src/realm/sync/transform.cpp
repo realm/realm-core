@@ -1334,7 +1334,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                        << "' on one side,"
                           "but primary key '"
                        << right_pk_name << "' on the other.";
-                    throw TransformError(ss.str());
+                    throw SchemaMismatchError(ss.str());
                 }
 
                 if (left_spec->type != right_spec->type) {
@@ -1342,27 +1342,27 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
                        << "', which is of type " << get_type_name(left_spec->type) << " on one side and type "
                        << get_type_name(right_spec->type) << " on the other.";
-                    throw TransformError(ss.str());
+                    throw SchemaMismatchError(ss.str());
                 }
 
                 if (left_spec->nullable != right_spec->nullable) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
                        << "', which is nullable on one side, but not the other";
-                    throw TransformError(ss.str());
+                    throw SchemaMismatchError(ss.str());
                 }
             }
             else {
                 std::stringstream ss;
                 ss << "Schema mismatch: '" << left_name << "' has a primary key on one side, but not on the other.";
-                throw TransformError(ss.str());
+                throw SchemaMismatchError(ss.str());
             }
         }
         else if (mpark::get_if<Instruction::AddTable::EmbeddedTable>(&left.type)) {
             if (!mpark::get_if<Instruction::AddTable::EmbeddedTable>(&right.type)) {
                 std::stringstream ss;
                 ss << "Schema mismatch: '" << left_name << "' is an embedded table on one side, but not the other";
-                throw TransformError(ss.str());
+                throw SchemaMismatchError(ss.str());
             }
         }
 
@@ -1515,11 +1515,15 @@ DEFINE_MERGE(Instruction::Set, Instruction::Set)
     if (same_path(left, right)) {
         bool left_is_default = false;
         bool right_is_default = false;
+        REALM_MERGE_ASSERT(left.is_array_set() == right.is_array_set());
 
         if (!left.is_array_set()) {
-            REALM_ASSERT(!right.is_array_set());
+            REALM_MERGE_ASSERT(!right.is_array_set());
             left_is_default = left.is_default;
             right_is_default = right.is_default;
+        }
+        else {
+            REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         }
 
         // CONFLICT: Two updates of the same element.
@@ -1659,21 +1663,21 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
                << "' is of type " << get_type_name(left.type) << " on one side and type " << get_type_name(right.type)
                << " on the other.";
-            throw TransformError(ss.str());
+            throw SchemaMismatchError(ss.str());
         }
 
         if (left.nullable != right.nullable) {
             std::stringstream ss;
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
                << "' is nullable on one side and not on the other.";
-            throw TransformError(ss.str());
+            throw SchemaMismatchError(ss.str());
         }
 
         if (left.list != right.list) {
             std::stringstream ss;
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
                << "' is a list on one side and not on the other.";
-            throw TransformError(ss.str());
+            throw SchemaMismatchError(ss.str());
         }
 
         if (left.type == Instruction::Payload::Type::Link) {
@@ -1684,7 +1688,7 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
                 ss << "Schema mismatch: Link property '" << left_name << "' in class '"
                    << left_side.get_string(left.table) << "' points to class '" << left_target
                    << "' on one side and to '" << right_target << "' on the other.";
-                throw TransformError(ss.str());
+                throw SchemaMismatchError(ss.str());
             }
         }
 
@@ -1720,34 +1724,10 @@ DEFINE_MERGE(Instruction::EraseColumn, Instruction::EraseColumn)
     }
 }
 
-DEFINE_MERGE(Instruction::ArrayInsert, Instruction::EraseColumn)
-{
-    if (same_column(left, right)) {
-        left_side.discard();
-    }
-}
-
-DEFINE_MERGE(Instruction::ArrayMove, Instruction::EraseColumn)
-{
-    if (same_column(left, right)) {
-        left_side.discard();
-    }
-}
-
-DEFINE_MERGE(Instruction::ArrayErase, Instruction::EraseColumn)
-{
-    if (same_column(left, right)) {
-        left_side.discard();
-    }
-}
-
-DEFINE_MERGE(Instruction::ArrayClear, Instruction::EraseColumn)
-{
-    if (same_column(left, right)) {
-        left_side.discard();
-    }
-}
-
+DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseColumn);
 
 /// ArrayInsert rules
 
@@ -2012,12 +1992,8 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
     }
 }
 
-DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayErase)
-{
-    if (same_path(left, right)) {
-        right_side.discard();
-    }
-}
+// Handled by nested rules.
+DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayErase);
 
 
 /// ArrayClear rules
