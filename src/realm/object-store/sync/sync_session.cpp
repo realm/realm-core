@@ -265,6 +265,41 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
+std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
+{
+    return [session](util::Optional<app::AppError> error) {
+        using namespace std::chrono;
+
+        auto session_user = session->user();
+        auto is_user_expired =
+            session_user && session_user->refresh_jwt().expires_at <
+                                duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+
+        if (!session_user) {
+            std::unique_lock<std::mutex> lock(session->m_state_mutex);
+            session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
+        }
+        else if (is_user_expired) {
+            std::unique_lock<std::mutex> lock(session->m_state_mutex);
+            session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
+            if (session->m_config.error_handler) {
+                session->m_config.error_handler(
+                    session, SyncError(SyncError::ProtocolError::bad_authentication, "expired refresh token", true));
+            }
+        }
+        else if (error) {
+            // 10 seconds is arbitrary, but it is to not swamp the server
+            std::this_thread::sleep_for(milliseconds(10000));
+            if (session->m_state == &SyncSession::State::active && session_user) {
+                session_user->refresh_custom_data(handle_refresh(session));
+            }
+        }
+        else {
+            session->m_session->refresh(session_user->access_token());
+        }
+    };
+}
+
 SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
     : m_state(&State::inactive)
     , m_config(std::move(config))
@@ -467,8 +502,16 @@ void SyncSession::handle_error(SyncError error)
         }
     }
     else {
-        // Unrecognized error code.
-        error.is_unrecognized_by_client = true;
+        switch (error_code.value()) {
+            // FIXME: We need to understand what errors can actually come from the server
+            // FIXME: and why the sync client is no longer parsing them correctly. */
+            case 11:
+                user()->refresh_custom_data(handle_refresh(shared_from_this()));
+                return;
+            default:
+                // Unrecognized error code.
+                error.is_unrecognized_by_client = true;
+        }
     }
     switch (next_state) {
         case NextStateAfterError::none:
@@ -521,7 +564,8 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 void SyncSession::create_sync_session()
 {
-    if (m_session)
+    auto app = SyncManager::shared().app();
+    if (m_session || !app)
         return;
 
     sync::Session::Config session_config;
@@ -536,7 +580,7 @@ void SyncSession::create_sync_session()
     session_config.multiplex_ident = m_multiplex_identity;
 
     {
-        std::string sync_route(app::App::Internal::sync_route(*SyncManager::shared().app()));
+        std::string sync_route(app::App::Internal::sync_route(*app));
 
         if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,

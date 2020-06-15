@@ -35,6 +35,9 @@
 #include <vector>
 
 namespace realm {
+namespace app {
+struct AppError;
+} // namespace app
 
 class SyncSession;
 
@@ -117,7 +120,7 @@ struct SyncUserIdentity {
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
-class SyncUser {
+class SyncUser : public std::enable_shared_from_this<SyncUser> {
     friend class SyncSession;
 
 public:
@@ -179,6 +182,11 @@ public:
 
     std::string refresh_token() const;
 
+    RealmJWT refresh_jwt() const
+    {
+        return m_refresh_token;
+    }
+
     std::string device_id() const;
 
     bool has_device_id() const;
@@ -203,6 +211,9 @@ public:
     // immediately, or upon the user becoming Active.
     // Note that this is called by the SyncManager, and should not be directly called.
     void register_session(std::shared_ptr<SyncSession>);
+
+    /// Refreshes the custom data for this user
+    void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);

@@ -159,8 +159,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]")
             SyncManager::shared().get_user("user-async-wait-upload-4", ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         std::atomic<int> error_count(0);
-        std::shared_ptr<SyncSession> session =
-            sync_session(user, "/async-wait-upload-4", [&](auto, auto) { ++error_count; });
+        std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-upload-4", [&](auto, auto) {
+            ++error_count;
+        });
         std::error_code code =
             std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the upload-completion notification
@@ -171,7 +172,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]")
         REQUIRE(handler_called == false);
         // Now trigger an error
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
-        EventLoop::main().run_until([&] { return error_count > 0; });
+        EventLoop::main().run_until([&] {
+            return error_count > 0;
+        });
         REQUIRE(handler_called == true);
     }
 }
