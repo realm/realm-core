@@ -2243,9 +2243,16 @@ ConstTableView Table::find_all_null(ColKey col_key) const
 
 TableView Table::get_distinct_view(ColKey col_key)
 {
-    TableView tv(TableView::DistinctView, m_own_ref, col_key);
-    tv.do_sync();
-    return tv;
+    if (this->has_search_index(col_key)) {
+        TableView tv(TableView::DistinctView, m_own_ref, col_key);
+        tv.do_sync();
+        return tv;
+    }
+
+    // Fallback is there is no search index
+    DescriptorOrdering order;
+    order.append_distinct(DistinctDescriptor({{col_key}}));
+    return where().find_all(order);
 }
 
 ConstTableView Table::get_distinct_view(ColKey col_key) const
