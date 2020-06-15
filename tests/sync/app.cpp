@@ -1592,37 +1592,24 @@ TEST_CASE("app: push notifications", "[sync][app]") {
                 
         CHECK(processed);
     }
-    
+
     SECTION("deregister") {
         bool processed;
 
-        app->push_notification_client("gcm").deregister_device("hello",
-                                                                  sync_user,
-                                                                  [&](Optional<app::AppError> error) {
+        app->push_notification_client("gcm").deregister_device(sync_user,
+                                                               [&](Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
         CHECK(processed);
     }
-    
-    SECTION("deregister with an unregistered user") {
-        bool processed;
 
-        app->push_notification_client("gcm").deregister_device("helloooo",
-                                                                  sync_user,
-                                                                  [&](Optional<app::AppError> error) {
-            CHECK(!error);
-            processed = true;
-        });
-        CHECK(processed);
-    }
-    
     SECTION("register with unavailable service") {
         bool processed;
 
-        app->push_notification_client("gcm_blah").deregister_device("hello",
-                                                                    sync_user,
-                                                                    [&](Optional<app::AppError> error) {
+        app->push_notification_client("gcm_blah").register_device("hello",
+                                                                  sync_user,
+                                                                  [&](Optional<app::AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "service not found: 'gcm_blah'");
             processed = true;
