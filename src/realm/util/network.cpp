@@ -45,7 +45,7 @@
 
 #ifndef _WIN32
 
-#if REALM_HAVE_EPOLL
+#if REALM_NETWORK_USE_EPOLL
 #include <linux/version.h>
 #include <sys/epoll.h>
 #elif REALM_HAVE_KQUEUE
@@ -62,7 +62,7 @@
 // bigger than (LONG_MAX - 999ULL)/HZ.  HZ in the wild can be as big as 1000,
 // and LONG_MAX can be as small as (2**31)-1, so the largest number of
 // milliseconds we can be sure to support on those early kernels is 2147482.
-#if REALM_HAVE_EPOLL
+#if REALM_NETWORK_USE_EPOLL
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
 #define EPOLL_LARGE_TIMEOUT_BUG 1
 #endif
@@ -447,7 +447,7 @@ public:
     // Thread-safe.
     void interrupt() noexcept;
 
-#if REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE
+#if REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE
     void register_desc(Descriptor&);
     void deregister_desc(Descriptor&) noexcept;
 #endif
@@ -457,7 +457,7 @@ public:
 #endif
 
 private:
-#if REALM_HAVE_EPOLL
+#if REALM_NETWORK_USE_EPOLL
 
     static constexpr int s_epoll_event_buffer_size = 256;
     const std::unique_ptr<epoll_event[]> m_epoll_event_buffer;
@@ -466,7 +466,7 @@ private:
     static std::unique_ptr<epoll_event[]> make_epoll_event_buffer();
     static CloseGuard make_epoll_fd();
 
-#elif REALM_HAVE_KQUEUE // !REALM_HAVE_EPOLL && REALM_HAVE_KQUEUE
+#elif REALM_HAVE_KQUEUE // !REALM_NETWORK_USE_EPOLL && REALM_HAVE_KQUEUE
 
     static constexpr int s_kevent_buffer_size = 256;
     const std::unique_ptr<struct kevent[]> m_kevent_buffer;
@@ -475,9 +475,9 @@ private:
     static std::unique_ptr<struct kevent[]> make_kevent_buffer();
     static CloseGuard make_kqueue_fd();
 
-#endif // !REALM_HAVE_EPOLL && REALM_HAVE_KQUEUE
+#endif // !REALM_NETWORK_USE_EPOLL && REALM_HAVE_KQUEUE
 
-#if REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE
+#if REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE
 
     OperQueue<IoOper> m_active_ops;
 
@@ -499,7 +499,7 @@ private:
 
     void advance_active_ops(OperQueue<AsyncOper>& completed_ops) noexcept;
 
-#else // !(REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE)
+#else // !(REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE)
 
     struct OperSlot {
         std::size_t pollfd_slot_ndx = 0; // Zero when slot is unused
@@ -519,7 +519,7 @@ private:
 
     void discard_pollfd_slot_by_move_last_over(OperSlot&) noexcept;
 
-#endif // !(REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE)
+#endif // !(REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE)
 
     std::size_t m_num_operations = 0;
     WakeupPipe m_wakeup_pipe;
@@ -542,7 +542,7 @@ inline void Service::IoReactor::interrupt() noexcept
 }
 
 
-#if REALM_HAVE_EPOLL
+#if REALM_NETWORK_USE_EPOLL
 
 inline Service::IoReactor::IoReactor()
     : m_epoll_event_buffer{make_epoll_event_buffer()} // Throws
@@ -707,7 +707,7 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
 }
 
 
-#elif REALM_HAVE_KQUEUE // !REALM_HAVE_EPOLL && REALM_HAVE_KQUEUE
+#elif REALM_HAVE_KQUEUE // !REALM_NETWORK_USE_EPOLL && REALM_HAVE_KQUEUE
 
 
 inline Service::IoReactor::IoReactor()
@@ -847,10 +847,10 @@ bool Service::IoReactor::wait_and_activate(clock::time_point timeout, clock::tim
     return false;
 }
 
-#endif // !REALM_HAVE_EPOLL && REALM_HAVE_KQUEUE
+#endif // !REALM_NETWORK_USE_EPOLL && REALM_HAVE_KQUEUE
 
 
-#if REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE
+#if REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE
 
 void Service::IoReactor::add_oper(Descriptor& desc, LendersIoOperPtr op, Want want)
 {
@@ -962,7 +962,7 @@ void Service::IoReactor::advance_active_ops(OperQueue<AsyncOper>& completed_ops)
 }
 
 
-#else // !(REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE)
+#else // !(REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE)
 
 
 inline Service::IoReactor::IoReactor()
@@ -1299,7 +1299,7 @@ void Service::IoReactor::discard_pollfd_slot_by_move_last_over(OperSlot& oper_sl
     m_pollfd_slots.pop_back();
 }
 
-#endif // !(REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE)
+#endif // !(REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE)
 
 
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
@@ -1947,7 +1947,7 @@ std::size_t Service::Descriptor::read_some(char* buffer, std::size_t size, std::
         REALM_ASSERT(ret > 0);
         std::size_t n = std::size_t(ret);
         REALM_ASSERT(n <= size);
-#if REALM_HAVE_EPOLL
+#if REALM_NETWORK_USE_EPOLL
         // On Linux a partial read (n < size) on a nonblocking stream-mode
         // socket is guaranteed to only ever happen if a complete read would
         // have been impossible without blocking (i.e., without failing with
@@ -2035,7 +2035,7 @@ std::size_t Service::Descriptor::write_some(const char* data, std::size_t size, 
         REALM_ASSERT(ret >= 0);
         std::size_t n = std::size_t(ret);
         REALM_ASSERT(n <= size);
-#if REALM_HAVE_EPOLL
+#if REALM_NETWORK_USE_EPOLL
         // On Linux a partial write (n < size) on a nonblocking stream-mode
         // socket is guaranteed to only ever happen if a complete write would
         // have been impossible without blocking (i.e., without failing with
@@ -2068,14 +2068,14 @@ std::size_t Service::Descriptor::write_some(const char* data, std::size_t size, 
 }
 
 
-#if REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE
+#if REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE
 
 void Service::Descriptor::deregister_for_async() noexcept
 {
     service_impl.io_reactor.deregister_desc(*this);
 }
 
-#endif // REALM_HAVE_EPOLL || REALM_HAVE_KQUEUE
+#endif // REALM_NETWORK_USE_EPOLL || REALM_HAVE_KQUEUE
 
 
 void Service::Descriptor::set_nonblock_flag(bool value)
