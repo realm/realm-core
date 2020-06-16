@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * We would allow converting a table to embedded table in spite some objects had no links to them. ([#3729](https://github.com/realm/realm-core/issues/3729), since v6.1.0-alpha.5)
+* If you upgrade from a realm file with file format version 6 (Realm Core v2.4.0 or earlier) the upgrade will result in a crash ([#3764](https://github.com/realm/realm-core/issues/3764), since v6.0.0-alpha.0)
  
 ### Breaking changes
 * None.
