@@ -5319,6 +5319,17 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
         CHECK(table->size() == 0);
         // do not commit
     }
+    {
+        // Sync operations
+        auto tr = sg->start_write();
+        auto table = tr->get_table("myEmbeddedStuff");
+        auto parent = tr->get_table("myParentStuff");
+        CHECK(table->size() == 2);
+        auto first = parent->begin();
+        first->invalidate();
+        CHECK(table->size() == 0);
+        // do not commit
+    }
 }
 
 TEST(Table_EmbeddedObjectCreateAndDestroyList)

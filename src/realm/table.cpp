@@ -3010,7 +3010,7 @@ void Table::remove_object(ObjKey key)
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
-        nullify_links(state);
+        m_clusters.nullify_links(key, state);
         remove_recursive(state);
     }
     else {
@@ -3040,8 +3040,8 @@ void Table::invalidate_object(ObjKey key)
         auto tombstone = get_or_create_tombstone(key, init_values);
         tombstone.assign_pk_and_backlinks(obj);
     }
-    CascadeState state(CascadeState::Mode::None);
-    m_clusters.erase(key, state);
+
+    remove_object(key);
 }
 
 void Table::remove_object_recursive(ObjKey key)
