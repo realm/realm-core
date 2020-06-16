@@ -81,12 +81,20 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     // Perform substitution if the alias is found in the mapping
     auto it = m_mapping.find({table, keypath[index]});
-    if (it != m_mapping.end()) {
+    size_t substitutions = 0;
+    while (it != m_mapping.end()) {
+        // if SDK's don't catch cycles in their property aliases, prevent infinite loops
+        constexpr size_t max_substitutions_allowed = 50;
+        realm_precondition(++substitutions < max_substitutions_allowed,
+                           util::format("Substitution loop detected while processing property '%1' -> '%2' found in "
+                                        "type '%3'. Check property aliases.",
+                                        keypath[index], it->second, get_printable_table_name(table->get_name())));
         // the alias needs to be mapped because it might be more than a single path
         // for example named backlinks must alias to @links.class_Name.property
         KeyPath mapped_path = key_path_from_string(it->second);
         keypath.erase(keypath.begin() + index);
         keypath.insert(keypath.begin() + index, mapped_path.begin(), mapped_path.end());
+        it = m_mapping.find({table, keypath[index]});
     }
 
     // Process backlinks which consumes 3 parts of the keypath
@@ -102,7 +110,11 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
             return element;
         }
         realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
-        std::string origin_table_name = m_backlink_class_prefix + keypath[index + 1];
+        std::string origin_table_name = keypath[index + 1];
+        if (origin_table_name.size() < m_backlink_class_prefix.size() ||
+            origin_table_name.substr(0, m_backlink_class_prefix.size()) != m_backlink_class_prefix) {
+            origin_table_name = m_backlink_class_prefix + origin_table_name;
+        }
         Table::BacklinkOrigin info = table->find_backlink_origin(origin_table_name, keypath[index + 2]);
         realm_precondition(bool(info), util::format("No property '%1' found in type '%2' which links to type '%3'",
                                                     keypath[index + 2], get_printable_table_name(keypath[index + 1]),
