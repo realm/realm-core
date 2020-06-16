@@ -832,6 +832,17 @@ void Lst<ObjLink>::set_repl(Replication* repl, size_t ndx, ObjLink link)
 }
 
 template <>
+void Lst<Decimal128>::set_repl(Replication* repl, size_t ndx, Decimal128 value)
+{
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    }
+    else {
+        repl->list_set_decimal(*this, ndx, value);
+    }
+}
+
+template <>
 void Lst<Mixed>::set_repl(Replication* repl, size_t ndx, Mixed value)
 {
     if (value.is_null()) {
@@ -894,16 +905,6 @@ void Lst<Mixed>::set_repl(Replication* repl, size_t ndx, Mixed value)
     }
 }
 
-template <>
-void Lst<Decimal128>::set_repl(Replication* repl, size_t ndx, Decimal128 value)
-{
-    if (value.is_null()) {
-        repl->list_set_null(*this, ndx);
-    }
-    else {
-        repl->list_set_decimal(*this, ndx, value);
-    }
-}
 
 /*************************** Lst<T>::insert_repl ****************************/
 template <>
@@ -1048,6 +1049,17 @@ void Lst<ObjLink>::insert_repl(Replication* repl, size_t ndx, ObjLink link)
 }
 
 template <>
+void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 value)
+{
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    }
+    else {
+        repl->list_insert_decimal(*this, ndx, value);
+    }
+}
+
+template <>
 void Lst<Mixed>::insert_repl(Replication* repl, size_t ndx, Mixed value)
 {
     if (value.is_null()) {
@@ -1107,17 +1119,6 @@ void Lst<Mixed>::insert_repl(Replication* repl, size_t ndx, Mixed value)
             case type_OldDateTime:
                 REALM_TERMINATE("Invalid Mixed type");
         }
-    }
-}
-
-template <>
-void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 value)
-{
-    if (value.is_null()) {
-        repl->list_insert_null(*this, ndx);
-    }
-    else {
-        repl->list_insert_decimal(*this, ndx, value);
     }
 }
 

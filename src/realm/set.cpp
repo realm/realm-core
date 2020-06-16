@@ -18,6 +18,7 @@
 
 
 #include "realm/set.hpp"
+#include "realm/array_mixed.hpp"
 #include "realm/replication.hpp"
 
 namespace realm {
@@ -35,6 +36,7 @@ Set<T>::Set(const Obj& obj, ColKey col_key)
 
 template Set<int64_t>::Set(const Obj& obj, ColKey col_key);
 template Set<StringData>::Set(const Obj& obj, ColKey col_key);
+template Set<Mixed>::Set(const Obj& obj, ColKey col_key);
 
 /***************************** Set<T>::insert_repl *****************************/
 
@@ -48,6 +50,12 @@ template <>
 void Set<String>::insert_repl(Replication*, StringData)
 {
     // repl->set_insert_string(*this, value);
+}
+
+template <>
+void Set<Mixed>::insert_repl(Replication*, Mixed)
+{
+    // repl->set_insert_any(*this, value);
 }
 
 } // namespace realm

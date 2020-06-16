@@ -19,6 +19,7 @@
 #include "testsettings.hpp"
 
 #include <realm.hpp>
+#include <realm/array_mixed.hpp>
 
 #include "test.hpp"
 
@@ -33,8 +34,10 @@ TEST(Set_Basics)
     auto t = g.add_table("foo");
     auto col_int = t->add_column_set(type_Int, "ints");
     auto col_str = t->add_column_set(type_String, "strings");
+    auto col_any = t->add_column_set(type_Mixed, "any");
     CHECK(col_int.is_set());
     CHECK(col_str.is_set());
+    CHECK(col_any.is_set());
 
     auto obj = t->create_object();
     {
@@ -60,6 +63,19 @@ TEST(Set_Basics)
         s.insert("Hello");
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find("Hello");
+        CHECK_NOT_EQUAL(ndx, realm::npos);
+        s.erase(ndx);
+        CHECK_EQUAL(s.size(), 1);
+    }
+    {
+        auto s = obj.get_set<Mixed>(col_any);
+        s.insert(Mixed("Hello"));
+        CHECK_EQUAL(s.size(), 1);
+        s.insert(Mixed(10));
+        CHECK_EQUAL(s.size(), 2);
+        s.insert(Mixed("Hello"));
+        CHECK_EQUAL(s.size(), 2);
+        auto ndx = s.find(Mixed("Hello"));
         CHECK_NOT_EQUAL(ndx, realm::npos);
         s.erase(ndx);
         CHECK_EQUAL(s.size(), 1);
