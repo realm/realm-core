@@ -239,8 +239,7 @@ private:
                          "group, \""
                       << table->get_name() << "\");\n";
         }
-        sync::TableInfoCache table_info_cache{*client.group};
-        sync::erase_table(*client.group, table_info_cache, table->get_name());
+        sync::erase_table(*client.group, table->get_name());
     }
 
     void clear_group(Peer& client)
@@ -477,7 +476,7 @@ private:
                              "group, *"
                           << trace_selected_table(client) << ");\n";
             }
-            sync::create_object(*client.group, *client.selected_table);
+            client.selected_table->create_object();
         }
         else {
             char string_buffer[2] = {0};
@@ -503,9 +502,9 @@ private:
                 std::cerr << ");\n";
             }
             if (is_string_pk)
-                sync::create_object_with_primary_key(*client.group, *client.selected_table, pk_string);
+                client.selected_table->create_object_with_primary_key(pk_string);
             else
-                sync::create_object_with_primary_key(*client.group, *client.selected_table, pk_int);
+                client.selected_table->create_object_with_primary_key(pk_int);
         }
     }
 

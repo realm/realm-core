@@ -90,7 +90,7 @@ TEST(ServerLegacyMigration_ClientFileToCore6)
         // Check that we can create new tables and objects
         TableRef foobar = sync::create_table(*tr, "class_foobar");
         CHECK(foobar);
-        sync::create_object(*tr, *foo).set(col_int, 100);
+        foo->create_object().set(col_int, 100);
         tr->commit();
     }
     {

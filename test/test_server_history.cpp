@@ -94,7 +94,7 @@ TEST(ServerHistory_Verify)
         TableRef table = sync::create_table(wt, "class_table");
         table->add_column(type_Int, "alpha");
         table->add_column(type_Int, "beta");
-        sync::create_object(wt, *table);
+        table->create_object();
         wt.commit();
     }
     {

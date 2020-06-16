@@ -85,7 +85,7 @@ TEST(AsyncOpen_DisableStateRealms)
         TableRef table = create_table_with_primary_key(wt, "class_table", type_Int, "pk_int");
         auto col_ndx = table->add_column(type_Int, "int");
         for (int i = 0; i < number_of_rows; ++i) {
-            sync::create_object_with_primary_key(wt, *table, i).set(col_ndx, i);
+            table->create_object_with_primary_key(i).set(col_ndx, i);
         }
         wt.commit();
 
@@ -157,7 +157,7 @@ TEST(AsyncOpen_StateRealmManagement)
         auto col_ndx_string = table->add_column(type_String, "string");
         for (int i = 0; i < num_rows; ++i) {
             std::string str = "something-" + std::to_string(i);
-            create_object(wt, *table).set(col_ndx_int, i).set(col_ndx_string, str);
+            table->create_object().set(col_ndx_int, i).set(col_ndx_string, str);
         }
         session_1.nonsync_transact_notify(wt.commit());
     }

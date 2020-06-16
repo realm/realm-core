@@ -56,7 +56,6 @@ public:
     using VersionInfo     = sync::VersionInfo;
     using HistoryEntry    = sync::HistoryEntry;
     using Transformer     = sync::Transformer;
-    using TableInfoCache  = sync::TableInfoCache;
     // clang-format on
 
     struct LocalChangeset {
@@ -325,7 +324,7 @@ private:
     void ensure_no_cooked_history();
     void save_cooked_changeset(BinaryData changeset, version_type server_version);
     void update_cooked_progress(CookedProgress progress);
-    void fix_up_client_file_ident_in_stored_changesets(Transaction&, TableInfoCache&, file_ident_type);
+    void fix_up_client_file_ident_in_stored_changesets(Transaction&, file_ident_type);
     void migrate_from_history_schema_version_1_to_2(int orig_schema_version);
     void migrate_from_history_schema_version_2_to_10();
     void record_current_schema_version();

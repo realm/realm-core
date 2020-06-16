@@ -396,7 +396,7 @@ TEST(Sync_CookedHistory_LargeChangeset)
         {
             std::string data(data_size, '\0');
             for (size_t row = 0; row < data_count; ++row) {
-                sync::create_object(wt, *table).set(col_data, BinaryData{data.data(), data.size()});
+                table->create_object().set(col_data, BinaryData{data.data(), data.size()});
             }
         }
 

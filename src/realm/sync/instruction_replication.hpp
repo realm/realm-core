@@ -152,7 +152,7 @@ private:
 
     ChangesetEncoder m_encoder;
     DB* m_sg = nullptr;
-    std::unique_ptr<TableInfoCache> m_cache;
+    Transaction* m_transaction;
 
     // Consistency checks:
     std::string m_table_being_erased;

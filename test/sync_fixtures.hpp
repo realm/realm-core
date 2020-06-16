@@ -1064,7 +1064,7 @@ inline void RealmFixture::nonempty_transact()
         TableRef table = tr.get_table("class_Table");
         if (!table)
             table = sync::create_table(tr, "class_Test");
-        sync::create_object(tr, *table);
+        table->create_object();
         return true;
     };
     transact(func);
@@ -1195,7 +1195,7 @@ inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table, Stri
         matches_col = result_sets->add_column_link(type_LinkList, matches_col_name, *table);
     }
 
-    Obj result_set = sync::create_object(g, *result_sets);
+    Obj result_set = result_sets->create_object();
     ColKey col_ndx_query = result_sets->get_column_key("query");
     ColKey col_ndx_matches_property = result_sets->get_column_key("matches_property");
 

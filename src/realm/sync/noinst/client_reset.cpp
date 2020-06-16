@@ -861,9 +861,7 @@ bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)>
 } // namespace
 
 
-void client_reset::transfer_group(const Transaction& group_src, const sync::TableInfoCache& table_info_cache_src,
-                                  Transaction& group_dst, sync::TableInfoCache& table_info_cache_dst,
-                                  util::Logger& logger)
+void client_reset::transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
     logger.debug("copy_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
 
@@ -882,8 +880,10 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         }
         // Check whether the table type is the same.
         TableRef table_dst = group_dst.get_table(table_key);
-        bool has_pk_src = sync::table_has_primary_key(table_info_cache_src, *table_src);
-        bool has_pk_dst = sync::table_has_primary_key(table_info_cache_dst, *table_dst);
+        auto pk_col_src = table_src->get_primary_key_column();
+        auto pk_col_dst = table_dst->get_primary_key_column();
+        bool has_pk_src = bool(pk_col_src);
+        bool has_pk_dst = bool(pk_col_dst);
         if (has_pk_src != has_pk_dst) {
             logger.debug("Table '%1' will be removed", table_name);
             tables_to_remove.insert(table_name);
@@ -893,16 +893,13 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
             continue;
 
         // Now the tables both have primary keys.
-        const sync::TableInfoCache::TableInfo& table_info_src = table_info_cache_src.get_table_info(*table_src);
-        const sync::TableInfoCache::TableInfo& table_info_dst = table_info_cache_dst.get_table_info(*table_dst);
-        if (table_info_src.primary_key_type != table_info_dst.primary_key_type ||
-            table_info_src.primary_key_nullable != table_info_dst.primary_key_nullable) {
+        if (pk_col_src.get_type() != pk_col_dst.get_type() || pk_col_src.is_nullable() != pk_col_dst.is_nullable()) {
             logger.debug("Table '%1' will be removed", table_name);
             tables_to_remove.insert(table_name);
             continue;
         }
-        StringData pk_col_name_src = table_src->get_column_name(table_info_src.primary_key_col);
-        StringData pk_col_name_dst = table_dst->get_column_name(table_info_dst.primary_key_col);
+        StringData pk_col_name_src = table_src->get_column_name(pk_col_src);
+        StringData pk_col_name_dst = table_dst->get_column_name(pk_col_dst);
         if (pk_col_name_src != pk_col_name_dst) {
             logger.debug("Table '%1' will be removed", table_name);
             tables_to_remove.insert(table_name);
@@ -911,7 +908,6 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         // The table survives.
         logger.debug("Table '%1' will remain", table_name);
     }
-    table_info_cache_dst.clear();
 
     // Remove all columns that link to one of the tables to be removed.
     for (auto table_key : group_dst.get_table_keys()) {
@@ -940,9 +936,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
 
     // Remove the tables to be removed.
     for (const std::string& table_name : tables_to_remove)
-        sync::erase_table(group_dst, table_info_cache_dst, table_name);
-
-    table_info_cache_dst.clear();
+        sync::erase_table(group_dst, table_name);
 
     // Create new tables in dst if needed.
     for (auto table_key : group_src.get_table_keys()) {
@@ -950,7 +944,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         StringData table_name = table_src->get_name();
         if (!table_name.begins_with("class"))
             continue;
-        bool has_pk = sync::table_has_primary_key(table_info_cache_src, *table_src);
+        bool has_pk = sync::table_has_primary_key(*table_src);
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
             // Create the table.
@@ -958,12 +952,10 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                 sync::create_table(group_dst, table_name);
             }
             else {
-                const sync::TableInfoCache::TableInfo& table_info_src =
-                    table_info_cache_src.get_table_info(*table_src);
-                DataType pk_type = table_info_src.primary_key_type;
-                StringData pk_col_name = table_src->get_column_name(table_info_src.primary_key_col);
-                bool nullable = table_info_src.primary_key_nullable;
-                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, nullable);
+                auto pk_col_src = table_src->get_primary_key_column();
+                DataType pk_type = DataType(pk_col_src.get_type());
+                StringData pk_col_name = table_src->get_column_name(pk_col_src);
+                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
             }
         }
     }
@@ -1130,13 +1122,13 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         TableRef table_dst = group_dst.get_table(table_name);
         REALM_ASSERT(table_src->size() == table_dst->size());
         REALM_ASSERT(table_src->get_column_count() == table_dst->get_column_count());
-        const sync::TableInfoCache::TableInfo& table_info_src = table_info_cache_src.get_table_info(*table_src);
-        if (table_src->get_primary_key_column()) {
+
+        if (auto pk_col = table_src->get_primary_key_column()) {
             logger.debug("Updating values for table '%1', number of rows = %2, "
                          "number of columns = %3, primary_key_col = %4, "
                          "primary_key_type = %5",
-                         table_name, table_src->size(), table_src->get_column_count(),
-                         table_info_src.primary_key_col.get_index().val, table_info_src.primary_key_type);
+                         table_name, table_src->size(), table_src->get_column_count(), pk_col.get_index().val,
+                         pk_col.get_type());
         }
         else {
             logger.debug("Updating values for table '%1', number of rows = %2, number of columns = %3", table_name,
@@ -1144,13 +1136,13 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
         }
 
         for (const Obj& src : *table_src) {
-            auto oid = sync::object_id_for_row(table_info_cache_src, src);
-            auto dst = obj_for_object_id(table_info_cache_dst, *table_dst, oid);
+            auto oid = src.get_object_id();
+            auto dst = obj_for_object_id(*table_dst, oid);
             REALM_ASSERT(dst);
             bool updated = false;
 
             for (ColKey col_key_src : table_src->get_column_keys()) {
-                if (col_key_src == table_info_src.primary_key_col)
+                if (col_key_src == table_src->get_primary_key_column())
                     continue;
                 StringData col_name = table_src->get_column_name(col_key_src);
                 ColKey col_key_dst = table_dst->get_column_key(col_name);
@@ -1169,10 +1161,8 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                     }
                     else {
                         ObjKey target_obj_key_src = src.get<ObjKey>(col_key_src);
-                        GlobalKey target_oid =
-                            sync::object_id_for_row(table_info_cache_src, *table_target_src, target_obj_key_src);
-                        ObjKey target_obj_key_dst =
-                            sync::row_for_object_id(table_info_cache_dst, *table_target_dst, target_oid);
+                        GlobalKey target_oid = table_target_src->get_object_id(target_obj_key_src);
+                        ObjKey target_obj_key_dst = sync::row_for_object_id(*table_target_dst, target_oid);
                         if (dst.get<ObjKey>(col_key_dst) != target_obj_key_dst) {
                             dst.set(col_key_dst, target_obj_key_dst);
                             updated = true;
@@ -1187,8 +1177,8 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
                     // to the row index in table_target_dst such that the
                     // object ids are the same.
                     auto convert_ndx = [&](ObjKey key_src) {
-                        auto oid = sync::object_id_for_row(table_info_cache_src, *table_target_src, key_src);
-                        ObjKey key_dst = sync::row_for_object_id(table_info_cache_dst, *table_target_dst, oid);
+                        auto oid = table_target_src->get_object_id(key_src);
+                        ObjKey key_dst = sync::row_for_object_id(*table_target_dst, oid);
                         REALM_ASSERT(key_dst);
                         return key_dst;
                     };
@@ -1220,8 +1210,7 @@ void client_reset::transfer_group(const Transaction& group_src, const sync::Tabl
 }
 
 
-void client_reset::recover_schema(const Transaction& group_src, const sync::TableInfoCache& table_info_cache_src,
-                                  Transaction& group_dst, util::Logger& logger)
+void client_reset::recover_schema(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
     // First the missing tables are created. Columns must be created later due
     // to links.
@@ -1236,18 +1225,15 @@ void client_reset::recover_schema(const Transaction& group_src, const sync::Tabl
             // That problem is rare and cannot be resolved here.
             continue;
         }
-        bool has_pk = sync::table_has_primary_key(table_info_cache_src, *table_src);
         // Create the table.
         logger.trace("Recover the table %1", table_name);
-        if (!has_pk) {
-            sync::create_table(group_dst, table_name);
+        if (auto pk_col = table_src->get_primary_key_column()) {
+            DataType pk_type = DataType(pk_col.get_type());
+            StringData pk_col_name = table_src->get_column_name(pk_col);
+            group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col.is_nullable());
         }
         else {
-            const sync::TableInfoCache::TableInfo& table_info_src = table_info_cache_src.get_table_info(*table_src);
-            DataType pk_type = table_info_src.primary_key_type;
-            StringData pk_col_name = table_src->get_column_name(table_info_src.primary_key_col);
-            bool nullable = table_info_src.primary_key_nullable;
-            group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, nullable);
+            sync::create_table(group_dst, table_name);
         }
     }
 
@@ -1309,7 +1295,6 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
     VersionID old_version_local = group_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     group_local->get_history()->ensure_updated(current_version_local);
-    sync::TableInfoCache table_info_cache_local{*group_local};
 
     std::unique_ptr<ClientHistoryImpl> history_remote = std::make_unique<ClientHistoryImpl>(path_remote);
     DBRef sg_remote = DB::create(*history_remote, shared_group_options);
@@ -1321,7 +1306,6 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
     if (recover_local_changes) {
         // Set the client file ident in the remote Realm to prepare it for creation of
         // local changes.
-        sync::TableInfoCache table_info_cache_remote{*wt_remote};
 
         // Copy tables and columns from local into remote to avoid destructive schema changes.
         // The instructions that create tables and columns present in local but not
@@ -1329,7 +1313,7 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
         // This needs to be done before the local changes are recovered otherwise we might loose
         // modifications on a table, which creation has been integrated on the server but not yet
         // present in the state file
-        recover_schema(*group_local, table_info_cache_local, *wt_remote, logger);
+        recover_schema(*group_local, *wt_remote, logger);
 
         // Recover the local changesets with client versions above 'client_version'.
         // The recovered changeset will be in history_remote's instruction encoder
@@ -1357,15 +1341,14 @@ client_reset::perform_client_reset_diff(const std::string& path_remote, const st
             current_version_remote = wt_remote->get_version();
             history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
             // Recover schema again. The previous changes were never comitted
-            recover_schema(*group_local, table_info_cache_local, *wt_remote, logger);
+            recover_schema(*group_local, *wt_remote, logger);
         }
     }
 
     // Diff the content from remote into local.
     {
-        sync::TableInfoCache table_info_cache_remote{*wt_remote};
         // Copy, by diffing, all group content from the remote to the local.
-        transfer_group(*wt_remote, table_info_cache_remote, *group_local, table_info_cache_local, logger);
+        transfer_group(*wt_remote, *group_local, logger);
     }
 
     // Extract the changeset produced in the remote Realm during recovery.
