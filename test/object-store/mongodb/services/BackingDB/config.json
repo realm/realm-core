@@ -1,8 +1,20 @@
 {
-    "id": "5eabdd97ada449487cf49f59",
+    "id": "5ed6e67569b0463a603e87d8",
     "name": "BackingDB",
     "type": "mongodb",
-    "config": {},
+    "config": {
+        "sync": {
+            "state": "enabled",
+            "database_name": "test_data",
+            "partition": {
+                "key": "realm_id",
+                "permissions": {
+                    "read": true,
+                    "write": true
+                }
+            }
+        }
+    },
     "secret_config": {
         "uri": "BackingDB_uri"
     },

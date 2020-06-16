@@ -192,7 +192,7 @@ install(FILES ${UTIL_METERED_INSTALL_HEADERS}
         COMPONENT devel)
 
 install(FILES ../../external/mpark/variant.hpp
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/mpark
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/external/mpark
         COMPONENT devel)
 
 if(REALM_BUILD_COMMANDLINE_TOOLS)

@@ -92,6 +92,18 @@ App::App(const Config& config)
 {
     REALM_ASSERT(m_config.transport_generator);
 
+    if (m_config.platform.empty()) {
+        throw std::runtime_error("You must specify the Platform in App::Config");
+    }
+
+    if (m_config.platform_version.empty()) {
+        throw std::runtime_error("You must specify the Platform Version in App::Config");
+    }
+
+    if (m_config.sdk_version.empty()) {
+        throw std::runtime_error("You must specify the SDK Version in App::Config");
+    }
+
     // change the scheme in the base url to ws from http to satisfy the sync client
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -138,8 +150,9 @@ void App::UsernamePasswordProviderClient::register_email(const std::string& emai
 
     nlohmann::json body = {{"email", email}, {"password", password}};
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
+        handler);
 }
 
 void App::UsernamePasswordProviderClient::confirm_user(const std::string& token, const std::string& token_id,
@@ -155,8 +168,9 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
 
     nlohmann::json body = {{"token", token}, {"tokenId", token_id}};
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
+        handler);
 }
 
 void App::UsernamePasswordProviderClient::resend_confirmation_email(
@@ -172,8 +186,9 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(
 
     nlohmann::json body{{"email", email}};
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
+        handler);
 }
 
 void App::UsernamePasswordProviderClient::send_reset_password_email(
@@ -189,8 +204,9 @@ void App::UsernamePasswordProviderClient::send_reset_password_email(
 
     nlohmann::json body = {{"email", email}};
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
+        handler);
 }
 
 void App::UsernamePasswordProviderClient::reset_password(const std::string& password, const std::string& token,
@@ -206,8 +222,9 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
 
     nlohmann::json body = {{"password", password}, {"token", token}, {"token_id", token_id}};
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()}, handler);
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
+        handler);
 }
 
 void App::UsernamePasswordProviderClient::call_reset_password_function(
@@ -227,8 +244,8 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(
     std::stringstream body;
     body << bson::Bson(arg);
 
-    m_parent->m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.str()}, handler);
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.str()}, handler);
 }
 
 // MARK: - UserAPIKeyProviderClient
@@ -279,6 +296,7 @@ void App::UserAPIKeyProviderClient::create_api_key(
     req.url = route;
     req.body = body.dump();
     req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -316,6 +334,7 @@ void App::UserAPIKeyProviderClient::fetch_api_key(
     req.method = HttpMethod::get;
     req.url = route;
     req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -360,6 +379,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(
     req.method = HttpMethod::get;
     req.url = route;
     req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -382,6 +402,7 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
     req.method = HttpMethod::del;
     req.url = route;
     req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -403,6 +424,7 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
     req.method = HttpMethod::put;
     req.url = route;
     req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -424,6 +446,7 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
     req.method = HttpMethod::put;
     req.url = route;
     req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 // MARK: - App
@@ -495,7 +518,24 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     req.url = profile_route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = false;
+
     do_authenticated_request(req, sync_user, profile_handler);
+}
+
+void App::attach_auth_options(bson::BsonDocument& body)
+{
+    bson::BsonDocument options;
+
+    if (m_config.local_app_version) {
+        options["appVersion"] = *m_config.local_app_version;
+    }
+
+    options["appId"] = m_config.app_id;
+    options["platform"] = m_config.platform;
+    options["platformVersion"] = m_config.platform_version;
+    options["sdkVersion"] = m_config.sdk_version;
+
+    body["options"] = bson::BsonDocument({{"device", options}});
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials, const std::shared_ptr<SyncUser> linking_user,
@@ -527,7 +567,8 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
                                                                   value_from_json<std::string>(json, "refresh_token"),
                                                                   value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string());
+                                                                  credentials.provider_as_string(),
+                                                                  value_from_json<std::string>(json, "device_id"));
             }
         }
         catch (const AppError& err) {
@@ -537,10 +578,27 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
         App::get_profile(linking_user ? linking_user : sync_user, completion_block);
     };
 
-    m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_request_timeout_ms,
-         get_request_headers(linking_user, RequestTokenType::AccessToken), credentials.serialize_as_json()},
-        handler);
+    bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
+    bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
+    attach_auth_options(body);
+
+    std::stringstream s;
+    s << bson::Bson(body);
+
+    // if we try logging in with an anonymous user while there
+    // is already an anonymous session active, reuse it
+    if (credentials.provider() == AuthProvider::ANONYMOUS) {
+        for (auto user : realm::SyncManager::shared().all_users()) {
+            if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
+                completion_block(switch_user(user), util::none);
+                return;
+            }
+        }
+    }
+
+    do_request({HttpMethod::post, route, m_request_timeout_ms,
+                get_request_headers(linking_user, RequestTokenType::AccessToken), s.str()},
+               handler);
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
@@ -571,6 +629,7 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = true;
+
     do_authenticated_request(req, user, handler);
 }
 
@@ -697,44 +756,45 @@ void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::O
     });
 }
 
-void App::do_authenticated_request(Request request, std::shared_ptr<SyncUser> sync_user,
-                                   std::function<void(Response)> completion_block)
+void App::do_request(Request request, std::function<void(Response)> completion_block)
 {
-    request.timeout_ms = m_request_timeout_ms;
-    request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
-                                                                                : RequestTokenType::AccessToken);
-
-    init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
-                                                                   const util::Optional<Response> response) {
+    request.timeout_ms = default_timeout_ms;
+    init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
+                                                        const util::Optional<Response> response) {
         if (error) {
             return completion_block(*response);
         }
 
-        auto handler = [completion_block, request, sync_user, this](const Response& response) {
-            if (auto error = check_for_errors(response)) {
-                App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
-            }
-            else {
-                completion_block(response);
-            }
-        };
+        m_config.transport_generator()->send_request_to_server(request, completion_block);
+    });
+}
 
+void App::do_authenticated_request(Request request, std::shared_ptr<SyncUser> sync_user,
+                                   std::function<void(Response)> completion_block)
+{
+    request.headers = get_request_headers(sync_user, request.uses_refresh_token ? RequestTokenType::RefreshToken
+                                                                                : RequestTokenType::AccessToken);
 
-        m_config.transport_generator()->send_request_to_server(request, handler);
+    do_request(request, [completion_block, request, sync_user, this](Response response) {
+        if (auto error = check_for_errors(response)) {
+            App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
+        }
+        else {
+            completion_block(response);
+        }
     });
 }
 
 void App::handle_auth_failure(const AppError& error, const Response& response, Request request,
-                              std::shared_ptr<SyncUser> sync_user,
-                              std::function<void(Response)> completion_block) const
+                              std::shared_ptr<SyncUser> sync_user, std::function<void(Response)> completion_block)
 {
-    auto transport_generator = m_config.transport_generator();
-    auto access_token_handler = [&transport_generator, &request, completion_block, response,
+    auto access_token_handler = [this, request, completion_block, response,
                                  sync_user](const Optional<AppError>& error) {
         if (!error) {
             // assign the new access_token to the auth header
-            request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
-            transport_generator->send_request_to_server(request, completion_block);
+            Request newRequest = request;
+            newRequest.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
+            m_config.transport_generator()->send_request_to_server(newRequest, completion_block);
         }
         else {
             // pass the error back up the chain
@@ -761,7 +821,7 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
 
 /// MARK: - refresh access token
 void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
-                               std::function<void(Optional<AppError>)> completion_block) const
+                               std::function<void(Optional<AppError>)> completion_block)
 {
     if (!sync_user) {
         completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found), "No current user exists"));
@@ -782,7 +842,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         try {
             nlohmann::json json = nlohmann::json::parse(response.body);
             auto access_token = value_from_json<std::string>(json, "access_token");
-            sync_user->update_access_token(access_token);
+            sync_user->update_access_token(std::move(access_token));
         }
         catch (const AppError& err) {
             return completion_block(err);
@@ -793,10 +853,9 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
 
     std::string route = util::format("%1/auth/session", m_base_route);
 
-    m_config.transport_generator()->send_request_to_server(
-        {HttpMethod::post, route, m_request_timeout_ms,
-         get_request_headers(sync_user, RequestTokenType::RefreshToken)},
-        handler);
+    do_request(Request{HttpMethod::post, route, m_request_timeout_ms,
+                       get_request_headers(sync_user, RequestTokenType::RefreshToken)},
+               handler);
 }
 
 void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
@@ -807,7 +866,6 @@ void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name,
         if (auto error = check_for_errors(response)) {
             return completion_block(error, util::none);
         }
-
         completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
     };
 
@@ -822,12 +880,8 @@ void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name,
     std::stringstream s;
     s << bson::Bson(args);
 
-    Request request;
-    request.method = HttpMethod::post;
-    request.url = route;
-    request.body = s.str();
-
-    do_authenticated_request(request, user, handler);
+    do_authenticated_request(Request{HttpMethod::post, route, m_request_timeout_ms, {}, s.str(), false}, user,
+                             handler);
 }
 
 void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
@@ -852,6 +906,11 @@ void App::call_function(const std::string& name, const bson::BsonArray& args_bso
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 {
     return RemoteMongoClient(shared_from_this(), service_name);
+}
+
+PushClient App::push_notification_client(const std::string& service_name)
+{
+    return PushClient(service_name, m_config.app_id, m_request_timeout_ms, shared_from_this());
 }
 
 } // namespace app

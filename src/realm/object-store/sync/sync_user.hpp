@@ -35,6 +35,9 @@
 #include <vector>
 
 namespace realm {
+namespace app {
+struct AppError;
+} // namespace app
 
 class SyncSession;
 
@@ -59,7 +62,7 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
-    RealmJWT(const std::string& token);
+    RealmJWT(std::string&& token);
 
     bool operator==(const RealmJWT& other) const
     {
@@ -117,7 +120,7 @@ struct SyncUserIdentity {
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
-class SyncUser {
+class SyncUser : public std::enable_shared_from_this<SyncUser> {
     friend class SyncSession;
 
 public:
@@ -129,7 +132,7 @@ public:
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(std::string refresh_token, const std::string id, const std::string provider_type,
-             std::string access_token, SyncUser::State state);
+             std::string access_token, SyncUser::State state, const std::string device_id);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -142,11 +145,11 @@ public:
 
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_refresh_token(std::string token);
+    void update_refresh_token(std::string&& token);
 
     // Update the user's access token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_access_token(std::string token);
+    void update_access_token(std::string&& token);
 
     // Update the user's profile.
     void update_user_profile(const SyncUserProfile& profile);
@@ -179,6 +182,15 @@ public:
 
     std::string refresh_token() const;
 
+    RealmJWT refresh_jwt() const
+    {
+        return m_refresh_token;
+    }
+
+    std::string device_id() const;
+
+    bool has_device_id() const;
+
     SyncUserProfile user_profile() const;
 
     std::vector<SyncUserIdentity> identities() const;
@@ -199,6 +211,9 @@ public:
     // immediately, or upon the user becoming Active.
     // Note that this is called by the SyncManager, and should not be directly called.
     void register_session(std::shared_ptr<SyncSession>);
+
+    /// Refreshes the custom data for this user
+    void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
@@ -242,6 +257,8 @@ private:
     std::vector<SyncUserIdentity> m_user_identities;
 
     SyncUserProfile m_user_profile;
+
+    const std::string m_device_id;
 };
 
 } // namespace realm

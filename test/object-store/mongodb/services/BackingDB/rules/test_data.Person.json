@@ -1,7 +1,15 @@
 {
-    "id": "5eabdd97ada449487cf49f5b",
+    "id": "5ed6e50abfbde00f7edd66ba",
     "database": "test_data",
     "collection": "Person",
+    "relationships": {
+        "dogs": {
+            "ref": "#/stitch/BackingDB/test_data/Dog",
+            "source_key": "dogs",
+            "foreign_key": "_id",
+            "is_list": true
+        }
+    },
     "roles": [
         {
             "name": "default",
@@ -39,8 +47,7 @@
         "required": [
             "firstName",
             "lastName",
-            "age",
-            "dogs"
+            "age"
         ],
         "title": "Person"
     }

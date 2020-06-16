@@ -22,6 +22,7 @@
 #include "sync/auth_request_client.hpp"
 #include "sync/app_service_client.hpp"
 #include "sync/app_credentials.hpp"
+#include "sync/push_client.hpp"
 #include "sync/generic_network_transport.hpp"
 
 #include <realm/object_id.hpp>
@@ -55,6 +56,9 @@ public:
         util::Optional<std::string> local_app_name;
         util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
+        std::string platform;
+        std::string platform_version;
+        std::string sdk_version;
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
@@ -328,6 +332,9 @@ public:
         call_function(current_user(), name, args_bson, completion_block);
     }
 
+    // MARK: Push notification client
+    PushClient push_notification_client(const std::string& service_name);
+
 private:
     friend class Internal;
     friend class OnlyForTesting;
@@ -364,7 +371,7 @@ private:
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
     void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
-                              std::function<void(util::Optional<AppError>)> completion_block) const;
+                              std::function<void(util::Optional<AppError>)> completion_block);
 
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
@@ -375,12 +382,16 @@ private:
     /// @param completion_block returns the original response in the case it is not an auth error, or if a failure
     /// occurs, if the refresh was a success the newly attempted response will be passed back
     void handle_auth_failure(const AppError& error, const Response& response, Request request,
-                             std::shared_ptr<SyncUser> sync_user,
-                             std::function<void(Response)> completion_block) const;
+                             std::shared_ptr<SyncUser> sync_user, std::function<void(Response)> completion_block);
 
     std::string url_for_path(const std::string& path) const override;
 
     void init_app_metadata(std::function<void(util::Optional<AppError>, util::Optional<Response>)> completion_block);
+
+    /// Performs a request to the Stitch server. This request does not contain authentication state.
+    /// @param request The request to be performed
+    /// @param completion_block Returns the response from the server
+    void do_request(Request request, std::function<void(Response)> completion_block);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
@@ -406,6 +417,9 @@ private:
     void log_in_with_credentials(
         const AppCredentials& credentials, const std::shared_ptr<SyncUser> linking_user,
         std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+
+    /// Provides MongoDB Realm Cloud with metadata related to the users session
+    void attach_auth_options(bson::BsonDocument& body);
 };
 
 // MARK: Provider client templates

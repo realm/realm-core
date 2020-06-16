@@ -57,14 +57,15 @@ static std::vector<std::string> split_token(const std::string& jwt)
     return parts;
 }
 
-RealmJWT::RealmJWT(const std::string& token)
+RealmJWT::RealmJWT(std::string&& token)
 {
-    auto parts = split_token(token);
+    this->token = std::move(token);
+
+    auto parts = split_token(this->token);
 
     auto json_str = base64_decode(parts[1]);
     auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
-    this->token = token;
     this->expires_at = long(static_cast<int64_t>(json["exp"]));
     this->issued_at = long(static_cast<int64_t>(json["iat"]));
 
@@ -100,12 +101,13 @@ SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
 SyncUser::SyncUser(std::string refresh_token, const std::string identity, const std::string provider_type,
-                   std::string access_token, SyncUser::State state)
+                   std::string access_token, SyncUser::State state, const std::string device_id)
     : m_state(state)
     , m_provider_type(provider_type)
     , m_refresh_token(RealmJWT(std::move(refresh_token)))
     , m_identity(std::move(identity))
     , m_access_token(RealmJWT(std::move(access_token)))
+    , m_device_id(device_id)
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -118,6 +120,7 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_refresh_token(m_refresh_token.token);
         metadata->set_access_token(m_access_token.token);
+        metadata->set_device_id(m_device_id);
         m_local_identity = metadata->local_uuid();
     });
     if (!updated)
@@ -161,7 +164,7 @@ std::shared_ptr<SyncSession> SyncUser::session_for_on_disk_path(const std::strin
     return locked;
 }
 
-void SyncUser::update_refresh_token(std::string token)
+void SyncUser::update_refresh_token(std::string&& token)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
@@ -170,11 +173,11 @@ void SyncUser::update_refresh_token(std::string token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_refresh_token = token;
+                m_refresh_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_refresh_token = token;
+                m_refresh_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -189,7 +192,7 @@ void SyncUser::update_refresh_token(std::string token)
 
         SyncManager::shared().perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-            metadata->set_refresh_token(token);
+            metadata->set_refresh_token(m_refresh_token.token);
         });
     }
     // (Re)activate all pending sessions.
@@ -200,7 +203,7 @@ void SyncUser::update_refresh_token(std::string token)
     }
 }
 
-void SyncUser::update_access_token(std::string token)
+void SyncUser::update_access_token(std::string&& token)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
@@ -209,11 +212,11 @@ void SyncUser::update_access_token(std::string token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_access_token = token;
+                m_access_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_access_token = token;
+                m_access_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -228,7 +231,7 @@ void SyncUser::update_access_token(std::string token)
 
         SyncManager::shared().perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
-            metadata->set_access_token(token);
+            metadata->set_access_token(m_access_token.token);
         });
     }
 
@@ -320,6 +323,18 @@ std::string SyncUser::access_token() const
     return m_access_token.token;
 }
 
+std::string SyncUser::device_id() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_device_id;
+}
+
+bool SyncUser::has_device_id() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !m_device_id.empty() && m_device_id != "000000000000000000000000";
+}
+
 SyncUser::State SyncUser::state() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -383,6 +398,14 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 {
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
     s_binding_context_factory = std::move(factory);
+}
+
+void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
+{
+    SyncManager::shared().app()->refresh_custom_data(shared_from_this(),
+                                                     [completion_block](util::Optional<app::AppError> error) {
+                                                         completion_block(error);
+                                                     });
 }
 } // namespace realm
 
