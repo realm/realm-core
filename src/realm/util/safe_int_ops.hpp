@@ -221,37 +221,37 @@ namespace util {
 template <class A, class B>
 inline bool int_equal_to(A a, B b) noexcept
 {
-    return _impl::SafeIntBinops<A, B>::equal(a, b);
+    return realm::_impl::SafeIntBinops<A, B>::equal(a, b);
 }
 
 template <class A, class B>
 inline bool int_not_equal_to(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<A, B>::equal(a, b);
+    return !realm::_impl::SafeIntBinops<A, B>::equal(a, b);
 }
 
 template <class A, class B>
 inline bool int_less_than(A a, B b) noexcept
 {
-    return _impl::SafeIntBinops<A, B>::less(a, b);
+    return realm::_impl::SafeIntBinops<A, B>::less(a, b);
 }
 
 template <class A, class B>
 inline bool int_less_than_or_equal(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<B, A>::less(b, a); // Not greater than
+    return !realm::_impl::SafeIntBinops<B, A>::less(b, a); // Not greater than
 }
 
 template <class A, class B>
 inline bool int_greater_than(A a, B b) noexcept
 {
-    return _impl::SafeIntBinops<B, A>::less(b, a);
+    return realm::_impl::SafeIntBinops<B, A>::less(b, a);
 }
 
 template <class A, class B>
 inline bool int_greater_than_or_equal(A a, B b) noexcept
 {
-    return !_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
+    return !realm::_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
 }
 
 template <class L, class R>

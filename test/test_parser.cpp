@@ -376,13 +376,13 @@ TEST(Parser_grammar_analysis)
 }
 
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                   size_t num_results)
+                   size_t num_results, parser::KeyPathMapping mapping = {})
 {
     Query q = t->where();
     realm::query_builder::NoArguments args;
 
     parser::ParserResult res = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, res.predicate, args);
+    realm::query_builder::apply_predicate(q, res.predicate, args, mapping);
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
@@ -390,7 +390,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
-    realm::query_builder::apply_predicate(q2, res2.predicate, args);
+    realm::query_builder::apply_predicate(q2, res2.predicate, args, mapping);
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
 }
@@ -3080,41 +3080,46 @@ TEST(Parser_Backlinks)
     parser::KeyPathMapping mapping;
     mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
     mapping.add_mapping(t, "money", "account_balance");
-    query_builder::NoArguments args;
 
-    q = items->where();
-    realm::parser::Predicate p = realm::parser::parse("purchasers.@count > 2").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping);
-    CHECK_EQUAL(q.count(), 2);
-
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping);
-    CHECK_EQUAL(q.count(), 3);
+    verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
+    verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
 
     // disable parsing backlink queries
     mapping.set_allow_backlinks(false);
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
-    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
-                         "of property 'items' on type 'Person'");
-
+    {
+        query_builder::NoArguments args;
+        q = items->where();
+        auto p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+        CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
+        CHECK_EQUAL(message,
+                    "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
+                    "of property 'items' on type 'Person'");
+    }
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
     mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
     mapping_with_prefix.add_mapping(t, "money", "account_balance");
+    mapping_with_prefix.add_mapping(t, "funds", "money");     // double indirection
+    mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
+    mapping_with_prefix.add_mapping(t, "banknotes", "finances");
+    mapping_with_prefix.add_mapping(t, "finances", "banknotes"); // indirect loop
 
-    q = items->where();
-    p = realm::parser::parse("purchasers.@count > 2").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
-    CHECK_EQUAL(q.count(), 2);
-
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
-    CHECK_EQUAL(q.count(), 3);
+    verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
+    verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
+    // double substitution via subquery "$x"->"" and "money"->"account_balance"
+    verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
+    // double indirection is allowed
+    verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
+    // infinite loops are detected
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "purchasers.@max.banknotes >= 20", 3, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "Substitution loop detected while processing property 'finances' -> 'banknotes' found in "
+                         "type 'Person'. Check property aliases.");
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "purchasers.@max.capital >= 20", 3, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "Substitution loop detected while processing property 'capital' -> 'capital' found in type "
+                         "'Person'. Check property aliases.");
 }
 
 

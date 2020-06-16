@@ -53,9 +53,9 @@ inline ObjectId convert_for_test<ObjectId>(int64_t v)
 }
 
 template <>
-inline Optional<ObjectId> convert_for_test(int64_t v)
+inline util::Optional<ObjectId> convert_for_test(int64_t v)
 {
-    return Optional<ObjectId>(convert_for_test<ObjectId>(v));
+    return util::Optional<ObjectId>(convert_for_test<ObjectId>(v));
 }
 
 template <typename T, typename U>

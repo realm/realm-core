@@ -137,7 +137,7 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<Decimal128>(other, col_ndx);
         case type_ObjectId:
             if (attr.test(col_attr_Nullable))
-                return cmp<Optional<ObjectId>>(other, col_ndx);
+                return cmp<util::Optional<ObjectId>>(other, col_ndx);
             else
                 return cmp<ObjectId>(other, col_ndx);
         case type_Link:
@@ -1008,7 +1008,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         ArrayIntNull values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
         values.init_from_parent();
-        Optional<int64_t> old = values.get(m_row_ndx);
+        util::Optional<int64_t> old = values.get(m_row_ndx);
         if (old) {
             auto new_val = add_wrap(*old, value);
             if (StringIndex* index = m_table->get_search_index(col_key)) {

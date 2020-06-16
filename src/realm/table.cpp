@@ -345,7 +345,7 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
 
-    m_has_any_embedded_objects |= target.is_embedded();
+    m_has_any_embedded_objects.reset();
 
     ColumnAttrMask attr;
     if (type == type_Link)
@@ -406,6 +406,7 @@ void Table::remove_column(ColKey col_key)
         do_set_primary_key_column(ColKey());
     }
     erase_root_column(col_key); // Throws
+    m_has_any_embedded_objects.reset();
 }
 
 
@@ -478,10 +479,10 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         MemRef mem = Array::create_array(Array::type_HasRefs, context_flag, nb_columns, 0, m_top.get_alloc());
         m_index_refs.init_from_mem(mem);
         m_index_refs.update_parent();
-        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, 0, m_top.get_alloc());
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, TableKey().value, m_top.get_alloc());
         m_opposite_table.init_from_mem(mem);
         m_opposite_table.update_parent();
-        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, 0, m_top.get_alloc());
+        mem = Array::create_array(Array::type_Normal, context_flag, nb_columns, ColKey().value, m_top.get_alloc());
         m_opposite_column.init_from_mem(mem);
         m_opposite_column.update_parent();
     }
@@ -512,6 +513,8 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
         m_is_embedded = flags & 0x1;
     }
+    m_has_any_embedded_objects.reset();
+
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
@@ -762,8 +765,8 @@ void Table::do_erase_root_column(ColKey col_key)
         delete m_index_accessors[col_ndx];
         m_index_accessors[col_ndx] = nullptr;
     }
-    m_opposite_table.set(col_ndx, 0);
-    m_opposite_column.set(col_ndx, 0);
+    m_opposite_table.set(col_ndx, TableKey().value);
+    m_opposite_column.set(col_ndx, ColKey().value);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
     if (m_tombstones)
@@ -806,7 +809,8 @@ bool Table::set_embedded(bool embedded)
 
         if (has_backlink_columns) {
             for (auto o : *this) {
-                if (o.get_backlink_count() > 1) {
+                // each object should be owned by one and only one parent
+                if (o.get_backlink_count() != 1) {
                     return false;
                 }
             }
@@ -931,6 +935,7 @@ void Table::migrate_indexes(util::FunctionRef<void()> commit_and_continue)
 // This is information about origin/target tables in relation to links
 // This information is now held in "opposite" arrays directly in Table structure
 // At the same time the backlink columns are destroyed
+// If there is no subspec, this stage is done
 void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
 {
     if (!m_spec.has_subspec())
@@ -986,10 +991,14 @@ void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
     commit_and_continue();
 }
 
-
+// When pk_col value is 1, links have been converted.
+// pk_col value will be set back to 0 when all objects are migrated.
 void Table::convert_links_from_ndx_to_key(util::FunctionRef<void()> commit_and_continue)
 {
-    if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
+    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
+    bool done = m_top.get(top_position_for_pk_col);
+
+    if (top_ref && !done) {
         bool changes = false;
         Array col_refs(m_alloc);
         col_refs.set_parent(&m_top, top_position_for_columns);
@@ -1049,6 +1058,8 @@ void Table::convert_links_from_ndx_to_key(util::FunctionRef<void()> commit_and_c
         for_each_public_column(convert_links);
 
         if (changes) {
+            m_top.set(top_position_for_pk_col, 1); // Mark that we are done with this step
+
             commit_and_continue();
         }
     }
@@ -1298,7 +1309,10 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
 
-        REALM_ASSERT(col_refs.get(col_ndx));
+        if (!col_refs.get(col_ndx)) {
+            // This column has been migrated
+            continue;
+        }
 
         if (attr.test(col_attr_List) && col_type != col_type_LinkList) {
             list_acc = std::make_unique<BPlusTree<int64_t>>(m_alloc);
@@ -1415,7 +1429,7 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         if (obj_key.value > max_key_value) {
             max_key_value = obj_key.value;
         }
-        Obj obj = create_object(obj_key, init_values);
+        Obj obj = m_clusters.insert(obj_key, init_values);
 
         // Then update possible list types
         for (auto& it : list_accessors) {
@@ -1459,15 +1473,16 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         }
     }
 
-    // Destroy values in the old columns
-    for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-        col_refs.set(col_ndx, 0);
-    }
-
     if (!has_link_columns) {
         // No link columns to update - mark that we are done with this table
         finalize_migration();
+    }
+    else {
+        // Destroy values in the old columns that has been copied
+        for (auto col_ndx : cols_to_destroy) {
+            Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
+            col_refs.set(col_ndx, 0);
+        }
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
@@ -1568,6 +1583,7 @@ void Table::finalize_migration()
     if (ref) {
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
+        m_top.set(top_position_for_pk_col, 0);
     }
     if (m_spec.get_public_column_count() > 0 && m_spec.get_column_name(0) == "!OID") {
         remove_column(m_spec.get_key(0));
@@ -1699,7 +1715,7 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
-    if (m_has_any_embedded_objects || (g && g->has_cascade_notification_handler())) {
+    if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         std::for_each(vec.begin(), vec.end(),
                       [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
@@ -2314,16 +2330,7 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             m_is_embedded = false;
         }
         refresh_content_version();
-        m_has_any_embedded_objects = false;
-        for_each_public_column([&](ColKey col_key) {
-            auto target_table_key = get_opposite_table_key(col_key);
-            if (target_table_key) {
-                auto target_table = get_parent_group()->get_table(target_table_key);
-                m_has_any_embedded_objects |= target_table->is_embedded();
-                return true; // early out
-            }
-            return false;
-        });
+        m_has_any_embedded_objects.reset();
     }
     m_alloc.bump_storage_version();
 }
@@ -3000,7 +3007,7 @@ void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
-    if (m_has_any_embedded_objects || (g && g->has_cascade_notification_handler())) {
+    if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
         nullify_links(state);
@@ -3534,6 +3541,25 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         add_search_index(new_col);
 
     return new_col;
+}
+
+bool Table::has_any_embedded_objects()
+{
+    if (!m_has_any_embedded_objects) {
+        m_has_any_embedded_objects = false;
+        for_each_public_column([&](ColKey col_key) {
+            auto target_table_key = get_opposite_table_key(col_key);
+            if (target_table_key && is_link_type(col_key.get_type())) {
+                auto target_table = get_parent_group()->get_table(target_table_key);
+                if (target_table->is_embedded()) {
+                    m_has_any_embedded_objects = true;
+                }
+                return true; // early out
+            }
+            return false;
+        });
+    }
+    return *m_has_any_embedded_objects;
 }
 
 void Table::set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column)

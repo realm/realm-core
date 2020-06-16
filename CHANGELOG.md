@@ -5,15 +5,47 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
+* We would allow converting a table to embedded table in spite some objects had no links to them. ([#3729](https://github.com/realm/realm-core/issues/3729), since v6.1.0-alpha.5)
+* Fixed parsing queries with substitutions in a subquery, for example on a named linking object property. This also enables support for substitution chains. ([realm-js 2977](https://github.com/realm/realm-js/issues/2977), since the parser supported subqueries).
+* If you upgrade from a realm file with file format version 6 (Realm Core v2.4.0 or earlier) the upgrade will result in a crash ([#3764](https://github.com/realm/realm-core/issues/3764), since v6.0.0-alpha.0)
+ ### Breaking changes
 * None.
 
 -----------
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 10.0.0-beta.1 Release notes
+
+### Enhancements
+* Validation errors when opening a DB now provide more information about the invalid values
+
+### Fixed
+* When opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT, you may get 'Operation not supported' exception. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
+* After upgrading of a realm file, you may at some point receive a 'NoSuchTable' exception. ([#3701](https://github.com/realm/realm-core/issues/3701), since 6.0.0)
+* If the upgrade process was interrupted/killed for various reasons, the following run could stop with some assertions failing. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
+* When querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table, you may get incorrect results. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
+ 
+-----------
+
+### Internals
+* Work around an issue with MSVC in Visual Studio 2019 where Release optimizations crash the compiler because of a regression in 64bit atomic loads on 32bit Windows.
+
+----------------------------------------------
+
+# 10.0.0-alpha.9 Release notes
+
+### Fixed
+* Embedded objects would in some cases not be deleted when parent object was deleted.
+ 
+-----------
+
+### Internals
+* 'using namespace realm::util' removed from header. This means that this namespace is no longer used automatically.
+* Some unused functionality has been removed.
 
 ----------------------------------------------
 
@@ -213,6 +245,20 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
 
+# 6.0.6 Release notes
+
+### Fixed
+* When opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT, you may get 'Operation not supported' exception. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
+* After upgrading of a realm file, you may at some point receive a 'NoSuchTable' exception. ([#3701](https://github.com/realm/realm-core/issues/3701), since 6.0.0)
+* If the upgrade process was interrupted/killed for various reasons, the following run could stop with some assertions failing. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
+* When querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table, you may get incorrect results. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
+
+-----------
+
+### Internals
+* Work around an issue with MSVC in Visual Studio 2019 where Release optimizations crash the compiler because of a regression in 64bit atomic loads on 32bit Windows.
+
+----------------------------------------------
 # 6.0.5 Release notes
 
 ### Fixed

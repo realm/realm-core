@@ -412,7 +412,7 @@ private:
     ObjKey find_first_integer(ColKey column_key, int64_t value) const;
     template <class oper>
     Timestamp minmax_timestamp(ColKey column_key, ObjKey* return_key) const;
-    RaceDetector m_race_detector;
+    util::RaceDetector m_race_detector;
 
     friend class Table;
     friend class ConstObj;

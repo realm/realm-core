@@ -30,11 +30,11 @@
 #include <sstream>
 
 using namespace realm;
+using namespace util;
 using namespace parser;
 using namespace query_builder;
 
 namespace {
-
 
 template <typename T, parser::Expression::KeyPathOp OpType, typename ExpressionType>
 void do_add_null_comparison_to_query(Query&, Predicate::Operator,

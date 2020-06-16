@@ -90,7 +90,7 @@ struct SubqueryGetter {
     {
         throw std::runtime_error(
             util::format("Predicate error: comparison of type '%1' with result of a subquery count is not supported.",
-                         type_to_str<RetType>()));
+                         util::type_to_str<RetType>()));
     }
 };
 

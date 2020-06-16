@@ -27,6 +27,8 @@
 namespace realm {
 namespace parser {
 
+using namespace util;
+
 Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds) {
     const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
     const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;

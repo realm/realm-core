@@ -76,7 +76,6 @@ struct QueryGroup {
     std::unique_ptr<ParentNode> m_root_node;
 
     bool m_pending_not = false;
-    size_t m_subtable_column = not_found;
     State m_state = State::Default;
 };
 

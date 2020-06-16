@@ -519,7 +519,7 @@ private:
         m_alloc.reset_free_space_tracking();
     }
 
-    void close_internal(std::unique_lock<InterprocessMutex>, bool allow_open_read_transactions);
+    void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions);
     friend class Transaction;
 };
 
