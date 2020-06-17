@@ -341,6 +341,7 @@ public:
     virtual void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value,
                              Instruction variant = instr_Set);
     virtual void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, Instruction variant = instr_Set);
+    virtual void set_typed_link(const Table*, ColKey col_key, ObjKey key, ObjLink value, Instruction variant = instr_Set);
     virtual void set_null(const Table*, ColKey col_key, ObjKey key, Instruction variant = instr_Set);
     virtual void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData);
     virtual void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size);
@@ -349,21 +350,23 @@ public:
     virtual void list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value);
     virtual void list_set_float(const ConstLstBase& list, size_t list_ndx, float value);
     virtual void list_set_double(const ConstLstBase& list, size_t list_ndx, double value);
-    virtual void list_set_string(const Lst<String>& list, size_t list_ndx, StringData value);
-    virtual void list_set_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData value);
-    virtual void list_set_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp value);
+    virtual void list_set_string(const ConstLstBase& list, size_t list_ndx, StringData value);
+    virtual void list_set_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value);
+    virtual void list_set_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value);
     virtual void list_set_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value);
-    virtual void list_set_decimal(const Lst<Decimal128>& list, size_t list_ndx, Decimal128 value);
+    virtual void list_set_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value);
+    virtual void list_set_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value);
 
     virtual void list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
     virtual void list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value);
     virtual void list_insert_float(const ConstLstBase& list, size_t list_ndx, float value);
     virtual void list_insert_double(const ConstLstBase& list, size_t list_ndx, double value);
-    virtual void list_insert_string(const Lst<String>& list, size_t list_ndx, StringData value);
-    virtual void list_insert_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData value);
-    virtual void list_insert_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp value);
+    virtual void list_insert_string(const ConstLstBase& list, size_t list_ndx, StringData value);
+    virtual void list_insert_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value);
+    virtual void list_insert_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value);
     virtual void list_insert_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value);
-    virtual void list_insert_decimal(const Lst<Decimal128>& list, size_t list_ndx, Decimal128 value);
+    virtual void list_insert_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value);
+    virtual void list_insert_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
@@ -869,6 +872,12 @@ inline void TransactLogConvenientEncoder::set_link(const Table* t, ColKey col_ke
     do_set(t, col_key, key, variant); // Throws
 }
 
+inline void TransactLogConvenientEncoder::set_typed_link(const Table* t, ColKey col_key, ObjKey key, ObjLink,
+                                                         Instruction variant)
+{
+    do_set(t, col_key, key, variant); // Throws
+}
+
 inline void TransactLogConvenientEncoder::set_null(const Table* t, ColKey col_key, ObjKey key, Instruction variant)
 {
     do_set(t, col_key, key, variant); // Throws
@@ -926,19 +935,19 @@ inline void TransactLogConvenientEncoder::list_set_double(const ConstLstBase& li
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_set_string(const Lst<String>& list, size_t list_ndx, StringData)
+inline void TransactLogConvenientEncoder::list_set_string(const ConstLstBase& list, size_t list_ndx, StringData)
 {
     select_list(list);            // Throws
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_set_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData)
+inline void TransactLogConvenientEncoder::list_set_binary(const ConstLstBase& list, size_t list_ndx, BinaryData)
 {
     select_list(list);            // Throws
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_set_timestamp(const Lst<Timestamp>& list, size_t list_ndx, Timestamp)
+inline void TransactLogConvenientEncoder::list_set_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp)
 {
     select_list(list);            // Throws
     m_encoder.list_set(list_ndx); // Throws
@@ -950,7 +959,13 @@ inline void TransactLogConvenientEncoder::list_set_object_id(const ConstLstBase&
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_set_decimal(const Lst<Decimal128>& list, size_t list_ndx, Decimal128)
+inline void TransactLogConvenientEncoder::list_set_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128)
+{
+    select_list(list);            // Throws
+    m_encoder.list_set(list_ndx); // Throws
+}
+
+inline void TransactLogConvenientEncoder::list_set_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink)
 {
     select_list(list);            // Throws
     m_encoder.list_set(list_ndx); // Throws
@@ -986,13 +1001,13 @@ inline void TransactLogConvenientEncoder::list_insert_double(const ConstLstBase&
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_string(const Lst<String>& list, size_t list_ndx, StringData)
+inline void TransactLogConvenientEncoder::list_insert_string(const ConstLstBase& list, size_t list_ndx, StringData)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_binary(const Lst<Binary>& list, size_t list_ndx, BinaryData)
+inline void TransactLogConvenientEncoder::list_insert_binary(const ConstLstBase& list, size_t list_ndx, BinaryData)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
@@ -1004,15 +1019,22 @@ inline void TransactLogConvenientEncoder::list_insert_object_id(const ConstLstBa
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_timestamp(const Lst<Timestamp>& list, size_t list_ndx,
+inline void TransactLogConvenientEncoder::list_insert_timestamp(const ConstLstBase& list, size_t list_ndx,
                                                                 Timestamp)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_decimal(const Lst<Decimal128>& list, size_t list_ndx,
+inline void TransactLogConvenientEncoder::list_insert_decimal(const ConstLstBase& list, size_t list_ndx,
                                                               Decimal128)
+{
+    select_list(list);               // Throws
+    m_encoder.list_insert(list_ndx); // Throws
+}
+
+inline void TransactLogConvenientEncoder::list_insert_typed_link(const ConstLstBase& list, size_t list_ndx,
+                                                                 ObjLink)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws

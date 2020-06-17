@@ -170,6 +170,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
     const auto& data = value.data;
     switch (value.type) {
         case Type::ObjectValue: {
+            // FIXME: Handle embedded objects in Mixed.
             if (!info.is_embedded_link) {
                 bad_transaction_log("%1(Object) on a property that does not contain embedded objects");
             }
@@ -188,14 +189,14 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Int: {
-            if (info.type != type_Int) {
+            if (info.type != type_Int && info.type != type_Mixed) {
                 bad_transaction_log("%1(Int) on '%2.%3' of type %4", name, info.table_name, info.col_name, info.type);
             }
             setter(data.integer);
             return;
         }
         case Type::Bool: {
-            if (info.type != type_Bool) {
+            if (info.type != type_Bool && info.type != type_Mixed) {
                 bad_transaction_log("%1(Bool) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -203,7 +204,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::String: {
-            if (info.type != type_String) {
+            if (info.type != type_String && info.type != type_Mixed) {
                 bad_transaction_log("%1(String) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -212,7 +213,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Binary: {
-            if (info.type != type_Binary) {
+            if (info.type != type_Binary && info.type != type_Mixed) {
                 bad_transaction_log("%1(Binary) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -221,7 +222,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Timestamp: {
-            if (info.type != type_Timestamp) {
+            if (info.type != type_Timestamp && info.type != type_Mixed) {
                 bad_transaction_log("%1(Timestamp) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -229,7 +230,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Float: {
-            if (info.type != type_Float) {
+            if (info.type != type_Float && info.type != type_Mixed) {
                 bad_transaction_log("%1(Float) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -237,7 +238,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Double: {
-            if (info.type != type_Double) {
+            if (info.type != type_Double && info.type != type_Mixed) {
                 bad_transaction_log("%1(Double) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -245,7 +246,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Decimal: {
-            if (info.type != type_Decimal) {
+            if (info.type != type_Decimal && info.type != type_Mixed) {
                 bad_transaction_log("%1(Decimal) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -253,7 +254,7 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             return;
         }
         case Type::Link: {
-            if (info.type != type_Link) {
+            if (info.type != type_Link && info.type != type_Mixed && info.type != type_TypedLink) {
                 bad_transaction_log("Set(Link) on '%2.%3' of type %4", name, info.table_name, info.col_name,
                                     info.type);
             }
@@ -264,27 +265,28 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             if (!target_table) {
                 bad_transaction_log("Set(Link) with invalid target table '%1'", target_table_name);
             }
+
             // FIXME: This needs adjustment for embedded objects.
-            ColKey source_col = m_last_table->get_column_key(info.col_name);
-            TableRef expected_target_table = m_last_table->get_link_target(source_col);
-            if (expected_target_table != target_table) {
-                bad_transaction_log("Set(Link) with unexpected target table '%1' (expected '%2')", target_table_name,
-                                    expected_target_table->get_name());
+
+            if (info.type != type_Mixed && info.type != type_TypedLink) {
+                ColKey source_col = m_last_table->get_column_key(info.col_name);
+                TableRef expected_target_table = m_last_table->get_link_target(source_col);
+                if (expected_target_table != target_table) {
+                    bad_transaction_log("Set(Link) with unexpected target table '%1' (expected '%2')", target_table_name,
+                                        expected_target_table->get_name());
+                }
+                ObjKey target = get_object_key(*target_table, data.link.target, "Set(Link)");
+                setter(target);
             }
-            ObjKey target = get_object_key(*target_table, data.link.target, "Set(Link)");
-            setter(target);
-            return;
-        }
-        case Type::TypedLink: {
-            // FIXME
-            return;
-        }
-        case Type::Mixed: {
-            // FIXME
+            else {
+                ObjKey target = get_object_key(*target_table, data.link.target, "Set(Link)");
+                ObjLink link = ObjLink{target_table->get_key(), target};
+                setter(link);
+            }
             return;
         }
         case Type::ObjectId: {
-            if (info.type != type_ObjectId) {
+            if (info.type != type_ObjectId && info.type != type_Mixed) {
                 bad_transaction_log("Set(ObjectId) on column '%1.%2' of type %3", info.table_name, info.col_name,
                                     info.type);
             }
@@ -321,8 +323,21 @@ void InstructionApplier::operator()(const Instruction::Set& instr)
                     obj.create_and_set_linked_object(col);
                 }
             },
+            [&](const ObjLink& link) {
+                if (info.type == type_Mixed) {
+                    obj.set<Mixed>(col, Mixed{link}, instr.is_default);
+                }
+                else if (info.type == type_TypedLink) {
+                    obj.set<ObjLink>(col, link, instr.is_default);
+                }
+            },
             [&](const auto& val) {
-                obj.set(col, val, instr.is_default);
+                if (info.type != type_Mixed) {
+                    obj.set(col, val, instr.is_default);
+                }
+                else {
+                    obj.set<Mixed>(col, val, instr.is_default);
+                }
             },
         };
 
@@ -359,10 +374,26 @@ void InstructionApplier::operator()(const Instruction::Set& instr)
                 // Embedded object creation is idempotent, and link lists cannot
                 // contain nulls, so this is a no-op.
             },
+            [&](const ObjLink& link) {
+                if (info.type == type_Mixed) {
+                    auto& lst = static_cast<Lst<Mixed>&>(list);
+                    lst.set(ndx, Mixed{link});
+                }
+                else if (info.type == type_TypedLink) {
+                    auto& lst = static_cast<Lst<ObjLink>&>(list);
+                    lst.set(ndx, link);
+                }
+            },
             [&](const auto& val) {
-                using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
-                auto& lst = static_cast<Lst<type>&>(list);
-                lst.set(ndx, val);
+                if (info.type == type_Mixed) {
+                    using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
+                    auto& lst = static_cast<Lst<type>&>(list);
+                    lst.set(ndx, val);
+                }
+                else {
+                    auto& lst = static_cast<Lst<Mixed>&>(list);
+                    lst.set(ndx, val);
+                }
             },
         };
 
@@ -399,8 +430,18 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         bad_transaction_log("AddColumn '%1.%3' which already exists", table->get_name(), col_name);
     }
 
-    if (instr.type != Type::Link) {
-        DataType type = get_data_type(instr.type);
+    if (!instr.type) {
+        if (!instr.list) {
+            table->add_column(type_Mixed, col_name);
+        } else {
+            table->add_column_list(type_Mixed, col_name);
+        }
+        return;
+    }
+
+
+    if (*instr.type != Type::Link) {
+        DataType type = get_data_type(*instr.type);
         if (instr.list) {
             table->add_column_list(type, col_name, instr.nullable);
         }
@@ -464,10 +505,26 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             auto& lst = static_cast<LnkLst&>(list);
             lst.create_and_insert_linked_object(instr.index());
         },
+        [&](const ObjLink& link) {
+            if (info.type == type_Mixed) {
+                auto& lst = static_cast<Lst<Mixed>&>(list);
+                lst.insert(instr.index(), Mixed{link});
+            }
+            else if (info.type == type_TypedLink) {
+                auto& lst = static_cast<Lst<ObjLink>&>(list);
+                lst.insert(instr.index(), link);
+            }
+        },
         [&](const auto& value) {
-            using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-            auto& lst = static_cast<Lst<type>&>(list);
-            lst.insert(instr.index(), value);
+            if (info.type != type_Mixed) {
+                using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
+                auto& lst = static_cast<Lst<type>&>(list);
+                lst.insert(instr.index(), value);
+            }
+            else {
+                auto& lst = static_cast<Lst<Mixed>&>(list);
+                lst.insert(instr.index(), value);
+            }
         },
     };
     set_value(info, instr.value, std::move(setter), "ArrayInsert");

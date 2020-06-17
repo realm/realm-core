@@ -823,15 +823,72 @@ void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
 }
 
 template <>
-void Lst<ObjLink>::set_repl(Replication*, size_t, ObjLink)
+void Lst<ObjLink>::set_repl(Replication* repl, size_t ndx, ObjLink link)
 {
-    // TODO: Implement
+    if (link) {
+        repl->list_set_typed_link(*this, ndx, link);
+    }
+    else {
+        repl->list_set_null(*this, ndx);
+    }
 }
 
 template <>
-void Lst<Mixed>::set_repl(Replication*, size_t, Mixed)
+void Lst<Mixed>::set_repl(Replication* repl, size_t ndx, Mixed value)
 {
-    // TODO: Implement
+    if (value.is_null()) {
+        repl->list_set_null(*this, ndx);
+    } else {
+        switch (value.get_type()) {
+            case type_Int: {
+                repl->list_set_int(*this, ndx, value.get_int());
+                break;
+            }
+            case type_Bool: {
+                repl->list_set_bool(*this, ndx, value.get_bool());
+                break;
+            }
+            case type_String: {
+                repl->list_set_string(*this, ndx, value.get_string());
+                break;
+            }
+            case type_Binary: {
+                repl->list_set_binary(*this, ndx, value.get_binary());
+                break;
+            }
+            case type_Timestamp: {
+                repl->list_set_timestamp(*this, ndx, value.get_timestamp());
+                break;
+            }
+            case type_Float: {
+                repl->list_set_float(*this, ndx, value.get_float());
+                break;
+            }
+            case type_Double: {
+                repl->list_set_double(*this, ndx, value.get_double());
+                break;
+            }
+            case type_Decimal: {
+                repl->list_set_decimal(*this, ndx, value.get<Decimal128>());
+                break;
+            }
+            case type_ObjectId: {
+                repl->list_set_object_id(*this, ndx, value.get<ObjectId>());
+                break;
+            }
+            case type_TypedLink: {
+                repl->list_set_typed_link(*this, ndx, value.get<ObjLink>());
+                break;
+            }
+
+            case type_OldTable: [[fallthrough]];
+            case type_Mixed: [[fallthrough]];
+            case type_LinkList: [[fallthrough]];
+            case type_Link: [[fallthrough]];
+            case type_OldDateTime:
+                REALM_TERMINATE("Invalid Mixed type");
+        }
+    }
 }
 
 template <>
@@ -977,15 +1034,72 @@ void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
 }
 
 template <>
-void Lst<ObjLink>::insert_repl(Replication*, size_t, ObjLink)
+void Lst<ObjLink>::insert_repl(Replication* repl, size_t ndx, ObjLink link)
 {
-    // TODO: Implement
+    if (link) {
+        repl->list_insert_typed_link(*this, ndx, link);
+    }
+    else {
+        repl->list_insert_null(*this, ndx);
+    }
 }
 
 template <>
-void Lst<Mixed>::insert_repl(Replication*, size_t, Mixed)
+void Lst<Mixed>::insert_repl(Replication* repl, size_t ndx, Mixed value)
 {
-    // TODO: Implement
+    if (value.is_null()) {
+        repl->list_insert_null(*this, ndx);
+    } else {
+        switch (value.get_type()) {
+            case type_Int: {
+                repl->list_insert_int(*this, ndx, value.get_int());
+                break;
+            }
+            case type_Bool: {
+                repl->list_insert_bool(*this, ndx, value.get_bool());
+                break;
+            }
+            case type_String: {
+                repl->list_insert_string(*this, ndx, value.get_string());
+                break;
+            }
+            case type_Binary: {
+                repl->list_insert_binary(*this, ndx, value.get_binary());
+                break;
+            }
+            case type_Timestamp: {
+                repl->list_insert_timestamp(*this, ndx, value.get_timestamp());
+                break;
+            }
+            case type_Float: {
+                repl->list_insert_float(*this, ndx, value.get_float());
+                break;
+            }
+            case type_Double: {
+                repl->list_insert_double(*this, ndx, value.get_double());
+                break;
+            }
+            case type_Decimal: {
+                repl->list_insert_decimal(*this, ndx, value.get<Decimal128>());
+                break;
+            }
+            case type_ObjectId: {
+                repl->list_insert_object_id(*this, ndx, value.get<ObjectId>());
+                break;
+            }
+            case type_TypedLink: {
+                repl->list_insert_typed_link(*this, ndx, value.get<ObjLink>());
+                break;
+            }
+
+            case type_OldTable: [[fallthrough]];
+            case type_Mixed: [[fallthrough]];
+            case type_LinkList: [[fallthrough]];
+            case type_Link: [[fallthrough]];
+            case type_OldDateTime:
+                REALM_TERMINATE("Invalid Mixed type");
+        }
+    }
 }
 
 template <>

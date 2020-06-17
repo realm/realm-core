@@ -372,7 +372,12 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
     m_tracer.name("AddColumn");
     table_instr(p);
     m_tracer.field("field", p.field);
-    m_tracer.field("type", p.type);
+    if (p.type) {
+        m_tracer.field("type", *p.type);
+    }
+    else {
+        m_tracer.field("type", "Mixed");
+    }
     m_tracer.field("nullable", p.nullable);
     m_tracer.field("list", p.list);
     if (p.type == Instruction::Payload::Type::Link) {

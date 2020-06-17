@@ -50,6 +50,7 @@ private:
     void append_value(const Instruction::Payload&);
     void append_value(const Instruction::Payload::Link&);
     void append_value(Instruction::Payload::Type);
+    void append_value(util::Optional<Instruction::Payload::Type>);
     void append_value(const Instruction::Path&);
     void append_value(DataType);
     void append_value(bool);

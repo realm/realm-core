@@ -160,6 +160,9 @@ struct Payload {
     ///
     /// Furthermore, link values for both Link and LinkList columns are
     /// represented by a single Link type.
+    ///
+    /// Note: For Mixed columns (including typed links), no separate value is required, because the
+    /// instruction set encodes the type of each value in the instruction.
     enum class Type : int8_t {
         // Special value indicating that an embedded object should be created at
         // the position.
@@ -176,8 +179,6 @@ struct Payload {
         Decimal = 8,
         Link = 9,
         ObjectId = 10,
-        Mixed = 11,
-        TypedLink = 12,
     };
 
     struct Link {
@@ -238,11 +239,6 @@ struct Payload {
         : type(Type::Link)
     {
         data.link = value;
-    }
-    explicit Payload(ObjLink value) noexcept
-        : type(Type::TypedLink)
-    {
-        data.typed_link = value;
     }
     explicit Payload(StringBufferRange value, bool is_binary = false) noexcept
         : type(is_binary ? Type::Binary : Type::String)
@@ -332,10 +328,6 @@ struct Payload {
                     return lhs.data.link == rhs.data.link;
                 case Type::ObjectId:
                     return lhs.data.object_id == rhs.data.object_id;
-                case Type::TypedLink:
-                    return lhs.data.typed_link == rhs.data.typed_link;
-                case Type::Mixed:
-                    return false; // FIXME
             }
         }
         return false;
@@ -433,7 +425,10 @@ struct AddColumn : TableInstruction {
     using TableInstruction::TableInstruction;
 
     InternString field;
-    Payload::Type type;
+
+    // `none` for Mixed columns. Mixed columns are always nullable.
+    util::Optional<Payload::Type> type;
+
     bool nullable;
     bool list;
     InternString link_target_table;
@@ -707,12 +702,18 @@ inline const char* get_type_name(Instruction::Payload::Type type)
             return "Link";
         case Type::ObjectId:
             return "ObjectId";
-        case Type::Mixed:
-            return "Mixed";
-        case Type::TypedLink:
-            return "TypedLink";
     }
     return "(unknown)";
+}
+
+inline const char* get_type_name(util::Optional<Instruction::Payload::Type> type)
+{
+    if (type) {
+        return get_type_name(*type);
+    }
+    else {
+        return "Mixed";
+    }
 }
 
 inline std::ostream& operator<<(std::ostream& os, Instruction::Payload::Type type)
@@ -763,10 +764,6 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
             return type_Link;
         case Type::ObjectId:
             return type_ObjectId;
-        case Type::Mixed:
-            return type_Mixed;
-        case Type::TypedLink:
-            return type_TypedLink;
         case Type::ObjectValue:
             [[fallthrough]];
         case Type::GlobalKey:

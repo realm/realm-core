@@ -89,30 +89,33 @@ public:
     void set_object_id(const Table*, ColKey col_key, ObjKey key, ObjectId value, _impl::Instruction variant) override;
     void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value, _impl::Instruction variant) override;
     void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, _impl::Instruction variant) override;
+    void set_typed_link(const Table*, ColKey col_key, ObjKey key, ObjLink value, _impl::Instruction variant) override;
     void set_null(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant) override;
     void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData) override;
     void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size) override;
 
     void list_set_null(const ConstLstBase& list, size_t ndx) override;
-    void list_set_int(const ConstLstBase& Lst, size_t list_ndx, int64_t value) override;
-    void list_set_bool(const ConstLstBase& Lst, size_t list_ndx, bool value) override;
-    void list_set_float(const ConstLstBase& Lst, size_t list_ndx, float value) override;
-    void list_set_double(const ConstLstBase& Lst, size_t list_ndx, double value) override;
-    void list_set_string(const Lst<String>& Lst, size_t list_ndx, StringData value) override;
-    void list_set_binary(const Lst<Binary>& Lst, size_t list_ndx, BinaryData value) override;
-    void list_set_timestamp(const Lst<Timestamp>& Lst, size_t list_ndx, Timestamp value) override;
+    void list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t value) override;
+    void list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value) override;
+    void list_set_float(const ConstLstBase& list, size_t list_ndx, float value) override;
+    void list_set_double(const ConstLstBase& list, size_t list_ndx, double value) override;
+    void list_set_string(const ConstLstBase& list, size_t list_ndx, StringData value) override;
+    void list_set_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value) override;
+    void list_set_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value) override;
     void list_set_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value) override;
-    void list_set_decimal(const Lst<Decimal128>& list, size_t list_ndx, Decimal128 value) override;
+    void list_set_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value) override;
+    void list_set_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value) override;
 
-    void list_insert_int(const ConstLstBase& Lst, size_t list_ndx, int64_t value) override;
-    void list_insert_bool(const ConstLstBase& Lst, size_t list_ndx, bool value) override;
-    void list_insert_float(const ConstLstBase& Lst, size_t list_ndx, float value) override;
-    void list_insert_double(const ConstLstBase& Lst, size_t list_ndx, double value) override;
-    void list_insert_string(const Lst<String>& Lst, size_t list_ndx, StringData value) override;
-    void list_insert_binary(const Lst<Binary>& Lst, size_t list_ndx, BinaryData value) override;
-    void list_insert_timestamp(const Lst<Timestamp>& Lst, size_t list_ndx, Timestamp value) override;
+    void list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value) override;
+    void list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value) override;
+    void list_insert_float(const ConstLstBase& list, size_t list_ndx, float value) override;
+    void list_insert_double(const ConstLstBase& list, size_t list_ndx, double value) override;
+    void list_insert_string(const ConstLstBase& list, size_t list_ndx, StringData value) override;
+    void list_insert_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value) override;
+    void list_insert_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value) override;
     void list_insert_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value) override;
-    void list_insert_decimal(const Lst<Decimal128>& list, size_t list_ndx, Decimal128 value) override;
+    void list_insert_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value) override;
+    void list_insert_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value) override;
 
     void remove_object(const Table*, ObjKey) override;
 

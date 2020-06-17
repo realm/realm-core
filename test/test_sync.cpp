@@ -7705,4 +7705,88 @@ TEST(Sync_NonLinkObjectId)
     }
 }
 
+TEST(Sync_Mixed)
+{
+    // Test replication and synchronization of Mixed values and lists.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    {
+        WriteTransaction tr{db_1};
+        auto foos = sync::create_table_with_primary_key(tr, "class_Foo", type_Int, "id");
+        auto bars = sync::create_table_with_primary_key(tr, "class_Bar", type_String, "id");
+        auto fops = sync::create_table_with_primary_key(tr, "class_Fop", type_Int, "id");
+        foos->add_column(type_Mixed, "value", true);
+        foos->add_column_list(type_Mixed, "values");
+
+        auto foo = foos->create_object_with_primary_key(123);
+        auto bar = bars->create_object_with_primary_key("Hello");
+        auto fop = fops->create_object_with_primary_key(456);
+
+        foo.set("value", Mixed(6.2f));
+        auto values = foo.get_list<Mixed>("values");
+        values.insert(0, StringData("A"));
+        values.insert(1, ObjLink{bars->get_key(), bar.get_key()});
+        values.insert(2, ObjLink{fops->get_key(), fop.get_key()});
+        values.insert(3, 123.f);
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+
+        auto foos = tr.get_table("class_Foo");
+        auto bars = tr.get_table("class_Bar");
+        auto fops = tr.get_table("class_Fop");
+
+        CHECK_EQUAL(foos->size(), 1);
+        CHECK_EQUAL(bars->size(), 1);
+        CHECK_EQUAL(fops->size(), 1);
+
+        auto foo = *foos->begin();
+        auto value = foo.get<Mixed>("value");
+        CHECK_EQUAL(value, Mixed{6.2f});
+        auto values = foo.get_list<Mixed>("values");
+        CHECK_EQUAL(values.size(), 4);
+
+        auto v0 = values.get(0);
+        auto v1 = values.get(1);
+        auto v2 = values.get(2);
+        auto v3 = values.get(3);
+
+        auto l1 = v1.get_link();
+        auto l2 = v2.get_link();
+
+        auto l1_table = tr.get_table(l1.get_table_key());
+        auto l2_table = tr.get_table(l2.get_table_key());
+
+        CHECK_EQUAL(v0, Mixed{"A"});
+        CHECK_EQUAL(l1_table, bars);
+        CHECK_EQUAL(l2_table, fops);
+        CHECK_EQUAL(l1.get_obj_key(), bars->begin()->get_key());
+        CHECK_EQUAL(l2.get_obj_key(), fops->begin()->get_key());
+        CHECK_EQUAL(v3, Mixed{123.f});
+    }
+}
+
 } // unnamed namespace
