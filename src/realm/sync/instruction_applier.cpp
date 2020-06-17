@@ -451,14 +451,19 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     }
     else {
         TableNameBuffer buffer;
-        auto target_table_name = class_name_to_table_name(get_string(instr.link_target_table), buffer);
-        TableRef target = m_transaction.get_table(target_table_name);
-        if (!target) {
-            bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
-                                col_name, target_table_name);
+        auto target_table_name = get_string(instr.link_target_table);
+        if (target_table_name.size() != 0) {
+            TableRef target = m_transaction.get_table(class_name_to_table_name(target_table_name, buffer));
+            if (!target) {
+                bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
+                                    col_name, target_table_name);
+            }
+            DataType type = instr.list ? type_LinkList : type_Link;
+            table->add_column_link(type, col_name, *target);
         }
-        DataType type = instr.list ? type_LinkList : type_Link;
-        table->add_column_link(type, col_name, *target);
+        else {
+            table->add_column(type_TypedLink, col_name);
+        }
     }
 }
 

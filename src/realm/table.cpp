@@ -315,7 +315,7 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable)
 
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
-    if (nullable)
+    if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
 
@@ -327,7 +327,7 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_List);
-    if (nullable)
+    if (nullable || type == type_Mixed)
         attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
     return do_insert_column(col_key, type, name, invalid_link); // Throws

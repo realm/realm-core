@@ -7729,9 +7729,10 @@ TEST(Sync_Mixed)
 
     {
         WriteTransaction tr{db_1};
-        auto foos = sync::create_table_with_primary_key(tr, "class_Foo", type_Int, "id");
-        auto bars = sync::create_table_with_primary_key(tr, "class_Bar", type_String, "id");
-        auto fops = sync::create_table_with_primary_key(tr, "class_Fop", type_Int, "id");
+        auto& g = tr.get_group();
+        auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+        auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+        auto fops = g.add_table_with_primary_key("class_Fop", type_Int, "id");
         foos->add_column(type_Mixed, "value", true);
         foos->add_column_list(type_Mixed, "values");
 
@@ -7786,6 +7787,76 @@ TEST(Sync_Mixed)
         CHECK_EQUAL(l1.get_obj_key(), bars->begin()->get_key());
         CHECK_EQUAL(l2.get_obj_key(), fops->begin()->get_key());
         CHECK_EQUAL(v3, Mixed{123.f});
+    }
+}
+
+TEST(Sync_TypedLinks)
+{
+    // Test replication and synchronization of Mixed values and lists.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    {
+        WriteTransaction tr{db_1};
+        auto& g = tr.get_group();
+        auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+        auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+        auto fops = g.add_table_with_primary_key("class_Fop", type_Int, "id");
+        foos->add_column(type_TypedLink, "link");
+
+        auto foo1 = foos->create_object_with_primary_key(123);
+        auto foo2 = foos->create_object_with_primary_key(456);
+        auto bar = bars->create_object_with_primary_key("Hello");
+        auto fop = fops->create_object_with_primary_key(456);
+
+        foo1.set("link", ObjLink(bars->get_key(), bar.get_key()));
+        foo2.set("link", ObjLink(fops->get_key(), fop.get_key()));
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+
+        auto foos = tr.get_table("class_Foo");
+        auto bars = tr.get_table("class_Bar");
+        auto fops = tr.get_table("class_Fop");
+
+        CHECK_EQUAL(foos->size(), 2);
+        CHECK_EQUAL(bars->size(), 1);
+        CHECK_EQUAL(fops->size(), 1);
+
+        auto it = foos->begin();
+        auto l1 = it->get<ObjLink>("link");
+        ++it;
+        auto l2 = it->get<ObjLink>("link");
+
+        auto l1_table = tr.get_table(l1.get_table_key());
+        auto l2_table = tr.get_table(l2.get_table_key());
+
+        CHECK_EQUAL(l1_table, bars);
+        CHECK_EQUAL(l2_table, fops);
+        CHECK_EQUAL(l1.get_obj_key(), bars->begin()->get_key());
+        CHECK_EQUAL(l2.get_obj_key(), fops->begin()->get_key());
     }
 }
 
