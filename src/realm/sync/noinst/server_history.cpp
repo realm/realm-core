@@ -445,8 +445,6 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
             ensure_updated(realm_version); // Throws
             prepare_for_write();           // Throws
 
-            TableInfoCache table_info_cache{*tr};
-
             bool dirty = false;
             bool backup_whole_realm_2 = false;
             for (file_ident_type client_file_ident : client_file_order) {
@@ -497,7 +495,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                     num_changesets_to_dump += num_changesets;
                     bool dirty_2 = integrate_remote_changesets(
                         client_file_ident, upload_progress, list.locked_server_version, changesets_2, num_changesets,
-                        table_info_cache, &reporter, &reporter, logger); // Throws
+                        &reporter, &reporter, logger); // Throws
                     if (dirty_2) {
                         dirty = true;
                         bool backup_whole_realm_3 =
@@ -588,8 +586,6 @@ auto ServerHistory::integrate_backup_idents_and_changeset(
         ensure_updated(realm_version); // Throws
         prepare_for_write();           // Throws
 
-        TableInfoCache table_info_cache{*tr};
-
         result.version_info.realm_version = realm_version;
 
         if (realm_version + 1 != expected_realm_version)
@@ -622,8 +618,7 @@ auto ServerHistory::integrate_backup_idents_and_changeset(
             version_type locked_server_version = upload_progress.last_integrated_server_version;
             IntegrationReporter* integration_reporter = nullptr;
             integrate_remote_changesets(client_file_ident, upload_progress, locked_server_version, pair.second.data(),
-                                        pair.second.size(), table_info_cache, transform_reporter,
-                                        integration_reporter,
+                                        pair.second.size(), transform_reporter, integration_reporter,
                                         logger); // Throws
         }
 
@@ -1591,8 +1586,7 @@ private:
 
 bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_ident, UploadCursor upload_progress,
                                                 version_type locked_server_version, const RemoteChangeset* changesets,
-                                                std::size_t num_changesets, TableInfoCache& table_info_cache,
-                                                Transformer::Reporter* transform_reporter,
+                                                std::size_t num_changesets, Transformer::Reporter* transform_reporter,
                                                 IntegrationReporter* integration_reporter, util::Logger& logger)
 {
     std::size_t remote_file_index = std::size_t(remote_file_ident);
@@ -1663,7 +1657,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
             util::AppendBuffer<char> changeset_buffer;
 
             TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
-            InstructionApplier applier{transaction, table_info_cache};
+            InstructionApplier applier{transaction};
             applier.apply(parsed_transformed_changesets[i], &logger);             // Throws
             encode_changeset(parsed_transformed_changesets[i], changeset_buffer); // Throws
             entry.changeset = BinaryData{changeset_buffer.data(), changeset_buffer.size()};
@@ -1892,7 +1886,6 @@ void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
     REALM_ASSERT(client_file_ident.ident != g_root_node_file_ident);
 
     TransactionRef tr = m_shared_group->start_write(); // Throws
-    TableInfoCache table_info_cache{*tr};
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -1918,8 +1911,7 @@ void ServerHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
         // made, which never have an impact on accessors. However, notifications
         // will not be triggered for those updates either.
         TempShortCircuitReplication tss{*this};
-        fixup_state_and_changesets_for_assigned_file_ident(*tr, table_info_cache,
-                                                           client_file_ident.ident); // Throws
+        fixup_state_and_changesets_for_assigned_file_ident(*tr, client_file_ident.ident); // Throws
     }
 
     tr->commit(); // Throws
@@ -2006,7 +1998,6 @@ bool ServerHistory::integrate_server_changesets(const SyncProgress& progress, co
     REALM_ASSERT(!transact_reporter);
 
     TransactionRef tr = m_shared_group->start_write(); // Throws
-    TableInfoCache table_info_cache{*tr};
     version_type realm_version = tr->get_version();
     ensure_updated(realm_version); // Throws
     prepare_for_write();           // Throws
@@ -2037,7 +2028,7 @@ bool ServerHistory::integrate_server_changesets(const SyncProgress& progress, co
                                         progress.download.last_integrated_client_version};
         version_type locked_server_version = upload_progress.last_integrated_server_version;
         integrate_remote_changesets(remote_file_ident, upload_progress, locked_server_version, changesets,
-                                    num_changesets, table_info_cache, &reporter, &reporter, logger); // Throws
+                                    num_changesets, &reporter, &reporter, logger); // Throws
     }
     catch (BadChangesetError& e) {
         logger.error("Failed to parse, or apply changeset received from server: %1",
@@ -2859,8 +2850,7 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
 }
 
 
-void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transaction& group, TableInfoCache&,
-                                                                       file_ident_type file_ident)
+void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transaction& group, file_ident_type file_ident)
 {
     // Must be in write transaction!
 

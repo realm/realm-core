@@ -758,8 +758,8 @@ private:
     /// std::error_code instead.
     bool integrate_remote_changesets(file_ident_type remote_file_ident, UploadCursor upload_progress,
                                      version_type locked_server_version, const RemoteChangeset* changesets,
-                                     std::size_t num_changesets, sync::TableInfoCache&, sync::Transformer::Reporter*,
-                                     IntegrationReporter*, util::Logger&);
+                                     std::size_t num_changesets, sync::Transformer::Reporter*, IntegrationReporter*,
+                                     util::Logger&);
 
     bool update_upload_progress(version_type orig_client_version, ReciprocalHistory& recip_hist,
                                 UploadCursor upload_progress);
@@ -768,8 +768,7 @@ private:
     // or history compartment).
     bool do_compact_history(util::Logger& logger, bool force);
 
-    void fixup_state_and_changesets_for_assigned_file_ident(Transaction&, sync::TableInfoCache& table_info_cache,
-                                                            file_ident_type);
+    void fixup_state_and_changesets_for_assigned_file_ident(Transaction&, file_ident_type);
 
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);

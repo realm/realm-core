@@ -40,7 +40,6 @@ class WriteTransaction;
 namespace sync {
 
 class SyncHistory;
-struct TableInfoCache;
 
 /// Determine whether the Group has a sync-type history, and therefore whether
 /// it supports globally stable object IDs.
@@ -116,8 +115,8 @@ inline TableRef create_table_with_primary_key(Transaction& wt, StringData name, 
 ///
 /// It is an error to erase tables via the Group API, because it does not
 /// correctly update metadata tables (such as the `pk` table).
-void erase_table(Transaction&, TableInfoCache& table_info_cache, StringData name);
-void erase_table(Transaction&, TableInfoCache& table_info_cache, TableRef);
+void erase_table(Transaction&, StringData name);
+void erase_table(Transaction&, TableRef);
 //@}
 
 /// Create an array column with the specified element type.
@@ -133,15 +132,7 @@ ColKey add_array_column(Table&, DataType element_type, StringData column_name, b
 /// primary keys. If the table has a primary key, always returns true.
 bool has_globally_stable_object_ids(const Table&);
 
-bool table_has_primary_key(const TableInfoCache&, const Table&);
-
-/// Get the globally unique object ID for the row.
-///
-/// If the table has a primary key, this is guaranteed to succeed. Otherwise, if
-/// the server has not been contacted yet (`has_globally_stable_object_ids()`
-/// returns false), an exception is thrown.
-GlobalKey object_id_for_row(const TableInfoCache&, const Table&, ObjKey);
-GlobalKey object_id_for_row(const TableInfoCache&, const Obj&);
+bool table_has_primary_key(const Table&);
 
 PrimaryKey primary_key_for_row(const Table&, ObjKey);
 PrimaryKey primary_key_for_row(const Obj&);
@@ -149,102 +140,11 @@ PrimaryKey primary_key_for_row(const Obj&);
 /// Get the index of the row with the object ID.
 ///
 /// \returns realm::npos if the object does not exist in the table.
-ObjKey row_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
-Obj obj_for_object_id(const TableInfoCache&, const Table&, GlobalKey);
+ObjKey row_for_object_id(const Table&, GlobalKey);
+Obj obj_for_object_id(const Table&, GlobalKey);
 
 ObjKey row_for_primary_key(const Table&, PrimaryKey);
 Obj obj_for_primary_key(const Table&, PrimaryKey);
-
-//@{
-/// Add a row to the table and populate the object ID with an appropriate value.
-///
-/// In the variant which takes an GlobalKey parameter, a check is performed to see
-/// if the object already exists. If it does, the row index of the existing object
-/// is returned.
-///
-/// If the table has a primary key column, an exception is thrown.
-///
-/// \returns the row index of the object.
-inline Obj create_object(const TableInfoCache&, Table& t)
-{
-    return t.create_object();
-}
-
-inline Obj create_object(const TableInfoCache&, Table& t, GlobalKey object_id)
-{
-    return t.create_object(object_id);
-}
-//@}
-
-//@{
-/// Create an object with a primary key value and populate the object ID with an
-/// appropriate value.
-///
-/// If the table does not have a primary key column (as indicated by the Object
-/// Store's metadata in the special "pk" table), or the type of the primary key
-/// column does not match the argument provided, an exception is thrown.
-///
-/// The primary key column's value is populated with the appropriate
-/// `set_int_unique()`, `set_string_unique()`, or `set_null_unique()` method
-/// called on \a table.
-///
-/// If an object with the given primary key value already exists, its row number
-/// is returned without creating any new objects.
-///
-/// These are convenience functions, equivalent to the following:
-///   - Add an empty row to the table.
-///   - Obtain an `GlobalKey` with `object_id_for_primary_key()`.
-///   - Obtain a local object ID with `global_to_local_object_id()`.
-///   - Store the local object ID in the object ID column.
-///   - Call `set_int_unique()`,`set_string_unique()`, or `set_null_unique()`
-///     to set the primary key value.
-///
-/// \returns the row index of the created object.
-Obj create_object_with_primary_key(const TableInfoCache&, Table&, util::Optional<int64_t> primary_key);
-Obj create_object_with_primary_key(const TableInfoCache&, Table&, StringData primary_key);
-Obj create_object_with_primary_key(const TableInfoCache&, Table&, int64_t primary_key);
-//@}
-
-struct TableInfoCache {
-    const Transaction& m_transaction;
-
-    // Implicit conversion deliberately allowed for the purpose of calling the above
-    // functions without constructing a cache manually.
-    TableInfoCache(const Transaction&);
-    TableInfoCache(WriteTransaction&);
-    TableInfoCache(ReadTransaction&);
-    TableInfoCache(TableInfoCache&&) noexcept = default;
-
-    struct TableInfo {
-        struct VTable;
-
-        TableKey key;
-        StringData name;
-        ColKey primary_key_col;
-
-        ConstTableRef get_table(const Transaction&) const;
-        TableRef get_table(Transaction&) const;
-        bool primary_key_nullable;
-        DataType primary_key_type;
-        mutable ObjKey last_obj_key;
-        mutable GlobalKey last_object_id;
-
-        void clear_last_object() const
-        {
-            last_obj_key = realm::null_key;
-            last_object_id = {};
-        }
-    };
-
-    mutable std::map<TableKey, TableInfo> m_table_info;
-
-    const TableInfo& get_table_info(const Table&) const;
-    const TableInfo& get_table_info(TableKey) const;
-    void clear();
-    void clear_last_object(const Table&);
-    void verify();
-};
-
 
 /// Migrate a server-side Realm file whose history type is
 /// `Replication::hist_SyncServer` and whose history schema version is 0 (i.e.,
@@ -273,16 +173,6 @@ inline StringData class_name_to_table_name(StringData class_name, TableNameBuffe
     size_t len = std::min(class_name.size(), buffer.size() - class_prefix_len);
     std::copy_n(class_name.data(), len, p);
     return StringData(buffer.data(), class_prefix_len + len);
-}
-
-inline TableInfoCache::TableInfoCache(WriteTransaction& wt)
-    : TableInfoCache(wt.operator Transaction&())
-{
-}
-
-inline TableInfoCache::TableInfoCache(ReadTransaction& rt)
-    : TableInfoCache(rt.operator Transaction&())
-{
 }
 
 } // namespace sync

@@ -78,7 +78,7 @@ TEST(Array_Example)
     client_2->create_schema(create_schema);
 
     client_1->transaction([](Peer& p) {
-        Obj obj = sync::create_object(*p.group, *p.table("class_foobar"));
+        Obj obj = p.table("class_foobar")->create_object();
         auto bar = p.table("class_foobar")->get_column_key("bar");
 
         auto foo = p.table("class_foobar")->get_column_key("foo");

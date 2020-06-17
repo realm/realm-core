@@ -66,8 +66,6 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
     };
 
     mpark::visit(std::move(add_table), instr.type);
-
-    m_table_info_cache.clear();
 }
 
 void InstructionApplier::operator()(const Instruction::EraseTable& instr)
@@ -80,8 +78,7 @@ void InstructionApplier::operator()(const Instruction::EraseTable& instr)
     }
 
     log("sync::erase_table(m_group, \"%1\")", table_name);
-    sync::erase_table(m_transaction, m_table_info_cache, table_name);
-    m_table_info_cache.clear();
+    sync::erase_table(m_transaction, table_name);
 }
 
 void InstructionApplier::operator()(const Instruction::CreateObject& instr)
@@ -100,7 +97,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), realm::util::none);",
                     table->get_name());
-                sync::create_object_with_primary_key(m_table_info_cache, *table, util::none);
+                table->create_object_with_primary_key(util::none);
             },
             [&](int64_t pk) {
                 if (!pk_col) {
@@ -111,7 +108,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                                         table->get_column_type(pk_col));
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), pk);
-                sync::create_object_with_primary_key(m_table_info_cache, *table, pk);
+                table->create_object_with_primary_key(pk);
             },
             [&](InternString pk) {
                 if (!pk_col) {
@@ -124,7 +121,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 StringData str = get_string(pk);
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), \"%2\");", table->get_name(),
                     str);
-                sync::create_object_with_primary_key(m_table_info_cache, *table, str);
+                table->create_object_with_primary_key(str);
             },
             [&](const ObjectId& id) {
                 if (!pk_col) {
@@ -143,7 +140,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), GlobalKey{%2, %3});",
                     table->get_name(), key, key.hi(), key.lo());
-                sync::create_object(m_table_info_cache, *table, key);
+                table->create_object(key);
             },
         },
         instr.object);
@@ -158,7 +155,6 @@ void InstructionApplier::operator()(const Instruction::EraseObject& instr)
         obj->invalidate();
     }
     m_last_object.reset();
-    m_table_info_cache.clear_last_object(*m_last_table);
 }
 
 template <class F>

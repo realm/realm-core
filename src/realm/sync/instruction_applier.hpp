@@ -33,7 +33,7 @@ namespace sync {
 struct Changeset;
 
 struct InstructionApplier {
-    explicit InstructionApplier(Transaction&, TableInfoCache&) noexcept;
+    explicit InstructionApplier(Transaction&) noexcept;
 
     /// Throws BadChangesetError if application fails due to a problem with the
     /// changeset.
@@ -67,7 +67,6 @@ protected:
     REALM_NORETURN void bad_transaction_log(const char*, Params&&...) const;
 
     Transaction& m_transaction;
-    TableInfoCache& m_table_info_cache;
 
     template <class... Args>
     void log(const char* fmt, Args&&... args)
@@ -121,9 +120,8 @@ private:
 
 // Implementation
 
-inline InstructionApplier::InstructionApplier(Transaction& group, TableInfoCache& table_info_cache) noexcept
+inline InstructionApplier::InstructionApplier(Transaction& group) noexcept
     : m_transaction(group)
-    , m_table_info_cache(table_info_cache)
 {
 }
 
@@ -153,9 +151,6 @@ inline void InstructionApplier::apply(A& applier, const Changeset& changeset, ut
         if (!instr)
             continue;
         instr->visit(applier); // Throws
-#if REALM_DEBUG
-        applier.m_table_info_cache.verify();
-#endif
     }
     applier.end_apply();
 }

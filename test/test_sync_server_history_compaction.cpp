@@ -100,7 +100,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
     {
         WriteTransaction wt{sg_1};
         TableRef foo = wt.get_table("class_Foo");
-        sync::create_object(wt, *foo);
+        foo->create_object();
         wt.commit();
         Session session = fixture.make_bound_session(client_1_path, "/test");
         session.wait_for_upload_complete_or_client_stopped();
@@ -114,7 +114,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
     {
         WriteTransaction wt{sg_1};
         TableRef foo = wt.get_table("class_Foo");
-        sync::create_object(wt, *foo);
+        foo->create_object();
         wt.commit();
         Session session = fixture.make_bound_session(client_1_path, "/test");
         session.wait_for_upload_complete_or_client_stopped();
@@ -126,7 +126,7 @@ TEST(Sync_ServerHistoryCompaction_Basic)
     {
         WriteTransaction wt{sg_1};
         TableRef foo = wt.get_table("class_Foo");
-        sync::create_object(wt, *foo);
+        foo->create_object();
         wt.commit();
         Session session = fixture.make_bound_session(client_1_path, "/test");
         session.wait_for_upload_complete_or_client_stopped();
@@ -353,7 +353,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
     {
         WriteTransaction wt{sg_1};
         TableRef foos = wt.get_table("class_Foo");
-        sync::create_object(wt, *foos).remove();
+        foos->create_object().remove();
         version_type version = wt.commit();
         client_1.nonsync_transact_notify(version);
     }
@@ -370,7 +370,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
         DBRef sg_3 = DB::create(*client_2_history);
         WriteTransaction wt{sg_3};
         TableRef foos = wt.get_table("class_Foo");
-        sync::create_object(wt, *foos);
+        foos->create_object();
         wt.commit();
     }
 
@@ -381,7 +381,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
     {
         WriteTransaction wt{sg_1};
         TableRef foos = wt.get_table("class_Foo");
-        sync::create_object(wt, *foos);
+        foos->create_object();
         version_type version = wt.commit();
         client_1.nonsync_transact_notify(version);
     }
@@ -391,7 +391,7 @@ TEST(Sync_ServerHistoryCompaction_Old)
     {
         WriteTransaction wt{sg_1};
         TableRef foos = wt.get_table("class_Foo");
-        sync::create_object(wt, *foos);
+        foos->create_object();
         version_type version = wt.commit();
         client_1.nonsync_transact_notify(version);
     }
@@ -488,7 +488,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
                     TableRef foo = sync::create_table_with_primary_key(wt, "class_Foo", type_Int, "pk");
                     ColKey col = foo->add_column(type_String, "large");
                     for (int_fast64_t j = 0; j < 100; ++j) {
-                        sync::create_object_with_primary_key(wt, *foo, j).set(col, large_string);
+                        foo->create_object_with_primary_key(j).set(col, large_string);
                     }
 
                     session.nonsync_transact_notify(wt.commit());
@@ -500,7 +500,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
                     // rh_base_version on the server is > 0.
                     WriteTransaction wt{sg};
                     TableRef foo = wt.get_table("class_Foo");
-                    sync::create_object_with_primary_key(wt, *foo, int(i) + 100);
+                    foo->create_object_with_primary_key(int(i) + 100);
                     session.nonsync_transact_notify(wt.commit());
                     session.wait_for_upload_complete_or_client_stopped();
                 }
@@ -516,7 +516,7 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
             session.wait_for_download_complete_or_client_stopped();
             WriteTransaction wt{sg};
             TableRef foo = wt.get_table("class_Foo");
-            sync::create_object_with_primary_key(wt, *foo, 1);
+            foo->create_object_with_primary_key(1);
             session.nonsync_transact_notify(wt.commit());
             session.wait_for_upload_complete_or_client_stopped();
             fixture.stop();
