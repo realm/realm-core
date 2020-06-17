@@ -272,8 +272,8 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
                 ColKey source_col = m_last_table->get_column_key(info.col_name);
                 TableRef expected_target_table = m_last_table->get_link_target(source_col);
                 if (expected_target_table != target_table) {
-                    bad_transaction_log("Set(Link) with unexpected target table '%1' (expected '%2')", target_table_name,
-                                        expected_target_table->get_name());
+                    bad_transaction_log("Set(Link) with unexpected target table '%1' (expected '%2')",
+                                        target_table_name, expected_target_table->get_name());
                 }
                 ObjKey target = get_object_key(*target_table, data.link.target, "Set(Link)");
                 setter(target);
@@ -433,7 +433,8 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     if (!instr.type) {
         if (!instr.list) {
             table->add_column(type_Mixed, col_name);
-        } else {
+        }
+        else {
             table->add_column_list(type_Mixed, col_name);
         }
         return;

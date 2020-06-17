@@ -838,7 +838,8 @@ void Lst<Mixed>::set_repl(Replication* repl, size_t ndx, Mixed value)
 {
     if (value.is_null()) {
         repl->list_set_null(*this, ndx);
-    } else {
+    }
+    else {
         switch (value.get_type()) {
             case type_Int: {
                 repl->list_set_int(*this, ndx, value.get_int());
@@ -881,10 +882,14 @@ void Lst<Mixed>::set_repl(Replication* repl, size_t ndx, Mixed value)
                 break;
             }
 
-            case type_OldTable: [[fallthrough]];
-            case type_Mixed: [[fallthrough]];
-            case type_LinkList: [[fallthrough]];
-            case type_Link: [[fallthrough]];
+            case type_OldTable:
+                [[fallthrough]];
+            case type_Mixed:
+                [[fallthrough]];
+            case type_LinkList:
+                [[fallthrough]];
+            case type_Link:
+                [[fallthrough]];
             case type_OldDateTime:
                 REALM_TERMINATE("Invalid Mixed type");
         }
@@ -1049,7 +1054,8 @@ void Lst<Mixed>::insert_repl(Replication* repl, size_t ndx, Mixed value)
 {
     if (value.is_null()) {
         repl->list_insert_null(*this, ndx);
-    } else {
+    }
+    else {
         switch (value.get_type()) {
             case type_Int: {
                 repl->list_insert_int(*this, ndx, value.get_int());
@@ -1092,10 +1098,14 @@ void Lst<Mixed>::insert_repl(Replication* repl, size_t ndx, Mixed value)
                 break;
             }
 
-            case type_OldTable: [[fallthrough]];
-            case type_Mixed: [[fallthrough]];
-            case type_LinkList: [[fallthrough]];
-            case type_Link: [[fallthrough]];
+            case type_OldTable:
+                [[fallthrough]];
+            case type_Mixed:
+                [[fallthrough]];
+            case type_LinkList:
+                [[fallthrough]];
+            case type_Link:
+                [[fallthrough]];
             case type_OldDateTime:
                 REALM_TERMINATE("Invalid Mixed type");
         }

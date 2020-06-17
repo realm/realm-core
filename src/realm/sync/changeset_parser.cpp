@@ -96,7 +96,8 @@ util::Optional<Instruction::Payload::Type> ChangesetParser::State::read_optional
     if (is_typed) {
         auto type = read_payload_type();
         return type;
-    } else {
+    }
+    else {
         return util::none;
     }
 }

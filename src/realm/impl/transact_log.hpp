@@ -341,7 +341,8 @@ public:
     virtual void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value,
                              Instruction variant = instr_Set);
     virtual void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, Instruction variant = instr_Set);
-    virtual void set_typed_link(const Table*, ColKey col_key, ObjKey key, ObjLink value, Instruction variant = instr_Set);
+    virtual void set_typed_link(const Table*, ColKey col_key, ObjKey key, ObjLink value,
+                                Instruction variant = instr_Set);
     virtual void set_null(const Table*, ColKey col_key, ObjKey key, Instruction variant = instr_Set);
     virtual void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData);
     virtual void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size);
@@ -1019,22 +1020,19 @@ inline void TransactLogConvenientEncoder::list_insert_object_id(const ConstLstBa
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_timestamp(const ConstLstBase& list, size_t list_ndx,
-                                                                Timestamp)
+inline void TransactLogConvenientEncoder::list_insert_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_decimal(const ConstLstBase& list, size_t list_ndx,
-                                                              Decimal128)
+inline void TransactLogConvenientEncoder::list_insert_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_typed_link(const ConstLstBase& list, size_t list_ndx,
-                                                                 ObjLink)
+inline void TransactLogConvenientEncoder::list_insert_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink)
 {
     select_list(list);               // Throws
     m_encoder.list_insert(list_ndx); // Throws

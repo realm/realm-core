@@ -102,7 +102,8 @@ void ChangesetEncoder::append_value(util::Optional<Instruction::Payload::Type> t
     if (type) {
         append_value(true);
         append_value(*type);
-    } else {
+    }
+    else {
         append_value(false);
     }
 }

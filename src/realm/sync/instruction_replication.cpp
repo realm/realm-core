@@ -474,7 +474,8 @@ void SyncReplication::set_link(const Table* table, ColKey col, ObjKey ndx, ObjKe
     }
 }
 
-void SyncReplication::set_typed_link(const Table* table, ColKey col, ObjKey ndx, ObjLink value, _impl::Instruction variant)
+void SyncReplication::set_typed_link(const Table* table, ColKey col, ObjKey ndx, ObjLink value,
+                                     _impl::Instruction variant)
 {
     TrivialReplication::set_typed_link(table, col, ndx, value, variant);
 
