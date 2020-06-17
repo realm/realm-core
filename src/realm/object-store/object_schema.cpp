@@ -88,7 +88,7 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
             return PropertyType::Data | flags;
         case col_type_Timestamp:
             return PropertyType::Date | flags;
-        case col_type_OldMixed:
+        case col_type_Mixed:
             return PropertyType::Any | flags;
         case col_type_ObjectId:
             return PropertyType::ObjectId | flags;

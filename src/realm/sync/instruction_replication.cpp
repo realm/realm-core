@@ -96,10 +96,12 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::Link;
         case type_ObjectId:
             return Type::ObjectId;
+        case type_Mixed:
+            return Type::Mixed;
+        case type_TypedLink:
+            return Type::TypedLink;
 
         case type_OldTable:
-            [[fallthrough]];
-        case type_OldMixed:
             [[fallthrough]];
         case type_OldDateTime:
             unsupported_instruction();

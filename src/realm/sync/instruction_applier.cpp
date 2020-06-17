@@ -275,6 +275,14 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
             setter(target);
             return;
         }
+        case Type::TypedLink: {
+            // FIXME
+            return;
+        }
+        case Type::Mixed: {
+            // FIXME
+            return;
+        }
         case Type::ObjectId: {
             if (info.type != type_ObjectId) {
                 bad_transaction_log("Set(ObjectId) on column '%1.%2' of type %3", info.table_name, info.col_name,

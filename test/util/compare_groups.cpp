@@ -304,6 +304,15 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                     }
                     continue;
                 }
+                case type_Mixed: {
+                    auto a = obj_1.get_list<Mixed>(col.key_1);
+                    auto b = obj_2.get_list<Mixed>(col.key_2);
+                    if (!compare_arrays(a, b)) {
+                        logger.error("List mismatch in column '%1'", col.name);
+                        equal = false;
+                    }
+                    continue;
+                }
                 case type_LinkList: {
                     auto a = obj_1.get_list<ObjKey>(col.key_1);
                     auto b = obj_2.get_list<ObjKey>(col.key_2);
@@ -373,7 +382,6 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                 case type_Link:
                 case type_OldDateTime:
                 case type_OldTable:
-                case type_OldMixed:
                     break;
             }
             REALM_TERMINATE("Unsupported column type.");
@@ -487,6 +495,15 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                 }
                 continue;
             }
+            case type_Mixed: {
+                auto a = obj_1.get<Mixed>(col.key_1);
+                auto b = obj_2.get<Mixed>(col.key_2);
+                if (a != b) {
+                    logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name, a, b);
+                    equal = false;
+                }
+                continue;
+            }
             case type_Link: {
                 auto link_1 = obj_1.get<ObjKey>(col.key_1);
                 auto link_2 = obj_2.get<ObjKey>(col.key_2);
@@ -540,7 +557,6 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
             }
             case type_OldDateTime:
             case type_OldTable:
-            case type_OldMixed:
             case type_LinkList:
                 break;
         }

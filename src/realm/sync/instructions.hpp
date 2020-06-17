@@ -176,6 +176,8 @@ struct Payload {
         Decimal = 8,
         Link = 9,
         ObjectId = 10,
+        Mixed = 11,
+        TypedLink = 12,
     };
 
     struct Link {
@@ -200,6 +202,7 @@ struct Payload {
         Decimal128 decimal;
         ObjectId object_id;
         Link link;
+        ObjLink typed_link;
 
         Data() {}
     };
@@ -235,6 +238,11 @@ struct Payload {
         : type(Type::Link)
     {
         data.link = value;
+    }
+    explicit Payload(ObjLink value) noexcept
+        : type(Type::TypedLink)
+    {
+        data.typed_link = value;
     }
     explicit Payload(StringBufferRange value, bool is_binary = false) noexcept
         : type(is_binary ? Type::Binary : Type::String)
@@ -324,6 +332,10 @@ struct Payload {
                     return lhs.data.link == rhs.data.link;
                 case Type::ObjectId:
                     return lhs.data.object_id == rhs.data.object_id;
+                case Type::TypedLink:
+                    return lhs.data.typed_link == rhs.data.typed_link;
+                case Type::Mixed:
+                    return false; // FIXME
             }
         }
         return false;
@@ -695,6 +707,10 @@ inline const char* get_type_name(Instruction::Payload::Type type)
             return "Link";
         case Type::ObjectId:
             return "ObjectId";
+        case Type::Mixed:
+            return "Mixed";
+        case Type::TypedLink:
+            return "TypedLink";
     }
     return "(unknown)";
 }
@@ -747,6 +763,10 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
             return type_Link;
         case Type::ObjectId:
             return type_ObjectId;
+        case Type::Mixed:
+            return type_Mixed;
+        case Type::TypedLink:
+            return type_TypedLink;
         case Type::ObjectValue:
             [[fallthrough]];
         case Type::GlobalKey:
