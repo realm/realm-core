@@ -26,6 +26,9 @@
 
 namespace realm {
 
+class ConstObj;
+class Obj;
+
 struct TableKey {
     static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
     constexpr TableKey() noexcept
@@ -53,6 +56,11 @@ struct TableKey {
     {
         return value < rhs.value;
     }
+    bool operator>(const TableKey& rhs) const noexcept
+    {
+        return value > rhs.value;
+    }
+
     explicit operator bool() const noexcept
     {
         return value != null_value;
@@ -212,6 +220,12 @@ private:
     operator int64_t() const = delete;
 };
 
+inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
+{
+    ostr << "ObjKey(" << key.value << ")";
+    return ostr;
+}
+
 class ObjKeys : public std::vector<ObjKey> {
 public:
     ObjKeys(const std::vector<int64_t>& init)
@@ -226,13 +240,57 @@ public:
     }
 };
 
+struct ObjLink {
+public:
+    ObjLink() {}
+    ObjLink(TableKey table_key, ObjKey obj_key)
+        : m_table_key(table_key)
+        , m_obj_key(obj_key)
+    {
+    }
+    explicit operator bool() const
+    {
+        return m_table_key.operator bool();
+    }
+    bool is_null() const
+    {
+        return !m_table_key.operator bool();
+    }
+    bool operator==(const ObjLink& other) const
+    {
+        return m_obj_key == other.m_obj_key && m_table_key == other.m_table_key;
+    }
+    bool operator!=(const ObjLink& other) const
+    {
+        return m_obj_key != other.m_obj_key || m_table_key != other.m_table_key;
+    }
+    bool operator<(const ObjLink& rhs) const
+    {
+        return m_table_key < rhs.m_table_key || m_obj_key < rhs.m_obj_key;
+    }
+    bool operator>(const ObjLink& rhs) const
+    {
+        return m_table_key > rhs.m_table_key || m_obj_key > rhs.m_obj_key;
+    }
+    TableKey get_table_key() const
+    {
+        return m_table_key;
+    }
+    ObjKey get_obj_key() const
+    {
+        return m_obj_key;
+    }
 
-inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
+private:
+    TableKey m_table_key;
+    ObjKey m_obj_key;
+};
+
+inline std::ostream& operator<<(std::ostream& os, ObjLink link)
 {
-    ostr << "ObjKey(" << key.value << ")";
-    return ostr;
+    os << '{' << link.get_table_key() << ',' << link.get_obj_key() << '}';
+    return os;
 }
-
 constexpr ObjKey null_key;
 
 namespace util {

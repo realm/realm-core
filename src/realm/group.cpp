@@ -958,6 +958,30 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
         repl->rename_group_level_table(key, new_name); // Throws
 }
 
+Obj Group::get_object(ObjLink link)
+{
+    auto target_table = get_table(link.get_table_key());
+    ObjKey key = link.get_obj_key();
+    ClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+    return ct->get(key);
+}
+
+void Group::validate(ObjLink link) const
+{
+    if (auto tk = link.get_table_key()) {
+        auto target_key = link.get_obj_key();
+        auto target_table = get_table(tk);
+        const ClusterTree* ct =
+            target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        if (!ct->is_valid(target_key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
+        }
+        if (target_table->is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+    }
+}
+
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
     DefaultTableWriter(const Group& group, bool should_write_history)

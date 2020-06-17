@@ -51,7 +51,8 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
     // Now follow all backlinks to their origin and clear forward links.
     if ((value & 1) != 0) {
         // just a single one
-        state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(value >> 1), target_key);
+        state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(value >> 1),
+                                        {target_table->get_key(), target_key});
     }
     else {
         // There is more than one backlink - Iterate through them all
@@ -61,7 +62,8 @@ void ArrayBacklink::nullify_fwd_links(size_t ndx, CascadeState& state)
 
         size_t sz = backlink_list.size();
         for (size_t i = 0; i < sz; i++) {
-            state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(backlink_list.get(i)), target_key);
+            state.enqueue_for_nullification(*source_table, src_col_key, ObjKey(backlink_list.get(i)),
+                                            {target_table->get_key(), target_key});
         }
     }
 }

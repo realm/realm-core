@@ -369,7 +369,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
 
         for (auto& l : cascade_state.m_to_be_nullified) {
             Obj obj = group->get_table(l.origin_table)->get_object(l.origin_key);
-            obj.nullify_link(l.origin_col_key, l.old_target_key);
+            obj.nullify_link(l.origin_col_key, l.old_target_link);
         }
         cascade_state.m_to_be_nullified.clear();
 
@@ -3429,10 +3429,11 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
             case type_Link:
+            case type_TypedLink:
             case type_LinkList:
                 // Can't have lists of these types
             case type_OldTable:
-            case type_OldMixed:
+            case type_Mixed:
             case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
@@ -3478,12 +3479,13 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Decimal:
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
+            case type_TypedLink:
             case type_Link:
                 // Always nullable, so can't convert
             case type_LinkList:
                 // Never nullable, so can't convert
             case type_OldTable:
-            case type_OldMixed:
+            case type_Mixed:
             case type_OldDateTime:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
@@ -3553,6 +3555,29 @@ void Table::set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey 
 {
     m_opposite_table.set(col_key.get_index().val, opposite_table.value);
     m_opposite_column.set(col_key.get_index().val, opposite_column.value);
+}
+
+ColKey Table::find_backlink_column(ColKey origin_col_key, TableKey origin_table) const
+{
+    for (size_t i = 0; i < m_opposite_column.size(); i++) {
+        if (m_opposite_column.get(i) == origin_col_key.value && m_opposite_table.get(i) == origin_table.value) {
+            return m_spec.get_key(m_leaf_ndx2spec_ndx[i]);
+        }
+    }
+
+    return {};
+}
+
+ColKey Table::find_or_add_backlink_column(ColKey origin_col_key, TableKey origin_table)
+{
+    ColKey backlink_col_key = find_backlink_column(origin_col_key, origin_table);
+
+    if (!backlink_col_key) {
+        backlink_col_key = do_insert_root_column(ColKey{}, col_type_BackLink, "");
+        set_opposite_column(backlink_col_key, origin_table, origin_col_key);
+    }
+
+    return backlink_col_key;
 }
 
 TableKey Table::get_opposite_table_key(ColKey col_key) const

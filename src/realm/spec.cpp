@@ -478,6 +478,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
         ColumnType col_type = ColumnType(m_types.get(col_ndx));
         switch (col_type) {
             case col_type_Link:
+            case col_type_TypedLink:
             case col_type_LinkList: {
                 // In addition to name and attributes, the link target table must also be compared
                 REALM_ASSERT(false); // We can no longer compare specs - in fact we don't want to
@@ -495,7 +496,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_String:
             case col_type_OldStringEnum:
             case col_type_OldTable:
-            case col_type_OldMixed:
+            case col_type_Mixed:
             case col_type_OldDateTime:
             case col_type_Timestamp:
             case col_type_Float:

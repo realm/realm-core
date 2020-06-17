@@ -279,6 +279,7 @@ private:
     ColKey get_column_key(StringData col_name) const;
     TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
+    TableRef get_target_table(ObjLink link) const;
     const Spec& get_spec() const;
 
     template <typename U>
@@ -288,7 +289,10 @@ private:
     int cmp(const Obj& other, ColKey::Idx col_ndx) const;
     int cmp(const Obj& other, ColKey::Idx col_ndx) const;
     ObjKey get_backlink(ColKey backlink_col, size_t backlink_ndx) const;
+    // Return all backlinks from a specific backlink column
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
+    // Return number of backlinks from a specific backlink column
+    size_t get_backlink_cnt(ColKey backlink_col) const;
     ObjKey get_unfiltered_link(ColKey col_key) const;
 
     template <class Val>
@@ -305,13 +309,13 @@ private:
     void set_int(ColKey col_key, int64_t value);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
-    void nullify_link(ColKey origin_col, ObjKey target_key);
+    void nullify_link(ColKey origin_col, ObjLink target_key);
     // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjKey new_key);
+    void set_backlink(ColKey col_key, ObjLink new_link);
     // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state);
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state);
     // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state);
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state);
     template <class T>
     inline void set_spec(T&, ColKey);
 };

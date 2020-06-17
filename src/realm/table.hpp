@@ -664,6 +664,8 @@ private:
 
     bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
+    ColKey find_backlink_column(ColKey origin_col_key, TableKey origin_table) const;
+    ColKey find_or_add_backlink_column(ColKey origin_col_key, TableKey origin_table);
     void do_set_primary_key_column(ColKey col_key);
     void validate_column_is_unique(ColKey col_key) const;
     void rebuild_table_with_pk_column();

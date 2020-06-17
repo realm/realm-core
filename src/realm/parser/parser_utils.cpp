@@ -107,10 +107,12 @@ const char* data_type_to_str(DataType type)
             return "ObjectId";
         case type_OldTable:
             return "Table";
-        case type_OldMixed:
+        case type_Mixed:
             return "Mixed";
         case type_Link:
             return "Link";
+        case type_TypedLink:
+            return "TypedLink";
         case type_LinkList:
             return "LinkList";
     }
