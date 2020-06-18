@@ -578,12 +578,6 @@ void ConstTableView::do_sync()
         std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
                       [this](ObjKey key) { m_key_values.add(key); });
     }
-    else if (m_distinct_column_source) {
-        m_key_values.clear();
-        auto index = m_table->get_search_index(m_distinct_column_source);
-        REALM_ASSERT(index);
-        index->distinct(m_key_values);
-    }
     else if (m_source_column_key) {
         m_key_values.clear();
         if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
@@ -674,9 +668,6 @@ bool ConstTableView::is_in_table_order() const
     }
     else if (m_linklist_source) {
         return false;
-    }
-    else if (m_distinct_column_source) {
-        return !m_descriptor_ordering.will_apply_sort();
     }
     else if (m_source_column_key) {
         return false;

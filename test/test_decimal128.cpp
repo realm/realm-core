@@ -265,9 +265,6 @@ TEST(Decimal_Distinct)
         order.append_distinct(DistinctDescriptor({{col}}));
         auto tv = table->where().find_all(order);
         CHECK_EQUAL(tv.size(), 10);
-
-        tv = table->get_distinct_view(col);
-        CHECK_EQUAL(tv.size(), 10);
     }
 }
 

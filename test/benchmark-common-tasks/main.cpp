@@ -291,34 +291,6 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
     }
 };
 
-struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
-    const char* name() const
-    {
-        return "DistinctStringFewDupes";
-    }
-
-    void operator()(DBRef)
-    {
-        auto table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
-struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
-    const char* name() const
-    {
-        return "DistinctStringManyDupes";
-    }
-
-    void operator()(DBRef)
-    {
-        ConstTableRef table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
 struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     const char* name() const
     {
@@ -1187,76 +1159,6 @@ struct BenchmarkSortInt : BenchmarkWithInts {
     }
 };
 
-struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
-    const char* name() const
-    {
-        return "DistinctIntNoDupes";
-    }
-
-    void before_all(DBRef group)
-    {
-        BenchmarkWithIntsTable::before_all(group);
-        WrtTrans tr(group);
-        TableRef t = tr.get_table(name());
-        Random r;
-        for (size_t i = 0; i < BASE_SIZE; ++i) {
-            int64_t val = r.draw_int(0, BASE_SIZE / 2);
-#ifdef REALM_CLUSTER_IF
-            Obj obj = t->create_object();
-            obj.set(m_col, val);
-            m_keys.push_back(obj.get_key());
-#else
-            auto row = t->add_empty_row();
-            t->set_int(m_col, row, val);
-#endif
-        }
-        t->add_search_index(m_col);
-        tr.commit();
-    }
-
-    void operator()(DBRef)
-    {
-        ConstTableRef table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
-struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
-    const char* name() const
-    {
-        return "DistinctIntManyDupes";
-    }
-
-    void before_all(DBRef group)
-    {
-        BenchmarkWithIntsTable::before_all(group);
-        WrtTrans tr(group);
-        TableRef t = tr.get_table(name());
-        Random r;
-        for (size_t i = 0; i < BASE_SIZE; ++i) {
-            int64_t val = r.draw_int(0, 10);
-#ifdef REALM_CLUSTER_IF
-            Obj obj = t->create_object();
-            obj.set(m_col, val);
-            m_keys.push_back(obj.get_key());
-#else
-            auto row = t->add_empty_row();
-            t->set_int(m_col, row, val);
-#endif
-        }
-        t->add_search_index(m_col);
-        tr.commit();
-    }
-
-    void operator()(DBRef)
-    {
-        ConstTableRef table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
 struct BenchmarkInsert : BenchmarkWithStringsTable {
     const char* name() const
     {
@@ -1956,10 +1858,6 @@ int benchmark_common_tasks_main()
 
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
-    BENCH(BenchmarkDistinctIntFewDupes);
-    BENCH(BenchmarkDistinctIntManyDupes);
-    BENCH(BenchmarkDistinctStringFewDupes);
-    BENCH(BenchmarkDistinctStringManyDupes);
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkUnorderedTableViewClearIndexed);

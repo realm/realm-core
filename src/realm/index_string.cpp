@@ -1171,59 +1171,6 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 }
 
 
-void StringIndex::distinct(BPlusTree<ObjKey>& result) const
-{
-    Allocator& alloc = m_array->get_alloc();
-    const size_t array_size = m_array->size();
-
-    // Get first matching row for every key
-    if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < array_size; ++i) {
-            size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, nullptr, 0, m_target_column, alloc);
-            ndx.distinct(result);
-        }
-    }
-    else {
-        for (size_t i = 1; i < array_size; ++i) {
-            int64_t ref = m_array->get(i);
-
-            // low bit set indicate literal ref (shifted)
-            if (ref & 1) {
-                ObjKey k = ObjKey((uint64_t(ref) >> 1));
-                result.add(k);
-            }
-            else {
-                // A real ref either points to a list or a subindex
-                char* header = alloc.translate(to_ref(ref));
-                if (Array::get_context_flag_from_header(header)) {
-                    StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column, alloc);
-                    ndx.distinct(result);
-                }
-                else {
-                    IntegerColumn sub(alloc, to_ref(ref)); // Throws
-                    if (sub.size() == 1) {                 // Optimization.
-                        ObjKey k = ObjKey(sub.get(0));     // get first match
-                        result.add(k);
-                    }
-                    else {
-                        // Add all unique values from this sorted list
-                        IntegerColumn::const_iterator it = sub.cbegin();
-                        IntegerColumn::const_iterator it_end = sub.cend();
-                        SortedListComparator slc(m_target_column);
-                        StringConversionBuffer buffer;
-                        while (it != it_end) {
-                            result.add(ObjKey(*it));
-                            StringData it_data = get(ObjKey(*it), buffer);
-                            it = std::upper_bound(it, it_end, it_data, slc);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 StringData StringIndex::get(ObjKey key, StringConversionBuffer& buffer) const
 {
     return m_target_column.get_index_data(key, buffer);

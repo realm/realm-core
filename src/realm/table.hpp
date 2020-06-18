@@ -395,10 +395,6 @@ public:
     TableView find_all_null(ColKey col_key);
     ConstTableView find_all_null(ColKey col_key) const;
 
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
-    TableView get_distinct_view(ColKey col_key);
-    ConstTableView get_distinct_view(ColKey col_key) const;
-
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;
 
