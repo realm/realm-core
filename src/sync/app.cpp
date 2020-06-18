@@ -18,6 +18,8 @@
 
 #include "sync/app.hpp"
 
+#include "realm/util/base64.hpp"
+#include "realm/util/uri.hpp"
 #include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/sync_manager.hpp"
@@ -956,6 +958,9 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
     }, handler);
 }
 
+std::string App::function_call_url_path() const {
+    return util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
+}
 void App::call_function(std::shared_ptr<SyncUser> user,
                         const std::string& name,
                         const bson::BsonArray& args_bson,
@@ -970,8 +975,6 @@ void App::call_function(std::shared_ptr<SyncUser> user,
         completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
     };
 
-    std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
-
     bson::BsonDocument args {
         { "arguments", args_bson },
         { "name", name }
@@ -981,15 +984,12 @@ void App::call_function(std::shared_ptr<SyncUser> user,
         args["service"] = *service_name;
     }
 
-    std::stringstream s;
-    s << bson::Bson(args);
-    
-    do_authenticated_request(Request {
+    do_authenticated_request(Request{
         HttpMethod::post,
-        route,
+        function_call_url_path(),
         m_request_timeout_ms,
         {},
-        s.str(),
+        bson::Bson(args).toJson(),
         false
     },
     user,
@@ -1031,6 +1031,36 @@ void App::call_function(const std::string& name,
                   name,
                   args_bson,
                   completion_block);
+}
+
+Request App::make_streaming_request(std::shared_ptr<SyncUser> user,
+                                    const std::string &name,
+                                    const bson::BsonArray &args_bson,
+                                    const util::Optional<std::string> &service_name) const {
+    auto args = bson::BsonDocument{
+        {"arguments", args_bson},
+        {"name", name},
+    };
+    if (service_name) {
+        args["service"] = *service_name;
+    }
+    const auto args_json = bson::Bson(args).toJson();
+
+    auto args_base64 = std::string(util::base64_encoded_size(args_json.size()), '\0');
+    util::base64_encode(args_json.data(), args_json.size(), args_base64.data(), args_base64.size());
+
+    auto url = function_call_url_path() + "?stitch_request=" + util::uri_percent_encode(args_base64);
+    if (user) {
+        url += "&stitch_at=";
+        url += user->access_token(); // doesn't need url encoding
+    }
+
+    return Request{
+        HttpMethod::get,
+        url,
+        m_request_timeout_ms,
+        {{"Accept", "text/event-stream"}},
+    };
 }
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)

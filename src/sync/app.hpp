@@ -351,7 +351,14 @@ public:
     {
         call_function(current_user(), name, args_bson, completion_block);
     }
-    
+
+    // NOTE: only sets "Accept: text/event-stream" header. If you use an API that sets that but doesn't support
+    // setting other headers (eg. EventSource() in JS), you can ignore the headers field on the request.
+    Request make_streaming_request(std::shared_ptr<SyncUser> user,
+                                   const std::string &name,
+                                   const bson::BsonArray &args_bson,
+                                   const util::Optional<std::string> &service_name) const;
+
     // MARK: Push notification client
     PushClient push_notification_client(const std::string& service_name);
     
@@ -425,6 +432,7 @@ private:
     /// Provides MongoDB Realm Cloud with metadata related to the users session
     void attach_auth_options(bson::BsonDocument& body);
 
+    std::string function_call_url_path() const;
 };
 
 // MARK: Provider client templates

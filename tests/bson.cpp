@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <json.hpp>
+#include <string_view>
 
 #include "catch2/catch.hpp"
 #include "util/test_utils.hpp"
@@ -27,6 +28,8 @@
 using namespace nlohmann;
 using namespace realm;
 using namespace bson;
+
+using namespace std::string_view_literals;
 
 static inline std::string remove_whitespace(const char* c) {
     std::string str(c);
@@ -262,6 +265,12 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {\"a\" : \"b\"}}",
                 [](auto val) { CHECK((std::string)val["a"] == "b"); }
+            });
+        }
+        SECTION("Special characters in field name") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x" : {">\n\t\u0002\\\"<" : "b"}})",
+                [](auto val) { CHECK((std::string)val[">\n\t\x02\\\"<"] == "b"); }
             });
         }
         SECTION("Nested Objects") {
@@ -661,6 +670,12 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<std::string>("a", {
                 "{\"a\" : \"abababababab\"}",
                 [](auto val) { CHECK(val == "abababababab"); }
+            });
+        }
+        SECTION("Special characters in string") {
+            run_corpus<std::string>("x", {
+                R"({"x" : ">\n\t\u0000\\\"<"})",
+                [](auto val) { CHECK(val == ">\n\t\x00\\\"<"sv); }
             });
         }
     }

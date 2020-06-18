@@ -85,6 +85,9 @@ public:
     /// Find or add a given key
     T& operator[](const std::string& k);
 
+    T& at(const std::string& k) { return m_map.at(k); }
+    const T& at(const std::string& k) const { return m_map.at(k); }
+
     /// Whether or not this map is empty
     bool empty();
 
