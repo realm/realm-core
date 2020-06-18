@@ -789,8 +789,8 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
     bool processed = false;
     
     SECTION("auth providers function integration") {
-        
-        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"realmCustomAuthFuncUserId", "123456"}}).dump());
+        bson::BsonDocument function_params { {"realmCustomAuthFuncUserId", "123456"} };
+        auto credentials = realm::app::AppCredentials::function(function_params);
         
         app->log_in_with_credentials(credentials,
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -3081,7 +3081,8 @@ TEST_CASE("app: auth providers", "[sync][app]") {
     }
     
     SECTION("auth providers function") {
-        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"name", "mongo"}}).dump());
+        bson::BsonDocument function_params { {"name", "mongo"} };
+        auto credentials = realm::app::AppCredentials::function(function_params);
         CHECK(credentials.provider() == AuthProvider::FUNCTION);
         CHECK(credentials.provider_as_string() == IdentityProviderFunction);
         CHECK(credentials.serialize_as_json() == "{\"name\":\"mongo\"}");
