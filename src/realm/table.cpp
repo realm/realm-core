@@ -2241,25 +2241,6 @@ ConstTableView Table::find_all_null(ColKey col_key) const
     return const_cast<Table*>(this)->find_all_null(col_key);
 }
 
-TableView Table::get_distinct_view(ColKey col_key)
-{
-    if (this->has_search_index(col_key)) {
-        TableView tv(TableView::DistinctView, m_own_ref, col_key);
-        tv.do_sync();
-        return tv;
-    }
-
-    // Fallback is there is no search index
-    DescriptorOrdering order;
-    order.append_distinct(DistinctDescriptor({{col_key}}));
-    return where().find_all(order);
-}
-
-ConstTableView Table::get_distinct_view(ColKey col_key) const
-{
-    return const_cast<Table*>(this)->get_distinct_view(col_key);
-}
-
 TableView Table::get_sorted_view(ColKey col_key, bool ascending)
 {
     TableView tv = where().find_all();
@@ -3274,7 +3255,8 @@ void Table::do_set_primary_key_column(ColKey col_key)
 bool Table::contains_unique_values(ColKey col) const
 {
     if (has_search_index(col)) {
-        return get_distinct_view(col).size() == size();
+        auto search_index = get_search_index(col);
+        return !search_index->has_duplicate_values();
     }
     else {
         TableView tv = where().find_all();

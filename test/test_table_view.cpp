@@ -559,7 +559,9 @@ TEST(TableView_Distinct_Follows_Changes)
         table.create_object().set_all(i, "Foo");
     }
 
-    TableView distinct_ints = table.get_distinct_view(col_int);
+    DescriptorOrdering order;
+    order.append_distinct(DistinctDescriptor({{col_int}}));
+    TableView distinct_ints = table.where().find_all(order);
     CHECK_EQUAL(5, distinct_ints.size());
     CHECK(distinct_ints.is_in_sync());
 
@@ -1650,9 +1652,6 @@ TEST(TableView_IsInTableOrder)
     auto ll = src_obj.get_linklist_ptr(col_link);
     tv = ll->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
-
-    tv = target->get_distinct_view(col_id);
-    CHECK_EQUAL(true, tv.is_in_table_order());
 
     // … unless sorted.
     tv = target->get_sorted_view(col_id);
