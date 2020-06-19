@@ -23,6 +23,7 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
+#include "sync/app.hpp"
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
@@ -40,11 +41,16 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Config> app_config)
 {
+    auto defer = util::make_scope_exit([this, app_config]() noexcept {
+        if (app_config) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_app = std::make_shared<app::App>(*app_config);
+        }
+    });
+
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
-        if (app_config)
-            m_app = std::make_shared<app::App>(*app_config);
         if (m_sync_client)
             return;
     }
@@ -575,4 +581,12 @@ std::string SyncManager::client_uuid() const
 {
     REALM_ASSERT(m_client_uuid);
     return *m_client_uuid;
+}
+
+util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
+{
+    if (!m_metadata_manager) {
+        return util::none;
+    }
+    return m_metadata_manager->get_app_metadata();
 }

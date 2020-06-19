@@ -29,14 +29,11 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
+#include "sync/app.hpp"
 #include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
-
-namespace realm::app {
-class App;
-}
 
 #endif // REALM_ENABLE_SYNC
 
@@ -166,17 +163,24 @@ struct SyncTestFile : TestFile {
 };
 
 struct TestSyncManager {
-    TestSyncManager(const std::string& base_url, std::string const& base_path = "",
+    TestSyncManager(const realm::app::App::Config& config, bool should_teardown_test_directory = true,
                     realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager(const std::string& base_url, std::string const& base_path = "",
+                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption,
+                    bool should_teardown_test_directory = true);
     TestSyncManager(const SyncServer& server, std::string const& base_path = "",
-                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption)
-        : TestSyncManager(server.base_url(), base_path, metadataMode)
+                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption,
+                    bool should_teardown_test_directory = true)
+        : TestSyncManager(server.base_url(), base_path, metadataMode, should_teardown_test_directory)
     {
     }
     ~TestSyncManager();
-    static void configure(const std::string& base_url, std::string const& base_path,
-                          realm::SyncManager::MetadataMode);
+
     std::shared_ptr<realm::app::App> app() const;
+
+private:
+    std::string m_base_file_path;
+    bool m_should_teardown_test_directory = true;
 };
 
 std::error_code wait_for_upload(realm::Realm& realm);

@@ -31,7 +31,7 @@ using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_file/";
+static const std::string base_path = tmp_dir() + "realm_objectstore_sync_file/";
 
 static void prepare_sync_manager_test()
 {
@@ -164,6 +164,9 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]")
     const std::string local_identity = "123456789";
     const std::string manager_path = base_path + "syncmanager/";
     prepare_sync_manager_test();
+    auto cleanup = util::make_scope_exit([=]() noexcept {
+        util::try_remove_dir_recursive(base_path);
+    });
     auto manager = SyncFileManager(manager_path);
 
     SECTION("user directory APIs")
