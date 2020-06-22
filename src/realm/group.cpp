@@ -218,22 +218,22 @@ void Group::set_size() const noexcept
     m_num_tables = retval;
 }
 
-void Group::remove_pk_table()
+std::map<TableRef, ColKey> Group::get_primary_key_columns_from_pk_table(TableRef pk_table)
 {
-    TableRef pk_table = get_table("pk");
-    if (pk_table) {
-        ColKey col_table = pk_table->get_column_key("pk_table");
-        ColKey col_prop = pk_table->get_column_key("pk_property");
-        for (auto pk_obj : *pk_table) {
-            auto object_type = pk_obj.get<String>(col_table);
-            auto name = std::string(g_class_name_prefix) + std::string(object_type);
-            auto table = get_table(name);
-            auto pk_col_name = pk_obj.get<String>(col_prop);
-            auto pk_col = table->get_column_key(pk_col_name);
-            table->do_set_primary_key_column(pk_col);
-        }
-        this->remove_table("pk");
+    std::map<TableRef, ColKey> ret;
+    REALM_ASSERT(pk_table);
+    ColKey col_table = pk_table->get_column_key("pk_table");
+    ColKey col_prop = pk_table->get_column_key("pk_property");
+    for (auto pk_obj : *pk_table) {
+        auto object_type = pk_obj.get<String>(col_table);
+        auto name = std::string(g_class_name_prefix) + std::string(object_type);
+        auto table = get_table(name);
+        auto pk_col_name = pk_obj.get<String>(col_prop);
+        auto pk_col = table->get_column_key(pk_col_name);
+        ret.emplace(table, pk_col);
     }
+
+    return ret;
 }
 
 TableKey Group::ndx2key(size_t ndx) const
@@ -404,36 +404,57 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
         DisableReplication disable_replication(*this);
 
-        std::vector<TableKey> table_keys;
+        std::vector<TableRef> table_accessors;
+        TableRef pk_table;
+        std::map<TableRef, ColKey> pk_cols;
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
             auto table = get_table(name);
-            table_keys.push_back(table->get_key());
+            if (name == "pk") {
+                pk_table = table;
+            }
+            else {
+                table_accessors.push_back(table);
+            }
+        }
+        auto commit_and_continue = [this]() { commit_and_continue_writing(); };
+
+        for (auto k : table_accessors) {
+            k->migrate_column_info(commit_and_continue);
         }
 
-        auto commit_and_continue = [this]() { commit_and_continue_writing(); };
-        for (auto k : table_keys) {
-            get_table(k)->migrate_column_info(commit_and_continue);
+        if (pk_table) {
+            pk_table->migrate_column_info(commit_and_continue);
+            pk_table->migrate_indexes(ColKey(), commit_and_continue);
+            pk_table->create_columns(commit_and_continue);
+            pk_table->migrate_objects(ColKey(), commit_and_continue);
+            pk_cols = get_primary_key_columns_from_pk_table(pk_table);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_indexes(commit_and_continue);
+
+        for (auto k : table_accessors) {
+            k->migrate_indexes(pk_cols[k], commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_subspec(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->migrate_subspec(commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->convert_links_from_ndx_to_key(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->create_columns(commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->create_columns(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->migrate_objects(pk_cols[k], commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_objects(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->migrate_links(commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_links(commit_and_continue);
+        for (auto k : table_accessors) {
+            auto orig_row_ndx_col = k->get_column_key("!ROW_INDEX");
+            if (orig_row_ndx_col)
+                k->remove_column(orig_row_ndx_col);
         }
-        remove_pk_table();
+
+        if (pk_table) {
+            remove_table("pk");
+        }
     }
 }
 

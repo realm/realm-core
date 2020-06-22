@@ -37,6 +37,8 @@
 #include <realm/history.hpp>
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
+
 
 using namespace realm;
 using namespace realm::util;
@@ -1220,6 +1222,120 @@ TEST(Upgrade_Database_6_10)
 
 namespace {
 constexpr bool generate_json = false;
+}
+
+TEST(Upgrade_Database_9_10_with_pk_table)
+{
+    /* File has this content:
+    {
+    "pk":[
+        {"_key":0,"pk_table":"link origin","pk_property":"pk"}
+        {"_key":1,"pk_table":"object","pk_property":"pk"}
+    ]
+    ,"metadata":[
+        {"_key":0,"version":0}
+    ]
+    ,"class_link origin":[
+        {"_key":0,"pk":5,"object":null,"array":{"table": "class_object", "keys": []}},
+        {"_key":1,"pk":6,"object":{"table": "class_object", "key": 0},"array":{"table": "class_object", "keys": []}},
+        {"_key":2,"pk":7,"object":null,"array":{"table": "class_object", "keys": [1,2]}}
+    ]
+    ,"class_object":[
+        {"_key":0,"pk":"hello","value":7,"optional":null},
+        {"_key":1,"pk":"world","value":35,"optional":null},
+        {"_key":2,"pk":"goodbye","value":800,"optional":-87}
+    ]
+    }
+    */
+
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_pk_table.realm";
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    ReadTransaction rt(sg);
+    rt.get_group().verify();
+    // rt.get_group().to_json(std::cout);
+
+    ConstTableRef t_object = rt.get_table("class_object");
+    ConstTableRef t_origin = rt.get_table("class_link origin");
+
+    auto pk_col = t_object->get_primary_key_column();
+    CHECK(pk_col);
+    CHECK_EQUAL(t_object->get_column_name(pk_col), "pk");
+    auto hello_key = t_object->find_first_string(pk_col, "hello");
+    auto obj1 = t_object->get_object(hello_key);
+    CHECK_EQUAL(obj1.get<Int>("value"), 7);
+
+    pk_col = t_origin->get_primary_key_column();
+    CHECK(pk_col);
+    CHECK_EQUAL(t_origin->get_column_name(pk_col), "pk");
+    auto key_6 = t_origin->find_first_int(pk_col, 6);
+    auto obj2 = t_origin->get_object(key_6);
+    CHECK_EQUAL(obj2.get<ObjKey>("object"), hello_key);
+}
+
+TEST(Upgrade_Database_9_10_with_oid)
+{
+    /* File has this content:
+    "pk":[
+        {"_key":0,"pk_table":"bar","pk_property":"ident"},
+        {"_key":1,"pk_table":"origin","pk_property":"num"}
+    ]
+    ,"metadata":[
+        {"_key":0,"version":0}
+    ]
+    ,"class_bar":[
+        {"_key":717911018529132092,"ident":"goodbye","value":800,"optional":-87},
+        {"_key":2515477941069477034,"ident":"hello","value":7,"optional":null},
+        {"_key":6444968757765087612,"ident":"world","value":35,"optional":null}
+    ]
+    ,"class_foo":[
+        {"_key":512,"name":"Tom","age":5},
+        {"_key":513,"name":"Pluto","age":10},
+        {"_key":514,"name":"Jerry","age":7}
+    ]
+    ,"class_origin":[
+        {"_key":0,"num":1,"object":null,"array":{"table": "class_foo", "keys": []}},
+        {"_key":1,"num":2,"object":{"table": "class_bar", "key": 2515477941069477034},
+            "array":{"table": "class_foo","keys": []}},
+        {"_key":2,"num":3,"object":null,"array":{"table": "class_foo", "keys": [512,514]}}
+    ]
+    }
+    */
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_oid.realm";
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    ReplSyncClient repl(temp_copy, 10, 2);
+    auto sg = DB::create(repl);
+    ReadTransaction rt(sg);
+    rt.get_group().verify();
+    // rt.get_group().to_json(std::cout);
+
+    ConstTableRef t_bar = rt.get_table("class_bar");
+    ConstTableRef t_origin = rt.get_table("class_origin");
+
+    auto pk_col = t_bar->get_primary_key_column();
+    CHECK(pk_col);
+    CHECK_EQUAL(t_bar->get_column_name(pk_col), "ident");
+    auto hello_key = t_bar->find_first_string(pk_col, "hello");
+    auto obj1 = t_bar->get_object(hello_key);
+    CHECK_EQUAL(obj1.get<Int>("value"), 7);
+
+    pk_col = t_origin->get_primary_key_column();
+    CHECK(pk_col);
+    CHECK_EQUAL(t_origin->get_column_name(pk_col), "num");
+    auto key_3 = t_origin->find_first_int(pk_col, 3);
+    auto obj2 = t_origin->get_object(key_3);
+    auto ll = obj2.get_linklist(t_origin->get_column_key("array"));
+    CHECK_EQUAL(ll.get_object(0).get<String>("name"), "Tom");
+    CHECK_EQUAL(ll.get_object(1).get<String>("name"), "Jerry");
 }
 
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
