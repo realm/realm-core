@@ -265,10 +265,14 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
-std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
+std::function<void(util::Optional<app::AppError>)>
+SyncSession::handle_refresh(std::weak_ptr<SyncSession> weak_session)
 {
-    return [session](util::Optional<app::AppError> error) {
+    return [weak_session](util::Optional<app::AppError> error) {
         using namespace std::chrono;
+        auto session = weak_session.lock();
+        if (!session)
+            return;
 
         auto session_user = session->user();
         auto is_user_expired =
