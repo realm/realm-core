@@ -125,6 +125,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     chunked_binary.hpp
     cluster.hpp
     cluster_tree.hpp
+    collection.hpp
     column_binary.hpp
     column_integer.hpp
     column_fwd.hpp
@@ -327,7 +328,7 @@ endif()
 
 # GCC<5.1 does not adhere to the C++11 ABI for std::string but some systems
 # still produce non-compliant C++11 ABI even with newer version of GCC (Centos 6 for example).
-# This performs a linking test and communicates to dependencies built with newer compilers 
+# This performs a linking test and communicates to dependencies built with newer compilers
 # that the old ABI should be used.
 if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     try_compile(USES_OLD_ABI ${RealmCore_BINARY_DIR}/abitest ${RealmCore_SOURCE_DIR}/tools/cmake/abitest abitest)
@@ -409,7 +410,7 @@ if(UNIX AND NOT APPLE)
     if (REALM_ENABLE_SYNC)
 	    target_link_libraries(Storage PUBLIC OpenSSL::SSL)
     endif()
-    
+
     if(NOT REALM_SKIP_SHARED_LIB)
         target_link_libraries(StorageShared PUBLIC OpenSSL::Crypto)
     endif()
