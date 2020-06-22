@@ -90,8 +90,8 @@ struct SyncSession::State {
     // The session should be closed and moved to `inactive`, in accordance with its stop policy and other state.
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    // Returns true iff the error has been fully handled and the error handler should immediately return.
-    virtual bool handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { return false; }
+    // If the error is fatal advance the state to inactive.
+    virtual void handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { }
 
     // Register a handler to wait for sync session uploads, downloads, or synchronization.
     // PRECONDITION: the session state lock must be held at the time this method is called, until after it returns.
@@ -187,17 +187,11 @@ struct sync_session_states::Dying : public SyncSession::State {
         });
     }
 
-    bool handle_error(std::unique_lock<std::mutex>& lock, SyncSession& session, const SyncError& error) const override
+    void handle_error(std::unique_lock<std::mutex>& lock, SyncSession& session, const SyncError& error) const override
     {
         if (error.is_fatal) {
             session.advance_state(lock, inactive);
         }
-        // If the error isn't fatal, don't change state, but don't
-        // allow it to be reported either.
-        // FIXME: What if the token expires while a session is dying?
-        // Should we allow the token to be refreshed so that changes
-        // can finish being uploaded?
-        return true;
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -268,16 +262,14 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
-std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::weak_ptr<SyncSession> weak_session) {
-    return [weak_session](util::Optional<app::AppError> error) {
+std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session) {
+    return [session](util::Optional<app::AppError> error) {
         using namespace std::chrono;
-        auto session = weak_session.lock();
-        if (!session) return;
-        
+
         auto session_user = session->user();
         auto is_user_expired = session_user &&
             session_user->refresh_jwt().expires_at < duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-        
+
         if (!session_user) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
@@ -291,11 +283,16 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
         } else if (error) {
             // 10 seconds is arbitrary, but it is to not swamp the server
             std::this_thread::sleep_for(milliseconds(10000));
-            if (session->m_state == &SyncSession::State::active && session_user) {
+            if (session_user) {
                 session_user->refresh_custom_data(handle_refresh(session));
             }
         } else {
-            session->m_session->refresh(session_user->access_token());
+            if (!session->m_session) {
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                session->advance_state(lock, State::active);
+            } else {
+                session->m_session->refresh(session_user->access_token());
+            }
         }
     };
 }
@@ -349,9 +346,7 @@ void SyncSession::handle_error(SyncError error)
     {
         // See if the current state wishes to take responsibility for handling the error.
         std::unique_lock<std::mutex> lock(m_state_mutex);
-        if (m_state->handle_error(lock, *this, error)) {
-            return;
-        }
+        m_state->handle_error(lock, *this, error);
     }
 
     if (error.is_client_reset_requested()) {
@@ -514,6 +509,13 @@ void SyncSession::handle_error(SyncError error)
                 error.is_unrecognized_by_client = true;
         }
     }
+
+    // Dont't bother invoking m_config.error_handler if the sync is inactive.
+    // It does not make sense to call the handler when the session is closed.
+    if (m_state == &State::inactive) {
+        return;
+    }
+
     switch (next_state) {
         case NextStateAfterError::none:
             if (m_config.cancel_waits_on_nonfatal_error) {
@@ -584,10 +586,10 @@ void SyncSession::create_sync_session()
     {
         std::string sync_route(app::App::Internal::sync_route(*app));
 
-        if (!m_client.decompose_server_url(sync_route, 
-                session_config.protocol_envelope, 
-                session_config.server_address, 
-                session_config.server_port, 
+        if (!m_client.decompose_server_url(sync_route,
+                session_config.protocol_envelope,
+                session_config.server_address,
+                session_config.server_port,
                 session_config.service_identifier)) {
             throw sync::BadServerUrl();
         }
