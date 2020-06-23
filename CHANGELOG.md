@@ -14,7 +14,7 @@
 -----------
 
 ### Internals
-* None.
+* Releases for Apple platforms are now built with Xcode 11.
 
 ----------------------------------------------
 
