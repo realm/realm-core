@@ -7,7 +7,8 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * If you upgrade from a realm file with file format version 6 (Realm Core v2.4.0 or earlier) the upgrade will result in a crash ([#3764](https://github.com/realm/realm-core/issues/3764), since v6.0.0-alpha.0)
 * After upgrade, columns with string primary keys would stille have a search index in spite this is generally not the case with file format 10. ([#3787](https://github.com/realm/realm-core/issues/3787), since v6.0.0-alpha.0)
- 
+* Realm file format upgrade to version 6 (or later) could be very time consuming if search indexes were present. ([#2767](https://github.com/realm/realm-core/issues/3767), since v6)
+
 ### Breaking changes
 * None.
 
