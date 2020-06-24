@@ -699,12 +699,10 @@ private:
 
     // Migration support
     void migrate_column_info(util::FunctionRef<void()>);
-    void migrate_indexes(util::FunctionRef<void()>);
+    void migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_subspec(util::FunctionRef<void()>);
-    void convert_links_from_ndx_to_key(util::FunctionRef<void()>);
-    ref_type get_oid_column_ref() const;
     void create_columns(util::FunctionRef<void()>);
-    void migrate_objects(util::FunctionRef<void()>);
+    void migrate_objects(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_links(util::FunctionRef<void()>);
     void finalize_migration();
 
