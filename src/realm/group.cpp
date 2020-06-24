@@ -407,8 +407,10 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         std::vector<TableRef> table_accessors;
         TableRef pk_table;
         std::map<TableRef, ColKey> pk_cols;
+        // Use table lookup by name. The table keys are not generated yet
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
+            // In file format version 9 files, all names represent existing tables.
             auto table = get_table(name);
             if (name == "pk") {
                 pk_table = table;

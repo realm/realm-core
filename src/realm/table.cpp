@@ -1448,13 +1448,14 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
         }
     }
 
-    auto orig_row_ndx_col = get_column_key("!ROW_INDEX");
+    auto orig_row_ndx_col_key = get_column_key("!ROW_INDEX");
     for (auto obj : *this) {
         for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
             if (col_keys[col_ndx]) {
                 // If no !ROW_INDEX column is found, the original row index number is
                 // equal to the ObjKey value
-                size_t orig_row_ndx = size_t(orig_row_ndx_col ? obj.get<Int>(orig_row_ndx_col) : obj.get_key().value);
+                size_t orig_row_ndx =
+                    size_t(orig_row_ndx_col_key ? obj.get<Int>(orig_row_ndx_col_key) : obj.get_key().value);
                 // Get original link value
                 int64_t link_val = link_column_accessors[col_ndx]->get(orig_row_ndx);
 
