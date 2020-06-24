@@ -1393,10 +1393,6 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         }
     }
 
-    if (oid_col) {
-        do_erase_root_column(oid_col);
-    }
-
     // We need to be sure that the stored 'next sequence number' is bigger than
     // the biggest ObjKey currently used.
     RefOrTagged rot = m_top.get_as_ref_or_tagged(top_position_for_sequence_number);

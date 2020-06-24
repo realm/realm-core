@@ -452,6 +452,9 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             auto orig_row_ndx_col = k->get_column_key("!ROW_INDEX");
             if (orig_row_ndx_col)
                 k->remove_column(orig_row_ndx_col);
+            auto oid_col = k->get_column_key("!OID");
+            if (oid_col)
+                k->remove_column(oid_col);
         }
 
         if (pk_table) {
