@@ -552,7 +552,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
             def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
 
             dir("build-macosx-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -637,7 +637,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx_pro') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 30, unit: 'MINUTES') {
                         sh """

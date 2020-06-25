@@ -618,8 +618,8 @@ private:
     ArrayStringShort m_table_names;
     uint64_t m_last_seen_mapping_version = 0;
 
-    typedef std::vector<Table*> table_accessors;
-    mutable table_accessors m_table_accessors;
+    typedef std::vector<Table*> TableAccessors;
+    mutable TableAccessors m_table_accessors;
     mutable std::mutex m_accessor_mutex;
     mutable int m_num_tables = 0;
     bool m_attached = false;
@@ -847,7 +847,7 @@ private:
     size_t key2ndx(TableKey key) const;
     size_t key2ndx_checked(TableKey key) const;
     void set_size() const noexcept;
-    void remove_pk_table();
+    std::map<TableRef, ColKey> get_primary_key_columns_from_pk_table(TableRef pk_table);
     void check_table_name_uniqueness(StringData name)
     {
         if (m_table_names.find_first(name) != not_found)
