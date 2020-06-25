@@ -111,6 +111,7 @@ class Lst : public Collection<T, LstBase> {
 public:
     using Collection<T, LstBase>::m_tree;
     using Collection<T, LstBase>::get;
+    using Collection<T, LstBase>::size;
 
     Lst() = default;
 
@@ -245,8 +246,13 @@ public:
         }
     }
 
+    using Collection<T, LstBase>::m_obj;
+    using Collection<T, LstBase>::m_col_key;
+    using Collection<T, LstBase>::m_nullable;
+
 protected:
     using Collection<T, LstBase>::m_valid;
+    using Collection<T, LstBase>::init_from_parent;
 
     bool update_if_needed()
     {

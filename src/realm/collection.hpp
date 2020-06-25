@@ -206,10 +206,14 @@ public:
     // Ensure that `Interface` implements `CollectionBase`.
     using Interface::avg;
     using Interface::distinct;
+    using Interface::is_attached;
     using Interface::max;
     using Interface::min;
+    using Interface::size;
     using Interface::sort;
     using Interface::sum;
+    using Interface::update_content_version;
+    using Interface::update_if_needed;
 
     T get(size_t ndx) const
     {
@@ -249,6 +253,7 @@ public:
 
     // FIXME: Make protected and provide access method.
     using Interface::m_col_key;
+    using Interface::m_deleted;
     using Interface::m_nullable;
     using Interface::m_obj;
 

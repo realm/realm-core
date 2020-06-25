@@ -29,7 +29,9 @@ template <class T>
 class Set : public Collection<T> {
 public:
     using Collection<T>::m_tree;
-    using Collection<T>::get;
+    using Collection<T>::size;
+    using Collection<T>::begin;
+    using Collection<T>::end;
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
@@ -56,6 +58,7 @@ public:
 private:
     using Collection<T>::m_valid;
     using Collection<T>::m_obj;
+    using Collection<T>::get;
 
     void create()
     {
