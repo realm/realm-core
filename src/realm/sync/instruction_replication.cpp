@@ -477,7 +477,7 @@ void SyncReplication::set_typed_link(const Table* table, ColKey col, ObjKey ndx,
             REALM_ASSERT(link_target_table);
 
             if (link_target_table->is_embedded()) {
-                REALM_TERMINATE("Mixed with embedded objects not supported yet.");
+                REALM_TERMINATE("TypedLinks with embedded objects not supported yet.");
             }
 
             link.target_table = emit_class_name(*link_target_table);

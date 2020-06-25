@@ -381,7 +381,7 @@ void InstructionApplier::operator()(const Instruction::Set& instr)
                 }
             },
             [&](const auto& val) {
-                if (info.type == type_Mixed) {
+                if (info.type != type_Mixed) {
                     using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
                     auto& lst = static_cast<Lst<type>&>(list);
                     lst.set(ndx, val);

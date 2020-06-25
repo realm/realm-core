@@ -392,9 +392,7 @@ public:
 
 class TrivialReplication : public Replication {
 public:
-    ~TrivialReplication() noexcept
-    {
-    }
+    ~TrivialReplication() noexcept {}
 
     std::string get_database_path() const override;
 
@@ -546,11 +544,11 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Obj
 }
 
 template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjLink target_obj, _impl::Instruction)
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjLink target_obj,
+                             _impl::Instruction variant)
 {
     if (target_obj) {
-        // TODO: Implement
-        // set_link(table, col_key, key, target_key, variant);
+        set_typed_link(table, col_key, key, target_obj, variant);
     }
     else {
         nullify_link(table, col_key, key);
