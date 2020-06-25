@@ -464,7 +464,9 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             remove_table("pk");
         }
     }
-    if (current_file_format_version <= 10 && target_file_format_version >= 11) {
+    // If we come from a file format version lower than 10, all objects with primary keys
+    // will be upgraded correctly by the above process
+    if (current_file_format_version == 10 && target_file_format_version >= 11) {
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);

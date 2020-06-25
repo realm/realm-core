@@ -914,8 +914,8 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
                 Array::destroy_deep(old_index_ref, m_alloc);
                 changes = true;
 
-                // Tables with string primary key does not need an index
-                if (m_leaf_ndx2colkey[col_ndx] != pk_col_key || pk_col_key.get_type() != col_type_String) {
+                // Primary key columns does not need an index
+                if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
                     // Otherwise create new index. Will be updated when objects are created
                     StringIndex* index =
                         new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
@@ -1323,7 +1323,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
 
     /*************************** Create objects ******************************/
 
-    bool use_row_ndx_as_key = !(oid_column || (pk_col_key && pk_col_key.get_type() == col_type_String));
+    bool use_row_ndx_as_key = !(oid_column || pk_col_key);
     int64_t max_key_value = -1;
     // Store old row ndx in a temporary column. Use this in next steps to find
     // the right target for links
