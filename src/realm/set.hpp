@@ -21,6 +21,8 @@
 
 #include <realm/list.hpp>
 
+#include <numeric> // std::iota
+
 namespace realm {
 
 template <class T>
@@ -32,69 +34,181 @@ public:
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
 
-    void insert(T value)
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
+    /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
+    /// or the index of the already-existing value.
+    size_t insert(T value);
 
-        ensure_created();
-        this->ensure_writeable();
-        auto b = this->begin();
-        auto e = this->end();
-        auto it = std::lower_bound(b, e, value);
-        if (it != e && *it == value) {
-            return;
-        }
-        if (Replication* repl = this->m_obj.get_replication()) {
-            insert_repl(repl, value);
-        }
-        m_tree->insert(it.m_ndx, value);
-        CollectionBase::m_obj.bump_content_version();
-    }
+    /// Find the index of a value in the set, or `size_t(-1)` if it is not in the set.
+    size_t find(T value) const;
 
-    size_t find(T value)
-    {
-        return m_tree->find_first(value);
-    }
+    /// Erase an element from the set, returning the index at which it was removed, or `size_t(-1)` if it did
+    /// not exist.
+    size_t erase(T value);
 
-    void erase(size_t ndx)
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
-        this->ensure_writeable();
-        if (Replication* repl = this->m_obj.get_replication()) {
-            CollectionBase::erase_repl(repl, ndx);
-        }
-        m_tree->erase(ndx);
-        CollectionBase::adj_remove(ndx);
-        CollectionBase::m_obj.bump_content_version();
-    }
+    // Overriding members of CollectionBase:
+    Mixed min(size_t* return_ndx = nullptr) const final;
+    Mixed max(size_t* return_ndx = nullptr) const final;
+    Mixed sum(size_t* return_cnt = nullptr) const final;
+    Mixed avg(size_t* return_cnt = nullptr) const final;
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
 private:
+    using Collection<T>::m_valid;
+    using Collection<T>::m_obj;
+
     void create()
     {
         m_tree->create();
-        Collection<T>::m_valid = true;
+        m_valid = true;
     }
 
     bool update_if_needed()
     {
-        if (CollectionBase::m_obj.update_if_needed()) {
+        if (m_obj.update_if_needed()) {
             return this->init_from_parent();
         }
         return false;
     }
     void ensure_created()
     {
-        if (!Collection<T>::m_valid && CollectionBase::m_obj.is_valid()) {
+        if (!m_valid && m_obj.is_valid()) {
             create();
         }
     }
-    void insert_repl(Replication* repl, T value);
+    void insert_repl(Replication* repl, T value, size_t index);
+    void erase_repl(Replication* repl, T value, size_t index);
 };
 
 template <typename U>
 Set<U> Obj::get_set(ColKey col_key) const
 {
     return Set<U>(*this, col_key);
+}
+
+template <class T>
+size_t Set<T>::find(T value) const
+{
+    return m_tree->find_first(value);
+}
+
+template <class T>
+size_t Set<T>::insert(T value)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+
+    ensure_created();
+    this->ensure_writeable();
+    auto b = this->begin();
+    auto e = this->end();
+    auto it = std::lower_bound(b, e, value);
+
+    if (it != e && *it == value) {
+        return it.m_ndx;
+    }
+
+    if (Replication* repl = m_obj.get_replication()) {
+        // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
+        // resolution in synchronized databases. The reason is that the new insertion may come at a later time
+        // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
+        insert_repl(repl, value, it.m_ndx);
+    }
+
+    m_tree->insert(it.m_ndx, value);
+    CollectionBase::m_obj.bump_content_version();
+    return it.m_ndx;
+}
+
+template <class T>
+size_t Set<T>::erase(T value)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+    this->ensure_writeable();
+
+    auto b = this->begin();
+    auto e = this->end();
+    auto it = std::lower_bound(b, e, value);
+
+    if (it == e || *it != value) {
+        return not_found;
+    }
+
+    if (Replication* repl = m_obj.get_replication()) {
+        erase_repl(repl, value, it.m_ndx);
+    }
+    m_tree->erase(it.m_ndx);
+    CollectionBase::adj_remove(it.m_ndx);
+    CollectionBase::m_obj.bump_content_version();
+    return it.m_ndx;
+}
+
+template <class T>
+inline Mixed Set<T>::min(size_t* return_ndx) const
+{
+    if (size() != 0) {
+        if (return_ndx) {
+            *return_ndx = 0;
+        }
+        return *begin();
+    }
+    else {
+        if (return_ndx) {
+            *return_ndx = not_found;
+        }
+        return Mixed{};
+    }
+}
+
+template <class T>
+inline Mixed Set<T>::max(size_t* return_ndx) const
+{
+    auto sz = size();
+    if (sz != 0) {
+        if (return_ndx) {
+            *return_ndx = sz - 1;
+        }
+        auto e = end();
+        --e;
+        return *e;
+    }
+    else {
+        if (return_ndx) {
+            *return_ndx = not_found;
+        }
+        return Mixed{};
+    }
+}
+
+template <class T>
+inline Mixed Set<T>::sum(size_t* return_cnt) const
+{
+    return SumHelper<T>::eval(*m_tree, return_cnt);
+}
+
+template <class T>
+inline Mixed Set<T>::avg(size_t* return_cnt) const
+{
+    return AverageHelper<T>::eval(*m_tree, return_cnt);
+}
+
+template <class T>
+inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    auto sz = size();
+    indices.resize(sz);
+    if (ascending) {
+        std::iota(indices.begin(), indices.end(), 0);
+    }
+    else {
+        std::iota(indices.rbegin(), indices.rend(), 0);
+    }
+}
+
+template <class T>
+inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+{
+    auto ascending = !sort_order || *sort_order;
+    sort(indices, ascending);
 }
 
 } // namespace realm

@@ -25,10 +25,9 @@ namespace realm {
 
 template <class T>
 Set<T>::Set(const Obj& obj, ColKey col_key)
-    : CollectionBase(obj, col_key)
-    , Collection<T>(obj.get_alloc())
+    : Collection<T>(obj, col_key)
 {
-    if (CollectionBase::m_obj) {
+    if (m_obj) {
         Collection<T>::init_from_parent();
     }
 }
@@ -41,21 +40,42 @@ template Set<Mixed>::Set(const Obj& obj, ColKey col_key);
 /***************************** Set<T>::insert_repl *****************************/
 
 template <>
-void Set<Int>::insert_repl(Replication*, int64_t)
+void Set<Int>::insert_repl(Replication*, int64_t, size_t)
 {
     // repl->set_insert_int(*this, value);
 }
 
 template <>
-void Set<String>::insert_repl(Replication*, StringData)
+void Set<String>::insert_repl(Replication*, StringData, size_t)
 {
     // repl->set_insert_string(*this, value);
 }
 
 template <>
-void Set<Mixed>::insert_repl(Replication*, Mixed)
+void Set<Mixed>::insert_repl(Replication*, Mixed, size_t)
 {
     // repl->set_insert_any(*this, value);
+}
+
+
+/***************************** Set<T>::erase_repl ******************************/
+
+template <>
+void Set<Int>::erase_repl(Replication*, int64_t, size_t)
+{
+    // repl->set_erase_int(*this, value);
+}
+
+template <>
+void Set<String>::erase_repl(Replication*, StringData, size_t)
+{
+    // repl->set_erase_string(*this, value);
+}
+
+template <>
+void Set<Mixed>::erase_repl(Replication*, Mixed, size_t)
+{
+    // repl->set_erase_any(*this, value);
 }
 
 } // namespace realm
