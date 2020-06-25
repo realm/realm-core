@@ -154,11 +154,10 @@ void CollectionBase::clear_repl(Replication* repl) const
 
 template <class T>
 Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : CollectionBase(obj, col_key)
-    , Collection<T>(obj.get_alloc())
+    : Collection<T, LstBase>(obj, col_key)
 {
     if (m_obj) {
-        Collection<T>::init_from_parent();
+        Collection<T, LstBase>::init_from_parent();
     }
 }
 
@@ -192,91 +191,31 @@ struct MinHelper<T, void_t<ColumnMinMaxType<T>>> {
 };
 
 template <class T>
-Mixed Collection<T>::min(size_t* return_ndx) const
+Mixed Lst<T>::min(size_t* return_ndx) const
 {
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
-template <class T, class Enable = void>
-struct MaxHelper {
-    template <class U>
-    static Mixed eval(U&, size_t*)
-    {
-        return Mixed{};
-    }
-};
-
 template <class T>
-struct MaxHelper<T, void_t<ColumnMinMaxType<T>>> {
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_ndx)
-    {
-        return Mixed(bptree_maximum<T>(tree, return_ndx));
-    }
-};
-
-template <class T>
-Mixed Collection<T>::max(size_t* return_ndx) const
+Mixed Lst<T>::max(size_t* return_ndx) const
 {
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
-template <class T, class Enable = void>
-class SumHelper {
-public:
-    template <class U>
-    static Mixed eval(U&, size_t* return_cnt)
-    {
-        if (return_cnt)
-            *return_cnt = 0;
-        return Mixed{};
-    }
-};
-
 template <class T>
-class SumHelper<T, void_t<ColumnSumType<T>>> {
-public:
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_cnt)
-    {
-        return Mixed(bptree_sum<T>(tree, return_cnt));
-    }
-};
-
-template <class T>
-Mixed Collection<T>::sum(size_t* return_cnt) const
+Mixed Lst<T>::sum(size_t* return_cnt) const
 {
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
-template <class T, class = void>
-struct AverageHelper {
-    template <class U>
-    static Mixed eval(U&, size_t* return_cnt)
-    {
-        if (return_cnt)
-            *return_cnt = 0;
-        return Mixed{};
-    }
-};
-
 template <class T>
-struct AverageHelper<T, void_t<ColumnSumType<T>>> {
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_cnt)
-    {
-        return Mixed(bptree_average<T>(tree, return_cnt));
-    }
-};
-
-template <class T>
-Mixed Collection<T>::avg(size_t* return_cnt) const
+Mixed Lst<T>::avg(size_t* return_cnt) const
 {
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
-void Collection<T>::sort(std::vector<size_t>& indices, bool ascending) const
+void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
     auto sz2 = indices.size();
@@ -294,20 +233,25 @@ void Collection<T>::sort(std::vector<size_t>& indices, bool ascending) const
     auto b = indices.begin();
     auto e = indices.end();
     if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) { return m_tree->get(i1) < m_tree->get(i2); });
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return m_tree->get(i1) < m_tree->get(i2);
+        });
     }
     else {
-        std::sort(b, e, [this](size_t i1, size_t i2) { return m_tree->get(i1) > m_tree->get(i2); });
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return m_tree->get(i1) > m_tree->get(i2);
+        });
     }
 }
 
 template <class T>
-void Collection<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
     indices.clear();
     sort(indices, sort_order ? *sort_order : true);
-    auto duplicates = std::unique(indices.begin(), indices.end(),
-                                  [this](size_t i1, size_t i2) { return m_tree->get(i1) == m_tree->get(i2); });
+    auto duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
+        return m_tree->get(i1) == m_tree->get(i2);
+    });
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
 
@@ -361,7 +305,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     auto origin_table = m_obj.get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    ObjKey old_key = get(ndx);
+    ObjKey old_key = this->get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
     bool recurse =
         m_obj.replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
@@ -567,7 +511,7 @@ Obj LnkLst::get_object(size_t ndx) const
 
 bool LnkLst::init_from_parent() const
 {
-    Collection<ObjKey>::init_from_parent();
+    Collection<ObjKey, LstBase>::init_from_parent();
     update_unresolved(m_unresolved, *m_tree);
 
     return m_valid;
@@ -668,8 +612,7 @@ void LnkLst::remove_all_target_rows()
 }
 
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
-    : CollectionBase(owner, col_key)
-    , Lst<ObjKey>(owner, col_key)
+    : Lst<ObjKey>(owner, col_key)
 {
     update_unresolved(m_unresolved, *m_tree);
 }

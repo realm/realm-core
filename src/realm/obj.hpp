@@ -256,7 +256,7 @@ private:
     friend class ColumnListBase;
     friend class CollectionBase;
     friend class ConstTableView;
-    template <class>
+    template <class, class>
     friend class Collection;
     template <class>
     friend class Lst;
@@ -457,6 +457,6 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
 {
     return _set(0, v, tail...);
 }
-}
+} // namespace realm
 
 #endif // REALM_OBJ_HPP

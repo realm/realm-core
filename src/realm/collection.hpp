@@ -2,7 +2,9 @@
 #define REALM_COLLECTION_HPP
 
 #include <realm/obj.hpp>
-#include <iosfwd>
+
+#include <iosfwd>      // std::ostream
+#include <type_traits> // std::void_t
 
 namespace realm {
 
@@ -28,6 +30,66 @@ struct SizeOfList {
         return sz;
     }
     size_t sz = null_value;
+};
+
+template <class T, class Enable = void>
+struct MaxHelper {
+    template <class U>
+    static Mixed eval(U&, size_t*)
+    {
+        return Mixed{};
+    }
+};
+
+template <class T>
+struct MaxHelper<T, std::void_t<ColumnMinMaxType<T>>> {
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_ndx)
+    {
+        return Mixed(bptree_maximum<T>(tree, return_ndx));
+    }
+};
+
+template <class T, class Enable = void>
+class SumHelper {
+public:
+    template <class U>
+    static Mixed eval(U&, size_t* return_cnt)
+    {
+        if (return_cnt)
+            *return_cnt = 0;
+        return Mixed{};
+    }
+};
+
+template <class T>
+class SumHelper<T, std::void_t<ColumnSumType<T>>> {
+public:
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_cnt)
+    {
+        return Mixed(bptree_sum<T>(tree, return_cnt));
+    }
+};
+
+template <class T, class = void>
+struct AverageHelper {
+    template <class U>
+    static Mixed eval(U&, size_t* return_cnt)
+    {
+        if (return_cnt)
+            *return_cnt = 0;
+        return Mixed{};
+    }
+};
+
+template <class T>
+struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_cnt)
+    {
+        return Mixed(bptree_average<T>(tree, return_cnt));
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
@@ -75,10 +137,7 @@ public:
     bool operator==(const CollectionBase& other) const;
 
 protected:
-    template <class>
-    friend class LstIterator;
     friend class Transaction;
-
 
     Obj m_obj;
     ColKey m_col_key;
@@ -89,10 +148,6 @@ protected:
     mutable uint_fast64_t m_last_content_version = 0;
 
     CollectionBase() = default;
-    CollectionBase(bool)
-    {
-        REALM_ASSERT(false);
-    }
     CollectionBase(const Obj& owner, ColKey col_key);
     CollectionBase& operator=(const CollectionBase& other);
 
@@ -105,7 +160,9 @@ protected:
     // Increase index by one. I we land on and index that is deleted, keep
     // increasing until we get to a valid entry.
     size_t incr(size_t ndx) const;
-    // Convert from virtual to real index
+    /// Decrease index by one. If we land on an index that is deleted, keep decreasing until we get to a valid entry.
+    size_t decr(size_t ndx) const;
+    /// Convert from virtual to real index
     size_t adjust(size_t ndx) const;
     void adj_remove(size_t ndx);
     void erase_repl(Replication* repl, size_t ndx) const;
@@ -114,18 +171,228 @@ protected:
     void clear_repl(Replication* repl) const;
 };
 
-inline void CollectionBase::update_if_needed() const
-{
-    auto content_version = m_obj.get_alloc().get_content_version();
-    if (m_obj.update_if_needed() || content_version != m_content_version) {
-        init_from_parent();
-    }
-}
+/// This class defines the interface to ConstList, except for the constructor
+/// The ConstList class has the Obj member m_obj, which should not be
+/// inherited from Lst<T>.
+template <class T, class Interface = CollectionBase>
+class Collection : public Interface {
+public:
+    struct iterator;
 
-inline void CollectionBase::update_content_version() const
-{
-    m_content_version = m_obj.get_alloc().get_content_version();
-}
+    /**
+     * Only member functions not referring to an index in the list will check if
+     * the object is up-to-date. The logic is that the user must always check the
+     * size before referring to a particular index, and size() will check for update.
+     */
+    size_t size() const override
+    {
+        if (!is_attached())
+            return 0;
+        update_if_needed();
+        if (!m_valid)
+            return 0;
+
+        return m_tree->size();
+    }
+    bool is_null(size_t ndx) const final
+    {
+        return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
+    }
+    Mixed get_any(size_t ndx) const final
+    {
+        return Mixed(get(ndx));
+    }
+
+    // Ensure that `Interface` implements `CollectionBase`.
+    using Interface::avg;
+    using Interface::distinct;
+    using Interface::max;
+    using Interface::min;
+    using Interface::sort;
+    using Interface::sum;
+
+    T get(size_t ndx) const
+    {
+        if (ndx >= Collection::size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return m_tree->get(ndx);
+    }
+    T operator[](size_t ndx) const
+    {
+        return get(ndx);
+    }
+    iterator begin() const
+    {
+        return iterator(this, 0);
+    }
+    iterator end() const
+    {
+        return iterator(this, Collection::size() + m_deleted.size());
+    }
+    size_t find_first(T value) const
+    {
+        if (!m_valid && !init_from_parent())
+            return not_found;
+        return m_tree->find_first(value);
+    }
+    template <typename Func>
+    void find_all(T value, Func&& func) const
+    {
+        if (m_valid && init_from_parent())
+            m_tree->find_all(value, std::forward<Func>(func));
+    }
+    const BPlusTree<T>& get_tree() const
+    {
+        return *m_tree;
+    }
+
+    // FIXME: Make protected and provide access method.
+    using Interface::m_col_key;
+    using Interface::m_nullable;
+    using Interface::m_obj;
+
+protected:
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
+    mutable bool m_valid = false;
+
+    Collection() = default;
+
+    Collection(const Obj& obj, ColKey col_key)
+        : Interface(obj, col_key)
+        , m_tree(new BPlusTree<T>(obj.get_alloc()))
+    {
+        check_column_type<T>(m_col_key);
+
+        m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
+    }
+
+    Collection(const Collection& other)
+        : Interface(static_cast<const Interface&>(other))
+        , m_valid(other.m_valid)
+    {
+        if (other.m_tree) {
+            Allocator& alloc = other.m_tree->get_alloc();
+            m_tree = std::make_unique<BPlusTree<T>>(alloc);
+            m_tree->set_parent(this, 0);
+            if (m_valid)
+                m_tree->init_from_ref(other.m_tree->get_ref());
+        }
+    }
+
+    Collection& operator=(const Collection& other)
+    {
+        if (this != &other) {
+            CollectionBase::operator=(other);
+            m_valid = other.m_valid;
+            m_deleted.clear();
+            m_tree = nullptr;
+
+            if (other.m_tree) {
+                Allocator& alloc = other.m_tree->get_alloc();
+                m_tree = std::make_unique<BPlusTree<T>>(alloc);
+                m_tree->set_parent(this, 0);
+                if (m_valid)
+                    m_tree->init_from_ref(other.m_tree->get_ref());
+            }
+        }
+        return *this;
+    }
+
+    bool init_from_parent() const override
+    {
+        m_valid = m_tree->init_from_parent();
+        update_content_version();
+        return m_valid;
+    }
+
+    void ensure_writeable()
+    {
+        if (m_obj.ensure_writeable()) {
+            init_from_parent();
+        }
+    }
+};
+
+/*
+ * This class implements a forward iterator over the elements in a Lst.
+ *
+ * The iterator is stable against deletions in the list. If you try to
+ * dereference an iterator that points to an element, that is deleted, the
+ * call will throw.
+ *
+ * Values are read into a member variable (m_val). This is the only way to
+ * implement operator-> and operator* returning a pointer and a reference resp.
+ * There is no overhead compared to the alternative where operator* would have
+ * to return T by value.
+ */
+template <class T, class Interface>
+struct Collection<T, Interface>::iterator {
+    typedef std::bidirectional_iterator_tag iterator_category;
+    typedef const T value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const T* pointer;
+    typedef const T& reference;
+
+    iterator(const Collection<T, Interface>* l, size_t ndx)
+        : m_list(l)
+        , m_ndx(ndx)
+    {
+    }
+    pointer operator->() const
+    {
+        m_val = m_list->get(m_list->adjust(m_ndx));
+        return &m_val;
+    }
+    reference operator*() const
+    {
+        return *operator->();
+    }
+    iterator& operator++()
+    {
+        m_ndx = m_list->incr(m_ndx);
+        return *this;
+    }
+    iterator operator++(int)
+    {
+        iterator tmp(*this);
+        operator++();
+        return tmp;
+    }
+    iterator& operator--()
+    {
+        m_ndx = m_list->decr(m_ndx);
+        return *this;
+    }
+    iterator operator--(int)
+    {
+        iterator tmp(*this);
+        operator--();
+        return tmp;
+    }
+
+    bool operator!=(const iterator& rhs) const
+    {
+        return m_ndx != rhs.m_ndx;
+    }
+
+    bool operator==(const iterator& rhs) const
+    {
+        return m_ndx == rhs.m_ndx;
+    }
+
+private:
+    friend class Lst<T>;
+    friend class Set<T>;
+    friend class Collection<T, Interface>;
+
+    mutable T m_val;
+    const Collection<T, Interface>* m_list;
+    size_t m_ndx;
+};
+
+
+// Implementation:
 
 inline CollectionBase& CollectionBase::operator=(const CollectionBase& other)
 {
@@ -195,7 +462,7 @@ inline void CollectionBase::update_content_version() const
 
 inline size_t CollectionBase::incr(size_t ndx) const
 {
-    // Increase index by one. I we land on and index that is deleted, keep
+    // Increase index by one. If we land on and index that is deleted, keep
     // increasing until we get to a valid entry.
     ndx++;
     if (!m_deleted.empty()) {
@@ -208,6 +475,25 @@ inline size_t CollectionBase::incr(size_t ndx) const
         while (it != end && *it == ndx) {
             ++it;
             ++ndx;
+        }
+    }
+    return ndx;
+}
+
+inline size_t CollectionBase::decr(size_t ndx) const
+{
+    REALM_ASSERT(ndx != 0);
+    ndx--;
+    if (!m_deleted.empty()) {
+        auto it = m_deleted.rbegin();
+        auto rend = m_deleted.rend();
+        while (it != rend && *it > ndx) {
+            ++it;
+        }
+        // If entry is deleted, decrease further
+        while (it != rend && *it == ndx) {
+            ++it;
+            --ndx;
         }
     }
     return ndx;
