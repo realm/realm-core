@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <stdio.h>
-#include <json/json.hpp>
+#include <external/json/json.hpp>
 
 #include "catch2/catch.hpp"
 #include "util/test_utils.hpp"

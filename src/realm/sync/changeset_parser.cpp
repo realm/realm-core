@@ -90,18 +90,6 @@ void ChangesetParser::parse(_impl::NoCopyInputStream& input, InstructionHandler&
         state.parse_one();
 }
 
-util::Optional<Instruction::Payload::Type> ChangesetParser::State::read_optional_payload_type()
-{
-    auto is_typed = read_bool();
-    if (is_typed) {
-        auto type = read_payload_type();
-        return type;
-    }
-    else {
-        return util::none;
-    }
-}
-
 Instruction::Payload::Type ChangesetParser::State::read_payload_type()
 {
     using Type = Instruction::Payload::Type;
@@ -342,7 +330,7 @@ void ChangesetParser::State::parse_one()
             Instruction::AddColumn instr;
             instr.table = read_intern_string();
             instr.field = read_intern_string();
-            instr.type = read_optional_payload_type();
+            instr.type = read_payload_type();
             instr.nullable = read_bool();
             instr.list = read_bool();
             if (instr.type == Instruction::Payload::Type::Link) {

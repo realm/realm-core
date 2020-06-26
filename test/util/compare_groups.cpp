@@ -313,6 +313,9 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                     }
                     continue;
                 }
+                case type_TypedLink:
+                    // FIXME: Implement
+                    continue;
                 case type_LinkList: {
                     auto a = obj_1.get_list<ObjKey>(col.key_1);
                     auto b = obj_2.get_list<ObjKey>(col.key_2);
@@ -504,6 +507,9 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                 }
                 continue;
             }
+            case type_TypedLink:
+                // FIXME: Implement
+                continue;
             case type_Link: {
                 auto link_1 = obj_1.get<ObjKey>(col.key_1);
                 auto link_2 = obj_2.get<ObjKey>(col.key_2);

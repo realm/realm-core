@@ -372,8 +372,8 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
     m_tracer.name("AddColumn");
     table_instr(p);
     m_tracer.field("field", p.field);
-    if (p.type) {
-        m_tracer.field("type", *p.type);
+    if (p.type != Instruction::Payload::Type::Null) {
+        m_tracer.field("type", p.type);
     }
     else {
         m_tracer.field("type", "Mixed");

@@ -1,5 +1,5 @@
 {
-    "id": "5ed6e67569b0463a603e87d8",
+    "id": "5ede3e8751768ee317aa520a",
     "name": "BackingDB",
     "type": "mongodb",
     "config": {
@@ -8,6 +8,7 @@
             "database_name": "test_data",
             "partition": {
                 "key": "realm_id",
+                "type": "string",
                 "permissions": {
                     "read": true,
                     "write": true

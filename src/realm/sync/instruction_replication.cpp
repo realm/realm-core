@@ -95,9 +95,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::Link;
         case type_ObjectId:
             return Type::ObjectId;
-
         case type_Mixed:
-            [[fallthrough]];
+            return Type::Null;
         case type_OldTable:
             [[fallthrough]];
         case type_OldDateTime:
@@ -260,15 +259,11 @@ void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType
         instr.table = m_last_class_name;
         instr.field = m_encoder.intern_string(name);
         instr.nullable = col_ndx.is_nullable();
-
-        if (type != type_Mixed) {
-            instr.type = get_payload_type(type);
-        }
-
+        instr.type = get_payload_type(type);
         instr.list = col_ndx.is_list();
 
         // Mixed columns are always nullable.
-        REALM_ASSERT(instr.type || instr.nullable);
+        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
 
         if (instr.type == Instruction::Payload::Type::Link && target_table) {
             instr.link_target_table = emit_class_name(*target_table);

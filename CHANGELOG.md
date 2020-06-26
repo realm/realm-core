@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* New data types: Mixed and TypedLink.
 
 ### Fixed
 * Fixed opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
