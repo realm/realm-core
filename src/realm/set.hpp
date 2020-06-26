@@ -152,7 +152,7 @@ inline Mixed Set<T>::min(size_t* return_ndx) const
         if (return_ndx) {
             *return_ndx = 0;
         }
-        return *begin();
+        return *Collection<T>::begin();
     }
     else {
         if (return_ndx) {
@@ -170,7 +170,7 @@ inline Mixed Set<T>::max(size_t* return_ndx) const
         if (return_ndx) {
             *return_ndx = sz - 1;
         }
-        auto e = end();
+        auto e = Collection<T>::end();
         --e;
         return *e;
     }

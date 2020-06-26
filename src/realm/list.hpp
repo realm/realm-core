@@ -51,39 +51,6 @@ class LstBase;
 template <class T>
 using LstIterator = typename Collection<T, LstBase>::iterator;
 
-template <class T>
-inline void check_column_type(ColKey col)
-{
-    if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-template <>
-inline void check_column_type<Int>(ColKey col)
-{
-    if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-template <>
-inline void check_column_type<util::Optional<Int>>(ColKey col)
-{
-    if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-template <>
-inline void check_column_type<ObjKey>(ColKey col)
-{
-    if (col && col.get_type() != col_type_LinkList) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-
 /*
  * This class defines a virtual interface to a writable list
  */
@@ -246,12 +213,12 @@ public:
         }
     }
 
-    using Collection<T, LstBase>::m_obj;
     using Collection<T, LstBase>::m_col_key;
-    using Collection<T, LstBase>::m_nullable;
 
 protected:
     using Collection<T, LstBase>::m_valid;
+    using Collection<T, LstBase>::m_nullable;
+    using Collection<T, LstBase>::m_obj;
     using Collection<T, LstBase>::init_from_parent;
 
     bool update_if_needed()
