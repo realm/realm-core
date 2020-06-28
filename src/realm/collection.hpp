@@ -165,10 +165,6 @@ protected:
     /// Convert from virtual to real index
     size_t adjust(size_t ndx) const;
     void adj_remove(size_t ndx);
-    void erase_repl(Replication* repl, size_t ndx) const;
-    void move_repl(Replication* repl, size_t from, size_t to) const;
-    void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
-    void clear_repl(Replication* repl) const;
 };
 
 /// This class defines the interface to ConstList, except for the constructor
