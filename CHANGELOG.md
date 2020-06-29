@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Empty tables will not have a primary key column after upgrade ([#3795](https://github.com/realm/realm-core/issues/3795), since v6.0.7)
  
 ### Breaking changes
 * None.

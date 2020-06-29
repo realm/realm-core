@@ -455,6 +455,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             auto oid_col = k->get_column_key("!OID");
             if (oid_col)
                 k->remove_column(oid_col);
+            k->do_set_primary_key_column(pk_cols[k]);
         }
 
         if (pk_table) {

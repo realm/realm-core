@@ -1235,6 +1235,7 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     ,"metadata":[
         {"_key":0,"version":0}
     ]
+    ,"class_dog":[]
     ,"class_link origin":[
         {"_key":0,"pk":5,"object":null,"array":{"table": "class_object", "keys": []}},
         {"_key":1,"pk":6,"object":{"table": "class_object", "key": 0},"array":{"table": "class_object", "keys": []}},
@@ -1262,6 +1263,7 @@ TEST(Upgrade_Database_9_10_with_pk_table)
 
     ConstTableRef t_object = rt.get_table("class_object");
     ConstTableRef t_origin = rt.get_table("class_link origin");
+    ConstTableRef t_dog = rt.get_table("class_dog");
 
     auto pk_col = t_object->get_primary_key_column();
     CHECK(pk_col);
@@ -1276,6 +1278,9 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     auto key_6 = t_origin->find_first_int(pk_col, 6);
     auto obj2 = t_origin->get_object(key_6);
     CHECK_EQUAL(obj2.get<ObjKey>("object"), hello_key);
+
+    pk_col = t_dog->get_primary_key_column();
+    CHECK(pk_col);
 }
 
 TEST(Upgrade_Database_9_10_with_oid)
