@@ -303,7 +303,7 @@ template <class T>
 void SyncReplication::set(const Table* table, ColKey col, ObjKey key, T value, _impl::Instruction variant)
 {
     if (select_table(*table)) {
-        Instruction::Set instr;
+        Instruction::Update instr;
         populate_path_instr(instr, *table, key, col);
         instr.value = as_payload(value);
         instr.is_default = (variant == _impl::instr_SetDefault);
@@ -315,9 +315,9 @@ template <class T>
 void SyncReplication::list_set(const CollectionBase& list, size_t ndx, T value)
 {
     if (select_list(list)) {
-        Instruction::Set instr;
+        Instruction::Update instr;
         populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_set());
+        REALM_ASSERT(instr.is_array_update());
         instr.value = as_payload(value);
         instr.prior_size = uint32_t(list.size());
         emit(instr);
@@ -438,7 +438,7 @@ void SyncReplication::set_link(const Table* table, ColKey col, ObjKey ndx, ObjKe
             if (link_target_table->is_embedded()) {
                 using Payload = Instruction::Payload;
 
-                Instruction::Set instr;
+                Instruction::Update instr;
                 populate_path_instr(instr, *table, ndx, col);
                 if (value) {
                     instr.value = Payload::ObjectValue{};
@@ -566,9 +566,9 @@ void SyncReplication::list_set_typed_link(const CollectionBase& list, size_t ndx
     TrivialReplication::list_set_typed_link(list, ndx, value);
 
     if (select_list(list)) {
-        Instruction::Set instr;
+        Instruction::Update instr;
         populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_set());
+        REALM_ASSERT(instr.is_array_update());
 
         ConstTableRef target_table = m_transaction->get_table(value.get_table_key());
         REALM_ASSERT(target_table);
@@ -596,9 +596,9 @@ void SyncReplication::list_set_link(const Lst<ObjKey>& list, size_t ndx, ObjKey 
         return;
     }
     if (select_list(list)) {
-        Instruction::Set instr;
+        Instruction::Update instr;
         populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_set());
+        REALM_ASSERT(instr.is_array_update());
 
         ConstTableRef target_table = list.get_table()->get_link_target(list.get_col_key());
         if (target_table->is_embedded()) {
@@ -799,9 +799,9 @@ void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey nd
     TrivialReplication::nullify_link(table, col_ndx, ndx);
 
     if (select_table(*table)) {
-        Instruction::Set instr;
+        Instruction::Update instr;
         populate_path_instr(instr, *table, ndx, col_ndx);
-        REALM_ASSERT(!instr.is_array_set());
+        REALM_ASSERT(!instr.is_array_update());
         instr.value = Instruction::Payload{realm::util::none};
         instr.is_default = false;
         emit(instr);

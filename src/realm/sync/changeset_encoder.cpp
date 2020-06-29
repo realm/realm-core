@@ -31,13 +31,13 @@ void ChangesetEncoder::operator()(const Instruction::EraseObject& instr)
     append(Instruction::Type::EraseObject, instr.table, instr.object);
 }
 
-void ChangesetEncoder::operator()(const Instruction::Set& instr)
+void ChangesetEncoder::operator()(const Instruction::Update& instr)
 {
-    if (instr.is_array_set()) {
-        append_path_instr(Instruction::Type::Set, instr, instr.value, instr.prior_size);
+    if (instr.is_array_update()) {
+        append_path_instr(Instruction::Type::Update, instr, instr.value, instr.prior_size);
     }
     else {
-        append_path_instr(Instruction::Type::Set, instr, instr.value, instr.is_default);
+        append_path_instr(Instruction::Type::Update, instr, instr.value, instr.is_default);
     }
 }
 

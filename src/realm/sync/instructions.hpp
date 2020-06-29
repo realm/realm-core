@@ -30,7 +30,7 @@ namespace sync {
     X(EraseColumn)                                                                                                   \
     X(CreateObject)                                                                                                  \
     X(EraseObject)                                                                                                   \
-    X(Set)                                                                                                           \
+    X(Update)                                                                                                        \
     X(AddInteger)                                                                                                    \
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
@@ -468,30 +468,30 @@ struct EraseObject : ObjectInstruction {
     }
 };
 
-struct Set : PathInstruction {
+struct Update : PathInstruction {
     using PathInstruction::PathInstruction;
 
-    // Note: For "ArraySet", the path ends with an integer.
+    // Note: For "ArrayUpdate", the path ends with an integer.
     Payload value;
     union {
         bool is_default;     // For fields
-        uint32_t prior_size; // For "ArraySet"
+        uint32_t prior_size; // For "ArrayUpdate"
     };
 
-    Set()
+    Update()
         : prior_size(0)
     {
     }
 
-    bool is_array_set() const noexcept
+    bool is_array_update() const noexcept
     {
         return path.is_array_index();
     }
 
-    bool operator==(const Set& rhs) const noexcept
+    bool operator==(const Update& rhs) const noexcept
     {
         return PathInstruction::operator==(rhs) && value == rhs.value &&
-               (is_array_set() ? is_default == rhs.is_default : prior_size == rhs.prior_size);
+               (is_array_update() ? is_default == rhs.is_default : prior_size == rhs.prior_size);
     }
 };
 
@@ -572,7 +572,7 @@ struct Instruction {
         EraseTable = 1,
         CreateObject = 2,
         EraseObject = 3,
-        Set = 4, // Note: Also covers ArraySet
+        Update = 4, // Note: Also covers ArrayUpdate
         AddInteger = 5,
         AddColumn = 6,
         EraseColumn = 7,
@@ -841,11 +841,11 @@ struct Instruction::Visitor {
         return lambda(instr);
     }
 
-    auto operator()(const Instruction::Vector&) -> decltype(lambda(std::declval<const Instruction::Set&>()))
+    auto operator()(const Instruction::Vector&) -> decltype(lambda(std::declval<const Instruction::Update&>()))
     {
         REALM_TERMINATE("visiting instruction vector");
     }
-    auto operator()(Instruction::Vector&) -> decltype(lambda(std::declval<Instruction::Set&>()))
+    auto operator()(Instruction::Vector&) -> decltype(lambda(std::declval<Instruction::Update&>()))
     {
         REALM_TERMINATE("visiting instruction vector");
     }

@@ -212,7 +212,7 @@ size_t get_object_ids_in_instruction(const Changeset& changeset, const sync::Ins
     if (auto obj_instr = instr.get_if<Instruction::ObjectInstruction>()) {
         ids[0] = {changeset.get_string(obj_instr->table), changeset.get_key(obj_instr->object)};
 
-        if (auto set_instr = instr.get_if<Instruction::Set>()) {
+        if (auto set_instr = instr.get_if<Instruction::Update>()) {
             auto& p = *set_instr;
             if (p.value.type == Instruction::Payload::Type::Link) {
                 ids[1] = {changeset.get_string(p.value.data.link.target_table),

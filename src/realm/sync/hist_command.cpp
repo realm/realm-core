@@ -435,7 +435,7 @@ public:
         return modify_object(Instruction::Type::EraseObject, instr.object);
     }
 
-    bool operator()(Instruction::Set& instr) noexcept
+    bool operator()(Instruction::Update& instr) noexcept
     {
         select_property(instr);
         return modify_property(Instruction::Type::Set, &instr.payload);

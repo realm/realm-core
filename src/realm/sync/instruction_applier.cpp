@@ -293,9 +293,9 @@ void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction:
 }
 
 
-void InstructionApplier::operator()(const Instruction::Set& instr)
+void InstructionApplier::operator()(const Instruction::Update& instr)
 {
-    if (!instr.is_array_set()) {
+    if (!instr.is_array_update()) {
         auto path = get_field(instr, "Set");
         // FIXME: Would use structured bindings, but they cannot be captured by lamdas.
         auto obj = std::move(std::get<0>(path));

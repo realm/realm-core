@@ -2906,7 +2906,7 @@ void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transacti
 
                 // Fix up the payload for Set and ArrayInsert.
                 Instruction::Payload* payload = nullptr;
-                if (auto set_instr = instr->get_if<Instruction::Set>()) {
+                if (auto set_instr = instr->get_if<Instruction::Update>()) {
                     payload = &set_instr->value;
                 }
                 else if (auto list_insert_instr = instr->get_if<Instruction::ArrayInsert>()) {
