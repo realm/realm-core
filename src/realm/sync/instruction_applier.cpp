@@ -381,13 +381,13 @@ void InstructionApplier::operator()(const Instruction::Set& instr)
                 }
             },
             [&](const auto& val) {
-                if (info.type != type_Mixed) {
-                    using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
-                    auto& lst = static_cast<Lst<type>&>(list);
+                if (info.type == type_Mixed) {
+                    auto& lst = static_cast<Lst<Mixed>&>(list);
                     lst.set(ndx, val);
                 }
                 else {
-                    auto& lst = static_cast<Lst<Mixed>&>(list);
+                    using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
+                    auto& lst = static_cast<Lst<type>&>(list);
                     lst.set(ndx, val);
                 }
             },
@@ -426,7 +426,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         bad_transaction_log("AddColumn '%1.%3' which already exists", table->get_name(), col_name);
     }
 
-    if (!instr.type) {
+    if (instr.type == Type::Null) {
         if (!instr.list) {
             table->add_column(type_Mixed, col_name);
         }
@@ -437,8 +437,8 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     }
 
 
-    if (*instr.type != Type::Link) {
-        DataType type = get_data_type(*instr.type);
+    if (instr.type != Type::Link) {
+        DataType type = get_data_type(instr.type);
         if (instr.list) {
             table->add_column_list(type, col_name, instr.nullable);
         }

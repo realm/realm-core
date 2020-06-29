@@ -2,6 +2,7 @@
 #define REALM_COLLECTION_HPP
 
 #include <realm/obj.hpp>
+#include <realm/bplustree.hpp>
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
@@ -31,6 +32,38 @@ struct SizeOfList {
     }
     size_t sz = null_value;
 };
+
+template <class T>
+inline void check_column_type(ColKey col)
+{
+    if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
+}
+
+template <>
+inline void check_column_type<Int>(ColKey col)
+{
+    if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
+}
+
+template <>
+inline void check_column_type<util::Optional<Int>>(ColKey col)
+{
+    if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
+}
+
+template <>
+inline void check_column_type<ObjKey>(ColKey col)
+{
+    if (col && col.get_type() != col_type_LinkList) {
+        throw LogicError(LogicError::list_type_mismatch);
+    }
+}
 
 template <class T, class Enable = void>
 struct MaxHelper {
@@ -247,15 +280,14 @@ public:
         return *m_tree;
     }
 
-    // FIXME: Make protected and provide access method.
+protected:
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
+    mutable bool m_valid = false;
+
     using Interface::m_col_key;
     using Interface::m_deleted;
     using Interface::m_nullable;
     using Interface::m_obj;
-
-protected:
-    mutable std::unique_ptr<BPlusTree<T>> m_tree;
-    mutable bool m_valid = false;
 
     Collection() = default;
 

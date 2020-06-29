@@ -97,17 +97,6 @@ void ChangesetEncoder::append_value(Instruction::Payload::Type type)
     append_value(int64_t(type));
 }
 
-void ChangesetEncoder::append_value(util::Optional<Instruction::Payload::Type> type)
-{
-    if (type) {
-        append_value(true);
-        append_value(*type);
-    }
-    else {
-        append_value(false);
-    }
-}
-
 void ChangesetEncoder::append_value(const Instruction::Payload::Link& link)
 {
     append_value(link.target_table);
@@ -169,7 +158,7 @@ void ChangesetEncoder::operator()(const Instruction::AddInteger& instr)
 void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
 {
     // Mixed columns are always nullable.
-    REALM_ASSERT(instr.type || instr.nullable);
+    REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
 
     append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.list);
     if (instr.type == Instruction::Payload::Type::Link) {
