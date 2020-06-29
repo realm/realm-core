@@ -600,7 +600,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/',
+                     'XCODE12_DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 45, unit: 'MINUTES') {
                         sh """
