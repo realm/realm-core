@@ -96,3 +96,85 @@ else
     rm -f "realm-core-cocoa-${v}.tar.xz"
     tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
 fi
+
+# produce xcframeworks
+rm -rf xcframework
+mkdir temp
+make_core_xcframework="xcodebuild -create-xcframework"
+make_core_debug_xcframework="xcodebuild -create-xcframework"
+make_parser_xcframework="xcodebuild -create-xcframework"
+make_parser_debug_xcframework="xcodebuild -create-xcframework"
+for bt in "${BUILD_TYPES[@]}"; do
+    [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
+    for p in "${PLATFORMS[@]}"; do
+        if [[ "$p" == "macosx" || "$p" == "maccatalyst" ]]; then
+            cp build-${p}-${bt}/src/realm/librealm${suffix}.a temp/librealm-${bt}-${p}${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/librealm-parser${suffix}.a temp/librealm-parser-${bt}-${p}${suffix}.a
+            if [[ "$bt" == "Release" ]]; then
+                make_core_xcframework+=" -library temp/librealm-${bt}-${p}${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-${p}${suffix}.a -headers core/include/"
+            else
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-${p}${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-${p}${suffix}.a -headers core/include/"
+            fi
+        elif [[ "$p" == "ios" ]]; then
+            cp build-${p}-${bt}/src/realm/${bt}-iphoneos/librealm${suffix}.a temp/librealm-${bt}-iphoneos${suffix}.a
+            cp build-${p}-${bt}/src/realm/${bt}-iphonesimulator/librealm${suffix}.a temp/librealm-${bt}-iphonesimulator${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/${bt}-iphoneos/librealm-parser${suffix}.a temp/librealm-parser-${bt}-iphoneos${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/${bt}-iphonesimulator/librealm-parser${suffix}.a temp/librealm-parser-${bt}-iphonesimulator${suffix}.a
+            if [[ "$bt" == "Release" ]]; then
+                make_core_xcframework+=" -library temp/librealm-${bt}-iphoneos${suffix}.a -headers core/include/"
+                make_core_xcframework+=" -library temp/librealm-${bt}-iphonesimulator${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-iphoneos${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-iphonesimulator${suffix}.a -headers core/include/"
+            else
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-iphoneos${suffix}.a -headers core/include/"
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-iphonesimulator${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-iphoneos${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-iphonesimulator${suffix}.a -headers core/include/"
+            fi
+        elif [[ "$p" == "watchos" ]]; then
+            cp build-${p}-${bt}/src/realm/${bt}-watchos/librealm${suffix}.a temp/librealm-${bt}-watchos${suffix}.a
+            cp build-${p}-${bt}/src/realm/${bt}-watchsimulator/librealm${suffix}.a temp/librealm-${bt}-watchsimulator${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/${bt}-watchos/librealm-parser${suffix}.a temp/librealm-parser-${bt}-watchos${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/${bt}-watchsimulator/librealm-parser${suffix}.a temp/librealm-parser-${bt}-watchsimulator${suffix}.a
+            if [[ "$bt" == "Release" ]]; then
+                make_core_xcframework+=" -library temp/librealm-${bt}-watchos${suffix}.a -headers core/include/"
+                make_core_xcframework+=" -library temp/librealm-${bt}-watchsimulator${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-watchos${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-watchsimulator${suffix}.a -headers core/include/"
+            else
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-watchos${suffix}.a -headers core/include/"
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-watchsimulator${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-watchos${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-watchsimulator${suffix}.a -headers core/include/"
+            fi
+        elif [[ "$p" == "tvos" ]]; then
+            cp build-${p}-${bt}/src/realm/${bt}-appletvos/librealm${suffix}.a temp/librealm-${bt}-appletvos${suffix}.a
+            cp build-${p}-${bt}/src/realm/${bt}-appletvsimulator/librealm${suffix}.a temp/librealm-${bt}-appletvsimulator${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/${bt}-appletvos/librealm-parser${suffix}.a temp/librealm-parser-${bt}-appletvos${suffix}.a
+            cp build-${p}-${bt}/src/realm/parser/${bt}-appletvsimulator/librealm-parser${suffix}.a temp/librealm-parser-${bt}-appletvsimulator${suffix}.a
+            if [[ "$bt" == "Release" ]]; then
+                make_core_xcframework+=" -library temp/librealm-${bt}-appletvos${suffix}.a -headers core/include/"
+                make_core_xcframework+=" -library temp/librealm-${bt}-appletvsimulator${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-appletvos${suffix}.a -headers core/include/"
+                make_parser_xcframework+=" -library temp/librealm-parser-${bt}-appletvsimulator${suffix}.a -headers core/include/"
+            else
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-appletvos${suffix}.a -headers core/include/"
+                make_core_debug_xcframework+=" -library temp/librealm-${bt}-appletvsimulator${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-appletvos${suffix}.a -headers core/include/"
+                make_parser_debug_xcframework+=" -library temp/librealm-parser-${bt}-appletvsimulator${suffix}.a -headers core/include/"
+            fi
+        fi
+    done
+done
+make_core_xcframework+=" -output core/xcframework/realm-core.xcframework"
+make_core_debug_xcframework+=" -output core/xcframework/realm-core-dbg.xcframework"
+make_parser_xcframework+=" -output core/xcframework/realm-parser.xcframework"
+make_parser_debug_xcframework+=" -output core/xcframework/realm-parser-dbg.xcframework"
+
+eval $make_core_xcframework
+eval $make_core_debug_xcframework
+eval $make_parser_xcframework
+eval $make_parser_debug_xcframework
+rm -rf temp
