@@ -71,6 +71,12 @@ public:
     virtual void move(size_t from, size_t to) = 0;
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
     virtual void clear() = 0;
+
+protected:
+    void erase_repl(Replication* repl, size_t) const;
+    void clear_repl(Replication* repl) const;
+    void move_repl(Replication* repl, size_t from, size_t to) const;
+    void swap_repl(Replication* repl, size_t from, size_t to) const;
 };
 
 template <class T>
@@ -167,7 +173,7 @@ public:
         if (from != to) {
             this->ensure_writeable();
             if (Replication* repl = this->m_obj.get_replication()) {
-                CollectionBase::move_repl(repl, from, to);
+                LstBase::move_repl(repl, from, to);
             }
             if (to > from) {
                 to++;
@@ -192,7 +198,7 @@ public:
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (ndx1 != ndx2) {
             if (Replication* repl = this->m_obj.get_replication()) {
-                CollectionBase::swap_repl(repl, ndx1, ndx2);
+                LstBase::swap_repl(repl, ndx1, ndx2);
             }
             m_tree->swap(ndx1, ndx2);
             m_obj.bump_content_version();
@@ -206,7 +212,7 @@ public:
         this->ensure_writeable();
         if (size() > 0) {
             if (Replication* repl = this->m_obj.get_replication()) {
-                CollectionBase::clear_repl(repl);
+                LstBase::clear_repl(repl);
             }
             m_tree->clear();
             m_obj.bump_content_version();
@@ -297,7 +303,7 @@ T Lst<T>::remove(size_t ndx)
     REALM_ASSERT_DEBUG(!update_if_needed());
     this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
-        CollectionBase::erase_repl(repl, ndx);
+        LstBase::erase_repl(repl, ndx);
     }
     T old = get(ndx);
     do_remove(ndx);

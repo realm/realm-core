@@ -22,6 +22,7 @@ set(REALM_SOURCES
     bplustree.cpp
     chunked_binary.cpp
     cluster.cpp
+    collection.cpp
     column_binary.cpp
     decimal128.cpp
     disable_sync_to_disk.cpp

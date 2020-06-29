@@ -106,39 +106,17 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-CollectionBase::CollectionBase(const Obj& owner, ColKey col_key)
-    : m_obj(owner)
-    , m_col_key(col_key)
-{
-    if (!(col_key.get_attrs().test(col_attr_List) || col_key.get_attrs().test(col_attr_Set))) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-    m_nullable = col_key.is_nullable();
-}
-
-CollectionBase::~CollectionBase() {}
-
-ref_type CollectionBase::get_child_ref(size_t) const noexcept
-{
-    try {
-        return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-    }
-    catch (const KeyNotFound&) {
-        return ref_type(0);
-    }
-}
-
-void CollectionBase::erase_repl(Replication* repl, size_t ndx) const
+void LstBase::erase_repl(Replication* repl, size_t ndx) const
 {
     repl->list_erase(*this, ndx);
 }
 
-void CollectionBase::move_repl(Replication* repl, size_t from, size_t to) const
+void LstBase::move_repl(Replication* repl, size_t from, size_t to) const
 {
     repl->list_move(*this, from, to);
 }
 
-void CollectionBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
+void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
 {
     if (ndx2 < ndx1)
         std::swap(ndx1, ndx2);
@@ -147,7 +125,7 @@ void CollectionBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) cons
         repl->list_move(*this, ndx1 + 1, ndx2);
 }
 
-void CollectionBase::clear_repl(Replication* repl) const
+void LstBase::clear_repl(Replication* repl) const
 {
     repl->list_clear(*this);
 }
