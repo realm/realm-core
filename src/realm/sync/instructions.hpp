@@ -35,7 +35,10 @@ namespace sync {
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
     X(ArrayErase)                                                                                                    \
-    X(ArrayClear)
+    X(ArrayClear)                                                                                                    \
+    X(SetInsert)                                                                                                     \
+    X(SetErase)                                                                                                      \
+    X(SetClear)
 
 struct StringBufferRange {
     uint32_t offset, size;
@@ -550,6 +553,38 @@ struct ArrayClear : PathInstruction {
     }
 };
 
+struct SetInsert : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+    uint32_t prior_size;
+
+    bool operator==(const SetInsert& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value && prior_size == rhs.prior_size;
+    }
+};
+
+struct SetErase : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+    uint32_t prior_size;
+
+    bool operator==(const SetErase& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value && prior_size == rhs.prior_size;
+    }
+};
+
+struct SetClear : PathInstruction {
+    using PathInstruction::PathInstruction;
+
+    bool operator==(const SetClear& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs);
+    }
+};
+
+
 } // namespace instr
 
 struct Instruction {
@@ -580,6 +615,9 @@ struct Instruction {
         ArrayMove = 9,
         ArrayErase = 10,
         ArrayClear = 11,
+        SetInsert = 12,
+        SetErase = 13,
+        SetClear = 14,
     };
 
     template <Type t>

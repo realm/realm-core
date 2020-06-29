@@ -19,19 +19,37 @@
 #ifndef REALM_SET_HPP
 #define REALM_SET_HPP
 
-#include <realm/list.hpp>
+#include <realm/collection.hpp>
 
 #include <numeric> // std::iota
 
 namespace realm {
 
-template <class T>
-class Set : public Collection<T> {
+class SetBase : public CollectionBase {
 public:
-    using Collection<T>::m_tree;
-    using Collection<T>::size;
-    using Collection<T>::begin;
-    using Collection<T>::end;
+    using CollectionBase::CollectionBase;
+
+    virtual ~SetBase() {}
+    SetBasePtr clone() const
+    {
+        return m_obj.get_setbase_ptr(m_col_key);
+    }
+
+    virtual void insert_null() = 0;
+    virtual void erase_null() = 0;
+    virtual void clear() = 0;
+
+protected:
+    void clear_repl(Replication* repl) const;
+};
+
+template <class T>
+class Set : public Collection<T, SetBase> {
+public:
+    using Collection<T, SetBase>::m_tree;
+    using Collection<T, SetBase>::size;
+    using Collection<T, SetBase>::begin;
+    using Collection<T, SetBase>::end;
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
@@ -56,9 +74,9 @@ public:
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
 private:
-    using Collection<T>::m_valid;
-    using Collection<T>::m_obj;
-    using Collection<T>::get;
+    using Collection<T, SetBase>::m_valid;
+    using Collection<T, SetBase>::m_obj;
+    using Collection<T, SetBase>::get;
 
     void create()
     {
@@ -152,7 +170,7 @@ inline Mixed Set<T>::min(size_t* return_ndx) const
         if (return_ndx) {
             *return_ndx = 0;
         }
-        return *Collection<T>::begin();
+        return *begin();
     }
     else {
         if (return_ndx) {
@@ -170,7 +188,7 @@ inline Mixed Set<T>::max(size_t* return_ndx) const
         if (return_ndx) {
             *return_ndx = sz - 1;
         }
-        auto e = Collection<T>::end();
+        auto e = end();
         --e;
         return *e;
     }

@@ -532,6 +532,121 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
     set_value(info, instr.value, std::move(setter), "ArrayInsert");
 }
 
+void InstructionApplier::operator()(const Instruction::SetInsert& instr)
+{
+    auto& set = get_set(instr, "SetInsert");
+
+    auto table = set.get_table();
+    ColKey col = set.get_col_key();
+    SetTargetInfo info;
+    info.table_name = table->get_name();
+    info.col_name = table->get_column_name(col);
+    info.type = table->get_column_type(col);
+    info.nullable = table->is_nullable(col);
+
+    if (info.type == type_LinkList) {
+        // FIXME: Should sets of links have `type_LinkList`?
+        info.type = type_Link;
+    }
+
+    if (info.type == type_Link && table->get_link_target(col)->is_embedded()) {
+        bad_transaction_log("Sets of embedded objects not supported");
+    }
+
+    auto setter = util::overloaded{
+        [&](const util::None&) {
+            set.insert_null();
+        },
+        [&](const Instruction::Payload::ObjectValue&) {
+            bad_transaction_log("Sets of embedded objects not supported");
+        },
+        [&](const ObjLink& link) {
+            if (info.type == type_Mixed) {
+                auto& st = static_cast<Set<Mixed>&>(set);
+                st.insert(Mixed{link});
+            }
+            else if (info.type == type_TypedLink) {
+                auto& st = static_cast<Set<ObjLink>&>(set);
+                st.insert(link);
+            }
+        },
+        [&](const auto& value) {
+            if (info.type != type_Mixed) {
+                using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
+                auto& st = static_cast<Set<type>&>(set);
+                st.insert(value);
+            }
+            else {
+                auto& st = static_cast<Set<Mixed>&>(set);
+                st.insert(value);
+            }
+        },
+    };
+
+    set_value(info, instr.value, std::move(setter), "SetInsert");
+}
+
+void InstructionApplier::operator()(const Instruction::SetErase& instr)
+{
+    auto& set = get_set(instr, "SetInsert");
+
+    auto table = set.get_table();
+    ColKey col = set.get_col_key();
+    SetTargetInfo info;
+    info.table_name = table->get_name();
+    info.col_name = table->get_column_name(col);
+    info.type = table->get_column_type(col);
+    info.nullable = table->is_nullable(col);
+
+    if (info.type == type_LinkList) {
+        // FIXME: Should sets of links have `type_LinkList`?
+        info.type = type_Link;
+    }
+
+    if (info.type == type_Link && table->get_link_target(col)->is_embedded()) {
+        bad_transaction_log("Sets of embedded objects not supported");
+    }
+
+    auto setter = util::overloaded{
+        [&](const util::None&) {
+            set.erase_null();
+        },
+        [&](const Instruction::Payload::ObjectValue&) {
+            bad_transaction_log("Sets of embedded objects not supported");
+        },
+        [&](const ObjLink& link) {
+            if (info.type == type_Mixed) {
+                auto& st = static_cast<Set<Mixed>&>(set);
+                st.erase(Mixed{link});
+            }
+            else if (info.type == type_TypedLink) {
+                auto& st = static_cast<Set<ObjLink>&>(set);
+                st.erase(link);
+            }
+        },
+        [&](const auto& value) {
+            if (info.type != type_Mixed) {
+                using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
+                auto& st = static_cast<Set<type>&>(set);
+                st.erase(value);
+            }
+            else {
+                auto& st = static_cast<Set<Mixed>&>(set);
+                st.erase(value);
+            }
+        },
+    };
+
+    set_value(info, instr.value, std::move(setter), "SetErase");
+}
+
+void InstructionApplier::operator()(const Instruction::SetClear& instr)
+{
+    auto& set = get_set(instr, "SetClear");
+
+    set.clear();
+}
+
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 {
     auto& list = get_list(instr, "ArrayMove");
@@ -772,6 +887,21 @@ LstBase& InstructionApplier::get_list(const Instruction::PathInstruction& instr,
     }
 
     return *m_last_list;
+}
+
+SetBase& InstructionApplier::get_set(const Instruction::PathInstruction& instr, const char* name)
+{
+    auto [obj, col] = get_field(instr, name);
+
+    // FIXME: Handle lists of sets.
+
+    auto table = obj.get_table();
+    if (!table->is_set(col)) {
+        bad_transaction_log("%1: '%2.%3' is not a set", name, table->get_name(), table->get_column_name(col));
+    }
+
+    m_last_set = obj.get_setbase_ptr(col);
+    return *m_last_set;
 }
 
 ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::PrimaryKey& primary_key,

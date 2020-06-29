@@ -24,6 +24,7 @@
 #include <realm/sync/object.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 
 #include <tuple>
 
@@ -88,6 +89,7 @@ private:
     util::Optional<Instruction::PrimaryKey> m_last_object_key;
     util::Optional<Obj> m_last_object;
     std::unique_ptr<LstBase> m_last_list;
+    std::unique_ptr<SetBase> m_last_set;
 
     StringData get_table_name(const Instruction::TableInstruction&, const char* instr = "(unspecified)");
     TableRef get_table(const Instruction::TableInstruction&, const char* instr = "(unspecified)");
@@ -99,6 +101,7 @@ private:
 
     // Same as get_field, but expects the field in question to be a list.
     LstBase& get_list(const Instruction::PathInstruction&, const char* instr = "(unspecified)");
+    SetBase& get_set(const Instruction::PathInstruction&, const char* instr = "(unspecified)");
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
     ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&, const char* instr = "(unspecified)") const;

@@ -385,6 +385,28 @@ void ChangesetParser::State::parse_one()
             m_handler(instr);
             return;
         }
+        case Instruction::Type::SetInsert: {
+            Instruction::SetInsert instr;
+            read_path_instr(instr);
+            instr.value = read_payload();
+            instr.prior_size = read_int<uint32_t>();
+            m_handler(instr);
+            return;
+        }
+        case Instruction::Type::SetErase: {
+            Instruction::SetErase instr;
+            read_path_instr(instr);
+            instr.value = read_payload();
+            instr.prior_size = read_int<uint32_t>();
+            m_handler(instr);
+            return;
+        }
+        case Instruction::Type::SetClear: {
+            Instruction::SetClear instr;
+            read_path_instr(instr);
+            m_handler(instr);
+            return;
+        }
     }
 
     parser_error("unknown instruction");

@@ -94,15 +94,15 @@ TEST(ChangesetEncoding_CreateObject)
     CHECK(**changeset.begin() == instr);
 }
 
-TEST(ChangesetEncoding_Set_Field)
+TEST(ChangesetEncoding_Update_Field)
 {
     Changeset changeset;
-    sync::instr::Set instr;
+    sync::instr::Update instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
     instr.is_default = true;
-    CHECK(!instr.is_array_set());
+    CHECK(!instr.is_array_update());
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
@@ -110,10 +110,10 @@ TEST(ChangesetEncoding_Set_Field)
     CHECK(**changeset.begin() == instr);
 }
 
-TEST(ChangesetEncoding_Set_Deep)
+TEST(ChangesetEncoding_Update_Deep)
 {
     Changeset changeset;
-    sync::instr::Set instr;
+    sync::instr::Update instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
@@ -121,7 +121,7 @@ TEST(ChangesetEncoding_Set_Deep)
     instr.path.push_back(changeset.intern_string("baz"));
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(changeset.intern_string("boo"));
-    CHECK(!instr.is_array_set());
+    CHECK(!instr.is_array_update());
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
@@ -129,16 +129,16 @@ TEST(ChangesetEncoding_Set_Deep)
     CHECK(**changeset.begin() == instr);
 }
 
-TEST(ChangesetEncoding_Set_ArraySet)
+TEST(ChangesetEncoding_Update_ArrayUpdate)
 {
     Changeset changeset;
-    sync::instr::Set instr;
+    sync::instr::Update instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
     instr.prior_size = 500;
     instr.path.push_back(123);
-    CHECK(instr.is_array_set());
+    CHECK(instr.is_array_update());
     CHECK_EQUAL(instr.index(), 123);
     changeset.push_back(instr);
 
@@ -147,10 +147,10 @@ TEST(ChangesetEncoding_Set_ArraySet)
     CHECK(**changeset.begin() == instr);
 }
 
-TEST(ChangesetEncoding_Set_ArraySet_Deep)
+TEST(ChangesetEncoding_Update_ArrayUpdate_Deep)
 {
     Changeset changeset;
-    sync::instr::Set instr;
+    sync::instr::Update instr;
     instr.table = changeset.intern_string("Foo");
     instr.object = PrimaryKey{123};
     instr.field = changeset.intern_string("bar");
@@ -159,7 +159,7 @@ TEST(ChangesetEncoding_Set_ArraySet_Deep)
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(changeset.intern_string("boo"));
     instr.path.push_back(123);
-    CHECK(instr.is_array_set());
+    CHECK(instr.is_array_update());
     CHECK_EQUAL(instr.index(), 123);
     changeset.push_back(instr);
 

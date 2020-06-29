@@ -71,9 +71,7 @@ enum Instruction {
 
 class TransactLogStream {
 public:
-    virtual ~TransactLogStream()
-    {
-    }
+    virtual ~TransactLogStream() {}
 
     /// Ensure contiguous free space in the transaction log
     /// buffer. This method must update `out_free_begin`
@@ -203,9 +201,7 @@ public:
         return true;
     }
 
-    void parse_complete()
-    {
-    }
+    void parse_complete() {}
 };
 // LCOV_EXCL_STOP (NullInstructionObserver)
 
@@ -393,6 +389,19 @@ public:
     virtual void set_insert_object_id(const CollectionBase& list, size_t list_ndx, ObjectId value);
     virtual void set_insert_decimal(const CollectionBase& list, size_t list_ndx, Decimal128 value);
     virtual void set_insert_typed_link(const CollectionBase& list, size_t list_ndx, ObjLink value);
+    virtual void set_insert_null(const CollectionBase& list, size_t list_ndx);
+
+    virtual void set_erase_int(const CollectionBase& list, size_t list_ndx, int64_t value);
+    virtual void set_erase_bool(const CollectionBase& list, size_t list_ndx, bool value);
+    virtual void set_erase_float(const CollectionBase& list, size_t list_ndx, float value);
+    virtual void set_erase_double(const CollectionBase& list, size_t list_ndx, double value);
+    virtual void set_erase_string(const CollectionBase& list, size_t list_ndx, StringData value);
+    virtual void set_erase_binary(const CollectionBase& list, size_t list_ndx, BinaryData value);
+    virtual void set_erase_timestamp(const CollectionBase& list, size_t list_ndx, Timestamp value);
+    virtual void set_erase_object_id(const CollectionBase& list, size_t list_ndx, ObjectId value);
+    virtual void set_erase_decimal(const CollectionBase& list, size_t list_ndx, Decimal128 value);
+    virtual void set_erase_typed_link(const CollectionBase& list, size_t list_ndx, ObjLink value);
+    virtual void set_erase_null(const CollectionBase& list, size_t list_ndx);
 
     virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val);
 
@@ -1235,9 +1244,7 @@ inline TransactLogParser::TransactLogParser()
 }
 
 
-inline TransactLogParser::~TransactLogParser() noexcept
-{
-}
+inline TransactLogParser::~TransactLogParser() noexcept {}
 
 
 template <class InstructionHandler>
@@ -1341,8 +1348,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
 
         case instr_SelectList: {
-            ColKey col_key = ColKey(read_int<int64_t>()); // Throws
-            ObjKey key = ObjKey(read_int<int64_t>());     // Throws
+            ColKey col_key = ColKey(read_int<int64_t>());  // Throws
+            ObjKey key = ObjKey(read_int<int64_t>());      // Throws
             if (!handler.seclect_collection(col_key, key)) // Throws
                 parser_error();
             return;

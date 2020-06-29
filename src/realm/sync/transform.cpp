@@ -1391,6 +1391,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddTable);
 
 /// EraseTable rules
 
@@ -1435,6 +1438,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseTable);
 
 
 /// CreateObject rules
@@ -1468,6 +1474,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::CreateObject);
 
 
 /// Erase rules
@@ -1493,6 +1502,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseObject);
 
 
 /// Set rules
@@ -1636,6 +1648,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 
 // Handled by nested rule
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::Update);
 
 
 /// AddInteger rules
@@ -1648,6 +1663,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddInteger);
 
 
 /// AddColumn rules
@@ -1710,6 +1728,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddColumn);
 
 
 /// EraseColumn rules
@@ -1728,6 +1749,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseColumn);
 
 /// ArrayInsert rules
 
@@ -1819,6 +1843,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayInsert)
 
 // Handled by nested rules
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayInsert);
 
 
 /// ArrayMove rules
@@ -1947,6 +1974,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
 
 // Handled by nested rule.
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayMove);
 
 
 /// ArrayErase rules
@@ -1994,6 +2024,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 
 // Handled by nested rules.
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayErase);
 
 
 /// ArrayClear rules
@@ -2020,6 +2053,136 @@ DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayClear)
         else {
             right_side.discard();
         }
+    }
+}
+
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayClear);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayClear);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayClear);
+
+
+/// SetInsert rules
+
+DEFINE_NESTED_MERGE_NOOP(Instruction::SetInsert);
+
+DEFINE_MERGE(Instruction::SetInsert, Instruction::SetInsert)
+{
+    if (same_path(left, right)) {
+        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+
+        // CONFLICT: Two inserts into the same set.
+        //
+        // RESOLUTION: If the values are the same, discard the insertion with the lower timestamp. Otherwise,
+        // do nothing.
+        //
+        // NOTE: Set insertion is idempotent. Keeping the instruction with the higher timestamp is necessary
+        // because we want to maintain associativity in the case where intermittent erases (as ordered by
+        // timestamp) arrive at a later point in time.
+        if (left.value == right.value) {
+            if (left_side.timestamp() < right_side.timestamp()) {
+                left_side.discard();
+            }
+            else {
+                right_side.discard();
+            }
+        }
+        else {
+            ++left.prior_size;
+            ++right.prior_size;
+        }
+    }
+}
+
+DEFINE_MERGE(Instruction::SetErase, Instruction::SetInsert)
+{
+    if (same_path(left, right)) {
+        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+
+        // CONFLICT: Insertion and erase in the same set.
+        //
+        // RESOLUTION: If the inserted/erased values are the same, discard the instruction with the lower
+        // timestamp. Otherwise, do nothing.
+        //
+        // Note: Set insertion and erase are both idempotent. Keeping the instruction with the higher
+        // timestamp is necessary because we want to maintain associativity.
+        if (left.value == right.value) {
+            if (left_side.timestamp() < right_side.timestamp()) {
+                left_side.discard();
+            }
+            else {
+                right_side.discard();
+            }
+        }
+        else {
+            ++left.prior_size;
+            --right.prior_size;
+        }
+    }
+}
+
+DEFINE_MERGE(Instruction::SetClear, Instruction::SetInsert)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Insertion and clear in the same set.
+        //
+        // RESOLUTION: Always discard the insertion. This mirrors the behavior of `ArrayClear`, although the
+        // mechanics there are based on nested rules.
+        right_side.discard();
+    }
+}
+
+
+/// SetErase rules.
+
+DEFINE_NESTED_MERGE_NOOP(Instruction::SetErase);
+
+DEFINE_MERGE(Instruction::SetErase, Instruction::SetErase)
+{
+    if (same_path(left, right)) {
+        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+
+        // CONFLICT: Two erases in the same set.
+        //
+        // RESOLUTION: If the values are the same, discard the instruction with the lower timestamp.
+        // Otherwise, do nothing.
+        if (left.value == right.value) {
+            if (left_side.timestamp() < right_side.timestamp()) {
+                left_side.discard();
+            }
+            else {
+                right_side.discard();
+            }
+        }
+        else {
+            --left.prior_size;
+            --right.prior_size;
+        }
+    }
+}
+
+DEFINE_MERGE(Instruction::SetClear, Instruction::SetErase)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Erase and clear of the same set.
+        //
+        // RESOLUTION: Always let the clear instruction win.
+        right_side.discard();
+    }
+}
+
+
+/// SetClear rules.
+
+DEFINE_NESTED_MERGE_NOOP(Instruction::SetClear);
+
+DEFINE_MERGE(Instruction::SetClear, Instruction::SetClear)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Both sides cleared the set.
+        //
+        // RESOLUTION: The clear instructions cancel each other out.
+        left_side.discard();
+        right_side.discard();
     }
 }
 
