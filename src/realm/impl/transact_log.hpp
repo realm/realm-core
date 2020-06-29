@@ -319,7 +319,7 @@ private:
     void append_simple_instr(L... numbers);
 
     template <typename... L>
-    void append_string_instr(Instruction, const std::tuple<L...>& numbers, StringData);
+    void append_string_instr(Instruction, StringData);
 
     template <class T>
     static char* encode_int(char*, T value);
@@ -737,18 +737,12 @@ void TransactLogEncoder::append_simple_instr(L... numbers)
 }
 
 template <typename... L>
-void TransactLogEncoder::append_string_instr(Instruction instr, const std::tuple<L...>& numbers, StringData string)
+void TransactLogEncoder::append_string_instr(Instruction instr, StringData string)
 {
-    size_t num_numbers = std::tuple_size_v<std::tuple<L...>> + 1;
-    size_t max_required_bytes = 1 + max_enc_bytes_per_int * num_numbers + string.size();
+    size_t max_required_bytes = 1 + max_enc_bytes_per_int + string.size();
     char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
-    std::apply(
-        [&ptr, this](auto&&... args) {
-            ((encode(ptr, args)), ...);
-        },
-        numbers);
-
+    encode(ptr, int(type_String));
     ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
 }
@@ -1157,7 +1151,7 @@ inline void TransactLogConvenientEncoder::set_insert_typed_link(const Collection
 inline bool TransactLogEncoder::dictionary_insert(Mixed key)
 {
     REALM_ASSERT(key.get_type() == type_String);
-    append_string_instr(instr_DictionaryInsert, std::tuple<int>(type_String), key.get_string()); // Throws
+    append_string_instr(instr_DictionaryInsert, key.get_string()); // Throws
     return true;
 }
 
