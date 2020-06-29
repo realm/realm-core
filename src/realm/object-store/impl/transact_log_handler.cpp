@@ -291,6 +291,10 @@ public:
     {
         return true;
     }
+    bool dictionary_insert(Mixed)
+    {
+        return true;
+    }
 };
 
 
@@ -301,7 +305,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
-    bool select_list(ColKey, ObjKey)
+    bool seclect_collection(ColKey, ObjKey)
     {
         return true;
     }
@@ -361,7 +365,7 @@ public:
         return true;
     }
 
-    bool select_list(ColKey col, ObjKey obj)
+    bool seclect_collection(ColKey col, ObjKey obj)
     {
         modify_object(col, obj);
         m_active_list = find_list(obj, col);

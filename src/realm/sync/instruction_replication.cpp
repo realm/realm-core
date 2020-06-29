@@ -708,6 +708,15 @@ void SyncReplication::list_insert_typed_link(const CollectionBase& list, size_t 
     }
 }
 
+void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
+{
+    TrivialReplication::dictionary_insert(dict, key, val);
+
+    if (select_list(dict)) {
+        // FIXME: Implement
+    }
+}
+
 void SyncReplication::list_insert_link(const Lst<ObjKey>& list, size_t ndx, ObjKey value)
 {
     TrivialReplication::list_insert_link(list, ndx, value);

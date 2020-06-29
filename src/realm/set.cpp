@@ -40,9 +40,9 @@ template Set<Mixed>::Set(const Obj& obj, ColKey col_key);
 /***************************** Set<T>::insert_repl *****************************/
 
 template <>
-void Set<Int>::insert_repl(Replication*, int64_t, size_t)
+void Set<Int>::insert_repl(Replication* repl, int64_t value, size_t ndx)
 {
-    // repl->set_insert_int(*this, value);
+    repl->set_insert_int(*this, ndx, value);
 }
 
 template <>

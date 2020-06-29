@@ -117,6 +117,8 @@ public:
     void list_insert_decimal(const CollectionBase& list, size_t list_ndx, Decimal128 value) override;
     void list_insert_typed_link(const CollectionBase& list, size_t list_ndx, ObjLink value) override;
 
+    void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val) override;
+
     void remove_object(const Table*, ObjKey) override;
 
     void list_insert_null(const CollectionBase&, size_t ndx) override;

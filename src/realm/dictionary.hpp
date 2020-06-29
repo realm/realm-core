@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * Copyright 2016 Realm Inc.
+ * Copyright 2019 Realm Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,38 @@
  *
  **************************************************************************/
 
-#ifndef REALM_HPP
-#define REALM_HPP
+#ifndef REALM_DICTIONARY_HPP
+#define REALM_DICTIONARY_HPP
 
-#include <realm/db.hpp>
-#include <realm/obj.hpp>
-#include <realm/list.hpp>
-#include <realm/set.hpp>
-#include <realm/dictionary.hpp>
-#include <realm/table_view.hpp>
-#include <realm/query.hpp>
-#include <realm/query_engine.hpp>
-#include <realm/query_expression.hpp>
+#include <realm/collection.hpp>
 
-#endif // REALM_HPP
+namespace realm {
+
+class DictionaryClusterTree;
+
+class Dictionary : public CollectionBase {
+public:
+    Dictionary(const Obj& obj, ColKey col_key)
+        : CollectionBase(obj, col_key)
+    {
+        if (m_obj) {
+            init_from_parent();
+        }
+    }
+    void insert(Mixed key, Mixed value)
+    {
+        if (Replication* repl = this->m_obj.get_replication()) {
+            repl->dictionary_insert(*this, key, value);
+        }
+    }
+
+
+private:
+    bool init_from_parent() const override
+    {
+        return false;
+    }
+};
+} // namespace realm
+
+#endif // REALM_DICTIONARY_HPP

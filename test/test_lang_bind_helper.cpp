@@ -1771,7 +1771,7 @@ public:
         return true;
     }
 
-    bool select_list(ColKey col_key, ObjKey obj_key)
+    bool seclect_collection(ColKey col_key, ObjKey obj_key)
     {
         m_current_linkview_col = col_key;
         m_current_linkview_row = obj_key;
@@ -1878,6 +1878,10 @@ public:
         return false;
     }
     bool list_move(size_t, size_t)
+    {
+        return false;
+    }
+    bool dictionary_insert(Mixed)
     {
         return false;
     }

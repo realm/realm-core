@@ -1471,7 +1471,7 @@ public:
         return true; // No-op
     }
 
-    bool select_list(ColKey, ObjKey) noexcept
+    bool seclect_collection(ColKey, ObjKey) noexcept
     {
         return true; // No-op
     }
@@ -1487,6 +1487,11 @@ public:
     }
 
     bool list_clear(size_t) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool dictionary_insert(Mixed)
     {
         return true; // No-op
     }
