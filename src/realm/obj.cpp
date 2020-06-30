@@ -663,7 +663,9 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
 Obj::FatPath Obj::get_fat_path() const
 {
     FatPath result;
-    auto sizer = [&](size_t size) { result.reserve(size); };
+    auto sizer = [&](size_t size) {
+        result.reserve(size);
+    };
     auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
         result.push_back({o2, col, idx});
     };
@@ -675,7 +677,9 @@ Obj::Path Obj::get_path() const
 {
     Path result;
     bool top_done = false;
-    auto sizer = [&](size_t size) { result.path_from_top.reserve(size); };
+    auto sizer = [&](size_t size) {
+        result.path_from_top.reserve(size);
+    };
     auto step = [&](const Obj& o2, ColKey col, size_t idx) -> void {
         if (!top_done) {
             top_done = true;
@@ -1043,8 +1047,8 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     }
 
     if (Replication* repl = get_replication()) {
-        repl->set_int(m_table.unchecked_ptr(), col_key, m_key, value,
-                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
+                  is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
     }
 
     return *this;
@@ -1262,7 +1266,7 @@ inline void check_range(const BinaryData& val)
     if (REALM_UNLIKELY(val.size() > ArrayBlob::max_binary_size))
         throw LogicError(LogicError::binary_too_big);
 }
-}
+} // namespace
 
 // helper functions for filtering out calls to set_spec()
 template <class T>
@@ -1312,8 +1316,8 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     values.set(m_row_ndx, value);
 
     if (Replication* repl = get_replication())
-        repl->set<T>(m_table.unchecked_ptr(), col_key, m_key, value,
-                     is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
+                  is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
 }
@@ -1717,8 +1721,8 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     }
 
     if (Replication* repl = get_replication())
-        repl->set_null(m_table.unchecked_ptr(), col_key, m_key,
-                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set(m_table.unchecked_ptr(), col_key, m_key, util::none,
+                  is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 
     return *this;
 }

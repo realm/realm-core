@@ -66,9 +66,9 @@ public:
     std::string format_timestamp(Timestamp);
     std::string format_object_id(ObjectId);
     std::string format_decimal(Decimal128);
-    std::string format_list(ConstLstBase&);
+    std::string format_list(CollectionBase&);
     std::string format_link(ObjKey);
-    std::string format_link_list(const ConstLnkLst&);
+    std::string format_link_list(const LnkLst&);
 
     template <DataType>
     std::string format_cell(const Obj& obj, ColKey col_key);
@@ -156,7 +156,7 @@ std::string Formatter::format_decimal(Decimal128 id)
     return id.to_string();
 }
 
-std::string Formatter::format_list(ConstLstBase& list)
+std::string Formatter::format_list(CollectionBase& list)
 {
     m_out.reset();
     m_out << format_num_rows(list.size());
@@ -170,7 +170,7 @@ std::string Formatter::format_link(ObjKey key)
     return std::string{m_out.data(), m_out.size()};
 }
 
-std::string Formatter::format_link_list(const ConstLnkLst& list)
+std::string Formatter::format_link_list(const LnkLst& list)
 {
     m_out.reset();
     m_out << format_num_links(list.size());
@@ -517,6 +517,12 @@ int main(int argc, char* argv[])
                             case type_Decimal:
                                 formatter.format_column<type_Decimal>(*table, col_ndx, col);
                                 break;
+                            case type_Mixed:
+                                formatter.format_column<type_Mixed>(*table, col_ndx, col);
+                                break;
+                            case type_TypedLink:
+                                formatter.format_column<type_TypedLink>(*table, col_ndx, col);
+                                break;
                             case type_Link:
                                 formatter.format_column<type_Link>(*table, col_ndx, col);
                                 break;
@@ -525,7 +531,6 @@ int main(int argc, char* argv[])
                                 break;
                             case type_OldDateTime:
                             case type_OldTable:
-                            case type_OldMixed:
                                 break;
                         }
                     }

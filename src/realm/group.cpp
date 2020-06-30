@@ -378,7 +378,9 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             table_keys.push_back(table->get_key());
         }
 
-        auto commit_and_continue = [this]() { commit_and_continue_writing(); };
+        auto commit_and_continue = [this]() {
+            commit_and_continue_writing();
+        };
         for (auto k : table_keys) {
             get_table(k)->migrate_column_info(commit_and_continue);
         }
@@ -462,7 +464,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     bool create_group_when_missing = true;
     bool writable = create_group_when_missing;
     attach(top_ref, writable, create_group_when_missing); // Throws
-    dg.release();                               // Do not detach after all
+    dg.release();                                         // Do not detach after all
 }
 
 void Group::open(const std::string& file_path, const char* encryption_key, OpenMode mode)
@@ -581,7 +583,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
 {
     REALM_ASSERT(!m_top.is_attached());
     if (create_group_when_missing)
-    	REALM_ASSERT(writable);
+        REALM_ASSERT(writable);
 
     // If this function throws, it must leave the group accesor in a the
     // unattached state.
@@ -840,8 +842,8 @@ Table* Group::create_table_accessor(size_t table_ndx)
         table->init(ref, this, table_ndx, m_is_writable, is_frozen());
     }
     else {
-        std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));             // Throws
-        new_table->init(ref, this, table_ndx, m_is_writable, is_frozen());            // Throws
+        std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));  // Throws
+        new_table->init(ref, this, table_ndx, m_is_writable, is_frozen()); // Throws
         table = new_table.release();
     }
     // must be atomic to allow concurrent probing of the m_table_accessors vector.
@@ -1337,7 +1339,7 @@ size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc)
     else
         return 0;
 }
-}
+} // namespace
 
 size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
 {
@@ -1471,7 +1473,7 @@ public:
         return true; // No-op
     }
 
-    bool select_list(ColKey, ObjKey) noexcept
+    bool select_collection(ColKey, ObjKey) noexcept
     {
         return true; // No-op
     }
@@ -1628,10 +1630,10 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     TransactAdvancer advancer(*this, schema_changed);
     parser.parse(in, advancer); // Throws
 
-    m_top.detach();                                 // Soft detach
-    bool create_group_when_missing = false;         // See Group::attach_shared().
+    m_top.detach();                                           // Soft detach
+    bool create_group_when_missing = false;                   // See Group::attach_shared().
     attach(new_top_ref, writable, create_group_when_missing); // Throws
-    refresh_dirty_accessors();                      // Throws
+    refresh_dirty_accessors();                                // Throws
 
     if (schema_changed)
         send_schema_change_notification();
@@ -1645,9 +1647,9 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         while (m_top.size() < s_hist_type_ndx) {
             m_top.add(0); // Throws
         }
-        ref_type history_ref = 0; // No history yet
-        m_top.add(RefOrTagged::make_tagged(history_type)); // Throws
-        m_top.add(RefOrTagged::make_ref(history_ref)); // Throws
+        ref_type history_ref = 0;                                    // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
         m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
         m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
     }
@@ -1731,7 +1733,7 @@ public:
                 ref_type prev_ref_end = i_1->ref + i_1->size;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
                 if (i_2->ref == prev_ref_end) { // in-file
-                    i_1->size += i_2->size; // Merge
+                    i_1->size += i_2->size;     // Merge
                 }
                 else {
                     *++i_1 = *i_2;
@@ -1881,7 +1883,9 @@ void Group::verify() const
 
     // Check the consistency of the allocation of the mutable memory that has
     // been marked as free
-    m_alloc.for_all_free_entries([&](ref_type ref, size_t sz) { mem_usage_2.add_mutable(ref, sz); });
+    m_alloc.for_all_free_entries([&](ref_type ref, size_t sz) {
+        mem_usage_2.add_mutable(ref, sz);
+    });
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     mem_usage_1.canonicalize();

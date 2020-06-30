@@ -301,7 +301,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
     {
         return true;
     }
-    bool select_list(ColKey, ObjKey)
+    bool select_collection(ColKey, ObjKey)
     {
         return true;
     }
@@ -361,7 +361,7 @@ public:
         return true;
     }
 
-    bool select_list(ColKey col, ObjKey obj)
+    bool select_collection(ColKey col, ObjKey obj)
     {
         modify_object(col, obj);
         m_active_list = find_list(obj, col);
@@ -457,8 +457,9 @@ public:
         auto cur_table = current_table();
         if (m_active_table)
             m_active_table->clear(old_size);
-        auto it = remove_if(begin(m_info.lists), end(m_info.lists),
-                            [&](auto const& lv) { return lv.table_key == cur_table; });
+        auto it = remove_if(begin(m_info.lists), end(m_info.lists), [&](auto const& lv) {
+            return lv.table_key == cur_table;
+        });
         m_info.lists.erase(it, end(m_info.lists));
         return true;
     }
@@ -577,14 +578,20 @@ void advance(const std::shared_ptr<Transaction>& tr, BindingContext* context, No
 {
     advance_with_notifications(
         context, tr,
-        [&](auto&&... args) { tr->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{})); },
+        [&](auto&&... args) {
+            tr->advance_read(std::move(args)..., notifiers.version().value_or(VersionID{}));
+        },
         notifiers);
 }
 
 void begin(const std::shared_ptr<Transaction>& tr, BindingContext* context, NotifierPackage& notifiers)
 {
     advance_with_notifications(
-        context, tr, [&](auto&&... args) { tr->promote_to_write(std::move(args)...); }, notifiers);
+        context, tr,
+        [&](auto&&... args) {
+            tr->promote_to_write(std::move(args)...);
+        },
+        notifiers);
 }
 
 void cancel(Transaction& tr, BindingContext* context)

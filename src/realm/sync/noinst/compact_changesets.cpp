@@ -133,7 +133,7 @@ void ChangesetCompactor::add_changeset(Changeset& changeset)
                 break;
             }
             case Instruction::Type::Set: {
-                auto& set = instr->get_as<Instruction::Set>();
+                auto& set = instr->get_as<Instruction::Update>();
                 auto& info = m_objects[selected_table][set.object]; // Throws
                 if (set.payload.type == type_Link) {
                     StringData link_target_table = changeset.get_string(set.payload.data.link.target_table);
@@ -343,7 +343,7 @@ void ChangesetCompactor::compact_live_object(ObjectInfo& info)
                 if (instr->type == Instruction::Type::Set) {
                     // If a previous Set instruction existed for this field, discard it
                     // and record the position of this instruction instead.
-                    auto& set = instr->get_as<Instruction::Set>();
+                    auto& set = instr->get_as<Instruction::Update>();
                     StringData field = changeset.get_string(set.field);
                     auto it = last_set_instructions.find(field);
 

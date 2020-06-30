@@ -2595,8 +2595,8 @@ TableRef Transaction::import_copy_of(ConstTableRef original)
 
 LnkLst Transaction::import_copy_of(const LnkLst& original)
 {
-    if (Obj obj = import_copy_of(original.m_obj)) {
-        ColKey ck = original.m_col_key;
+    if (Obj obj = import_copy_of(original.CollectionBase::m_obj)) {
+        ColKey ck = original.CollectionBase::m_col_key;
         return obj.get_linklist(ck);
     }
     return LnkLst();
@@ -2615,8 +2615,8 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    if (Obj obj = import_copy_of(original->m_obj)) {
-        ColKey ck = original->m_col_key;
+    if (Obj obj = import_copy_of(original->CollectionBase::m_obj)) {
+        ColKey ck = original->CollectionBase::m_col_key;
         return obj.get_linklist_ptr(ck);
     }
     return std::make_unique<LnkLst>();

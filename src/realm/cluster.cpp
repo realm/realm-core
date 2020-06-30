@@ -47,7 +47,7 @@ constexpr int node_shift_factor = 2;
 #endif
 
 constexpr size_t cluster_node_size = 1 << node_shift_factor;
-}
+} // namespace
 
 /*
  * Node-splitting is done in the way that if the new element comes after all the
@@ -205,7 +205,7 @@ private:
     // and setting it to 0 thereafter
     void adjust_keys_first_child(int64_t adj);
 };
-}
+} // namespace realm
 
 void ClusterNode::IteratorState::clear()
 {
@@ -236,9 +236,7 @@ ClusterNodeInner::ClusterNodeInner(Allocator& allocator, const ClusterTree& tree
 {
 }
 
-ClusterNodeInner::~ClusterNodeInner()
-{
-}
+ClusterNodeInner::~ClusterNodeInner() {}
 
 void ClusterNodeInner::create(int sub_tree_depth)
 {
@@ -311,8 +309,9 @@ T ClusterNodeInner::recurse(ChildInfo& child_info, F func)
 
 MemRef ClusterNodeInner::ensure_writeable(ObjKey key)
 {
-    return recurse<MemRef>(
-        key, [](ClusterNode* node, ChildInfo& child_info) { return node->ensure_writeable(child_info.key); });
+    return recurse<MemRef>(key, [](ClusterNode* node, ChildInfo& child_info) {
+        return node->ensure_writeable(child_info.key);
+    });
 }
 
 ref_type ClusterNodeInner::insert(ObjKey key, const FieldValues& init_values, ClusterNode::State& state)
@@ -372,8 +371,10 @@ bool ClusterNodeInner::try_get(ObjKey key, ClusterNode::State& state) const
     if (!find_child(key, child_info)) {
         return false;
     }
-    return const_cast<ClusterNodeInner*>(this)->recurse<bool>(
-        child_info, [&state](const ClusterNode* node, ChildInfo& info) { return node->try_get(info.key, state); });
+    return const_cast<ClusterNodeInner*>(this)->recurse<bool>(child_info,
+                                                              [&state](const ClusterNode* node, ChildInfo& info) {
+                                                                  return node->try_get(info.key, state);
+                                                              });
 }
 
 ObjKey ClusterNodeInner::get(size_t ndx, ClusterNode::State& state) const
@@ -1153,9 +1154,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
     m_keys.truncate(ndx);
 }
 
-Cluster::~Cluster()
-{
-}
+Cluster::~Cluster() {}
 
 const Table* Cluster::get_owning_table() const
 {
@@ -2155,8 +2154,9 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
     const Table* table = get_owner();
 
     // Sort ColKey according to index
-    std::sort(init_values.begin(), init_values.end(),
-              [](auto& a, auto& b) { return a.col_key.get_index().val < b.col_key.get_index().val; });
+    std::sort(init_values.begin(), init_values.end(), [](auto& a, auto& b) {
+        return a.col_key.get_index().val < b.col_key.get_index().val;
+    });
 
     insert_fast(k, init_values, state);
 
@@ -2229,12 +2229,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
             auto pk_col = table->get_primary_key_column();
             for (const auto& v : values) {
                 if (v.col_key != pk_col) {
-                    if (v.value.is_null()) {
-                        repl->set_null(table, v.col_key, k, _impl::instr_Set);
-                    }
-                    else {
-                        repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
-                    }
+                    repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
                 }
             }
         }
@@ -2369,7 +2364,9 @@ void ClusterTree::enumerate_string_column(ColKey col_key)
         return false; // Continue
     };
 
-    auto upgrade = [col_key, &keys](Cluster* cluster) { cluster->upgrade_string_to_enum(col_key, keys); };
+    auto upgrade = [col_key, &keys](Cluster* cluster) {
+        cluster->upgrade_string_to_enum(col_key, keys);
+    };
 
     // Populate 'keys' array
     traverse(collect_strings);

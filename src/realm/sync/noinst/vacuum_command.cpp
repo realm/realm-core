@@ -7,9 +7,9 @@
 
 #include <realm/util/logger.hpp>
 #include <realm/util/load_file.hpp>
-#include <realm/noinst/vacuum.hpp>
-#include <realm/noinst/server_history.hpp>
-#include <realm/noinst/command_line_util.hpp>
+#include <realm/sync/noinst/vacuum.hpp>
+#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/command_line_util.hpp>
 
 using namespace realm;
 using namespace realm::sync;

@@ -106,41 +106,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /********************************* LstBase **********************************/
 
-ConstLstBase::ConstLstBase(const Obj& owner, ColKey col_key)
-    : m_obj(owner)
-    , m_col_key(col_key)
-{
-    if (!col_key.get_attrs().test(col_attr_List)) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-    m_nullable = col_key.is_nullable();
-}
-
-ConstLstBase::~ConstLstBase()
-{
-}
-
-ref_type ConstLstBase::get_child_ref(size_t) const noexcept
-{
-    try {
-        return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-    }
-    catch (const KeyNotFound&) {
-        return ref_type(0);
-    }
-}
-
-void ConstLstBase::erase_repl(Replication* repl, size_t ndx) const
-{
-    repl->list_erase(*this, ndx);
-}
-
-void ConstLstBase::move_repl(Replication* repl, size_t from, size_t to) const
-{
-    repl->list_move(*this, from, to);
-}
-
-void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
+void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
 {
     if (ndx2 < ndx1)
         std::swap(ndx1, ndx2);
@@ -149,18 +115,13 @@ void ConstLstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
         repl->list_move(*this, ndx1 + 1, ndx2);
 }
 
-void ConstLstBase::clear_repl(Replication* repl) const
-{
-    repl->list_clear(*this);
-}
 
 template <class T>
 Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : ConstLstBase(obj, col_key)
-    , ConstLstIf<T>(obj.get_alloc())
+    : Collection<T, LstBase>(obj, col_key)
 {
     if (m_obj) {
-        ConstLstIf<T>::init_from_parent();
+        Collection<T, LstBase>::init_from_parent();
     }
 }
 
@@ -194,91 +155,31 @@ struct MinHelper<T, void_t<ColumnMinMaxType<T>>> {
 };
 
 template <class T>
-Mixed ConstLstIf<T>::min(size_t* return_ndx) const
+Mixed Lst<T>::min(size_t* return_ndx) const
 {
     return MinHelper<T>::eval(*m_tree, return_ndx);
 }
 
-template <class T, class Enable = void>
-struct MaxHelper {
-    template <class U>
-    static Mixed eval(U&, size_t*)
-    {
-        return Mixed{};
-    }
-};
-
 template <class T>
-struct MaxHelper<T, void_t<ColumnMinMaxType<T>>> {
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_ndx)
-    {
-        return Mixed(bptree_maximum<T>(tree, return_ndx));
-    }
-};
-
-template <class T>
-Mixed ConstLstIf<T>::max(size_t* return_ndx) const
+Mixed Lst<T>::max(size_t* return_ndx) const
 {
     return MaxHelper<T>::eval(*m_tree, return_ndx);
 }
 
-template <class T, class Enable = void>
-class SumHelper {
-public:
-    template <class U>
-    static Mixed eval(U&, size_t* return_cnt)
-    {
-        if (return_cnt)
-            *return_cnt = 0;
-        return Mixed{};
-    }
-};
-
 template <class T>
-class SumHelper<T, void_t<ColumnSumType<T>>> {
-public:
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_cnt)
-    {
-        return Mixed(bptree_sum<T>(tree, return_cnt));
-    }
-};
-
-template <class T>
-Mixed ConstLstIf<T>::sum(size_t* return_cnt) const
+Mixed Lst<T>::sum(size_t* return_cnt) const
 {
     return SumHelper<T>::eval(*m_tree, return_cnt);
 }
 
-template <class T, class = void>
-struct AverageHelper {
-    template <class U>
-    static Mixed eval(U&, size_t* return_cnt)
-    {
-        if (return_cnt)
-            *return_cnt = 0;
-        return Mixed{};
-    }
-};
-
 template <class T>
-struct AverageHelper<T, void_t<ColumnSumType<T>>> {
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_cnt)
-    {
-        return Mixed(bptree_average<T>(tree, return_cnt));
-    }
-};
-
-template <class T>
-Mixed ConstLstIf<T>::avg(size_t* return_cnt) const
+Mixed Lst<T>::avg(size_t* return_cnt) const
 {
     return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
-void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
+void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     auto sz = size();
     auto sz2 = indices.size();
@@ -296,20 +197,25 @@ void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
     auto b = indices.begin();
     auto e = indices.end();
     if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) { return m_tree->get(i1) < m_tree->get(i2); });
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return m_tree->get(i1) < m_tree->get(i2);
+        });
     }
     else {
-        std::sort(b, e, [this](size_t i1, size_t i2) { return m_tree->get(i1) > m_tree->get(i2); });
+        std::sort(b, e, [this](size_t i1, size_t i2) {
+            return m_tree->get(i1) > m_tree->get(i2);
+        });
     }
 }
 
 template <class T>
-void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
     indices.clear();
     sort(indices, sort_order ? *sort_order : true);
-    auto duplicates = std::unique(indices.begin(), indices.end(),
-                                  [this](size_t i1, size_t i2) { return m_tree->get(i1) == m_tree->get(i2); });
+    auto duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
+        return m_tree->get(i1) == m_tree->get(i2);
+    });
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
 
@@ -363,7 +269,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     auto origin_table = m_obj.get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    ObjKey old_key = get(ndx);
+    ObjKey old_key = this->get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
     bool recurse =
         m_obj.replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
@@ -434,7 +340,7 @@ void Lst<ObjKey>::clear()
             while (ndx--) {
                 do_set(ndx, null_key);
                 m_tree->erase(ndx);
-                ConstLstBase::adj_remove(ndx);
+                CollectionBase::adj_remove(ndx);
             }
             // m_obj.bump_both_versions();
             m_obj.bump_content_version();
@@ -569,7 +475,7 @@ Obj LnkLst::get_object(size_t ndx) const
 
 bool LnkLst::init_from_parent() const
 {
-    ConstLstIf<ObjKey>::init_from_parent();
+    Collection<ObjKey, LstBase>::init_from_parent();
     update_unresolved(m_unresolved, *m_tree);
 
     return m_valid;
@@ -670,8 +576,7 @@ void LnkLst::remove_all_target_rows()
 }
 
 LnkLst::LnkLst(const Obj& owner, ColKey col_key)
-    : ConstLstBase(owner, col_key)
-    , Lst<ObjKey>(owner, col_key)
+    : Lst<ObjKey>(owner, col_key)
 {
     update_unresolved(m_unresolved, *m_tree);
 }
@@ -688,438 +593,6 @@ void LnkLst::sync_if_needed() const
 {
     if (this->is_attached()) {
         const_cast<LnkLst*>(this)->update_if_needed();
-    }
-}
-
-/***************************** Lst<T>::set_repl *****************************/
-template <>
-void Lst<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
-{
-    repl->list_set_int(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<Int>>::set_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
-{
-    if (value) {
-        repl->list_set_int(*this, ndx, *value);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
-{
-    repl->list_set_bool(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<bool>>::set_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
-{
-    if (value) {
-        repl->list_set_bool(*this, ndx, *value);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Float>::set_repl(Replication* repl, size_t ndx, float value)
-{
-    repl->list_set_float(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<Float>>::set_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
-{
-    if (value) {
-        repl->list_set_float(*this, ndx, *value);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Double>::set_repl(Replication* repl, size_t ndx, double value)
-{
-    repl->list_set_double(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<Double>>::set_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
-{
-    if (value) {
-        repl->list_set_double(*this, ndx, *value);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<String>::set_repl(Replication* repl, size_t ndx, StringData value)
-{
-    if (value.is_null()) {
-        repl->list_set_null(*this, ndx);
-    }
-    else {
-        repl->list_set_string(*this, ndx, value);
-    }
-}
-
-template <>
-void Lst<Binary>::set_repl(Replication* repl, size_t ndx, BinaryData value)
-{
-    if (value.is_null()) {
-        repl->list_set_null(*this, ndx);
-    }
-    else {
-        repl->list_set_binary(*this, ndx, value);
-    }
-}
-
-template <>
-void Lst<Timestamp>::set_repl(Replication* repl, size_t ndx, Timestamp value)
-{
-    if (value.is_null()) {
-        repl->list_set_null(*this, ndx);
-    }
-    else {
-        repl->list_set_timestamp(*this, ndx, value);
-    }
-}
-
-template <>
-void Lst<ObjectId>::set_repl(Replication* repl, size_t ndx, ObjectId value)
-{
-    repl->list_set_object_id(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<ObjectId>>::set_repl(Replication* repl, size_t ndx, util::Optional<ObjectId> value)
-{
-    if (value) {
-        repl->list_set_object_id(*this, ndx, *value);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-
-template <>
-void Lst<ObjKey>::set_repl(Replication* repl, size_t ndx, ObjKey key)
-{
-    if (key) {
-        repl->list_set_link(*this, ndx, key);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<ObjLink>::set_repl(Replication* repl, size_t ndx, ObjLink link)
-{
-    if (link) {
-        repl->list_set_typed_link(*this, ndx, link);
-    }
-    else {
-        repl->list_set_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Mixed>::set_repl(Replication* repl, size_t ndx, Mixed value)
-{
-    if (value.is_null()) {
-        repl->list_set_null(*this, ndx);
-    }
-    else {
-        switch (value.get_type()) {
-            case type_Int: {
-                repl->list_set_int(*this, ndx, value.get_int());
-                break;
-            }
-            case type_Bool: {
-                repl->list_set_bool(*this, ndx, value.get_bool());
-                break;
-            }
-            case type_String: {
-                repl->list_set_string(*this, ndx, value.get_string());
-                break;
-            }
-            case type_Binary: {
-                repl->list_set_binary(*this, ndx, value.get_binary());
-                break;
-            }
-            case type_Timestamp: {
-                repl->list_set_timestamp(*this, ndx, value.get_timestamp());
-                break;
-            }
-            case type_Float: {
-                repl->list_set_float(*this, ndx, value.get_float());
-                break;
-            }
-            case type_Double: {
-                repl->list_set_double(*this, ndx, value.get_double());
-                break;
-            }
-            case type_Decimal: {
-                repl->list_set_decimal(*this, ndx, value.get<Decimal128>());
-                break;
-            }
-            case type_ObjectId: {
-                repl->list_set_object_id(*this, ndx, value.get<ObjectId>());
-                break;
-            }
-            case type_TypedLink: {
-                repl->list_set_typed_link(*this, ndx, value.get<ObjLink>());
-                break;
-            }
-
-            case type_OldTable:
-                [[fallthrough]];
-            case type_Mixed:
-                [[fallthrough]];
-            case type_LinkList:
-                [[fallthrough]];
-            case type_Link:
-                [[fallthrough]];
-            case type_OldDateTime:
-                REALM_TERMINATE("Invalid Mixed type");
-        }
-    }
-}
-
-template <>
-void Lst<Decimal128>::set_repl(Replication* repl, size_t ndx, Decimal128 value)
-{
-    if (value.is_null()) {
-        repl->list_set_null(*this, ndx);
-    }
-    else {
-        repl->list_set_decimal(*this, ndx, value);
-    }
-}
-
-/*************************** Lst<T>::insert_repl ****************************/
-template <>
-void Lst<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
-{
-    repl->list_insert_int(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<Int>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
-{
-    if (value) {
-        repl->list_insert_int(*this, ndx, *value);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Bool>::insert_repl(Replication* repl, size_t ndx, bool value)
-{
-    repl->list_insert_bool(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<bool>>::insert_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
-{
-    if (value) {
-        repl->list_insert_bool(*this, ndx, *value);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Float>::insert_repl(Replication* repl, size_t ndx, float value)
-{
-    repl->list_insert_float(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<Float>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
-{
-    if (value) {
-        repl->list_insert_float(*this, ndx, *value);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Double>::insert_repl(Replication* repl, size_t ndx, double value)
-{
-    repl->list_insert_double(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<Double>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
-{
-    if (value) {
-        repl->list_insert_double(*this, ndx, *value);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<String>::insert_repl(Replication* repl, size_t ndx, StringData value)
-{
-    if (value.is_null()) {
-        repl->list_insert_null(*this, ndx);
-    }
-    else {
-        repl->list_insert_string(*this, ndx, value);
-    }
-}
-
-template <>
-void Lst<Binary>::insert_repl(Replication* repl, size_t ndx, BinaryData value)
-{
-    if (value.is_null()) {
-        repl->list_insert_null(*this, ndx);
-    }
-    else {
-        repl->list_insert_binary(*this, ndx, value);
-    }
-}
-
-template <>
-void Lst<Timestamp>::insert_repl(Replication* repl, size_t ndx, Timestamp value)
-{
-    if (value.is_null()) {
-        repl->list_insert_null(*this, ndx);
-    }
-    else {
-        repl->list_insert_timestamp(*this, ndx, value);
-    }
-}
-
-template <>
-void Lst<ObjectId>::insert_repl(Replication* repl, size_t ndx, ObjectId value)
-{
-    repl->list_insert_object_id(*this, ndx, value);
-}
-
-template <>
-void Lst<util::Optional<ObjectId>>::insert_repl(Replication* repl, size_t ndx, util::Optional<ObjectId> value)
-{
-    if (value) {
-        repl->list_insert_object_id(*this, ndx, *value);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-
-template <>
-void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
-{
-    if (key) {
-        repl->list_insert_link(*this, ndx, key);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<ObjLink>::insert_repl(Replication* repl, size_t ndx, ObjLink link)
-{
-    if (link) {
-        repl->list_insert_typed_link(*this, ndx, link);
-    }
-    else {
-        repl->list_insert_null(*this, ndx);
-    }
-}
-
-template <>
-void Lst<Mixed>::insert_repl(Replication* repl, size_t ndx, Mixed value)
-{
-    if (value.is_null()) {
-        repl->list_insert_null(*this, ndx);
-    }
-    else {
-        switch (value.get_type()) {
-            case type_Int: {
-                repl->list_insert_int(*this, ndx, value.get_int());
-                break;
-            }
-            case type_Bool: {
-                repl->list_insert_bool(*this, ndx, value.get_bool());
-                break;
-            }
-            case type_String: {
-                repl->list_insert_string(*this, ndx, value.get_string());
-                break;
-            }
-            case type_Binary: {
-                repl->list_insert_binary(*this, ndx, value.get_binary());
-                break;
-            }
-            case type_Timestamp: {
-                repl->list_insert_timestamp(*this, ndx, value.get_timestamp());
-                break;
-            }
-            case type_Float: {
-                repl->list_insert_float(*this, ndx, value.get_float());
-                break;
-            }
-            case type_Double: {
-                repl->list_insert_double(*this, ndx, value.get_double());
-                break;
-            }
-            case type_Decimal: {
-                repl->list_insert_decimal(*this, ndx, value.get<Decimal128>());
-                break;
-            }
-            case type_ObjectId: {
-                repl->list_insert_object_id(*this, ndx, value.get<ObjectId>());
-                break;
-            }
-            case type_TypedLink: {
-                repl->list_insert_typed_link(*this, ndx, value.get<ObjLink>());
-                break;
-            }
-
-            case type_OldTable:
-                [[fallthrough]];
-            case type_Mixed:
-                [[fallthrough]];
-            case type_LinkList:
-                [[fallthrough]];
-            case type_Link:
-                [[fallthrough]];
-            case type_OldDateTime:
-                REALM_TERMINATE("Invalid Mixed type");
-        }
-    }
-}
-
-template <>
-void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 value)
-{
-    if (value.is_null()) {
-        repl->list_insert_null(*this, ndx);
-    }
-    else {
-        repl->list_insert_decimal(*this, ndx, value);
     }
 }
 

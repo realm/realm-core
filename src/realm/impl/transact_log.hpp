@@ -29,7 +29,9 @@
 #include <realm/impl/input_stream.hpp>
 
 #include <realm/group.hpp>
-#include <realm/list.hpp>
+#include <realm/collection.hpp>
+
+#include <tuple>
 
 namespace realm {
 
@@ -67,9 +69,7 @@ enum Instruction {
 
 class TransactLogStream {
 public:
-    virtual ~TransactLogStream()
-    {
-    }
+    virtual ~TransactLogStream() {}
 
     /// Ensure contiguous free space in the transaction log
     /// buffer. This method must update `out_free_begin`
@@ -119,7 +119,7 @@ public:
     {
         return true;
     }
-    bool select_list(ColKey, ObjKey)
+    bool select_collection(ColKey, ObjKey)
     {
         return true;
     }
@@ -194,9 +194,7 @@ public:
         return true;
     }
 
-    void parse_complete()
-    {
-    }
+    void parse_complete() {}
 };
 // LCOV_EXCL_STOP (NullInstructionObserver)
 
@@ -234,8 +232,8 @@ public:
     bool rename_column(ColKey col_key);
     bool set_link_type(ColKey col_key);
 
-    // Must have linklist selected:
-    bool select_list(ColKey col_key, ObjKey key);
+    // Must have list selected:
+    bool select_collection(ColKey col_key, ObjKey key);
     bool list_set(size_t list_ndx);
     bool list_insert(size_t ndx);
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
@@ -307,6 +305,9 @@ private:
     template <class... L>
     void append_simple_instr(L... numbers);
 
+    template <typename... L>
+    void append_string_instr(Instruction, StringData);
+
     template <class T>
     static char* encode_int(char*, T value);
     friend class TransactLogParser;
@@ -324,62 +325,19 @@ public:
     virtual void erase_column(const Table*, ColKey col_key);
     virtual void rename_column(const Table*, ColKey col_key, StringData name);
 
-    virtual void set_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value,
-                         Instruction variant = instr_Set);
     virtual void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value);
-    virtual void set_bool(const Table*, ColKey col_key, ObjKey key, bool value, Instruction variant = instr_Set);
-    virtual void set_float(const Table*, ColKey col_key, ObjKey key, float value, Instruction variant = instr_Set);
-    virtual void set_double(const Table*, ColKey col_key, ObjKey key, double value, Instruction variant = instr_Set);
-    virtual void set_string(const Table*, ColKey col_key, ObjKey key, StringData value,
-                            Instruction variant = instr_Set);
-    virtual void set_binary(const Table*, ColKey col_key, ObjKey key, BinaryData value,
-                            Instruction variant = instr_Set);
-    virtual void set_timestamp(const Table*, ColKey col_key, ObjKey key, Timestamp value,
-                               Instruction variant = instr_Set);
-    virtual void set_object_id(const Table*, ColKey col_key, ObjKey key, ObjectId value,
-                               Instruction variant = instr_Set);
-    virtual void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value,
-                             Instruction variant = instr_Set);
-    virtual void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, Instruction variant = instr_Set);
-    virtual void set_typed_link(const Table*, ColKey col_key, ObjKey key, ObjLink value,
-                                Instruction variant = instr_Set);
-    virtual void set_null(const Table*, ColKey col_key, ObjKey key, Instruction variant = instr_Set);
-    virtual void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData);
-    virtual void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size);
+    virtual void set(const Table*, ColKey col_key, ObjKey key, Mixed value, Instruction variant = instr_Set);
 
-    virtual void list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
-    virtual void list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value);
-    virtual void list_set_float(const ConstLstBase& list, size_t list_ndx, float value);
-    virtual void list_set_double(const ConstLstBase& list, size_t list_ndx, double value);
-    virtual void list_set_string(const ConstLstBase& list, size_t list_ndx, StringData value);
-    virtual void list_set_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value);
-    virtual void list_set_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value);
-    virtual void list_set_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value);
-    virtual void list_set_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value);
-    virtual void list_set_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value);
+    virtual void list_set(const CollectionBase& list, size_t list_ndx, Mixed value);
+    virtual void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value);
+    virtual void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx);
+    virtual void list_erase(const CollectionBase&, size_t link_ndx);
+    virtual void list_clear(const CollectionBase&);
 
-    virtual void list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value);
-    virtual void list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value);
-    virtual void list_insert_float(const ConstLstBase& list, size_t list_ndx, float value);
-    virtual void list_insert_double(const ConstLstBase& list, size_t list_ndx, double value);
-    virtual void list_insert_string(const ConstLstBase& list, size_t list_ndx, StringData value);
-    virtual void list_insert_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value);
-    virtual void list_insert_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value);
-    virtual void list_insert_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value);
-    virtual void list_insert_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value);
-    virtual void list_insert_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
     virtual void remove_object(const Table*, ObjKey);
-
-    virtual void list_set_null(const ConstLstBase&, size_t ndx);
-    virtual void list_insert_null(const ConstLstBase&, size_t ndx);
-    virtual void list_set_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
-    virtual void list_insert_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value);
-    virtual void list_move(const ConstLstBase&, size_t from_link_ndx, size_t to_link_ndx);
-    virtual void list_erase(const ConstLstBase&, size_t link_ndx);
-    virtual void list_clear(const ConstLstBase&);
 
     //@{
 
@@ -409,39 +367,39 @@ protected:
     }
 
 private:
-    struct LinkListId {
+    struct CollectionId {
         TableKey table_key;
         ObjKey object_key;
         ColKey col_id;
 
-        LinkListId() = default;
-        LinkListId(const ConstLstBase& list)
+        CollectionId() = default;
+        CollectionId(const CollectionBase& list)
             : table_key(list.get_table()->get_key())
             , object_key(list.get_key())
             , col_id(list.get_col_key())
         {
         }
-        LinkListId(TableKey t, ObjKey k, ColKey c)
+        CollectionId(TableKey t, ObjKey k, ColKey c)
             : table_key(t)
             , object_key(k)
             , col_id(c)
         {
         }
-        bool operator!=(const LinkListId& other)
+        bool operator!=(const CollectionId& other)
         {
             return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
         }
     };
     TransactLogEncoder m_encoder;
     mutable const Table* m_selected_table = nullptr;
-    mutable LinkListId m_selected_list;
+    mutable CollectionId m_selected_list;
 
     void unselect_all() noexcept;
     void select_table(const Table*); // unselects link list
-    void select_list(const ConstLstBase&);
+    void select_collection(const CollectionBase&);
 
     void do_select_table(const Table*);
-    void do_select_list(const ConstLstBase&);
+    void do_select_collection(const CollectionBase&);
 
     void do_set(const Table*, ColKey col_key, ObjKey key, Instruction variant = instr_Set);
 
@@ -487,6 +445,11 @@ private:
 
     template <class T>
     T read_int();
+
+    void read_bytes(char* data, size_t size);
+    BinaryData read_buffer(util::StringBuffer&, size_t size);
+
+    StringData read_string(util::StringBuffer&);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
     // Returns false if no more input was available
@@ -704,23 +667,34 @@ void TransactLogEncoder::append_simple_instr(L... numbers)
     encode_list(ptr, numbers...);
 }
 
+template <typename... L>
+void TransactLogEncoder::append_string_instr(Instruction instr, StringData string)
+{
+    size_t max_required_bytes = 1 + max_enc_bytes_per_int + string.size();
+    char* ptr = reserve(max_required_bytes); // Throws
+    *ptr++ = char(instr);
+    encode(ptr, int(type_String));
+    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
+    advance(ptr);
+}
+
 inline void TransactLogConvenientEncoder::unselect_all() noexcept
 {
     m_selected_table = nullptr;
-    m_selected_list = LinkListId();
+    m_selected_list = CollectionId();
 }
 
 inline void TransactLogConvenientEncoder::select_table(const Table* table)
 {
     if (table != m_selected_table)
         do_select_table(table); // Throws
-    m_selected_list = LinkListId();
+    m_selected_list = CollectionId();
 }
 
-inline void TransactLogConvenientEncoder::select_list(const ConstLstBase& list)
+inline void TransactLogConvenientEncoder::select_collection(const CollectionBase& list)
 {
-    if (LinkListId(list) != m_selected_list) {
-        do_select_list(list); // Throws
+    if (CollectionId(list) != m_selected_list) {
+        do_select_collection(list); // Throws
     }
 }
 
@@ -807,8 +781,7 @@ inline void TransactLogConvenientEncoder::do_set(const Table* t, ColKey col_key,
 }
 
 
-inline void TransactLogConvenientEncoder::set_int(const Table* t, ColKey col_key, ObjKey key, int_fast64_t,
-                                                  Instruction variant)
+inline void TransactLogConvenientEncoder::set(const Table* t, ColKey col_key, ObjKey key, Mixed, Instruction variant)
 {
     do_set(t, col_key, key, variant); // Throws
 }
@@ -819,92 +792,14 @@ inline void TransactLogConvenientEncoder::add_int(const Table* t, ColKey col_key
     do_set(t, col_key, key); // Throws
 }
 
-inline void TransactLogConvenientEncoder::set_bool(const Table* t, ColKey col_key, ObjKey key, bool,
-                                                   Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_float(const Table* t, ColKey col_key, ObjKey key, float,
-                                                    Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_double(const Table* t, ColKey col_key, ObjKey key, double,
-                                                     Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_string(const Table* t, ColKey col_key, ObjKey key, StringData,
-                                                     Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_binary(const Table* t, ColKey col_key, ObjKey key, BinaryData,
-                                                     Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, ColKey col_key, ObjKey key, Timestamp,
-                                                        Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_object_id(const Table* t, ColKey col_key, ObjKey key, ObjectId,
-                                                        Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_decimal(const Table* t, ColKey col_key, ObjKey key, Decimal128,
-                                                      Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_link(const Table* t, ColKey col_key, ObjKey key, ObjKey,
-                                                   Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_typed_link(const Table* t, ColKey col_key, ObjKey key, ObjLink,
-                                                         Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
-inline void TransactLogConvenientEncoder::set_null(const Table* t, ColKey col_key, ObjKey key, Instruction variant)
-{
-    do_set(t, col_key, key, variant); // Throws
-}
-
 inline void TransactLogConvenientEncoder::nullify_link(const Table* t, ColKey col_key, ObjKey key)
 {
     select_table(t);                       // Throws
     m_encoder.modify_object(col_key, key); // Throws
 }
 
-inline void TransactLogConvenientEncoder::insert_substring(const Table* t, ColKey col_key, ObjKey key, size_t,
-                                                           StringData value)
-{
-    if (value.size() > 0) {
-        do_set(t, col_key, key); // Throws
-    }
-}
 
-inline void TransactLogConvenientEncoder::erase_substring(const Table* t, ColKey col_key, ObjKey key, size_t,
-                                                          size_t size)
-{
-    if (size > 0) {
-        do_set(t, col_key, key); // Throws
-    }
-}
+/************************************ List ***********************************/
 
 inline bool TransactLogEncoder::list_set(size_t list_ndx)
 {
@@ -912,63 +807,9 @@ inline bool TransactLogEncoder::list_set(size_t list_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t)
+inline void TransactLogConvenientEncoder::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
 {
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_bool(const ConstLstBase& list, size_t list_ndx, bool)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_float(const ConstLstBase& list, size_t list_ndx, float)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_double(const ConstLstBase& list, size_t list_ndx, double)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_string(const ConstLstBase& list, size_t list_ndx, StringData)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_binary(const ConstLstBase& list, size_t list_ndx, BinaryData)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink)
-{
-    select_list(list);            // Throws
+    select_collection(list);      // Throws
     m_encoder.list_set(list_ndx); // Throws
 }
 
@@ -978,100 +819,17 @@ inline bool TransactLogEncoder::list_insert(size_t list_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t)
+inline void TransactLogConvenientEncoder::list_insert(const CollectionBase& list, size_t list_ndx, Mixed)
 {
-    select_list(list);               // Throws
+    select_collection(list);         // Throws
     m_encoder.list_insert(list_ndx); // Throws
 }
 
-inline void TransactLogConvenientEncoder::list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_float(const ConstLstBase& list, size_t list_ndx, float)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_double(const ConstLstBase& list, size_t list_ndx, double)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_string(const ConstLstBase& list, size_t list_ndx, StringData)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_binary(const ConstLstBase& list, size_t list_ndx, BinaryData)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
 
 inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey key)
 {
     select_table(t);              // Throws
     m_encoder.remove_object(key); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_null(const ConstLstBase& list, size_t list_ndx)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_null(const ConstLstBase& list, size_t list_ndx)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(list_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_set_link(const Lst<ObjKey>& list, size_t link_ndx, ObjKey)
-{
-    select_list(list);            // Throws
-    m_encoder.list_set(link_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::list_insert_link(const Lst<ObjKey>& list, size_t link_ndx, ObjKey)
-{
-    select_list(list);               // Throws
-    m_encoder.list_insert(link_ndx); // Throws
-}
-
-inline void TransactLogConvenientEncoder::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
-{
-    select_list(list);              // Throws
-    m_encoder.list_erase(link_ndx); // Throws
 }
 
 inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
@@ -1081,10 +839,10 @@ inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_n
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_move(const ConstLstBase& list, size_t from_link_ndx,
+inline void TransactLogConvenientEncoder::list_move(const CollectionBase& list, size_t from_link_ndx,
                                                     size_t to_link_ndx)
 {
-    select_list(list);                               // Throws
+    select_collection(list);                         // Throws
     m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
 }
 
@@ -1094,9 +852,9 @@ inline bool TransactLogEncoder::list_erase(size_t list_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::list_erase(const ConstLstBase& list, size_t link_ndx)
+inline void TransactLogConvenientEncoder::list_erase(const CollectionBase& list, size_t link_ndx)
 {
-    select_list(list);              // Throws
+    select_collection(list);        // Throws
     m_encoder.list_erase(link_ndx); // Throws
 }
 
@@ -1112,9 +870,7 @@ inline TransactLogParser::TransactLogParser()
 }
 
 
-inline TransactLogParser::~TransactLogParser() noexcept
-{
-}
+inline TransactLogParser::~TransactLogParser() noexcept {}
 
 
 template <class InstructionHandler>
@@ -1211,7 +967,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SelectList: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
-            if (!handler.select_list(col_key, key))       // Throws
+            if (!handler.select_collection(col_key, key)) // Throws
                 parser_error();
             return;
         }
@@ -1296,6 +1052,49 @@ T TransactLogParser::read_int()
 
 bad_transact_log:
     throw BadTransactLog();
+}
+
+inline void TransactLogParser::read_bytes(char* data, size_t size)
+{
+    for (;;) {
+        const size_t avail = m_input_end - m_input_begin;
+        if (size <= avail)
+            break;
+        const char* to = m_input_begin + avail;
+        std::copy(m_input_begin, to, data);
+        if (!next_input_buffer())
+            throw BadTransactLog();
+        data += avail;
+        size -= avail;
+    }
+    const char* to = m_input_begin + size;
+    std::copy(m_input_begin, to, data);
+    m_input_begin = to;
+}
+
+inline BinaryData TransactLogParser::read_buffer(util::StringBuffer& buf, size_t size)
+{
+    const size_t avail = m_input_end - m_input_begin;
+    if (avail >= size) {
+        m_input_begin += size;
+        return BinaryData(m_input_begin - size, size);
+    }
+
+    buf.clear();
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
+    return BinaryData(buf.data(), size);
+}
+
+inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
+{
+    size_t size = read_int<size_t>(); // Throws
+
+    if (size > Table::max_string_size)
+        parser_error();
+
+    BinaryData buffer = read_buffer(buf, size);
+    return StringData{buffer.data(), size};
 }
 
 inline bool TransactLogParser::next_input_buffer()
@@ -1415,10 +1214,10 @@ public:
         return true;
     }
 
-    bool select_list(ColKey col_key, ObjKey key)
+    bool select_collection(ColKey col_key, ObjKey key)
     {
         sync_list();
-        m_encoder.select_list(col_key, key);
+        m_encoder.select_collection(col_key, key);
         m_pending_ls_instr = get_inst();
         return true;
     }

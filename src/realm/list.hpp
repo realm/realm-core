@@ -19,6 +19,8 @@
 #ifndef REALM_LIST_HPP
 #define REALM_LIST_HPP
 
+#include <realm/collection.hpp>
+
 #include <realm/obj.hpp>
 #include <realm/bplustree.hpp>
 #include <realm/obj_list.hpp>
@@ -34,6 +36,7 @@
 #include <realm/array_decimal128.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/array_typed_link.hpp>
+#include <realm/replication.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC
@@ -44,442 +47,19 @@ namespace realm {
 class TableView;
 class SortDescriptor;
 class Group;
-
-// To be used in query for size. Adds nullability to size so that
-// it can be put in a NullableVector
-struct SizeOfList {
-    static constexpr size_t null_value = size_t(-1);
-
-    SizeOfList(size_t s = null_value)
-        : sz(s)
-    {
-    }
-    bool is_null()
-    {
-        return sz == null_value;
-    }
-    void set_null()
-    {
-        sz = null_value;
-    }
-    size_t size() const
-    {
-        return sz;
-    }
-    size_t sz = null_value;
-};
-
-inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
-{
-    if (size_of_list.is_null()) {
-        ostr << "null";
-    }
-    else {
-        ostr << size_of_list.sz;
-    }
-    return ostr;
-}
-
-class ConstLstBase : public ArrayParent {
-public:
-    virtual ~ConstLstBase();
-    /*
-     * Operations that makes sense without knowing the specific type
-     * can be made virtual.
-     */
-    virtual size_t size() const = 0;
-    virtual bool is_null(size_t ndx) const = 0;
-    virtual Mixed get_any(size_t ndx) const = 0;
-
-    virtual Mixed min(size_t* return_ndx = nullptr) const = 0;
-    virtual Mixed max(size_t* return_ndx = nullptr) const = 0;
-    virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
-    virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
-
-    // Modifies a vector of indices so that they refer to values sorted according
-    // to the specified sort order
-    virtual void sort(std::vector<size_t>& indices, bool ascending = true) const = 0;
-    // Modifies a vector of indices so that they refer to distinct values.
-    // If 'sort_order' is supplied, the indices will refer to values in sort order,
-    // otherwise the indices will be in original order.
-    virtual void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const = 0;
-
-    bool is_empty() const
-    {
-        return size() == 0;
-    }
-    ObjKey get_key() const
-    {
-        return m_obj.get_key();
-    }
-    bool is_attached() const
-    {
-        return m_obj.is_valid();
-    }
-    bool has_changed() const
-    {
-        update_if_needed();
-        if (m_last_content_version != m_content_version) {
-            m_last_content_version = m_content_version;
-            return true;
-        }
-        return false;
-    }
-    void update_child_ref(size_t, ref_type new_ref) override
-    {
-        m_obj.set_int(ConstLstBase::m_col_key, from_ref(new_ref));
-    }
-    ConstTableRef get_table() const
-    {
-        return m_obj.get_table();
-    }
-    ColKey get_col_key() const
-    {
-        return m_col_key;
-    }
-
-    bool operator==(const ConstLstBase& other) const
-    {
-        return get_key() == other.get_key() && get_col_key() == other.get_col_key();
-    }
-
-protected:
-    template <class>
-    friend class LstIterator;
-    friend class Transaction;
-
-
-    Obj m_obj;
-    ColKey m_col_key;
-    bool m_nullable = false;
-
-    mutable std::vector<size_t> m_deleted;
-    mutable uint_fast64_t m_content_version = 0;
-    mutable uint_fast64_t m_last_content_version = 0;
-
-    ConstLstBase() = default;
-    ConstLstBase(bool)
-    {
-        REALM_ASSERT(false);
-    }
-    ConstLstBase(const Obj& owner, ColKey col_key);
-    ConstLstBase& operator=(const ConstLstBase& other)
-    {
-        m_obj = other.m_obj;
-        m_col_key = other.m_col_key;
-        m_nullable = other.m_nullable;
-        return *this;
-    }
-
-    virtual bool init_from_parent() const = 0;
-
-    ref_type get_child_ref(size_t) const noexcept override;
-
-    void update_if_needed() const
-    {
-        auto content_version = m_obj.get_alloc().get_content_version();
-        if (m_obj.update_if_needed() || content_version != m_content_version) {
-            init_from_parent();
-        }
-    }
-    void update_content_version() const
-    {
-        m_content_version = m_obj.get_alloc().get_content_version();
-    }
-    // Increase index by one. I we land on and index that is deleted, keep
-    // increasing until we get to a valid entry.
-    size_t incr(size_t ndx) const
-    {
-        ndx++;
-        if (!m_deleted.empty()) {
-            auto it = m_deleted.begin();
-            auto end = m_deleted.end();
-            while (it != end && *it < ndx) {
-                ++it;
-            }
-            // If entry is deleted, increase further
-            while (it != end && *it == ndx) {
-                ++it;
-                ++ndx;
-            }
-        }
-        return ndx;
-    }
-    // Convert from virtual to real index
-    size_t adjust(size_t ndx) const
-    {
-        if (!m_deleted.empty()) {
-            // Optimized for the case where the iterator is past that last deleted entry
-            auto it = m_deleted.rbegin();
-            auto end = m_deleted.rend();
-            while (it != end && *it >= ndx) {
-                if (*it == ndx) {
-                    throw std::out_of_range("Element was deleted");
-                }
-                ++it;
-            }
-            auto diff = end - it;
-            ndx -= diff;
-        }
-        return ndx;
-    }
-    void adj_remove(size_t ndx)
-    {
-        auto it = m_deleted.begin();
-        auto end = m_deleted.end();
-        while (it != end && *it <= ndx) {
-            ++ndx;
-            ++it;
-        }
-        m_deleted.insert(it, ndx);
-    }
-    void erase_repl(Replication* repl, size_t ndx) const;
-    void move_repl(Replication* repl, size_t from, size_t to) const;
-    void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
-    void clear_repl(Replication* repl) const;
-};
-
-/*
- * This class implements a forward iterator over the elements in a Lst.
- *
- * The iterator is stable against deletions in the list. If you try to
- * dereference an iterator that points to an element, that is deleted, the
- * call will throw.
- *
- * Values are read into a member variable (m_val). This is the only way to
- * implement operator-> and operator* returning a pointer and a reference resp.
- * There is no overhead compared to the alternative where operator* would have
- * to return T by value.
- */
-
-template <class>
-class ConstLstIf;
+class LstBase;
 
 template <class T>
-class LstIterator {
-public:
-    typedef std::forward_iterator_tag iterator_category;
-    typedef const T value_type;
-    typedef ptrdiff_t difference_type;
-    typedef const T* pointer;
-    typedef const T& reference;
-
-    LstIterator(const ConstLstIf<T>* l, size_t ndx)
-        : m_list(l)
-        , m_ndx(ndx)
-    {
-    }
-    pointer operator->()
-    {
-        m_val = m_list->get(m_list->adjust(m_ndx));
-        return &m_val;
-    }
-    reference operator*()
-    {
-        return *operator->();
-    }
-    LstIterator& operator++()
-    {
-        m_ndx = m_list->incr(m_ndx);
-        return *this;
-    }
-    LstIterator operator++(int)
-    {
-        LstIterator tmp(*this);
-        operator++();
-        return tmp;
-    }
-
-    bool operator!=(const LstIterator& rhs)
-    {
-        return m_ndx != rhs.m_ndx;
-    }
-
-    bool operator==(const LstIterator& rhs)
-    {
-        return m_ndx == rhs.m_ndx;
-    }
-
-private:
-    friend class Lst<T>;
-    T m_val;
-    const ConstLstIf<T>* m_list;
-    size_t m_ndx;
-};
-
-template <class T>
-inline void check_column_type(ColKey col)
-{
-    if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-template <>
-inline void check_column_type<Int>(ColKey col)
-{
-    if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-template <>
-inline void check_column_type<util::Optional<Int>>(ColKey col)
-{
-    if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-template <>
-inline void check_column_type<ObjKey>(ColKey col)
-{
-    if (col && col.get_type() != col_type_LinkList) {
-        throw LogicError(LogicError::list_type_mismatch);
-    }
-}
-
-/// This class defines the interface to ConstList, except for the constructor
-/// The ConstList class has the Obj member m_obj, which should not be
-/// inherited from Lst<T>.
-template <class T>
-class ConstLstIf : public virtual ConstLstBase {
-public:
-    /**
-     * Only member functions not referring to an index in the list will check if
-     * the object is up-to-date. The logic is that the user must always check the
-     * size before referring to a particular index, and size() will check for update.
-     */
-    size_t size() const override
-    {
-        if (!is_attached())
-            return 0;
-        update_if_needed();
-        if (!m_valid)
-            return 0;
-
-        return m_tree->size();
-    }
-    bool is_null(size_t ndx) const final
-    {
-        return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
-    }
-    Mixed get_any(size_t ndx) const final
-    {
-        return Mixed(get(ndx));
-    }
-
-    Mixed min(size_t* return_ndx = nullptr) const final;
-    Mixed max(size_t* return_ndx = nullptr) const final;
-    Mixed sum(size_t* return_cnt = nullptr) const final;
-    Mixed avg(size_t* return_cnt = nullptr) const final;
-
-    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
-    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
-
-    T get(size_t ndx) const
-    {
-        if (ndx >= ConstLstIf::size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        return m_tree->get(ndx);
-    }
-    T operator[](size_t ndx) const
-    {
-        return get(ndx);
-    }
-    LstIterator<T> begin() const
-    {
-        return LstIterator<T>(this, 0);
-    }
-    LstIterator<T> end() const
-    {
-        return LstIterator<T>(this, ConstLstIf::size() + m_deleted.size());
-    }
-    size_t find_first(T value) const
-    {
-        if (!m_valid && !init_from_parent())
-            return not_found;
-        return m_tree->find_first(value);
-    }
-    template <typename Func>
-    void find_all(T value, Func&& func) const
-    {
-        if (m_valid && init_from_parent())
-            m_tree->find_all(value, std::forward<Func>(func));
-    }
-    const BPlusTree<T>& get_tree() const
-    {
-        return *m_tree;
-    }
-
-protected:
-    mutable std::unique_ptr<BPlusTree<T>> m_tree;
-    mutable bool m_valid = false;
-
-    ConstLstIf() = default;
-
-    ConstLstIf(Allocator& alloc)
-        : ConstLstBase(false)
-        , m_tree(new BPlusTree<T>(alloc))
-    {
-        check_column_type<T>(m_col_key);
-
-        m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
-    }
-
-    ConstLstIf(const ConstLstIf& other)
-        : ConstLstBase(false)
-        , m_valid(other.m_valid)
-    {
-        if (other.m_tree) {
-            Allocator& alloc = other.m_tree->get_alloc();
-            m_tree = std::make_unique<BPlusTree<T>>(alloc);
-            m_tree->set_parent(this, 0);
-            if (m_valid)
-                m_tree->init_from_ref(other.m_tree->get_ref());
-        }
-    }
-
-    ConstLstIf& operator=(const ConstLstIf& other)
-    {
-        if (this != &other) {
-            ConstLstBase::operator=(other);
-            m_valid = other.m_valid;
-            m_deleted.clear();
-            m_tree = nullptr;
-
-            if (other.m_tree) {
-                Allocator& alloc = other.m_tree->get_alloc();
-                m_tree = std::make_unique<BPlusTree<T>>(alloc);
-                m_tree->set_parent(this, 0);
-                if (m_valid)
-                    m_tree->init_from_ref(other.m_tree->get_ref());
-            }
-        }
-        return *this;
-    }
-
-    bool init_from_parent() const override
-    {
-        m_valid = m_tree->init_from_parent();
-        update_content_version();
-        return m_valid;
-    }
-};
+using LstIterator = typename Collection<T, LstBase>::iterator;
 
 /*
  * This class defines a virtual interface to a writable list
  */
-class LstBase : public virtual ConstLstBase {
+class LstBase : public CollectionBase {
 public:
-    LstBase()
-        : ConstLstBase(false)
-    {
-    }
-    virtual ~LstBase()
-    {
-    }
+    using CollectionBase::CollectionBase;
+
+    virtual ~LstBase() {}
     LstBasePtr clone() const
     {
         return m_obj.get_listbase_ptr(m_col_key);
@@ -492,13 +72,17 @@ public:
     virtual void move(size_t from, size_t to) = 0;
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
     virtual void clear() = 0;
+
+protected:
+    void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
 };
 
 template <class T>
-class Lst : public ConstLstIf<T>, public LstBase {
+class Lst : public Collection<T, LstBase> {
 public:
-    using ConstLstIf<T>::m_tree;
-    using ConstLstIf<T>::get;
+    using Collection<T, LstBase>::m_tree;
+    using Collection<T, LstBase>::get;
+    using Collection<T, LstBase>::size;
 
     Lst() = default;
 
@@ -511,8 +95,16 @@ public:
     void create()
     {
         m_tree->create();
-        ConstLstIf<T>::m_valid = true;
+        m_valid = true;
     }
+
+    // Overriding members of CollectionBase:
+    Mixed min(size_t* return_ndx = nullptr) const final;
+    Mixed max(size_t* return_ndx = nullptr) const final;
+    Mixed sum(size_t* return_cnt = nullptr) const final;
+    Mixed avg(size_t* return_cnt = nullptr) const final;
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
     void set_null(size_t ndx) override
     {
@@ -559,9 +151,9 @@ public:
 
     void insert(size_t ndx, T value);
 
-    T remove(LstIterator<T>& it)
+    T remove(const LstIterator<T>& it)
     {
-        return remove(ConstLstBase::adjust(it.m_ndx));
+        return remove(CollectionBase::adjust(it.m_ndx));
     }
 
     T remove(size_t ndx);
@@ -577,9 +169,9 @@ public:
     {
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (from != to) {
-            ensure_writeable();
+            this->ensure_writeable();
             if (Replication* repl = this->m_obj.get_replication()) {
-                ConstLstBase::move_repl(repl, from, to);
+                repl->list_move(*this, from, to);
             }
             if (to > from) {
                 to++;
@@ -604,7 +196,7 @@ public:
         REALM_ASSERT_DEBUG(!update_if_needed());
         if (ndx1 != ndx2) {
             if (Replication* repl = this->m_obj.get_replication()) {
-                ConstLstBase::swap_repl(repl, ndx1, ndx2);
+                LstBase::swap_repl(repl, ndx1, ndx2);
             }
             m_tree->swap(ndx1, ndx2);
             m_obj.bump_content_version();
@@ -615,17 +207,24 @@ public:
     {
         ensure_created();
         update_if_needed();
-        ensure_writeable();
+        this->ensure_writeable();
         if (size() > 0) {
             if (Replication* repl = this->m_obj.get_replication()) {
-                ConstLstBase::clear_repl(repl);
+                repl->list_clear(*this);
             }
             m_tree->clear();
             m_obj.bump_content_version();
         }
     }
 
+    using Collection<T, LstBase>::m_col_key;
+
 protected:
+    using Collection<T, LstBase>::m_valid;
+    using Collection<T, LstBase>::m_nullable;
+    using Collection<T, LstBase>::m_obj;
+    using Collection<T, LstBase>::init_from_parent;
+
     bool update_if_needed()
     {
         if (m_obj.update_if_needed()) {
@@ -635,14 +234,8 @@ protected:
     }
     void ensure_created()
     {
-        if (!ConstLstIf<T>::m_valid && m_obj.is_valid()) {
+        if (!m_valid && m_obj.is_valid()) {
             create();
-        }
-    }
-    void ensure_writeable()
-    {
-        if (m_obj.ensure_writeable()) {
-            init_from_parent();
         }
     }
     void do_set(size_t ndx, T value)
@@ -657,21 +250,18 @@ protected:
     {
         m_tree->erase(ndx);
     }
-    void set_repl(Replication* repl, size_t ndx, T value);
-    void insert_repl(Replication* repl, size_t ndx, T value);
 };
 
 template <class T>
 Lst<T>::Lst(const Lst<T>& other)
-    : ConstLstBase(other)
-    , ConstLstIf<T>(other)
+    : Collection<T, LstBase>(other)
 {
 }
 
 template <class T>
 Lst<T>& Lst<T>::operator=(const Lst& other)
 {
-    ConstLstIf<T>::operator=(other);
+    Collection<T, LstBase>::operator=(other);
     return *this;
 }
 
@@ -693,12 +283,12 @@ T Lst<T>::set(size_t ndx, T value)
     // get will check for ndx out of bounds
     T old = get(ndx);
     if (old != value) {
-        ensure_writeable();
+        this->ensure_writeable();
         do_set(ndx, value);
         m_obj.bump_content_version();
     }
     if (Replication* repl = this->m_obj.get_replication()) {
-        set_repl(repl, ndx, value);
+        repl->list_set(*this, ndx, value);
     }
     return old;
 }
@@ -707,13 +297,13 @@ template <class T>
 T Lst<T>::remove(size_t ndx)
 {
     REALM_ASSERT_DEBUG(!update_if_needed());
-    ensure_writeable();
+    this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
-        ConstLstBase::erase_repl(repl, ndx);
+        repl->list_erase(*this, ndx);
     }
     T old = get(ndx);
     do_remove(ndx);
-    ConstLstBase::adj_remove(ndx);
+    CollectionBase::adj_remove(ndx);
     m_obj.bump_content_version();
 
     return old;
@@ -731,9 +321,9 @@ void Lst<T>::insert(size_t ndx, T value)
     if (ndx > m_tree->size()) {
         throw std::out_of_range("Index out of range");
     }
-    ensure_writeable();
+    this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
-        insert_repl(repl, ndx, value);
+        repl->list_insert(*this, ndx, value);
     }
     do_insert(ndx, value);
     m_obj.bump_content_version();
@@ -781,8 +371,7 @@ public:
 
     LnkLst(const Obj& owner, ColKey col_key);
     LnkLst(const LnkLst& other)
-        : ConstLstBase(other)
-        , Lst<ObjKey>(other)
+        : Lst<ObjKey>(other)
         , m_unresolved(other.m_unresolved)
     {
     }
@@ -928,28 +517,28 @@ inline LnkLst Obj::get_linklist(StringData col_name) const
 }
 
 template <class T>
-inline ColumnSumType<T> list_sum(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
+inline ColumnSumType<T> list_sum(const Collection<T, LstBase>& list, size_t* return_cnt = nullptr)
 {
     return bptree_sum(list.get_tree(), return_cnt);
 }
 
 template <class T>
-inline ColumnMinMaxType<T> list_maximum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
+inline ColumnMinMaxType<T> list_maximum(const Collection<T, LstBase>& list, size_t* return_ndx = nullptr)
 {
     return bptree_maximum(list.get_tree(), return_ndx);
 }
 
 template <class T>
-inline ColumnMinMaxType<T> list_minimum(const ConstLstIf<T>& list, size_t* return_ndx = nullptr)
+inline ColumnMinMaxType<T> list_minimum(const Collection<T, LstBase>& list, size_t* return_ndx = nullptr)
 {
     return bptree_minimum(list.get_tree(), return_ndx);
 }
 
 template <class T>
-inline ColumnAverageType<T> list_average(const ConstLstIf<T>& list, size_t* return_cnt = nullptr)
+inline ColumnAverageType<T> list_average(const Collection<T, LstBase>& list, size_t* return_cnt = nullptr)
 {
     return bptree_average(list.get_tree(), return_cnt);
 }
-}
+} // namespace realm
 
 #endif /* REALM_LIST_HPP */

@@ -24,6 +24,8 @@
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/permissions.hpp>
 #include <realm/sync/noinst/object_id_history_state.hpp>
+#include <realm/array_integer.hpp>
+#include <realm/array_ref.hpp>
 
 namespace realm {
 namespace sync {

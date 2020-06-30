@@ -8,7 +8,7 @@
 #include <iostream>
 
 #include <realm/util/load_file.hpp>
-#include <realm/noinst/server_history.hpp>
+#include <realm/sync/noinst/server_history.hpp>
 #include <realm/db.hpp>
 #include <realm/sync/version.hpp>
 

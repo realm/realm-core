@@ -6,6 +6,7 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/sync/object.hpp>
+#include <realm/list.hpp>
 
 #include "compare_groups.hpp"
 

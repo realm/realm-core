@@ -303,14 +303,14 @@ void ChangesetParser::State::parse_one()
             m_handler(instr);
             return;
         }
-        case Instruction::Type::Set: {
-            Instruction::Set instr;
+        case Instruction::Type::Update: {
+            Instruction::Update instr;
             read_path_instr(instr);
             instr.value = read_payload();
 
             // If the last path element is a string, we are setting a field. Otherwise, we are setting an array
             // element.
-            if (!instr.is_array_set()) {
+            if (!instr.is_array_update()) {
                 instr.is_default = read_bool();
             }
             else {
