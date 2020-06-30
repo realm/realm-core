@@ -7,21 +7,23 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 VERSION=$(git describe)
 
 function usage {
-    echo "Usage: ${SCRIPT} [-b] [-m] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
+    echo "Usage: ${SCRIPT} [-b] [-m] [-x] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
     echo ""
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
+    echo "   -x : build as an xcframework"
     echo "   -c : copy core to the specified folder instead of packaging it"
     echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 
 # Parse the options
-while getopts ":bmc:f:" opt; do
+while getopts ":bmxc:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
+        x) BUILD_XCFRAMEWORK=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
         f) CMAKE_FLAGS=${OPTARG};;
@@ -98,57 +100,33 @@ else
 fi
 
 # produce xcframeworks
-rm -rf xcframework
-mkdir temp
-make_core_xcframework="xcodebuild -create-xcframework"
-make_core_debug_xcframework="xcodebuild -create-xcframework"
-for bt in "${BUILD_TYPES[@]}"; do
-    [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
-    for p in "${PLATFORMS[@]}"; do
-        if [[ "$p" == "macosx" || "$p" == "maccatalyst" ]]; then
-            cp build-${p}-${bt}/src/realm/librealm${suffix}.a temp/librealm-${p}${suffix}.a
-            cp build-${p}-${bt}/src/realm/parser/librealm-parser${suffix}.a temp/librealm-parser-${p}${suffix}.a
-            if [[ "$bt" == "Release" ]]; then
-                make_core_xcframework+=" -library temp/librealm-${p}${suffix}.a -headers core/include/"
-            else
-                make_core_debug_xcframework+=" -library temp/librealm-${p}${suffix}.a -headers core/include/"
+if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+    for bt in "${BUILD_TYPES[@]}"; do
+        make_core_xcframework=()
+        [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
+        for p in "${PLATFORMS[@]}"; do
+            if [[ "$p" == "macosx" || "$p" == "maccatalyst" ]]; then
+                build_dir="build-${p}-${bt}/src/realm/librealm${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir} -headers core/include/)
+            elif [[ "$p" == "ios" ]]; then
+                build_dir_device="build-${p}-${bt}/src/realm/${bt}-iphoneos/librealm${suffix}.a"
+                build_dir_simulator="build-${p}-${bt}/src/realm/${bt}-iphonesimulator/librealm${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
+                make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
+            elif [[ "$p" == "watchos" ]]; then
+                build_dir_device="build-${p}-${bt}/src/realm/${bt}-watchos/librealm${suffix}.a"
+                build_dir_simulator="build-${p}-${bt}/src/realm/${bt}-watchsimulator/librealm${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
+                make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
+            elif [[ "$p" == "tvos" ]]; then
+                build_dir_device="build-${p}-${bt}/src/realm/${bt}-appletvos/librealm${suffix}.a"
+                build_dir_simulator="build-${p}-${bt}/src/realm/${bt}-appletvsimulator/librealm${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
+                make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
             fi
-        elif [[ "$p" == "ios" ]]; then
-            cp build-${p}-${bt}/src/realm/${bt}-iphoneos/librealm${suffix}.a temp/librealm-iphoneos${suffix}.a
-            cp build-${p}-${bt}/src/realm/${bt}-iphonesimulator/librealm${suffix}.a temp/librealm-iphonesimulator${suffix}.a
-            if [[ "$bt" == "Release" ]]; then
-                make_core_xcframework+=" -library temp/librealm-iphoneos${suffix}.a -headers core/include/"
-                make_core_xcframework+=" -library temp/librealm-iphonesimulator${suffix}.a -headers core/include/"
-            else
-                make_core_debug_xcframework+=" -library temp/librealm-iphoneos${suffix}.a -headers core/include/"
-                make_core_debug_xcframework+=" -library temp/librealm-iphonesimulator${suffix}.a -headers core/include/"
-            fi
-        elif [[ "$p" == "watchos" ]]; then
-            cp build-${p}-${bt}/src/realm/${bt}-watchos/librealm${suffix}.a temp/librealm-watchos${suffix}.a
-            cp build-${p}-${bt}/src/realm/${bt}-watchsimulator/librealm${suffix}.a temp/librealm-watchsimulator${suffix}.a
-            if [[ "$bt" == "Release" ]]; then
-                make_core_xcframework+=" -library temp/librealm-watchos${suffix}.a -headers core/include/"
-                make_core_xcframework+=" -library temp/librealm-watchsimulator${suffix}.a -headers core/include/"
-            else
-                make_core_debug_xcframework+=" -library temp/librealm-watchos${suffix}.a -headers core/include/"
-                make_core_debug_xcframework+=" -library temp/librealm-watchsimulator${suffix}.a -headers core/include/"
-            fi
-        elif [[ "$p" == "tvos" ]]; then
-            cp build-${p}-${bt}/src/realm/${bt}-appletvos/librealm${suffix}.a temp/librealm-appletvos${suffix}.a
-            cp build-${p}-${bt}/src/realm/${bt}-appletvsimulator/librealm${suffix}.a temp/librealm-appletvsimulator${suffix}.a
-            if [[ "$bt" == "Release" ]]; then
-                make_core_xcframework+=" -library temp/librealm-appletvos${suffix}.a -headers core/include/"
-                make_core_xcframework+=" -library temp/librealm-appletvsimulator${suffix}.a -headers core/include/"
-            else
-                make_core_debug_xcframework+=" -library temp/librealm-appletvos${suffix}.a -headers core/include/"
-                make_core_debug_xcframework+=" -library temp/librealm-appletvsimulator${suffix}.a -headers core/include/"
-            fi
-        fi
+        done
+        xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
     done
-done
-make_core_xcframework+=" -output core/xcframework/realm-core.xcframework"
-make_core_debug_xcframework+=" -output core/xcframework/realm-core-dbg.xcframework"
+fi
 
-eval $make_core_xcframework
-eval $make_core_debug_xcframework
 rm -rf temp
