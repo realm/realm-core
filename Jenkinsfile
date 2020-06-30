@@ -134,7 +134,7 @@ jobWrapper {
         parallel parallelExecutors
     }
 
-    if (isPublishingRun) {
+    //if (isPublishingRun) {
         stage('BuildPackages') {
             parallelExecutors = [
                 buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
@@ -222,7 +222,7 @@ jobWrapper {
                 others: doPublishLocalArtifacts()
             )
         }
-    }
+    //}
 }
 
 def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
