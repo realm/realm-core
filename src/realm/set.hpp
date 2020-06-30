@@ -73,18 +73,10 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
-    void insert_null() override
-    {
-        REALM_TERMINATE("Not implemented yet");
-    }
-    void erase_null() override
-    {
-        REALM_TERMINATE("Not implemented yet");
-    }
-    void clear() override
-    {
-        REALM_TERMINATE("Not implemented yet");
-    }
+    // Overriding members of SetBase:
+    void insert_null() override;
+    void erase_null() override;
+    void clear() override;
 
 private:
     using Collection<T, SetBase>::m_valid;
@@ -181,6 +173,33 @@ size_t Set<T>::erase(T value)
     CollectionBase::adj_remove(it.m_ndx);
     CollectionBase::m_obj.bump_content_version();
     return it.m_ndx;
+}
+
+template <class T>
+inline void Set<T>::insert_null()
+{
+    insert(BPlusTree<T>::default_value(m_nullable));
+}
+
+template <class T>
+inline void Set<T>::erase_null()
+{
+    erase(BPlusTree<T>::default_value(m_nullable));
+}
+
+template <class T>
+inline void Set<T>::clear()
+{
+    ensure_created();
+    update_if_needed();
+    this->ensure_writeable();
+    if (size() > 0) {
+        if (Replication* repl = this->m_obj.get_replication()) {
+            repl->set_clear(*this);
+        }
+        m_tree->clear();
+        m_obj.bump_content_version();
+    }
 }
 
 template <class T>
