@@ -336,9 +336,6 @@ public:
     /// constraint.
     virtual bool is_sync_agent() const noexcept;
 
-    template <class T>
-    void set(const Table*, ColKey col_key, ObjKey key, T value, _impl::Instruction variant);
-
     ~Replication() override;
 
 protected:
@@ -467,96 +464,6 @@ inline bool Replication::is_sync_agent() const noexcept
 {
     return false;
 }
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, StringData value,
-                             _impl::Instruction variant)
-{
-    set_string(table, col_key, key, value, variant);
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, BinaryData value,
-                             _impl::Instruction variant)
-{
-    set_binary(table, col_key, key, value, variant);
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Timestamp value,
-                             _impl::Instruction variant)
-{
-    if (value.is_null()) {
-        set_null(table, col_key, key, variant);
-    }
-    else {
-        set_timestamp(table, col_key, key, value, variant);
-    }
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjectId value,
-                             _impl::Instruction variant)
-{
-    set_object_id(table, col_key, key, value, variant);
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, bool value, _impl::Instruction variant)
-{
-    set_bool(table, col_key, key, value, variant);
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, float value, _impl::Instruction variant)
-{
-    set_float(table, col_key, key, value, variant);
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, double value, _impl::Instruction variant)
-{
-    set_double(table, col_key, key, value, variant);
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Decimal128 value,
-                             _impl::Instruction variant)
-{
-    if (value.is_null()) {
-        set_null(table, col_key, key, variant);
-    }
-    else {
-        set_decimal(table, col_key, key, value, variant);
-    }
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjKey target_key,
-                             _impl::Instruction variant)
-{
-    if (target_key) {
-        set_link(table, col_key, key, target_key, variant);
-    }
-    else {
-        nullify_link(table, col_key, key);
-    }
-}
-
-template <>
-inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjLink target_obj,
-                             _impl::Instruction variant)
-{
-    if (target_obj) {
-        set_typed_link(table, col_key, key, target_obj, variant);
-    }
-    else {
-        nullify_link(table, col_key, key);
-    }
-}
-
-template <>
-void Replication::set(const Table* table, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant);
 
 inline TrivialReplication::TrivialReplication(const std::string& database_file)
     : Replication(m_stream)

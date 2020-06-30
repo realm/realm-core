@@ -22,6 +22,7 @@
 #include <realm/array.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/array_key.hpp>
 
 namespace realm {
 

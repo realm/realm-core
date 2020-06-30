@@ -30,6 +30,7 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
+#include <realm/list.hpp>
 
 #include "sync_fixtures.hpp"
 

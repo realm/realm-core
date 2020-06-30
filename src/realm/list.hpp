@@ -36,6 +36,7 @@
 #include <realm/array_decimal128.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/array_typed_link.hpp>
+#include <realm/replication.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC
@@ -73,10 +74,7 @@ public:
     virtual void clear() = 0;
 
 protected:
-    void erase_repl(Replication* repl, size_t) const;
-    void clear_repl(Replication* repl) const;
-    void move_repl(Replication* repl, size_t from, size_t to) const;
-    void swap_repl(Replication* repl, size_t from, size_t to) const;
+    void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
 };
 
 template <class T>
@@ -173,7 +171,7 @@ public:
         if (from != to) {
             this->ensure_writeable();
             if (Replication* repl = this->m_obj.get_replication()) {
-                LstBase::move_repl(repl, from, to);
+                repl->list_move(*this, from, to);
             }
             if (to > from) {
                 to++;
@@ -212,7 +210,7 @@ public:
         this->ensure_writeable();
         if (size() > 0) {
             if (Replication* repl = this->m_obj.get_replication()) {
-                LstBase::clear_repl(repl);
+                repl->list_clear(*this);
             }
             m_tree->clear();
             m_obj.bump_content_version();
@@ -252,8 +250,6 @@ protected:
     {
         m_tree->erase(ndx);
     }
-    void set_repl(Replication* repl, size_t ndx, T value);
-    void insert_repl(Replication* repl, size_t ndx, T value);
 };
 
 template <class T>
@@ -292,7 +288,7 @@ T Lst<T>::set(size_t ndx, T value)
         m_obj.bump_content_version();
     }
     if (Replication* repl = this->m_obj.get_replication()) {
-        set_repl(repl, ndx, value);
+        repl->list_set(*this, ndx, value);
     }
     return old;
 }
@@ -303,7 +299,7 @@ T Lst<T>::remove(size_t ndx)
     REALM_ASSERT_DEBUG(!update_if_needed());
     this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
-        LstBase::erase_repl(repl, ndx);
+        repl->list_erase(*this, ndx);
     }
     T old = get(ndx);
     do_remove(ndx);
@@ -327,7 +323,7 @@ void Lst<T>::insert(size_t ndx, T value)
     }
     this->ensure_writeable();
     if (Replication* repl = this->m_obj.get_replication()) {
-        insert_repl(repl, ndx, value);
+        repl->list_insert(*this, ndx, value);
     }
     do_insert(ndx, value);
     m_obj.bump_content_version();

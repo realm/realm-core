@@ -73,6 +73,19 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
+    void insert_null() override
+    {
+        REALM_TERMINATE("Not implemented yet");
+    }
+    void erase_null() override
+    {
+        REALM_TERMINATE("Not implemented yet");
+    }
+    void clear() override
+    {
+        REALM_TERMINATE("Not implemented yet");
+    }
+
 private:
     using Collection<T, SetBase>::m_valid;
     using Collection<T, SetBase>::m_obj;
@@ -97,9 +110,16 @@ private:
             create();
         }
     }
-    void insert_repl(Replication* repl, T value, size_t index);
-    void erase_repl(Replication* repl, T value, size_t index);
 };
+
+template <class T>
+inline Set<T>::Set(const Obj& obj, ColKey col_key)
+    : Collection<T, SetBase>(obj, col_key)
+{
+    if (m_obj) {
+        init_from_parent();
+    }
+}
 
 template <typename U>
 Set<U> Obj::get_set(ColKey col_key) const
@@ -132,7 +152,7 @@ size_t Set<T>::insert(T value)
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
-        insert_repl(repl, value, it.m_ndx);
+        repl->set_insert(*this, it.m_ndx, value);
     }
 
     m_tree->insert(it.m_ndx, value);
@@ -155,7 +175,7 @@ size_t Set<T>::erase(T value)
     }
 
     if (Replication* repl = m_obj.get_replication()) {
-        erase_repl(repl, value, it.m_ndx);
+        repl->set_erase(*this, it.m_ndx, value);
     }
     m_tree->erase(it.m_ndx);
     CollectionBase::adj_remove(it.m_ndx);
