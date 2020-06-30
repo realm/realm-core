@@ -375,6 +375,7 @@ public:
     {
         if (!m_valid && !init_from_parent())
             return not_found;
+        update_if_needed();
         return m_tree->find_first(value);
     }
     template <typename Func>
