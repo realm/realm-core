@@ -1236,6 +1236,33 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
     out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
 
+void Group::recursive_touch(int level, Array& parent, ref_type first, ref_type last)
+{
+    std::cout << parent.get_ref() << ",  sz = " << parent.size() << std::endl;
+    if (parent.get_ref() >= first && parent.get_ref() < last)
+        parent.copy_on_write();
+    if (parent.has_refs())
+        for (size_t i = 0; i < parent.size(); ++i) {
+            auto rot = parent.get_as_ref_or_tagged(i);
+            if (rot.is_ref()) {
+                Array arr(m_alloc);
+                ref_type ref = rot.get_as_ref();
+                if (ref == 0)
+                    continue;
+                for (int k = 0; k < level; ++k)
+                    std::cout << "    ";
+                std::cout << parent.get_ref() << "[" << i << "] = ";
+                arr.init_from_ref(ref);
+                arr.set_parent(&parent, i);
+                recursive_touch(1 + level, arr, first, last);
+            }
+        }
+}
+
+void Group::touch(ref_type first, ref_type last)
+{
+    recursive_touch(0, m_top, first, last);
+}
 
 void Group::commit()
 {

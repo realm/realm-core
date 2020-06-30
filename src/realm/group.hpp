@@ -542,7 +542,8 @@ public:
     /// size of the last snapshot done in that DB. If the snapshots are
     /// identical, the numbers will of course be equal.
     size_t get_used_space() const noexcept;
-
+    void touch(ref_type first, ref_type end);
+    void recursive_touch(int level, Array& parent, ref_type first, ref_type last);
     void verify() const;
     void validate_primary_columns();
 #ifdef REALM_DEBUG

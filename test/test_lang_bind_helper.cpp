@@ -6005,4 +6005,59 @@ TEST(LangBindHelper_SchemaChangeNotification)
     CHECK(handler_called);
 }
 
+TEST(LangBindHelper_FragmentFile)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    auto tr = db->start_write();
+    auto t = tr->add_table("the_table");
+    auto c = t->add_column(type_Binary, "str");
+    char w[1000];
+    for (int i = 0; i < 1000; ++i) {
+        w[i] = '0' + (i % 10);
+    }
+    size_t num = 4;
+    for (size_t j = 0; j < num; ++j) {
+        BinaryData sd(w, 500 + (j % 500));
+        t->create_object().set(c, sd);
+    }
+    tr->commit_and_continue_as_read();
+    size_t free_space, used_space;
+    db->get_stats(free_space, used_space);
+    std::cout << free_space << ", " << used_space << std::endl;
+    tr->promote_to_write();
+    int j = 0;
+    for (auto o : *t) {
+        BinaryData sd(w, j % 500);
+        o.set(c, sd);
+        ++j;
+    }
+    tr->commit_and_continue_as_read();
+    db->get_stats(free_space, used_space);
+    std::cout << free_space << ", " << used_space << std::endl;
+    tr->promote_to_write();
+    j = 0;
+    for (auto o : *t) {
+        BinaryData sd(w, j % 10);
+        o.set(c, sd);
+        ++j;
+    }
+    tr->commit_and_continue_as_read();
+    db->get_stats(free_space, used_space);
+    std::cout << free_space << ", " << used_space << std::endl;
+    size_t total = free_space + used_space;
+    while (free_space * 100 / total > 75) {
+        tr->promote_to_write();
+        tr->touch(3 * total / 4, total);
+        tr->commit_and_continue_as_read();
+        tr->promote_to_write();
+        // tr->truncate();
+        tr->commit_and_continue_as_read();
+        db->get_stats(free_space, used_space);
+        std::cout << free_space << ", " << used_space << std::endl;
+        total = free_space + used_space;
+    }
+}
+
 #endif

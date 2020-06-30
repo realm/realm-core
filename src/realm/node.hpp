@@ -303,6 +303,7 @@ private:
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
 
     void do_copy_on_write(size_t minimum_size = 0);
+    friend class Group;
 };
 
 class Spec;
