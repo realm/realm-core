@@ -2,6 +2,7 @@
 
 #if REALM_DEBUG
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #endif // REALM_DEBUG
 

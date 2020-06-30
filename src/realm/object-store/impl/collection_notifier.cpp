@@ -22,6 +22,7 @@
 #include "shared_realm.hpp"
 
 #include <realm/db.hpp>
+#include <realm/list.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

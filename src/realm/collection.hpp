@@ -2,6 +2,7 @@
 #define REALM_COLLECTION_HPP
 
 #include <realm/obj.hpp>
+#include <realm/bplustree.hpp>
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t

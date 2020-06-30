@@ -30,7 +30,7 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 
-#include <realm/db.hpp>
+#include <realm.hpp>
 #include <realm/history.hpp>
 
 using namespace realm;
