@@ -52,9 +52,9 @@ jobWrapper {
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
-        isPublishingRun = false
+        isPublishingRun = true//false
         if (gitTag) {
-            isPublishingRun = currentBranch.contains('release')
+            //isPublishingRun = currentBranch.contains('release')
         }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
@@ -134,7 +134,7 @@ jobWrapper {
         parallel parallelExecutors
     }
 
-    //if (isPublishingRun) {
+    if (isPublishingRun) {
         stage('BuildPackages') {
             parallelExecutors = [
                 buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
@@ -222,7 +222,7 @@ jobWrapper {
                 others: doPublishLocalArtifacts()
             )
         }
-    //}
+    }
 }
 
 def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
