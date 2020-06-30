@@ -89,16 +89,6 @@ for bt in "${BUILD_TYPES[@]}"; do
     done
 done
 
-if [[ ! -z $COPY ]]; then
-    rm -rf "${DESTINATION}/core"
-    mkdir -p "${DESTINATION}"
-    cp -R core "${DESTINATION}"
-else
-    v=$(git describe --tags)
-    rm -f "realm-core-cocoa-${v}.tar.xz"
-    tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
-fi
-
 # produce xcframeworks
 if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
@@ -129,4 +119,13 @@ if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
     done
 fi
 
-rm -rf temp
+# Package artifacts
+if [[ ! -z $COPY ]]; then
+    rm -rf "${DESTINATION}/core"
+    mkdir -p "${DESTINATION}"
+    cp -R core "${DESTINATION}"
+else
+    v=$(git describe --tags)
+    rm -f "realm-core-cocoa-${v}.tar.xz"
+    tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
+fi
