@@ -5,6 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Empty tables will not have a primary key column after upgrade ([#3795](https://github.com/realm/realm-core/issues/3795), since v6.0.7)
 * Calling ConstLst::find_first() immediately after advance_read() would give incorrect results ([Cocoa #6606](https://github.com/realm/realm-cocoa/issues/6606), since 6.0.0).
  
 ### Breaking changes

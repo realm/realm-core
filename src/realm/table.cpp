@@ -1267,8 +1267,10 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
 
     REALM_ASSERT(number_of_objects != size_t(-1));
 
-    if (m_clusters.size() == number_of_objects)
+    if (m_clusters.size() == number_of_objects) {
+        // We have migrated all objects
         return;
+    }
 
     /******************** Optionally create !OID accessor ********************/
 
@@ -1401,7 +1403,6 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         rot = RefOrTagged::make_tagged(max_key_value + 1);
         m_top.set(top_position_for_sequence_number, rot);
     }
-    this->do_set_primary_key_column(pk_col_key);
 
     commit_and_continue();
 #if 0
