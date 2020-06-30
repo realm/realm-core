@@ -639,7 +639,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 30, unit: 'MINUTES') {
+                    timeout(time: 45, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
