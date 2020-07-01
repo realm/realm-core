@@ -190,7 +190,7 @@ jobWrapper {
         stage('Aggregate') {
             parallel (
                 cocoa: {
-                    node('docker') {
+                    node('osx') {
                         getArchive()
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
