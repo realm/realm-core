@@ -11,7 +11,7 @@ org = tokens[tokens.size()-3]
 repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
-//jobWrapper {
+jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
         targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
@@ -52,9 +52,9 @@ branch = tokens[tokens.size()-1]
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
-        isPublishingRun = true//false
+        isPublishingRun = false
         if (gitTag) {
-            //isPublishingRun = currentBranch.contains('release')
+            isPublishingRun = currentBranch.contains('release')
         }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
@@ -102,7 +102,6 @@ branch = tokens[tokens.size()-1]
         nativeDocker: 'armhf-native.Dockerfile',
         nativeDockerPlatform: 'linux/arm/v7',
     ]
-    /*
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
@@ -133,10 +132,10 @@ branch = tokens[tokens.size()-1]
             parallelExecutors.putAll(extendedChecks)
         }
         parallel parallelExecutors
-    }*/
+    }
 
     if (isPublishingRun) {
-        /*stage('BuildPackages') {
+        stage('BuildPackages') {
             parallelExecutors = [
                 buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
                 buildMacOsRelease   : doBuildMacOs('Release', false),
@@ -187,7 +186,7 @@ branch = tokens[tokens.size()-1]
             }
 
             parallel parallelExecutors
-        }*/
+        }
         stage('Aggregate') {
             parallel (
                 cocoa: {
@@ -202,6 +201,19 @@ branch = tokens[tokens.size()-1]
                         stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
                         publishingStashes << stashName
                     }
+                },
+                android: {
+                    node('docker') {
+                        getArchive()
+                        for (androidStash in androidStashes) {
+                            unstash name: androidStash
+                        }
+                        sh 'tools/build-android.sh'
+                        archiveArtifacts('realm-core-android*.tar.gz')
+                        def stashName = 'android'
+                        stash includes: 'realm-core-android*.tar.gz', name: stashName
+                        publishingStashes << stashName
+                    }
                 }
             )
         }
@@ -211,7 +223,7 @@ branch = tokens[tokens.size()-1]
             )
         }
     }
-//}
+}
 
 def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
     return {
