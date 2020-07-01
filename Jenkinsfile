@@ -11,7 +11,7 @@ org = tokens[tokens.size()-3]
 repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
-jobWrapper {
+//jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
         targetBranch = isPullRequest ? env.CHANGE_TARGET : "none"
@@ -223,7 +223,7 @@ jobWrapper {
             )
         }
     }
-}
+//}
 
 def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
     return {
