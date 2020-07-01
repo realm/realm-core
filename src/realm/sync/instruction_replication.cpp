@@ -82,6 +82,10 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
             REALM_TERMINATE("as_payload() needs table/collection for links");
             break;
         }
+        case type_Mixed:
+            [[fallthrough]];
+        case type_OldTable:
+            [[fallthrough]];
         case type_OldDateTime:
             [[fallthrough]];
         case type_LinkList: {
