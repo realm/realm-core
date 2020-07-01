@@ -461,7 +461,7 @@ bool copy_linklist(LnkLst& ll_src, LnkLst& ll_dst, std::function<ObjKey(ObjKey)>
 //         }
 //     }
 
-//     void operator()(const Instruction::Set& instr)
+//     void operator()(const Instruction::Update& instr)
 //     {
 //         if (REALM_COVER_NEVER(!selected_table))
 //             return;

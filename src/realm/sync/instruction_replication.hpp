@@ -77,54 +77,17 @@ public:
     void erase_column(const Table*, ColKey col_key) override;
     void rename_column(const Table*, ColKey col_key, StringData name) override;
 
-    void set_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value, _impl::Instruction variant) override;
     void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value) override;
-    void set_bool(const Table*, ColKey col_key, ObjKey key, bool value, _impl::Instruction variant) override;
-    void set_float(const Table*, ColKey col_key, ObjKey key, float value, _impl::Instruction variant) override;
-    void set_double(const Table*, ColKey col_key, ObjKey key, double value, _impl::Instruction variant) override;
-    void set_string(const Table*, ColKey col_key, ObjKey key, StringData value, _impl::Instruction variant) override;
-    void set_binary(const Table*, ColKey col_key, ObjKey key, BinaryData value, _impl::Instruction variant) override;
-    void set_timestamp(const Table*, ColKey col_key, ObjKey key, Timestamp value,
-                       _impl::Instruction variant) override;
-    void set_object_id(const Table*, ColKey col_key, ObjKey key, ObjectId value, _impl::Instruction variant) override;
-    void set_decimal(const Table*, ColKey col_key, ObjKey key, Decimal128 value, _impl::Instruction variant) override;
-    void set_link(const Table*, ColKey col_key, ObjKey key, ObjKey value, _impl::Instruction variant) override;
-    void set_typed_link(const Table*, ColKey col_key, ObjKey key, ObjLink value, _impl::Instruction variant) override;
-    void set_null(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant) override;
-    void insert_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, StringData) override;
-    void erase_substring(const Table*, ColKey col_key, ObjKey key, size_t pos, size_t size) override;
+    void set(const Table*, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant) override;
 
-    void list_set_null(const ConstLstBase& list, size_t ndx) override;
-    void list_set_int(const ConstLstBase& list, size_t list_ndx, int64_t value) override;
-    void list_set_bool(const ConstLstBase& list, size_t list_ndx, bool value) override;
-    void list_set_float(const ConstLstBase& list, size_t list_ndx, float value) override;
-    void list_set_double(const ConstLstBase& list, size_t list_ndx, double value) override;
-    void list_set_string(const ConstLstBase& list, size_t list_ndx, StringData value) override;
-    void list_set_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value) override;
-    void list_set_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value) override;
-    void list_set_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value) override;
-    void list_set_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value) override;
-    void list_set_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value) override;
+    void list_set(const CollectionBase& list, size_t list_ndx, Mixed value) override;
+    void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value) override;
+    void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx) override;
+    void list_erase(const CollectionBase&, size_t link_ndx) override;
+    void list_clear(const CollectionBase&) override;
 
-    void list_insert_int(const ConstLstBase& list, size_t list_ndx, int64_t value) override;
-    void list_insert_bool(const ConstLstBase& list, size_t list_ndx, bool value) override;
-    void list_insert_float(const ConstLstBase& list, size_t list_ndx, float value) override;
-    void list_insert_double(const ConstLstBase& list, size_t list_ndx, double value) override;
-    void list_insert_string(const ConstLstBase& list, size_t list_ndx, StringData value) override;
-    void list_insert_binary(const ConstLstBase& list, size_t list_ndx, BinaryData value) override;
-    void list_insert_timestamp(const ConstLstBase& list, size_t list_ndx, Timestamp value) override;
-    void list_insert_object_id(const ConstLstBase& list, size_t list_ndx, ObjectId value) override;
-    void list_insert_decimal(const ConstLstBase& list, size_t list_ndx, Decimal128 value) override;
-    void list_insert_typed_link(const ConstLstBase& list, size_t list_ndx, ObjLink value) override;
 
     void remove_object(const Table*, ObjKey) override;
-
-    void list_insert_null(const ConstLstBase&, size_t ndx) override;
-    void list_set_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value) override;
-    void list_insert_link(const Lst<ObjKey>&, size_t link_ndx, ObjKey value) override;
-    void list_move(const ConstLstBase&, size_t from_link_ndx, size_t to_link_ndx) override;
-    void list_erase(const ConstLstBase&, size_t link_ndx) override;
-    void list_clear(const ConstLstBase&) override;
 
     //@{
 
@@ -164,26 +127,21 @@ private:
 
     // Returns true and populates m_last_class_name if instructions for the
     // owning table should be emitted.
-    bool select_list(const ConstLstBase&); // returns true if table behavior != ignored
+    bool select_collection(const CollectionBase&); // returns true if table behavior != ignored
 
     InternString emit_class_name(StringData table_name);
     InternString emit_class_name(const Table& table);
     Instruction::Payload::Type get_payload_type(DataType) const;
 
-    template <class T>
-    void set(const Table*, ColKey col_key, ObjKey row_ndx, T payload, _impl::Instruction variant);
-    template <class T>
-    void list_set(const ConstLstBase& Lst, size_t ndx, T payload);
-    template <class T>
-    void list_insert(const ConstLstBase& Lst, size_t ndx, T payload);
-    template <class T>
-    auto as_payload(T value);
+    Instruction::Payload as_payload(Mixed value);
+    Instruction::Payload as_payload(const CollectionBase& collection, Mixed value);
+    Instruction::Payload as_payload(const Table& table, ColKey col_key, Mixed value);
 
     Instruction::PrimaryKey as_primary_key(Mixed);
     Instruction::PrimaryKey primary_key_for_object(const Table&, ObjKey key);
     void populate_path_instr(Instruction::PathInstruction&, const Table&, ObjKey key, ColKey field);
-    void populate_path_instr(Instruction::PathInstruction&, const ConstLstBase&);
-    void populate_path_instr(Instruction::PathInstruction&, const ConstLstBase&, uint32_t ndx);
+    void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&);
+    void populate_path_instr(Instruction::PathInstruction&, const CollectionBase&, uint32_t ndx);
 
     // Cache information for the purpose of avoiding excessive string comparisons / interning
     // lookups.

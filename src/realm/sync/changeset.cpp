@@ -2,6 +2,7 @@
 
 #if REALM_DEBUG
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #endif // REALM_DEBUG
 
@@ -249,7 +250,7 @@ void Changeset::verify() const
                     verify_path(path_instr->path);
                 }
 
-                if (auto set_instr = instr->get_if<Instruction::Set>()) {
+                if (auto set_instr = instr->get_if<Instruction::Update>()) {
                     verify_payload(set_instr->value);
                 }
                 else if (auto insert_instr = instr->get_if<Instruction::ArrayInsert>()) {
@@ -305,12 +306,12 @@ void Changeset::Reflector::operator()(const Instruction::EraseTable& p) const
     table_instr(p);
 }
 
-void Changeset::Reflector::operator()(const Instruction::Set& p) const
+void Changeset::Reflector::operator()(const Instruction::Update& p) const
 {
     m_tracer.name("Set");
     path_instr(p);
     m_tracer.field("value", p.value);
-    if (p.is_array_set()) {
+    if (p.is_array_update()) {
         m_tracer.field("prior_size", p.prior_size);
     }
     else {

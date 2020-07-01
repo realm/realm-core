@@ -3198,7 +3198,7 @@ TEST(Table_ListOps)
 TEST(Table_ListOfPrimitives)
 {
     Group g;
-    std::vector<ConstLstBase*> lists;
+    std::vector<CollectionBase*> lists;
     TableRef t = g.add_table("table");
     ColKey int_col = t->add_column_list(type_Int, "integers");
     ColKey bool_col = t->add_column_list(type_Bool, "booleans");

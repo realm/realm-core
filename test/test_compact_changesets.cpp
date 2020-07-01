@@ -50,21 +50,21 @@ TEST_IF(CompactChangesets_RedundantSets, false)
 
     auto table = changeset.intern_string("Test");
 
-    Instruction::Set set1;
+    Instruction::Update set1;
     set1.table = table;
     set1.object = GlobalKey{1, 1};
     set1.field = changeset.intern_string("foo");
     set1.value = Instruction::Payload(int64_t(123));
     push(set1);
 
-    Instruction::Set set2;
+    Instruction::Update set2;
     set2.table = table;
     set2.object = GlobalKey{1, 1};
     set2.field = changeset.intern_string("foo");
     set2.value = Instruction::Payload(int64_t(345));
     push(set2);
 
-    Instruction::Set set3;
+    Instruction::Update set3;
     set3.table = table;
     set3.object = GlobalKey{1, 1};
     set3.field = changeset.intern_string("foo");
@@ -92,7 +92,7 @@ TEST_IF(CompactChangesets_DiscardsCreateErasePair, false)
     create_object.object = GlobalKey{1, 1};
     push(create_object);
 
-    Instruction::Set set;
+    Instruction::Update set;
     set.table = table;
     set.object = GlobalKey{1, 1};
     set.field = changeset.intern_string("foo");
@@ -126,7 +126,7 @@ TEST_IF(CompactChangesets_LinksRescueObjects, false)
     create_object.object = GlobalKey{1, 1};
     push(create_object);
 
-    Instruction::Set set;
+    Instruction::Update set;
     set.table = table;
     set.field = changeset.intern_string("foo");
     set.object = GlobalKey{1, 1};
@@ -221,7 +221,7 @@ TEST_IF(CompactChangesets_EraseRecreate, false)
     create_1.object = GlobalKey{1, 1};
     push(create_1);
 
-    Instruction::Set set_1;
+    Instruction::Update set_1;
     set_1.table = table;
     set_1.object = GlobalKey{1, 1};
     set_1.field = field;
@@ -238,7 +238,7 @@ TEST_IF(CompactChangesets_EraseRecreate, false)
     create_2.object = GlobalKey{1, 1};
     push(create_2);
 
-    Instruction::Set set_2;
+    Instruction::Update set_2;
     set_2.table = table;
     set_2.object = GlobalKey{1, 1};
     set_2.field = field;
@@ -269,7 +269,7 @@ TEST(CompactChangesets_PrimaryKeysRescueObjects)
     push(create_object);
 
 
-    Instruction::Set set;
+    Instruction::Update set;
     set.field = changeset.intern_string("foo");
     set.object = object_id_for_primary_key(123);
     set.payload = Instruction::Payload{int64_t(123)};
@@ -359,7 +359,7 @@ TEST_IF(CompactChangesets_Measure, false)
 
         auto set_foo_foo = [](B& builder, R& random, StringData& selected_table) {
             select_table("class_Foo", builder, selected_table);
-            Instruction::Set set;
+            Instruction::Update set;
             set.object = make_object_id(random);
             set.field = builder.intern_string("foo");
             set.payload = Instruction::Payload(random.draw_int<int64_t>(0, 10));
@@ -368,7 +368,7 @@ TEST_IF(CompactChangesets_Measure, false)
 
         auto set_foo_bar = [](B& builder, R& random, StringData& selected_table) {
             select_table("class_Foo", builder, selected_table);
-            Instruction::Set set;
+            Instruction::Update set;
             set.object = make_object_id(random);
             set.field = builder.intern_string("bar");
             set.payload = Instruction::Payload(builder.add_string_range(
@@ -380,7 +380,7 @@ TEST_IF(CompactChangesets_Measure, false)
 
         auto set_bar_foo = [](B& builder, R& random, StringData& selected_table) {
             select_table("class_Bar", builder, selected_table);
-            Instruction::Set set;
+            Instruction::Update set;
             set.object = make_object_id(random);
             set.field = builder.intern_string("foo");
             Instruction::Payload::Link link;
@@ -392,7 +392,7 @@ TEST_IF(CompactChangesets_Measure, false)
 
         auto set_bar_bar = [](B& builder, R& random, StringData& selected_table) {
             select_table("class_Bar", builder, selected_table);
-            Instruction::Set set;
+            Instruction::Update set;
             set.object = make_object_id(random);
             set.field = builder.intern_string("bar");
             set.payload = Instruction::Payload(random.draw_int<int64_t>(0, 10));

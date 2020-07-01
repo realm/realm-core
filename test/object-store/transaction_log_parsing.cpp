@@ -30,7 +30,7 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 
-#include <realm/db.hpp>
+#include <realm.hpp>
 #include <realm/history.hpp>
 
 using namespace realm;
@@ -57,7 +57,7 @@ public:
         _impl::CollectionChangeBuilder c;
         _impl::TransactionChangeInfo info{};
         info.tables[m_table_key.value];
-        info.lists.push_back({m_table_key, m_list.ConstLstBase::get_key().value, m_list.get_col_key().value, &c});
+        info.lists.push_back({m_table_key, m_list.CollectionBase::get_key().value, m_list.get_col_key().value, &c});
         _impl::transaction::advance(*m_group, info);
 
         if (info.lists.empty()) {

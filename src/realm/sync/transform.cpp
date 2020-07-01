@@ -1127,7 +1127,7 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_object(const Instruction::Set& left, const Instruction::ObjectInstruction& right) const
+    bool value_targets_object(const Instruction::Update& left, const Instruction::ObjectInstruction& right) const
     {
         return value_targets_object(left.value, right);
     }
@@ -1383,7 +1383,7 @@ DEFINE_MERGE(Instruction::EraseTable, Instruction::AddTable)
 
 DEFINE_MERGE_NOOP(Instruction::CreateObject, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::EraseObject, Instruction::AddTable);
-DEFINE_MERGE_NOOP(Instruction::Set, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::Update, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::AddTable);
@@ -1412,7 +1412,7 @@ DEFINE_MERGE(Instruction::EraseTable, Instruction::EraseTable)
 // Handled by nesting rule.
 DEFINE_MERGE_NOOP(Instruction::CreateObject, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::EraseObject, Instruction::EraseTable);
-DEFINE_MERGE_NOOP(Instruction::Set, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::Update, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::EraseTable);
 
 DEFINE_MERGE(Instruction::AddColumn, Instruction::EraseTable)
@@ -1460,7 +1460,7 @@ DEFINE_MERGE(Instruction::EraseObject, Instruction::CreateObject)
     }
 }
 
-DEFINE_MERGE_NOOP(Instruction::Set, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::Update, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::CreateObject);
@@ -1483,7 +1483,7 @@ DEFINE_NESTED_MERGE(Instruction::EraseObject)
 DEFINE_MERGE_NOOP(Instruction::EraseObject, Instruction::EraseObject);
 
 // Handled by nested merge.
-DEFINE_MERGE_NOOP(Instruction::Set, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::Update, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::EraseObject);
@@ -1497,7 +1497,7 @@ DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseObject);
 
 /// Set rules
 
-DEFINE_NESTED_MERGE(Instruction::Set)
+DEFINE_NESTED_MERGE(Instruction::Update)
 {
     // Setting a value higher up in the hierarchy overwrites any modification to
     // the inner value.
@@ -1508,17 +1508,17 @@ DEFINE_NESTED_MERGE(Instruction::Set)
     }
 }
 
-DEFINE_MERGE(Instruction::Set, Instruction::Set)
+DEFINE_MERGE(Instruction::Update, Instruction::Update)
 {
     // The two instructions are at the same level of nesting.
 
     if (same_path(left, right)) {
         bool left_is_default = false;
         bool right_is_default = false;
-        REALM_MERGE_ASSERT(left.is_array_set() == right.is_array_set());
+        REALM_MERGE_ASSERT(left.is_array_update() == right.is_array_update());
 
-        if (!left.is_array_set()) {
-            REALM_MERGE_ASSERT(!right.is_array_set());
+        if (!left.is_array_update()) {
+            REALM_MERGE_ASSERT(!right.is_array_update());
             left_is_default = left.is_default;
             right_is_default = right.is_default;
         }
@@ -1551,7 +1551,7 @@ DEFINE_MERGE(Instruction::Set, Instruction::Set)
     }
 }
 
-DEFINE_MERGE(Instruction::AddInteger, Instruction::Set)
+DEFINE_MERGE(Instruction::AddInteger, Instruction::Update)
 {
     // The two instructions are at the same level of nesting.
 
@@ -1563,7 +1563,7 @@ DEFINE_MERGE(Instruction::AddInteger, Instruction::Set)
 
         REALM_MERGE_ASSERT(right.value.type == Instruction::Payload::Type::Int || right.value.is_null());
 
-        bool right_is_default = !right.is_array_set() && right.is_default;
+        bool right_is_default = !right.is_array_update() && right.is_default;
 
         // Note: AddInteger survives SetDefault, regardless of timestamp.
         if (right_side.timestamp() < left_side.timestamp() || right_is_default) {
@@ -1585,19 +1585,19 @@ DEFINE_MERGE(Instruction::AddInteger, Instruction::Set)
     }
 }
 
-DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::Set);
+DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::Update);
 
-DEFINE_MERGE(Instruction::EraseColumn, Instruction::Set)
+DEFINE_MERGE(Instruction::EraseColumn, Instruction::Update)
 {
     if (same_column(left, right)) {
         right_side.discard();
     }
 }
 
-DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Set)
+DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Update)
 {
     if (same_container(left, right)) {
-        REALM_ASSERT(right.is_array_set());
+        REALM_ASSERT(right.is_array_update());
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         right.prior_size += 1;
         if (right.index() >= left.index()) {
@@ -1606,19 +1606,19 @@ DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Set)
     }
 }
 
-DEFINE_MERGE(Instruction::ArrayMove, Instruction::Set)
+DEFINE_MERGE(Instruction::ArrayMove, Instruction::Update)
 {
     if (same_container(left, right)) {
-        REALM_ASSERT(right.is_array_set());
+        REALM_ASSERT(right.is_array_update());
         // FIXME: This marks both sides as dirty, even when they are unmodified.
         merge_get_vs_move(right.index(), left.index(), left.ndx_2);
     }
 }
 
-DEFINE_MERGE(Instruction::ArrayErase, Instruction::Set)
+DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 {
     if (same_container(left, right)) {
-        REALM_ASSERT(right.is_array_set());
+        REALM_ASSERT(right.is_array_update());
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         right.prior_size -= 1;
 
@@ -1635,8 +1635,7 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Set)
 }
 
 // Handled by nested rule
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Set);
-
+DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Update);
 
 /// AddInteger rules
 

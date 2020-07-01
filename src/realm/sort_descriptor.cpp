@@ -20,6 +20,7 @@
 #include <realm/table.hpp>
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/list.hpp>
 
 using namespace realm;
 
@@ -206,8 +207,9 @@ void DistinctDescriptor::execute(IndexPairs& v, const Sorter& predicate, const B
     using IP = ColumnsDescriptor::IndexPair;
     // Remove all rows which have a null link along the way to the distinct columns
     if (predicate.has_links()) {
-        auto nulls =
-            std::remove_if(v.begin(), v.end(), [&](const IP& index) { return predicate.any_is_null(index); });
+        auto nulls = std::remove_if(v.begin(), v.end(), [&](const IP& index) {
+            return predicate.any_is_null(index);
+        });
         v.erase(nulls, v.end());
     }
 
@@ -215,15 +217,18 @@ void DistinctDescriptor::execute(IndexPairs& v, const Sorter& predicate, const B
     std::sort(v.begin(), v.end(), std::ref(predicate));
 
     // Move duplicates to the back - "not less than" is "equal" since they're sorted
-    auto duplicates =
-        std::unique(v.begin(), v.end(), [&](const IP& a, const IP& b) { return !predicate(a, b, false); });
+    auto duplicates = std::unique(v.begin(), v.end(), [&](const IP& a, const IP& b) {
+        return !predicate(a, b, false);
+    });
     // Erase the duplicates
     v.erase(duplicates, v.end());
     bool will_be_sorted_next = next && next->get_type() == DescriptorType::Sort;
     if (!will_be_sorted_next) {
         // Restore the original order, this is either the original
         // tableview order or the order of the previous sort
-        std::sort(v.begin(), v.end(), [](const IP& a, const IP& b) { return a.index_in_view < b.index_in_view; });
+        std::sort(v.begin(), v.end(), [](const IP& a, const IP& b) {
+            return a.index_in_view < b.index_in_view;
+        });
     }
 }
 
@@ -316,7 +321,6 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
         if (c) {
             return m_columns[t].ascending ? c < 0 : c > 0;
         }
-
     }
     // make sort stable by using original index as final comparison
     return total_ordering ? i.index_in_view < j.index_in_view : 0;
@@ -363,7 +367,7 @@ IncludeDescriptor::IncludeDescriptor(ConstTableRef table, const std::vector<std:
         backlink_source.reserve(links.size());
         ConstTableRef cur_table = table;
         size_t link_ndx = 0;
-        for (auto link : links) {  // follow path, one link at a time:
+        for (auto link : links) { // follow path, one link at a time:
             auto col_type = link.column_key.get_type();
             columns.push_back(link.column_key);
             backlink_source.push_back(link.from);
@@ -651,7 +655,8 @@ util::Optional<size_t> DescriptorOrdering::remove_all_limits()
                 min_limit = limit->get_limit();
             }
             it = m_descriptors.erase(it);
-        } else {
+        }
+        else {
             ++it;
         }
     }

@@ -1704,8 +1704,9 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
-        std::for_each(vec.begin(), vec.end(),
-                      [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
+        std::for_each(vec.begin(), vec.end(), [this, &state](ObjKey k) {
+            state.m_to_be_deleted.emplace_back(m_key, k);
+        });
         nullify_links(state);
         remove_recursive(state);
     }
@@ -3305,7 +3306,7 @@ ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
     return val.value();
 }
-}
+} // namespace
 
 template <class F, class T>
 void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_null)

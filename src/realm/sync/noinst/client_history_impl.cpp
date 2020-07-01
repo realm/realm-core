@@ -1458,7 +1458,7 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
 
                 // Fix up the payload for Set and ArrayInsert.
                 Instruction::Payload* payload = nullptr;
-                if (auto set_instr = instr->get_if<Instruction::Set>()) {
+                if (auto set_instr = instr->get_if<Instruction::Update>()) {
                     payload = &set_instr->value;
                 }
                 else if (auto list_insert_instr = instr->get_if<Instruction::ArrayInsert>()) {

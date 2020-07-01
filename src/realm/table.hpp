@@ -306,7 +306,10 @@ public:
     bool is_group_level() const noexcept;
 
     /// A Table accessor obtained from a frozen transaction is also frozen.
-    bool is_frozen() const noexcept { return m_is_frozen; }
+    bool is_frozen() const noexcept
+    {
+        return m_is_frozen;
+    }
 
     /// If this table is a group-level table, then this function returns the
     /// index of this table within the group. Otherwise it returns realm::npos.
@@ -594,13 +597,13 @@ private:
     {
         m_alloc.update_from_underlying_allocator(writable);
     }
-    Spec m_spec;            // 1st slot in m_top
-    ClusterTree m_clusters; // 3rd slot in m_top
+    Spec m_spec;                               // 1st slot in m_top
+    ClusterTree m_clusters;                    // 3rd slot in m_top
     std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
-    TableKey m_key;     // 4th slot in m_top
-    Array m_index_refs; // 5th slot in m_top
-    Array m_opposite_table;  // 7th slot in m_top
-    Array m_opposite_column; // 8th slot in m_top
+    TableKey m_key;                            // 4th slot in m_top
+    Array m_index_refs;                        // 5th slot in m_top
+    Array m_opposite_table;                    // 7th slot in m_top
+    Array m_opposite_column;                   // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
@@ -1018,7 +1021,6 @@ inline void Table::bump_content_version() const noexcept
 {
     m_alloc.bump_content_version();
 }
-
 
 
 inline size_t Table::get_column_count() const noexcept

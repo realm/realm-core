@@ -127,7 +127,9 @@ TEST(Transactions_Frozen)
     const int num_threads = 100;
     std::thread frozen_workers[num_threads];
     for (int j = 0; j < num_threads; ++j)
-        frozen_workers[j] = std::thread([&] { work_on_frozen(test_context, frozen); });
+        frozen_workers[j] = std::thread([&] {
+            work_on_frozen(test_context, frozen);
+        });
     for (int j = 0; j < num_threads; ++j)
         frozen_workers[j].join();
 }
@@ -1253,7 +1255,9 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // later deletion.
     util::Thread deleter;
     ConcurrentQueue<LnkLstPtr> queue(buffer_size);
-    deleter.start([&] { deleter_thread(queue); });
+    deleter.start([&] {
+        deleter_thread(queue);
+    });
     for (int i = 0; i < max_refs; ++i) {
         TableRef origin = rt->get_table("origin");
         int ndx = random.draw_int_mod(table_size);
@@ -1506,19 +1510,25 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     };
 
     // Break link by clearing table
-    perform_change([](Table& origin) { origin.clear(); });
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
     CHECK(!target_obj0.is_valid());
     CHECK(!target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 0);
 
     // Break link by nullifying
-    perform_change([&](Table& origin) { origin.get_object(1).set_null(col); });
+    perform_change([&](Table& origin) {
+        origin.get_object(1).set_null(col);
+    });
     CHECK(target_obj0.is_valid());
     CHECK(!target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([&](Table& origin) { origin.get_object(1).create_and_set_linked_object(col); });
+    perform_change([&](Table& origin) {
+        origin.get_object(1).create_and_set_linked_object(col);
+    });
     CHECK(target_obj0.is_valid());
     CHECK(!target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);
@@ -1586,22 +1596,30 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
 
     // Break link by clearing list
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).clear(); });
+    perform_change([&](Table& origin) {
+        origin.get_object(1).get_linklist(col).clear();
+    });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by removal from list
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).remove(0); });
+    perform_change([&](Table& origin) {
+        origin.get_object(1).get_linklist(col).remove(0);
+    });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).create_and_set_linked_object(0); });
+    perform_change([&](Table& origin) {
+        origin.get_object(1).get_linklist(col).create_and_set_linked_object(0);
+    });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);
 
     // Break link by clearing table
-    perform_change([](Table& origin) { origin.clear(); });
+    perform_change([](Table& origin) {
+        origin.clear();
+    });
     CHECK(!target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 0);
 }
@@ -1771,7 +1789,7 @@ public:
         return true;
     }
 
-    bool select_list(ColKey col_key, ObjKey obj_key)
+    bool select_collection(ColKey col_key, ObjKey obj_key)
     {
         m_current_linkview_col = col_key;
         m_current_linkview_row = obj_key;
@@ -1878,6 +1896,10 @@ public:
         return false;
     }
     bool list_move(size_t, size_t)
+    {
+        return false;
+    }
+    bool dictionary_insert(Mixed)
     {
         return false;
     }
@@ -3006,10 +3028,14 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     // FIXME: Use separate arrays for reader and writer threads for safety and readability.
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
-        threads[i].start([&] { multiple_trackers_writer_thread(sg); });
+        threads[i].start([&] {
+            multiple_trackers_writer_thread(sg);
+        });
     std::this_thread::yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].start([&] { multiple_trackers_reader_thread(test_context, sg); });
+        threads[write_thread_count + i].start([&] {
+            multiple_trackers_reader_thread(test_context, sg);
+        });
     }
 
     // Wait for all writer threads to complete
@@ -3121,7 +3147,6 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         int status;
         waitpid(readpids[i], &status, 0);
     }
-
 }
 
 #endif // !REALM_ANDROID && !REALM_IOS
@@ -3753,7 +3778,9 @@ void handover_querier(HandoverControl<Work>* control, TestContext& test_context,
     // to the initial version before even starting the writer.
     auto g = db->start_read();
     Thread writer;
-    writer.start([&] { handover_writer(db); });
+    writer.start([&] {
+        handover_writer(db);
+    });
     TableRef table = g->get_table("table");
     ColKeys cols = table->get_column_keys();
     TableView tv = table->where().greater(cols[0], 50).find_all();
@@ -3861,7 +3888,9 @@ TEST_IF(LangBindHelper_RacingAttachers, !running_with_tsan)
     }
     Thread attachers[num_attachers];
     for (int i = 0; i < num_attachers; ++i) {
-        attachers[i].start([&] { attacher(path, col); });
+        attachers[i].start([&] {
+            attacher(path, col);
+        });
     }
     for (int i = 0; i < num_attachers; ++i) {
         attachers[i].join();
@@ -3885,8 +3914,12 @@ TEST_IF(LangBindHelper_HandoverBetweenThreads, !running_with_valgrind)
 
     HandoverControl<Work> control;
     Thread querier, verifier;
-    querier.start([&] { handover_querier(&control, test_context, sg); });
-    verifier.start([&] { handover_verifier(&control, test_context); });
+    querier.start([&] {
+        handover_querier(&control, test_context, sg);
+    });
+    verifier.start([&] {
+        handover_verifier(&control, test_context);
+    });
     querier.join();
     verifier.join();
 }
@@ -5041,7 +5074,9 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
 
     Thread slaves[threads];
     for (int i = 0; i != threads; ++i) {
-        slaves[i].start([=] { async(); });
+        slaves[i].start([=] {
+            async();
+        });
     }
 
     // Main thread
@@ -5765,7 +5800,9 @@ TEST(LangBindHelper_callWithLock)
         CHECK(realm_path.compare(path) == 0);
     };
 
-    DB::CallbackWithLock callback_not_called = [=](const std::string&) { CHECK(false); };
+    DB::CallbackWithLock callback_not_called = [=](const std::string&) {
+        CHECK(false);
+    };
 
     // call_with_lock should run the callback if the lock file doesn't exist.
     CHECK_NOT(File::exists(path.get_lock_path()));
@@ -5982,7 +6019,9 @@ TEST(LangBindHelper_SchemaChangeNotification)
 
     auto rt = db->start_read();
     bool handler_called;
-    rt->set_schema_change_notification_handler([&handler_called]() { handler_called = true; });
+    rt->set_schema_change_notification_handler([&handler_called]() {
+        handler_called = true;
+    });
     CHECK(rt->has_schema_change_notification_handler());
 
     {

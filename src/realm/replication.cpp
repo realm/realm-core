@@ -44,9 +44,7 @@ public:
     {
     }
 
-    ~InputStreamImpl() noexcept
-    {
-    }
+    ~InputStreamImpl() noexcept {}
 
     bool next_block(const char*& begin, const char*& end) override
     {
@@ -63,45 +61,6 @@ public:
 };
 
 } // anonymous namespace
-
-template <>
-void Replication::set(const Table* table, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant)
-{
-    switch (value.get_type()) {
-        case type_Int:
-            set_int(table, col_key, key, value.get<Int>(), variant);
-            break;
-        case type_Bool:
-            set_bool(table, col_key, key, value.get<Bool>(), variant);
-            break;
-        case type_Float:
-            set_float(table, col_key, key, value.get<Float>(), variant);
-            break;
-        case type_Double:
-            set_double(table, col_key, key, value.get<Double>(), variant);
-            break;
-        case type_String:
-            set_string(table, col_key, key, value.get<String>(), variant);
-            break;
-        case type_Binary:
-            set_binary(table, col_key, key, value.get<Binary>(), variant);
-            break;
-        case type_Timestamp:
-            set_timestamp(table, col_key, key, value.get<Timestamp>(), variant);
-            break;
-        case type_Decimal:
-            set_decimal(table, col_key, key, value.get<Decimal128>(), variant);
-            break;
-        case type_ObjectId:
-            set_object_id(table, col_key, key, value.get<ObjectId>(), variant);
-            break;
-        case type_Link:
-            set_link(table, col_key, key, value.get<ObjKey>(), variant);
-            break;
-        default:
-            break;
-    }
-}
 
 std::string TrivialReplication::get_database_path() const
 {
@@ -133,15 +92,8 @@ void TrivialReplication::do_finalize_commit() noexcept
     finalize_changeset();
 }
 
-void TrivialReplication::do_abort_transact() noexcept
-{
-}
+void TrivialReplication::do_abort_transact() noexcept {}
 
-void TrivialReplication::do_interrupt() noexcept
-{
-}
+void TrivialReplication::do_interrupt() noexcept {}
 
-void TrivialReplication::do_clear_interrupt() noexcept
-{
-}
-
+void TrivialReplication::do_clear_interrupt() noexcept {}

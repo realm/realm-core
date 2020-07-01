@@ -8,7 +8,7 @@
 #include <realm/util/file.hpp>
 #include <realm/util/load_file.hpp>
 #include <realm/util/timestamp_logger.hpp>
-#include <realm/noinst/reopening_file_logger.hpp>
+#include <realm/sync/noinst/reopening_file_logger.hpp>
 #include <realm/sync/metrics.hpp>
 #include <realm/sync/server.hpp>
 #include <realm/sync/server_configuration.hpp>

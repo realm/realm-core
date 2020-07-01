@@ -2,6 +2,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/transform.hpp> // TransformError
 #include <realm/sync/object.hpp>
+#include <realm/list.hpp>
 
 namespace realm {
 namespace sync {
@@ -36,25 +37,106 @@ void SyncReplication::do_initiate_transact(Group& group, version_type current_ve
     reset();
 }
 
-template <class T>
-auto SyncReplication::as_payload(T value)
+Instruction::Payload SyncReplication::as_payload(Mixed value)
 {
-    return Instruction::Payload{value};
+    if (value.is_null()) {
+        return Instruction::Payload{};
+    }
+
+    switch (value.get_type()) {
+        case type_Int: {
+            return Instruction::Payload{value.get<int64_t>()};
+        }
+        case type_Bool: {
+            return Instruction::Payload{value.get<bool>()};
+        }
+        case type_Float: {
+            return Instruction::Payload{value.get<float>()};
+        }
+        case type_Double: {
+            return Instruction::Payload{value.get<double>()};
+        }
+        case type_String: {
+            auto str = value.get<StringData>();
+            auto range = m_encoder.add_string_range(str);
+            return Instruction::Payload{range};
+        }
+        case type_Binary: {
+            auto binary = value.get<BinaryData>();
+            auto range = m_encoder.add_string_range(StringData{binary.data(), binary.size()});
+            const bool is_binary = true;
+            return Instruction::Payload{range, is_binary};
+        }
+        case type_Timestamp: {
+            return Instruction::Payload{value.get<Timestamp>()};
+        }
+        case type_Decimal: {
+            return Instruction::Payload{value.get<Decimal128>()};
+        }
+        case type_ObjectId: {
+            return Instruction::Payload{value.get<ObjectId>()};
+        }
+        case type_TypedLink:
+            [[fallthrough]];
+        case type_Link: {
+            REALM_TERMINATE("as_payload() needs table/collection for links");
+            break;
+        }
+        case type_Mixed:
+            [[fallthrough]];
+        case type_OldTable:
+            [[fallthrough]];
+        case type_OldDateTime:
+            [[fallthrough]];
+        case type_LinkList: {
+            REALM_TERMINATE("Invalid payload type");
+            break;
+        }
+    }
+    return Instruction::Payload{};
 }
 
-template <>
-auto SyncReplication::as_payload(StringData value)
+Instruction::Payload SyncReplication::as_payload(const CollectionBase& collection, Mixed value)
 {
-    auto range = m_encoder.add_string_range(value);
-    return Instruction::Payload{range};
+    return as_payload(*collection.get_table(), collection.get_col_key(), value);
 }
 
-template <>
-auto SyncReplication::as_payload(BinaryData value)
+Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_key, Mixed value)
 {
-    auto range = m_encoder.add_string_range(StringData{value.data(), value.size()});
-    const bool is_binary = true;
-    return Instruction::Payload{range, is_binary};
+    if (value.is_null()) {
+        // FIXME: `Mixed::get_type()` asserts on null.
+        return Instruction::Payload{};
+    }
+
+    if (value.get_type() == type_Link) {
+        ConstTableRef target_table = table.get_link_target(col_key);
+        if (target_table->is_embedded()) {
+            // FIXME: Include target table name to support Mixed of Embedded Objects.
+            return Instruction::Payload::ObjectValue{};
+        }
+
+        Instruction::Payload::Link link;
+        link.target_table = emit_class_name(*target_table);
+        link.target = primary_key_for_object(*target_table, value.get<ObjKey>());
+        return Instruction::Payload{link};
+    }
+    else if (value.get_type() == type_TypedLink) {
+        auto obj_link = value.get<ObjLink>();
+        ConstTableRef target_table = m_transaction->get_table(obj_link.get_table_key());
+        REALM_ASSERT(target_table);
+
+        if (target_table->is_embedded()) {
+            REALM_TERMINATE("Dynamically typed embedded objects not supported yet.");
+        }
+
+        Instruction::Payload::Link link;
+        link.target_table = emit_class_name(*target_table);
+        link.target = primary_key_for_object(*target_table, obj_link.get_obj_key());
+        return Instruction::Payload{link};
+    }
+    else {
+        return as_payload(value);
+    }
 }
 
 InternString SyncReplication::emit_class_name(StringData table_name)
@@ -299,49 +381,37 @@ void SyncReplication::rename_column(const Table*, ColKey, StringData)
     unsupported_instruction();
 }
 
-template <class T>
-void SyncReplication::set(const Table* table, ColKey col, ObjKey key, T value, _impl::Instruction variant)
+void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed value)
 {
-    if (select_table(*table)) {
-        Instruction::Set instr;
-        populate_path_instr(instr, *table, key, col);
-        instr.value = as_payload(value);
-        instr.is_default = (variant == _impl::instr_SetDefault);
-        emit(instr);
-    }
-}
+    TrivialReplication::list_set(list, ndx, value);
 
-template <class T>
-void SyncReplication::list_set(const ConstLstBase& list, size_t ndx, T value)
-{
-    if (select_list(list)) {
-        Instruction::Set instr;
+    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        // If link is unresolved, it should not be communicated.
+        return;
+    }
+
+    if (select_collection(list)) {
+        Instruction::Update instr;
         populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_set());
-        instr.value = as_payload(value);
+        REALM_ASSERT(instr.is_array_update());
+        instr.value = as_payload(list, value);
         instr.prior_size = uint32_t(list.size());
         emit(instr);
     }
 }
 
-template <class T>
-void SyncReplication::list_insert(const ConstLstBase& list, size_t ndx, T value)
+void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value)
 {
-    if (select_list(list)) {
+    TrivialReplication::list_insert(list, ndx, value);
+
+    if (select_collection(list)) {
         auto sz = uint32_t(list.size());
         Instruction::ArrayInsert instr;
         populate_path_instr(instr, list, uint32_t(ndx));
-        instr.value = as_payload(value);
+        instr.value = as_payload(list, value);
         instr.prior_size = sz;
         emit(instr);
     }
-}
-
-void SyncReplication::set_int(const Table* table, ColKey col, ObjKey ndx, int_fast64_t value,
-                              _impl::Instruction variant)
-{
-    TrivialReplication::set_int(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
 }
 
 void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fast64_t value)
@@ -358,377 +428,24 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
     }
 }
 
-void SyncReplication::set_bool(const Table* table, ColKey col, ObjKey ndx, bool value, _impl::Instruction variant)
+void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed value, _impl::Instruction variant)
 {
-    TrivialReplication::set_bool(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
-}
+    TrivialReplication::set(table, col, key, value, variant);
 
-void SyncReplication::set_float(const Table* table, ColKey col, ObjKey ndx, float value, _impl::Instruction variant)
-{
-    TrivialReplication::set_float(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
-}
-
-void SyncReplication::set_double(const Table* table, ColKey col, ObjKey ndx, double value, _impl::Instruction variant)
-{
-    TrivialReplication::set_double(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
-}
-
-void SyncReplication::set_string(const Table* table, ColKey col, ObjKey ndx, StringData value,
-                                 _impl::Instruction variant)
-{
-    TrivialReplication::set_string(table, col, ndx, value, variant);
-
-    if (value.is_null()) {
-        set(table, col, ndx, realm::util::none, variant);
-    }
-    else {
-        set(table, col, ndx, value, variant);
-    }
-}
-
-void SyncReplication::set_binary(const Table* table, ColKey col, ObjKey ndx, BinaryData value,
-                                 _impl::Instruction variant)
-{
-    TrivialReplication::set_binary(table, col, ndx, value, variant);
-
-    if (value.is_null()) {
-        set(table, col, ndx, realm::util::none, variant);
-    }
-    else {
-        set(table, col, ndx, value, variant);
-    }
-}
-
-void SyncReplication::set_timestamp(const Table* table, ColKey col, ObjKey ndx, Timestamp value,
-                                    _impl::Instruction variant)
-{
-    TrivialReplication::set_timestamp(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
-}
-
-void SyncReplication::set_object_id(const Table* table, ColKey col, ObjKey ndx, ObjectId value,
-                                    _impl::Instruction variant)
-{
-    TrivialReplication::set_object_id(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
-}
-
-void SyncReplication::set_decimal(const Table* table, ColKey col, ObjKey ndx, Decimal128 value,
-                                  _impl::Instruction variant)
-{
-    TrivialReplication::set_decimal(table, col, ndx, value, variant);
-    set(table, col, ndx, value, variant);
-}
-
-void SyncReplication::set_link(const Table* table, ColKey col, ObjKey ndx, ObjKey value, _impl::Instruction variant)
-{
-    TrivialReplication::set_link(table, col, ndx, value, variant);
-
-    if (value.is_unresolved()) {
-        // If link is unresolved, it should not be communicated
+    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        // If link is unresolved, it should not be communicated.
         return;
     }
-    if (select_table(*table)) {
-        if (value) {
-            Instruction::Payload::Link link;
-            ConstTableRef link_target_table = table->get_link_target(col);
-            if (link_target_table->is_embedded()) {
-                using Payload = Instruction::Payload;
-
-                Instruction::Set instr;
-                populate_path_instr(instr, *table, ndx, col);
-                if (value) {
-                    instr.value = Payload::ObjectValue{};
-                }
-                else {
-                    instr.value = Payload{util::none};
-                }
-                emit(instr);
-            }
-            else {
-                link.target_table = emit_class_name(*link_target_table);
-                link.target = primary_key_for_object(*link_target_table, value);
-                set(table, col, ndx, link, variant);
-            }
-        }
-        else {
-            set(table, col, ndx, realm::util::none, variant);
-        }
-    }
-}
-
-void SyncReplication::set_typed_link(const Table* table, ColKey col, ObjKey ndx, ObjLink value,
-                                     _impl::Instruction variant)
-{
-    TrivialReplication::set_typed_link(table, col, ndx, value, variant);
 
     if (select_table(*table)) {
-        if (value) {
-            Instruction::Payload::Link link;
-            ConstTableRef link_target_table = m_transaction->get_table(value.get_table_key());
-            REALM_ASSERT(link_target_table);
-
-            if (link_target_table->is_embedded()) {
-                REALM_TERMINATE("Mixed with embedded objects not supported yet.");
-            }
-
-            link.target_table = emit_class_name(*link_target_table);
-            link.target = primary_key_for_object(*link_target_table, value.get_obj_key());
-            set(table, col, ndx, link, variant);
-        }
-        else {
-            set(table, col, ndx, realm::util::none, variant);
-        }
-    }
-}
-
-void SyncReplication::set_null(const Table* table, ColKey col, ObjKey ndx, _impl::Instruction variant)
-{
-    TrivialReplication::set_null(table, col, ndx, variant);
-    set(table, col, ndx, realm::util::none, variant);
-}
-
-void SyncReplication::insert_substring(const Table*, ColKey, ObjKey, size_t, StringData)
-{
-    unsupported_instruction();
-}
-
-void SyncReplication::erase_substring(const Table*, ColKey, ObjKey, size_t, size_t)
-{
-    unsupported_instruction();
-}
-
-void SyncReplication::list_set_null(const ConstLstBase& list, size_t ndx)
-{
-    TrivialReplication::list_set_null(list, ndx);
-    list_set(list, ndx, util::none);
-}
-
-void SyncReplication::list_set_int(const ConstLstBase& list, size_t ndx, int64_t value)
-{
-    TrivialReplication::list_set_int(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_bool(const ConstLstBase& list, size_t ndx, bool value)
-{
-    TrivialReplication::list_set_bool(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_float(const ConstLstBase& list, size_t ndx, float value)
-{
-    TrivialReplication::list_set_float(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_double(const ConstLstBase& list, size_t ndx, double value)
-{
-    TrivialReplication::list_set_double(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_string(const ConstLstBase& list, size_t ndx, StringData value)
-{
-    TrivialReplication::list_set_string(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_binary(const ConstLstBase& list, size_t ndx, BinaryData value)
-{
-    TrivialReplication::list_set_binary(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_timestamp(const ConstLstBase& list, size_t ndx, Timestamp value)
-{
-    TrivialReplication::list_set_timestamp(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_object_id(const ConstLstBase& list, size_t ndx, ObjectId value)
-{
-    TrivialReplication::list_set_object_id(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_decimal(const ConstLstBase& list, size_t ndx, Decimal128 value)
-{
-    TrivialReplication::list_set_decimal(list, ndx, value);
-    list_set(list, ndx, value);
-}
-
-void SyncReplication::list_set_typed_link(const ConstLstBase& list, size_t ndx, ObjLink value)
-{
-    TrivialReplication::list_set_typed_link(list, ndx, value);
-
-    if (select_list(list)) {
-        Instruction::Set instr;
-        populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_set());
-
-        ConstTableRef target_table = m_transaction->get_table(value.get_table_key());
-        REALM_ASSERT(target_table);
-
-        if (target_table->is_embedded()) {
-            REALM_TERMINATE("Mixed with embedded objects not supported yet.");
-        }
-        else {
-            Instruction::Payload::Link link;
-            link.target_table = emit_class_name(*target_table);
-            link.target = primary_key_for_object(*target_table, value.get_obj_key());
-            instr.value = Instruction::Payload{link};
-        }
-        instr.prior_size = uint32_t(list.size());
+        Instruction::Update instr;
+        populate_path_instr(instr, *table, key, col);
+        instr.value = as_payload(*table, col, value);
+        instr.is_default = (variant == _impl::instr_SetDefault);
         emit(instr);
     }
 }
 
-void SyncReplication::list_set_link(const Lst<ObjKey>& list, size_t ndx, ObjKey value)
-{
-    TrivialReplication::list_set_link(list, ndx, value);
-
-    if (value.is_unresolved()) {
-        // If link is unresolved, it should not be communicated
-        return;
-    }
-    if (select_list(list)) {
-        Instruction::Set instr;
-        populate_path_instr(instr, list, uint32_t(ndx));
-        REALM_ASSERT(instr.is_array_set());
-
-        ConstTableRef target_table = list.get_table()->get_link_target(list.get_col_key());
-        if (target_table->is_embedded()) {
-            if (value) {
-                instr.value = Instruction::Payload::ObjectValue{};
-            }
-            else {
-                // ArraySet(null) is not yet supported by Core, so this will
-                // never happen in practice. The only way to erase an embedded
-                // object in a list is to remove the entry.
-                instr.value = Instruction::Payload{};
-            }
-        }
-        else {
-            Instruction::Payload::Link link;
-            link.target_table = emit_class_name(*target_table);
-            link.target = primary_key_for_object(*target_table, value);
-            instr.value = Instruction::Payload{link};
-        }
-        instr.prior_size = uint32_t(list.size());
-        emit(instr);
-    }
-}
-
-void SyncReplication::list_insert_null(const ConstLstBase& list, size_t ndx)
-{
-    TrivialReplication::list_insert_null(list, ndx);
-    list_insert(list, ndx, util::none);
-}
-
-void SyncReplication::list_insert_int(const ConstLstBase& list, size_t ndx, int64_t value)
-{
-    TrivialReplication::list_insert_int(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_bool(const ConstLstBase& list, size_t ndx, bool value)
-{
-    TrivialReplication::list_insert_bool(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_float(const ConstLstBase& list, size_t ndx, float value)
-{
-    TrivialReplication::list_insert_float(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_double(const ConstLstBase& list, size_t ndx, double value)
-{
-    TrivialReplication::list_insert_double(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_string(const ConstLstBase& list, size_t ndx, StringData value)
-{
-    TrivialReplication::list_insert_string(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_binary(const ConstLstBase& list, size_t ndx, BinaryData value)
-{
-    TrivialReplication::list_insert_binary(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_timestamp(const ConstLstBase& list, size_t ndx, Timestamp value)
-{
-    TrivialReplication::list_insert_timestamp(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_object_id(const ConstLstBase& list, size_t ndx, ObjectId value)
-{
-    TrivialReplication::list_insert_object_id(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_decimal(const ConstLstBase& list, size_t ndx, Decimal128 value)
-{
-    TrivialReplication::list_insert_decimal(list, ndx, value);
-    list_insert(list, ndx, value);
-}
-
-void SyncReplication::list_insert_typed_link(const ConstLstBase& list, size_t ndx, ObjLink value)
-{
-    TrivialReplication::list_insert_typed_link(list, ndx, value);
-
-    if (select_list(list)) {
-        Instruction::ArrayInsert instr;
-        populate_path_instr(instr, list, uint32_t(ndx));
-
-        ConstTableRef target_table = m_transaction->get_table(value.get_table_key());
-        REALM_ASSERT(target_table);
-
-        if (target_table->is_embedded()) {
-            REALM_TERMINATE("Mixed with embedded objects not supported yet.");
-        }
-        else {
-            Instruction::Payload::Link link;
-            link.target_table = emit_class_name(*target_table);
-            link.target = primary_key_for_object(*target_table, value.get_obj_key());
-            instr.value = Instruction::Payload{link};
-        }
-        instr.prior_size = uint32_t(list.size());
-        emit(instr);
-    }
-}
-
-void SyncReplication::list_insert_link(const Lst<ObjKey>& list, size_t ndx, ObjKey value)
-{
-    TrivialReplication::list_insert_link(list, ndx, value);
-
-    if (select_list(list)) {
-        Instruction::ArrayInsert instr;
-        populate_path_instr(instr, list, uint32_t(ndx));
-        ConstTableRef target_table = list.get_table()->get_link_target(list.get_col_key());
-        if (target_table->is_embedded()) {
-            instr.value = Instruction::Payload::ObjectValue{};
-        }
-        else {
-            auto link = Instruction::Payload::Link{emit_class_name(*target_table),
-                                                   primary_key_for_object(*target_table, value)};
-            instr.value = Instruction::Payload{link};
-        }
-        instr.prior_size = uint32_t(list.size());
-
-        emit(instr);
-    }
-}
 
 void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 {
@@ -750,10 +467,10 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 }
 
 
-void SyncReplication::list_move(const ConstLstBase& view, size_t from_ndx, size_t to_ndx)
+void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, size_t to_ndx)
 {
     TrivialReplication::list_move(view, from_ndx, to_ndx);
-    if (select_list(view)) {
+    if (select_collection(view)) {
         Instruction::ArrayMove instr;
         populate_path_instr(instr, view, uint32_t(from_ndx));
         instr.ndx_2 = uint32_t(to_ndx);
@@ -761,11 +478,11 @@ void SyncReplication::list_move(const ConstLstBase& view, size_t from_ndx, size_
     }
 }
 
-void SyncReplication::list_erase(const ConstLstBase& view, size_t ndx)
+void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
 {
     size_t prior_size = view.size();
     TrivialReplication::list_erase(view, ndx);
-    if (select_list(view)) {
+    if (select_collection(view)) {
         Instruction::ArrayErase instr;
         populate_path_instr(instr, view, uint32_t(ndx));
         instr.prior_size = uint32_t(prior_size);
@@ -773,11 +490,11 @@ void SyncReplication::list_erase(const ConstLstBase& view, size_t ndx)
     }
 }
 
-void SyncReplication::list_clear(const ConstLstBase& view)
+void SyncReplication::list_clear(const CollectionBase& view)
 {
     size_t prior_size = view.size();
     TrivialReplication::list_clear(view);
-    if (select_list(view)) {
+    if (select_collection(view)) {
         Instruction::ArrayClear instr;
         populate_path_instr(instr, view);
         instr.prior_size = uint32_t(prior_size);
@@ -790,9 +507,9 @@ void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey nd
     TrivialReplication::nullify_link(table, col_ndx, ndx);
 
     if (select_table(*table)) {
-        Instruction::Set instr;
+        Instruction::Update instr;
         populate_path_instr(instr, *table, ndx, col_ndx);
-        REALM_ASSERT(!instr.is_array_set());
+        REALM_ASSERT(!instr.is_array_update());
         instr.value = Instruction::Payload{realm::util::none};
         instr.is_default = false;
         emit(instr);
@@ -803,7 +520,7 @@ void SyncReplication::link_list_nullify(const Lst<ObjKey>& view, size_t ndx)
 {
     size_t prior_size = view.size();
     TrivialReplication::link_list_nullify(view, ndx);
-    if (select_list(view)) {
+    if (select_collection(view)) {
         Instruction::ArrayErase instr;
         populate_path_instr(instr, view, uint32_t(ndx));
         instr.prior_size = uint32_t(prior_size);
@@ -839,7 +556,7 @@ bool SyncReplication::select_table(const Table& table)
     }
 }
 
-bool SyncReplication::select_list(const ConstLstBase& view)
+bool SyncReplication::select_collection(const CollectionBase& view)
 {
     return select_table(*view.get_table());
 }
@@ -946,7 +663,7 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     }
 }
 
-void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const ConstLstBase& list)
+void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list)
 {
     ConstTableRef source_table = list.get_table();
     ObjKey source_obj = list.get_key();
@@ -954,7 +671,8 @@ void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, c
     populate_path_instr(instr, *source_table, source_obj, source_field);
 }
 
-void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const ConstLstBase& list, uint32_t ndx)
+void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const CollectionBase& list,
+                                          uint32_t ndx)
 {
     populate_path_instr(instr, list);
     instr.path.m_path.push_back(ndx);
