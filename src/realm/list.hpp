@@ -580,7 +580,7 @@ inline void LnkLst::remove(size_t from, size_t to)
 
 inline void LnkLst::clear()
 {
-    // Lst<ObjKey>::clear();
+    Lst<ObjKey>::clear();
     m_unresolved.clear();
 }
 
