@@ -92,7 +92,8 @@ void TransactLogConvenientEncoder::list_clear(const CollectionBase& list)
 
 void TransactLogConvenientEncoder::link_list_nullify(const Lst<ObjKey>& list, size_t link_ndx)
 {
-    list_erase(list, link_ndx);
+    select_collection(list);
+    m_encoder.list_erase(link_ndx);
 }
 
 REALM_NORETURN

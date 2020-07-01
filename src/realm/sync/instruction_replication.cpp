@@ -99,6 +99,11 @@ Instruction::Payload SyncReplication::as_payload(const CollectionBase& collectio
 
 Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_key, Mixed value)
 {
+    if (value.is_null()) {
+        // FIXME: `Mixed::get_type()` asserts on null.
+        return Instruction::Payload{};
+    }
+
     if (value.get_type() == type_Link) {
         ConstTableRef target_table = table.get_link_target(col_key);
         if (target_table->is_embedded()) {
@@ -374,6 +379,13 @@ void SyncReplication::rename_column(const Table*, ColKey, StringData)
 
 void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed value)
 {
+    TrivialReplication::list_set(list, ndx, value);
+
+    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+        // If link is unresolved, it should not be communicated.
+        return;
+    }
+
     if (select_collection(list)) {
         Instruction::Update instr;
         populate_path_instr(instr, list, uint32_t(ndx));
@@ -386,6 +398,8 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 
 void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value)
 {
+    TrivialReplication::list_insert(list, ndx, value);
+
     if (select_collection(list)) {
         auto sz = uint32_t(list.size());
         Instruction::ArrayInsert instr;
@@ -414,7 +428,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 {
     TrivialReplication::set(table, col, key, value, variant);
 
-    if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
         // If link is unresolved, it should not be communicated.
         return;
     }
