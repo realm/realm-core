@@ -104,79 +104,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
     return {};
 }
 
-/********************************* LstBase **********************************/
-
-void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
-{
-    if (ndx2 < ndx1)
-        std::swap(ndx1, ndx2);
-    repl->list_move(*this, ndx2, ndx1);
-    if (ndx1 + 1 != ndx2)
-        repl->list_move(*this, ndx1 + 1, ndx2);
-}
-
-
-template <class T>
-Lst<T>::Lst(const Obj& obj, ColKey col_key)
-    : Collection<T, LstBase>(obj, col_key)
-{
-    if (m_obj) {
-        Collection<T, LstBase>::init_from_parent();
-    }
-}
-
 /****************************** Lst aggregates *******************************/
-
-// This will be defined when using C++17
-template <typename... Ts>
-struct make_void {
-    typedef void type;
-};
-template <typename... Ts>
-using void_t = typename make_void<Ts...>::type;
-
-
-template <class T, class = void>
-struct MinHelper {
-    template <class U>
-    static Mixed eval(U&, size_t*)
-    {
-        return Mixed{};
-    }
-};
-
-template <class T>
-struct MinHelper<T, void_t<ColumnMinMaxType<T>>> {
-    template <class U>
-    static Mixed eval(U& tree, size_t* return_ndx)
-    {
-        return Mixed(bptree_minimum<T>(tree, return_ndx));
-    }
-};
-
-template <class T>
-Mixed Lst<T>::min(size_t* return_ndx) const
-{
-    return MinHelper<T>::eval(*m_tree, return_ndx);
-}
-
-template <class T>
-Mixed Lst<T>::max(size_t* return_ndx) const
-{
-    return MaxHelper<T>::eval(*m_tree, return_ndx);
-}
-
-template <class T>
-Mixed Lst<T>::sum(size_t* return_cnt) const
-{
-    return SumHelper<T>::eval(*m_tree, return_cnt);
-}
-
-template <class T>
-Mixed Lst<T>::avg(size_t* return_cnt) const
-{
-    return AverageHelper<T>::eval(*m_tree, return_cnt);
-}
 
 template <class T>
 void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
@@ -225,26 +153,6 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
     }
 }
 
-
-/************************* template instantiations ***************************/
-
-template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<bool>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<bool>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<float>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<float>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<double>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<double>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
-template Lst<BinaryData>::Lst(const Obj& obj, ColKey col_key);
-template Lst<Timestamp>::Lst(const Obj& obj, ColKey col_key);
-template Lst<ObjKey>::Lst(const Obj& obj, ColKey col_key);
-template Lst<Decimal128>::Lst(const Obj& obj, ColKey col_key);
-template Lst<ObjectId>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<ObjectId>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<Mixed>::Lst(const Obj& obj, ColKey col_key);
-template Lst<ObjLink>::Lst(const Obj& obj, ColKey col_key);
 
 /********************************* Lst<Key> *********************************/
 
@@ -596,24 +504,9 @@ void LnkLst::sync_if_needed() const
     }
 }
 
-#ifdef _WIN32
-// For some strange reason these functions needs to be explicitly instantiated
-// on Visual Studio 2017. Otherwise the code is not generated.
-template void Lst<ObjKey>::add(ObjKey target_key);
-template void Lst<ObjKey>::insert(size_t ndx, ObjKey target_key);
-template ObjKey Lst<ObjKey>::remove(size_t ndx);
-template void Lst<ObjKey>::clear();
-template void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
-template void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
-template void Lst<ObjKey>::do_remove(size_t ndx);
-
-template void Lst<ObjLink>::do_insert(size_t ndx, ObjLink target_key);
-template void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_key);
-template void Lst<ObjLink>::do_remove(size_t ndx);
-
-template void Lst<Mixed>::do_insert(size_t ndx, Mixed target_key);
-template void Lst<Mixed>::do_set(size_t ndx, Mixed target_key);
-template void Lst<Mixed>::do_remove(size_t ndx);
-#endif
+// Force instantiation:
+template class Lst<ObjKey>;
+template class Lst<Mixed>;
+template class Lst<ObjLink>;
 
 } // namespace realm
