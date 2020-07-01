@@ -102,6 +102,7 @@ branch = tokens[tokens.size()-1]
         nativeDocker: 'armhf-native.Dockerfile',
         nativeDockerPlatform: 'linux/arm/v7',
     ]
+    /*
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
@@ -132,10 +133,10 @@ branch = tokens[tokens.size()-1]
             parallelExecutors.putAll(extendedChecks)
         }
         parallel parallelExecutors
-    }
+    }*/
 
     if (isPublishingRun) {
-        stage('BuildPackages') {
+        /*stage('BuildPackages') {
             parallelExecutors = [
                 buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
                 buildMacOsRelease   : doBuildMacOs('Release', false),
@@ -186,7 +187,7 @@ branch = tokens[tokens.size()-1]
             }
 
             parallel parallelExecutors
-        }
+        }*/
         stage('Aggregate') {
             parallel (
                 cocoa: {
@@ -199,19 +200,6 @@ branch = tokens[tokens.size()-1]
                         archiveArtifacts('realm-core-cocoa*.tar.xz')
                         def stashName = 'cocoa'
                         stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                        publishingStashes << stashName
-                    }
-                },
-                android: {
-                    node('docker') {
-                        getArchive()
-                        for (androidStash in androidStashes) {
-                            unstash name: androidStash
-                        }
-                        sh 'tools/build-android.sh'
-                        archiveArtifacts('realm-core-android*.tar.gz')
-                        def stashName = 'android'
-                        stash includes: 'realm-core-android*.tar.gz', name: stashName
                         publishingStashes << stashName
                     }
                 }
