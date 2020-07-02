@@ -84,3 +84,45 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 1);
     }
 }
+
+
+TEST(Set_Mixed)
+{
+    Group g;
+
+    auto t = g.add_table("foo");
+    auto col_set = t->add_column_set(type_Mixed, "mixeds");
+    auto obj = t->create_object();
+
+    auto set = obj.get_set<Mixed>("mixeds");
+    set.insert(123);
+    set.insert(123);
+    set.insert(123);
+    CHECK_EQUAL(set.size(), 1);
+    CHECK_EQUAL(set.get(0), Mixed(123));
+
+    // Sets of Mixed should be ordered by their type index (as specified by the `DataType` enum).
+    set.insert(56.f);
+    set.insert("Hello, World!");
+    set.insert(util::none);
+    set.insert(util::none);
+    set.insert("Hello, World!");
+    CHECK_EQUAL(set.size(), 4);
+
+    CHECK_EQUAL(set.get(0), Mixed{});
+    CHECK_EQUAL(set.get(1), Mixed{123});
+    CHECK_EQUAL(set.get(2), Mixed{"Hello, World!"});
+    CHECK_EQUAL(set.get(3), Mixed{56.f});
+
+    // Sets of Mixed can be sorted.
+    std::vector<Mixed> sorted;
+    std::vector<size_t> sorted_indices;
+    set.sort(sorted_indices);
+    std::transform(begin(sorted_indices), end(sorted_indices), std::back_inserter(sorted), [&](size_t index) {
+        return set.get(index);
+    });
+    CHECK(std::equal(begin(sorted), end(sorted), set.begin()));
+    auto sorted2 = sorted;
+    std::sort(begin(sorted2), end(sorted2));
+    CHECK(sorted2 == sorted);
+}
