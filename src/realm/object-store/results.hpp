@@ -344,7 +344,7 @@ private:
         Obj get(Table const& table, size_t ndx);
 
     private:
-        std::unique_ptr<Table::ConstIterator> m_it;
+        std::unique_ptr<Table::Iterator> m_it;
     } m_table_iterator;
 
     util::CheckedOptionalMutex m_mutex;

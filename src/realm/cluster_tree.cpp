@@ -733,6 +733,8 @@ ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for
 {
 }
 
+ClusterTree::~ClusterTree() {}
+
 TableRef ClusterTree::get_table_ref() const
 {
     REALM_ASSERT(m_owner != nullptr);
@@ -808,47 +810,6 @@ bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
     return was_updated;
 }
 
-void ClusterTree::clear(CascadeState& state)
-{
-    size_t num_cols = get_spec().get_public_column_count();
-    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        auto col_key = m_owner->spec_ndx2colkey(col_ndx);
-        if (StringIndex* index = m_owner->get_search_index(col_key)) {
-            index->clear();
-        }
-    }
-
-    if (state.m_group) {
-        remove_all_links(state); // This will also delete objects loosing their last strong link
-    }
-
-    // We no longer have "clear table" instruction, so we have to report the removal of each
-    // object individually
-    auto table = m_owner;
-    if (Replication* repl = table->get_repl()) {
-        // Go through all clusters
-        traverse([repl, table](const Cluster* cluster) {
-            auto sz = cluster->node_size();
-            for (size_t i = 0; i < sz; i++) {
-                repl->remove_object(table, cluster->get_real_key(i));
-            }
-            // Continue
-            return false;
-        });
-    }
-
-    m_root->destroy_deep();
-
-    auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
-    leaf->create(m_owner->num_leaf_cols());
-    replace_root(std::move(leaf));
-
-    bump_content_version();
-    bump_storage_version();
-
-    m_size = 0;
-}
-
 void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state)
 {
     ref_type new_sibling_ref = m_root->insert(k, init_values, state);
@@ -865,7 +826,7 @@ void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterN
     m_size++;
 }
 
-Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
+ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
 {
     ClusterNode::State state;
     FieldValues init_values(values);
@@ -956,7 +917,7 @@ Obj ClusterTree::insert(ObjKey k, const FieldValues& values)
     bump_content_version();
     bump_storage_version();
 
-    return Obj(get_table_ref(), state.mem, k, state.index);
+    return state;
 }
 
 bool ClusterTree::is_valid(ObjKey k) const
@@ -965,21 +926,21 @@ bool ClusterTree::is_valid(ObjKey k) const
     return m_root->try_get(k, state);
 }
 
-Obj ClusterTree::get(ObjKey k) const
+ClusterNode::State ClusterTree::get(ObjKey k) const
 {
     ClusterNode::State state;
     m_root->get(k, state);
-    return Obj(get_table_ref(), state.mem, k, state.index);
+    return state;
 }
 
-Obj ClusterTree::get(size_t ndx) const
+ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {
         throw std::out_of_range("Object was deleted");
     }
     ClusterNode::State state;
-    ObjKey k = m_root->get(ndx, state);
-    return Obj(get_table_ref(), state.mem, k, state.index);
+    k = m_root->get(ndx, state);
+    return state;
 }
 
 size_t ClusterTree::get_ndx(ObjKey k) const
@@ -1126,65 +1087,6 @@ const Spec& ClusterTree::get_spec() const
     return tf::get_spec(*m_owner);
 }
 
-void ClusterTree::remove_all_links(CascadeState& state)
-{
-    Allocator& alloc = get_alloc();
-    // This function will add objects that should be deleted to 'state'
-    auto func = [this, &state, &alloc](const Cluster* cluster) {
-        auto remove_link_from_column = [&](ColKey col_key) {
-            // Prevent making changes to table that is going to be removed anyway
-            // Furthermore it is a prerequisite for using 'traverse' that the tree
-            // is not modified
-            if (m_owner->links_to_self(col_key)) {
-                return false;
-            }
-            auto col_type = col_key.get_type();
-            if (col_type == col_type_Link) {
-                ArrayKey values(alloc);
-                cluster->init_leaf(col_key, &values);
-                size_t sz = values.size();
-                for (size_t i = 0; i < sz; i++) {
-                    if (ObjKey key = values.get(i)) {
-                        cluster->remove_backlinks(cluster->get_real_key(i), col_key, {key}, state);
-                    }
-                }
-            }
-            else if (col_type == col_type_LinkList) {
-                ArrayInteger values(alloc);
-                cluster->init_leaf(col_key, &values);
-                size_t sz = values.size();
-                BPlusTree<ObjKey> links(alloc);
-                for (size_t i = 0; i < sz; i++) {
-                    if (ref_type ref = values.get_as_ref(i)) {
-                        links.init_from_ref(ref);
-                        if (links.size() > 0) {
-                            cluster->remove_backlinks(cluster->get_real_key(i), col_key, links.get_all(), state);
-                        }
-                    }
-                }
-            }
-            else if (col_type == col_type_BackLink) {
-                ArrayBacklink values(alloc);
-                cluster->init_leaf(col_key, &values);
-                values.set_parent(const_cast<Cluster*>(cluster),
-                                  col_key.get_index().val + Cluster::s_first_col_index);
-                size_t sz = values.size();
-                for (size_t i = 0; i < sz; i++) {
-                    values.nullify_fwd_links(i, state);
-                }
-            }
-            return false;
-        };
-        get_owner()->for_each_and_every_column(remove_link_from_column);
-        // Continue
-        return false;
-    };
-
-    // Go through all clusters
-    traverse(func);
-
-    m_owner->remove_recursive(state);
-}
 
 void ClusterTree::verify() const
 {
@@ -1202,7 +1104,7 @@ void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
     m_root->nullify_incoming_links(obj_key, state);
 }
 
-ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
+ClusterTree::Iterator::Iterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)
     , m_leaf(0, t.get_alloc(), t)
     , m_state(m_leaf)
@@ -1222,14 +1124,13 @@ ClusterTree::ConstIterator::ConstIterator(const ClusterTree& t, size_t ndx)
         m_leaf_start_pos = 0;
     }
     else {
-        m_obj = const_cast<ClusterTree&>(m_tree).get(ndx);
-        m_key = m_obj.get_key();
-        m_state.init(m_obj);
+        auto s = const_cast<ClusterTree&>(m_tree).get(ndx, m_key);
+        m_state.init(s, m_key);
         m_leaf_start_pos = ndx - m_state.m_current_index;
     }
 }
 
-ClusterTree::ConstIterator::ConstIterator(const ConstIterator& other)
+ClusterTree::Iterator::Iterator(const Iterator& other)
     : m_tree(other.m_tree)
     , m_leaf(0, m_tree.get_alloc(), m_tree)
     , m_state(m_leaf)
@@ -1246,7 +1147,7 @@ ClusterTree::ConstIterator::ConstIterator(const ConstIterator& other)
     m_leaf_start_pos = m_position - m_state.m_current_index;
 }
 
-size_t ClusterTree::ConstIterator::get_position()
+size_t ClusterTree::Iterator::get_position()
 {
     try {
         return m_tree.get_ndx(m_key);
@@ -1257,7 +1158,7 @@ size_t ClusterTree::ConstIterator::get_position()
     return 0; // dummy
 }
 
-ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
+ObjKey ClusterTree::Iterator::load_leaf(ObjKey key) const
 {
     m_storage_version = m_tree.get_storage_version(m_instance_version);
     // 'key' may or may not exist. If it does not exist, state is updated
@@ -1273,7 +1174,7 @@ ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
     }
 }
 
-auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
+ObjKey ClusterTree::Iterator::go(size_t n)
 {
     if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         // reload
@@ -1284,28 +1185,27 @@ auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
     auto abs_pos = n + m_position;
 
     auto leaf_node_size = m_leaf.node_size();
+    ObjKey k;
     if (abs_pos < m_leaf_start_pos || abs_pos >= (m_leaf_start_pos + leaf_node_size)) {
         if (abs_pos >= m_tree.size()) {
             throw std::out_of_range("Index out of range");
         }
         // Find cluster holding requested position
-        m_obj = const_cast<ClusterTree&>(m_tree).get(abs_pos);
-        m_state.init(m_obj);
-        m_leaf_start_pos = abs_pos - m_state.m_current_index;
+
+        auto s = m_tree.get(abs_pos, k);
+        m_state.init(s, k);
+        m_leaf_start_pos = abs_pos - s.index;
     }
     else {
         m_state.m_current_index = (abs_pos - m_leaf_start_pos);
-        auto key = m_leaf.get_real_key(m_state.m_current_index);
-        new (&m_obj) Obj(m_tree.get_table_ref(), m_leaf.get_mem(), key, m_state.m_current_index);
+        k = m_leaf.get_real_key(m_state.m_current_index);
     }
-
     // The state no longer corresponds to m_key
     m_leaf_invalid = true;
-
-    return m_obj;
+    return k;
 }
 
-ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
+bool ClusterTree::Iterator::update() const
 {
     if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         ObjKey k = load_leaf(m_key);
@@ -1313,20 +1213,14 @@ ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
         if (m_leaf_invalid) {
             throw std::runtime_error("Outdated iterator");
         }
-        // Object still exists, but storage version changed so update
-        new (&m_obj) Obj(m_tree.get_table_ref(), m_leaf.get_mem(), m_key, m_state.m_current_index);
+        return true;
     }
 
     REALM_ASSERT(m_leaf.is_attached());
-
-    if (m_key != m_obj.get_key()) {
-        new (&m_obj) Obj(m_tree.get_table_ref(), m_leaf.get_mem(), m_key, m_state.m_current_index);
-    }
-
-    return &m_obj;
+    return false;
 }
 
-ClusterTree::ConstIterator& Table::ConstIterator::operator++()
+ClusterTree::Iterator& ClusterTree::Iterator::operator++()
 {
     if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         ObjKey k = load_leaf(m_key);
@@ -1350,7 +1244,7 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator++()
     return *this;
 }
 
-ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
+ClusterTree::Iterator& ClusterTree::Iterator::operator+=(ptrdiff_t adj)
 {
     // If you have to jump far away and thus have to load many leaves,
     // this function will be slow
@@ -1379,9 +1273,8 @@ ClusterTree::ConstIterator& Table::ConstIterator::operator+=(ptrdiff_t adj)
         }
         else {
             if (m_position < m_tree.size()) {
-                m_obj = const_cast<ClusterTree&>(m_tree).get(m_position);
-                m_key = m_obj.get_key();
-                m_state.init(m_obj);
+                auto s = const_cast<ClusterTree&>(m_tree).get(m_position, m_key);
+                m_state.init(s, m_key);
                 m_leaf_start_pos = m_position - m_state.m_current_index;
             }
             else {

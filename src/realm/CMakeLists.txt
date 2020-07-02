@@ -24,6 +24,7 @@ set(REALM_SOURCES
     cluster.cpp
     collection.cpp
     cluster_tree.cpp
+    table_cluster_tree.cpp
     column_binary.cpp
     decimal128.cpp
     disable_sync_to_disk.cpp
@@ -126,6 +127,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     chunked_binary.hpp
     cluster.hpp
     cluster_tree.hpp
+    table_cluster_tree.hpp
     collection.hpp
     column_binary.hpp
     column_integer.hpp

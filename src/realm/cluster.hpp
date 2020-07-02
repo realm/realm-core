@@ -67,7 +67,7 @@ public:
         }
         IteratorState(const IteratorState&);
         void clear();
-        void init(const Obj&);
+        void init(State&, ObjKey);
 
         Cluster& m_current_leaf;
         int64_t m_key_offset = 0;
@@ -266,6 +266,9 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    friend class ClusterTree;
+    friend class TableClusterTree;
+
     static constexpr size_t s_key_ref_or_size_index = 0;
     static constexpr size_t s_first_col_index = 1;
 
@@ -273,7 +276,7 @@ private:
     {
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
-    friend class ClusterTree;
+
     void insert_row(size_t ndx, ObjKey k, const FieldValues& init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>

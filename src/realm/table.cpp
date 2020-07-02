@@ -518,7 +518,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -1677,7 +1677,7 @@ void Table::ensure_graveyard()
         REALM_ASSERT(!m_top.get(top_position_for_tombstones));
         MemRef mem = ClusterTree::create_empty_cluster(m_alloc);
         m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
-        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         m_tombstones->init_from_parent();
         for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
             ts->insert_column(col);
@@ -3048,22 +3048,12 @@ void Table::remove_object_recursive(ObjKey key)
     }
 }
 
-Table::ConstIterator Table::begin() const
-{
-    return ConstIterator(m_clusters, 0);
-}
-
-Table::ConstIterator Table::end() const
-{
-    return ConstIterator(m_clusters, size());
-}
-
-Table::Iterator Table::begin()
+Table::Iterator Table::begin() const
 {
     return Iterator(m_clusters, 0);
 }
 
-Table::Iterator Table::end()
+Table::Iterator Table::end() const
 {
     return Iterator(m_clusters, size());
 }

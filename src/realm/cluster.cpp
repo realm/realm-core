@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include "realm/cluster_tree.hpp"
+#include "realm/cluster.hpp"
 #include "realm/table.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_basic.hpp"
@@ -31,7 +31,6 @@
 #include "realm/array_ref.hpp"
 #include "realm/array_typed_link.hpp"
 #include "realm/array_backlink.hpp"
-#include "realm/index_string.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include <iostream>
@@ -48,11 +47,11 @@ void ClusterNode::IteratorState::clear()
     m_current_index = size_t(-1);
 }
 
-void ClusterNode::IteratorState::init(const Obj& obj)
+void ClusterNode::IteratorState::init(State& s, ObjKey key)
 {
-    m_current_leaf.init(obj.m_mem);
-    m_current_index = obj.m_row_ndx;
-    m_key_offset = obj.get_key().value - m_current_leaf.get_key_value(obj.m_row_ndx);
+    m_current_leaf.init(s.mem);
+    m_current_index = s.index;
+    m_key_offset = key.value - m_current_leaf.get_key_value(m_current_index);
     m_current_leaf.set_offset(m_key_offset);
 }
 
