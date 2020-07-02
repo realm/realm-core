@@ -50,6 +50,7 @@ public:
     using Collection<T, SetBase>::size;
     using Collection<T, SetBase>::begin;
     using Collection<T, SetBase>::end;
+    using Collection<T, SetBase>::get;
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
@@ -81,7 +82,6 @@ public:
 private:
     using Collection<T, SetBase>::m_valid;
     using Collection<T, SetBase>::m_obj;
-    using Collection<T, SetBase>::get;
 
     void create()
     {
