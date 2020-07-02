@@ -1283,6 +1283,49 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     CHECK(pk_col);
 }
 
+TEST_IF(Upgrade_Database_9_10_encrypted, REALM_ENABLE_ENCRYPTION)
+{
+    // Same as test above - just with an encrypted file - and without dogs
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_encrypted.realm";
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    DBOptions options;
+    options.encryption_key = "abcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefgh";
+    {
+        auto sg = DB::create(*hist, options);
+        ReadTransaction rt(sg);
+        rt.get_group().verify();
+        // rt.get_group().to_json(std::cout);
+
+        ConstTableRef t_object = rt.get_table("class_object");
+        ConstTableRef t_origin = rt.get_table("class_link origin");
+
+        auto pk_col = t_object->get_primary_key_column();
+        CHECK(pk_col);
+        CHECK_EQUAL(t_object->get_column_name(pk_col), "pk");
+        auto hello_key = t_object->find_first_string(pk_col, "hello");
+        auto obj1 = t_object->get_object(hello_key);
+        CHECK_EQUAL(obj1.get<Int>("value"), 7);
+
+        pk_col = t_origin->get_primary_key_column();
+        CHECK(pk_col);
+        CHECK_EQUAL(t_origin->get_column_name(pk_col), "pk");
+        auto key_6 = t_origin->find_first_int(pk_col, 6);
+        auto obj2 = t_origin->get_object(key_6);
+        CHECK_EQUAL(obj2.get<ObjKey>("object"), hello_key);
+    }
+    {
+        // Check that the file can be opened after upgrade
+        auto sg = DB::create(*hist, options);
+        ReadTransaction rt(sg);
+        rt.get_group().verify();
+    }
+}
+
 TEST(Upgrade_Database_9_10_with_oid)
 {
     /* File has this content:
