@@ -247,6 +247,11 @@ public:
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     template <typename U>
+    Set<U> get_set(StringData col_name) const
+    {
+        return get_set<U>(get_column_key(col_name));
+    }
+    template <typename U>
     Set<U> get_set(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
 
