@@ -64,6 +64,11 @@ struct AnyContext
     T unbox(const util::Any& wrapper) {
         return util::any_cast<T>(wrapper);
     }
+    template <typename T>
+    bool is_type(const util::Any& wrapper)
+    {
+        return wrapper.type() == typeid(T);
+    }
     bool is_null(const util::Any& wrapper) {
         if (!wrapper.has_value()) {
             return true;
@@ -85,9 +90,20 @@ public:
     virtual BinaryData binary_for_argument(size_t argument_index) = 0;
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual ObjKey object_index_for_argument(size_t argument_index) = 0;
-    virtual ObjectId objectid_for_argument(size_t i) = 0;
-    virtual Decimal128 decimal128_for_argument(size_t i) = 0;
+    virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
+    virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
+    virtual bool is_argument_bool(size_t argument_index) = 0;
+    virtual bool is_argument_long(size_t argument_index) = 0;
+    virtual bool is_argument_float(size_t argument_index) = 0;
+    virtual bool is_argument_double(size_t argument_index) = 0;
+    virtual bool is_argument_string(size_t argument_index) = 0;
+    virtual bool is_argument_binary(size_t argument_index) = 0;
+    virtual bool is_argument_timestamp(size_t argument_index) = 0;
+    virtual bool is_argument_object_index(size_t argument_index) = 0;
+    virtual bool is_argument_objectid(size_t argument_index) = 0;
+    virtual bool is_argument_decimal128(size_t argument_index) = 0;
+
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
     std::vector<util::StringBuffer> buffer_space;
@@ -112,9 +128,9 @@ public:
     ObjectId objectid_for_argument(size_t i) override
     {
         // allow construction of an ObjectId from a Timestamp arg
-        if (at(i).type() == typeid(Timestamp)) {
-            return ObjectId(get<Timestamp>(i));
-        }
+        //        if (at(i).type() == typeid(Timestamp)) {
+        //            return ObjectId(get<Timestamp>(i));
+        //        }
         return get<ObjectId>(i);
     }
     Decimal128 decimal128_for_argument(size_t i) override
@@ -131,6 +147,53 @@ public:
             return get<Timestamp>(i).is_null();
         }
         return m_ctx.is_null(at(i));
+    }
+
+    bool is_argument_bool(size_t argument_index) override
+    {
+        return argument_is_type<bool>(argument_index);
+    }
+    bool is_argument_long(size_t argument_index) override
+    {
+        return argument_is_type<long>(argument_index);
+    }
+    bool is_argument_float(size_t argument_index) override
+    {
+        return argument_is_type<float>(argument_index);
+    }
+    bool is_argument_double(size_t argument_index) override
+    {
+        return argument_is_type<double>(argument_index);
+    }
+    bool is_argument_string(size_t argument_index) override
+    {
+        return argument_is_type<String>(argument_index);
+    }
+    bool is_argument_binary(size_t argument_index) override
+    {
+        return argument_is_type<Binary>(argument_index);
+    }
+    bool is_argument_timestamp(size_t argument_index) override
+    {
+        return argument_is_type<Timestamp>(argument_index);
+    }
+    bool is_argument_object_index(size_t argument_index) override
+    {
+        return argument_is_type<ObjKey>(argument_index);
+    }
+    bool is_argument_objectid(size_t argument_index) override
+    {
+        return argument_is_type<ObjectId>(argument_index);
+    }
+    bool is_argument_decimal128(size_t argument_index) override
+    {
+        return argument_is_type<Decimal128>(argument_index);
+    }
+
+    template <typename T>
+    bool argument_is_type(size_t i)
+    {
+        return m_ctx.template is_type<T>(at(i));
     }
 
 private:
@@ -212,6 +275,46 @@ public:
         throw NoArgsError();
     }
     bool is_argument_null(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_bool(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_long(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_float(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_double(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_string(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_binary(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_timestamp(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_object_index(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_objectid(size_t)
+    {
+        throw NoArgsError();
+    }
+    bool is_argument_decimal128(size_t)
     {
         throw NoArgsError();
     }

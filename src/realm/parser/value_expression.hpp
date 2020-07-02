@@ -32,9 +32,31 @@ struct ValueExpression
 
     ValueExpression(query_builder::Arguments* args, const parser::Expression* v);
     bool is_null();
+    template <typename T>
+    bool is_type();
     template <typename RetType>
     RetType value_of_type_for_query();
 };
+
+template <typename T>
+bool ValueExpression::is_type()
+{
+    try {
+        if constexpr (std::is_same_v<T, Timestamp>) {
+            if (value->type == parser::Expression::Type::Timestamp) {
+                return true;
+            }
+        }
+        if (value->type == parser::Expression::Type::Null) {
+            return false;
+        }
+        value_of_type_for_query<T>();
+    }
+    catch (const std::exception& e) {
+        return false;
+    }
+    return true;
+}
 
 } // namespace parser
 } // namespace realm

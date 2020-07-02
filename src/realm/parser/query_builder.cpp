@@ -20,6 +20,7 @@
 
 #include "parser.hpp"
 #include "parser_utils.hpp"
+#include "property_expression.hpp"
 #include "expression_container.hpp"
 
 #include <realm.hpp>
@@ -378,41 +379,56 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
                                             lhs. template value_of_type_for_query<Timestamp>(),
                                             rhs. template value_of_type_for_query<Timestamp>());
             break;
-        case type_Double:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Double>(),
-                                            rhs. template value_of_type_for_query<Double>());
-            break;
-        case type_Float:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Float>(),
-                                            rhs. template value_of_type_for_query<Float>());
-            break;
-        case type_Int:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Int>(),
-                                            rhs. template value_of_type_for_query<Int>());
-            break;
-        case type_String:
-            add_string_constraint_to_query(query, cmp,
-                                           lhs. template value_of_type_for_query<String>(),
-                                           rhs. template value_of_type_for_query<String>());
-            break;
-        case type_Binary:
-            add_binary_constraint_to_query(query, cmp,
-                                           lhs. template value_of_type_for_query<Binary>(),
-                                           rhs. template value_of_type_for_query<Binary>());
-            break;
-        case type_Link:
-            add_link_constraint_to_query(query, cmp.op, lhs, rhs);
-            break;
+            //        case type_Double:
+            //            add_numeric_constraint_to_query(query, cmp.op,
+            //                                            lhs. template value_of_type_for_query<Double>(),
+            //                                            rhs. template value_of_type_for_query<Double>());
+            //            break;
+            //        case type_Float:
+            //            add_numeric_constraint_to_query(query, cmp.op,
+            //                                            lhs. template value_of_type_for_query<Float>(),
+            //                                            rhs. template value_of_type_for_query<Float>());
+            //            break;
+            //        case type_Int:
+            //            add_numeric_constraint_to_query(query, cmp.op,
+            //                                            lhs. template value_of_type_for_query<Int>(),
+            //                                            rhs. template value_of_type_for_query<Int>());
+            //            break;
+            //        case type_String:
+            //            add_string_constraint_to_query(query, cmp,
+            //                                           lhs. template value_of_type_for_query<String>(),
+            //                                           rhs. template value_of_type_for_query<String>());
+            //            break;
+            //        case type_Binary:
+            //            add_binary_constraint_to_query(query, cmp,
+            //                                           lhs. template value_of_type_for_query<Binary>(),
+            //                                           rhs. template value_of_type_for_query<Binary>());
+            //            break;
+            //        case type_Link:
+            //            add_link_constraint_to_query(query, cmp.op, lhs, rhs);
+            //            break;
         case type_ObjectId:
+            if constexpr (std::is_same_v<B, ValueExpression>) {
+                if (rhs.template is_type<Timestamp>()) {
+                    add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
+                                                    rhs.template value_of_type_for_query<Timestamp>());
+                    break;
+                }
+            }
+            if constexpr (std::is_same_v<A, ValueExpression>) {
+                if (lhs.template is_type<Timestamp>()) {
+                    add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Timestamp>(),
+                                                    rhs.template value_of_type_for_query<ObjectId>());
+                    break;
+                }
+            }
             add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
                                             rhs.template value_of_type_for_query<ObjectId>());
             break;
-        case type_Decimal:
-            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Decimal128>(),
-                                            rhs.template value_of_type_for_query<Decimal128>());
+            //        case type_Decimal:
+            //            add_numeric_constraint_to_query(query, cmp.op, lhs.template
+            //            value_of_type_for_query<Decimal128>(),
+            //                                            rhs.template value_of_type_for_query<Decimal128>());
             break;
         default:
             throw std::logic_error(util::format("Object type '%1' not supported", data_type_to_str(type)));
