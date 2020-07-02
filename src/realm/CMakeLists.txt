@@ -23,6 +23,7 @@ set(REALM_SOURCES
     chunked_binary.cpp
     cluster.cpp
     collection.cpp
+    cluster_tree.cpp
     column_binary.cpp
     decimal128.cpp
     disable_sync_to_disk.cpp

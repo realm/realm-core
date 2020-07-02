@@ -165,6 +165,14 @@ public:
     }
 
 protected:
+#if REALM_MAX_BPNODE_SIZE > 256
+    static constexpr int node_shift_factor = 8;
+#else
+    static constexpr int node_shift_factor = 2;
+#endif
+
+    static constexpr size_t cluster_node_size = 1 << node_shift_factor;
+
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
     uint64_t m_offset;
