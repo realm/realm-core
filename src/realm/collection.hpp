@@ -381,11 +381,11 @@ protected:
  */
 template <class T, class Interface>
 struct Collection<T, Interface>::iterator {
-    typedef std::bidirectional_iterator_tag iterator_category;
-    typedef const T value_type;
-    typedef ptrdiff_t difference_type;
-    typedef const T* pointer;
-    typedef const T& reference;
+    using iterator_category = std::bidirectional_iterator_tag;
+    using value_type = const T;
+    using difference_type = ptrdiff_t;
+    using pointer = const T*;
+    using reference = const T&;
 
     iterator(const Collection<T, Interface>* l, size_t ndx)
         : m_list(l)
