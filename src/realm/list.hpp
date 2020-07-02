@@ -92,11 +92,7 @@ public:
     Lst& operator=(const Lst& other);
     Lst& operator=(const BPlusTree<T>& other);
 
-    void create()
-    {
-        m_tree->create();
-        m_valid = true;
-    }
+    void create();
 
     // Overriding members of CollectionBase:
     Mixed min(size_t* return_ndx = nullptr) const final;
@@ -106,116 +102,21 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
-    void set_null(size_t ndx) override
-    {
-        set(ndx, BPlusTree<T>::default_value(m_nullable));
-    }
+    // Overriding members of LstBase:
+    void set_null(size_t ndx) override;
+    void insert_null(size_t ndx) override;
+    void insert_any(size_t ndx, Mixed val) override;
+    void resize(size_t new_size) override;
+    void remove(size_t from, size_t to) override;
+    void move(size_t from, size_t to) override;
+    void swap(size_t ndx1, size_t ndx2) override;
+    void clear() override;
 
-    void insert_null(size_t ndx) override
-    {
-        insert(ndx, BPlusTree<T>::default_value(m_nullable));
-    }
-
-    void insert_any(size_t ndx, Mixed val) override
-    {
-        if constexpr (std::is_same_v<T, Mixed>) {
-            insert(ndx, val);
-        }
-        else {
-            if (val.is_null()) {
-                insert_null(ndx);
-            }
-            else {
-                insert(ndx, val.get<typename util::RemoveOptional<T>::type>());
-            }
-        }
-    }
-
-    void resize(size_t new_size) override
-    {
-        update_if_needed();
-        size_t current_size = m_tree->size();
-        while (new_size > current_size) {
-            insert_null(current_size++);
-        }
-        remove(new_size, current_size);
-        m_obj.bump_both_versions();
-    }
-
-    void add(T value)
-    {
-        insert(size(), value);
-    }
-
+    void add(T value);
     T set(size_t ndx, T value);
-
     void insert(size_t ndx, T value);
-
-    T remove(const LstIterator<T>& it)
-    {
-        return remove(CollectionBase::adjust(it.m_ndx));
-    }
-
+    T remove(const LstIterator<T>& it);
     T remove(size_t ndx);
-
-    void remove(size_t from, size_t to) override
-    {
-        while (from < to) {
-            remove(--to);
-        }
-    }
-
-    void move(size_t from, size_t to) override
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
-        if (from != to) {
-            this->ensure_writeable();
-            if (Replication* repl = this->m_obj.get_replication()) {
-                repl->list_move(*this, from, to);
-            }
-            if (to > from) {
-                to++;
-            }
-            else {
-                from++;
-            }
-            // We use swap here as it handles the special case for StringData where
-            // 'to' and 'from' points into the same array. In this case you cannot
-            // set an entry with the result of a get from another entry in the same
-            // leaf.
-            m_tree->insert(to, BPlusTree<T>::default_value(m_nullable));
-            m_tree->swap(from, to);
-            m_tree->erase(from);
-
-            m_obj.bump_content_version();
-        }
-    }
-
-    void swap(size_t ndx1, size_t ndx2) override
-    {
-        REALM_ASSERT_DEBUG(!update_if_needed());
-        if (ndx1 != ndx2) {
-            if (Replication* repl = this->m_obj.get_replication()) {
-                LstBase::swap_repl(repl, ndx1, ndx2);
-            }
-            m_tree->swap(ndx1, ndx2);
-            m_obj.bump_content_version();
-        }
-    }
-
-    void clear() override
-    {
-        ensure_created();
-        update_if_needed();
-        this->ensure_writeable();
-        if (size() > 0) {
-            if (Replication* repl = this->m_obj.get_replication()) {
-                repl->list_clear(*this);
-            }
-            m_tree->clear();
-            m_obj.bump_content_version();
-        }
-    }
 
     using Collection<T, LstBase>::m_col_key;
 
@@ -225,37 +126,173 @@ protected:
     using Collection<T, LstBase>::m_obj;
     using Collection<T, LstBase>::init_from_parent;
 
-    bool update_if_needed()
-    {
-        if (m_obj.update_if_needed()) {
-            return init_from_parent();
-        }
-        return false;
-    }
-    void ensure_created()
-    {
-        if (!m_valid && m_obj.is_valid()) {
-            create();
-        }
-    }
-    void do_set(size_t ndx, T value)
-    {
-        m_tree->set(ndx, value);
-    }
-    void do_insert(size_t ndx, T value)
-    {
-        m_tree->insert(ndx, value);
-    }
-    void do_remove(size_t ndx)
-    {
-        m_tree->erase(ndx);
-    }
+    bool update_if_needed();
+    void ensure_created();
+    void do_set(size_t ndx, T value);
+    void do_insert(size_t ndx, T value);
+    void do_remove(size_t ndx);
 };
 
+// Specialization of Lst<ObjKey>:
+template <>
+void Lst<ObjKey>::clear();
+template <>
+void Lst<ObjKey>::do_set(size_t, ObjKey);
+template <>
+void Lst<ObjKey>::do_insert(size_t, ObjKey);
+template <>
+void Lst<ObjKey>::do_remove(size_t);
+extern template class Lst<ObjKey>;
+
+// Specialization of Lst<Mixed>:
+template <>
+void Lst<Mixed>::do_set(size_t, Mixed);
+template <>
+void Lst<Mixed>::do_insert(size_t, Mixed);
+template <>
+void Lst<Mixed>::do_remove(size_t);
+extern template class Lst<Mixed>;
+
+// Specialization of Lst<ObjLink>:
+template <>
+void Lst<ObjLink>::do_set(size_t, ObjLink);
+template <>
+void Lst<ObjLink>::do_insert(size_t, ObjLink);
+template <>
+void Lst<ObjLink>::do_remove(size_t);
+extern template class Lst<ObjLink>;
+
+class LnkLst : public Lst<ObjKey>, public ObjList {
+public:
+    LnkLst() = default;
+
+    LnkLst(const Obj& owner, ColKey col_key);
+    LnkLst(const LnkLst& other)
+        : Lst<ObjKey>(other)
+        , m_unresolved(other.m_unresolved)
+    {
+    }
+    LnkLst& operator=(const LnkLst& other)
+    {
+        Lst<ObjKey>::operator=(other);
+        m_unresolved = other.m_unresolved;
+        return *this;
+    }
+
+    LnkLstPtr clone() const
+    {
+        if (m_obj.is_valid()) {
+            return std::make_unique<LnkLst>(m_obj, m_col_key);
+        }
+        else {
+            return std::make_unique<LnkLst>();
+        }
+    }
+    TableRef get_target_table() const override
+    {
+        return m_obj.get_target_table(m_col_key);
+    }
+    bool is_in_sync() const override
+    {
+        return true;
+    }
+    size_t size() const override
+    {
+        auto full_sz = Lst<ObjKey>::size();
+        return full_sz - m_unresolved.size();
+    }
+
+    bool has_unresolved() const noexcept
+    {
+        return !m_unresolved.empty();
+    }
+
+    bool is_obj_valid(size_t) const noexcept override
+    {
+        // A link list cannot contain null values
+        return true;
+    }
+
+    Obj get_object(size_t ndx) const override;
+
+    Obj operator[](size_t ndx)
+    {
+        return get_object(ndx);
+    }
+
+    using Lst<ObjKey>::find_first;
+    using Lst<ObjKey>::find_all;
+    void add(ObjKey value)
+    {
+        insert(size(), value);
+    }
+    void set(size_t ndx, ObjKey value);
+    void insert(size_t ndx, ObjKey value);
+    ObjKey get(size_t ndx) const;
+    ObjKey get_key(size_t ndx) const override;
+    void remove(size_t ndx);
+    void remove(size_t from, size_t to) override;
+    void clear() override;
+    // Create a new object in insert a link to it
+    Obj create_and_insert_linked_object(size_t ndx);
+    // Create a new object and link it. If an embedded object
+    // is already set, it will be removed. TBD: If a non-embedded
+    // object is already set, we throw LogicError (to prevent
+    // dangling objects, since they do not delete automatically
+    // if they are not embedded...)
+    Obj create_and_set_linked_object(size_t ndx);
+    // to be implemented:
+    Obj clear_linked_object(size_t ndx);
+
+    TableView get_sorted_view(SortDescriptor order) const;
+    TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
+    void remove_target_row(size_t link_ndx);
+    void remove_all_target_rows();
+
+private:
+    friend class ConstTableView;
+    friend class Query;
+
+    // Sorted set of indices containing unresolved links.
+    mutable std::vector<size_t> m_unresolved;
+
+    void get_dependencies(TableVersions&) const override;
+    void sync_if_needed() const override;
+    bool init_from_parent() const override;
+};
+
+
+// Implementation:
+
+inline void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const
+{
+    if (ndx2 < ndx1)
+        std::swap(ndx1, ndx2);
+    repl->list_move(*this, ndx2, ndx1);
+    if (ndx1 + 1 != ndx2)
+        repl->list_move(*this, ndx1 + 1, ndx2);
+}
+
 template <class T>
-Lst<T>::Lst(const Lst<T>& other)
+inline Lst<T>::Lst(const Lst<T>& other)
     : Collection<T, LstBase>(other)
 {
+}
+
+template <class T>
+inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
+    : Collection<T, LstBase>(obj, col_key)
+{
+    if (m_obj) {
+        Collection<T, LstBase>::init_from_parent();
+    }
+}
+
+template <class T>
+inline void Lst<T>::create()
+{
+    m_tree->create();
+    m_valid = true;
 }
 
 template <class T>
@@ -329,158 +366,161 @@ void Lst<T>::insert(size_t ndx, T value)
     m_obj.bump_content_version();
 }
 
-template <>
-void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key);
+template <class T>
+void Lst<T>::set_null(size_t ndx)
+{
+    set(ndx, BPlusTree<T>::default_value(m_nullable));
+}
 
-template <>
-void Lst<ObjKey>::do_insert(size_t ndx, ObjKey target_key);
+template <class T>
+void Lst<T>::insert_null(size_t ndx)
+{
+    insert(ndx, BPlusTree<T>::default_value(m_nullable));
+}
 
-template <>
-void Lst<ObjKey>::do_remove(size_t ndx);
+template <class T>
+void Lst<T>::insert_any(size_t ndx, Mixed val)
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        insert(ndx, val);
+    }
+    else {
+        if (val.is_null()) {
+            insert_null(ndx);
+        }
+        else {
+            insert(ndx, val.get<typename util::RemoveOptional<T>::type>());
+        }
+    }
+}
 
-template <>
-void Lst<ObjKey>::clear();
+template <class T>
+void Lst<T>::resize(size_t new_size)
+{
+    update_if_needed();
+    size_t current_size = m_tree->size();
+    while (new_size > current_size) {
+        insert_null(current_size++);
+    }
+    remove(new_size, current_size);
+    m_obj.bump_both_versions();
+}
 
-template <>
-void Lst<ObjLink>::do_set(size_t ndx, ObjLink target_key);
+template <class T>
+void Lst<T>::add(T value)
+{
+    insert(size(), value);
+}
 
-template <>
-void Lst<ObjLink>::do_insert(size_t ndx, ObjLink target_key);
+template <class T>
+T Lst<T>::remove(const LstIterator<T>& it)
+{
+    return remove(CollectionBase::adjust(it.m_ndx));
+}
 
-template <>
-void Lst<ObjLink>::do_remove(size_t ndx);
+template <class T>
+void Lst<T>::remove(size_t from, size_t to)
+{
+    while (from < to) {
+        remove(--to);
+    }
+}
 
-template <>
-void Lst<Mixed>::do_set(size_t ndx, Mixed target_key);
+template <class T>
+void Lst<T>::move(size_t from, size_t to)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+    if (from != to) {
+        this->ensure_writeable();
+        if (Replication* repl = this->m_obj.get_replication()) {
+            repl->list_move(*this, from, to);
+        }
+        if (to > from) {
+            to++;
+        }
+        else {
+            from++;
+        }
+        // We use swap here as it handles the special case for StringData where
+        // 'to' and 'from' points into the same array. In this case you cannot
+        // set an entry with the result of a get from another entry in the same
+        // leaf.
+        m_tree->insert(to, BPlusTree<T>::default_value(m_nullable));
+        m_tree->swap(from, to);
+        m_tree->erase(from);
 
-template <>
-void Lst<Mixed>::do_insert(size_t ndx, Mixed target_key);
+        m_obj.bump_content_version();
+    }
+}
 
-template <>
-void Lst<Mixed>::do_remove(size_t ndx);
+template <class T>
+void Lst<T>::swap(size_t ndx1, size_t ndx2)
+{
+    REALM_ASSERT_DEBUG(!update_if_needed());
+    if (ndx1 != ndx2) {
+        if (Replication* repl = this->m_obj.get_replication()) {
+            LstBase::swap_repl(repl, ndx1, ndx2);
+        }
+        m_tree->swap(ndx1, ndx2);
+        m_obj.bump_content_version();
+    }
+}
+
+template <class T>
+void Lst<T>::clear()
+{
+    static_assert(!std::is_same_v<T, ObjKey>);
+    ensure_created();
+    update_if_needed();
+    this->ensure_writeable();
+    if (size() > 0) {
+        if (Replication* repl = this->m_obj.get_replication()) {
+            repl->list_clear(*this);
+        }
+        m_tree->clear();
+        m_obj.bump_content_version();
+    }
+}
+
+template <class T>
+inline bool Lst<T>::update_if_needed()
+{
+    if (m_obj.update_if_needed()) {
+        return init_from_parent();
+    }
+    return false;
+}
+
+template <class T>
+inline void Lst<T>::ensure_created()
+{
+    if (!m_valid && m_obj.is_valid()) {
+        create();
+    }
+}
+
+template <class T>
+inline void Lst<T>::do_set(size_t ndx, T value)
+{
+    m_tree->set(ndx, value);
+}
+
+template <class T>
+inline void Lst<T>::do_insert(size_t ndx, T value)
+{
+    m_tree->insert(ndx, value);
+}
+
+template <class T>
+inline void Lst<T>::do_remove(size_t ndx)
+{
+    m_tree->erase(ndx);
+}
 
 // Translate from userfacing index to internal index.
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx);
 // Scan through the list to find unresolved links
 void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
-
-
-class LnkLst : public Lst<ObjKey>, public ObjList {
-public:
-    LnkLst() = default;
-
-    LnkLst(const Obj& owner, ColKey col_key);
-    LnkLst(const LnkLst& other)
-        : Lst<ObjKey>(other)
-        , m_unresolved(other.m_unresolved)
-    {
-    }
-    LnkLst& operator=(const LnkLst& other)
-    {
-        Lst<ObjKey>::operator=(other);
-        m_unresolved = other.m_unresolved;
-        return *this;
-    }
-
-    LnkLstPtr clone() const
-    {
-        if (m_obj.is_valid()) {
-            return std::make_unique<LnkLst>(m_obj, m_col_key);
-        }
-        else {
-            return std::make_unique<LnkLst>();
-        }
-    }
-    TableRef get_target_table() const override
-    {
-        return m_obj.get_target_table(m_col_key);
-    }
-    bool is_in_sync() const override
-    {
-        return true;
-    }
-    size_t size() const override
-    {
-        auto full_sz = Lst<ObjKey>::size();
-        return full_sz - m_unresolved.size();
-    }
-
-    bool has_unresolved() const noexcept
-    {
-        return !m_unresolved.empty();
-    }
-
-    bool is_obj_valid(size_t) const noexcept override
-    {
-        // A link list cannot contain null values
-        return true;
-    }
-
-    Obj get_object(size_t ndx) const override;
-
-    Obj operator[](size_t ndx)
-    {
-        return get_object(ndx);
-    }
-
-    using Lst<ObjKey>::find_first;
-    using Lst<ObjKey>::find_all;
-    void add(ObjKey value)
-    {
-        insert(size(), value);
-    }
-    void set(size_t ndx, ObjKey value);
-    void insert(size_t ndx, ObjKey value);
-    ObjKey get(size_t ndx) const
-    {
-        return Lst<ObjKey>::get(virtual2real(m_unresolved, ndx));
-    }
-    ObjKey get_key(size_t ndx) const override
-    {
-        return get(ndx);
-    }
-    void remove(size_t ndx)
-    {
-        Lst<ObjKey>::remove(virtual2real(m_unresolved, ndx));
-    }
-    void remove(size_t from, size_t to) override
-    {
-        while (from < to) {
-            remove(--to);
-        }
-    }
-    void clear() override
-    {
-        Lst<ObjKey>::clear();
-        m_unresolved.clear();
-    }
-    // Create a new object in insert a link to it
-    Obj create_and_insert_linked_object(size_t ndx);
-    // Create a new object and link it. If an embedded object
-    // is already set, it will be removed. TBD: If a non-embedded
-    // object is already set, we throw LogicError (to prevent
-    // dangling objects, since they do not delete automatically
-    // if they are not embedded...)
-    Obj create_and_set_linked_object(size_t ndx);
-    // to be implemented:
-    Obj clear_linked_object(size_t ndx);
-
-    TableView get_sorted_view(SortDescriptor order) const;
-    TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
-    void remove_target_row(size_t link_ndx);
-    void remove_all_target_rows();
-
-private:
-    friend class ConstTableView;
-    friend class Query;
-
-    // Sorted set of indices containing unresolved links.
-    mutable std::vector<size_t> m_unresolved;
-
-    void get_dependencies(TableVersions&) const override;
-    void sync_if_needed() const override;
-    bool init_from_parent() const override;
-};
 
 
 template <typename U>
@@ -516,6 +556,34 @@ inline LnkLst Obj::get_linklist(StringData col_name) const
     return get_linklist(get_column_key(col_name));
 }
 
+inline ObjKey LnkLst::get(size_t ndx) const
+{
+    return Lst<ObjKey>::get(virtual2real(m_unresolved, ndx));
+}
+
+inline ObjKey LnkLst::get_key(size_t ndx) const
+{
+    return get(ndx);
+}
+
+inline void LnkLst::remove(size_t ndx)
+{
+    Lst<ObjKey>::remove(virtual2real(m_unresolved, ndx));
+}
+
+inline void LnkLst::remove(size_t from, size_t to)
+{
+    while (from < to) {
+        remove(--to);
+    }
+}
+
+inline void LnkLst::clear()
+{
+    Lst<ObjKey>::clear();
+    m_unresolved.clear();
+}
+
 template <class T>
 inline ColumnSumType<T> list_sum(const Collection<T, LstBase>& list, size_t* return_cnt = nullptr)
 {
@@ -539,6 +607,31 @@ inline ColumnAverageType<T> list_average(const Collection<T, LstBase>& list, siz
 {
     return bptree_average(list.get_tree(), return_cnt);
 }
+
+template <class T>
+Mixed Lst<T>::min(size_t* return_ndx) const
+{
+    return MinHelper<T>::eval(*m_tree, return_ndx);
+}
+
+template <class T>
+Mixed Lst<T>::max(size_t* return_ndx) const
+{
+    return MaxHelper<T>::eval(*m_tree, return_ndx);
+}
+
+template <class T>
+Mixed Lst<T>::sum(size_t* return_cnt) const
+{
+    return SumHelper<T>::eval(*m_tree, return_cnt);
+}
+
+template <class T>
+Mixed Lst<T>::avg(size_t* return_cnt) const
+{
+    return AverageHelper<T>::eval(*m_tree, return_cnt);
+}
+
 } // namespace realm
 
 #endif /* REALM_LIST_HPP */

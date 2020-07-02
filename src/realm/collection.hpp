@@ -2,6 +2,7 @@
 #define REALM_COLLECTION_HPP
 
 #include <realm/obj.hpp>
+#include <realm/bplustree.hpp>
 
 #include <iosfwd>      // std::ostream
 #include <type_traits> // std::void_t
@@ -63,6 +64,24 @@ inline void check_column_type<ObjKey>(ColKey col)
         throw LogicError(LogicError::list_type_mismatch);
     }
 }
+
+template <class T, class = void>
+struct MinHelper {
+    template <class U>
+    static Mixed eval(U&, size_t*)
+    {
+        return Mixed{};
+    }
+};
+
+template <class T>
+struct MinHelper<T, std::void_t<ColumnMinMaxType<T>>> {
+    template <class U>
+    static Mixed eval(U& tree, size_t* return_ndx)
+    {
+        return Mixed(bptree_minimum<T>(tree, return_ndx));
+    }
+};
 
 template <class T, class Enable = void>
 struct MaxHelper {
@@ -138,6 +157,8 @@ inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
 class CollectionBase : public ArrayParent {
 public:
     virtual ~CollectionBase();
+    CollectionBase(const CollectionBase&) = default;
+
     /*
      * Operations that makes sense without knowing the specific type
      * can be made virtual.
