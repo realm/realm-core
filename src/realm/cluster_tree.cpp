@@ -18,7 +18,6 @@
 
 #include "realm/cluster_tree.hpp"
 #include "realm/group.hpp"
-#include "realm/index_string.hpp"
 #include "realm/replication.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_timestamp.hpp"
@@ -830,7 +829,7 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
 {
     ClusterNode::State state;
     FieldValues init_values(values);
-    const Table* table = get_owner();
+    Table* table = get_owner();
 
     // Sort ColKey according to index
     std::sort(init_values.begin(), init_values.end(), [](auto& a, auto& b) {
@@ -838,78 +837,13 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
     });
 
     insert_fast(k, init_values, state);
+    table->update_indexes(k, init_values);
 
-    // Tombstones do not use index - will crash if we try to insert values
-    if (!k.is_unresolved()) {
-        // Update index
-        auto value = init_values.begin();
-        auto insert_in_column = [&](ColKey col_key) {
-            // Check if initial value is provided
-            Mixed init_value;
-            if (value != init_values.end() && value->col_key.get_index().val == col_key.get_index().val) {
-                init_value = value->value;
-                ++value;
-            }
-
-            if (StringIndex* index = table->get_search_index(col_key)) {
-                auto type = col_key.get_type();
-                auto attr = col_key.get_attrs();
-                bool nullable = attr.test(col_attr_Nullable);
-                switch (type) {
-                    case col_type_Int:
-                        if (init_value.is_null()) {
-                            index->insert(k, ArrayIntNull::default_value(nullable));
-                        }
-                        else {
-                            index->insert(k, init_value.get<int64_t>());
-                        }
-                        break;
-                    case col_type_Bool:
-                        if (init_value.is_null()) {
-                            index->insert(k, ArrayBoolNull::default_value(nullable));
-                        }
-                        else {
-                            index->insert(k, init_value.get<bool>());
-                        }
-                        break;
-                    case col_type_String:
-                        if (init_value.is_null()) {
-                            index->insert(k, ArrayString::default_value(nullable));
-                        }
-                        else {
-                            index->insert(k, init_value.get<String>());
-                        }
-                        break;
-                    case col_type_Timestamp:
-                        if (init_value.is_null()) {
-                            index->insert(k, ArrayTimestamp::default_value(nullable));
-                        }
-                        else {
-                            index->insert(k, init_value.get<Timestamp>());
-                        }
-                        break;
-                    case col_type_ObjectId:
-                        if (init_value.is_null()) {
-                            index->insert(k, ArrayObjectIdNull::default_value(nullable));
-                        }
-                        else {
-                            index->insert(k, init_value.get<ObjectId>());
-                        }
-                        break;
-                    default:
-                        REALM_UNREACHABLE();
-                }
-            }
-            return false;
-        };
-        get_owner()->for_each_public_column(insert_in_column);
-
-        if (Replication* repl = table->get_repl()) {
-            auto pk_col = table->get_primary_key_column();
-            for (const auto& v : values) {
-                if (v.col_key != pk_col) {
-                    repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
-                }
+    if (Replication* repl = table->get_repl()) {
+        auto pk_col = table->get_primary_key_column();
+        for (const auto& v : values) {
+            if (v.col_key != pk_col) {
+                repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
             }
         }
     }
@@ -950,16 +884,7 @@ size_t ClusterTree::get_ndx(ObjKey k) const
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
-    // Tombstones do not use index - will crash if we try to erase values
-    if (!k.is_unresolved()) {
-        size_t num_cols = get_spec().get_public_column_count();
-        for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-            auto col_key = m_owner->spec_ndx2colkey(col_ndx);
-            if (StringIndex* index = m_owner->get_search_index(col_key)) {
-                index->erase(k);
-            }
-        }
-    }
+    get_owner()->erase_from_search_indexes(k);
 
     size_t root_size = m_root->erase(k, state);
 

@@ -49,7 +49,7 @@ public:
     {
         return m_alloc;
     }
-    const Table* get_owner() const
+    Table* get_owner() const
     {
         return m_owner;
     }

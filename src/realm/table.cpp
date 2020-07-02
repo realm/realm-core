@@ -598,6 +598,92 @@ void Table::populate_search_index(ColKey col_key)
     }
 }
 
+void Table::erase_from_search_indexes(ObjKey key)
+{
+    // Tombstones do not use index - will crash if we try to erase values
+    if (!key.is_unresolved()) {
+        for (auto index : m_index_accessors) {
+            if (index) {
+                index->erase(key);
+            }
+        }
+    }
+}
+
+void Table::update_indexes(ObjKey key, const FieldValues& values)
+{
+    // Tombstones do not use index - will crash if we try to insert values
+    if (key.is_unresolved()) {
+        return;
+    }
+
+    auto sz = m_index_accessors.size();
+    // values are sorted by column index - there may be values missing
+    auto value = values.begin();
+    for (size_t column_ndx = 0; column_ndx < sz; column_ndx++) {
+        // Check if initial value is provided
+        Mixed init_value;
+        if (value != values.end() && value->col_key.get_index().val == column_ndx) {
+            // Value for this column is provided
+            init_value = value->value;
+            ++value;
+        }
+
+        if (auto index = m_index_accessors[column_ndx]) {
+            // There is an index for this column
+            auto col_key = m_leaf_ndx2colkey[column_ndx];
+            auto type = col_key.get_type();
+            auto attr = col_key.get_attrs();
+            bool nullable = attr.test(col_attr_Nullable);
+            switch (type) {
+                case col_type_Int:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayIntNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<int64_t>());
+                    }
+                    break;
+                case col_type_Bool:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayBoolNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<bool>());
+                    }
+                    break;
+                case col_type_String:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayString::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<String>());
+                    }
+                    break;
+                case col_type_Timestamp:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayTimestamp::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<Timestamp>());
+                    }
+                    break;
+                case col_type_ObjectId:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayObjectIdNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<ObjectId>());
+                    }
+                    break;
+                default:
+                    REALM_UNREACHABLE();
+            }
+        }
+    }
+}
+
+
 void Table::add_search_index(ColKey col_key)
 {
     check_column(col_key);

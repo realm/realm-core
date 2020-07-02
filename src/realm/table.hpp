@@ -613,6 +613,8 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
+    void erase_from_search_indexes(ObjKey key);
+    void update_indexes(ObjKey key, const FieldValues& values);
 
     // Migration support
     void migrate_column_info(util::FunctionRef<void()>);
