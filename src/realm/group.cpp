@@ -1261,7 +1261,11 @@ void Group::recursive_touch(int level, Array& parent, ref_type first, ref_type l
 
 void Group::touch(ref_type first, ref_type last)
 {
+    recursive_touch(1, m_table_names, first, last);
+    recursive_touch(1, m_tables, first, last);
+    // ^ must be done before, so that touching their entries in the top array has no effect.
     recursive_touch(0, m_top, first, last);
+    std::cout << "Touch completed with m_top at " << m_top.m_ref << std::endl << std::endl;
 }
 
 void Group::commit()
@@ -1289,7 +1293,7 @@ void Group::commit()
     size_t old_baseline = m_alloc.get_baseline();
 
     // Update view of the file
-    size_t new_file_size = out.get_file_size();
+    size_t new_file_size = out.get_physical_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(true);
 

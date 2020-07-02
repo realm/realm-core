@@ -261,7 +261,14 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
 
 GroupWriter::~GroupWriter() = default;
 
-size_t GroupWriter::get_file_size() const noexcept
+size_t GroupWriter::get_logical_file_size() const noexcept
+{
+    size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
+    return logical_file_size;
+    //return get_physical_file_size();
+}
+
+size_t GroupWriter::get_physical_file_size() const noexcept
 {
     auto sz = to_size_t(m_alloc.get_file().get_size());
     return sz;
@@ -494,7 +501,8 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = from_ref(end_ref);
     int_fast64_t value_9 = to_int64(rest);
-
+    std::cout << " -- freelists and top at [" << reserve_pos << " : " << end_ref << "]" << std::endl;
+    std::cout << "    -- residual free block at [" << end_ref << " : " << end_ref + rest << "]" << std::endl;
     // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit expansion
     REALM_ASSERT_3(value_8, <=, Array::ubound_for_width(m_free_positions.get_width()));
     REALM_ASSERT_3(value_9, <=, Array::ubound_for_width(m_free_lengths.get_width()));
@@ -536,16 +544,37 @@ void GroupWriter::read_in_freelist()
         for (size_t idx = 0; idx < limit; ++idx) {
             size_t ref = size_t(m_free_positions.get(idx));
             size_t size = size_t(m_free_lengths.get(idx));
-
+            uint64_t version = 0;
             if (is_shared) {
-                uint64_t version = m_free_versions.get(idx);
+                version = m_free_versions.get(idx);
                 // Entries that are freed in still alive versions are not candidates for merge or allocation
                 if (version >= limit_version) {
+                    std::cout << " - lock: [" << ref << " : " << ref + size << "]" << std::endl;
                     m_not_free_in_file.emplace_back(ref, size, version);
                     continue;
                 }
             }
-
+            if (ref <= m_evac_start && ref + size >= m_evac_end) {
+                std::cout << "*** Evacuation zone [" << m_evac_start << " : " << m_evac_end 
+                          << "] empty *** " << std::endl;
+/*
+                // if the evac zone ends at the logical file size, reset it to
+                // start of free block and discard the free block.
+                size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
+                if (m_evac_end == logical_file_size) {
+                    std::cout << "*** Reducing logical file size to " << ref << std::endl;
+                    m_group.m_top.set(2, 1 + 2 * uint64_t(ref)); // Throws
+                    continue; // loses this free block
+                }
+*/
+            }
+            // avoid allocation from any block which is part of the evacuation zone
+            if (ref + size >= m_evac_start && ref < m_evac_end) {
+                std::cout << " - evac: [" << ref << " : " << ref + size << "]" << std::endl;
+                m_not_free_in_file.emplace_back(ref, size, version);
+                continue;
+            }
+            std::cout << " -                           free: [" << ref << " : " << ref + size << "]" << std::endl;
             free_in_file.emplace_back(ref, size, 0);
         }
 
@@ -581,19 +610,27 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     size_t reserve_ndx = realm::npos;
     bool is_shared = m_group.m_is_shared;
 
+    // combine all blocks in the 'free_in_file'
+    // 1. all the really free blocks from the size map
     for (const auto& entry : m_size_map) {
+        std::cout << " * still free: [" << entry.second << " : " 
+                  << entry.second + entry.first << "]" << std::endl;
         free_in_file.emplace_back(entry.second, entry.first, 0);
     }
 
     {
         size_t locked_space_size = 0;
-        REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
+        // no longer holds: REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
+        // 2. the blocks that are in file and not free as they belong to live versions or evac zone
         for (const auto& locked : m_not_free_in_file) {
+            std::cout << " * locked: [" << locked.ref << " : " << locked.ref + locked.size << "]" << std::endl;
             free_in_file.emplace_back(locked.ref, locked.size, locked.released_at_version);
             locked_space_size += locked.size;
         }
-
+        // 3. the blocks that are being freed up as part of the current transaction
         for (const auto& free_space : new_free_space) {
+            std::cout << " * newly freed: [" << free_space.first << " : " 
+                      << free_space.first + free_space.second << "]" << std::endl;
             free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
             locked_space_size += free_space.second;
         }
@@ -602,7 +639,7 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
 
     REALM_ASSERT(free_in_file.size() == nb_elements);
     std::sort(begin(free_in_file), end(free_in_file), [](auto& a, auto& b) { return a.ref < b.ref; });
-
+    // free_in_file now holds all free blocks sorted in ref order
     {
         // Copy into arrays while checking consistency
         size_t prev_ref = 0;
@@ -613,6 +650,7 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
             const auto& free_space = free_in_file[i];
             auto ref = free_space.ref;
             if (REALM_UNLIKELY(prev_ref + prev_size > ref)) {
+                /* FIXME: Is this check not valid anymore: */
                 // Check if we are freeing arrays already in 'm_not_free_in_file'
                 for (const auto& elem : new_free_space) {
                     ref_type free_ref = elem.first;
@@ -626,7 +664,6 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
                                                 m_current_version, m_alloc.get_file_path_for_assertions());
                     }
                 }
-
                 REALM_ASSERT_RELEASE_EX(prev_ref + prev_size <= ref, prev_ref, prev_size, ref, i, limit,
                                         m_alloc.get_file_path_for_assertions());
             }
@@ -698,12 +735,16 @@ size_t GroupWriter::get_free_space(size_t size)
 
     size_t rest = chunk_size - size;
     m_size_map.erase(p);
+    std::cout << " * allocated: [" << chunk_pos << " : "
+              << chunk_pos + size << "]" << std::endl;
     if (rest > 0) {
         // Allocating part of chunk - this alway happens from the beginning
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
         m_size_map.emplace(rest, chunk_pos + size);
+        std::cout << "   ^ adjusted free block: ["
+                  << chunk_pos + size << " : " << chunk_pos + chunk_size << "]" << std::endl;
     }
     return chunk_pos;
 }
@@ -836,7 +877,7 @@ GroupWriter::FreeListElement GroupWriter::extend_free_space(size_t requested_siz
     // lock at this time, and in non-transactional mode it is the responsibility
     // of the user to ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
-    REALM_ASSERT(new_file_size <= get_file_size());
+    REALM_ASSERT(new_file_size <= get_physical_file_size());
 #if REALM_ALLOC_DEBUG
     std::cout << "        ** File extension to " << new_file_size << "     after request for " << requested_size
               << std::endl;

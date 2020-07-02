@@ -57,6 +57,7 @@ public:
     ~GroupWriter();
 
     void set_versions(uint64_t current, uint64_t read_lock) noexcept;
+    void set_evacuation_zone(size_t evac_start, size_t evac_end) noexcept;
 
     /// Write all changed array nodes into free space.
     ///
@@ -69,7 +70,8 @@ public:
     /// returned by write_group().
     void commit(ref_type new_top_ref);
 
-    size_t get_file_size() const noexcept;
+    size_t get_logical_file_size() const noexcept;
+    size_t get_physical_file_size() const noexcept;
 
     ref_type write_array(const char*, size_t, uint32_t) override;
 
@@ -99,6 +101,8 @@ private:
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
+    size_t m_evac_start = 0;
+    size_t m_evac_end = 0;
     Durability m_durability;
 
     struct FreeSpaceEntry {
@@ -189,6 +193,12 @@ private:
 
 
 // Implementation:
+
+inline void GroupWriter::set_evacuation_zone(size_t evac_start, size_t evac_end) noexcept
+{
+    m_evac_start = evac_start;
+    m_evac_end = evac_end;
+}
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
 {

@@ -2208,6 +2208,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
     // info->readers.dump();
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
+    out.set_evacuation_zone(transaction.m_evac_start, transaction.m_evac_end);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2220,7 +2221,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
-        m_used_space = out.get_file_size() - m_free_space;
+        m_used_space = out.get_physical_file_size() - m_free_space;
         // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
         //     << " Read lock at version " << oldest_version << std::endl;
         switch (Durability(info->durability)) {
@@ -2236,7 +2237,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
                 // mode the file on disk may very likely be in an invalid state.
                 break;
         }
-        size_t new_file_size = out.get_file_size();
+        size_t new_file_size = out.get_logical_file_size();
         // We must reset the allocators free space tracking before communicating the new
         // version through the ring buffer. If not, a reader may start updating the allocators
         // mappings while the allocator is in dirty state.

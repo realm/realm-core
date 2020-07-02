@@ -521,6 +521,7 @@ void SlabAlloc::do_free(ref_type ref, char* addr)
         try {
             REALM_ASSERT_RELEASE_EX(ref != 0, ref, get_file_path_for_assertions());
             REALM_ASSERT_RELEASE_EX(!(ref & 7), ref, get_file_path_for_assertions());
+            std::cout << " * releasing [" << ref << " : " << ref + size << "]" << std::endl;
             auto next = m_free_read_only.lower_bound(ref);
             if (next != m_free_read_only.end()) {
                 REALM_ASSERT_RELEASE_EX(ref + size <= next->first, ref, size, next->first, next->second, get_file_path_for_assertions());

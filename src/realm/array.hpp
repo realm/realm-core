@@ -1094,20 +1094,6 @@ inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_i
     return do_write_deep(out, only_if_modified); // Throws
 }
 
-inline ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified)
-{
-    if (only_if_modified && alloc.is_read_only(ref))
-        return ref;
-
-    Array array(alloc);
-    array.init_from_ref(ref);
-
-    if (!array.m_has_refs)
-        return array.do_write_shallow(out); // Throws
-
-    return array.do_write_deep(out, only_if_modified); // Throws
-}
-
 inline void Array::add(int_fast64_t value)
 {
     insert(m_size, value);

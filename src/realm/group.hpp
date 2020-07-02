@@ -1082,6 +1082,7 @@ inline void Group::init_array_parents() noexcept
 
 inline void Group::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
+    std::cout << " *** BONG *** " << std::endl;
     m_tables.set(child_ndx, new_ref);
 }
 

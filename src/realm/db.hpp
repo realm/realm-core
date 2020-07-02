@@ -558,7 +558,7 @@ public:
     /// than what will eventually be needed as we reserve a bit more memory than
     /// what will be needed.
     size_t get_commit_size() const;
-
+    void set_evacuation_zone(size_t evac_start, size_t evac_end);
     DB::version_type commit();
     void rollback();
     void end_read();
@@ -638,6 +638,8 @@ private:
 
     DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
+    size_t m_evac_start = 0;
+    size_t m_evac_end = 0;
 
     friend class DB;
     friend class DisableReplication;
@@ -810,6 +812,13 @@ inline DB::TransactStage Transaction::get_transact_stage() const noexcept
 {
     return m_transact_stage;
 }
+
+inline void Transaction::set_evacuation_zone(size_t evac_start, size_t evac_end)
+{
+    m_evac_start = evac_start;
+    m_evac_end = evac_end;
+}
+
 
 class DB::ReadLockGuard {
 public:
