@@ -6017,7 +6017,7 @@ TEST(LangBindHelper_FragmentFile)
     for (int i = 0; i < 1000; ++i) {
         w[i] = '0' + (i % 10);
     }
-    size_t num = 1;
+    size_t num = 1000;
     for (size_t j = 0; j < num; ++j) {
         BinaryData sd(w, 500 + (j % 500));
         t->create_object().set(c, sd);
@@ -6047,15 +6047,18 @@ TEST(LangBindHelper_FragmentFile)
     db->get_stats(free_space, used_space);
     std::cout << free_space << ", " << used_space << std::endl;
     size_t total = free_space + used_space;
+    std::vector<int> progress_vector;
     for (int h = 0; h < 10; ++h)  {
-        tr->promote_to_write();
-        /* if (free_space * 100 / total > 50) */ {
-            size_t evac_start = h * total / 10;
-            size_t evac_end = (h+1) * total / 10;
+                /* if (free_space * 100 / total > 50) */ 
+        size_t evac_start = h * total / 10;
+        if (evac_start < 24) evac_start = 24;
+        size_t evac_end = (h+1) * total / 10;
+        do {
+            tr->promote_to_write();
             tr->touch(evac_start, evac_end);
             tr->set_evacuation_zone(evac_start, evac_end);
-        }
-        tr->commit_and_continue_as_read();
+            tr->commit_and_continue_as_read();
+        } while (!tr->evacuated());
         db->get_stats(free_space, used_space);
         std::cout << free_space << ", " << used_space << std::endl;
         total = free_space + used_space;

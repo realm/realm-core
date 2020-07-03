@@ -58,6 +58,7 @@ public:
 
     void set_versions(uint64_t current, uint64_t read_lock) noexcept;
     void set_evacuation_zone(size_t evac_start, size_t evac_end) noexcept;
+    bool evacuated() noexcept;
 
     /// Write all changed array nodes into free space.
     ///
@@ -103,6 +104,7 @@ private:
     size_t m_locked_space_size = 0;
     size_t m_evac_start = 0;
     size_t m_evac_end = 0;
+    bool m_evacuated = false;
     Durability m_durability;
 
     struct FreeSpaceEntry {
@@ -198,6 +200,12 @@ inline void GroupWriter::set_evacuation_zone(size_t evac_start, size_t evac_end)
 {
     m_evac_start = evac_start;
     m_evac_end = evac_end;
+    m_evacuated = false;
+}
+
+inline bool GroupWriter::evacuated() noexcept
+{
+    return m_evacuated;
 }
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept

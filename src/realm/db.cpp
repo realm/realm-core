@@ -2216,6 +2216,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         new_top_ref = out.write_group();                         // Throws
     }
+    transaction.m_evacuated = out.evacuated();
     {
         // protect access to shared variables and m_reader_mapping from here
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);

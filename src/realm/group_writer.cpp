@@ -554,26 +554,6 @@ void GroupWriter::read_in_freelist()
                     continue;
                 }
             }
-            if (ref <= m_evac_start && ref + size >= m_evac_end) {
-                std::cout << "*** Evacuation zone [" << m_evac_start << " : " << m_evac_end 
-                          << "] empty *** " << std::endl;
-/*
-                // if the evac zone ends at the logical file size, reset it to
-                // start of free block and discard the free block.
-                size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-                if (m_evac_end == logical_file_size) {
-                    std::cout << "*** Reducing logical file size to " << ref << std::endl;
-                    m_group.m_top.set(2, 1 + 2 * uint64_t(ref)); // Throws
-                    continue; // loses this free block
-                }
-*/
-            }
-            // avoid allocation from any block which is part of the evacuation zone
-            if (ref + size >= m_evac_start && ref < m_evac_end) {
-                std::cout << " - evac: [" << ref << " : " << ref + size << "]" << std::endl;
-                m_not_free_in_file.emplace_back(ref, size, version);
-                continue;
-            }
             std::cout << " -                           free: [" << ref << " : " << ref + size << "]" << std::endl;
             free_in_file.emplace_back(ref, size, 0);
         }
@@ -595,6 +575,32 @@ void GroupWriter::read_in_freelist()
     }
 
     free_in_file.merge_adjacent_entries_in_freelist();
+    // After merge, we can pick out free blocks which are in the evac zone and prevent
+    // their use. We can also detect if the entire evac zone is empty.
+    for (auto& e: free_in_file) {
+        if (e.ref >= m_evac_end)
+            continue;
+        if (e.ref + e.size <= m_evac_start)
+            continue;
+        if (e.ref <= m_evac_start && e.ref + e.size >= m_evac_end) {
+            m_evacuated = true;
+/*
+                // if the evac zone ends at the logical file size, reset it to
+                // start of free block and discard the free block.
+                size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
+                if (m_evac_end == logical_file_size) {
+                    std::cout << "*** Reducing logical file size to " << ref << std::endl;
+                    m_group.m_top.set(2, 1 + 2 * uint64_t(ref)); // Throws
+                    continue; // loses this free block
+                }
+*/
+        }
+        // prevent use by moving free block to m_not_free_in_file:
+        if (e.size) { // (merging may have left entries with size 0 behind. Must be ignored)
+            m_not_free_in_file.emplace_back(e.ref, e.size, e.released_at_version);
+            e.size = 0; // <-- setting to zero will cause this entry to be dropped below
+        }
+    }
     // Previous step produces - potentially - some entries with size of zero. These
     // entries will be skipped in the next step.
     free_in_file.move_free_in_file_to_size_map(m_size_map);
