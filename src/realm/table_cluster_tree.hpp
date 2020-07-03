@@ -20,6 +20,7 @@
 #define REALM_TABLE_CLUSTER_TREE_HPP
 
 #include "realm/cluster_tree.hpp"
+#include "realm/obj.hpp"
 
 namespace realm {
 
@@ -46,9 +47,28 @@ public:
         auto state = ClusterTree::get(ndx, k);
         return Obj(get_table_ref(), state.mem, k, state.index);
     }
+
     void clear(CascadeState&);
+    void enumerate_string_column(ColKey col_key);
+
+    // Specialization of ClusterTree interface
+    const Table* get_owning_table() const override
+    {
+        return m_owner;
+    }
+
+    void cleanup_key(ObjKey k) override;
+    void update_indexes(ObjKey k, const FieldValues& init_values) override;
+    void for_each_and_every_column(ColIterateFunction func) const override;
+    void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const override;
+    bool is_string_enum_type(ColKey::Idx col_ndx) const override;
+    std::unique_ptr<ClusterNode> get_root_from_parent() override;
 
 private:
+    Table* m_owner;
+    size_t m_top_position_for_cluster_tree;
+
+    TableRef get_table_ref() const;
     void remove_all_links(CascadeState&);
 };
 

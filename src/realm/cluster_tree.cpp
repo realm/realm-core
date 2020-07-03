@@ -39,7 +39,6 @@
  */
 
 namespace realm {
-
 /*
  * The inner nodes are organized in the way that the main array has a ref to the
  * (optional) key array in position 0 and the subtree depth in position 1. After
@@ -95,13 +94,13 @@ public:
     void nullify_incoming_links(ObjKey key, CascadeState& state) override;
     void add(ref_type ref, int64_t key_value = 0);
 
-    // Reset first (and only!) child ref and return the previous value
-    ref_type clear_first_child_ref()
+    // Reset first (and only!) child ref and return node based on the previous value
+    std::unique_ptr<ClusterNode> return_and_clear_first_child()
     {
         REALM_ASSERT(node_size() == 1);
-        ref_type ret = Array::get_as_ref(s_first_node_index);
-        Array::set(s_first_node_index, 0);
-        return ret;
+        auto new_root = m_tree_top.get_node(this, s_first_node_index);
+        Array::set(s_first_node_index, 0); // The node is no longer belonging to this
+        return new_root;
     }
 
     int64_t get_first_key_value()
@@ -181,10 +180,6 @@ private:
     // and setting it to 0 thereafter
     void adjust_keys_first_child(int64_t adj);
 };
-
-} // namespace realm
-
-using namespace realm;
 
 /***************************** ClusterNodeInner ******************************/
 
@@ -515,9 +510,7 @@ void ClusterNodeInner::insert_column(ColKey col)
 {
     size_t sz = node_size();
     for (size_t i = 0; i < sz; i++) {
-        ref_type child_ref = _get_child_ref(i);
-        std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
-        node->set_parent(this, i + s_first_node_index);
+        std::shared_ptr<ClusterNode> node = m_tree_top.get_node(this, i + s_first_node_index);
         node->insert_column(col);
     }
 }
@@ -526,9 +519,7 @@ void ClusterNodeInner::remove_column(ColKey col)
 {
     size_t sz = node_size();
     for (size_t i = 0; i < sz; i++) {
-        ref_type child_ref = _get_child_ref(i);
-        std::shared_ptr<ClusterNode> node = m_tree_top.get_node(child_ref);
-        node->set_parent(this, i + s_first_node_index);
+        std::shared_ptr<ClusterNode> node = m_tree_top.get_node(this, i + s_first_node_index);
         node->remove_column(col);
     }
 }
@@ -611,7 +602,8 @@ void ClusterNodeInner::dump_objects(int64_t key_offset, std::string lead) const
             key_value = (i << m_shift_factor) + key_offset;
         }
         std::cout << lead << std::hex << "split: " << key_value << std::dec << std::endl;
-        m_tree_top.get_node(_get_child_ref(i))->dump_objects(key_value, lead + "   ");
+        m_tree_top.get_node(const_cast<ClusterNodeInner*>(this), i + s_first_node_index)
+            ->dump_objects(key_value, lead + "   ");
     }
 }
 // LCOV_EXCL_STOP
@@ -723,25 +715,13 @@ int64_t ClusterNodeInner::get_last_key_value() const
         return offset + node.get_last_key_value();
     }
 }
-/******************************** ClusterTree ********************************/
 
-ClusterTree::ClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree)
-    : m_owner(owner)
-    , m_alloc(alloc)
-    , m_top_position_for_cluster_tree(top_position_for_cluster_tree)
+ClusterTree::ClusterTree(Allocator& alloc)
+    : m_alloc(alloc)
 {
 }
 
 ClusterTree::~ClusterTree() {}
-
-TableRef ClusterTree::get_table_ref() const
-{
-    REALM_ASSERT(m_owner != nullptr);
-    // as safe as storing the TableRef locally in the ClusterTree,
-    // because the cluster tree and the table is basically one object :-O
-    return m_owner->m_own_ref;
-}
-
 
 MemRef ClusterTree::create_empty_cluster(Allocator& alloc)
 {
@@ -752,12 +732,14 @@ MemRef ClusterTree::create_empty_cluster(Allocator& alloc)
     return arr.get_mem();
 }
 
-std::unique_ptr<ClusterNode> ClusterTree::create_root_from_mem(Allocator& alloc, MemRef mem)
+std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
+    ref_type ref = parent->get_child_ref(ndx_in_parent);
+    MemRef mem{m_alloc.translate(ref), ref, m_alloc};
     const char* header = mem.get_addr();
     bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
 
-    bool can_reuse_root_accessor = m_root && &m_root->get_alloc() == &alloc && m_root->is_leaf() == is_leaf;
+    bool can_reuse_root_accessor = m_root && m_root->is_leaf() == is_leaf;
     if (can_reuse_root_accessor) {
         m_root->init(mem);
         return std::move(m_root); // Same root will be reinstalled.
@@ -766,38 +748,52 @@ std::unique_ptr<ClusterNode> ClusterTree::create_root_from_mem(Allocator& alloc,
     // Not reusing root note, allocating a new one.
     std::unique_ptr<ClusterNode> new_root;
     if (is_leaf) {
-        new_root = std::make_unique<Cluster>(0, alloc, *this);
+        new_root = std::make_unique<Cluster>(0, m_alloc, *this);
     }
     else {
-        new_root = std::make_unique<ClusterNodeInner>(alloc, *this);
+        new_root = std::make_unique<ClusterNodeInner>(m_alloc, *this);
     }
     new_root->init(mem);
+    new_root->set_parent(parent, ndx_in_parent);
 
     return new_root;
+}
+
+std::unique_ptr<ClusterNode> ClusterTree::get_node(ArrayParent* parent, size_t ndx_in_parent) const
+{
+    ref_type ref = parent->get_child_ref(ndx_in_parent);
+
+    std::unique_ptr<ClusterNode> node;
+
+    char* child_header = static_cast<char*>(m_alloc.translate(ref));
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
+    if (child_is_leaf) {
+        node = std::make_unique<Cluster>(0, m_alloc, *this);
+    }
+    else {
+        node = std::make_unique<ClusterNodeInner>(m_alloc, *this);
+    }
+    node->init(MemRef(child_header, ref, m_alloc));
+    node->set_parent(parent, ndx_in_parent);
+
+    return node;
 }
 
 void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
 {
     if (new_root != m_root) {
         // Maintain parent.
-        new_root->set_parent(&m_owner->m_top, m_top_position_for_cluster_tree);
+        new_root->set_parent(m_root->get_parent(), m_root->get_ndx_in_parent());
         new_root->update_parent(); // Throws
         m_root = std::move(new_root);
     }
 }
 
-void ClusterTree::init_from_ref(ref_type ref)
-{
-    auto new_root = create_root_from_ref(m_alloc, ref);
-    new_root->set_parent(&m_owner->m_top, m_top_position_for_cluster_tree);
-    m_root = std::move(new_root);
-    m_size = m_root->get_tree_size();
-}
-
 void ClusterTree::init_from_parent()
 {
-    ref_type ref = m_owner->m_top.get_as_ref(m_top_position_for_cluster_tree);
-    init_from_ref(ref);
+    auto new_root = get_root_from_parent();
+    m_root = std::move(new_root);
+    m_size = m_root->get_tree_size();
 }
 
 bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
@@ -829,7 +825,6 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
 {
     ClusterNode::State state;
     FieldValues init_values(values);
-    Table* table = get_owner();
 
     // Sort ColKey according to index
     std::sort(init_values.begin(), init_values.end(), [](auto& a, auto& b) {
@@ -837,12 +832,12 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
     });
 
     insert_fast(k, init_values, state);
-    table->update_indexes(k, init_values);
+    update_indexes(k, init_values);
 
-    if (Replication* repl = table->get_repl()) {
-        auto pk_col = table->get_primary_key_column();
-        for (const auto& v : values) {
-            if (v.col_key != pk_col) {
+    // Replicate setting of values
+    if (const Table* table = get_owning_table()) {
+        if (Replication* repl = table->get_repl()) {
+            for (const auto& v : values) {
                 repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
             }
         }
@@ -884,7 +879,14 @@ size_t ClusterTree::get_ndx(ObjKey k) const
 
 void ClusterTree::erase(ObjKey k, CascadeState& state)
 {
-    get_owner()->erase_from_search_indexes(k);
+    cleanup_key(k);
+    if (!k.is_unresolved()) {
+        if (auto table = get_owning_table()) {
+            if (Replication* repl = table->get_repl()) {
+                repl->remove_object(table, k);
+            }
+        }
+    }
 
     size_t root_size = m_root->erase(k, state);
 
@@ -895,10 +897,8 @@ void ClusterTree::erase(ObjKey k, CascadeState& state)
         ClusterNodeInner* node = static_cast<ClusterNodeInner*>(m_root.get());
 
         REALM_ASSERT(node->get_first_key_value() == 0);
-        ref_type new_root_ref = node->clear_first_child_ref();
+        auto new_root = node->return_and_clear_first_child();
         node->destroy_deep();
-
-        auto new_root = get_node(new_root_ref);
 
         replace_root(std::move(new_root));
         root_size = m_root->node_size();
@@ -944,75 +944,6 @@ void ClusterTree::update(UpdateFunction func)
     }
 }
 
-void ClusterTree::enumerate_string_column(ColKey col_key)
-{
-    Allocator& alloc = get_alloc();
-
-    ArrayString keys(alloc);
-    ArrayString leaf(alloc);
-    keys.create();
-
-    auto collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t sz = leaf.size();
-        size_t key_size = keys.size();
-        for (size_t i = 0; i < sz; i++) {
-            auto v = leaf.get(i);
-            size_t pos = keys.lower_bound(v);
-            if (pos == key_size || keys.get(pos) != v) {
-                keys.insert(pos, v); // Throws
-                key_size++;
-            }
-        }
-
-        return false; // Continue
-    };
-
-    auto upgrade = [col_key, &keys](Cluster* cluster) {
-        cluster->upgrade_string_to_enum(col_key, keys);
-    };
-
-    // Populate 'keys' array
-    traverse(collect_strings);
-
-    // Store key strings in spec
-    size_t spec_ndx = get_owner()->colkey2spec_ndx(col_key);
-    const_cast<Spec*>(&get_spec())->upgrade_string_to_enum(spec_ndx, keys.get_ref());
-
-    // Replace column in all clusters
-    update(upgrade);
-}
-
-std::unique_ptr<ClusterNode> ClusterTree::get_node(ref_type ref) const
-{
-    std::unique_ptr<ClusterNode> node;
-    Allocator& alloc = m_root->get_alloc();
-
-    char* child_header = static_cast<char*>(alloc.translate(ref));
-    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
-    if (child_is_leaf) {
-        node = std::make_unique<Cluster>(0, alloc, *this);
-    }
-    else {
-        node = std::make_unique<ClusterNodeInner>(alloc, *this);
-    }
-    node->init(MemRef(child_header, ref, alloc));
-
-    return node;
-}
-
-size_t ClusterTree::get_column_index(StringData col_name) const
-{
-    return get_spec().get_column_index(col_name);
-}
-
-const Spec& ClusterTree::get_spec() const
-{
-    typedef _impl::TableFriend tf;
-    return tf::get_spec(*m_owner);
-}
-
-
 void ClusterTree::verify() const
 {
 #ifdef REALM_DEBUG
@@ -1028,6 +959,8 @@ void ClusterTree::nullify_links(ObjKey obj_key, CascadeState& state)
     REALM_ASSERT(state.m_group);
     m_root->nullify_incoming_links(obj_key, state);
 }
+
+/**************************  ClusterTree::Iterator  **************************/
 
 ClusterTree::Iterator::Iterator(const ClusterTree& t, size_t ndx)
     : m_tree(t)
@@ -1211,3 +1144,5 @@ ClusterTree::Iterator& ClusterTree::Iterator::operator+=(ptrdiff_t adj)
     m_leaf_invalid = !m_key;
     return *this;
 }
+
+} // namespace realm

@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include "realm/cluster.hpp"
-#include "realm/table.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_bool.hpp"
@@ -36,7 +35,7 @@
 #include <iostream>
 #include <cmath>
 
-using namespace realm;
+namespace realm {
 
 /******************************* ClusterNode *********************************/
 
@@ -62,6 +61,7 @@ void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
     }
 }
 
+
 /********************************* Cluster ***********************************/
 
 template <class T>
@@ -74,14 +74,14 @@ inline void Cluster::do_create(ColKey col)
     arr.update_parent();
 }
 
-void Cluster::create(size_t nb_leaf_columns)
+void Cluster::create()
 {
-    // Create array with the required size
-    Array::create(type_HasRefs, false, nb_leaf_columns + s_first_col_index);
+    Array::create(type_HasRefs, false, s_first_col_index);
     Array::set(0, RefOrTagged::make_tagged(0));
-    auto table = m_tree_top.get_owner();
     auto column_initialize = [this](ColKey col_key) {
         auto col_ndx = col_key.get_index();
+        while (size() <= col_ndx.val + 1)
+            add(0);
         auto type = col_key.get_type();
         auto attr = col_key.get_attrs();
         if (attr.test(col_attr_List)) {
@@ -110,8 +110,7 @@ void Cluster::create(size_t nb_leaf_columns)
                 do_create<ArrayDoubleNull>(col_key);
                 break;
             case col_type_String: {
-                size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-                if (m_tree_top.get_spec().is_string_enum_type(spec_ndx)) {
+                if (m_tree_top.is_string_enum_type(col_ndx)) {
                     do_create<ArrayInteger>(col_key);
                 }
                 else {
@@ -148,7 +147,7 @@ void Cluster::create(size_t nb_leaf_columns)
         }
         return false;
     };
-    table->for_each_and_every_column(column_initialize);
+    m_tree_top.for_each_and_every_column(column_initialize);
 }
 
 void Cluster::init(MemRef mem)
@@ -192,8 +191,6 @@ size_t Cluster::node_size_from_header(Allocator& alloc, const char* header)
     }
 }
 
-namespace realm {
-
 template <class T>
 inline void Cluster::set_spec(T&, ColKey::Idx) const
 {
@@ -202,10 +199,8 @@ inline void Cluster::set_spec(T&, ColKey::Idx) const
 template <>
 inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
 {
-    auto spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-    arr.set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+    m_tree_top.set_spec(arr, col_ndx);
 }
-} // namespace realm
 
 template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
@@ -236,7 +231,7 @@ inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, O
 
     // Insert backlink if link is not null
     if (target_key) {
-        const Table* origin_table = m_tree_top.get_owner();
+        const Table* origin_table = m_tree_top.get_owning_table();
         ColKey opp_col = origin_table->get_opposite_column(col_key);
         TableRef opp_table = origin_table->get_opposite_table(col_key);
         Obj target_obj = opp_table->get_object(target_key);
@@ -255,7 +250,7 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
 
     // Insert backlink if link is not null
     if (target_link) {
-        Table* origin_table = const_cast<Table*>(m_tree_top.get_owner());
+        Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table());
         Obj target_obj = origin_table->get_parent_group()->get_object(target_link);
         auto target_table = target_obj.get_table();
         ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
@@ -273,7 +268,6 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
     }
 
     auto val = init_values.begin();
-    auto table = m_tree_top.get_owner();
     auto insert_in_column = [&](ColKey col_key) {
         auto col_ndx = col_key.get_index();
         auto attr = col_key.get_attrs();
@@ -354,7 +348,7 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         }
         return false;
     };
-    table->for_each_and_every_column(insert_in_column);
+    m_tree_top.for_each_and_every_column(insert_in_column);
 }
 
 template <class T>
@@ -404,9 +398,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 do_move<ArrayDouble>(ndx, col_key, new_leaf);
                 break;
             case col_type_String: {
-                const Spec& spec = m_tree_top.get_spec();
-                size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_key.get_index());
-                if (spec.is_string_enum_type(spec_ndx))
+                if (m_tree_top.is_string_enum_type(col_key.get_index()))
                     do_move<ArrayInteger>(ndx, col_key, new_leaf);
                 else
                     do_move<ArrayString>(ndx, col_key, new_leaf);
@@ -442,7 +434,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         }
         return false;
     };
-    m_tree_top.get_owner()->for_each_and_every_column(move_from_column);
+    m_tree_top.for_each_and_every_column(move_from_column);
     for (size_t i = ndx; i < m_keys.size(); i++) {
         new_leaf->m_keys.add(m_keys.get(i) - offset);
     }
@@ -453,7 +445,7 @@ Cluster::~Cluster() {}
 
 const Table* Cluster::get_owning_table() const
 {
-    return m_tree_top.get_owner();
+    return m_tree_top.get_owning_table();
 }
 
 ColKey Cluster::get_col_key(size_t ndx_in_parent) const
@@ -622,7 +614,7 @@ ref_type Cluster::insert(ObjKey k, const FieldValues& init_values, ClusterNode::
     else {
         // Split leaf node
         Cluster new_leaf(0, m_alloc, m_tree_top);
-        new_leaf.create(size() - 1);
+        new_leaf.create();
         if (ndx == sz) {
             new_leaf.insert_row(0, ObjKey(0), init_values); // Throws
             state.split_key = k.value;
@@ -679,7 +671,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
     if constexpr (std::is_same_v<T, ArrayTypedLink>) {
         ObjLink link = values.get(ndx);
         if (link) {
-            const Table* origin_table = m_tree_top.get_owner();
+            const Table* origin_table = m_tree_top.get_owning_table();
             auto target_obj = origin_table->get_parent_group()->get_object(link);
 
             ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
@@ -691,7 +683,7 @@ inline void Cluster::do_erase(size_t ndx, ColKey col_key)
         Mixed value = values.get(ndx);
         if (!value.is_null() && value.get_type() == type_TypedLink) {
             ObjLink link = value.get<ObjLink>();
-            const Table* origin_table = m_tree_top.get_owner();
+            const Table* origin_table = m_tree_top.get_owning_table();
             auto target_obj = origin_table->get_parent_group()->get_object(link);
 
             ColKey backlink_col_key = target_obj.get_table()->find_backlink_column(col_key, origin_table->get_key());
@@ -737,15 +729,6 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
 size_t Cluster::erase(ObjKey key, CascadeState& state)
 {
     size_t ndx = get_ndx(key, 0);
-    ObjKey real_key = get_real_key(ndx);
-    auto table = m_tree_top.get_owner();
-    const_cast<Table*>(table)->free_local_id_after_hash_collision(real_key);
-    if (!real_key.is_unresolved()) {
-        if (Replication* repl = table->get_repl()) {
-            repl->remove_object(table, real_key);
-        }
-    }
-
     std::vector<ColKey> backlink_column_keys;
 
     auto erase_in_column = [&](ColKey col_key) {
@@ -769,7 +752,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (col_type == col_type_TypedLink) {
                     BPlusTree<ObjLink> links(m_alloc);
                     links.init_from_ref(ref);
-                    const Table* origin_table = m_tree_top.get_owner();
+                    const Table* origin_table = m_tree_top.get_owning_table();
                     for (size_t i = 0; i < links.size(); i++) {
                         ObjLink link = links.get(i);
                         auto target_obj = origin_table->get_parent_group()->get_object(link);
@@ -781,7 +764,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 else if (col_type == col_type_Mixed) {
                     BPlusTree<Mixed> list(m_alloc);
                     list.init_from_ref(ref);
-                    const Table* origin_table = m_tree_top.get_owner();
+                    const Table* origin_table = m_tree_top.get_owning_table();
                     for (size_t i = 0; i < list.size(); i++) {
                         Mixed val = list.get(i);
                         if (val.get_type() == type_TypedLink) {
@@ -861,7 +844,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
         }
         return false;
     };
-    m_tree_top.get_owner()->for_each_and_every_column(erase_in_column);
+    m_tree_top.for_each_and_every_column(erase_in_column);
 
     // Any remaining backlink columns to erase from?
     for (auto k : backlink_column_keys)
@@ -920,7 +903,7 @@ void Cluster::nullify_incoming_links(ObjKey key, CascadeState& state)
         return false;
     };
 
-    m_tree_top.get_owner()->for_each_backlink_column(nullify_fwd_links);
+    m_tree_top.get_owning_table()->for_each_backlink_column(nullify_fwd_links);
 }
 
 void Cluster::upgrade_string_to_enum(ColKey col_key, ArrayString& keys)
@@ -948,11 +931,10 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     // FIXME: Move this validation into callers.
     // Currently, the query subsystem may call with an unvalidated key.
     // once fixed, reintroduce the noexcept declaration :-D
-    m_tree_top.get_owner()->report_invalid_key(col_key);
+    m_tree_top.get_owning_table()->report_invalid_key(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
     if (leaf->need_spec()) {
-        size_t spec_ndx = m_tree_top.get_owner()->leaf_ndx2spec_ndx(col_ndx);
-        leaf->set_spec(const_cast<Spec*>(&m_tree_top.get_spec()), spec_ndx);
+        m_tree_top.set_spec(*leaf, col_ndx);
     }
     leaf->init_from_ref(ref);
     leaf->set_parent(const_cast<Cluster*>(this), col_ndx.val + 1);
@@ -1111,7 +1093,7 @@ void Cluster::verify() const
         return false;
     };
 
-    m_tree_top.get_owner()->for_each_and_every_column(verify_column);
+    m_tree_top.for_each_and_every_column(verify_column);
 #endif
 }
 
@@ -1275,7 +1257,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
 void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const std::vector<ObjKey>& keys,
                                CascadeState& state) const
 {
-    const Table* origin_table = m_tree_top.get_owner();
+    const Table* origin_table = m_tree_top.get_owning_table();
     TableRef target_table = origin_table->get_opposite_table(origin_col_key);
     ColKey backlink_col_key = origin_table->get_opposite_column(origin_col_key);
     bool strong_links = target_table->is_embedded();
@@ -1300,3 +1282,5 @@ void Cluster::remove_backlinks(ObjKey origin_key, ColKey origin_col_key, const s
         }
     }
 }
+
+} // namespace realm

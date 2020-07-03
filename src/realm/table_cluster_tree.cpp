@@ -22,11 +22,15 @@
 #include "realm/array_key.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_backlink.hpp"
+#include "realm/array_string.hpp"
+#include "realm/group.hpp"
 
 namespace realm {
 
 TableClusterTree::TableClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree)
-    : ClusterTree(owner, alloc, top_position_for_cluster_tree)
+    : ClusterTree(alloc)
+    , m_owner(owner)
+    , m_top_position_for_cluster_tree(top_position_for_cluster_tree)
 {
 }
 
@@ -42,13 +46,12 @@ void TableClusterTree::clear(CascadeState& state)
 
     // We no longer have "clear table" instruction, so we have to report the removal of each
     // object individually
-    auto table = m_owner;
-    if (Replication* repl = table->get_repl()) {
+    if (Replication* repl = m_owner->get_repl()) {
         // Go through all clusters
-        traverse([repl, table](const Cluster* cluster) {
+        traverse([repl, this](const Cluster* cluster) {
             auto sz = cluster->node_size();
             for (size_t i = 0; i < sz; i++) {
-                repl->remove_object(table, cluster->get_real_key(i));
+                repl->remove_object(m_owner, cluster->get_real_key(i));
             }
             // Continue
             return false;
@@ -58,13 +61,94 @@ void TableClusterTree::clear(CascadeState& state)
     m_root->destroy_deep();
 
     auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
-    leaf->create(m_owner->num_leaf_cols());
+    leaf->create();
     replace_root(std::move(leaf));
 
     bump_content_version();
     bump_storage_version();
 
     m_size = 0;
+}
+
+
+void TableClusterTree::enumerate_string_column(ColKey col_key)
+{
+    Allocator& alloc = get_alloc();
+
+    ArrayString keys(alloc);
+    ArrayString leaf(alloc);
+    keys.create();
+
+    auto collect_strings = [col_key, &leaf, &keys](const Cluster* cluster) {
+        cluster->init_leaf(col_key, &leaf);
+        size_t sz = leaf.size();
+        size_t key_size = keys.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto v = leaf.get(i);
+            size_t pos = keys.lower_bound(v);
+            if (pos == key_size || keys.get(pos) != v) {
+                keys.insert(pos, v); // Throws
+                key_size++;
+            }
+        }
+
+        return false; // Continue
+    };
+
+    auto upgrade = [col_key, &keys](Cluster* cluster) {
+        cluster->upgrade_string_to_enum(col_key, keys);
+    };
+
+    // Populate 'keys' array
+    traverse(collect_strings);
+
+    // Store key strings in spec
+    size_t spec_ndx = m_owner->colkey2spec_ndx(col_key);
+    const_cast<Spec*>(&m_owner->m_spec)->upgrade_string_to_enum(spec_ndx, keys.get_ref());
+
+    // Replace column in all clusters
+    update(upgrade);
+}
+
+TableRef TableClusterTree::get_table_ref() const
+{
+    REALM_ASSERT(m_owner != nullptr);
+    // as safe as storing the TableRef locally in the ClusterTree,
+    // because the cluster tree and the table is basically one object :-O
+    return m_owner->m_own_ref;
+}
+
+void TableClusterTree::cleanup_key(ObjKey k)
+{
+    m_owner->free_local_id_after_hash_collision(k);
+    m_owner->erase_from_search_indexes(k);
+}
+
+void TableClusterTree::update_indexes(ObjKey k, const FieldValues& init_values)
+{
+    m_owner->update_indexes(k, init_values);
+}
+
+void TableClusterTree::for_each_and_every_column(ColIterateFunction func) const
+{
+    m_owner->for_each_and_every_column(func);
+}
+
+void TableClusterTree::set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const
+{
+    auto spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
+    arr.set_spec(&m_owner->m_spec, spec_ndx);
+}
+
+bool TableClusterTree::is_string_enum_type(ColKey::Idx col_ndx) const
+{
+    size_t spec_ndx = m_owner->leaf_ndx2spec_ndx(col_ndx);
+    return m_owner->m_spec.is_string_enum_type(spec_ndx);
+}
+
+std::unique_ptr<ClusterNode> TableClusterTree::get_root_from_parent()
+{
+    return create_root_from_parent(&m_owner->m_top, m_top_position_for_cluster_tree);
 }
 
 void TableClusterTree::remove_all_links(CascadeState& state)
@@ -76,7 +160,7 @@ void TableClusterTree::remove_all_links(CascadeState& state)
             // Prevent making changes to table that is going to be removed anyway
             // Furthermore it is a prerequisite for using 'traverse' that the tree
             // is not modified
-            if (m_owner->links_to_self(col_key)) {
+            if (get_owning_table()->links_to_self(col_key)) {
                 return false;
             }
             auto col_type = col_key.get_type();
@@ -116,7 +200,7 @@ void TableClusterTree::remove_all_links(CascadeState& state)
             }
             return false;
         };
-        get_owner()->for_each_and_every_column(remove_link_from_column);
+        m_owner->for_each_and_every_column(remove_link_from_column);
         // Continue
         return false;
     };
@@ -124,7 +208,18 @@ void TableClusterTree::remove_all_links(CascadeState& state)
     // Go through all clusters
     traverse(func);
 
-    m_owner->remove_recursive(state);
+    const_cast<Table*>(get_owning_table())->remove_recursive(state);
+}
+
+/***********************  TableClusterTree::Iterator  ************************/
+
+auto TableClusterTree::Iterator::operator[](size_t n) -> reference
+{
+    auto k = go(n);
+    if (m_obj.get_key() != k) {
+        new (&m_obj) Obj(m_table, m_leaf.get_mem(), k, m_state.m_current_index);
+    }
+    return m_obj;
 }
 
 TableClusterTree::Iterator::pointer TableClusterTree::Iterator::operator->() const
@@ -134,15 +229,6 @@ TableClusterTree::Iterator::pointer TableClusterTree::Iterator::operator->() con
     }
 
     return &m_obj;
-}
-
-auto TableClusterTree::Iterator::operator[](size_t n) -> reference
-{
-    auto k = go(n);
-    if (m_obj.get_key() != k) {
-        new (&m_obj) Obj(m_table, m_leaf.get_mem(), k, m_state.m_current_index);
-    }
-    return m_obj;
 }
 
 } // namespace realm

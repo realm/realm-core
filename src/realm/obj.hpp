@@ -20,9 +20,9 @@
 #define REALM_OBJ_HPP
 
 #include <realm/array.hpp>
-#include <realm/cluster.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
+#include <realm/mixed.hpp>
 #include <map>
 
 #define REALM_CLUSTER_IF
@@ -33,6 +33,7 @@ class TableClusterTree;
 class Replication;
 class TableView;
 class CollectionBase;
+class CascadeState;
 class LstBase;
 struct GlobalKey;
 
@@ -252,7 +253,6 @@ private:
     friend class LinkMap;
     friend class Table;
     friend class Transaction;
-    friend struct ClusterNode::IteratorState;
 
     mutable TableRef m_table;
     ObjKey m_key;

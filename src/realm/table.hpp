@@ -484,7 +484,6 @@ public:
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
     void report_invalid_key(ColKey col_key) const;
-    size_t num_leaf_cols() const;
 
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
@@ -1228,11 +1227,6 @@ inline size_t Table::colkey2spec_ndx(ColKey key) const
     auto leaf_idx = key.get_index();
     REALM_ASSERT(leaf_idx.val < m_leaf_ndx2spec_ndx.size());
     return m_leaf_ndx2spec_ndx[leaf_idx.val];
-}
-
-inline size_t Table::num_leaf_cols() const
-{
-    return m_leaf_ndx2spec_ndx.size();
 }
 
 inline ColKey Table::spec_ndx2colkey(size_t spec_ndx) const

@@ -186,7 +186,7 @@ public:
     }
     ~Cluster() override;
 
-    void create(size_t nb_leaf_columns); // Note: leaf columns - may include holes
+    void create(); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -276,7 +276,6 @@ private:
     {
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
-
     void insert_row(size_t ndx, ObjKey k, const FieldValues& init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>
