@@ -311,6 +311,7 @@ private:
     friend class WrappedAllocator;
     friend class Obj;
     friend class CollectionBase;
+    friend class Dictionary;
 };
 
 

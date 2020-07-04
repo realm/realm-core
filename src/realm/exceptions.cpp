@@ -104,8 +104,8 @@ const char* LogicError::message() const noexcept
             return "Column does not exist";
         case subtable_of_subtable_index:
             return "Search index on a subtable of a subtable is not yet supported";
-        case list_type_mismatch:
-            return "Instantiating a list object not matching column type";
+        case collection_type_mismatch:
+            return "Instantiating a collection object not matching column type";
     }
     return "Unknown error";
 }

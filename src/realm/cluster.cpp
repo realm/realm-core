@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include "realm/cluster.hpp"
+#include "realm/dictionary_cluster_tree.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_bool.hpp"
@@ -64,6 +65,16 @@ void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 
 /********************************* Cluster ***********************************/
 
+MemRef Cluster::create_empty_cluster(Allocator& alloc)
+{
+    Array arr(alloc);
+    arr.create(Array::type_HasRefs); // Throws
+
+    arr.add(RefOrTagged::make_tagged(0)); // Compact form
+    return arr.get_mem();
+}
+
+
 template <class T>
 inline void Cluster::do_create(ColKey col)
 {
@@ -84,7 +95,7 @@ void Cluster::create()
             add(0);
         auto type = col_key.get_type();
         auto attr = col_key.get_attrs();
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_Collection)) {
             ArrayRef arr(m_alloc);
             arr.create();
             arr.set_parent(this, col_ndx.val + s_first_col_index);
@@ -278,7 +289,8 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             ++val;
         }
 
-        if (attr.test(col_attr_List)) {
+        auto type = col_key.get_type();
+        if (attr.test(col_attr_Collection)) {
             REALM_ASSERT(init_value.is_null());
             ArrayRef arr(m_alloc);
             arr.set_parent(this, col_ndx.val + s_first_col_index);
@@ -288,7 +300,6 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
         }
 
         bool nullable = attr.test(col_attr_Nullable);
-        auto type = col_key.get_type();
         switch (type) {
             case col_type_Int:
                 if (attr.test(col_attr_Nullable)) {
@@ -374,7 +385,7 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
         auto attr = col_key.get_attrs();
         auto type = col_key.get_type();
 
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_Collection)) {
             do_move<ArrayRef>(ndx, col_key, new_leaf);
             return false;
         }
@@ -495,7 +506,8 @@ inline void Cluster::do_insert_column(ColKey col_key, bool nullable)
 void Cluster::insert_column(ColKey col_key)
 {
     auto attr = col_key.get_attrs();
-    if (attr.test(col_attr_List)) {
+    auto type = col_key.get_type();
+    if (attr.test(col_attr_Collection)) {
         size_t sz = node_size();
 
         ArrayRef arr(m_alloc);
@@ -509,7 +521,6 @@ void Cluster::insert_column(ColKey col_key)
         return;
     }
     bool nullable = attr.test(col_attr_Nullable);
-    auto type = col_key.get_type();
     switch (type) {
         case col_type_Int:
             if (nullable) {
@@ -734,7 +745,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
     auto erase_in_column = [&](ColKey col_key) {
         auto col_type = col_key.get_type();
         auto attr = col_key.get_attrs();
-        if (attr.test(col_attr_List)) {
+        if (attr.test(col_attr_Collection)) {
             auto col_ndx = col_key.get_index();
             ArrayRef values(m_alloc);
             values.set_parent(this, col_ndx.val + s_first_col_index);
@@ -1041,6 +1052,26 @@ void Cluster::verify() const
                     break;
                 default:
                     break;
+            }
+            return false;
+        }
+        else if (attr.test(col_attr_Dictionary)) {
+            ArrayRef arr(get_alloc());
+            arr.set_parent(const_cast<Cluster*>(this), col);
+            arr.init_from_ref(ref);
+            arr.verify();
+            if (sz) {
+                REALM_ASSERT(arr.size() == *sz);
+            }
+            else {
+                sz = arr.size();
+            }
+            for (size_t n = 0; n < sz; n++) {
+                if (arr.get(n)) {
+                    DictionaryClusterTree cluster(&arr, col_type, get_alloc(), n);
+                    cluster.init_from_parent();
+                    cluster.verify();
+                }
             }
             return false;
         }

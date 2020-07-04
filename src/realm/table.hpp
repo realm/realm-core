@@ -92,6 +92,10 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    /// If this table is a group-level table, the parent group is returned,
+    /// otherwise null is returned.
+    Group* get_parent_group() const noexcept;
+
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
@@ -125,6 +129,7 @@ public:
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
+    ColKey add_column_dictionary(DataType type, StringData name);
 
     ColKey add_column_link(DataType type, StringData name, Table& target);
 
@@ -709,9 +714,6 @@ private:
 
     ColumnType get_real_column_type(ColKey col_key) const noexcept;
 
-    /// If this table is a group-level table, the parent group is returned,
-    /// otherwise null is returned.
-    Group* get_parent_group() const noexcept;
     uint64_t get_sync_file_id() const noexcept;
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;

@@ -46,6 +46,8 @@ using LstBasePtr = std::unique_ptr<LstBase>;
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 
+class Dictionary;
+
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
@@ -78,6 +80,7 @@ public:
     }
 
     GlobalKey get_object_id() const;
+    ObjLink get_link() const;
 
     Replication* get_replication() const;
 
@@ -236,6 +239,9 @@ public:
     LnkLst get_linklist(StringData col_name) const;
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
+
+    Dictionary get_dictionary(ColKey col_key) const;
+
     void assign_pk_and_backlinks(const Obj& other);
 
 private:
@@ -250,6 +256,7 @@ private:
     template <class>
     friend class Lst;
     friend class LnkLst;
+    friend class Dictionary;
     friend class LinkMap;
     friend class Table;
     friend class Transaction;
@@ -299,6 +306,12 @@ private:
     void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
+
+    // Dictionary support
+    size_t get_row_ndx() const
+    {
+        return m_row_ndx;
+    }
 
     void set_int(ColKey col_key, int64_t value);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);

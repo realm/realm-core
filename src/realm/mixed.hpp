@@ -189,6 +189,7 @@ public:
     {
         return compare(other) > 0;
     }
+    size_t hash() const;
 
 private:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);

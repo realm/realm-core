@@ -186,6 +186,8 @@ public:
     }
     ~Cluster() override;
 
+    static MemRef create_empty_cluster(Allocator& alloc);
+
     void create(); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;

@@ -34,6 +34,7 @@
 #include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
 #include "realm/spec.hpp"
+#include "realm/dictionary.hpp"
 #include "realm/table_view.hpp"
 #include "realm/replication.hpp"
 #include "realm/util/base64.hpp"
@@ -55,6 +56,11 @@ Obj::Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx)
 GlobalKey Obj::get_object_id() const
 {
     return m_table->get_object_id(m_key);
+}
+
+ObjLink Obj::get_link() const
+{
+    return ObjLink(m_table->get_key(), m_key);
 }
 
 const TableClusterTree* Obj::get_tree_top() const
@@ -558,7 +564,15 @@ size_t Obj::get_backlink_count(const Table& origin, ColKey origin_col_key) const
 
     size_t cnt = 0;
     if (TableKey origin_table_key = origin.get_key()) {
-        ColKey backlink_col_key = origin.get_opposite_column(origin_col_key);
+        ColKey backlink_col_key;
+        auto type = origin_col_key.get_type();
+        if (type == col_type_TypedLink || type == col_type_Mixed || origin_col_key.is_dictionary()) {
+            backlink_col_key = get_table()->find_backlink_column(origin_col_key, origin_table_key);
+        }
+        else {
+            backlink_col_key = origin.get_opposite_column(origin_col_key);
+        }
+
         cnt = get_backlink_cnt(backlink_col_key);
     }
     return cnt;
@@ -568,7 +582,7 @@ ObjKey Obj::get_backlink(const Table& origin, ColKey origin_col_key, size_t back
 {
     ColKey backlink_col_key;
     auto type = origin_col_key.get_type();
-    if (type == col_type_TypedLink || type == col_type_Mixed) {
+    if (type == col_type_TypedLink || type == col_type_Mixed || origin_col_key.is_dictionary()) {
         backlink_col_key = get_table()->find_backlink_column(origin_col_key, origin.get_key());
     }
     else {
@@ -793,14 +807,14 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
-        DataType type = DataType(ck.get_type());
+        auto type = ck.get_type();
         if (renames[name] != "")
             name = renames[name];
 
         out << ",\"" << name << "\":";
 
         if (ck.get_attrs().test(col_attr_List)) {
-            if (type == type_LinkList) {
+            if (type == col_type_LinkList) {
                 TableRef target_table = get_target_table(ck);
                 auto ll = get_linklist(ck);
                 auto sz = ll.size();
@@ -842,8 +856,22 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
                 out << "]";
             }
         }
+        else if (ck.get_attrs().test(col_attr_Dictionary)) {
+            auto dict = get_dictionary(ck);
+            out << "{";
+            bool first = true;
+            for (auto it : dict) {
+                if (!first)
+                    out << ",";
+                first = false;
+                out_mixed(out, it.first);
+                out << ":";
+                out_mixed(out, it.second);
+            }
+            out << "}";
+        }
         else {
-            if (type == type_Link) {
+            if (type == col_type_Link) {
                 TableRef target_table = get_target_table(ck);
                 auto k = get<ObjKey>(ck);
                 if (k) {
@@ -1424,6 +1452,15 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
             REALM_ASSERT(false);
         }
     }
+    else if (attr.test(col_attr_Dictionary)) {
+        auto dict = this->get_dictionary(origin_col_key);
+        Mixed val{target_link};
+        for (auto it : dict) {
+            if (it.second == val) {
+                dict.nullify(it.first);
+            }
+        }
+    }
     else {
         if (origin_col_key.get_type() == col_type_Link) {
             ArrayKey links(alloc);
@@ -1468,7 +1505,7 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link)
         auto target_obj = m_table->get_parent_group()->get_object(new_link);
         ColKey backlink_col_key;
         auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed) {
+        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
             backlink_col_key = target_obj.get_table()->find_or_add_backlink_column(col_key, get_table_key());
         }
         else {
@@ -1495,7 +1532,7 @@ bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
         TableRef target_table = target_obj.get_table();
         ColKey backlink_col_key;
         auto type = col_key.get_type();
-        if (type == col_type_TypedLink || type == col_type_Mixed) {
+        if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
             backlink_col_key = target_table->find_or_add_backlink_column(col_key, get_table_key());
         }
         else {
@@ -1587,6 +1624,12 @@ void Obj::assign(const Obj& other)
     m_table->for_each_backlink_column(copy_links);
 }
 
+Dictionary Obj::get_dictionary(ColKey col_key) const
+{
+    REALM_ASSERT(col_key.is_dictionary());
+    update_if_needed();
+    return Dictionary(Obj(*this), col_key);
+}
 
 void Obj::assign_pk_and_backlinks(const Obj& other)
 {
@@ -1606,6 +1649,16 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
                 // Single link
                 REALM_ASSERT(!linking_obj.get<ObjKey>(c) || linking_obj.get<ObjKey>(c) == other.get_key());
                 linking_obj.set(c, get_key());
+            }
+            else if (c.is_dictionary()) {
+                auto dict = linking_obj.get_dictionary(c);
+                Mixed val(other.get_link());
+                for (auto it : dict) {
+                    if (it.second == val) {
+                        auto link = get_link();
+                        dict.insert(it.first, link);
+                    }
+                }
             }
             else {
                 auto l = linking_obj.get_list<ObjKey>(c);

@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/mixed.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/unicode.hpp>
 
 namespace realm {
@@ -162,6 +163,35 @@ int Mixed::compare(const Mixed& b) const
             break;
         default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
+            break;
+    }
+
+    return 0;
+}
+
+size_t Mixed::hash() const
+{
+    REALM_ASSERT(!is_null());
+
+    switch (get_type()) {
+        case type_Int:
+            return size_t(int_val);
+            break;
+        case type_Bool:
+            return bool_val;
+            break;
+        case type_String:
+            return get<StringData>().hash();
+            break;
+        case type_ObjectId:
+            return get<ObjectId>().hash();
+            break;
+        case type_Decimal: {
+            std::hash<realm::Decimal128> h;
+            return h(decimal_val);
+        }
+        default:
+            REALM_ASSERT_RELEASE(false && "Hash not supported for this column type");
             break;
     }
 
