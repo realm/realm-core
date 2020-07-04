@@ -333,6 +333,15 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
+ColKey Table::add_column_dictionary(DataType type, StringData name)
+{
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_Dictionary);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
+}
+
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
@@ -457,7 +466,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     if (m_top.get_as_ref(top_position_for_cluster_tree) == 0) {
         // This is an upgrade - create cluster
-        MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc()); // Throws
+        MemRef mem = Cluster::create_empty_cluster(m_top.get_alloc()); // Throws
         m_top.set_as_ref(top_position_for_cluster_tree, mem.get_ref());
     }
     m_clusters.init_from_parent();
@@ -1710,7 +1719,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     }
     top.add(0); // Old position for columns
     {
-        MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
+        MemRef mem = Cluster::create_empty_cluster(alloc); // Throws
         dg_2.reset(mem.get_ref());
         int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
@@ -1769,7 +1778,7 @@ void Table::ensure_graveyard()
         while (m_top.size() < top_position_for_tombstones)
             m_top.add(0);
         REALM_ASSERT(!m_top.get(top_position_for_tombstones));
-        MemRef mem = ClusterTree::create_empty_cluster(m_alloc);
+        MemRef mem = Cluster::create_empty_cluster(m_alloc);
         m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
         m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         m_tombstones->init_from_parent();

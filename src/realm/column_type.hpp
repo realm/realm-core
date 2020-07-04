@@ -29,7 +29,6 @@ enum ColumnType {
     col_type_Int = 0,
     col_type_Bool = 1,
     col_type_String = 2,
-    col_type_OldStringEnum = 3, // double refs
     col_type_Binary = 4,
     col_type_OldTable = 5,
     col_type_Mixed = 6,
@@ -66,12 +65,15 @@ enum ColumnAttr {
     col_attr_Nullable = 16,
 
     /// Each element is a list of values
-    col_attr_List = 32
+    col_attr_List = 32,
+
+    /// Each element is a dictionary
+    col_attr_Dictionary = 64
 };
 
 class ColumnAttrMask {
 public:
-    ColumnAttrMask()
+    constexpr ColumnAttrMask()
         : m_value(0)
     {
     }

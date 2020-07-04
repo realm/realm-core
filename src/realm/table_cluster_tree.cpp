@@ -58,16 +58,7 @@ void TableClusterTree::clear(CascadeState& state)
         });
     }
 
-    m_root->destroy_deep();
-
-    auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
-    leaf->create();
-    replace_root(std::move(leaf));
-
-    bump_content_version();
-    bump_storage_version();
-
-    m_size = 0;
+    ClusterTree::clear();
 }
 
 

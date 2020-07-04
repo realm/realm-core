@@ -37,7 +37,7 @@ template <class T>
 inline void check_column_type(ColKey col)
 {
     if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -45,7 +45,7 @@ template <>
 inline void check_column_type<Int>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -53,7 +53,7 @@ template <>
 inline void check_column_type<util::Optional<Int>>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -61,7 +61,7 @@ template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
     if (col && col.get_type() != col_type_LinkList) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 

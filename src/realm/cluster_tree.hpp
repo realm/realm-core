@@ -35,7 +35,6 @@ public:
 
     ClusterTree(Allocator& alloc);
     virtual ~ClusterTree();
-    static MemRef create_empty_cluster(Allocator& alloc);
 
     ClusterTree(ClusterTree&&) = default;
 
@@ -160,6 +159,7 @@ protected:
     std::unique_ptr<ClusterNode> m_root;
     size_t m_size = 0;
 
+    void clear();
     void replace_root(std::unique_ptr<ClusterNode> leaf);
 
     std::unique_ptr<ClusterNode> create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent);

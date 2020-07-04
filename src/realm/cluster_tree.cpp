@@ -723,15 +723,6 @@ ClusterTree::ClusterTree(Allocator& alloc)
 
 ClusterTree::~ClusterTree() {}
 
-MemRef ClusterTree::create_empty_cluster(Allocator& alloc)
-{
-    Array arr(alloc);
-    arr.create(Array::type_HasRefs); // Throws
-
-    arr.add(RefOrTagged::make_tagged(0)); // Compact form
-    return arr.get_mem();
-}
-
 std::unique_ptr<ClusterNode> ClusterTree::create_root_from_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
     ref_type ref = parent->get_child_ref(ndx_in_parent);
@@ -777,6 +768,20 @@ std::unique_ptr<ClusterNode> ClusterTree::get_node(ArrayParent* parent, size_t n
     node->set_parent(parent, ndx_in_parent);
 
     return node;
+}
+
+void ClusterTree::clear()
+{
+    m_root->destroy_deep();
+
+    auto leaf = std::make_unique<Cluster>(0, m_root->get_alloc(), *this);
+    leaf->create();
+    replace_root(std::move(leaf));
+
+    bump_content_version();
+    bump_storage_version();
+
+    m_size = 0;
 }
 
 void ClusterTree::replace_root(std::unique_ptr<ClusterNode> new_root)
