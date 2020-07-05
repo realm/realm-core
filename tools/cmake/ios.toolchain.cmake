@@ -1,4 +1,5 @@
 include("${CMAKE_CURRENT_LIST_DIR}/Utilities.cmake")
+include(GNUInstallDirs)
 
 check_generator("Xcode")
 
@@ -27,3 +28,5 @@ set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeRel "armv7 arm64")
 set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=iphone*] "YES")
 
 set_bitcode_attributes()
+
+install_arch_slices_for_platform("iphone")
