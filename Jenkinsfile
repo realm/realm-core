@@ -52,9 +52,9 @@ jobWrapper {
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
-        isPublishingRun = false
+        isPublishingRun = true
         if (gitTag) {
-            isPublishingRun = currentBranch.contains('release')
+            //isPublishingRun = currentBranch.contains('release')
         }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
@@ -102,7 +102,7 @@ jobWrapper {
         nativeDocker: 'armhf-native.Dockerfile',
         nativeDockerPlatform: 'linux/arm/v7',
     ]
-    stage('Checking') {
+    /*stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
             checkLinuxRelease       : doCheckInDocker('Release'),
@@ -132,7 +132,7 @@ jobWrapper {
             parallelExecutors.putAll(extendedChecks)
         }
         parallel parallelExecutors
-    }
+    }*/
 
     if (isPublishingRun) {
         stage('BuildPackages') {
@@ -142,18 +142,18 @@ jobWrapper {
                 buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
-                buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
-                buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
+                //buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
+                //buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
 
-            androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
+            /*androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
             androidBuildTypes = ['Debug', 'Release']
 
             for (abi in androidAbis) {
                 for (buildType in androidBuildTypes) {
                     parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
                 }
-            }
+            }*/
 
             appleSdks = ['ios', 'tvos', 'watchos']
             appleBuildTypes = ['MinSizeDebug', 'Release']
@@ -164,7 +164,7 @@ jobWrapper {
                 }
             }
 
-            linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
+            /*linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
             linuxCrossCompileTargets = ['armhf']
 
             for (buildType in linuxBuildTypes) {
@@ -183,7 +183,7 @@ jobWrapper {
                     parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
                 }
                 parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
-            }
+            }*/
 
             parallel parallelExecutors
         }
@@ -201,7 +201,7 @@ jobWrapper {
                         stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
                         publishingStashes << stashName
                     }
-                },
+                }/*,
                 android: {
                     node('docker') {
                         getArchive()
@@ -214,7 +214,7 @@ jobWrapper {
                         stash includes: 'realm-core-android*.tar.gz', name: stashName
                         publishingStashes << stashName
                     }
-                }
+                }*/
             )
         }
         stage('publish-packages') {
