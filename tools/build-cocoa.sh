@@ -85,32 +85,52 @@ for bt in "${BUILD_TYPES[@]}"; do
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
         tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
         mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${p}${suffix}.a"
+
+        # extract arch slices for iOS, Watch, TV
+        if [[ "$p" != "macosx" && "$p" != "maccatalyst" ]]; then
+            case "${p}" in
+                ios) SDK="iphone";;
+                watchos) SDK="watch";;
+                tvos) SDK="appletv";;
+            esac
+            tar -C core -zxvf "${filename}" "lib/librealm-${SDK}os${suffix}.a"
+            mv "core/lib/librealm-${SDK}os${suffix}.a" "core/librealm-${SDK}os${suffix}.a"
+            tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}os${suffix}.a"
+            mv "core/lib/librealm-parser-${SDK}os${suffix}.a" "core/librealm-parser-${SDK}os${suffix}.a"
+            tar -C core -zxvf "${filename}" "lib/librealm-${SDK}simulator${suffix}.a"
+            mv "core/lib/librealm-${SDK}simulator${suffix}.a" "core/librealm-${SDK}simulator${suffix}.a"
+            tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}simulator${suffix}.a"
+            mv "core/lib/librealm-parser-${SDK}simulator${suffix}.a" "core/librealm-parser-${SDK}simulator${suffix}.a"
+        fi
         rm -rf core/lib
     done
 done
 
-# produce xcframeworks
+# Produce xcframeworks
 if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
         make_core_xcframework=()
         [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
         for p in "${PLATFORMS[@]}"; do
-            if [[ "$p" == "macosx" || "$p" == "maccatalyst" ]]; then
-                build_dir="build-${p}-${bt}/src/realm/librealm${suffix}.a"
+            if [[ "$p" == "macosx" ]]; then
+                build_dir="core/librealm-macosx${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir} -headers core/include/)
+            elif [[ "$p" == "maccatalyst" ]]; then
+                build_dir="core/librealm-maccatalyst${suffix}.a"
                 make_core_xcframework+=( -library ${build_dir} -headers core/include/)
             elif [[ "$p" == "ios" ]]; then
-                build_dir_device="build-${p}-${bt}/src/realm/${bt}-iphoneos/librealm${suffix}.a"
-                build_dir_simulator="build-${p}-${bt}/src/realm/${bt}-iphonesimulator/librealm${suffix}.a"
+                build_dir_device="core/librealm-iphoneos${suffix}.a"
+                build_dir_simulator="core/librealm-iphonesimulator${suffix}.a"
                 make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
                 make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
             elif [[ "$p" == "watchos" ]]; then
-                build_dir_device="build-${p}-${bt}/src/realm/${bt}-watchos/librealm${suffix}.a"
-                build_dir_simulator="build-${p}-${bt}/src/realm/${bt}-watchsimulator/librealm${suffix}.a"
+                build_dir_device="core/librealm-watchos${suffix}.a"
+                build_dir_simulator="core/librealm-watchsimulator${suffix}.a"
                 make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
                 make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
             elif [[ "$p" == "tvos" ]]; then
-                build_dir_device="build-${p}-${bt}/src/realm/${bt}-appletvos/librealm${suffix}.a"
-                build_dir_simulator="build-${p}-${bt}/src/realm/${bt}-appletvsimulator/librealm${suffix}.a"
+                build_dir_device="core/librealm-appletvos${suffix}.a"
+                build_dir_simulator="core/librealm-appletvsimulator${suffix}.a"
                 make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
                 make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
             fi
