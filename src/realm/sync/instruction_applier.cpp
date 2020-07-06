@@ -426,24 +426,22 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         bad_transaction_log("AddColumn '%1.%3' which already exists", table->get_name(), col_name);
     }
 
-    if (instr.type == Type::Null) {
-        if (!instr.list) {
-            table->add_column(type_Mixed, col_name);
-        }
-        else {
-            table->add_column_list(type_Mixed, col_name);
-        }
-        return;
-    }
-
+    DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
 
     if (instr.type != Type::Link) {
-        DataType type = get_data_type(instr.type);
-        if (instr.list) {
-            table->add_column_list(type, col_name, instr.nullable);
-        }
-        else {
-            table->add_column(type, col_name, instr.nullable);
+        switch (instr.collection_type) {
+            case Instruction::AddColumn::CollectionType::Single:
+                table->add_column(type, col_name, instr.nullable);
+                break;
+            case Instruction::AddColumn::CollectionType::List:
+                table->add_column_list(type, col_name, instr.nullable);
+                break;
+            case Instruction::AddColumn::CollectionType::Dictionary:
+                table->add_column_dictionary(type, col_name);
+                break;
+            case Instruction::AddColumn::CollectionType::Set:
+                // table->add_column_set(type, col_name);
+                break;
         }
     }
     else {
@@ -455,7 +453,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
                                     col_name, target_table_name);
             }
-            if (instr.list) {
+            if (instr.collection_type == Instruction::AddColumn::CollectionType::List) {
                 table->add_column_list(*target, col_name);
             }
             else {
@@ -463,7 +461,12 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
             }
         }
         else {
-            table->add_column(type_TypedLink, col_name);
+            if (instr.collection_type == Instruction::AddColumn::CollectionType::List) {
+                table->add_column_list(type_TypedLink, col_name);
+            }
+            else {
+                table->add_column(type_TypedLink, col_name);
+            }
         }
     }
 }
@@ -570,6 +573,43 @@ void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
     auto& list = get_list(instr, "ArrayClear");
 
     list.clear();
+}
+
+void InstructionApplier::operator()(const Instruction::DictionaryInsert& instr)
+{
+    std::unique_ptr<Dictionary> dict;
+    Mixed key;
+    std::tie(dict, key) = get_dictionary(instr, "DictionaryInsert");
+
+    auto table = dict->get_table();
+    ColKey col = dict->get_col_key();
+    SetTargetInfo info;
+    info.table_name = table->get_name();
+    info.col_name = table->get_column_name(col);
+    info.type = type_Mixed;
+
+    auto setter = util::overloaded{
+        [&](const util::None&) {
+            dict->insert(key, Mixed());
+        },
+        [&](const Instruction::Payload::ObjectValue&) {},
+        [&](const ObjLink& link) {
+            dict->insert(key, Mixed(link));
+        },
+        [&](const auto& value) {
+            dict->insert(key, value);
+        },
+    };
+    set_value(info, instr.value, std::move(setter), "DictionaryInsert");
+}
+
+void InstructionApplier::operator()(const Instruction::DictionaryErase& instr)
+{
+    std::unique_ptr<Dictionary> dict;
+    Mixed key;
+    std::tie(dict, key) = get_dictionary(instr, "DictionaryErase");
+
+    dict->erase(key);
 }
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
@@ -692,6 +732,9 @@ std::tuple<Obj, ColKey> InstructionApplier::get_field(const Instruction::PathIns
                                         tbl->get_name(), col_name);
                 }
             }
+            else if (col.is_dictionary()) {
+                // We are done
+            }
             else {
                 bad_transaction_log("%1: Invalid path (not an embedded object '%2.%3')", name,
                                     obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
@@ -776,6 +819,25 @@ LstBase& InstructionApplier::get_list(const Instruction::PathInstruction& instr,
     }
 
     return *m_last_list;
+}
+
+std::tuple<std::unique_ptr<Dictionary>, Mixed>
+InstructionApplier::get_dictionary(const Instruction::PathInstruction& instr, const char* name)
+{
+    // Note: get_field() returns the last object field in the path, which is to
+    // say that if the last element of the path is an index, it will not be
+    // traversed.
+    auto [obj, col] = get_field(instr, name);
+    auto dictionary = std::make_unique<Dictionary>(obj, col);
+    auto key = instr.path.back();
+    if (auto psubfield = mpark::get_if<InternString>(&key)) {
+        StringData string_key = get_string(*psubfield);
+        return std::make_tuple(std::move(dictionary), Mixed(string_key));
+    }
+    else {
+        bad_transaction_log("%1: Invalid path (only string keys supported)", name);
+    }
+    return {};
 }
 
 ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::PrimaryKey& primary_key,

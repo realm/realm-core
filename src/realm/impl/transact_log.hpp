@@ -65,6 +65,9 @@ enum Instruction {
     // instr_ListSwap = 34,   Swap two entries within a list (unused from file format 11)
     instr_ListErase = 35, // Remove an entry from a list
     instr_ListClear = 36, // Remove all entries from a list
+
+    instr_DictionaryInsert = 37,
+    instr_DictionaryErase = 38,
 };
 
 class TransactLogStream {
@@ -162,6 +165,15 @@ public:
         return true;
     }
 
+    bool dictionary_insert(Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(Mixed)
+    {
+        return true;
+    }
+
     // Must have descriptor selected:
     bool insert_column(ColKey)
     {
@@ -239,6 +251,9 @@ public:
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
+
+    bool dictionary_insert(Mixed);
+    bool dictionary_erase(Mixed);
 
     /// End of methods expected by parser.
 
@@ -334,6 +349,8 @@ public:
     virtual void list_erase(const CollectionBase&, size_t link_ndx);
     virtual void list_clear(const CollectionBase&);
 
+    virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value);
+    virtual void dictionary_erase(const CollectionBase& dict, Mixed key);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
@@ -673,7 +690,8 @@ void TransactLogEncoder::append_string_instr(Instruction instr, StringData strin
     size_t max_required_bytes = 1 + max_enc_bytes_per_int + string.size();
     char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
-    encode(ptr, int(type_String));
+    ptr = encode(ptr, int(type_String));
+    ptr = encode(ptr, size_t(string.size()));
     ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
 }
@@ -964,6 +982,22 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_DictionaryInsert: {
+            int type = read_int<int>(); // Throws
+            REALM_ASSERT(type == type_String);
+            Mixed key = Mixed(read_string(m_string_buffer));
+            if (!handler.dictionary_insert(key)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_DictionaryErase: {
+            int type = read_int<int>(); // Throws
+            REALM_ASSERT(type == type_String);
+            Mixed key = Mixed(read_string(m_string_buffer));
+            if (!handler.dictionary_erase(key)) // Throws
+                parser_error();
+            return;
+        }
         case instr_SelectList: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
@@ -1176,6 +1210,18 @@ public:
     {
         m_encoder.list_erase(ndx);
         append_instruction();
+        return true;
+    }
+
+    bool dictionary_insert(Mixed key)
+    {
+        m_encoder.dictionary_erase(key);
+        return true;
+    }
+
+    bool dictionary_erase(Mixed key)
+    {
+        m_encoder.dictionary_insert(key);
         return true;
     }
 

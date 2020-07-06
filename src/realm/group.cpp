@@ -1493,6 +1493,19 @@ public:
         return true; // No-op
     }
 
+    bool dictionary_insert(Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_erase(Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_clear(size_t)
+    {
+        return true; // No-op
+    }
+
 private:
     bool& m_schema_changed;
 };

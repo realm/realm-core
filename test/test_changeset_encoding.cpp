@@ -58,7 +58,7 @@ TEST(ChangesetEncoding_AddColumn)
     instr.table = changeset.intern_string("Foo");
     instr.field = changeset.intern_string("foo");
     instr.type = Payload::Type::Link;
-    instr.list = true;
+    instr.collection_type = AddColumn::CollectionType::List;
     instr.nullable = false;
     instr.link_target_table = changeset.intern_string("Bar");
     changeset.push_back(instr);

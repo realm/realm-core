@@ -1903,6 +1903,10 @@ public:
     {
         return false;
     }
+    bool dictionary_erase(Mixed)
+    {
+        return false;
+    }
     bool modify_object(ColKey, ObjKey)
     {
         return false;

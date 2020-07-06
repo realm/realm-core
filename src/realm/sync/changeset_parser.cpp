@@ -332,7 +332,7 @@ void ChangesetParser::State::parse_one()
             instr.field = read_intern_string();
             instr.type = read_payload_type();
             instr.nullable = read_bool();
-            instr.list = read_bool();
+            instr.collection_type = Instruction::AddColumn::CollectionType(read_int<uint8_t>());
             if (instr.type == Instruction::Payload::Type::Link) {
                 instr.link_target_table = read_intern_string();
             }
@@ -382,6 +382,19 @@ void ChangesetParser::State::parse_one()
             Instruction::ArrayClear instr;
             read_path_instr(instr);
             instr.prior_size = read_int<uint32_t>();
+            m_handler(instr);
+            return;
+        }
+        case Instruction::Type::DictionaryInsert: {
+            Instruction::DictionaryInsert instr;
+            read_path_instr(instr);
+            instr.value = read_payload();
+            m_handler(instr);
+            return;
+        }
+        case Instruction::Type::DictionaryErase: {
+            Instruction::DictionaryErase instr;
+            read_path_instr(instr);
             m_handler(instr);
             return;
         }
