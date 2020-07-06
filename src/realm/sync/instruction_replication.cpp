@@ -342,7 +342,13 @@ void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType
         instr.field = m_encoder.intern_string(name);
         instr.nullable = col_ndx.is_nullable();
         instr.type = get_payload_type(type);
-        instr.list = col_ndx.is_list();
+        instr.collection_type = Instruction::AddColumn::CollectionType::Single;
+        if (col_ndx.is_list()) {
+            instr.collection_type = Instruction::AddColumn::CollectionType::List;
+        }
+        if (col_ndx.is_dictionary()) {
+            instr.collection_type = Instruction::AddColumn::CollectionType::Dictionary;
+        }
 
         // Mixed columns are always nullable.
         REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
@@ -501,6 +507,40 @@ void SyncReplication::list_clear(const CollectionBase& view)
         emit(instr);
     }
 }
+
+
+void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
+{
+    TrivialReplication::dictionary_insert(dict, key, val);
+
+    if (select_collection(dict)) {
+        Instruction::DictionaryInsert instr;
+        REALM_ASSERT(key.get_type() == type_String);
+        populate_path_instr(instr, dict);
+        StringData key_value = key.get_string();
+        InternString interned_key_value = m_encoder.intern_string(key_value);
+        instr.path.m_path.push_back(interned_key_value);
+        instr.value = as_payload(dict, val);
+        emit(instr);
+    }
+}
+
+
+void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
+{
+    TrivialReplication::dictionary_erase(dict, key);
+
+    if (select_collection(dict)) {
+        Instruction::DictionaryErase instr;
+        REALM_ASSERT(key.get_type() == type_String);
+        populate_path_instr(instr, dict);
+        StringData key_value = key.get_string();
+        InternString interned_key_value = m_encoder.intern_string(key_value);
+        instr.path.m_path.push_back(interned_key_value);
+        emit(instr);
+    }
+}
+
 
 void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
 {
