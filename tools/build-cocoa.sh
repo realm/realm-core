@@ -118,7 +118,7 @@ if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
             elif [[ "$p" == "maccatalyst" ]]; then
                 build_dir="core/librealm-maccatalyst${suffix}.a"
                 make_core_xcframework+=( -library ${build_dir} -headers core/include/)
-            elif [[ "$p" == "ios" ]]; then
+            else
                 case "${p}" in
                     ios) SDK="iphone";;
                     watchos) SDK="watch";;
