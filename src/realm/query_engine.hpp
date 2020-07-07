@@ -635,6 +635,7 @@ class IntegerNode : public IntegerNodeBase<LeafType> {
 public:
     static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
+    using TConditionOperator = TConditionFunction;
 
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
@@ -689,6 +690,7 @@ public:
     using BaseType = IntegerNodeBase<LeafType>;
     using TConditionValue = typename BaseType::TConditionValue;
     using ThisType = IntegerNode<LeafType, Equal>;
+    using TConditionOperator = Equal;
 
     IntegerNode(TConditionValue value, ColKey column_key)
         : BaseType(value, column_key)
@@ -883,6 +885,7 @@ template <class LeafType, class TConditionFunction>
 class FloatDoubleNode : public ParentNode {
 public:
     using TConditionValue = typename LeafType::value_type;
+    using TConditionOperator = TConditionFunction;
     static const bool special_null_node = false;
 
     FloatDoubleNode(TConditionValue v, ColKey column_key)
@@ -1105,6 +1108,7 @@ template <class TConditionFunction>
 class BinaryNode : public ParentNode {
 public:
     using TConditionValue = BinaryData;
+    using TConditionOperator = TConditionFunction;
     static const bool special_null_node = false;
 
     BinaryNode(BinaryData v, ColKey column)
@@ -1176,6 +1180,7 @@ template <class TConditionFunction>
 class BoolNode : public ParentNode {
 public:
     using TConditionValue = bool;
+    using TConditionOperator = TConditionFunction;
 
     BoolNode(util::Optional<bool> v, ColKey column)
         : m_value(v)
@@ -1286,6 +1291,7 @@ template <class TConditionFunction>
 class TimestampNode : public TimestampNodeBase {
 public:
     using TimestampNodeBase::TimestampNodeBase;
+    using TConditionOperator = TConditionFunction;
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -1361,6 +1367,7 @@ template <class TConditionFunction>
 class DecimalNode : public DecimalNodeBase {
 public:
     using DecimalNodeBase::DecimalNodeBase;
+    using TConditionOperator = TConditionFunction;
 
     size_t find_first_local(size_t start, size_t end) override
     {
@@ -1447,6 +1454,7 @@ template <class TConditionFunction>
 class ObjectIdNode : public ObjectIdNodeBase {
 public:
     using ObjectIdNodeBase::ObjectIdNodeBase;
+    using TConditionOperator = TConditionFunction;
 
     size_t find_first_local(size_t start, size_t end) override
     {

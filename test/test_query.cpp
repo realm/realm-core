@@ -32,6 +32,8 @@
 #include <realm/query_expression.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
+
 
 using namespace realm;
 using namespace realm::util;
@@ -1725,7 +1727,19 @@ TEST(Query_ListOfPrimitives)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
+
+    q = q.and_query(table->column<Lst<Int>>(col_int_list) == 3);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+
     q = table->column<Lst<String>>(col_string_list) == "Str_5";
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+
+    // old style query syntax should still be supported
+    q = table->where().equal(col_string_list, "Str_5");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_key(0), keys[1]);
@@ -1788,6 +1802,10 @@ TEST(Query_ListOfPrimitives)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 
+    q = baa->link(col_linklist).column<Lst<String>>(col_string_list).equal("Str_5");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
     q = baa->link(col_linklist).column<Lst<Int>>(col_int_list).average() >= 3.0;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
@@ -1795,6 +1813,74 @@ TEST(Query_ListOfPrimitives)
     // Now, one less object will have average bigger than 3
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 1);
+}
+
+TEST_TYPES(Query_ListOfPrimitivesTypes, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
+           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, StringData, BinaryData)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value
+        || realm::is_any_v<TEST_TYPE, StringData, BinaryData, Decimal128>;
+    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+
+    auto obj1 = t->create_object();
+    std::vector<TEST_TYPE> values =
+        values_from_int<TEST_TYPE, underlying_type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    obj1.set_list_values(col, values);
+    auto obj2 = t->create_object(); // empty list
+    auto obj3 = t->create_object(); // {1}
+    underlying_type value_1 = convert_for_test<underlying_type>(1);
+    obj3.get_list<TEST_TYPE>(col).add(value_1);
+    auto obj4 = t->create_object(); // {1, 1}
+    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    auto obj5 = t->create_object(); // {null} or {0}
+    if constexpr (is_optional) {
+        obj5.get_list<TEST_TYPE>(col).add(realm::null());
+    }
+    else {
+        obj5.get_list<TEST_TYPE>(col).add(convert_for_test<underlying_type>(0));
+    }
+    Query q;
+    TableView tv;
+    auto check_tv_results = [&](std::vector<Obj> objs) {
+        CHECK_EQUAL(tv.size(), objs.size());
+        for (auto obj : objs) {
+            CHECK_NOT_EQUAL(realm::not_found, tv.find_by_source_ndx(obj.get_key()));
+        }
+    };
+
+    tv = t->where().equal(col, value_1).find_all();
+    check_tv_results({obj1, obj3, obj4});
+    tv = t->where().not_equal(col, value_1).find_all();
+    check_tv_results({obj1, obj5});
+    tv = t->where().equal(col, realm::null()).find_all();
+    check_tv_results(is_optional ? std::vector<Obj>{obj5} : std::vector<Obj>{});
+
+    if constexpr (realm::is_any_v<underlying_type, Float, Double, Int, Decimal128>) {
+        tv = t->where().greater(col, underlying_type(0)).find_all();
+        check_tv_results({obj1, obj3, obj4});
+        tv = t->where().less(col, underlying_type(1)).find_all();
+        check_tv_results(is_optional ? std::vector<Obj>{obj1} : std::vector<Obj>{obj1, obj5});
+        tv = t->where().greater_equal(col, underlying_type(1)).find_all();
+        check_tv_results({obj1, obj3, obj4});\
+        tv = t->where().less_equal(col, underlying_type(1)).find_all();
+        check_tv_results(is_optional ? std::vector<Obj>{obj1, obj3, obj4} : std::vector<Obj>{obj1, obj3, obj4, obj5});
+    }
+
+    if constexpr (realm::is_any_v<underlying_type, StringData, BinaryData>) {
+        tv = t->where().begins_with(col, value_1).find_all();
+        check_tv_results({obj1, obj3, obj4, obj5});
+        tv = t->where().ends_with(col, value_1).find_all();
+        check_tv_results({obj1, obj3, obj4, obj5});
+        tv = t->where().contains(col, value_1).find_all();
+        check_tv_results({obj1, obj3, obj4, obj5});
+        tv = t->where().like(col, value_1).find_all();
+        check_tv_results({obj1, obj3, obj4});
+    }
 }
 
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)

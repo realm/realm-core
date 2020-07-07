@@ -251,26 +251,46 @@ namespace {
 
 template <class Node>
 struct MakeConditionNode {
-    static std::unique_ptr<ParentNode> make(ColKey col_key, typename Node::TConditionValue value)
+    static std::unique_ptr<ParentNode> make(ColKey col_key, typename Node::TConditionValue value, const Table& table)
     {
-        return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
+        if (col_key.is_list()) {
+            using ValueType =  typename Node::TConditionValue;
+            using NonOptionalValueType = typename util::RemoveOptional<ValueType>::type;
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalValueType>>(table.column<Lst<NonOptionalValueType>>(col_key).clone(), make_subexpr<Value<NonOptionalValueType>>(value))));
+        }
+        else {
+            return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
+        }
     }
 
-    static std::unique_ptr<ParentNode> make(ColKey col_key, null)
+    static std::unique_ptr<ParentNode> make(ColKey col_key, null, const Table& table)
     {
-        return std::unique_ptr<ParentNode>{new Node(null{}, col_key)};
+        if (col_key.is_list()) {
+            using ValueType =  typename Node::TConditionValue;
+            using NonOptionalValueType = typename util::RemoveOptional<ValueType>::type;
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalValueType>>(table.column<Lst<NonOptionalValueType>>(col_key).clone(), make_subexpr<Value<realm::null>>(null()))));
+        }
+        else {
+            return std::unique_ptr<ParentNode>{new Node(null{}, col_key)};
+        }
     }
 
     template <class T = typename Node::TConditionValue>
     static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value,
                                    std::unique_ptr<ParentNode>>::type
-    make(ColKey col_key, typename util::RemoveOptional<T>::type value)
+    make(ColKey col_key, typename util::RemoveOptional<T>::type value, const Table& table)
     {
-        return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
+        if (col_key.is_list()) {
+            using NonOptionalT =  typename util::RemoveOptional<T>::type;
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalT>>(table.column<Lst<NonOptionalT>>(col_key).clone(), make_subexpr<Value<NonOptionalT>>(value))));
+        }
+        else {
+            return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
+        }
     }
 
     template <class T>
-    static std::unique_ptr<ParentNode> make(ColKey, T)
+    static std::unique_ptr<ParentNode> make(ColKey, T, const Table&)
     {
         throw LogicError{LogicError::type_mismatch};
     }
@@ -278,13 +298,29 @@ struct MakeConditionNode {
 
 template <class Cond>
 struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
-    static std::unique_ptr<ParentNode> make(ColKey col_key, int64_t value)
+    static std::unique_ptr<ParentNode> make(ColKey col_key, int64_t value, const Table& table)
     {
-        return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(std::move(value), col_key)};
+        if (col_key.is_list()) {
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, Int>>(table.column<Lst<Int>>(col_key).clone(), make_subexpr<Value<Int>>(value))));
+        } else {
+            return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(std::move(value), col_key)};
+        }
+    }
+
+    static std::unique_ptr<ParentNode> make(ColKey col_key, null, const Table& table)
+    {
+        if (col_key.is_list()) {
+            using ValueType =  typename IntegerNode<ArrayInteger, Cond>::TConditionValue;
+            using NonOptionalValueType = typename util::RemoveOptional<ValueType>::type;
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, NonOptionalValueType>>(table.column<Lst<NonOptionalValueType>>(col_key).clone(), make_subexpr<Value<realm::null>>(null()))));
+        }
+        else {
+            return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(null{}, col_key)};
+        }
     }
 
     template <class T>
-    static std::unique_ptr<ParentNode> make(ColKey, T)
+    static std::unique_ptr<ParentNode> make(ColKey, T, const Table&)
     {
         throw LogicError{LogicError::type_mismatch};
     }
@@ -292,18 +328,28 @@ struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
 
 template <class Cond>
 struct MakeConditionNode<StringNode<Cond>> {
-    static std::unique_ptr<ParentNode> make(ColKey col_key, StringData value)
+    static std::unique_ptr<ParentNode> make(ColKey col_key, StringData value, const Table& table)
     {
-        return std::unique_ptr<ParentNode>{new StringNode<Cond>(std::move(value), col_key)};
+        if (col_key.is_list()) {
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(table.column<Lst<StringData>>(col_key).clone(), make_subexpr<Value<StringData>>(value))));
+        }
+        else {
+            return std::unique_ptr<ParentNode>{new StringNode<Cond>(std::move(value), col_key)};
+        }
     }
 
-    static std::unique_ptr<ParentNode> make(ColKey col_key, null)
+    static std::unique_ptr<ParentNode> make(ColKey col_key, null, const Table& table)
     {
-        return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_key)};
+        if (col_key.is_list()) {
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(table.column<Lst<StringData>>(col_key).clone(), make_subexpr<Value<realm::null>>(null{}))));
+        }
+        else {
+            return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_key)};
+        }
     }
 
     template <class T>
-    static std::unique_ptr<ParentNode> make(ColKey, T)
+    static std::unique_ptr<ParentNode> make(ColKey, T, const Table&)
     {
         throw LogicError{LogicError::type_mismatch};
     }
@@ -314,38 +360,39 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
 {
     table.check_column(column_key);
     DataType type = DataType(column_key.get_type());
+
     switch (type) {
         case type_Int: {
-            if (column_key.get_attrs().test(col_attr_Nullable)) {
-                return MakeConditionNode<IntegerNode<ArrayIntNull, Cond>>::make(column_key, value);
+            if (column_key.is_nullable()) {
+                return MakeConditionNode<IntegerNode<ArrayIntNull, Cond>>::make(column_key, value, table);
             }
             else {
-                return MakeConditionNode<IntegerNode<ArrayInteger, Cond>>::make(column_key, value);
+                return MakeConditionNode<IntegerNode<ArrayInteger, Cond>>::make(column_key, value, table);
             }
         }
         case type_Bool: {
-            return MakeConditionNode<BoolNode<Cond>>::make(column_key, value);
+            return MakeConditionNode<BoolNode<Cond>>::make(column_key, value, table);
         }
         case type_Float: {
-            return MakeConditionNode<FloatDoubleNode<ArrayFloat, Cond>>::make(column_key, value);
+            return MakeConditionNode<FloatDoubleNode<ArrayFloat, Cond>>::make(column_key, value, table);
         }
         case type_Double: {
-            return MakeConditionNode<FloatDoubleNode<ArrayDouble, Cond>>::make(column_key, value);
+            return MakeConditionNode<FloatDoubleNode<ArrayDouble, Cond>>::make(column_key, value, table);
         }
         case type_String: {
-            return MakeConditionNode<StringNode<Cond>>::make(column_key, value);
+            return MakeConditionNode<StringNode<Cond>>::make(column_key, value, table);
         }
         case type_Binary: {
-            return MakeConditionNode<BinaryNode<Cond>>::make(column_key, value);
+            return MakeConditionNode<BinaryNode<Cond>>::make(column_key, value, table);
         }
         case type_Timestamp: {
-            return MakeConditionNode<TimestampNode<Cond>>::make(column_key, value);
+            return MakeConditionNode<TimestampNode<Cond>>::make(column_key, value, table);
         }
         case type_Decimal: {
-            return MakeConditionNode<DecimalNode<Cond>>::make(column_key, value);
+            return MakeConditionNode<DecimalNode<Cond>>::make(column_key, value, table);
         }
         case type_ObjectId: {
-            return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value);
+            return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value, table);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -410,6 +457,7 @@ Query& Query::add_condition(ColKey column_key, T value)
 {
     auto node = make_condition_node<TConditionFunction>(*m_table, column_key, value);
     add_node(std::move(node));
+
     return *this;
 }
 
