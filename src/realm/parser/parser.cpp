@@ -28,6 +28,8 @@
 
 #include <realm/parser/parser_utils.hpp>
 
+// clang-format off
+
 // String tokens can't be followed by [A-z0-9_].
 #define string_token_t(s) seq< TAOCPP_PEGTL_ISTRING(s), not_at< identifier_other > >
 
@@ -60,17 +62,20 @@ struct b64_content : until< at< one< '"' > >, must< b64_allowed > > {};
 struct base64 : seq< TAOCPP_PEGTL_ISTRING("B64\""), must< b64_content >, any > {};
 
 // numbers
-struct minus : opt< one< '-' > > {};
+struct optional_sign : opt< sor< one< '-' >, one< '+' > > > {};
 struct dot : one< '.' > {};
+struct optional_exponent : opt< seq< sor< one< 'E' >, one< 'e' > >, optional_sign, plus< digit > > > {};
+struct infinity : seq< optional_sign, sor< string_token_t("infinity"), string_token_t("inf") > > {};
+struct nan : seq< optional_sign, string_token_t("nan") > {};
 
 struct float_num : sor<
-    seq< plus< digit >, dot, star< digit > >,
-    seq< star< digit >, dot, plus< digit > >
+    seq< plus< digit >, dot, star< digit >, optional_exponent >,
+    seq< star< digit >, dot, plus< digit >, optional_exponent >
 > {};
 struct hex_num : seq< one< '0' >, one< 'x', 'X' >, plus< xdigit > > {};
-struct int_num : plus< digit > {};
+struct int_num : seq< plus< digit >, optional_exponent > {};
 
-struct number : seq< minus, sor< float_num, hex_num, int_num > > {};
+struct number : seq< optional_sign, sor< float_num, hex_num, int_num, infinity, nan > > {};
 
 struct timestamp_number : disable< number > {};
 struct first_timestamp_number : disable< timestamp_number > {};
@@ -84,16 +89,23 @@ struct readable_timestamp : seq< first_timestamp_number, one< '-' >, timestamp_n
     timestamp_number, opt< seq< one< ':' >, timestamp_number > > > {};
 struct timestamp : sor< internal_timestamp, readable_timestamp > {};
 
+struct oid_allowed : disable< xdigit > {};
+struct oid_content : until< at< one< ')' > >, must< oid_allowed > > {};
+struct oid : seq< TAOCPP_PEGTL_ISTRING("oid("), must< oid_content >, any > {};
+
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
-struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {
-};
+struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {};
 
 // following operators must allow proceeding string characters
-struct min : TAOCPP_PEGTL_ISTRING(".@min.") {};
-struct max : TAOCPP_PEGTL_ISTRING(".@max.") {};
-struct sum : TAOCPP_PEGTL_ISTRING(".@sum.") {};
-struct avg : TAOCPP_PEGTL_ISTRING(".@avg.") {};
+struct min : TAOCPP_PEGTL_ISTRING(".@min") {
+};
+struct max : TAOCPP_PEGTL_ISTRING(".@max") {
+};
+struct sum : TAOCPP_PEGTL_ISTRING(".@sum") {
+};
+struct avg : TAOCPP_PEGTL_ISTRING(".@avg") {
+};
 // these operators are normal strings (no proceeding string characters)
 struct count : string_token_t(".@count") {};
 struct size : string_token_t(".@size") {};
@@ -116,7 +128,7 @@ struct key_path : list<sor<backlink_path, one_key_path>, one<'.'>> {
 struct key_path_prefix : disable< key_path > {};
 struct key_path_suffix : disable< key_path > {};
 struct collection_operator_match
-    : sor<seq<key_path_prefix, key_collection_operators, key_path_suffix>,
+    : sor<seq<key_path_prefix, key_collection_operators, opt<seq<dot, key_path_suffix>>>,
           seq<opt<key_path_prefix, dot>, backlink_count>, seq<key_path_prefix, single_collection_operators>> {
 };
 
@@ -144,21 +156,18 @@ struct subquery : seq<sub_preamble, pad<pred, blank>, pad<subq_suffix, blank>, s
 // list aggregate operations
 struct agg_target : seq<key_path> {
 };
-struct agg_any : seq<sor<string_token_t("any"), string_token_t("some")>, plus<blank>, agg_target,
-                     pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+struct agg_any : sor<string_token_t("any"), string_token_t("some")> {
 };
-struct agg_all
-    : seq<string_token_t("all"), plus<blank>, agg_target, pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+struct agg_all : string_token_t("all") {
 };
-struct agg_none
-    : seq<string_token_t("none"), plus<blank>, agg_target, pad<sor<string_oper, symbolic_oper>, blank>, expr> {
+struct agg_none : string_token_t("none") {
 };
-struct agg_shortcut_pred : sor<agg_any, agg_all, agg_none> {
+struct agg_expr : seq< sor<agg_any, agg_all, agg_none>, plus<blank>, key_path> {
 };
 
 // expressions and operators
-struct expr : sor<dq_string, sq_string, timestamp, number, argument, true_value, false_value, null_value, base64,
-                  collection_operator_match, subquery, key_path> {
+struct expr : sor<dq_string, sq_string, timestamp, oid, number, argument, true_value, false_value, null_value, base64,
+                  collection_operator_match, subquery, agg_expr, key_path> {
 };
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
 
@@ -216,7 +225,7 @@ struct false_pred : string_token_t("falsepredicate") {};
 
 struct not_pre : seq< sor< one< '!' >, string_token_t("not") > > {};
 struct atom_pred
-    : seq<opt<not_pre>, pad<sor<group_pred, true_pred, false_pred, agg_shortcut_pred, comparison_pred>, blank>,
+    : seq<opt<not_pre>, pad<sor<group_pred, true_pred, false_pred, comparison_pred>, blank>,
           star<pad<predicate_suffix_modifier, blank>>> {
 };
 
@@ -229,6 +238,8 @@ struct and_pred : seq< atom_pred, star< and_ext > > {};
 
 struct pred : seq< and_pred, star< or_ext > > {};
 
+// clang-format on
+
 // state
 struct ParserState
 {
@@ -240,7 +251,7 @@ struct ParserState
     DescriptorOrderingState::SingleOrderingState temp_ordering;
     std::string subquery_path, subquery_var;
     std::vector<Predicate> subqueries;
-    Predicate::ComparisonType pending_comparison_type;
+    Expression::ComparisonType pending_comparison_type = Expression::ComparisonType::Unspecified;
 
     Predicate *current_group()
     {
@@ -277,20 +288,18 @@ struct ParserState
 
     void add_collection_aggregate_expression()
     {
-        add_expression(Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix));
+        add_expression(
+            Expression(collection_key_path_prefix, pending_op, collection_key_path_suffix, pending_comparison_type));
         collection_key_path_prefix = "";
         collection_key_path_suffix = "";
         pending_op = Expression::KeyPathOp::None;
-    }
-
-    void apply_list_aggregate_operation()
-    {
-        last_predicate()->cmpr.compare_type = pending_comparison_type;
-        pending_comparison_type = Predicate::ComparisonType::Unspecified;
+        pending_comparison_type = Expression::ComparisonType::Unspecified;
     }
 
     void add_expression(Expression && exp)
     {
+        exp.comparison_type = pending_comparison_type;
+        pending_comparison_type = Expression::ComparisonType::Unspecified;
         Predicate *current = last_predicate();
         if (current->type == Predicate::Type::Comparison && current->cmpr.expr[1].type == parser::Expression::Type::None) {
             current->cmpr.expr[1] = std::move(exp);
@@ -355,7 +364,10 @@ template< typename Rule >
 struct action : nothing< Rule > {};
 
 #ifdef REALM_PARSER_PRINT_TOKENS
-    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
+#define DEBUG_PRINT_TOKEN(string)                                                                                    \
+    do {                                                                                                             \
+        std::cout << string << std::endl;                                                                            \
+    } while (0)
 #else
     #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
 #endif
@@ -401,6 +413,7 @@ EXPRESSION_ACTION(false_value, Expression::Type::False)
 EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
 EXPRESSION_ACTION(base64, Expression::Type::Base64)
+EXPRESSION_ACTION(oid, Expression::Type::ObjectId)
 
 template<> struct action< timestamp >
 {
@@ -540,7 +553,7 @@ struct action<limit_param> {
         try {
             DescriptorOrderingState::SingleOrderingState limit_state;
             limit_state.type = DescriptorOrderingState::SingleOrderingState::DescriptorType::Limit;
-            limit_state.limit = realm::util::stot<size_t>(in.string());
+            limit_state.limit = realm::util::string_to<size_t>(in.string());
             state.ordering_state.orderings.push_back(limit_state);
         }
         catch (...) {
@@ -619,7 +632,7 @@ COLLECTION_OPERATION_ACTION(max, Expression::KeyPathOp::Max)
 COLLECTION_OPERATION_ACTION(sum, Expression::KeyPathOp::Sum)
 COLLECTION_OPERATION_ACTION(avg, Expression::KeyPathOp::Avg)
 COLLECTION_OPERATION_ACTION(count, Expression::KeyPathOp::Count)
-COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::SizeString)
+COLLECTION_OPERATION_ACTION(size, Expression::KeyPathOp::Count)
 COLLECTION_OPERATION_ACTION(backlink_count, Expression::KeyPathOp::BacklinkCount)
 
 template<> struct action< key_path_prefix > {
@@ -657,19 +670,9 @@ template<> struct action< collection_operator_match > {
         }                                                                                                            \
     };
 
-LIST_AGG_OP_TYPE_ACTION(agg_any, Predicate::ComparisonType::Any)
-LIST_AGG_OP_TYPE_ACTION(agg_all, Predicate::ComparisonType::All)
-LIST_AGG_OP_TYPE_ACTION(agg_none, Predicate::ComparisonType::None)
-
-template <>
-struct action<agg_shortcut_pred> {
-    template <typename Input>
-    static void apply(const Input& in, ParserState& state)
-    {
-        DEBUG_PRINT_TOKEN(in.string() + " Aggregate shortcut matched");
-        state.apply_list_aggregate_operation();
-    }
-};
+LIST_AGG_OP_TYPE_ACTION(agg_any, Expression::ComparisonType::Any)
+LIST_AGG_OP_TYPE_ACTION(agg_all, Expression::ComparisonType::All)
+LIST_AGG_OP_TYPE_ACTION(agg_none, Expression::ComparisonType::None)
 
 template<> struct action< true_pred >
 {

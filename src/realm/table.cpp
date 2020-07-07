@@ -38,6 +38,8 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
+#include <realm/array_decimal128.hpp>
+#include <realm/array_object_id.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -258,8 +260,6 @@
 using namespace realm;
 using namespace realm::util;
 
-const int_fast64_t realm::Table::max_integer;
-const int_fast64_t realm::Table::min_integer;
 Replication* Table::g_dummy_replication = nullptr;
 
 bool TableVersions::operator==(const TableVersions& other) const
@@ -293,6 +293,8 @@ const char* get_data_type_name(DataType type) noexcept
             return "binary";
         case type_Timestamp:
             return "timestamp";
+        case type_ObjectId:
+            return "ObjectId";
         case type_Link:
             return "link";
         case type_LinkList:
@@ -308,25 +310,31 @@ const char* get_data_type_name(DataType type) noexcept
 
 ColKey Table::add_column(DataType type, StringData name, bool nullable)
 {
-    return insert_column(ColKey(), type, name, nullable); // Throws
+    if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    if (nullable)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
 ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
 {
-    LinkTargetInfo invalid_link;
-    return do_insert_column(ColKey(), type, name, invalid_link, nullable, true); // Throws
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_List);
+    if (nullable)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
-ColKey Table::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
+ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
-    return insert_column_link(ColKey(), type, name, target, link_type); // Throws
-}
-
-
-ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name, Table& target, LinkType link_type)
-{
-    if (REALM_UNLIKELY(col_key && !valid_column(col_key)))
-        throw InvalidKey("Requested key in use");
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
     // Both origin and target must be group-level tables, and in the same group.
@@ -337,9 +345,16 @@ ColKey Table::insert_column_link(ColKey col_key, DataType type, StringData name,
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
 
-    LinkTargetInfo link_target_info(&target);
-    auto retval =
-        do_insert_column(col_key, type, name, link_target_info, false, type == type_LinkList, link_type); // Throws
+    m_has_any_embedded_objects.reset();
+
+    ColumnAttrMask attr;
+    if (type == type_Link)
+        attr.set(col_attr_Nullable);
+    if (type == type_LinkList)
+        attr.set(col_attr_List);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+
+    auto retval = do_insert_column(col_key, type, name, &target); // Throws
     return retval;
 }
 
@@ -362,6 +377,7 @@ void Table::remove_recursive(CascadeState& cascade_state)
         for (auto obj : to_delete) {
             auto table = group->get_table(obj.first);
             // This might add to the list of objects that should be deleted
+            REALM_ASSERT(!obj.second.is_unresolved());
             table->m_clusters.erase(obj.second, cascade_state);
         }
         nullify_links(cascade_state);
@@ -379,18 +395,6 @@ void Table::nullify_links(CascadeState& cascade_state)
 }
 
 
-ColKey Table::insert_column(ColKey col_key, DataType type, StringData name, bool nullable)
-{
-    if (REALM_UNLIKELY(col_key && valid_column(col_key)))
-        throw InvalidKey("Requested key in use");
-    if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
-        throw LogicError(LogicError::illegal_type);
-
-    LinkTargetInfo invalid_link;
-    return do_insert_column(col_key, type, name, invalid_link, nullable); // Throws
-}
-
-
 void Table::remove_column(ColKey col_key)
 {
     check_column(col_key);
@@ -401,9 +405,8 @@ void Table::remove_column(ColKey col_key)
     if (col_key == m_primary_key_col) {
         do_set_primary_key_column(ColKey());
     }
-    bump_content_version();
-    bump_storage_version();
     erase_root_column(col_key); // Throws
+    m_has_any_embedded_objects.reset();
 }
 
 
@@ -448,7 +451,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     m_spec.init_from_parent();
 
-    while (m_top.size() < top_array_size) {
+    while (m_top.size() <= top_position_for_pk_col) {
         m_top.add(0);
     }
 
@@ -502,20 +505,46 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+
+    if (m_top.size() <= top_position_for_flags) {
+        m_is_embedded = false;
+    }
+    else {
+        uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+        m_is_embedded = flags & 0x1;
+    }
+    m_has_any_embedded_objects.reset();
+
+    if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
+        // Tombstones exists
+        if (!m_tombstones) {
+            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        }
+        m_tombstones->init_from_parent();
+    }
+    else {
+        m_tombstones = nullptr;
+    }
 }
 
 
-ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                               bool nullable, bool listtype, LinkType link_type)
+ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table)
 {
-    if (type == type_Link)
-        nullable = true;
+    col_key = do_insert_root_column(col_key, ColumnType(type), name); // Throws
 
-    bump_storage_version();
-    col_key = insert_root_column(col_key, type, name, link_target_info, nullable, listtype, link_type); // Throws
+    // When the inserted column is a link-type column, we must also add a
+    // backlink column to the target table.
+
+    if (target_table) {
+        auto backlink_col_key = target_table->do_insert_root_column(ColKey{}, col_type_BackLink, ""); // Throws
+        target_table->report_invalid_key(backlink_col_key);
+
+        set_opposite_column(col_key, target_table->get_key(), backlink_col_key);
+        target_table->set_opposite_column(backlink_col_key, get_key(), col_key);
+    }
 
     if (Replication* repl = get_repl())
-        repl->insert_column(this, col_key, type, name, link_target_info, nullable, listtype, link_type); // Throws
+        repl->insert_column(this, col_key, type, name, target_table); // Throws
 
     return col_key;
 }
@@ -559,6 +588,10 @@ void Table::populate_search_index(ColKey col_key)
             Timestamp value = o.get<Timestamp>(col_key);
             index->insert(key, value); // Throws
         }
+        else if (type == type_ObjectId) {
+            ObjectId value = o.get<ObjectId>(col_key);
+            index->insert(key, value); // Throws
+        }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
         }
@@ -574,7 +607,7 @@ void Table::add_search_index(ColKey col_key)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type()))) {
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.get_attrs().test(col_attr_List)) {
         // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
         // should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
@@ -656,26 +689,6 @@ size_t Table::get_num_unique_values(ColKey col_key) const
     return col.size();
 }
 
-ColKey Table::insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                                 bool nullable, bool listtype, LinkType link_type)
-{
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, nullable, listtype, link_type); // Throws
-
-    // When the inserted column is a link-type column, we must also add a
-    // backlink column to the target table.
-
-    if (link_target.is_valid()) {
-        auto target_table_key = link_target.m_target_table->get_key();
-        auto origin_table_key = get_key();
-        link_target.m_backlink_col_key = link_target.m_target_table->insert_backlink_column(
-            origin_table_key, col_key, link_target.m_backlink_col_key); // Throws
-        link_target.m_target_table->report_invalid_key(link_target.m_backlink_col_key);
-        set_opposite_column(col_key, target_table_key, link_target.m_backlink_col_key);
-        // backlink metadata in opposite table is set by insert_backlink_column...
-    }
-    return col_key;
-}
-
 
 void Table::erase_root_column(ColKey col_key)
 {
@@ -684,14 +697,13 @@ void Table::erase_root_column(ColKey col_key)
     if (is_link_type(col_type)) {
         auto target_table = get_opposite_table(col_key);
         auto target_column = get_opposite_column(col_key);
-        target_table->erase_backlink_column(target_column);
+        target_table->do_erase_root_column(target_column);
     }
     do_erase_root_column(col_key); // Throws
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, bool nullable, bool listtype,
-                                    LinkType link_type)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
@@ -699,22 +711,11 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     // locate insertion point: ordinary columns must come before backlink columns
     size_t spec_ndx = (type == col_type_BackLink) ? m_spec.get_column_count() : m_spec.get_public_column_count();
 
-    int attr = col_attr_None;
-    if (nullable)
-        attr |= col_attr_Nullable;
-    if (listtype)
-        attr |= col_attr_List;
-    if (link_type == link_Strong)
-        attr |= col_attr_StrongLinks;
-    // if col_key does not specify a key, one must be generated
     if (!col_key) {
-        col_key = generate_col_key(type, attr);
-    }
-    else {
-        REALM_ASSERT(col_key.get_attrs() == attr); // FIXME
+        col_key = generate_col_key(type, {});
     }
 
-    m_spec.insert_column(spec_ndx, col_key, type, name, attr); // Throws
+    m_spec.insert_column(spec_ndx, col_key, type, name, col_key.get_attrs().m_value); // Throws
     auto col_ndx = col_key.get_index().val;
     build_column_mapping();
     REALM_ASSERT(col_ndx <= m_index_refs.size());
@@ -736,6 +737,18 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     }
     refresh_index_accessors();
     m_clusters.insert_column(col_key);
+    if (m_tombstones) {
+        m_tombstones->insert_column(col_key);
+        /*
+          FIXME: fails
+        if (col_key == get_primary_key_column())
+            m_tombstones->insert_column(col_key);
+        else if (col_key.get_type() == col_type_BackLink)
+            m_tombstones->insert_column(col_key);
+        */
+    }
+
+    bump_storage_version();
 
     return col_key;
 }
@@ -756,6 +769,8 @@ void Table::do_erase_root_column(ColKey col_key)
     m_opposite_column.set(col_ndx, ColKey().value);
     m_index_accessors[col_ndx] = nullptr;
     m_clusters.remove_column(col_key);
+    if (m_tombstones)
+        m_tombstones->remove_column(col_key);
     size_t spec_ndx = colkey2spec_ndx(col_key);
     m_spec.erase_column(spec_ndx);
     m_top.adjust(top_position_for_column_key, 2);
@@ -765,30 +780,62 @@ void Table::do_erase_root_column(ColKey col_key)
         REALM_ASSERT(m_index_accessors.back() == nullptr);
         m_index_accessors.erase(m_index_accessors.end() - 1);
     }
-}
-
-LinkType Table::get_link_type(ColKey col_key) const
-{
-    auto type = col_key.get_type();
-    if (!(type == col_type_Link) && !(type == col_type_LinkList)) {
-        throw LogicError{LogicError::illegal_type};
-    }
-    return col_key.get_attrs().test(col_attr_StrongLinks) ? link_Strong : link_Weak;
-}
-
-ColKey Table::insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key)
-{
-    ColKey retval = do_insert_root_column(backlink_col_key, col_type_BackLink, ""); // Throws
-    set_opposite_column(retval, origin_table_key, origin_col_key);
-    return retval;
-}
-
-
-void Table::erase_backlink_column(ColKey backlink_col_key)
-{
     bump_content_version();
     bump_storage_version();
-    do_erase_root_column(backlink_col_key); // Throws
+}
+
+bool Table::set_embedded(bool embedded)
+{
+    if (embedded == m_is_embedded)
+        return true;
+
+    if (Replication* repl = get_repl()) {
+        if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
+            throw std::logic_error("Cannot change embedded property in sync client");
+        }
+    }
+
+    if (get_primary_key_column()) {
+        return false;
+    }
+    if (size() > 0) {
+        // Check if the table has any backlink columns. If not, it is not required
+        // to check all objects for backlinks.
+        bool has_backlink_columns = false;
+        for_each_backlink_column([&has_backlink_columns](ColKey) {
+            has_backlink_columns = true;
+            return true; // Done
+        });
+
+        if (has_backlink_columns) {
+            for (auto o : *this) {
+                // each object should be owned by one and only one parent
+                if (o.get_backlink_count() != 1) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    do_set_embedded(embedded);
+
+    return true;
+}
+
+void Table::do_set_embedded(bool embedded)
+{
+    while (m_top.size() <= top_position_for_flags)
+        m_top.add(0);
+
+    uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+    if (embedded) {
+        flags |= 1;
+    }
+    else {
+        flags &= ~1;
+    }
+    m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
+    m_is_embedded = embedded;
 }
 
 
@@ -1018,42 +1065,30 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
         case col_type_Int:
             if (nullable) {
                 auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
-                if (val) {
-                    return Mixed{*val};
-                }
+                return Mixed{val};
             }
             else {
                 return Mixed{static_cast<BPlusTree<Int>*>(accessor)->get(ndx)};
             }
-            break;
         case col_type_Bool:
             if (nullable) {
                 auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
-                if (val) {
-                    return Mixed{bool(*val)};
-                }
+                return val ? Mixed{bool(*val)} : Mixed{};
             }
             else {
                 return Mixed{bool(static_cast<BPlusTree<Int>*>(accessor)->get(ndx))};
             }
-            break;
         case col_type_Float:
             return Mixed{static_cast<BPlusTree<float>*>(accessor)->get(ndx)};
-            break;
         case col_type_Double:
             return Mixed{static_cast<BPlusTree<double>*>(accessor)->get(ndx)};
-            break;
         case col_type_String:
             return Mixed{static_cast<LegacyStringColumn*>(accessor)->get_legacy(ndx)};
-            break;
         case col_type_Binary:
             return Mixed{static_cast<BPlusTree<Binary>*>(accessor)->get(ndx)};
-            break;
         default:
-            break;
+            REALM_UNREACHABLE();
     }
-
-    return Mixed{};
 }
 
 template <class T>
@@ -1580,12 +1615,30 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     top.add(0); // Sequence number
     top.add(0); // Collision_map
     top.add(0); // pk col key
+    top.add(0); // flags
+    top.add(0); // tombstones
 
     REALM_ASSERT(top.size() == top_array_size);
 
     return top.get_ref();
 }
 
+void Table::ensure_graveyard()
+{
+    if (!m_tombstones) {
+        while (m_top.size() < top_position_for_tombstones)
+            m_top.add(0);
+        REALM_ASSERT(!m_top.get(top_position_for_tombstones));
+        MemRef mem = ClusterTree::create_empty_cluster(m_alloc);
+        m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
+        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones->init_from_parent();
+        for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
+            ts->insert_column(col);
+            return false;
+        });
+    }
+}
 
 void Table::batch_erase_rows(const KeyColumn& keys)
 {
@@ -1603,7 +1656,7 @@ void Table::batch_erase_rows(const KeyColumn& keys)
     sort(vec.begin(), vec.end());
     vec.erase(unique(vec.begin(), vec.end()), vec.end());
 
-    if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+    if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         std::for_each(vec.begin(), vec.end(),
                       [this, &state](ObjKey k) { state.m_to_be_deleted.emplace_back(m_key, k); });
@@ -1624,24 +1677,17 @@ void Table::batch_erase_rows(const KeyColumn& keys)
 
 void Table::clear()
 {
-    size_t old_size = size();
-
     CascadeState state(CascadeState::Mode::Strong, get_parent_group());
     m_clusters.clear(state);
-
-    bump_content_version();
-    bump_storage_version();
-
-    if (Replication* repl = get_repl())
-        repl->clear_table(this, old_size); // Throws
+    free_collision_table();
 }
 
 
 Group* Table::get_parent_group() const noexcept
 {
     if (!m_top.is_attached())
-        return 0;                                              // Subtable with shared descriptor
-    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
+        return 0;                             // Subtable with shared descriptor
+    ArrayParent* parent = m_top.get_parent(); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return 0; // Free-standing table
 
@@ -1657,8 +1703,8 @@ inline uint64_t Table::get_sync_file_id() const noexcept
 size_t Table::get_index_in_group() const noexcept
 {
     if (!m_top.is_attached())
-        return realm::npos;                                    // Subtable with shared descriptor
-    ArrayParent* parent = m_top.get_parent();                  // ArrayParent guaranteed to be Table::Parent
+        return realm::npos;                   // Subtable with shared descriptor
+    ArrayParent* parent = m_top.get_parent(); // ArrayParent guaranteed to be Table::Parent
     if (!parent)
         return realm::npos; // Free-standing table
     return m_top.get_ndx_in_parent();
@@ -1718,6 +1764,27 @@ size_t Table::count_double(ColKey col_key, double value) const
     aggregate<act_Count, double, double>(col_key, value, &count);
     return count;
 }
+size_t Table::count_decimal(ColKey col_key, Decimal128 value) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    size_t cnt = 0;
+    bool null_value = value.is_null();
+    auto f = [value, &leaf, col_key, null_value, &cnt](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(col_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            if ((null_value && leaf.is_null(i)) || (leaf.get(i) == value)) {
+                cnt++;
+            }
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+
+    return cnt;
+}
 size_t Table::count_string(ColKey col_key, StringData value) const
 {
     if (auto index = this->get_search_index(col_key)) {
@@ -1729,6 +1796,34 @@ size_t Table::count_string(ColKey col_key, StringData value) const
 }
 
 // sum ----------------------------------------------
+
+template <>
+Decimal128 Table::aggregate<act_Sum, Decimal128, Decimal128>(ColKey column_key, Decimal128, size_t* resultcount,
+                                                             ObjKey*) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    Decimal128 sum = Decimal128(0);
+    size_t count = 0;
+    auto f = [&leaf, column_key, &sum, &count](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(column_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            if (!leaf.is_null(i)) {
+                sum = sum + leaf.get(i);
+                count++;
+            }
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+    if (resultcount) {
+        *resultcount = count;
+    }
+
+    return sum;
+}
 
 int64_t Table::sum_int(ColKey col_key) const
 {
@@ -1744,6 +1839,10 @@ double Table::sum_float(ColKey col_key) const
 double Table::sum_double(ColKey col_key) const
 {
     return aggregate<act_Sum, double, double>(col_key);
+}
+Decimal128 Table::sum_decimal(ColKey col_key) const
+{
+    return aggregate<act_Sum, Decimal128, Decimal128>(col_key);
 }
 
 // average ----------------------------------------------
@@ -1762,6 +1861,17 @@ double Table::average_float(ColKey col_key, size_t* value_count) const
 double Table::average_double(ColKey col_key, size_t* value_count) const
 {
     return average<double>(col_key, value_count);
+}
+Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
+{
+    size_t count;
+    auto sum = aggregate<act_Sum, Decimal128, Decimal128>(col_key, {}, &count);
+    Decimal128 avg(0);
+    if (count != 0)
+        avg = sum / count;
+    if (value_count)
+        *value_count = count;
+    return avg;
 }
 
 // minimum ----------------------------------------------
@@ -1784,6 +1894,33 @@ float Table::minimum_float(ColKey col_key, ObjKey* return_ndx) const
 double Table::minimum_double(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Min, double, double>(col_key, 0., nullptr, return_ndx);
+}
+
+Decimal128 Table::minimum_decimal(ColKey col_key, ObjKey* return_ndx) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    Decimal128 min("+Inf");
+    ObjKey ret_key;
+    auto f = [&min, &ret_key, &leaf, col_key](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(col_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val = leaf.get(i);
+            if (!val.is_null() && val < min) {
+                min = val;
+                ret_key = cluster->get_real_key(i);
+            }
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+    if (return_ndx) {
+        *return_ndx = ret_key;
+    }
+
+    return min;
 }
 
 Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
@@ -1811,6 +1948,32 @@ double Table::maximum_double(ColKey col_key, ObjKey* return_ndx) const
     return aggregate<act_Max, double, double>(col_key, 0., nullptr, return_ndx);
 }
 
+Decimal128 Table::maximum_decimal(ColKey col_key, ObjKey* return_ndx) const
+{
+    ArrayDecimal128 leaf(get_alloc());
+    Decimal128 max("-Inf");
+    ObjKey ret_key;
+    auto f = [&max, &ret_key, &leaf, col_key](const Cluster* cluster) {
+        // direct aggregate on the leaf
+        cluster->init_leaf(col_key, &leaf);
+        auto sz = leaf.size();
+        for (size_t i = 0; i < sz; i++) {
+            auto val = leaf.get(i);
+            if (!val.is_null() && val > max) {
+                max = val;
+                ret_key = cluster->get_real_key(i);
+            }
+        }
+        return false;
+    };
+
+    traverse_clusters(f);
+    if (return_ndx) {
+        *return_ndx = ret_key;
+    }
+    return max;
+}
+
 Timestamp Table::maximum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 {
     return aggregate<act_Max, Timestamp, Timestamp>(col_key, Timestamp{}, nullptr, return_ndx);
@@ -1821,8 +1984,15 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 {
     check_column(col_key);
 
-    if (StringIndex* index = get_search_index(col_key)) {
-        return index->find_first(value);
+    // You cannot call GetIndexData on ObjKey
+    if constexpr (!std::is_same_v<T, ObjKey>) {
+        if (StringIndex* index = get_search_index(col_key)) {
+            return index->find_first(value);
+        }
+
+        if (col_key == m_primary_key_col) {
+            return this->find_primary_key(value);
+        }
     }
 
     ObjKey key;
@@ -1847,64 +2017,6 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
-ObjKey Table::find_first(ColKey col_key, StringData value) const
-{
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("Non-existing column");
-
-    if (StringIndex* index = get_search_index(col_key)) {
-        return index->find_first(value);
-    }
-
-    if (col_key.get_type() == col_type_String && col_key == m_primary_key_col) {
-        GlobalKey object_id{value};
-        ObjKey k = global_to_local_object_id_hashed(object_id);
-        return is_valid(k) ? k : ObjKey();
-    }
-
-    ObjKey key;
-    ArrayString leaf(get_alloc());
-
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
-        if (row != realm::npos) {
-            key = cluster->get_real_key(row);
-            return true;
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-
-    return key;
-}
-
-template <>
-ObjKey Table::find_first(ColKey col_key, ObjKey value) const
-{
-    check_column(col_key);
-
-    ObjKey key;
-    using LeafType = typename ColumnTypeTraits<ObjKey>::cluster_leaf_type;
-    LeafType leaf(get_alloc());
-
-    auto f = [&key, &col_key, &value, &leaf](const Cluster* cluster) {
-        cluster->init_leaf(col_key, &leaf);
-        size_t row = leaf.find_first(value, 0, cluster->node_size());
-        if (row != realm::npos) {
-            key = cluster->get_real_key(row);
-            return true;
-        }
-        return false;
-    };
-
-    traverse_clusters(f);
-
-    return key;
-}
-
-template <>
 ObjKey Table::find_first(ColKey col_key, util::Optional<float> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
@@ -1921,18 +2033,19 @@ ObjKey Table::find_first(ColKey col_key, null) const
 {
     return find_first_null(col_key);
 }
-}
+} // namespace realm
 
 // Explicitly instantiate the generic case of the template for the types we care about.
 template ObjKey Table::find_first(ColKey col_key, bool) const;
 template ObjKey Table::find_first(ColKey col_key, int64_t) const;
 template ObjKey Table::find_first(ColKey col_key, float) const;
 template ObjKey Table::find_first(ColKey col_key, double) const;
+template ObjKey Table::find_first(ColKey col_key, Decimal128) const;
+template ObjKey Table::find_first(ColKey col_key, ObjectId) const;
+template ObjKey Table::find_first(ColKey col_key, ObjKey) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
-
-
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -1955,6 +2068,11 @@ ObjKey Table::find_first_timestamp(ColKey col_key, Timestamp value) const
     return find_first(col_key, value);
 }
 
+ObjKey Table::find_first_object_id(ColKey col_key, ObjectId value) const
+{
+    return find_first(col_key, value);
+}
+
 ObjKey Table::find_first_float(ColKey col_key, float value) const
 {
     return find_first<Float>(col_key, value);
@@ -1963,6 +2081,11 @@ ObjKey Table::find_first_float(ColKey col_key, float value) const
 ObjKey Table::find_first_double(ColKey col_key, double value) const
 {
     return find_first<Double>(col_key, value);
+}
+
+ObjKey Table::find_first_decimal(ColKey col_key, Decimal128 value) const
+{
+    return find_first<Decimal128>(col_key, value);
 }
 
 ObjKey Table::find_first_string(ColKey col_key, StringData value) const
@@ -2059,18 +2182,6 @@ ConstTableView Table::find_all_null(ColKey col_key) const
     return const_cast<Table*>(this)->find_all_null(col_key);
 }
 
-TableView Table::get_distinct_view(ColKey col_key)
-{
-    TableView tv(TableView::DistinctView, m_own_ref, col_key);
-    tv.do_sync();
-    return tv;
-}
-
-ConstTableView Table::get_distinct_view(ColKey col_key) const
-{
-    return const_cast<Table*>(this)->get_distinct_view(col_key);
-}
-
 TableView Table::get_sorted_view(ColKey col_key, bool ascending)
 {
     TableView tv = where().find_all();
@@ -2140,7 +2251,15 @@ void Table::update_from_parent(size_t old_baseline) noexcept
             m_opposite_table.update_from_parent(old_baseline);
         if (m_top.size() > top_position_for_opposite_column)
             m_opposite_column.update_from_parent(old_baseline);
+        if (m_top.size() > top_position_for_flags) {
+            uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
+            m_is_embedded = flags & 0x1;
+        }
+        else {
+            m_is_embedded = false;
+        }
         refresh_content_version();
+        m_has_any_embedded_objects.reset();
     }
     m_alloc.bump_storage_version();
 }
@@ -2254,6 +2373,13 @@ void Table::refresh_accessor_tree()
     m_opposite_column.init_from_parent();
     auto rot_pk_key = m_top.get_as_ref_or_tagged(top_position_for_pk_col);
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
+    if (m_top.size() > top_position_for_flags) {
+        auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
+        m_is_embedded = rot_flags.get_as_int() & 0x1;
+    }
+    else {
+        m_is_embedded = false;
+    }
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
@@ -2332,6 +2458,8 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
+    if (m_is_embedded || m_primary_key_col)
+        throw LogicError(LogicError::wrong_kind_of_table);
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
@@ -2341,62 +2469,99 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 
     REALM_ASSERT(key.value >= 0);
 
-    bump_content_version();
-    bump_storage_version();
     Obj obj = m_clusters.insert(key, values);
+
+    return obj;
+}
+
+Obj Table::create_linked_object(GlobalKey object_id)
+{
+    if (!m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (!object_id) {
+        object_id = allocate_object_id_squeezed();
+    }
+    ObjKey key = object_id.get_local_key(get_sync_file_id());
+
+    REALM_ASSERT(key.value >= 0);
+
+    Obj obj = m_clusters.insert(key, {});
 
     return obj;
 }
 
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
+    if (m_is_embedded || m_primary_key_col)
+        throw LogicError(LogicError::wrong_kind_of_table);
     ObjKey key = object_id.get_local_key(get_sync_file_id());
 
     if (auto repl = get_repl())
         repl->create_object(this, object_id);
 
-    bump_content_version();
-    bump_storage_version();
-    Obj obj = m_clusters.insert(key, values);
+    try {
+        Obj obj = m_clusters.insert(key, values);
+        // Check if tombstone exists
+        if (m_tombstones && m_tombstones->is_valid(key.get_unresolved())) {
+            auto unres_key = key.get_unresolved();
+            // Copy links over
+            auto tombstone = m_tombstones->get(unres_key);
+            obj.assign_pk_and_backlinks(tombstone);
+            // If tombstones had no links to it, it may still be alive
+            if (m_tombstones->is_valid(unres_key)) {
+                CascadeState state(CascadeState::Mode::None);
+                m_tombstones->erase(unres_key, state);
+            }
+        }
 
-    return obj;
+        return obj;
+    }
+    catch (const KeyAlreadyUsed&) {
+        return m_clusters.get(key);
+    }
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values)
 {
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    ObjKey object_key;
+    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+
+    // Generate local ObjKey
     GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
 
-    if (type == type_Int) {
-        if (primary_key.is_null())
-            object_key = find_first_null(primary_key_col);
-        else
-            object_key = find_first_int(primary_key_col, primary_key.get_int());
+    // Check for collision
+    if (is_valid(object_key)) {
+        Obj existing_obj = get_object(object_key);
+        auto existing_pk_value = existing_obj.get_any(primary_key_col);
 
-        if (object_key)
-            return get_object(object_key); // Already exists
-        object_key = get_next_key();
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return existing_obj;
+        }
+
+        GlobalKey existing_id{existing_pk_value};
+        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
     }
 
-    if (type == type_String) {
-        // Generate local ObjKey
-        object_key = global_to_local_object_id_hashed(object_id);
-        // Check for collision
-        if (is_valid(object_key)) {
-            Obj existing_obj = get_object(object_key);
-            StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
+    // Check for collision with tombstones
+    ObjKey unres_key = object_key.get_unresolved();
+    bool needs_resurrection = false;
+    if (m_tombstones && m_tombstones->is_valid(unres_key)) {
+        auto existing_pk_value = m_tombstones->get(unres_key).get_any(primary_key_col);
 
-            // It may just be the same object
-            if (existing_pk_value == primary_key.get_string()) {
-                return existing_obj;
-            }
-
+        // If the primary key is the same, the object should be resurrected below
+        if (existing_pk_value == primary_key) {
+            needs_resurrection = true;
+        }
+        else {
             GlobalKey existing_id{existing_pk_value};
             object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
         }
@@ -2406,35 +2571,111 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
 
-    return create_object(object_key, {{primary_key_col, primary_key}});
+    field_values.emplace_back(primary_key_col, primary_key);
+    Obj ret = m_clusters.insert(object_key, field_values);
+
+    // Check if unresolved exists
+    if (needs_resurrection) {
+        auto tombstone = m_tombstones->get(unres_key);
+        ret.assign_pk_and_backlinks(tombstone);
+        // If tombstones had no links to it, it may still be alive
+        if (m_tombstones->is_valid(unres_key)) {
+            CascadeState state(CascadeState::Mode::None);
+            m_tombstones->erase(unres_key, state);
+        }
+    }
+    return ret;
 }
 
-ObjKey Table::get_obj_key(GlobalKey id) const
+ObjKey Table::find_primary_key(Mixed primary_key) const
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    // Generate local ObjKey
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return object_key;
+        }
+    }
+    return {};
+}
+
+ObjKey Table::get_objkey_from_primary_key(const Mixed& primary_key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    // Generate local ObjKey
+    GlobalKey object_id{primary_key};
+    ObjKey object_key = global_to_local_object_id_hashed(object_id);
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+
+        // It may just be the same object
+        if (existing_pk_value == primary_key) {
+            return object_key;
+        }
+
+        GlobalKey existing_id{existing_pk_value};
+        object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    }
+
+    // Object does not exist - create tombstone
+    auto tombstone = get_or_create_tombstone(object_key, {{primary_key_col, primary_key}});
+    auto existing_pk_value = tombstone.get_any(primary_key_col);
+    // It may just be the same object
+    if (existing_pk_value == primary_key) {
+        return tombstone.get_key();
+    }
+    // We have a collision - create new ObjKey
+    GlobalKey existing_id{existing_pk_value};
+    object_key = allocate_local_id_after_hash_collision(object_id, existing_id, object_key);
+    return get_or_create_tombstone(object_key, {{primary_key_col, primary_key}}).get_key();
+}
+
+ObjKey Table::get_objkey_from_global_key(GlobalKey global_key)
+{
+    REALM_ASSERT(!m_primary_key_col);
+    auto object_key = global_key.get_local_key(get_sync_file_id());
+
+    // Check if existing
+    if (m_clusters.is_valid(object_key)) {
+        return object_key;
+    }
+
+    return get_or_create_tombstone(object_key, {{}}).get_key();
+}
+
+ObjKey Table::get_objkey(GlobalKey global_key) const
 {
     ObjKey key;
-    auto col = get_primary_key_column();
-    if (col) {
-        if (col.get_type() == col_type_Int) {
-            REALM_ASSERT(id.hi() == 0 || col.get_attrs().test(col_attr_Nullable));
-            if (id.hi() != 0 && id.lo() == 0) {
-                key = find_first_null(col);
-            }
-            else {
-                key = find_first_int(col, int64_t(id.lo()));
-            }
-        }
-        if (col.get_type() == col_type_String) {
-            key = global_to_local_object_id_hashed(id);
-        }
+    if (m_primary_key_col) {
+        key = global_to_local_object_id_hashed(global_key);
     }
     else {
         uint32_t max = std::numeric_limits<uint32_t>::max();
-        if (id.hi() <= max && id.lo() <= max) {
-            key = id.get_local_key(get_sync_file_id());
-            if (!is_valid(key)) {
-                key = realm::null_key;
-            }
+        if (global_key.hi() <= max && global_key.lo() <= max) {
+            key = global_key.get_local_key(get_sync_file_id());
         }
+    }
+    if (key && !is_valid(key)) {
+        key = realm::null_key;
     }
     return key;
 }
@@ -2451,6 +2692,36 @@ GlobalKey Table::get_object_id(ObjKey key) const
         return {key, get_sync_file_id()};
     }
     return {};
+}
+
+Obj Table::get_object_with_primary_key(Mixed primary_key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    DataType type = DataType(primary_key_col.get_type());
+    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
+                 primary_key.get_type() == type);
+
+    ObjKey object_key;
+    GlobalKey object_id{primary_key};
+
+    // Generate local ObjKey
+    object_key = global_to_local_object_id_hashed(object_id);
+
+    return m_clusters.get(object_key);
+}
+
+Mixed Table::get_primary_key(ObjKey key)
+{
+    auto primary_key_col = get_primary_key_column();
+    REALM_ASSERT(primary_key_col);
+    if (key.is_unresolved()) {
+        REALM_ASSERT(m_tombstones);
+        return m_tombstones->get(key).get_any(primary_key_col);
+    }
+    else {
+        return m_clusters.get(key).get_any(primary_key_col);
+    }
 }
 
 GlobalKey Table::allocate_object_id_squeezed()
@@ -2586,13 +2857,29 @@ ObjKey Table::allocate_local_id_after_hash_collision(GlobalKey incoming_id, Glob
     return new_local_id;
 }
 
+Obj Table::get_or_create_tombstone(ObjKey key, const FieldValues& values)
+{
+    auto unres_key = key.get_unresolved();
+
+    ensure_graveyard();
+
+    try {
+        Obj tombstone = m_tombstones->insert(unres_key, values);
+        bump_content_version();
+        bump_storage_version();
+        return tombstone;
+    }
+    catch (const KeyAlreadyUsed&) {
+        return m_tombstones->get(unres_key);
+    }
+}
+
 void Table::free_local_id_after_hash_collision(ObjKey key)
 {
     if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
         // FIXME: Cache these accessors
-        Allocator& alloc = m_top.get_alloc();
-        Array collision_map{alloc};
-        Array local_id{alloc};
+        Array collision_map{m_alloc};
+        Array local_id{m_alloc};
 
         collision_map.set_parent(&m_top, top_position_for_collision_map);
         local_id.set_parent(&collision_map, s_collision_map_local_id);
@@ -2600,8 +2887,8 @@ void Table::free_local_id_after_hash_collision(ObjKey key)
         local_id.init_from_parent();
         auto ndx = local_id.find_first(key.value);
         if (ndx != realm::npos) {
-            Array hi{alloc};
-            Array lo{alloc};
+            Array hi{m_alloc};
+            Array lo{m_alloc};
 
             hi.set_parent(&collision_map, s_collision_map_hi);
             lo.set_parent(&collision_map, s_collision_map_lo);
@@ -2611,7 +2898,18 @@ void Table::free_local_id_after_hash_collision(ObjKey key)
             hi.erase(ndx);
             lo.erase(ndx);
             local_id.erase(ndx);
+            if (hi.size() == 0) {
+                free_collision_table();
+            }
         }
+    }
+}
+
+void Table::free_collision_table()
+{
+    if (ref_type collision_map_ref = to_ref(m_top.get(top_position_for_collision_map))) {
+        Array::destroy_deep(collision_map_ref, m_alloc);
+        m_top.set(top_position_for_collision_map, 0);
     }
 }
 
@@ -2638,10 +2936,10 @@ void Table::remove_object(ObjKey key)
 {
     Group* g = get_parent_group();
 
-    if (m_spec.has_strong_link_columns() || (g && g->has_cascade_notification_handler())) {
+    if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
-        nullify_links(state);
+        m_clusters.nullify_links(key, state);
         remove_recursive(state);
     }
     else {
@@ -2651,6 +2949,28 @@ void Table::remove_object(ObjKey key)
         }
         m_clusters.erase(key, state);
     }
+}
+
+void Table::invalidate_object(ObjKey key)
+{
+    if (m_is_embedded)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    REALM_ASSERT(!key.is_unresolved());
+
+    auto obj = get_object(key);
+    if (obj.has_backlinks(false)) {
+        // If the object has backlinks, we should make a tombstone
+        // and make inward links point to it,
+        FieldValues init_values;
+        if (auto primary_key_col = get_primary_key_column()) {
+            auto pk = obj.get_any(primary_key_col);
+            init_values.emplace_back(primary_key_col, pk);
+        }
+        auto tombstone = get_or_create_tombstone(key, init_values);
+        tombstone.assign_pk_and_backlinks(obj);
+    }
+
+    remove_object(key);
 }
 
 void Table::remove_object_recursive(ObjKey key)
@@ -2804,13 +3124,8 @@ void Table::set_primary_key_column(ColKey col_key)
         validate_column_is_unique(col_key);
         do_set_primary_key_column(col_key);
 
-        if (col_key.get_type() == col_type_String) {
-            remove_search_index(col_key);
-            rebuild_table_with_pk_column();
-        }
-        else {
-            add_search_index(col_key);
-        }
+        remove_search_index(col_key);
+        rebuild_table_with_pk_column();
     }
     else {
         do_set_primary_key_column(col_key);
@@ -2821,7 +3136,7 @@ void Table::rebuild_table_with_pk_column()
 {
     std::vector<std::pair<ObjKey, ObjKey>> changed_keys;
     for (auto& obj : *this) {
-        StringData pk(obj.get<String>(m_primary_key_col));
+        Mixed pk = obj.get_any(m_primary_key_col);
         GlobalKey object_id{pk};
         ObjKey new_key = global_to_local_object_id_hashed(object_id);
         if (new_key != obj.get_key())
@@ -2848,18 +3163,18 @@ void Table::rebuild_table_with_pk_column()
             // and then we'll move the object to its final key in a second pass.
             uint64_t sequence_number_for_local_id = allocate_sequence_number();
             ObjKey temp_key = make_tagged_local_id_after_hash_collision(sequence_number_for_local_id);
-            auto tmp_obj = create_object(temp_key);
+            auto tmp_obj = m_clusters.insert(temp_key, {});
             tmp_obj.assign(old_obj);
             tmp_keys.push_back(temp_key);
         }
         else {
-            create_object(new_key).assign(old_obj);
+            m_clusters.insert(new_key, {}).assign(old_obj);
         }
         remove_object(old_key);
     }
     for (auto key : tmp_keys) {
         auto old_obj = get_object(key);
-        StringData pk(old_obj.get<String>(m_primary_key_col));
+        Mixed pk(old_obj.get_any(m_primary_key_col));
         auto new_obj = create_object_with_primary_key(pk);
         new_obj.assign(old_obj);
         remove_object(key);
@@ -2881,7 +3196,8 @@ void Table::do_set_primary_key_column(ColKey col_key)
 bool Table::contains_unique_values(ColKey col) const
 {
     if (has_search_index(col)) {
-        return get_distinct_view(col).size() == size();
+        auto search_index = get_search_index(col);
+        return !search_index->has_duplicate_values();
     }
     else {
         TableView tv = where().find_all();
@@ -2901,9 +3217,7 @@ void Table::validate_primary_column()
 {
     if (ColKey col = get_primary_key_column()) {
         validate_column_is_unique(col);
-        if (col.get_type() == col_type_String) {
-            rebuild_table_with_pk_column();
-        }
+        rebuild_table_with_pk_column();
     }
 }
 
@@ -2926,6 +3240,11 @@ int64_t remove_optional<Optional<int64_t>>(Optional<int64_t> val)
 }
 template <>
 bool remove_optional<Optional<bool>>(Optional<bool> val)
+{
+    return val.value();
+}
+template <>
+ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
     return val.value();
 }
@@ -3041,7 +3360,24 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Timestamp:
                 change_nullability_list<Timestamp, Timestamp>(from, to, throw_on_null);
                 break;
-            default:
+            case type_ObjectId:
+                if (is_nullable(from)) {
+                    change_nullability_list<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability_list<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                }
+                break;
+            case type_Decimal:
+                change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
+                break;
+            case type_Link:
+            case type_LinkList:
+                // Can't have lists of these types
+            case type_OldTable:
+            case type_OldMixed:
+            case type_OldDateTime:
+                // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
         }
@@ -3074,7 +3410,25 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Timestamp:
                 change_nullability<Timestamp, Timestamp>(from, to, throw_on_null);
                 break;
-            default:
+            case type_ObjectId:
+                if (is_nullable(from)) {
+                    change_nullability<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                }
+                break;
+            case type_Decimal:
+                change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
+                break;
+            case type_Link:
+                // Always nullable, so can't convert
+            case type_LinkList:
+                // Never nullable, so can't convert
+            case type_OldTable:
+            case type_OldMixed:
+            case type_OldDateTime:
+                // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;
         }
@@ -3084,15 +3438,22 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
 
 ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 {
-    if (is_nullable(col_key) == nullable)
+    if (col_key.is_nullable() == nullable)
         return col_key;
 
     bool si = has_search_index(col_key);
     std::string column_name(get_column_name(col_key));
-    auto type = get_real_column_type(col_key);
-    auto list = is_list(col_key);
+    auto type = col_key.get_type();
+    auto attr = col_key.get_attrs();
+    if (nullable) {
+        attr.set(col_attr_Nullable);
+    }
+    else {
+        attr.reset(col_attr_Nullable);
+    }
 
-    ColKey new_col = do_insert_root_column(ColKey(), type, "__temporary", nullable, list);
+    ColKey new_col = generate_col_key(type, attr);
+    do_insert_root_column(new_col, type, "__temporary");
 
     try {
         convert_column(col_key, new_col, throw_on_null);
@@ -3103,9 +3464,6 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         throw;
     }
 
-    bump_content_version();
-    bump_storage_version();
-
     erase_root_column(col_key);
     m_spec.rename_column(colkey2spec_ndx(new_col), column_name);
 
@@ -3113,6 +3471,25 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
         add_search_index(new_col);
 
     return new_col;
+}
+
+bool Table::has_any_embedded_objects()
+{
+    if (!m_has_any_embedded_objects) {
+        m_has_any_embedded_objects = false;
+        for_each_public_column([&](ColKey col_key) {
+            auto target_table_key = get_opposite_table_key(col_key);
+            if (target_table_key && is_link_type(col_key.get_type())) {
+                auto target_table = get_parent_group()->get_table(target_table_key);
+                if (target_table->is_embedded()) {
+                    m_has_any_embedded_objects = true;
+                }
+                return true; // early out
+            }
+            return false;
+        });
+    }
+    return *m_has_any_embedded_objects;
 }
 
 void Table::set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column)

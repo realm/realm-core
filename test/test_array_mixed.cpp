@@ -18,6 +18,7 @@
 
 #include "testsettings.hpp"
 
+#include <realm.hpp>
 #include <realm/array_mixed.hpp>
 
 #include "test.hpp"
@@ -71,8 +72,10 @@ TEST(ArrayMixed_Basics)
     arr.add(Timestamp(1234, 5678));
     arr.add({});
     arr.add(Timestamp(2345, 6789));
+    arr.add(Decimal128("10.50"));
+    arr.add(ObjectId("abcdefabcdefabcdefabcdef"));
 
-    CHECK_EQUAL(arr.size(), 10);
+    CHECK_EQUAL(arr.size(), 12);
     CHECK_EQUAL(arr.get(0).get_int(), 5);
     CHECK_EQUAL(arr.get(1).get_bool(), true);
     CHECK_EQUAL(arr.get(2).get_float(), 3.5f);
@@ -84,6 +87,8 @@ TEST(ArrayMixed_Basics)
     CHECK(arr.is_null(8));
     CHECK(arr.get(8).is_null());
     CHECK_EQUAL(arr.get(9).get_timestamp(), Timestamp(2345, 6789));
+    CHECK_EQUAL(arr.get(10).get<Decimal128>(), Decimal128("10.50"));
+    CHECK_EQUAL(arr.get(11).get<ObjectId>(), ObjectId("abcdefabcdefabcdefabcdef"));
 
     CHECK_NOT(arr.get(4) == arr.get(5));
 
@@ -115,7 +120,7 @@ TEST(ArrayMixed_Basics)
 
     arr.move(arr2, 4);
     CHECK_EQUAL(arr.size(), 4);
-    CHECK_EQUAL(arr2.size(), 7);
+    CHECK_EQUAL(arr2.size(), 9);
     CHECK_EQUAL(arr.get(0).get_int(), 5);
     CHECK_EQUAL(arr.get(1).get_bool(), true);
     CHECK_EQUAL(arr.get(2).get_int(), 4500000000);
@@ -134,8 +139,26 @@ TEST(ArrayMixed_Basics)
     CHECK(arr2.is_null(5));
     CHECK_EQUAL(arr2.get(6).get_timestamp(), Timestamp(2345, 6789));
 
+    arr2.clear();
+    CHECK_EQUAL(arr2.size(), 0);
+    arr2.clear(); // Check idempotency
+    CHECK_EQUAL(arr2.size(), 0);
+    arr2.add("Hello");
+    CHECK_EQUAL(arr2.size(), 1);
+
     arr.destroy();
     arr2.destroy();
 }
+
+TEST(Mixed_Table)
+{
+    Table t;
+    auto col_data = t.add_column(type_OldMixed, "data");
+    auto obj0 = t.create_object().set(col_data, Mixed(5));
+    auto obj1 = t.create_object().set(col_data, Mixed("Hello"));
+    CHECK_EQUAL(obj0.get_any(col_data), Mixed(5));
+    CHECK_EQUAL(obj1.get_any(col_data), Mixed("Hello"));
+}
+
 
 #endif // TEST_ARRAY_VARIANT

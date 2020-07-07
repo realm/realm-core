@@ -39,7 +39,6 @@
 #include <locale>
 #endif
 
-
 using namespace realm;
 
 namespace {
@@ -49,8 +48,15 @@ std::wstring utf8_to_wstring(StringData str)
 #if defined(_MSC_VER)
     // __STDC_UTF_16__ seems not to work
     static_assert(sizeof(wchar_t) == 2, "Expected Windows to use utf16");
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utf8conv;
-    auto w_result = utf8conv.from_bytes(str.data(), str.data() + str.size());
+
+    // First get the number of chars needed for output buffer
+    int wchars_num = MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, nullptr, 0);
+    wchar_t* wstr = new wchar_t[wchars_num];
+    // Then convert
+    MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, wstr, wchars_num);
+    std::wstring w_result{wstr};
+    delete[] wstr;
+
     return w_result;
 #else
     // gcc 4.7 and 4.8 do not yet support codecvt_utf8_utf16 and wstring_convert, and note that we can NOT just use

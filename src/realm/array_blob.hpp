@@ -64,11 +64,7 @@ public:
     /// initialized to zero.
     static MemRef create_array(size_t init_size, Allocator&);
 
-#ifdef REALM_DEBUG
     void verify() const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-#endif
-
 private:
     size_t calc_byte_len(size_t for_size, size_t width) const override;
     size_t calc_item_count(size_t bytes, size_t width) const noexcept override;

@@ -162,11 +162,7 @@ struct Compl {
         return "~";
     }
     template <class A>
-    struct Result {
-        typedef typename Promote<A>::type type;
-    };
-    template <class A>
-    static typename Result<A>::type eval(const A& a)
+    static auto eval(const A& a)
     {
         return ~a;
     }
@@ -181,11 +177,7 @@ struct Pos {
         return "+";
     }
     template <class A>
-    struct Result {
-        typedef typename Promote<A>::type type;
-    };
-    template <class A>
-    static typename Result<A>::type eval(const A& a)
+    static auto eval(const A& a)
     {
         return +a;
     }
@@ -198,11 +190,7 @@ struct Neg {
         return "-";
     }
     template <class A>
-    struct Result {
-        typedef typename Promote<A>::type type;
-    };
-    template <class A>
-    static typename Result<A>::type eval(const A& a)
+    static auto eval(const A& a)
     {
         return -a;
     }
@@ -316,12 +304,8 @@ struct Shl {
     {
         return "<<";
     }
-    template <class A, class>
-    struct Result {
-        typedef typename Promote<A>::type type;
-    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b)
+    static auto eval(const A& a, const B& b)
     {
         return a << b;
     }
@@ -333,12 +317,8 @@ struct Shr {
     {
         return ">>";
     }
-    template <class A, class>
-    struct Result {
-        typedef typename Promote<A>::type type;
-    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b)
+    static auto eval(const A& a, const B& b)
     {
         return a >> b;
     }

@@ -27,6 +27,8 @@
 namespace realm {
 namespace parser {
 
+using namespace util;
+
 Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds) {
     const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
     const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
@@ -40,19 +42,19 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
 
     if (time_inputs.size() == 2) {
         // internal format seconds, nanoseconds
-        int64_t seconds = stot<int64_t>(time_inputs[0]);
-        int32_t nanoseconds = stot<int32_t>(time_inputs[1]);
+        int64_t seconds = string_to<int64_t>(time_inputs[0]);
+        int32_t nanoseconds = string_to<int32_t>(time_inputs[1]);
         return get_timestamp_if_valid(seconds, nanoseconds);
     }
     else if (time_inputs.size() == 6 || time_inputs.size() == 7) {
         // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional
         struct tm created = tm();
-        created.tm_year = stot<int>(time_inputs[0]) - 1900; // epoch offset (see man mktime)
-        created.tm_mon = stot<int>(time_inputs[1]) - 1; // converts from 1-12 to 0-11
-        created.tm_mday = stot<int>(time_inputs[2]);
-        created.tm_hour = stot<int>(time_inputs[3]);
-        created.tm_min = stot<int>(time_inputs[4]);
-        created.tm_sec = stot<int>(time_inputs[5]);
+        created.tm_year = string_to<int>(time_inputs[0]) - 1900; // epoch offset (see man mktime)
+        created.tm_mon = string_to<int>(time_inputs[1]) - 1;     // converts from 1-12 to 0-11
+        created.tm_mday = string_to<int>(time_inputs[2]);
+        created.tm_hour = string_to<int>(time_inputs[3]);
+        created.tm_min = string_to<int>(time_inputs[4]);
+        created.tm_sec = string_to<int>(time_inputs[5]);
 
         if (created.tm_year < 0) {
             // platform timegm functions do not throw errors, they return -1 which is also a valid time
@@ -62,7 +64,7 @@ Timestamp from_timestamp_values(std::vector<std::string> const& time_inputs) {
         int64_t seconds = platform_timegm(created); // UTC time
         int32_t nanoseconds = 0;
         if (time_inputs.size() == 7) {
-            nanoseconds = stot<int32_t>(time_inputs[6]);
+            nanoseconds = string_to<int32_t>(time_inputs[6]);
             if (nanoseconds < 0) {
                 throw std::logic_error("The nanoseconds of a Timestamp cannot be negative.");
             }
@@ -111,7 +113,7 @@ bool ValueExpression::is_null()
         return true;
     }
     else if (value->type == parser::Expression::Type::Argument) {
-        return arguments->is_argument_null(stot<int>(value->s));
+        return arguments->is_argument_null(string_to<int>(value->s));
     }
     return false;
 }
@@ -120,7 +122,7 @@ template <>
 Timestamp ValueExpression::value_of_type_for_query<Timestamp>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->timestamp_for_argument(stot<int>(value->s));
+        return arguments->timestamp_for_argument(string_to<int>(value->s));
     } else if (value->type == parser::Expression::Type::Timestamp) {
         return from_timestamp_values(value->time_inputs);
     } else if (value->type == parser::Expression::Type::Null) {
@@ -133,13 +135,13 @@ template <>
 bool ValueExpression::value_of_type_for_query<bool>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->bool_for_argument(stot<int>(value->s));
+        return arguments->bool_for_argument(string_to<int>(value->s));
     }
     if (value->type != parser::Expression::Type::True && value->type != parser::Expression::Type::False) {
         if (value->type == parser::Expression::Type::Number) {
             // As a special exception we can handle 0 and 1.
             // Our bool values are actually stored as integers {0, 1}
-            int64_t number_value = stot<int64_t>(value->s);
+            int64_t number_value = string_to<int64_t>(value->s);
             if (number_value == 0) {
                 return false;
             }
@@ -156,39 +158,51 @@ template <>
 Double ValueExpression::value_of_type_for_query<Double>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->double_for_argument(stot<int>(value->s));
+        return arguments->double_for_argument(string_to<int>(value->s));
     }
-    return stot<double>(value->s);
+    return string_to<double>(value->s);
 }
 
 template <>
 Float ValueExpression::value_of_type_for_query<Float>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->float_for_argument(stot<int>(value->s));
+        return arguments->float_for_argument(string_to<int>(value->s));
     }
-    return stot<float>(value->s);
+    return string_to<float>(value->s);
 }
 
 template <>
 Int ValueExpression::value_of_type_for_query<Int>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->long_for_argument(stot<int>(value->s));
+        return arguments->long_for_argument(string_to<int>(value->s));
     }
     // We can allow string types here in case people have numbers in their strings like "int == '23'"
     // it's just a convienence but if the string conversion fails we'll throw from the stot function.
     if (value->type != parser::Expression::Type::Number && value->type != parser::Expression::Type::String) {
         throw std::logic_error("Attempting to compare a numeric property to a non-numeric value");
     }
-    return stot<long long>(value->s);
+    return string_to<long long>(value->s);
+}
+
+template <>
+Decimal128 ValueExpression::value_of_type_for_query<Decimal128>()
+{
+    if (value->type == parser::Expression::Type::Argument) {
+        return arguments->decimal128_for_argument(string_to<int>(value->s));
+    }
+    if (value->type != parser::Expression::Type::Number) {
+        throw std::logic_error("Attempting to compare a decimal128 property to a non-numeric value");
+    }
+    return Decimal128(value->s);
 }
 
 template <>
 StringData ValueExpression::value_of_type_for_query<StringData>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->string_for_argument(stot<int>(value->s));
+        return arguments->string_for_argument(string_to<int>(value->s));
     }
     else if (value->type == parser::Expression::Type::String) {
         arguments->buffer_space.push_back({});
@@ -207,7 +221,7 @@ template <>
 BinaryData ValueExpression::value_of_type_for_query<BinaryData>()
 {
     if (value->type == parser::Expression::Type::Argument) {
-        return arguments->binary_for_argument(stot<int>(value->s));
+        return arguments->binary_for_argument(string_to<int>(value->s));
     }
     else if (value->type == parser::Expression::Type::String) {
         arguments->buffer_space.push_back({});
@@ -222,6 +236,29 @@ BinaryData ValueExpression::value_of_type_for_query<BinaryData>()
         return BinaryData(converted.data(), converted.size());
     }
     throw std::logic_error("Binary properties must be compared against a binary argument.");
+}
+
+template <>
+ObjectId ValueExpression::value_of_type_for_query<ObjectId>()
+{
+    if (value->type == parser::Expression::Type::Argument) {
+        return arguments->objectid_for_argument(string_to<int>(value->s));
+    }
+    else if (value->type == parser::Expression::Type::Timestamp) {
+        return ObjectId(from_timestamp_values(value->time_inputs));
+    }
+    else if (value->type == parser::Expression::Type::Null) {
+        return ObjectId();
+    }
+    else if (value->type == parser::Expression::Type::ObjectId) {
+        // expect oid(...) from the parser, and pass in the contents
+        if (value->s.size() > 5 && value->s.substr(0, 4) == "oid(" && value->s[value->s.size() - 1] == ')') {
+            return ObjectId(value->s.substr(4, value->s.size() - 5).c_str());
+        }
+        // otherwise let the ObjectId constructor try to parse all the contents (may assert)
+        return ObjectId(value->s.c_str());
+    }
+    throw std::logic_error("ObjectId properties must be compared against an ObjectId or Timestamp argument.");
 }
 
 } // namespace parser

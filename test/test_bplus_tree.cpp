@@ -18,11 +18,8 @@
 
 #include "testsettings.hpp"
 
-#include "realm/bplustree.hpp"
-#include "realm/array_string.hpp"
-#include "realm/array_timestamp.hpp"
-#include "realm/array_key.hpp"
-#include "realm/column_binary.hpp"
+#include "realm.hpp"
+#include <realm/history.hpp>
 
 #include "test.hpp"
 
@@ -189,6 +186,55 @@ TEST(BPlusTree_Fuzz)
 
     tree.destroy();
 }
+
+
+TEST(BPlusTree_FuzzBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    const size_t iters = 2000;
+    std::vector<std::string> ref_arr;
+
+    auto tr = db->start_write();
+    auto table = tr->add_table("table");
+    auto col = table->add_column_list(type_Binary, "bin");
+    table->create_object();
+    tr->commit_and_continue_as_read();
+
+    for (size_t iter = 0; iter < iters; iter++) {
+
+        tr->promote_to_write();
+        auto list = table->begin()->get_list<Binary>(col);
+
+        // Add
+        uint64_t nb_add = fastrand(10);
+        for (uint64_t i = 0; i < nb_add; i++) {
+            std::string str = "foo ";
+            str += util::to_string(i);
+            list.add(BinaryData(str));
+            ref_arr.push_back(str);
+        }
+
+        // Erase
+        uint64_t nb_erase = (list.size() > 2) ? fastrand(list.size() - 2) : 0;
+        for (uint64_t i = 0; i < nb_erase; i++) {
+            list.remove(0);
+            ref_arr.erase(ref_arr.begin());
+        }
+
+        tr->commit_and_continue_as_read();
+        tr->verify();
+
+        size_t sz = list.size();
+        CHECK_EQUAL(sz, ref_arr.size());
+
+        for (size_t i = 0; i < sz; i++) {
+            CHECK_EQUAL(list.get(i), BinaryData(ref_arr[i]));
+        }
+    }
+}
+
 
 // This test is designed to work with a node size of 4
 TEST(BPlusTree_Initialization)

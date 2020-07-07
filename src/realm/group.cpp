@@ -246,7 +246,7 @@ TableKey Group::ndx2key(size_t ndx) const
     // slow path:
     RefOrTagged rot = m_tables.get_as_ref_or_tagged(ndx);
     if (rot.is_tagged())
-        throw InvalidKey("No such table");
+        throw NoSuchTable();
     ref_type ref = rot.get_as_ref();
     REALM_ASSERT(ref);
     return Table::get_key_direct(m_tables.get_alloc(), ref);
@@ -279,7 +279,7 @@ size_t Group::key2ndx_checked(TableKey key) const
             return idx;
         }
     }
-    throw InvalidKey("No corresponding table");
+    throw NoSuchTable();
 }
 
 
@@ -301,8 +301,8 @@ int Group::get_committed_file_format_version() const noexcept
 }
 
 
-int Group::get_target_file_format_version_for_session(int /* current_file_format_version */,
-                                                      int /* requested_history_type */) noexcept
+int Group::get_target_file_format_version_for_session(int current_file_format_version,
+                                                      int requested_history_type) noexcept
 {
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -316,7 +316,10 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    return 10;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 10)
+        return 10;
+
+    return 11;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -374,15 +377,15 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 10, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 11, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
-    // SharedGroup::do_open() must ensure this. Be sure to revisit the
-    // following upgrade logic when SharedGroup::do_open() is changed (or
+    // DB::do_open() must ensure this. Be sure to revisit the
+    // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 9,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
                     current_file_format_version);
 
 
@@ -400,7 +403,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         commit_and_continue_writing();
     }
 
-    // NOTE: Additional future upgrade steps go here.
+    // Upgrade from version prior to 10 (Cluster based db)
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
         DisableReplication disable_replication(*this);
 
@@ -462,6 +465,20 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             remove_table("pk");
         }
     }
+    if (current_file_format_version <= 10 && target_file_format_version >= 11) {
+        auto table_keys = get_table_keys();
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                if (col.get_type() == col_type_Int) {
+                    // Tables with integer primary keys have to be rebuilt
+                    t->remove_search_index(col);
+                    t->rebuild_table_with_pk_column();
+                }
+            }
+        }
+    }
+    // NOTE: Additional future upgrade steps go here.
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -482,6 +499,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             file_format_ok = (top_ref == 0);
             break;
         case 10:
+        case 11:
             file_format_ok = true;
             break;
     }
@@ -544,7 +562,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
 Group::~Group() noexcept
 {
     // If this group accessor is detached at this point in time, it is either
-    // because it is SharedGroup::m_group (m_is_shared), or it is a free-stading
+    // because it is DB::m_group (m_is_shared), or it is a free-stading
     // group accessor that was never successfully opened.
     if (!m_top.is_attached())
         return;
@@ -783,21 +801,23 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
 
-    if (Replication* repl = *get_repl())
-        repl->add_class_with_primary_key(name, pk_type, pk_name, nullable);
+    auto table = do_add_table(name, false, false);
 
-    auto table = do_add_table(name);
-
-    ColKey pk_col = table->add_column(pk_type, pk_name, nullable);
+    // Add pk column - without replication
+    ColumnAttrMask attr;
+    if (nullable)
+        attr.set(col_attr_Nullable);
+    ColKey pk_col = table->generate_col_key(ColumnType(pk_type), attr);
+    table->do_insert_root_column(pk_col, ColumnType(pk_type), pk_name);
     table->do_set_primary_key_column(pk_col);
-    if (pk_type != type_String) {
-        table->add_search_index(pk_col);
-    }
 
-    return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
+    if (Replication* repl = *get_repl())
+        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable);
+
+    return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-Table* Group::do_add_table(StringData name)
+Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 {
     if (!m_is_writable)
         throw LogicError(LogicError::wrong_transact_state);
@@ -815,37 +835,7 @@ Table* Group::do_add_table(StringData name)
     bool gen_null_tag = (j == m_tables.size()); // new tags start at zero
     uint32_t tag = gen_null_tag ? 0 : uint32_t(rot.get_as_int());
     TableKey key = TableKey((tag << 16) | j);
-    create_and_insert_table(key, name);
-    Table* table = create_table_accessor(j);
 
-    return table;
-}
-
-
-Table* Group::do_get_or_add_table(StringData name, bool* was_added)
-{
-    REALM_ASSERT(m_table_names.is_attached());
-    auto table = do_get_table(name);
-    if (table) {
-        if (was_added)
-            *was_added = false;
-        return table;
-    }
-    else {
-        Replication* repl = *get_repl();
-        if (repl && name.begins_with(g_class_name_prefix))
-            repl->add_class(name);
-
-        table = do_add_table(name);
-        if (was_added)
-            *was_added = true;
-        return table;
-    }
-}
-
-
-void Group::create_and_insert_table(TableKey key, StringData name)
-{
     if (REALM_UNLIKELY(name.size() > max_table_name_length))
         throw LogicError(LogicError::table_name_too_long);
 
@@ -853,8 +843,8 @@ void Group::create_and_insert_table(TableKey key, StringData name)
     size_t table_ndx = key2ndx(key);
     ref_type ref = Table::create_empty_table(m_alloc, key); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    size_t prior_num_tables = m_tables.size();
-    RefOrTagged rot = RefOrTagged::make_ref(ref);
+
+    rot = RefOrTagged::make_ref(ref);
     REALM_ASSERT(m_table_accessors.size() == m_tables.size());
 
     if (table_ndx == m_tables.size()) {
@@ -868,9 +858,17 @@ void Group::create_and_insert_table(TableKey key, StringData name)
         m_table_names.set(table_ndx, name); // Throws
     }
 
-    if (Replication* repl = *get_repl())
-        repl->insert_group_level_table(key, prior_num_tables, name); // Throws
+    Replication* repl = *get_repl();
+    if (do_repl && repl)
+        repl->add_class(key, name, is_embedded);
+
     ++m_num_tables;
+
+    Table* table = create_table_accessor(j);
+    if (is_embedded)
+        table->do_set_embedded(true);
+
+    return table;
 }
 
 
@@ -882,7 +880,7 @@ Table* Group::create_table_accessor(size_t table_ndx)
     RefOrTagged rot = m_tables.get_as_ref_or_tagged(table_ndx);
     ref_type ref = rot.get_as_ref();
     if (ref == 0) {
-        throw InvalidKey("No such table");
+        throw NoSuchTable();
     }
     Table* table = 0;
     {
@@ -1173,7 +1171,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         // the top-array. The free-space information of the group will only be
         // included if a non-zero version number is given as parameter,
         // indicating that versioning info is to be saved. This is used from
-        // SharedGroup to compact the database by writing only the live data
+        // DB to compact the database by writing only the live data
         // into a separate file.
         ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
@@ -1422,7 +1420,7 @@ size_t Group::get_used_space() const noexcept
     if (m_top.size() > 4) {
         Array free_lengths(const_cast<SlabAlloc&>(m_alloc));
         free_lengths.init_from_ref(ref_type(m_top.get(4)));
-        used_space -= size_t(free_lengths.sum());
+        used_space -= size_t(free_lengths.get_sum());
     }
 
     return used_space;
@@ -1465,11 +1463,6 @@ public:
     }
 
     bool remove_object(ObjKey) noexcept
-    {
-        return true;
-    }
-
-    bool clear_table(size_t) noexcept
     {
         return true;
     }
@@ -1523,11 +1516,6 @@ public:
     }
 
     bool list_move(size_t, size_t) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool list_swap(size_t, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1885,7 +1873,7 @@ void Group::verify() const
                             m_top.size() == 11,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
-        ArrayInteger pos(alloc), len(alloc), ver(alloc);
+        Array pos(alloc), len(alloc), ver(alloc);
         pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
         len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
         ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
@@ -1984,7 +1972,7 @@ void Group::print() const
 void Group::print_free() const
 {
     Allocator& alloc = m_top.get_alloc();
-    ArrayInteger pos(alloc), len(alloc), ver(alloc);
+    Array pos(alloc), len(alloc), ver(alloc);
     pos.set_parent(const_cast<Array*>(&m_top), s_free_pos_ndx);
     len.set_parent(const_cast<Array*>(&m_top), s_free_size_ndx);
     ver.set_parent(const_cast<Array*>(&m_top), s_free_version_ndx);
@@ -2009,12 +1997,12 @@ void Group::print_free() const
 
     size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
-        size_t offset = to_size_t(pos[i]);
-        size_t size_of_i = to_size_t(len[i]);
+        size_t offset = to_size_t(pos.get(i));
+        size_t size_of_i = to_size_t(len.get(i));
         std::cout << i << ": " << offset << " " << size_of_i;
 
         if (has_versions) {
-            size_t version = to_size_t(ver[i]);
+            size_t version = to_size_t(ver.get(i));
             std::cout << " " << version;
         }
         std::cout << "\n";
@@ -2022,10 +2010,5 @@ void Group::print_free() const
     std::cout << "\n";
 }
 #endif
-
-std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
-{
-    return std::make_pair(m_tables.get_ref(), ndx_in_parent);
-}
 
 // LCOV_EXCL_STOP ignore debug functions

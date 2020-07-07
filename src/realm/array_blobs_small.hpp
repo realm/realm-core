@@ -21,7 +21,6 @@
 
 #include <realm/binary_data.hpp>
 #include <realm/array_blob.hpp>
-#include <realm/array_integer.hpp>
 #include <realm/exceptions.hpp>
 
 namespace realm {
@@ -115,14 +114,11 @@ public:
     /// initialization value).
     static MemRef create_array(size_t size, Allocator&, BinaryData defaults);
 
-#ifdef REALM_DEBUG
-    void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
-#endif
     bool update_from_parent(size_t old_baseline) noexcept;
 
 private:
     friend class ArrayString;
-    ArrayInteger m_offsets;
+    Array m_offsets;
     ArrayBlob m_blob;
     Array m_nulls;
 

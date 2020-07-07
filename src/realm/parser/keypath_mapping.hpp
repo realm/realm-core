@@ -32,8 +32,11 @@ namespace parser {
 struct KeyPathElement {
     ConstTableRef table;
     ColKey col_key;
-    DataType col_type;
-    bool is_backlink;
+    enum class KeyPathOperation { None, BacklinkTraversal, BacklinkCount, ListOfPrimitivesElementLength } operation;
+    bool is_list_of_primitives() const
+    {
+        return bool(col_key) && col_key.get_type() != col_type_LinkList && col_key.get_attrs().test(col_attr_List);
+    }
 };
 
 class BacklinksRestrictedError : public std::runtime_error {
@@ -60,20 +63,24 @@ public:
     bool add_mapping(ConstTableRef table, std::string name, std::string alias);
     void remove_mapping(ConstTableRef table, std::string name);
     bool has_mapping(ConstTableRef table, std::string name);
-    KeyPathElement process_next_path(ConstTableRef table, KeyPath& path, size_t& index);
+    KeyPathElement process_next_path(ConstTableRef table, util::KeyPath& path, size_t& index);
     void set_allow_backlinks(bool allow);
     bool backlinks_allowed() const
     {
         return m_allow_backlinks;
     }
     void set_backlink_class_prefix(std::string prefix);
-    static LinkChain link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links);
+    static LinkChain link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links,
+                                       ExpressionComparisonType type = ExpressionComparisonType::Any);
 
 protected:
     bool m_allow_backlinks;
     std::string m_backlink_class_prefix;
     std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;
 };
+
+std::vector<KeyPathElement> generate_link_chain_from_string(Query& q, const std::string& key_path_string,
+                                                            KeyPathMapping& mapping);
 
 } // namespace parser
 } // namespace realm

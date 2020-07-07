@@ -89,7 +89,6 @@ public:
 
 #ifdef REALM_DEBUG
     void string_stats() const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:

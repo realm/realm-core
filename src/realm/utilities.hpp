@@ -127,7 +127,7 @@ size_t round_down(size_t p, size_t align);
 void millisleep(unsigned long milliseconds);
 
 #ifdef _WIN32
-int gettimeofday(struct timeval * tp, struct timezone * tzp);
+int gettimeofday(struct timeval* tp, struct timezone* tzp);
 #endif
 
 int64_t platform_timegm(tm time);
@@ -176,6 +176,36 @@ inline int log2(size_t x)
 #else // not __GNUC__ and not _WIN32
     int r = 0;
     while (x >>= 1) {
+        r++;
+    }
+    return r;
+#endif
+}
+
+// count trailing zeros (from least-significant bit)
+inline int ctz(size_t x)
+{
+    if (x == 0)
+        return sizeof(x) * 8;
+
+#if defined(__GNUC__)
+#ifdef REALM_PTR_64
+    return __builtin_ctzll(x); // returns int
+#else
+    return __builtin_ctz(x);      // returns int
+#endif
+#elif defined(_WIN32)
+    unsigned long index = 0;
+#ifdef REALM_PTR_64
+    unsigned char c = _BitScanForward64(&index, x); // outputs unsigned long
+#else
+    unsigned char c = _BitScanForward(&index, x); // outputs unsigned long
+#endif
+    return static_cast<int>(index);
+#else // not __GNUC__ and not _WIN32
+    int r = 0;
+    while (r < sizeof(size_t) * 8 && (x & 1) == 0) {
+        x >>= 1;
         r++;
     }
     return r;
@@ -250,6 +280,9 @@ template <typename T, typename U, typename... Ts>
 struct is_any<T, U, Ts...> : is_any<T, Ts...> {
 };
 
+template <typename... Ts>
+inline constexpr bool is_any_v = is_any<Ts...>::value;
+
 
 // Use realm::safe_equal() instead of std::equal() if one of the parameters can be a null pointer.
 template <class InputIterator1, class InputIterator2>
@@ -270,7 +303,7 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 
 // Use realm::safe_copy_n() instead of std::copy_n() if one of the parameters can be a null pointer. See the
 // explanation of safe_equal() above; same things apply.
-template< class InputIt, class Size, class OutputIt>
+template <class InputIt, class Size, class OutputIt>
 OutputIt safe_copy_n(InputIt first, Size count, OutputIt result)
 {
 #if defined(_MSC_VER)

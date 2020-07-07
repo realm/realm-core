@@ -147,9 +147,7 @@ public:
     {
     }
 
-    ~Array() noexcept override
-    {
-    }
+    ~Array() noexcept override {}
 
     /// Create a new integer array of the specified type and size, and filled
     /// with the specified value, and attach this accessor to it. This does not
@@ -211,6 +209,13 @@ public:
 
     Type get_type() const noexcept;
 
+    /// The meaning of 'width' depends on the context in which this
+    /// array is used.
+    size_t get_width() const noexcept
+    {
+        REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
+        return m_width;
+    }
 
     static void add_to_column(IntegerColumn* column, int64_t value);
     static void add_to_column(KeyColumn* column, int64_t value);
@@ -253,6 +258,14 @@ public:
 
     int64_t front() const noexcept;
     int64_t back() const noexcept;
+
+    void alloc(size_t init_size, size_t new_width)
+    {
+        REALM_ASSERT_3(m_width, ==, get_width_from_header(get_header()));
+        REALM_ASSERT_3(m_size, ==, get_size_from_header(get_header()));
+        Node::alloc(init_size, new_width);
+        update_width_cache_from_header();
+    }
 
     /// Remove the element at the specified index, and move elements at higher
     /// indexes to the next lower index.
@@ -331,10 +344,6 @@ public:
     /// Add \a diff to all the elements in the specified index range.
     void adjust(size_t begin, size_t end, int_fast64_t diff);
 
-    /// Add signed \a diff to all elements that are greater than, or equal to \a
-    /// limit.
-    void adjust_ge(int_fast64_t limit, int_fast64_t diff);
-
     //@{
     /// This is similar in spirit to std::move() from `<algorithm>`.
     /// \a dest_begin must not be in the range [`begin`,`end`)
@@ -382,36 +391,10 @@ public:
     size_t upper_bound_int(int64_t value) const noexcept;
     //@}
 
-    /// \brief Search the \c Array for a value greater or equal than \a target,
-    /// starting the search at the \a start index. If \a indirection is
-    /// provided, use it as a look-up table to iterate over the \c Array.
-    ///
-    /// If \a indirection is not provided, then the \c Array must be sorted in
-    /// ascending order. If \a indirection is provided, then its values should
-    /// point to indices in this \c Array in such a way that iteration happens
-    /// in ascending order.
-    ///
-    /// Behaviour is undefined if:
-    /// - a value in \a indirection is out of bounds for this \c Array;
-    /// - \a indirection does not contain at least as many elements as this \c
-    ///   Array;
-    /// - sorting conditions are not respected;
-    /// - \a start is greater than the number of elements in this \c Array or
-    ///   \a indirection (if provided).
-    ///
-    /// \param target the smallest value to search for
-    /// \param start the offset at which to start searching in the array
-    /// \param indirection an \c Array containing valid indices of values in
-    ///        this \c Array, sorted in ascending order
-    /// \return the index of the value if found, or realm::not_found otherwise
-    size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
-
-    int64_t sum(size_t start = 0, size_t end = size_t(-1)) const;
-    size_t count(int64_t value) const noexcept;
-
-    bool maximum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
-
-    bool minimum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
+    int64_t get_sum(size_t start = 0, size_t end = size_t(-1)) const
+    {
+        return sum(start, end);
+    }
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const noexcept;
@@ -677,62 +660,37 @@ public:
 
     void verify() const;
 
-#ifdef REALM_DEBUG
-    void print() const;
-    typedef size_t (*LeafVerifier)(MemRef, Allocator&);
-    void verify_bptree(LeafVerifier) const;
-    typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
-    void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-    class ToDotHandler {
-    public:
-        virtual void to_dot(MemRef leaf_mem, ArrayParent*, size_t ndx_in_parent, std::ostream&) = 0;
-        ~ToDotHandler()
-        {
-        }
-    };
-    void bptree_to_dot(std::ostream&, ToDotHandler&) const;
-    void to_dot_parent_edge(std::ostream&) const;
-#endif
-
     Array& operator=(const Array&) = delete; // not allowed
-    Array(const Array&) = delete; // not allowed
+    Array(const Array&) = delete;            // not allowed
 protected:
     typedef bool (*CallbackDummy)(int64_t);
 
 protected:
     // This returns the minimum value ("lower bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <size_t width>
-    static int_fast64_t lbound_for_width() noexcept;
-
     static int_fast64_t lbound_for_width(size_t width) noexcept;
 
     // This returns the maximum value ("inclusive upper bound") of the representable values
     // for the given bit width. Valid widths are 0, 1, 2, 4, 8, 16, 32, and 64.
-    template <size_t width>
-    static int_fast64_t ubound_for_width() noexcept;
-
     static int_fast64_t ubound_for_width(size_t width) noexcept;
 
-    template <size_t width>
-    void set_width() noexcept;
-    void set_width(size_t) noexcept;
-
 private:
+    void update_width_cache_from_header() noexcept;
+
     void do_ensure_minimum_width(int_fast64_t);
+
+    int64_t sum(size_t start, size_t end) const;
+    size_t count(int64_t value) const noexcept;
+
+    bool maximum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
+
+    bool minimum(int64_t& result, size_t start = 0, size_t end = size_t(-1), size_t* return_ndx = nullptr) const;
 
     template <size_t w>
     int64_t sum(size_t start, size_t end) const;
 
     template <bool max, size_t w>
     bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
-
-    template <size_t w>
-    size_t find_gte(const int64_t target, size_t start, size_t end) const;
-
-    template <size_t w>
-    size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
 
 protected:
     /// It is an error to specify a non-zero value unless the width
@@ -747,8 +705,6 @@ protected:
     ref_type get_child_ref(size_t) const noexcept override;
 
     void destroy_children(size_t offset = 0) noexcept;
-
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
 protected:
     // Getters and Setters for adaptive-packed arrays
@@ -779,8 +735,9 @@ private:
     const VTable* m_vtable = nullptr;
 
 protected:
-    int64_t m_lbound; // min number that can be stored with current m_width
-    int64_t m_ubound; // max number that can be stored with current m_width
+    uint_least8_t m_width = 0; // Size of an element (meaning depend on type of array).
+    int64_t m_lbound;          // min number that can be stored with current m_width
+    int64_t m_ubound;          // max number that can be stored with current m_width
 
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
     bool m_has_refs;             // Elements whose first bit is zero are refs to subarrays.
@@ -947,82 +904,6 @@ private:
     }
 };
 
-// Used only for Basic-types: currently float and double
-template <class R>
-class QueryState : public QueryStateBase {
-public:
-    R m_state;
-
-    template <Action action>
-    bool uses_val()
-    {
-        return (action == act_Max || action == act_Min || action == act_Sum || action == act_Count);
-    }
-
-    QueryState(Action action, Array* = nullptr, size_t limit = -1)
-        : QueryStateBase(limit)
-    {
-        REALM_ASSERT((std::is_same<R, float>::value || std::is_same<R, double>::value));
-        if (action == act_Max)
-            m_state = -std::numeric_limits<R>::infinity();
-        else if (action == act_Min)
-            m_state = std::numeric_limits<R>::infinity();
-        else if (action == act_Sum)
-            m_state = 0.0;
-        else if (action == act_Count)
-            m_state = 0.0;
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
-    }
-
-    template <Action action, bool pattern, typename resulttype>
-    inline bool match(size_t index, uint64_t /*indexpattern*/, resulttype value)
-    {
-        if (pattern)
-            return false;
-
-        static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
-                      "Search action not supported");
-
-        if (action == act_Count) {
-            ++m_match_count;
-        }
-        else if (!null::is_null_float(value)) {
-            ++m_match_count;
-            if (action == act_Max) {
-                if (value > m_state) {
-                    m_state = value;
-                    if (m_key_values) {
-                        m_minmax_index = m_key_values->get(index) + m_key_offset;
-                    }
-                    else {
-                        m_minmax_index = int64_t(index);
-                    }
-                }
-            }
-            else if (action == act_Min) {
-                if (value < m_state) {
-                    m_state = value;
-                    if (m_key_values) {
-                        m_minmax_index = m_key_values->get(index) + m_key_offset;
-                    }
-                    else {
-                        m_minmax_index = int64_t(index);
-                    }
-                }
-            }
-            else if (action == act_Sum)
-                m_state += value;
-            else {
-                REALM_ASSERT_DEBUG(false);
-            }
-        }
-
-        return (m_limit > m_match_count);
-    }
-};
-
 inline bool RefOrTagged::is_ref() const noexcept
 {
     return (m_value & 1) == 0;
@@ -1055,8 +936,7 @@ inline RefOrTagged RefOrTagged::make_ref(ref_type ref) noexcept
 inline RefOrTagged RefOrTagged::make_tagged(uint_fast64_t i) noexcept
 {
     REALM_ASSERT(i < (1ULL << 63));
-    int_fast64_t value = util::from_twos_compl<int_fast64_t>((i << 1) | 1);
-    return RefOrTagged(value);
+    return RefOrTagged((i << 1) | 1);
 }
 
 inline RefOrTagged::RefOrTagged(int_fast64_t value) noexcept
@@ -1182,7 +1062,7 @@ inline bool Array::get_context_flag() const noexcept
 inline void Array::set_context_flag(bool value) noexcept
 {
     if (m_context_flag != value) {
-        REALM_ASSERT(!is_read_only());
+        copy_on_write();
         m_context_flag = value;
         set_context_flag_in_header(value, get_header());
     }
@@ -1605,7 +1485,8 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
             baseindex--;
         }
         else {
-            // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc. Fixme:
+            // We were called by find() of a nullable array. So skip first entry, take nulls in count, etc, etc.
+            // Fixme:
             // Huge speed optimizations are possible here! This is a very simple generic method.
             auto null_value = get(0);
             for (; start2 < end; start2++) {
@@ -1839,8 +1720,10 @@ size_t Array::find_zero(uint64_t v) const
 template <bool gt, size_t width>
 int64_t Array::find_gtlt_magic(int64_t v) const
 {
-    uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) -
-                                             1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask1 =
+        (width == 64
+             ? ~0ULL
+             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
     uint64_t magic = gt ? (~0ULL / no0(mask1) * (mask2 - v)) : (~0ULL / no0(mask1) * v);
     return magic;
@@ -1853,8 +1736,10 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* 
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
     // Fast, but limited to work when all values in the chunk are positive.
 
-    uint64_t mask1 = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) -
-                                             1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask1 =
+        (width == 64
+             ? ~0ULL
+             : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
     uint64_t mask2 = mask1 >> 1;
     uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1))
                     : ((chunk - magic) & ~chunk & ~0ULL / no0(mask1) * (mask2 + 1));
@@ -2054,8 +1939,10 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
     if (width != 32 && width != 64) {
         const int64_t* p = reinterpret_cast<const int64_t*>(m_data + (start * width / 8));
         const int64_t* const e = reinterpret_cast<int64_t*>(m_data + (end * width / 8)) - 1;
-        const uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) -
-                                                      1ULL)); // Warning free way of computing (1ULL << width) - 1
+        const uint64_t mask =
+            (width == 64
+                 ? ~0ULL
+                 : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1
         const uint64_t valuemask =
             ~0ULL / no0(mask) * (value & mask); // the "== ? :" is to avoid division by 0 compiler error
 
@@ -2393,8 +2280,9 @@ bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t bas
                              Callback callback) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
-    uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) -
-                                               1ULL)); // Warning free way of computing (1ULL << width) - 1
+    uint64_t mask = (bitwidth == 64 ? ~0ULL
+                                    : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) -
+                                       1ULL)); // Warning free way of computing (1ULL << width) - 1
 
     size_t ee = round_up(start, 64 / no0(bitwidth));
     ee = ee > end ? end : ee;

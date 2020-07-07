@@ -23,6 +23,8 @@
 namespace realm {
 namespace parser {
 
+using namespace realm::util;
+
 std::size_t TableAndColHash::operator()(const std::pair<ConstTableRef, std::string>& p) const
 {
     // in practice, table names are unique between tables and column names are unique within a table
@@ -60,10 +62,17 @@ bool KeyPathMapping::has_mapping(ConstTableRef table, std::string name)
 
 // This may be premature optimisation, but it'll be super fast and it doesn't
 // bother dragging in anything locale specific for case insensitive comparisons.
-bool is_backlinks_prefix(std::string& s)
+bool is_backlinks_prefix(const std::string& s)
 {
     return s.size() == 6 && s[0] == '@' && (s[1] == 'l' || s[1] == 'L') && (s[2] == 'i' || s[2] == 'I') &&
            (s[3] == 'n' || s[3] == 'N') && (s[4] == 'k' || s[4] == 'K') && (s[5] == 's' || s[5] == 'S');
+}
+
+bool is_length_suffix(const std::string& s)
+{
+    return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
+           (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T') &&
+           (s[5] == 'h' || s[5] == 'H');
 }
 
 KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& keypath, size_t& index)
@@ -72,12 +81,20 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
 
     // Perform substitution if the alias is found in the mapping
     auto it = m_mapping.find({table, keypath[index]});
-    if (it != m_mapping.end()) {
+    size_t substitutions = 0;
+    while (it != m_mapping.end()) {
+        // if SDK's don't catch cycles in their property aliases, prevent infinite loops
+        constexpr size_t max_substitutions_allowed = 50;
+        realm_precondition(++substitutions < max_substitutions_allowed,
+                           util::format("Substitution loop detected while processing property '%1' -> '%2' found in "
+                                        "type '%3'. Check property aliases.",
+                                        keypath[index], it->second, get_printable_table_name(table->get_name())));
         // the alias needs to be mapped because it might be more than a single path
         // for example named backlinks must alias to @links.class_Name.property
         KeyPath mapped_path = key_path_from_string(it->second);
         keypath.erase(keypath.begin() + index);
         keypath.insert(keypath.begin() + index, mapped_path.begin(), mapped_path.end());
+        it = m_mapping.find({table, keypath[index]});
     }
 
     // Process backlinks which consumes 3 parts of the keypath
@@ -89,12 +106,15 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
             KeyPathElement element;
             element.table = table;
             element.col_key = ColKey(); // unused
-            element.col_type = type_LinkList;
-            element.is_backlink = false;
+            element.operation = KeyPathElement::KeyPathOperation::BacklinkCount;
             return element;
         }
         realm_precondition(index + 2 < keypath.size(), "'@links' must be proceeded by type name and a property name");
-        std::string origin_table_name = m_backlink_class_prefix + keypath[index + 1];
+        std::string origin_table_name = keypath[index + 1];
+        if (origin_table_name.size() < m_backlink_class_prefix.size() ||
+            origin_table_name.substr(0, m_backlink_class_prefix.size()) != m_backlink_class_prefix) {
+            origin_table_name = m_backlink_class_prefix + origin_table_name;
+        }
         Table::BacklinkOrigin info = table->find_backlink_origin(origin_table_name, keypath[index + 2]);
         realm_precondition(bool(info), util::format("No property '%1' found in type '%2' which links to type '%3'",
                                                     keypath[index + 2], get_printable_table_name(keypath[index + 1]),
@@ -111,8 +131,7 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
         KeyPathElement element;
         element.table = info->first;
         element.col_key = info->second;
-        element.col_type = type_LinkList; // backlinks should be operated on as a list
-        element.is_backlink = true;
+        element.operation = KeyPathElement::KeyPathOperation::BacklinkTraversal;
         return element;
     }
 
@@ -121,14 +140,27 @@ KeyPathElement KeyPathMapping::process_next_path(ConstTableRef table, KeyPath& k
     realm_precondition(col_key != ColKey(), util::format("No property '%1' on object of type '%2'", keypath[index],
                                                          get_printable_table_name(*table)));
 
-    DataType cur_col_type = table->get_column_type(col_key);
+    ColumnType cur_col_type = col_key.get_type();
+
+    bool is_primitive_list = col_key.get_attrs().test(ColumnAttr::col_attr_List) && cur_col_type != col_type_LinkList;
+    bool is_length_op = false;
+    if (is_primitive_list) {
+        if (index + 2 == keypath.size() && is_length_suffix(keypath[index + 1])) {
+            realm_precondition(cur_col_type == col_type_String || cur_col_type == col_type_Binary,
+                               util::format("The '.length' operation only applies to string or binary "
+                                            "elements within a list of primitives, but this is a list of type '%1'.",
+                                            data_type_to_str(DataType(cur_col_type))));
+            is_length_op = true;
+            ++index; // consume .length too
+        }
+    }
 
     index++;
     KeyPathElement element;
     element.table = table;
     element.col_key = col_key;
-    element.col_type = cur_col_type;
-    element.is_backlink = false;
+    element.operation = is_length_op ? KeyPathElement::KeyPathOperation::ListOfPrimitivesElementLength
+                                     : KeyPathElement::KeyPathOperation::None;
     return element;
 }
 
@@ -142,15 +174,16 @@ void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
     m_backlink_class_prefix = prefix;
 }
 
-LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links)
+LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links,
+                                            ExpressionComparisonType type)
 {
-    LinkChain lc(table);
+    LinkChain lc(table, type);
     if (links.empty()) {
         return lc;
     }
     // mutates m_link_chain on table
     for (size_t i = 0; i < links.size() - 1; i++) {
-        if (links[i].is_backlink) {
+        if (links[i].operation == KeyPathElement::KeyPathOperation::BacklinkTraversal) {
             lc.backlink(*links[i].table, links[i].col_key);
         }
         else {
@@ -160,6 +193,36 @@ LinkChain KeyPathMapping::link_chain_getter(ConstTableRef table, const std::vect
     return lc;
 }
 
+std::vector<KeyPathElement> generate_link_chain_from_string(Query& q, const std::string& key_path_string,
+                                                            KeyPathMapping& mapping)
+{
+    ConstTableRef cur_table = q.get_table();
+    KeyPath key_path = key_path_from_string(key_path_string);
+    size_t index = 0;
+    std::vector<KeyPathElement> link_chain;
+    while (index < key_path.size()) {
+        KeyPathElement element = mapping.process_next_path(cur_table, key_path, index);
+        if (index != key_path.size()) {
+            realm_precondition(element.table->is_link_type(element.col_key.get_type()),
+                               util::format("Property '%1' is not a link in object of type '%2'",
+                                            element.table->get_column_name(element.col_key),
+                                            get_printable_table_name(*element.table)));
+            if (element.table == cur_table) {
+                if (!element.col_key) {
+                    cur_table = element.table;
+                }
+                else {
+                    cur_table = element.table->get_link_target(element.col_key); // advance through forward link
+                }
+            }
+            else {
+                cur_table = element.table; // advance through backlink
+            }
+        }
+        link_chain.push_back(element);
+    }
+    return link_chain;
+}
 
 } // namespace parser
 } // namespace realm
