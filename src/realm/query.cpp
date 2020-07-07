@@ -254,9 +254,12 @@ struct MakeConditionNode {
     static std::unique_ptr<ParentNode> make(ColKey col_key, typename Node::TConditionValue value, const Table& table)
     {
         if (col_key.is_list()) {
-            using ValueType =  typename Node::TConditionValue;
+            using ValueType = typename Node::TConditionValue;
             using NonOptionalValueType = typename util::RemoveOptional<ValueType>::type;
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalValueType>>(table.column<Lst<NonOptionalValueType>>(col_key).clone(), make_subexpr<Value<NonOptionalValueType>>(value))));
+            return std::unique_ptr<ParentNode>(
+                new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalValueType>>(
+                    table.column<Lst<NonOptionalValueType>>(col_key).clone(),
+                    make_subexpr<Value<NonOptionalValueType>>(value))));
         }
         else {
             return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
@@ -266,9 +269,12 @@ struct MakeConditionNode {
     static std::unique_ptr<ParentNode> make(ColKey col_key, null, const Table& table)
     {
         if (col_key.is_list()) {
-            using ValueType =  typename Node::TConditionValue;
+            using ValueType = typename Node::TConditionValue;
             using NonOptionalValueType = typename util::RemoveOptional<ValueType>::type;
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalValueType>>(table.column<Lst<NonOptionalValueType>>(col_key).clone(), make_subexpr<Value<realm::null>>(null()))));
+            return std::unique_ptr<ParentNode>(
+                new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalValueType>>(
+                    table.column<Lst<NonOptionalValueType>>(col_key).clone(),
+                    make_subexpr<Value<realm::null>>(null()))));
         }
         else {
             return std::unique_ptr<ParentNode>{new Node(null{}, col_key)};
@@ -281,8 +287,10 @@ struct MakeConditionNode {
     make(ColKey col_key, typename util::RemoveOptional<T>::type value, const Table& table)
     {
         if (col_key.is_list()) {
-            using NonOptionalT =  typename util::RemoveOptional<T>::type;
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalT>>(table.column<Lst<NonOptionalT>>(col_key).clone(), make_subexpr<Value<NonOptionalT>>(value))));
+            using NonOptionalT = typename util::RemoveOptional<T>::type;
+            return std::unique_ptr<ParentNode>(
+                new ExpressionNode(make_expression<Compare<typename Node::TConditionOperator, NonOptionalT>>(
+                    table.column<Lst<NonOptionalT>>(col_key).clone(), make_subexpr<Value<NonOptionalT>>(value))));
         }
         else {
             return std::unique_ptr<ParentNode>{new Node(std::move(value), col_key)};
@@ -301,8 +309,10 @@ struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, int64_t value, const Table& table)
     {
         if (col_key.is_list()) {
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, Int>>(table.column<Lst<Int>>(col_key).clone(), make_subexpr<Value<Int>>(value))));
-        } else {
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, Int>>(
+                table.column<Lst<Int>>(col_key).clone(), make_subexpr<Value<Int>>(value))));
+        }
+        else {
             return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(std::move(value), col_key)};
         }
     }
@@ -310,9 +320,12 @@ struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, null, const Table& table)
     {
         if (col_key.is_list()) {
-            using ValueType =  typename IntegerNode<ArrayInteger, Cond>::TConditionValue;
+            using ValueType = typename IntegerNode<ArrayInteger, Cond>::TConditionValue;
             using NonOptionalValueType = typename util::RemoveOptional<ValueType>::type;
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, NonOptionalValueType>>(table.column<Lst<NonOptionalValueType>>(col_key).clone(), make_subexpr<Value<realm::null>>(null()))));
+            return std::unique_ptr<ParentNode>(
+                new ExpressionNode(make_expression<Compare<Cond, NonOptionalValueType>>(
+                    table.column<Lst<NonOptionalValueType>>(col_key).clone(),
+                    make_subexpr<Value<realm::null>>(null()))));
         }
         else {
             return std::unique_ptr<ParentNode>{new IntegerNode<ArrayInteger, Cond>(null{}, col_key)};
@@ -331,7 +344,8 @@ struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, StringData value, const Table& table)
     {
         if (col_key.is_list()) {
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(table.column<Lst<StringData>>(col_key).clone(), make_subexpr<Value<StringData>>(value))));
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(
+                table.column<Lst<StringData>>(col_key).clone(), make_subexpr<Value<StringData>>(value))));
         }
         else {
             return std::unique_ptr<ParentNode>{new StringNode<Cond>(std::move(value), col_key)};
@@ -341,7 +355,8 @@ struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(ColKey col_key, null, const Table& table)
     {
         if (col_key.is_list()) {
-            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(table.column<Lst<StringData>>(col_key).clone(), make_subexpr<Value<realm::null>>(null{}))));
+            return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(
+                table.column<Lst<StringData>>(col_key).clone(), make_subexpr<Value<realm::null>>(null{}))));
         }
         else {
             return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_key)};

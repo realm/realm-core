@@ -1822,8 +1822,8 @@ TEST_TYPES(Query_ListOfPrimitivesTypes, Int, Optional<Int>, Bool, Optional<Bool>
     TableRef t = g.add_table("table");
 
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
-    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value
-        || realm::is_any_v<TEST_TYPE, StringData, BinaryData, Decimal128>;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value ||
+                                 realm::is_any_v<TEST_TYPE, StringData, BinaryData, Decimal128>;
     ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
 
     auto obj1 = t->create_object();
@@ -1866,7 +1866,7 @@ TEST_TYPES(Query_ListOfPrimitivesTypes, Int, Optional<Int>, Bool, Optional<Bool>
         tv = t->where().less(col, underlying_type(1)).find_all();
         check_tv_results(is_optional ? std::vector<Obj>{obj1} : std::vector<Obj>{obj1, obj5});
         tv = t->where().greater_equal(col, underlying_type(1)).find_all();
-        check_tv_results({obj1, obj3, obj4});\
+        check_tv_results({obj1, obj3, obj4});
         tv = t->where().less_equal(col, underlying_type(1)).find_all();
         check_tv_results(is_optional ? std::vector<Obj>{obj1, obj3, obj4} : std::vector<Obj>{obj1, obj3, obj4, obj5});
     }
