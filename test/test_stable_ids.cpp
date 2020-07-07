@@ -178,7 +178,7 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
         WriteTransaction wt{sg};
         TableRef t0 = sync::create_table(wt, "class_t0");
         TableRef t1 = sync::create_table(wt, "class_t1");
-        link_col = t0->add_column_link(type_Link, "link", *t1);
+        link_col = t0->add_column(*t1, "link");
 
         Obj t1_k1 = t1->create_object();
         Obj t0_k1 = t0->create_object().set(link_col, t1_k1.get_key());

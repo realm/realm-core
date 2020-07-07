@@ -212,7 +212,7 @@ TEST(InstructionReplication_CreateEmbedded)
         TableRef car = sync::create_table_with_primary_key(wt, "class_Car", type_String, "id", false);
         auto wheel = wt.add_embedded_table("class_Wheel");
         auto col_position = wheel->add_column(type_String, "position");
-        auto col_wheels = car->add_column_link(type_LinkList, "wheels", *wheel);
+        auto col_wheels = car->add_column_list(*wheel, "wheels");
         Obj volvo = car->create_object_with_primary_key("Volvo");
 
         auto list = volvo.get_linklist(col_wheels);
@@ -269,7 +269,7 @@ TEST(InstructionReplication_EraseObject)
         TableRef foo = wt.get_or_add_table("class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
         TableRef bar = wt.get_or_add_table("class_bar");
-        ColKey col_link = bar->add_column_link(type_Link, "link", *foo);
+        ColKey col_link = bar->add_column(*foo, "link");
 
         Obj obj = foo->create_object().set(col_ndx, 123);
         // Create link to object soon to be deleted
@@ -301,8 +301,8 @@ TEST(InstructionReplication_InvalidateObject)
         TableRef foo = wt.get_or_add_table("class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
         TableRef bar = wt.get_or_add_table("class_bar");
-        ColKey col_link = bar->add_column_link(type_Link, "link", *foo);
-        ColKey col_linklist = bar->add_column_link(type_LinkList, "linklist", *foo);
+        ColKey col_link = bar->add_column(*foo, "link");
+        ColKey col_linklist = bar->add_column_list(*foo, "linklist");
 
         Obj obj = foo->create_object().set(col_ndx, 123);
         // Create link to object soon to be deleted
@@ -338,7 +338,7 @@ TEST(InstructionReplication_SetLink)
         TableRef foo = sync::create_table(wt, "class_foo");
         TableRef bar = sync::create_table(wt, "class_bar");
         ColKey foo_i = foo->add_column(type_Int, "i");
-        ColKey bar_l = bar->add_column_link(type_Link, "l", *foo);
+        ColKey bar_l = bar->add_column(*foo, "l");
 
         auto foo_1 = foo->create_object().set(foo_i, 123).get_key();
         auto foo_2 = foo->create_object().set(foo_i, 456).get_key();
@@ -433,7 +433,7 @@ TEST(InstructionReplication_LinkLists)
         TableRef foo = sync::create_table(wt, "class_foo");
         TableRef bar = sync::create_table(wt, "class_bar");
         ColKey foo_i = foo->add_column(type_Int, "i");
-        ColKey bar_ll = bar->add_column_link(type_LinkList, "ll", *foo);
+        ColKey bar_ll = bar->add_column_list(*foo, "ll");
 
         ObjKey foo_1 = foo->create_object().set(foo_i, 123).get_key();
         ObjKey foo_2 = foo->create_object().set(foo_i, 456).get_key();

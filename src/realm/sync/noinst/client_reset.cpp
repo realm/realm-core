@@ -1043,7 +1043,12 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 if (Table::is_link_type(ColumnType(type))) {
                     ConstTableRef target_src = table_src->get_link_target(col_key);
                     TableRef target_dst = group_dst.get_table(target_src->get_name());
-                    col_key_dst = table_dst->add_column_link(type, col_name, *target_dst);
+                    if (type == type_LinkList) {
+                        col_key_dst = table_dst->add_column_list(*target_dst, col_name);
+                    }
+                    else {
+                        col_key_dst = table_dst->add_column(*target_dst, col_name);
+                    }
                 }
                 else if (col_key.get_attrs().test(col_attr_List)) {
                     col_key_dst = table_dst->add_column_list(type, col_name, nullable);
@@ -1254,16 +1259,25 @@ void client_reset::recover_schema(const Transaction& group_src, Transaction& gro
                 logger.trace("Recover column, table = %1, column name = %2, "
                              " type = %3, nullable = %4",
                              table_name, col_name, type, nullable);
-                if (type == type_Link || type == type_LinkList) {
-                    ConstTableRef target_src = table_src->get_link_target(col_key);
-                    TableRef target_dst = group_dst.get_table(target_src->get_name());
-                    table_dst->add_column_link(type, col_name, *target_dst);
-                }
-                else if (col_key.get_attrs().test(col_attr_List)) {
-                    table_dst->add_column_list(type, col_name, nullable);
+                if (col_key.is_list()) {
+                    if (type == type_LinkList) {
+                        ConstTableRef target_src = table_src->get_link_target(col_key);
+                        TableRef target_dst = group_dst.get_table(target_src->get_name());
+                        table_dst->add_column_list(*target_dst, col_name);
+                    }
+                    else {
+                        table_dst->add_column_list(type, col_name, nullable);
+                    }
                 }
                 else {
-                    table_dst->add_column(type, col_name, nullable);
+                    if (type == type_Link) {
+                        ConstTableRef target_src = table_src->get_link_target(col_key);
+                        TableRef target_dst = group_dst.get_table(target_src->get_name());
+                        table_dst->add_column(*target_dst, col_name);
+                    }
+                    else {
+                        table_dst->add_column(type, col_name, nullable);
+                    }
                 }
             }
         }

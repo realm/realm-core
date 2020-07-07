@@ -266,12 +266,12 @@ TEST(Query_TableInitialization)
     ColKey col_int = table.add_column(type_Int, "int");
     ColKey col_float = table.add_column(type_Float, "float");
     ColKey col_bool = table.add_column(type_Bool, "bool");
-    ColKey col_link = table.add_column_link(type_Link, "link", table);
+    ColKey col_link = table.add_column(table, "link");
     ColKey col_string_enum = table.add_column(type_String, "string enum");
     // FIXME table.optimize();
     ColKey col_double = table.add_column(type_Double, "double");
     ColKey col_string = table.add_column(type_String, "string");
-    ColKey col_list = table.add_column_link(type_LinkList, "list", table);
+    ColKey col_list = table.add_column_list(table, "list");
     ColKey col_binary = table.add_column(type_Binary, "binary");
     ColKey col_timestamp = table.add_column(type_Timestamp, "timestamp");
     ColKey col_string_indexed = table.add_column(type_String, "indexed string");

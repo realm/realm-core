@@ -248,7 +248,7 @@ TEST(Transform_LinkListSet_vs_MoveLastOver)
         TableRef foo = sync::create_table(transaction, "class_foo");
         foo->add_column(type_Int, "i");
         TableRef bar = sync::create_table(transaction, "class_bar");
-        bar->add_column_link(type_LinkList, "ll", *foo);
+        bar->add_column_list(*foo, "ll");
     };
     client_1->create_schema(create_schema);
     client_2->create_schema(create_schema);
@@ -291,7 +291,7 @@ TEST(Transform_LinkListInsert_vs_MoveLastOver)
         TableRef foo = sync::create_table(transaction, "class_foo");
         foo->add_column(type_Int, "i");
         TableRef bar = sync::create_table(transaction, "class_bar");
-        bar->add_column_link(type_LinkList, "ll", *foo);
+        bar->add_column_list(*foo, "ll");
     };
     client_1->create_schema(create_schema);
     client_2->create_schema(create_schema);
@@ -334,7 +334,7 @@ TEST(Transform_Experiment)
         TableRef t = sync::create_table(tr, "class_t");
         TableRef t2 = sync::create_table(tr, "class_t2");
         t2->add_column(type_Int, "i");
-        t->add_column_link(type_LinkList, "ll", *t2);
+        t->add_column_list(*t2, "ll");
     };
 
     client_1->create_schema(schema);
@@ -388,7 +388,7 @@ TEST(Transform_SelectLinkList)
         TableRef t = sync::create_table(tr, "class_t");
         TableRef t2 = sync::create_table(tr, "class_t2");
         t2->add_column(type_Int, "i");
-        t->add_column_link(type_LinkList, "ll", *t2);
+        t->add_column_list(*t2, "ll");
     };
 
     client_1->create_schema(schema);
@@ -474,7 +474,7 @@ TEST(Transform_AdjustSetLinkPayload)
         TableRef t = sync::create_table(tr, "class_t");
         t->add_column(type_Int, "i");
         TableRef l = sync::create_table(tr, "class_l");
-        l->add_column_link(type_Link, "l", *t);
+        l->add_column(*t, "l");
     };
 
     client_1->create_schema(schema);
@@ -528,7 +528,7 @@ TEST(Transform_AdjustLinkListSetPayload)
         TableRef t = sync::create_table(tr, "class_t");
         t->add_column(type_Int, "i");
         TableRef l = sync::create_table(tr, "class_ll");
-        l->add_column_link(type_LinkList, "ll", *t);
+        l->add_column_list(*t, "ll");
     };
 
     client_1->create_schema(schema);
@@ -623,7 +623,7 @@ TEST(Transform_MergeSetLinkAndMoveLastOver)
         TableRef t = sync::create_table(tr, "class_t");
         t->add_column(type_Int, "i");
         TableRef l = sync::create_table(tr, "class_l");
-        l->add_column_link(type_Link, "l", *t);
+        l->add_column(*t, "l");
     };
 
     client_1->create_schema(schema);
@@ -719,7 +719,7 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
         TableRef t = sync::create_table_with_primary_key(tr, "class_t", type_Int, "i");
         TableRef t2 = sync::create_table(tr, "class_t2");
         t->add_column(type_String, "s");
-        t->add_column_link(type_LinkList, "ll", *t2);
+        t->add_column_list(*t2, "ll");
         t2->add_column(type_Int, "i2");
     };
 
@@ -908,7 +908,7 @@ TEST(Transform_EraseSelectedLinkView)
     auto init = [](WriteTransaction& tr) {
         TableRef origin = sync::create_table(tr, "class_origin");
         TableRef target = sync::create_table(tr, "class_target");
-        origin->add_column_link(type_LinkList, "ll", *target);
+        origin->add_column_list(*target, "ll");
         target->add_column(type_Int, "");
         origin->create_object();
         origin->create_object();
@@ -1419,7 +1419,7 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
     client_1->transaction([](Peer& c) {
         TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
         TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
-        a->add_column_link(type_LinkList, "ll", *b);
+        a->add_column_list(*b, "ll");
         Obj a_obj = a->create_object_with_primary_key(123);
         Obj b_obj = b->create_object_with_primary_key(456);
         a_obj.get_linklist("ll").add(b_obj.get_key());
@@ -1428,7 +1428,7 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
     client_2->transaction([](Peer& c) {
         TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
         TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
-        a->add_column_link(type_LinkList, "ll", *b);
+        a->add_column_list(*b, "ll");
         Obj a_obj = a->create_object_with_primary_key(123);
         Obj b_obj = b->create_object_with_primary_key(456);
         a_obj.get_linklist("ll").add(b_obj.get_key());
@@ -1454,7 +1454,7 @@ TEST(Transform_ArrayInsert_EraseObject)
     client_1->transaction([&k0, &k1](Peer& c) {
         TableRef source = sync::create_table(*c.group, "class_source");
         TableRef target = sync::create_table(*c.group, "class_target");
-        source->add_column_link(type_LinkList, "ll", *target);
+        source->add_column_list(*target, "ll");
         source->create_object();
         k0 = target->create_object().get_key();
         k1 = target->create_object().get_key();
@@ -1815,7 +1815,7 @@ TEST(Transform_DanglingLinks)
             auto& tr = *c.group;
             auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
             auto table2 = sync::create_table_with_primary_key(tr, "class_table2", type_Int, "pk");
-            table->add_column_link(type_LinkList, "links", *table2);
+            table->add_column_list(*table2, "links");
             auto obj = table->create_object_with_primary_key(0);
             auto obj2 = table2->create_object_with_primary_key(0);
             obj.get_linklist("links").insert(0, obj2.get_key());

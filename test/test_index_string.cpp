@@ -256,8 +256,8 @@ TEST(StringIndex_NonIndexable)
     Group group;
     TableRef table = group.add_table("table");
     TableRef target_table = group.add_table("target");
-    table->add_column_link(type_Link, "link", *target_table);
-    table->add_column_link(type_LinkList, "linkList", *target_table);
+    table->add_column(*target_table, "link");
+    table->add_column_list(*target_table, "linkList");
     table->add_column(type_Double, "double");
     table->add_column(type_Float, "float");
     table->add_column(type_Binary, "binary");

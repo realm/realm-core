@@ -515,7 +515,7 @@ void Peer::add_query(const std::string& class_name, const std::string& query)
         const std::string& matches_column_name = class_to_matches_column_name(class_name, buffer);
         ColKey col_ndx_matches = result_sets->get_column_key(matches_column_name);
         if (!col_ndx_matches) {
-            result_sets->add_column_link(type_LinkList, matches_column_name, *queryable);
+            result_sets->add_column_list(*queryable, matches_column_name);
         }
         else {
             if (result_sets->get_column_type(col_ndx_matches) != type_LinkList) {

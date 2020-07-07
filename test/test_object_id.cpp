@@ -260,8 +260,8 @@ TEST(ObjectId_Query)
 
         col_id = table->add_column(type_ObjectId, "alternative_id", true);
         col_int = table->add_column(type_Int, "int");
-        col_has = table->add_column_link(type_Link, "Has", *target);
-        col_owns = origin->add_column_link(type_Link, "Owns", *table);
+        col_has = table->add_column(*target, "Has");
+        col_owns = origin->add_column(*table, "Owns");
 
         ObjKeys target_keys;
         target->create_objects(16, target_keys);

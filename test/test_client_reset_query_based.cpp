@@ -83,7 +83,7 @@ TEST_IF(ClientResetQueryBased_1, false)
                 CHECK(col_key_query);
                 CHECK(col_key_matches_property);
                 CHECK(col_key_status);
-                result_sets->add_column_link(type_LinkList, "values", *table);
+                result_sets->add_column_list(*table, "values");
                 Obj res = create_object(wt, *result_sets);
                 res.set(col_key_matches_property, "values");
                 res.set(col_key_query, "value = 1100");

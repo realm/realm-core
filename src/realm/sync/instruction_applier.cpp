@@ -455,8 +455,12 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
                                     col_name, target_table_name);
             }
-            DataType type = instr.list ? type_LinkList : type_Link;
-            table->add_column_link(type, col_name, *target);
+            if (instr.list) {
+                table->add_column_list(*target, col_name);
+            }
+            else {
+                table->add_column(*target, col_name);
+            }
         }
         else {
             table->add_column(type_TypedLink, col_name);

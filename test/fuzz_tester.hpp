@@ -327,11 +327,12 @@ private:
                       << "\", *client_" << client.local_file_ident << "->group->get_table(\"A\"));\n";
         }
 
-        ColKey col_key = table->add_column_link(type, name, *link_target_table);
         if (type == type_LinkList) {
+            ColKey col_key = table->add_column_list(*link_target_table, name);
             m_link_list_columns.push_back(col_key);
         }
         else {
+            ColKey col_key = table->add_column(*link_target_table, name);
             m_unstructured_columns.push_back(col_key);
         }
     }

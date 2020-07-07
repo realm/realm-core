@@ -378,7 +378,7 @@ TEST(Table_Null)
         TableRef table = group.add_table("table");
 
         auto col_int = target->add_column(type_Int, "int");
-        auto col_link = table->add_column_link(type_Link, "link", *target);
+        auto col_link = table->add_column(*target, "link");
         CHECK(table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
     }
@@ -390,7 +390,7 @@ TEST(Table_Null)
         TableRef table = group.add_table("table");
 
         auto col_int = target->add_column(type_Int, "int");
-        auto col_link = table->add_column_link(type_LinkList, "link", *target);
+        auto col_link = table->add_column_list(*target, "link");
         CHECK(!table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
     }
@@ -912,14 +912,13 @@ TEST(Table_ColumnNameTooLong)
     memset(buf, 'A', buf_size);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_link(type_Link, StringData(buf, buf_size), *table),
-                      LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column(*table, StringData(buf, buf_size)), LogicError::column_name_too_long);
 
     table->add_column(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'B', buf_size); // Column names must be unique
     table->add_column_list(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'C', buf_size);
-    table->add_column_link(type_Link, StringData(buf, buf_size - 1), *table);
+    table->add_column(*table, StringData(buf, buf_size - 1));
 }
 
 TEST(Table_StringOrBinaryTooBig)
@@ -2707,7 +2706,7 @@ TEST(Table_DetachedAccessor)
     auto col_int = table->add_column(type_Int, "i");
     auto col_str = table->add_column(type_String, "s");
     table->add_column(type_Binary, "b");
-    table->add_column_link(type_Link, "l", *table);
+    table->add_column(*table, "l");
     ObjKey key0 = table->create_object().get_key();
     Obj obj1 = table->create_object();
     group.remove_table("table");
@@ -2737,7 +2736,7 @@ TEST(Table_addRowsToTableWithNoColumns)
 
     // Check that links are nulled when connected table is cleared
     TableRef u = g.add_table("u");
-    auto col_link = u->add_column_link(type_Link, "link from u to t", *t);
+    auto col_link = u->add_column(*t, "link from u to t");
     Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
     CHECK_EQUAL(t->size(), 3);
@@ -5186,7 +5185,7 @@ TEST(Table_MultipleObjs) {
 
     auto tr = sg->start_write();
     auto table = tr->add_table("my_table");
-    auto col = table->add_column_link(type_LinkList, "the links", *table);
+    auto col = table->add_column_list(*table, "the links");
     auto col_int = table->add_column_list(type_String, "the integers");
     auto obj_key = table->create_object().get_key();
     tr->commit();
@@ -5289,10 +5288,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     {
         auto tr = sg->start_write();
         auto table = tr->add_embedded_table("myEmbeddedStuff");
-        auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
+        auto col_recurse = table->add_column(*table, "theRecursiveBit");
         CHECK_THROW(table->create_object(), LogicError);
         auto parent = tr->add_table("myParentStuff");
-        auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
+        auto ck = parent->add_column(*table, "theGreatColumn");
         Obj o = parent->create_object();
         Obj o2 = o.create_and_set_linked_object(ck);
         o2.create_and_set_linked_object(col_recurse);
@@ -5330,10 +5329,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5367,10 +5366,10 @@ TEST(Table_EmbeddedObjectNotifications)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5424,10 +5423,10 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5481,10 +5480,10 @@ TEST(Table_EmbeddedObjectPath)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto gch = collect_path(o);
     CHECK(gch.size() == 0);

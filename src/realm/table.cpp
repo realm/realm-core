@@ -322,21 +322,8 @@ ColKey Table::add_column(DataType type, StringData name, bool nullable)
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
-ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
+ColKey Table::add_column(Table& target, StringData name)
 {
-    Table* invalid_link = nullptr;
-    ColumnAttrMask attr;
-    attr.set(col_attr_List);
-    if (nullable || type == type_Mixed)
-        attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
-}
-
-ColKey Table::add_column_link(DataType type, StringData name, Table& target)
-{
-    if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
-        throw LogicError(LogicError::illegal_type);
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
     Group* target_group = target.get_parent_group();
@@ -348,14 +335,56 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     m_has_any_embedded_objects.reset();
 
     ColumnAttrMask attr;
-    if (type == type_Link)
-        attr.set(col_attr_Nullable);
-    if (type == type_LinkList)
-        attr.set(col_attr_List);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(col_type_Link, attr);
 
-    auto retval = do_insert_column(col_key, type, name, &target); // Throws
+    auto retval = do_insert_column(col_key, type_Link, name, &target); // Throws
     return retval;
+}
+
+ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
+{
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_List);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
+}
+
+ColKey Table::add_column_list(Table& target, StringData name)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+
+    m_has_any_embedded_objects.reset();
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_List);
+    ColKey col_key = generate_col_key(col_type_LinkList, attr);
+
+    auto retval = do_insert_column(col_key, type_LinkList, name, &target); // Throws
+    return retval;
+}
+
+ColKey Table::add_column_link(DataType type, StringData name, Table& target)
+{
+    if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
+        throw LogicError(LogicError::illegal_type);
+
+    if (type == type_LinkList) {
+        return add_column_list(target, name);
+    }
+    else {
+        REALM_ASSERT(type == type_Link);
+        return add_column(target, name);
+    }
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)

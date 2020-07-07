@@ -111,7 +111,12 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        return table.add_column_link(is_array(property.type) ? type_LinkList : type_Link, property.name, *link_table);
+        if (is_array(property.type)) {
+            return table.add_column_list(*link_table, property.name);
+        }
+        else {
+            return table.add_column(*link_table, property.name);
+        }
     }
     else if (is_array(property.type)) {
         return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,

@@ -252,8 +252,8 @@ TEST(Json_LinkList1)
     table3->create_object().set_all(800, "test");
     auto k32 = table3->create_object().set_all(900, "hi").get_key();
 
-    ColKey col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
-    ColKey col_link3 = table1->add_column_link(type_LinkList, "linkB", *table3);
+    ColKey col_link2 = table1->add_column_list(*table2, "linkA");
+    ColKey col_link3 = table1->add_column_list(*table3, "linkB");
 
     // set some links
     auto ll0 = obj0.get_linklist(col_link2); // Links to table 2
@@ -316,8 +316,8 @@ TEST(Json_LinkListCycle)
 
     auto t20 = table2->create_object().set_all("foo");
 
-    auto col_link1 = table1->add_column_link(type_LinkList, "linkA", *table2);
-    auto col_link2 = table2->add_column_link(type_LinkList, "linkB", *table1);
+    auto col_link1 = table1->add_column_list(*table2, "linkA");
+    auto col_link2 = table2->add_column_list(*table1, "linkB");
 
     // set some links
     auto links1 = t10.get_linklist(col_link1);
@@ -372,8 +372,8 @@ TEST(Json_LinkCycles)
 
     auto t20 = table2->create_object().set_all("foo");
 
-    ColKey col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
-    ColKey col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
+    ColKey col_link1 = table1->add_column(*table2, "linkA");
+    ColKey col_link2 = table2->add_column(*table1, "linkB");
 
     // set some links
     table1->begin()->set(col_link1, t20.get_key());

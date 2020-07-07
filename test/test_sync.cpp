@@ -1238,7 +1238,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
             WriteTransaction wt(sg_1);
             TableRef table = sync::create_table(wt, "class_foo");
             TableRef target = sync::create_table(wt, "class_bar");
-            table->add_column_link(type_Link, "column", *target);
+            table->add_column(*target, "column");
             auto new_version = wt.commit();
             session_1.nonsync_transact_notify(new_version);
         }
@@ -1247,7 +1247,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
             WriteTransaction wt(sg_2);
             TableRef table = sync::create_table(wt, "class_foo");
             TableRef target = sync::create_table(wt, "class_baz");
-            table->add_column_link(type_Link, "column", *target);
+            table->add_column(*target, "column");
             auto new_version = wt.commit();
             session_2.nonsync_transact_notify(new_version);
         }
@@ -6499,7 +6499,7 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
         auto k1 = table_target->create_object().set(col_ndx, 456).get_key();
 
         TableRef table_source = create_table(wt, "class_source");
-        col_ndx = table_source->add_column_link(type_LinkList, "target_link", *table_target);
+        col_ndx = table_source->add_column_list(*table_target, "target_link");
         Obj obj = table_source->create_object();
         LnkLst ll = obj.get_linklist(col_ndx);
         ll.insert(0, k0);
@@ -7394,7 +7394,7 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 
         TableRef table_source = create_table(wt, "class_source");
         TableRef table_target = create_table(wt, "class_target");
-        auto col_key = table_source->add_column_link(type_LinkList, "target_link", *table_target);
+        auto col_key = table_source->add_column_list(*table_target, "target_link");
 
         auto k0 = table_target->create_object().get_key();
         auto k1 = table_target->create_object().get_key();

@@ -124,9 +124,13 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
+    ColKey add_column(Table& target, StringData name);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
+    ColKey add_column_list(Table& target, StringData name);
 
-    ColKey add_column_link(DataType type, StringData name, Table& target);
+    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
+    ColKey
+    add_column_link(DataType type, StringData name, Table& target);
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);

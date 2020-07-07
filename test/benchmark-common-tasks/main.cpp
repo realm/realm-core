@@ -374,7 +374,7 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
         TableRef strings = tr.get_table(name());
-        link_col_ndx = t->add_column_link(type_Link, "myLink", *strings);
+        link_col_ndx = t->add_column(*strings, "myLink");
         const size_t num_links = strings->size();
 
 #ifdef REALM_CLUSTER_IF
@@ -560,7 +560,7 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
         TableRef timestamps = tr.get_table(name());
-        link_col_ndx = t->add_column_link(type_Link, "myLink", *timestamps);
+        link_col_ndx = t->add_column(*timestamps, "myLink");
         const size_t num_timestamps = timestamps->size();
 #ifdef REALM_CLUSTER_IF
         auto target = timestamps->begin();
@@ -1594,7 +1594,7 @@ struct BenchmarkGetLinkList : Benchmark {
         std::string n = std::string(name()) + "_Destination";
         TableRef destination_table = tr.add_table(n);
         TableRef table = tr.add_table(name());
-        m_col_link = table->add_column_link(type_LinkList, "linklist", *destination_table);
+        m_col_link = table->add_column_list(*destination_table, "linklist");
 #ifdef REALM_CLUSTER_IF
         table->create_objects(rows, m_keys);
 #else
