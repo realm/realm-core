@@ -683,6 +683,14 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
     }
 }
 
+void Table::clear_indexes()
+{
+    for (auto index : m_index_accessors) {
+        if (index) {
+            index->clear();
+        }
+    }
+}
 
 void Table::add_search_index(ColKey col_key)
 {

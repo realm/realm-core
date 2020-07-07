@@ -18,7 +18,6 @@
 
 #include "realm/table_cluster_tree.hpp"
 #include "realm/table.hpp"
-#include "realm/index_string.hpp"
 #include "realm/replication.hpp"
 #include "realm/array_key.hpp"
 #include "realm/array_integer.hpp"
@@ -35,13 +34,7 @@ TableClusterTree::~TableClusterTree() {}
 
 void TableClusterTree::clear(CascadeState& state)
 {
-    size_t num_cols = get_spec().get_public_column_count();
-    for (size_t col_ndx = 0; col_ndx < num_cols; col_ndx++) {
-        auto col_key = m_owner->spec_ndx2colkey(col_ndx);
-        if (StringIndex* index = m_owner->get_search_index(col_key)) {
-            index->clear();
-        }
-    }
+    m_owner->clear_indexes();
 
     if (state.m_group) {
         remove_all_links(state); // This will also delete objects loosing their last strong link

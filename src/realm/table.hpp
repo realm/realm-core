@@ -615,6 +615,7 @@ private:
     void populate_search_index(ColKey col_key);
     void erase_from_search_indexes(ObjKey key);
     void update_indexes(ObjKey key, const FieldValues& values);
+    void clear_indexes();
 
     // Migration support
     void migrate_column_info(util::FunctionRef<void()>);
