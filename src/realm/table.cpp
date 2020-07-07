@@ -2362,7 +2362,7 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     return obj;
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, bool* did_create)
 {
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
@@ -2370,9 +2370,10 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    ObjKey object_key;
-    GlobalKey object_id{primary_key};
+    if (did_create)
+        *did_create = false;
 
+    ObjKey object_key;
     if (type == type_Int) {
         if (primary_key.is_null())
             object_key = find_first_null(primary_key_col);
@@ -2384,6 +2385,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
         object_key = get_next_key();
     }
 
+    GlobalKey object_id{primary_key};
     if (type == type_String) {
         // Generate local ObjKey
         object_key = global_to_local_object_id_hashed(object_id);
@@ -2406,6 +2408,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key)
         repl->create_object_with_primary_key(this, object_id, primary_key);
     }
 
+    if (did_create)
+        *did_create = true;
     return create_object(object_key, {{primary_key_col, primary_key}});
 }
 
