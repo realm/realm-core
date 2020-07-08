@@ -572,22 +572,22 @@ public:
     void rollback_and_continue_as_read(O* observer);
     void rollback_and_continue_as_read()
     {
-        _impl::NullInstructionObserver o;
-        rollback_and_continue_as_read(&o);
+        _impl::NullInstructionObserver* o = nullptr;
+        rollback_and_continue_as_read(o);
     }
     template <class O>
     void advance_read(O* observer, VersionID target_version = VersionID());
     void advance_read(VersionID target_version = VersionID())
     {
-        _impl::NullInstructionObserver o;
-        advance_read(&o, target_version);
+        _impl::NullInstructionObserver* o = nullptr;
+        advance_read(o, target_version);
     }
     template <class O>
     bool promote_to_write(O* observer, bool nonblocking = false);
     bool promote_to_write(bool nonblocking = false)
     {
-        _impl::NullInstructionObserver o;
-        return promote_to_write(&o, nonblocking);
+        _impl::NullInstructionObserver* o = nullptr;
+        return promote_to_write(o, nonblocking);
     }
     TransactionRef freeze();
     // Frozen transactions are created by freeze() or DB::start_frozen()
