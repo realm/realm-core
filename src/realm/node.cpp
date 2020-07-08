@@ -146,7 +146,6 @@ void Node::do_copy_on_write(size_t minimum_size)
     // Update internal data
     m_ref = mref.get_ref();
     m_data = get_data_from_header(new_begin);
-    std::cout << " * COW(" << old_ref << ") -> [" << m_ref << " : ...]" << std::endl;
     // Update capacity in header. Uses m_data to find header, so
     // m_data must be initialized correctly first.
     set_capacity_in_header(new_size, new_begin);

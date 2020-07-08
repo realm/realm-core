@@ -306,7 +306,6 @@ ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& ou
         else
             result = array.do_write_deep(out, only_if_modified); // Throws
     }
-    std::cout << "ToDisk-write " << ref << " -> " << result << std::endl;
     return result;
 }
 
@@ -343,7 +342,6 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         }
         new_array.add(value); // Throws
     }
-    std::cout << "COPY: " << m_ref << " -> " << new_array.m_ref << std::endl;
     return new_array.do_write_shallow(out); // Throws
 }
 

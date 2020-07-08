@@ -542,8 +542,8 @@ public:
     /// size of the last snapshot done in that DB. If the snapshots are
     /// identical, the numbers will of course be equal.
     size_t get_used_space() const noexcept;
-    void touch(ref_type first, ref_type end, std::vector<int>& progress_vector, size_t work_limit);
-    bool recursive_touch(int level, Array& parent, ref_type first, ref_type last, std::vector<int>& progress_vector, size_t& work_limit);
+    void touch(ref_type first, ref_type end, std::vector<unsigned>& progress_vector, size_t work_limit);
+    bool recursive_touch(size_t level, Array& parent, ref_type first, ref_type last, std::vector<unsigned>& progress_vector, size_t& work_limit);
     void verify() const;
     void validate_primary_columns();
 #ifdef REALM_DEBUG
@@ -1082,7 +1082,6 @@ inline void Group::init_array_parents() noexcept
 
 inline void Group::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    std::cout << " *** BONG *** " << std::endl;
     m_tables.set(child_ndx, new_ref);
 }
 

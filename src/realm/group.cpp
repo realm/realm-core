@@ -1236,9 +1236,11 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
     out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
 
-bool Group::recursive_touch(int level, Array& parent, ref_type first, ref_type last, std::vector<int>& progress_vector, size_t& work_limit)
+bool Group::recursive_touch(size_t level, Array& parent, ref_type first, ref_type last, std::vector<unsigned>& progress_vector, size_t& work_limit)
 {
+#ifdef DEBUG_TOUCH
     std::cout << parent.get_ref() << ",  sz = " << parent.size() << std::endl;
+#endif
     if (parent.get_ref() >= first && parent.get_ref() < last)
         parent.copy_on_write();
     if (parent.has_refs()) {
@@ -1256,9 +1258,11 @@ bool Group::recursive_touch(int level, Array& parent, ref_type first, ref_type l
                     ++progress_vector[level];
                     continue;
                 }
+#ifdef DEBUG_TOUCH
                 for (int k = 0; k < level; ++k)
                     std::cout << "    ";
                 std::cout << parent.get_ref() << "[" << i << "] = ";
+#endif
                 arr.init_from_ref(ref);
                 arr.set_parent(&parent, i);
                 auto done = recursive_touch(1 + level, arr, first, last, progress_vector, work_limit);
@@ -1274,7 +1278,7 @@ bool Group::recursive_touch(int level, Array& parent, ref_type first, ref_type l
     return true;
 }
 
-void Group::touch(ref_type first, ref_type last, std::vector<int>& progress_vector, size_t work_limit)
+void Group::touch(ref_type first, ref_type last, std::vector<unsigned>& progress_vector, size_t work_limit)
 {
     size_t early_out_limit = 0;
     bool done = false;
@@ -1306,9 +1310,11 @@ void Group::touch(ref_type first, ref_type last, std::vector<int>& progress_vect
 
     if (done) {
         progress_vector.resize(0);
+#ifdef DEBUG_TOUCH
         std::cout << "Touch completed with m_top at " << m_top.m_ref << std::endl << std::endl;
     } else {
         std::cout << "Incremental Touch with m_top at " << m_top.m_ref << std::endl << std::endl;
+#endif
     }
 }
 

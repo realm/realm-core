@@ -501,8 +501,6 @@ ref_type GroupWriter::write_group()
     REALM_ASSERT_3(rest, >, 0);
     int_fast64_t value_8 = from_ref(end_ref);
     int_fast64_t value_9 = to_int64(rest);
-    std::cout << " -- freelists and top at [" << reserve_pos << " : " << end_ref << "]" << std::endl;
-    std::cout << "    -- residual free block at [" << end_ref << " : " << end_ref + rest << "]" << std::endl;
     // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit expansion
     REALM_ASSERT_3(value_8, <=, Array::ubound_for_width(m_free_positions.get_width()));
     REALM_ASSERT_3(value_9, <=, Array::ubound_for_width(m_free_lengths.get_width()));
@@ -549,12 +547,12 @@ void GroupWriter::read_in_freelist()
                 version = m_free_versions.get(idx);
                 // Entries that are freed in still alive versions are not candidates for merge or allocation
                 if (version >= limit_version) {
-                    std::cout << " - lock: [" << ref << " : " << ref + size << "]" << std::endl;
+                    // std::cout << " - lock: [" << ref << " : " << ref + size << "]" << std::endl;
                     m_not_free_in_file.emplace_back(ref, size, version);
                     continue;
                 }
             }
-            std::cout << " -                           free: [" << ref << " : " << ref + size << "]" << std::endl;
+            // std::cout << " -                           free: [" << ref << " : " << ref + size << "]" << std::endl;
             free_in_file.emplace_back(ref, size, 0);
         }
 
@@ -619,8 +617,8 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     // combine all blocks in the 'free_in_file'
     // 1. all the really free blocks from the size map
     for (const auto& entry : m_size_map) {
-        std::cout << " * still free: [" << entry.second << " : " 
-                  << entry.second + entry.first << "]" << std::endl;
+        //std::cout << " * still free: [" << entry.second << " : " 
+        //          << entry.second + entry.first << "]" << std::endl;
         free_in_file.emplace_back(entry.second, entry.first, 0);
     }
 
@@ -629,14 +627,14 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
         // no longer holds: REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
         // 2. the blocks that are in file and not free as they belong to live versions or evac zone
         for (const auto& locked : m_not_free_in_file) {
-            std::cout << " * locked: [" << locked.ref << " : " << locked.ref + locked.size << "]" << std::endl;
+            // std::cout << " * locked: [" << locked.ref << " : " << locked.ref + locked.size << "]" << std::endl;
             free_in_file.emplace_back(locked.ref, locked.size, locked.released_at_version);
             locked_space_size += locked.size;
         }
         // 3. the blocks that are being freed up as part of the current transaction
         for (const auto& free_space : new_free_space) {
-            std::cout << " * newly freed: [" << free_space.first << " : " 
-                      << free_space.first + free_space.second << "]" << std::endl;
+            // std::cout << " * newly freed: [" << free_space.first << " : " 
+            //          << free_space.first + free_space.second << "]" << std::endl;
             free_in_file.emplace_back(free_space.first, free_space.second, m_current_version);
             locked_space_size += free_space.second;
         }
@@ -741,16 +739,12 @@ size_t GroupWriter::get_free_space(size_t size)
 
     size_t rest = chunk_size - size;
     m_size_map.erase(p);
-    std::cout << " * allocated: [" << chunk_pos << " : "
-              << chunk_pos + size << "]" << std::endl;
     if (rest > 0) {
         // Allocating part of chunk - this alway happens from the beginning
         // of the chunk. The call to reserve_free_space may split chunks
         // in order to make sure that it returns a chunk from which allocation
         // can be done from the beginning
         m_size_map.emplace(rest, chunk_pos + size);
-        std::cout << "   ^ adjusted free block: ["
-                  << chunk_pos + size << " : " << chunk_pos + chunk_size << "]" << std::endl;
     }
     return chunk_pos;
 }

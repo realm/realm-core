@@ -6017,7 +6017,7 @@ TEST(LangBindHelper_FragmentFile)
     for (int i = 0; i < 1000; ++i) {
         w[i] = '0' + (i % 10);
     }
-    size_t num = 10000;
+    size_t num = 100000;
     for (size_t j = 0; j < num; ++j) {
         BinaryData sd(w, 500 + (j % 500));
         t->create_object().set(c, sd);
@@ -6044,12 +6044,13 @@ TEST(LangBindHelper_FragmentFile)
         ++j;
     }
     tr->commit_and_continue_as_read();
+
     db->get_stats(free_space, used_space);
     std::cout << free_space << ", " << used_space << std::endl;
     size_t total = free_space + used_space;
-    std::vector<int> progress_vector;
+    std::vector<unsigned> progress_vector;
     for (int h = 0; h < 10; ++h)  {
-                /* if (free_space * 100 / total > 50) */ 
+                // if (free_space * 100 / total > 50)
         size_t evac_start = h * total / 10;
         if (evac_start < 24) evac_start = 24;
         size_t evac_end = (h+1) * total / 10;
@@ -6065,6 +6066,7 @@ TEST(LangBindHelper_FragmentFile)
         std::cout << free_space << ", " << used_space << std::endl;
         total = free_space + used_space;
     }
+
 }
 
 #endif
