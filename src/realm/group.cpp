@@ -1236,36 +1236,80 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
     out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
 
-void Group::recursive_touch(int level, Array& parent, ref_type first, ref_type last)
+bool Group::recursive_touch(int level, Array& parent, ref_type first, ref_type last, std::vector<int>& progress_vector, size_t& work_limit)
 {
     std::cout << parent.get_ref() << ",  sz = " << parent.size() << std::endl;
     if (parent.get_ref() >= first && parent.get_ref() < last)
         parent.copy_on_write();
-    if (parent.has_refs())
-        for (size_t i = 0; i < parent.size(); ++i) {
+    if (parent.has_refs()) {
+        if (work_limit == 0)
+            return false;
+        if (progress_vector.size() == level)
+            progress_vector.push_back(0); // start new round
+        while (progress_vector[level] < parent.size()) {
+            auto i = progress_vector[level];
             auto rot = parent.get_as_ref_or_tagged(i);
             if (rot.is_ref()) {
                 Array arr(m_alloc);
                 ref_type ref = rot.get_as_ref();
-                if (ref == 0)
+                if (ref == 0) {
+                    ++progress_vector[level];
                     continue;
+                }
                 for (int k = 0; k < level; ++k)
                     std::cout << "    ";
                 std::cout << parent.get_ref() << "[" << i << "] = ";
                 arr.init_from_ref(ref);
                 arr.set_parent(&parent, i);
-                recursive_touch(1 + level, arr, first, last);
+                auto done = recursive_touch(1 + level, arr, first, last, progress_vector, work_limit);
+                if (!done) 
+                    return false;
+                if (work_limit)
+                    --work_limit; // work is only carried out in case of progress!
             }
+            ++progress_vector[level];
         }
+        progress_vector.resize(level);
+    }
+    return true;
 }
 
-void Group::touch(ref_type first, ref_type last)
+void Group::touch(ref_type first, ref_type last, std::vector<int>& progress_vector, size_t work_limit)
 {
-    recursive_touch(1, m_table_names, first, last);
-    recursive_touch(1, m_tables, first, last);
-    // ^ must be done before, so that touching their entries in the top array has no effect.
-    recursive_touch(0, m_top, first, last);
-    std::cout << "Touch completed with m_top at " << m_top.m_ref << std::endl << std::endl;
+    size_t early_out_limit = 0;
+    bool done = false;
+    if (progress_vector.size() == 0) {
+        progress_vector.push_back(0);
+    }
+    /* m_table_names */
+    if (progress_vector[0] == 0) {
+        done = recursive_touch(1, m_table_names, first, last, progress_vector, work_limit);
+        if (done)
+            progress_vector[0]++;
+    } else {
+        done = recursive_touch(1, m_table_names, first, last, progress_vector, early_out_limit);
+    }
+    /* m_tables */
+    if (progress_vector[0] == 1) {
+        done = recursive_touch(1, m_tables, first, last, progress_vector, work_limit);
+        if (done)
+            progress_vector[0]++;
+    } else {
+        done = recursive_touch(1, m_tables, first, last, progress_vector,early_out_limit);
+    }
+
+    // ^ must be done first, so that touching their entries in the top array has no effect.
+    /* m_top */
+    if (progress_vector.size() == 1)
+        progress_vector.push_back(2); // skip arrays 0 and 1, they've been handled above
+    done = recursive_touch(1, m_top, first, last, progress_vector, work_limit);
+
+    if (done) {
+        progress_vector.resize(0);
+        std::cout << "Touch completed with m_top at " << m_top.m_ref << std::endl << std::endl;
+    } else {
+        std::cout << "Incremental Touch with m_top at " << m_top.m_ref << std::endl << std::endl;
+    }
 }
 
 void Group::commit()
