@@ -1675,9 +1675,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;
-    _impl::TransactLogParser parser; // Throws
-    TransactAdvancer advancer(*this, schema_changed);
-    parser.parse(in, advancer); // Throws
+    if (has_schema_change_notification_handler()) {
+        _impl::TransactLogParser parser; // Throws
+        TransactAdvancer advancer(*this, schema_changed);
+        parser.parse(in, advancer); // Throws
+    }
 
     m_top.detach();                                 // Soft detach
     bool create_group_when_missing = false;         // See Group::attach_shared().
