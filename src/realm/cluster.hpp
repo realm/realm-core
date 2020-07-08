@@ -67,7 +67,7 @@ public:
         }
         IteratorState(const IteratorState&);
         void clear();
-        void init(const Obj&);
+        void init(State&, ObjKey);
 
         Cluster& m_current_leaf;
         int64_t m_key_offset = 0;
@@ -165,6 +165,14 @@ public:
     }
 
 protected:
+#if REALM_MAX_BPNODE_SIZE > 256
+    static constexpr int node_shift_factor = 8;
+#else
+    static constexpr int node_shift_factor = 2;
+#endif
+
+    static constexpr size_t cluster_node_size = 1 << node_shift_factor;
+
     const ClusterTree& m_tree_top;
     ClusterKeyArray m_keys;
     uint64_t m_offset;
@@ -178,7 +186,9 @@ public:
     }
     ~Cluster() override;
 
-    void create(size_t nb_leaf_columns); // Note: leaf columns - may include holes
+    static MemRef create_empty_cluster(Allocator& alloc);
+
+    void create(); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
     bool update_from_parent(size_t old_baseline) noexcept override;
     bool is_writeable() const
@@ -258,6 +268,9 @@ public:
     void dump_objects(int64_t key_offset, std::string lead) const override;
 
 private:
+    friend class ClusterTree;
+    friend class TableClusterTree;
+
     static constexpr size_t s_key_ref_or_size_index = 0;
     static constexpr size_t s_first_col_index = 1;
 
@@ -265,7 +278,6 @@ private:
     {
         return size_t(Array::get(s_key_ref_or_size_index)) >> 1; // Size is stored as tagged value
     }
-    friend class ClusterTree;
     void insert_row(size_t ndx, ObjKey k, const FieldValues& init_values);
     void move(size_t ndx, ClusterNode* new_node, int64_t key_adj) override;
     template <class T>

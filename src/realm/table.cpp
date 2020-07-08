@@ -369,8 +369,7 @@ ColKey Table::add_column_list(Table& target, StringData name)
     attr.set(col_attr_List);
     ColKey col_key = generate_col_key(col_type_LinkList, attr);
 
-    auto retval = do_insert_column(col_key, type_LinkList, name, &target); // Throws
-    return retval;
+    return do_insert_column(col_key, type_LinkList, name, &target); // Throws
 }
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
@@ -385,6 +384,15 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
         REALM_ASSERT(type == type_Link);
         return add_column(target, name);
     }
+}
+
+ColKey Table::add_column_dictionary(DataType type, StringData name)
+{
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_Dictionary);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -486,7 +494,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
     if (m_top.get_as_ref(top_position_for_cluster_tree) == 0) {
         // This is an upgrade - create cluster
-        MemRef mem = ClusterTree::create_empty_cluster(m_top.get_alloc()); // Throws
+        MemRef mem = Cluster::create_empty_cluster(m_top.get_alloc()); // Throws
         m_top.set_as_ref(top_position_for_cluster_tree, mem.get_ref());
     }
     m_clusters.init_from_parent();
@@ -547,7 +555,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
         if (!m_tombstones) {
-            m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+            m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         }
         m_tombstones->init_from_parent();
     }
@@ -623,6 +631,100 @@ void Table::populate_search_index(ColKey col_key)
         }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
+        }
+    }
+}
+
+void Table::erase_from_search_indexes(ObjKey key)
+{
+    // Tombstones do not use index - will crash if we try to erase values
+    if (!key.is_unresolved()) {
+        for (auto index : m_index_accessors) {
+            if (index) {
+                index->erase(key);
+            }
+        }
+    }
+}
+
+void Table::update_indexes(ObjKey key, const FieldValues& values)
+{
+    // Tombstones do not use index - will crash if we try to insert values
+    if (key.is_unresolved()) {
+        return;
+    }
+
+    auto sz = m_index_accessors.size();
+    // values are sorted by column index - there may be values missing
+    auto value = values.begin();
+    for (size_t column_ndx = 0; column_ndx < sz; column_ndx++) {
+        // Check if initial value is provided
+        Mixed init_value;
+        if (value != values.end() && value->col_key.get_index().val == column_ndx) {
+            // Value for this column is provided
+            init_value = value->value;
+            ++value;
+        }
+
+        if (auto index = m_index_accessors[column_ndx]) {
+            // There is an index for this column
+            auto col_key = m_leaf_ndx2colkey[column_ndx];
+            auto type = col_key.get_type();
+            auto attr = col_key.get_attrs();
+            bool nullable = attr.test(col_attr_Nullable);
+            switch (type) {
+                case col_type_Int:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayIntNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<int64_t>());
+                    }
+                    break;
+                case col_type_Bool:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayBoolNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<bool>());
+                    }
+                    break;
+                case col_type_String:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayString::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<String>());
+                    }
+                    break;
+                case col_type_Timestamp:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayTimestamp::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<Timestamp>());
+                    }
+                    break;
+                case col_type_ObjectId:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayObjectIdNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<ObjectId>());
+                    }
+                    break;
+                default:
+                    REALM_UNREACHABLE();
+            }
+        }
+    }
+}
+
+void Table::clear_indexes()
+{
+    for (auto index : m_index_accessors) {
+        if (index) {
+            index->clear();
         }
     }
 }
@@ -1645,7 +1747,7 @@ ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
     }
     top.add(0); // Old position for columns
     {
-        MemRef mem = ClusterTree::create_empty_cluster(alloc); // Throws
+        MemRef mem = Cluster::create_empty_cluster(alloc); // Throws
         dg_2.reset(mem.get_ref());
         int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
@@ -1704,9 +1806,9 @@ void Table::ensure_graveyard()
         while (m_top.size() < top_position_for_tombstones)
             m_top.add(0);
         REALM_ASSERT(!m_top.get(top_position_for_tombstones));
-        MemRef mem = ClusterTree::create_empty_cluster(m_alloc);
+        MemRef mem = Cluster::create_empty_cluster(m_alloc);
         m_top.set_as_ref(top_position_for_tombstones, mem.get_ref());
-        m_tombstones = std::make_unique<ClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
+        m_tombstones = std::make_unique<TableClusterTree>(this, m_alloc, size_t(top_position_for_tombstones));
         m_tombstones->init_from_parent();
         for_each_and_every_column([ts = m_tombstones.get()](ColKey col) {
             ts->insert_column(col);
@@ -3077,22 +3179,12 @@ void Table::remove_object_recursive(ObjKey key)
     }
 }
 
-Table::ConstIterator Table::begin() const
-{
-    return ConstIterator(m_clusters, 0);
-}
-
-Table::ConstIterator Table::end() const
-{
-    return ConstIterator(m_clusters, size());
-}
-
-Table::Iterator Table::begin()
+Table::Iterator Table::begin() const
 {
     return Iterator(m_clusters, 0);
 }
 
-Table::Iterator Table::end()
+Table::Iterator Table::end() const
 {
     return Iterator(m_clusters, size());
 }

@@ -45,7 +45,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 
 DataType ClusterColumn::get_data_type() const
 {
-    const Table* table = m_cluster_tree->get_owner();
+    const Table* table = m_cluster_tree->get_owning_table();
     return table->get_column_type(m_column_key);
 }
 

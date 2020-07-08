@@ -964,7 +964,7 @@ Obj Group::get_object(ObjLink link)
 {
     auto target_table = get_table(link.get_table_key());
     ObjKey key = link.get_obj_key();
-    ClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+    TableClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
     return ct->get(key);
 }
 

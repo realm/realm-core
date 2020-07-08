@@ -260,7 +260,7 @@ Results::IteratorWrapper::IteratorWrapper(IteratorWrapper const& rgt)
 Results::IteratorWrapper& Results::IteratorWrapper::operator=(IteratorWrapper const& rgt)
 {
     if (rgt.m_it)
-        m_it = std::make_unique<Table::ConstIterator>(*rgt.m_it);
+        m_it = std::make_unique<Table::Iterator>(*rgt.m_it);
     return *this;
 }
 
@@ -270,7 +270,7 @@ Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
     // than indexing into it as the iterator caches the cluster the last accessed
     // object is stored in.
     if (!m_it && table.size() > 5) {
-        m_it = std::make_unique<Table::ConstIterator>(table.begin());
+        m_it = std::make_unique<Table::Iterator>(table.begin());
     }
     if (!m_it) {
         return const_cast<Table&>(table).get_object(ndx);
@@ -280,7 +280,7 @@ Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
     }
     catch (...) {
         // Iterator might be outdated
-        m_it = std::make_unique<Table::ConstIterator>(table.begin());
+        m_it = std::make_unique<Table::Iterator>(table.begin());
         return (*m_it)[ndx];
     }
 }

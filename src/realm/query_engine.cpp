@@ -67,14 +67,22 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
+template <class T>
+inline bool Obj::evaluate(T func) const
+{
+    Cluster cluster(0, get_alloc(), m_table->m_clusters);
+    cluster.init(m_mem);
+    cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
+    return func(&cluster, m_row_ndx);
+}
+
 bool ParentNode::match(const Obj& obj)
 {
-    auto cb = [this](const Cluster* cluster, size_t row) {
+    return obj.evaluate([this](const Cluster* cluster, size_t row) {
         set_cluster(cluster);
         size_t m = find_first(row, row + 1);
         return m != npos;
-    };
-    return obj.evaluate(cb);
+    });
 }
 
 template <Action action>
