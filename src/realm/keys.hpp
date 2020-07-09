@@ -252,8 +252,8 @@ struct ObjLink {
 public:
     ObjLink() {}
     ObjLink(TableKey table_key, ObjKey obj_key)
-        : m_table_key(table_key)
-        , m_obj_key(obj_key)
+        : m_obj_key(obj_key)
+        , m_table_key(table_key)
     {
     }
     explicit operator bool() const
@@ -290,8 +290,10 @@ public:
     }
 
 private:
-    TableKey m_table_key;
+    // Having ObjKey first ensures that there will be no uninitialized space
+    // in the first 12 bytes. This is important when generating a hash
     ObjKey m_obj_key;
+    TableKey m_table_key;
 };
 
 inline std::ostream& operator<<(std::ostream& os, ObjLink link)

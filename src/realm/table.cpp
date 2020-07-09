@@ -713,6 +713,9 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
                         index->insert(key, init_value.get<ObjectId>());
                     }
                     break;
+                case col_type_Mixed:
+                    index->insert(key, init_value);
+                    break;
                 default:
                     REALM_UNREACHABLE();
             }
@@ -738,7 +741,7 @@ void Table::add_search_index(ColKey col_key)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.get_attrs().test(col_attr_List)) {
+    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
         // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
         // should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
@@ -2224,6 +2227,7 @@ template ObjKey Table::find_first(ColKey col_key, ObjKey) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
+template ObjKey Table::find_first(ColKey col_key, Mixed) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {

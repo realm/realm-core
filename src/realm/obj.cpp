@@ -962,6 +962,11 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
         recurse = replace_backlink(col_key, old_link, new_link, state);
     }
 
+
+    if (StringIndex* index = m_table->get_search_index(col_key)) {
+        index->set<Mixed>(m_key, value);
+    }
+
     ensure_writeable();
 
     Allocator& alloc = get_alloc();
@@ -1767,6 +1772,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                 break;
             case col_type_Decimal:
                 do_set_null<ArrayDecimal128>(col_key);
+                break;
+            case col_type_Mixed:
+                do_set_null<ArrayMixed>(col_key);
                 break;
             default:
                 REALM_UNREACHABLE();

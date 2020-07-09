@@ -5522,5 +5522,52 @@ TEST(Table_EmbeddedObjectPath)
     CHECK(gyh[1].index == 0);
 }
 
+TEST(Table_IndexOnMixed)
+{
+    Timestamp now{std::chrono::system_clock::now()};
+    Group g;
+
+    auto bars = g.add_table("bar");
+    auto foos = g.add_table("foo");
+    auto col = foos->add_column(type_Mixed, "any");
+    foos->add_search_index(col);
+
+    auto bar = bars->create_object();
+
+    auto k0 = foos->create_object().set(col, Mixed()).get_key();
+    auto k1 = foos->create_object().set(col, Mixed(25)).get_key();
+    auto k2 = foos->create_object().set(col, Mixed(123.456f)).get_key();
+    auto k3 = foos->create_object().set(col, Mixed(987.654)).get_key();
+    auto k4 = foos->create_object().set(col, Mixed("Hello")).get_key();
+    auto k5 = foos->create_object().set(col, Mixed(now)).get_key();
+    auto k6 = foos->create_object().set(col, Mixed(Decimal128("2.25"))).get_key();
+    auto k7 = foos->create_object().set(col, Mixed(1)).get_key();
+    auto k8 = foos->create_object().set(col, Mixed(true)).get_key();
+    auto k9 = foos->create_object().set(col, Mixed(bar.get_link())).get_key();
+
+    CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 123.456f), k2);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 987.654), k3);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, "Hello"), k4);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, now), k5);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, Decimal128("2.25")), k6);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+
+    foos->remove_search_index(col);
+
+    CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 123.456f), k2);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 987.654), k3);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, "Hello"), k4);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, now), k5);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, Decimal128("2.25")), k6);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+}
 
 #endif // TEST_TABLE
