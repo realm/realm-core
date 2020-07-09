@@ -897,7 +897,7 @@ void Table::migrate_column_info(util::FunctionRef<void()> commit_and_continue)
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns
-void Table::migrate_indexes(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
 {
     if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
         bool changes = false;
@@ -907,22 +907,22 @@ void Table::migrate_indexes(util::FunctionRef<void()> commit_and_continue)
 
         for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
             if (m_spec.get_column_attr(col_ndx).test(col_attr_Indexed) && !m_index_refs.get(col_ndx)) {
-                auto old_index_ref = to_ref(col_refs.get(col_ndx + 1));
-
-                // Delete old index
-                Array::destroy_deep(old_index_ref, m_alloc);
-
-                // Create new one
-                StringIndex* index =
-                    new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
-                m_index_accessors[col_ndx] = index;
-                index->set_parent(&m_index_refs, col_ndx);
-                m_index_refs.set(col_ndx, index->get_ref());
-
                 // Simply delete entry. This will have the effect that we will not have to take
                 // extra entries into account
+                auto old_index_ref = to_ref(col_refs.get(col_ndx + 1));
                 col_refs.erase(col_ndx + 1);
+                Array::destroy_deep(old_index_ref, m_alloc);
                 changes = true;
+
+                // Primary key columns does not need an index
+                if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
+                    // Otherwise create new index. Will be updated when objects are created
+                    StringIndex* index =
+                        new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
+                    m_index_accessors[col_ndx] = index;
+                    index->set_parent(&m_index_refs, col_ndx);
+                    m_index_refs.set(col_ndx, index->get_ref());
+                }
             }
         };
         if (changes) {
@@ -989,87 +989,6 @@ void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
     }
     m_spec.destroy_subspec();
     commit_and_continue();
-}
-
-// When pk_col value is 1, links have been converted.
-// pk_col value will be set back to 0 when all objects are migrated.
-void Table::convert_links_from_ndx_to_key(util::FunctionRef<void()> commit_and_continue)
-{
-    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
-    bool done = m_top.get(top_position_for_pk_col);
-
-    if (top_ref && !done) {
-        bool changes = false;
-        Array col_refs(m_alloc);
-        col_refs.set_parent(&m_top, top_position_for_columns);
-        col_refs.init_from_ref(top_ref);
-
-        auto convert_links = [&](ColKey col_key) {
-            auto col_type = col_key.get_type();
-            if (is_link_type(col_type)) {
-                auto target_table = get_opposite_table(col_key);
-                ColKey oid_col = target_table->get_column_key("!OID");
-
-                // If the target table has an !OID column, all it's objects will be stored
-                // with the key present in this column. As links nowadays are represented by
-                // target key values - and not indices into the table - we will need to
-                // replace all old indices with the corresponding key values.
-                if (oid_col) {
-                    BPlusTree<Int> oid_column(m_alloc);
-                    oid_column.init_from_ref(target_table->get_oid_column_ref());
-
-                    BPlusTree<Int> link_column(m_alloc);
-                    link_column.set_parent(&col_refs, col_key.get_index().val);
-                    link_column.init_from_parent();
-                    auto link_column_size = link_column.size();
-
-                    for (size_t row_ndx = 0; row_ndx < link_column_size; row_ndx++) {
-                        if (int64_t val = link_column.get(row_ndx)) {
-                            // Link is not null
-                            int64_t new_val;
-                            if (col_type == col_type_LinkList) {
-                                BPlusTree<Int> link_list(m_alloc);
-                                link_list.init_from_ref(ref_type(val));
-                                size_t link_list_sz = link_list.size();
-                                for (size_t j = 0; j < link_list_sz; j++) {
-                                    int64_t link_val = link_list.get(j);
-                                    int64_t key_val = oid_column.get(size_t(link_val));
-                                    if (key_val != link_val) {
-                                        link_list.set(j, key_val);
-                                    }
-                                }
-                                // If array was cow, the ref has changed
-                                new_val = link_list.get_ref();
-                            }
-                            else {
-                                new_val = oid_column.get(size_t(val - 1)) + 1;
-                            }
-                            if (new_val != val) {
-                                link_column.set(row_ndx, new_val);
-                                changes = true;
-                            }
-                        }
-                    }
-                }
-            }
-            return false;
-        };
-
-        for_each_public_column(convert_links);
-
-        if (changes) {
-            m_top.set(top_position_for_pk_col, 1); // Mark that we are done with this step
-
-            commit_and_continue();
-        }
-    }
-}
-
-ref_type Table::get_oid_column_ref() const
-{
-    Array col_refs(m_alloc);
-    col_refs.init_from_ref(m_top.get_as_ref(top_position_for_columns));
-    return to_ref(col_refs.get(0));
 }
 
 namespace {
@@ -1269,7 +1188,7 @@ void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
     }
 }
 
-void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
 {
     ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
     if (!top_ref) {
@@ -1388,47 +1307,71 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
 
     /******************** Optionally create !OID accessor ********************/
 
+    ColKey oid_col;
     BPlusTree<Int>* oid_column = nullptr;
     std::unique_ptr<BPlusTreeBase> oid_column_store;
     if (m_spec.get_column_name(0) == "!OID") {
-        // The !OID column is needed in the next stage as well, so it must be
-        // deleted in this stage, so move it from column_accessors to oid_column_store.
-        auto col0 = m_spec.get_key(0);
-        oid_column_store = std::move(column_accessors[col0]);
+        // The !OID column should not be migrated, but we need an accessor
+        // to the old column
+        oid_col = m_spec.get_key(0);
+        oid_column_store = std::move(column_accessors[oid_col]);
 
-        column_accessors.erase(col0);
+        column_accessors.erase(oid_col);
         oid_column = dynamic_cast<BPlusTree<Int>*>(oid_column_store.get());
         REALM_ASSERT(oid_column);
-
-        // Delete '0' from cols_to_destroy
-        auto first = cols_to_destroy.begin();
-        REALM_ASSERT(*first == 0);
-        cols_to_destroy.erase(first);
     }
 
     /*************************** Create objects ******************************/
 
+    bool use_row_ndx_as_key = !(oid_column || pk_col_key);
     int64_t max_key_value = -1;
-    for (size_t row_ndx = 0; row_ndx < number_of_objects; row_ndx++) {
+    // Store old row ndx in a temporary column. Use this in next steps to find
+    // the right target for links
+    ColKey orig_row_ndx_col;
+    if (!use_row_ndx_as_key) {
+        orig_row_ndx_col = add_column(type_Int, "!ROW_INDEX");
+        add_search_index(orig_row_ndx_col);
+    }
 
+    for (size_t row_ndx = 0; row_ndx < number_of_objects; row_ndx++) {
+        Mixed pk_val;
         // Build a vector of values obtained from the old columns
         FieldValues init_values;
         for (auto& it : column_accessors) {
             auto col_key = it.first;
             auto col_type = col_key.get_type();
             auto nullable = col_key.get_attrs().test(col_attr_Nullable);
-            init_values.emplace_back(col_key, get_val_from_column(row_ndx, col_type, nullable, it.second.get()));
+            auto val = get_val_from_column(row_ndx, col_type, nullable, it.second.get());
+            init_values.emplace_back(col_key, val);
+            if (col_key == pk_col_key) {
+                pk_val = val;
+            }
         }
         for (auto& it : ts_accessors) {
             init_values.emplace_back(it.first, Mixed(it.second->get(row_ndx)));
         }
 
-        // Key will either be equal to the old row number or be based on value from !OID column
-        ObjKey obj_key(oid_column ? oid_column->get(row_ndx) : row_ndx);
-        // Create object with the initial values
+        ObjKey obj_key;
+        if (use_row_ndx_as_key) {
+            obj_key = ObjKey(row_ndx);
+        }
+        else {
+            init_values.emplace_back(orig_row_ndx_col, Mixed(int64_t(row_ndx)));
+            if (oid_column) {
+                obj_key = oid_column->get(row_ndx);
+            }
+            else {
+                // Generate key from pk value
+                GlobalKey object_id{pk_val};
+                obj_key = global_to_local_object_id_hashed(object_id);
+            }
+        }
+
         if (obj_key.value > max_key_value) {
             max_key_value = obj_key.value;
         }
+
+        // Create object with the initial values
         Obj obj = m_clusters.insert(obj_key, init_values);
 
         // Then update possible list types
@@ -1493,6 +1436,7 @@ void Table::migrate_objects(util::FunctionRef<void()> commit_and_continue)
         rot = RefOrTagged::make_tagged(max_key_value + 1);
         m_top.set(top_position_for_sequence_number, rot);
     }
+    this->do_set_primary_key_column(pk_col_key);
 
     commit_and_continue();
 #if 0
@@ -1514,11 +1458,13 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
     col_refs.set_parent(&m_top, top_position_for_columns);
     col_refs.init_from_ref(top_ref);
 
-    // Create column accessors
+    // Cache column accessors and other information
     size_t nb_columns = m_spec.get_public_column_count();
     std::vector<std::unique_ptr<BPlusTree<Int>>> link_column_accessors(nb_columns);
     std::vector<ColKey> col_keys(nb_columns);
     std::vector<ColumnType> col_types(nb_columns);
+    std::vector<Table*> target_tables(nb_columns);
+    std::vector<ColKey> opposite_orig_row_ndx_col(nb_columns);
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
         ColumnType col_type = m_spec.get_column_type(col_ndx);
 
@@ -1528,44 +1474,42 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
             link_column_accessors[col_ndx]->init_from_parent();
             col_keys[col_ndx] = m_spec.get_key(col_ndx);
             col_types[col_ndx] = col_type;
+            target_tables[col_ndx] = get_opposite_table(col_keys[col_ndx]).unchecked_ptr();
+            opposite_orig_row_ndx_col[col_ndx] = target_tables[col_ndx]->get_column_key("!ROW_INDEX");
         }
     }
 
-    size_t sz = size_t(-1);
-    for (auto& acc : link_column_accessors) {
-        if (acc) {
-            if (sz == size_t(-1)) {
-                sz = acc->size();
-            }
-            else {
-                REALM_ASSERT(acc->size() == sz);
-            }
-        }
-    }
-    if (sz != size_t(-1)) {
-        bool use_oid = (m_spec.get_column_name(0) == "!OID");
-        BPlusTree<Int> oid_column(m_alloc);
-        if (use_oid) {
-            oid_column.init_from_ref(to_ref(col_refs.get(0)));
-        }
-        for (size_t i = 0; i < sz; i++) {
-            ObjKey obj_key(use_oid ? oid_column.get(i) : i);
-            Obj obj = get_object(obj_key);
-            for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
-                if (col_keys[col_ndx]) {
-                    int64_t val = link_column_accessors[col_ndx]->get(i);
-                    if (val) {
-                        if (col_types[col_ndx] == col_type_Link) {
-                            obj.set(col_keys[col_ndx], ObjKey(val - 1));
-                        }
-                        else {
-                            auto ll = obj.get_linklist(col_keys[col_ndx]);
-                            BPlusTree<Int> links(m_alloc);
-                            links.init_from_ref(ref_type(val));
-                            size_t nb_links = links.size();
-                            for (size_t j = 0; j < nb_links; j++) {
-                                ll.add(ObjKey(links.get(j)));
-                            }
+    auto orig_row_ndx_col_key = get_column_key("!ROW_INDEX");
+    for (auto obj : *this) {
+        for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+            if (col_keys[col_ndx]) {
+                // If no !ROW_INDEX column is found, the original row index number is
+                // equal to the ObjKey value
+                size_t orig_row_ndx =
+                    size_t(orig_row_ndx_col_key ? obj.get<Int>(orig_row_ndx_col_key) : obj.get_key().value);
+                // Get original link value
+                int64_t link_val = link_column_accessors[col_ndx]->get(orig_row_ndx);
+
+                Table* target_table = target_tables[col_ndx];
+                ColKey search_col = opposite_orig_row_ndx_col[col_ndx];
+                auto get_target_key = [target_table, search_col](int64_t orig_link_val) -> ObjKey {
+                    if (search_col)
+                        return target_table->find_first_int(search_col, orig_link_val);
+                    else
+                        return ObjKey(orig_link_val);
+                };
+
+                if (link_val) {
+                    if (col_types[col_ndx] == col_type_Link) {
+                        obj.set(col_keys[col_ndx], get_target_key(link_val - 1));
+                    }
+                    else {
+                        auto ll = obj.get_linklist(col_keys[col_ndx]);
+                        BPlusTree<Int> links(m_alloc);
+                        links.init_from_ref(ref_type(link_val));
+                        size_t nb_links = links.size();
+                        for (size_t j = 0; j < nb_links; j++) {
+                            ll.add(get_target_key(links.get(j)));
                         }
                     }
                 }
@@ -1583,10 +1527,6 @@ void Table::finalize_migration()
     if (ref) {
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
-        m_top.set(top_position_for_pk_col, 0);
-    }
-    if (m_spec.get_public_column_count() > 0 && m_spec.get_column_name(0) == "!OID") {
-        remove_column(m_spec.get_key(0));
     }
 }
 
@@ -2239,18 +2179,6 @@ TableView Table::find_all_null(ColKey col_key)
 ConstTableView Table::find_all_null(ColKey col_key) const
 {
     return const_cast<Table*>(this)->find_all_null(col_key);
-}
-
-TableView Table::get_distinct_view(ColKey col_key)
-{
-    TableView tv(TableView::DistinctView, m_own_ref, col_key);
-    tv.do_sync();
-    return tv;
-}
-
-ConstTableView Table::get_distinct_view(ColKey col_key) const
-{
-    return const_cast<Table*>(this)->get_distinct_view(col_key);
 }
 
 TableView Table::get_sorted_view(ColKey col_key, bool ascending)
@@ -3010,7 +2938,7 @@ void Table::remove_object(ObjKey key)
     if (has_any_embedded_objects() || (g && g->has_cascade_notification_handler())) {
         CascadeState state(CascadeState::Mode::Strong, g);
         state.m_to_be_deleted.emplace_back(m_key, key);
-        nullify_links(state);
+        m_clusters.nullify_links(key, state);
         remove_recursive(state);
     }
     else {
@@ -3040,8 +2968,8 @@ void Table::invalidate_object(ObjKey key)
         auto tombstone = get_or_create_tombstone(key, init_values);
         tombstone.assign_pk_and_backlinks(obj);
     }
-    CascadeState state(CascadeState::Mode::None);
-    m_clusters.erase(key, state);
+
+    remove_object(key);
 }
 
 void Table::remove_object_recursive(ObjKey key)
@@ -3267,7 +3195,8 @@ void Table::do_set_primary_key_column(ColKey col_key)
 bool Table::contains_unique_values(ColKey col) const
 {
     if (has_search_index(col)) {
-        return get_distinct_view(col).size() == size();
+        auto search_index = get_search_index(col);
+        return !search_index->has_duplicate_values();
     }
     else {
         TableView tv = where().find_all();

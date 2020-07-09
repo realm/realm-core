@@ -395,10 +395,6 @@ public:
     TableView find_all_null(ColKey col_key);
     ConstTableView find_all_null(ColKey col_key) const;
 
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
-    TableView get_distinct_view(ColKey col_key);
-    ConstTableView get_distinct_view(ColKey col_key) const;
-
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;
 
@@ -625,12 +621,10 @@ private:
 
     // Migration support
     void migrate_column_info(util::FunctionRef<void()>);
-    void migrate_indexes(util::FunctionRef<void()>);
+    void migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_subspec(util::FunctionRef<void()>);
-    void convert_links_from_ndx_to_key(util::FunctionRef<void()>);
-    ref_type get_oid_column_ref() const;
     void create_columns(util::FunctionRef<void()>);
-    void migrate_objects(util::FunctionRef<void()>);
+    void migrate_objects(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_links(util::FunctionRef<void()>);
     void finalize_migration();
 

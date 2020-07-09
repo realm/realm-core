@@ -29,7 +29,7 @@ class IntegerColumn;
 
 class IntegerColumnIterator {
 public:
-    typedef std::bidirectional_iterator_tag iterator_category;
+    typedef std::random_access_iterator_tag iterator_category;
     typedef int64_t value_type;
     typedef ptrdiff_t difference_type;
     typedef const value_type* pointer;

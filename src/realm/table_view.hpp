@@ -173,9 +173,6 @@ public:
     ConstTableView(ConstTableRef parent, ColKey column, const ConstObj& obj);
     ConstTableView(ConstTableRef parent, ConstLnkLstPtr link_list);
 
-    enum DistinctViewTag { DistinctView };
-    ConstTableView(DistinctViewTag, ConstTableRef parent, ColKey column_key);
-
     /// Copy constructor.
     ConstTableView(const ConstTableView&);
 
@@ -389,9 +386,6 @@ protected:
     // If this TableView was created from a LnkLst, then this reference points to it. Otherwise it's 0
     mutable ConstLnkLstPtr m_linklist_source;
 
-    // m_distinct_column_source != ColKey() if this view was created from distinct values in a column of m_table.
-    ColKey m_distinct_column_source;
-
     // Stores the ordering criteria of applied sort and distinct operations.
     DescriptorOrdering m_descriptor_ordering;
     size_t m_limit_count = 0;
@@ -481,7 +475,6 @@ private:
     TableView(TableRef parent);
     TableView(TableRef parent, Query& query, size_t start, size_t end, size_t limit);
     TableView(TableRef parent, ConstLnkLstPtr);
-    TableView(DistinctViewTag, TableRef parent, ColKey column_key);
 
     friend class ConstTableView;
     friend class Table;
@@ -530,18 +523,6 @@ inline ConstTableView::ConstTableView(ConstTableRef src_table, ColKey src_column
     }
 }
 
-inline ConstTableView::ConstTableView(DistinctViewTag, ConstTableRef parent, ColKey column_key)
-    : m_table(parent) // Throws
-    , m_distinct_column_source(column_key)
-    , m_key_values(Allocator::get_default())
-{
-    REALM_ASSERT(m_distinct_column_source != ColKey());
-    m_key_values.create();
-    if (m_table) {
-        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
-    }
-}
-
 inline ConstTableView::ConstTableView(ConstTableRef parent, ConstLnkLstPtr link_list)
     : m_table(parent) // Throws
     , m_linklist_source(std::move(link_list))
@@ -560,7 +541,6 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
     , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone() : LnkLstPtr{})
-    , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
@@ -578,7 +558,6 @@ inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
     , m_linklist_source(std::move(tv.m_linklist_source))
-    , m_distinct_column_source(tv.m_distinct_column_source)
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
     , m_start(tv.m_start)
@@ -608,7 +587,6 @@ inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
     m_linked_table = tv.m_linked_table;
     m_linklist_source = std::move(tv.m_linklist_source);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
-    m_distinct_column_source = tv.m_distinct_column_source;
 
     return *this;
 }
@@ -631,7 +609,6 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     m_linked_table = tv.m_linked_table;
     m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone() : LnkLstPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
-    m_distinct_column_source = tv.m_distinct_column_source;
 
     return *this;
 }
@@ -702,11 +679,6 @@ inline TableView::TableView(TableRef parent, Query& query, size_t start, size_t 
 
 inline TableView::TableView(TableRef parent, ConstLnkLstPtr link_list)
     : ConstTableView(parent, std::move(link_list))
-{
-}
-
-inline TableView::TableView(ConstTableView::DistinctViewTag, TableRef parent, ColKey column_key)
-    : ConstTableView(ConstTableView::DistinctView, parent, column_key)
 {
 }
 

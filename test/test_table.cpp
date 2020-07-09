@@ -1543,162 +1543,6 @@ TEST(Table_AddIntIndexed)
     obj.remove();
 }
 
-TEST(Table_Distinct)
-{
-    Table table;
-    auto col_int = table.add_column(type_Int, "first");
-    auto col_str = table.add_column(type_String, "second");
-
-    ObjKey k0 = table.create_object().set_all(int(Mon), "A").get_key();
-    ObjKey k1 = table.create_object().set_all(int(Tue), "B").get_key();
-    ObjKey k2 = table.create_object().set_all(int(Wed), "C").get_key();
-    ObjKey k3 = table.create_object().set_all(int(Thu), "B").get_key();
-    ObjKey k4 = table.create_object().set_all(int(Fri), "C").get_key();
-    ObjKey k5 = table.create_object().set_all(int(Sat), "D").get_key();
-    ObjKey k6 = table.create_object().set_all(int(Sun), "D").get_key();
-    table.create_object().set_all(int(Mon), "D");
-
-    table.add_search_index(col_int);
-    CHECK(table.has_search_index(col_int));
-
-    auto view = table.get_distinct_view(col_int);
-
-    CHECK_EQUAL(7, view.size());
-    CHECK_EQUAL(k0, view.get_key(0));
-    CHECK_EQUAL(k1, view.get_key(1));
-    CHECK_EQUAL(k2, view.get_key(2));
-    CHECK_EQUAL(k3, view.get_key(3));
-    CHECK_EQUAL(k4, view.get_key(4));
-    CHECK_EQUAL(k5, view.get_key(5));
-    CHECK_EQUAL(k6, view.get_key(6));
-
-    table.add_search_index(col_str);
-    CHECK(table.has_search_index(col_str));
-
-    view = table.get_distinct_view(col_str);
-
-    CHECK_EQUAL(4, view.size());
-    CHECK_EQUAL(k0, view.get_key(0));
-    CHECK_EQUAL(k1, view.get_key(1));
-    CHECK_EQUAL(k2, view.get_key(2));
-    CHECK_EQUAL(k5, view.get_key(3));
-}
-
-
-TEST(Table_DistinctBool)
-{
-    Table table;
-    auto col_bool = table.add_column(type_Bool, "first");
-
-    ObjKey k0 = table.create_object().set(col_bool, true).get_key();
-    ObjKey k1 = table.create_object().set(col_bool, false).get_key();
-    table.create_object().set(col_bool, true);
-    table.create_object().set(col_bool, false);
-
-    table.add_search_index(col_bool);
-    CHECK(table.has_search_index(col_bool));
-
-    TableView view = table.get_distinct_view(col_bool);
-
-    CHECK_EQUAL(2, view.size());
-    CHECK_EQUAL(k0, view.get_key(1));
-    CHECK_EQUAL(k1, view.get_key(0));
-}
-
-
-/*
-// FIXME Commented out because indexes on floats and doubles are not supported (yet).
-
-TEST(Table_DistinctFloat)
-{
-    Table table;
-    table.add_column(type_Float, "first");
-    table.add_empty_row(12);
-    for (size_t i = 0; i < 10; ++i) {
-        table.set_float(0, i, static_cast<float>(i) + 0.5f);
-    }
-    table.set_float(0, 10, 0.5f);
-    table.set_float(0, 11, 1.5f);
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    TableView view = table.get_distinct_view(0);
-    CHECK_EQUAL(10, view.size());
-}
-
-
-TEST(Table_DistinctDouble)
-{
-    Table table;
-    table.add_column(type_Double, "first");
-    table.add_empty_row(12);
-    for (size_t i = 0; i < 10; ++i) {
-        table.set_double(0, i, static_cast<double>(i) + 0.5);
-    }
-    table.set_double(0, 10, 0.5);
-    table.set_double(0, 11, 1.5);
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    TableView view = table.get_distinct_view(0);
-    CHECK_EQUAL(10, view.size());
-}
-*/
-
-
-TEST(Table_DistinctTimestamp)
-{
-    Table table;
-    auto col_date = table.add_column(type_Timestamp, "first");
-
-    table.create_object().set(col_date, Timestamp(0, 0));
-    table.create_object().set(col_date, Timestamp(1, 0));
-    table.create_object().set(col_date, Timestamp(3, 0));
-    table.create_object().set(col_date, Timestamp(3, 0));
-
-    table.add_search_index(col_date);
-    CHECK(table.has_search_index(col_date));
-
-    TableView view = table.get_distinct_view(col_date);
-    CHECK_EQUAL(3, view.size());
-}
-
-
-TEST(Table_DistincTBasePersistedTable)
-{
-    GROUP_TEST_PATH(path);
-
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        auto col = table->add_column(type_Int, "first");
-
-        table->create_object().set(col, 1);
-        table->create_object().set(col, 2);
-        table->create_object().set(col, 3);
-        table->create_object().set(col, 3);
-
-        table->add_search_index(col);
-        CHECK(table->has_search_index(col));
-        group.write(path);
-    }
-
-    {
-        Group group(path, 0, Group::mode_ReadOnly);
-        TableRef table = group.get_table("table");
-        auto col = table->get_column_key("first");
-        TableView view = table->get_distinct_view(col);
-
-        CHECK_EQUAL(3, view.size());
-        CHECK_EQUAL(table->get_object(view.get_key(0)).get<Int>(col), 1);
-        CHECK_EQUAL(table->get_object(view.get_key(1)).get<Int>(col), 2);
-        CHECK_EQUAL(table->get_object(view.get_key(2)).get<Int>(col), 3);
-    }
-}
-
-
 TEST(Table_IndexInt)
 {
     Table table;
@@ -5316,6 +5160,17 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
         CHECK(table->size() == 2);
         auto first = parent->begin();
         first->remove();
+        CHECK(table->size() == 0);
+        // do not commit
+    }
+    {
+        // Sync operations
+        auto tr = sg->start_write();
+        auto table = tr->get_table("myEmbeddedStuff");
+        auto parent = tr->get_table("myParentStuff");
+        CHECK(table->size() == 2);
+        auto first = parent->begin();
+        first->invalidate();
         CHECK(table->size() == 0);
         // do not commit
     }
