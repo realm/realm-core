@@ -24,3 +24,5 @@ set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO")
 set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=watch*] "YES")
 
 set_bitcode_attributes()
+
+install_arch_slices_for_platform("watch")
