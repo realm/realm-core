@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Improve the performance of advancing transaction read versions when not using a transaction log observer or schema changehandler.
 * Added the ability to produce an XCFramework, usage: `sh ./tools/build-cocoa.sh -x`
 
 ### Fixed

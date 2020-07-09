@@ -3982,6 +3982,33 @@ TEST(Table_CollisionMapping)
     }
 }
 
+TEST(Table_CreateObjectWithPrimaryKeyDidCreate)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+
+    auto wt = sg->start_write();
+    TableRef string_table = wt->add_table_with_primary_key("string pk", type_String, "pk");
+
+    bool did_create = false;
+    string_table->create_object_with_primary_key(StringData("1"), &did_create);
+    CHECK(did_create);
+    string_table->create_object_with_primary_key(StringData("1"), &did_create);
+    CHECK_NOT(did_create);
+    string_table->create_object_with_primary_key(StringData("2"), &did_create);
+    CHECK(did_create);
+
+    TableRef int_table = wt->add_table_with_primary_key("int pk", type_Int, "pk");
+
+    did_create = false;
+    int_table->create_object_with_primary_key(1, &did_create);
+    CHECK(did_create);
+    int_table->create_object_with_primary_key(1, &did_create);
+    CHECK_NOT(did_create);
+    int_table->create_object_with_primary_key(2, &did_create);
+    CHECK(did_create);
+}
+
 TEST(Table_PrimaryKeyString)
 {
 #ifdef REALM_DEBUG

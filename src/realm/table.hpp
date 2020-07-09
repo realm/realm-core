@@ -276,8 +276,9 @@ public:
     Obj create_object(ObjKey key = {}, const FieldValues& = {});
     // Create an object with specific GlobalKey.
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
-    // Create an object with primary key
-    Obj create_object_with_primary_key(const Mixed& primary_key);
+    // Create an object with primary key. If an object with the given primary key already exists, it
+    // will be returned and did_create (if supplied) will be set to false.
+    Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr);
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
     /// Create a number of objects with keys supplied
