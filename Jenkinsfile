@@ -541,7 +541,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('windows') {
+        node('windows-vs2017') {
             getArchive()
 
             dir('build-dir') {
@@ -673,7 +673,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir("build-macosx-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -758,7 +758,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx_pro') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                 retry(3) {
                     timeout(time: 30, unit: 'MINUTES') {
                         sh """

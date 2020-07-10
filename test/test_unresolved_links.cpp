@@ -160,7 +160,9 @@ TEST(Unresolved_InvalidateObject)
 {
     Group g;
 
+    auto wheels = g.add_embedded_table("Wheels");
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto col_wheels = cars->add_column_link(type_LinkList, "wheels", *wheels);
     auto col_price = cars->add_column(type_Decimal, "price");
     auto dealers = g.add_table("Dealer");
     auto col_has = dealers->add_column_list(*cars, "stock");
@@ -175,8 +177,17 @@ TEST(Unresolved_InvalidateObject)
     members.add(dealer1.get_key());
     members.add(dealer2.get_key());
 
-    auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
-    auto tesla = cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    auto create_car = [&](const char* name, const char* price) {
+        Obj car = cars->create_object_with_primary_key(name).set(col_price, Decimal128(price));
+        auto list = car.get_linklist(col_wheels);
+        for (int i = 0; i < 4; i++) {
+            list.create_and_insert_linked_object(i);
+        }
+        return car;
+    };
+
+    auto skoda = create_car("Skoda Fabia", "149999.5");
+    auto tesla = create_car("Tesla 10", "499999.5");
 
     auto stock = dealer1.get_linklist(col_has);
     stock.add(tesla.get_key());
@@ -185,6 +196,7 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(members.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
+    CHECK_EQUAL(wheels->size(), 8);
 
     // Tesla goes to the grave. Too expensive
     cars->invalidate_object(tesla.get_key());
@@ -195,6 +207,7 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
+    CHECK_EQUAL(wheels->size(), 4);
 
     // One dealer goes bankrupt
     dealer2.invalidate();
@@ -202,9 +215,10 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(dealers->nb_unresolved(), 1);
 
     // resurrect the tesla
-    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("399999.5"));
+    create_car("Tesla 10", "399999.5");
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
+    CHECK_EQUAL(wheels->size(), 8);
 }
 
 TEST(Unresolved_LinkList)
