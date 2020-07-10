@@ -64,11 +64,6 @@ struct AnyContext
     T unbox(const util::Any& wrapper) {
         return util::any_cast<T>(wrapper);
     }
-    template <typename T>
-    bool is_type(const util::Any& wrapper)
-    {
-        return wrapper.type() == typeid(T);
-    }
     bool is_null(const util::Any& wrapper) {
         if (!wrapper.has_value()) {
             return true;
