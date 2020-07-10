@@ -165,7 +165,7 @@ public:
     static bool type_supported(realm::DataType type)
     {
         return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
-                type == type_ObjectId);
+                type == type_ObjectId || type == type_Mixed);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -370,6 +370,22 @@ struct GetIndexData<StringData> {
     static StringData get_index_data(StringData data, StringConversionBuffer&)
     {
         return data;
+    }
+};
+
+template <>
+struct GetIndexData<Mixed> {
+    static StringData get_index_data(Mixed value, StringConversionBuffer& buffer)
+    {
+        if (value.is_null()) {
+            return null{};
+        }
+
+        auto hash = value.hash();
+        const char* c = reinterpret_cast<const char*>(&hash);
+        realm::safe_copy_n(c, sizeof(size_t), buffer.data());
+
+        return StringData{buffer.data(), sizeof(size_t)};
     }
 };
 

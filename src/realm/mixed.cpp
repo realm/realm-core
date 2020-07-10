@@ -173,29 +173,59 @@ size_t Mixed::hash() const
 {
     REALM_ASSERT(!is_null());
 
+    size_t hash = 0;
     switch (get_type()) {
         case type_Int:
-            return size_t(int_val);
+            hash = size_t(int_val);
             break;
         case type_Bool:
-            return bool_val;
+            hash = bool_val ? 0xdeadbeef : 0xcafebabe;
             break;
+        case type_Float: {
+            auto unsigned_data = reinterpret_cast<const unsigned char*>(&float_val);
+            hash = murmur2_or_cityhash(unsigned_data, sizeof(float));
+            break;
+        }
+        case type_Double: {
+            auto unsigned_data = reinterpret_cast<const unsigned char*>(&double_val);
+            hash = murmur2_or_cityhash(unsigned_data, sizeof(double));
+            break;
+        }
         case type_String:
-            return get<StringData>().hash();
+            hash = get<StringData>().hash();
+            break;
+        case type_Binary: {
+            auto bin = get<BinaryData>();
+            StringData str(bin.data(), bin.size());
+            hash = str.hash();
+            break;
+        }
+        case type_Timestamp:
+            hash = get<Timestamp>().hash();
             break;
         case type_ObjectId:
-            return get<ObjectId>().hash();
+            hash = get<ObjectId>().hash();
             break;
         case type_Decimal: {
             std::hash<realm::Decimal128> h;
-            return h(decimal_val);
+            hash = h(decimal_val);
+            break;
         }
-        default:
+        case type_TypedLink: {
+            auto unsigned_data = reinterpret_cast<const unsigned char*>(&link_val);
+            hash = murmur2_or_cityhash(unsigned_data, 12);
+            break;
+        }
+        case type_OldDateTime:
+        case type_OldTable:
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
             REALM_ASSERT_RELEASE(false && "Hash not supported for this column type");
             break;
     }
 
-    return 0;
+    return hash;
 }
 
 // LCOV_EXCL_START
