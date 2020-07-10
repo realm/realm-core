@@ -93,16 +93,6 @@ public:
     virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
-    virtual bool is_argument_bool(size_t argument_index) = 0;
-    virtual bool is_argument_long(size_t argument_index) = 0;
-    virtual bool is_argument_float(size_t argument_index) = 0;
-    virtual bool is_argument_double(size_t argument_index) = 0;
-    virtual bool is_argument_string(size_t argument_index) = 0;
-    virtual bool is_argument_binary(size_t argument_index) = 0;
-    virtual bool is_argument_timestamp(size_t argument_index) = 0;
-    virtual bool is_argument_object_index(size_t argument_index) = 0;
-    virtual bool is_argument_objectid(size_t argument_index) = 0;
-    virtual bool is_argument_decimal128(size_t argument_index) = 0;
 
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
@@ -127,10 +117,6 @@ public:
     Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
     ObjectId objectid_for_argument(size_t i) override
     {
-        // allow construction of an ObjectId from a Timestamp arg
-        //        if (at(i).type() == typeid(Timestamp)) {
-        //            return ObjectId(get<Timestamp>(i));
-        //        }
         return get<ObjectId>(i);
     }
     Decimal128 decimal128_for_argument(size_t i) override
@@ -143,57 +129,7 @@ public:
     }
     bool is_argument_null(size_t i) override
     {
-        if (at(i).type() == typeid(Timestamp)) {
-            return get<Timestamp>(i).is_null();
-        }
         return m_ctx.is_null(at(i));
-    }
-
-    bool is_argument_bool(size_t argument_index) override
-    {
-        return argument_is_type<bool>(argument_index);
-    }
-    bool is_argument_long(size_t argument_index) override
-    {
-        return argument_is_type<long>(argument_index);
-    }
-    bool is_argument_float(size_t argument_index) override
-    {
-        return argument_is_type<float>(argument_index);
-    }
-    bool is_argument_double(size_t argument_index) override
-    {
-        return argument_is_type<double>(argument_index);
-    }
-    bool is_argument_string(size_t argument_index) override
-    {
-        return argument_is_type<String>(argument_index);
-    }
-    bool is_argument_binary(size_t argument_index) override
-    {
-        return argument_is_type<Binary>(argument_index);
-    }
-    bool is_argument_timestamp(size_t argument_index) override
-    {
-        return argument_is_type<Timestamp>(argument_index);
-    }
-    bool is_argument_object_index(size_t argument_index) override
-    {
-        return argument_is_type<ObjKey>(argument_index);
-    }
-    bool is_argument_objectid(size_t argument_index) override
-    {
-        return argument_is_type<ObjectId>(argument_index);
-    }
-    bool is_argument_decimal128(size_t argument_index) override
-    {
-        return argument_is_type<Decimal128>(argument_index);
-    }
-
-    template <typename T>
-    bool argument_is_type(size_t i)
-    {
-        return m_ctx.template is_type<T>(at(i));
     }
 
 private:
@@ -275,46 +211,6 @@ public:
         throw NoArgsError();
     }
     bool is_argument_null(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_bool(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_long(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_float(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_double(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_string(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_binary(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_timestamp(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_object_index(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_objectid(size_t)
-    {
-        throw NoArgsError();
-    }
-    bool is_argument_decimal128(size_t)
     {
         throw NoArgsError();
     }

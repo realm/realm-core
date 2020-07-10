@@ -1103,17 +1103,6 @@ inline void NullableVector<ObjectId>::set_null(size_t index)
     m_first[index].reset();
 }
 
-//    template <typename Type = T>
-//    typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
-//    Decimal128, ref_type, SizeOfList, null>::value,
-//    void>::type
-//    template <>
-//    inline void NullableVector<ObjectId>::set(size_t index, Timestamp value)
-//    {
-//        m_first[index] = value;
-//    }
-
-
 template <>
 inline ObjectId NullableVector<ObjectId>::operator[](size_t index) const
 {
@@ -1375,8 +1364,7 @@ public:
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
     template <class D>
-    typename std::enable_if_t<std::is_convertible<T, D>::value>
-        REALM_FORCEINLINE export2(ValueBase& destination) const
+    std::enable_if_t<std::is_convertible<T, D>::value> REALM_FORCEINLINE export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
         d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
@@ -1394,7 +1382,7 @@ public:
 
     // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
-    typename std::enable_if_t<IsNullToObjectId<T, D>> REALM_FORCEINLINE export2(ValueBase& destination) const
+    std::enable_if_t<IsNullToObjectId<T, D>> REALM_FORCEINLINE export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
         d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
@@ -1404,7 +1392,7 @@ public:
     }
 
     template <class D>
-    typename std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D>>
+    std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D>>
         REALM_FORCEINLINE export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
