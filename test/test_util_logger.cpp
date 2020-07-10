@@ -61,7 +61,7 @@ namespace {
 
 TEST(Util_Logger_LevelToFromString)
 {
-    auto check = [&test_context = test_context](util::Logger::Level level, const char* name) {
+    auto check = [& test_context = test_context](util::Logger::Level level, const char* name) {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << level;
