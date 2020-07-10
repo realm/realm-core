@@ -42,19 +42,42 @@ template <typename T>
 bool ValueExpression::is_type()
 {
     try {
+        // as an optimization, handle the types we can here if it's known
         if constexpr (std::is_same_v<T, Timestamp>) {
             if (value->type == parser::Expression::Type::Timestamp) {
+                return true;
+            }
+        }
+        if constexpr (std::is_same_v<T, ObjectId>) {
+            if (value->type == parser::Expression::Type::ObjectId) {
+                return true;
+            }
+        }
+        if constexpr (realm::is_any_v<T, Float, Int, Double, Decimal128>) {
+            if (value->type == parser::Expression::Type::Number) {
+                return true;
+            }
+        }
+        if constexpr (std::is_same_v<T, String>) {
+            if (value->type == parser::Expression::Type::String) {
+                return true;
+            }
+        }
+        if constexpr (std::is_same_v<T, Bool>) {
+            if (value->type == parser::Expression::Type::True || value->type == parser::Expression::Type::False) {
                 return true;
             }
         }
         if (value->type == parser::Expression::Type::Null) {
             return false;
         }
+        // attempt a cast
         value_of_type_for_query<T>();
     }
-    catch (const std::exception& e) {
+    catch (const std::exception&) {
         return false;
     }
+    // the cast succeeded so it is convertible to type T
     return true;
 }
 

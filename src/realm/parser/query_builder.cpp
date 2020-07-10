@@ -363,11 +363,30 @@ void add_link_constraint_to_query(realm::Query &query,
     add_link_constraint_to_query(query, op, prop_expr, value_expr);
 }
 
+template <typename A, typename B, typename KnownType, typename PossibleMixedType>
+void add_mixed_type_numeric_comparison_to_query(Query& query, const Predicate::Comparison& cmp, A& lhs, B& rhs)
+{
+    if constexpr (std::is_same_v<B, ValueExpression>) {
+        if (rhs.template is_type<PossibleMixedType>()) {
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<KnownType>(),
+                                            rhs.template value_of_type_for_query<PossibleMixedType>());
+            return;
+        }
+    }
+    if constexpr (std::is_same_v<A, ValueExpression>) {
+        if (lhs.template is_type<PossibleMixedType>()) {
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<PossibleMixedType>(),
+                                            rhs.template value_of_type_for_query<KnownType>());
+            return;
+        }
+    }
+    add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<KnownType>(),
+                                    rhs.template value_of_type_for_query<KnownType>());
+}
 
 template <typename A, typename B>
 void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, A& lhs, B& rhs, DataType type)
 {
-
     switch (type) {
         case type_Bool:
             add_bool_constraint_to_query(query, cmp.op,
@@ -375,9 +394,7 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
                                          rhs. template value_of_type_for_query<bool>());
             break;
         case type_Timestamp:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Timestamp>(),
-                                            rhs. template value_of_type_for_query<Timestamp>());
+            add_mixed_type_numeric_comparison_to_query<A, B, Timestamp, ObjectId>(query, cmp, lhs, rhs);
             break;
         case type_Double:
             add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Double>(),
@@ -403,22 +420,7 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
             add_link_constraint_to_query(query, cmp.op, lhs, rhs);
             break;
         case type_ObjectId:
-            if constexpr (std::is_same_v<B, ValueExpression>) {
-                if (rhs.template is_type<Timestamp>()) {
-                    add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
-                                                    rhs.template value_of_type_for_query<Timestamp>());
-                    break;
-                }
-            }
-            if constexpr (std::is_same_v<A, ValueExpression>) {
-                if (lhs.template is_type<Timestamp>()) {
-                    add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Timestamp>(),
-                                                    rhs.template value_of_type_for_query<ObjectId>());
-                    break;
-                }
-            }
-            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
-                                            rhs.template value_of_type_for_query<ObjectId>());
+            add_mixed_type_numeric_comparison_to_query<A, B, ObjectId, Timestamp>(query, cmp, lhs, rhs);
             break;
         case type_Decimal:
             add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Decimal128>(),
