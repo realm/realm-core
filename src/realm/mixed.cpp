@@ -179,7 +179,7 @@ size_t Mixed::hash() const
             hash = size_t(int_val);
             break;
         case type_Bool:
-            hash = bool_val;
+            hash = bool_val ? 0xdeadbeef : 0xcafebabe;
             break;
         case type_Float: {
             auto unsigned_data = reinterpret_cast<const unsigned char*>(&float_val);
@@ -225,7 +225,6 @@ size_t Mixed::hash() const
             break;
     }
 
-    hash = (hash << 5) | m_type;
     return hash;
 }
 

@@ -211,8 +211,6 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 }
 // LCOV_EXCL_STOP
 
-size_t murmur2_or_cityhash(const unsigned char* data, size_t len) noexcept;
-
 inline size_t Timestamp::hash() const noexcept
 {
     return size_t(m_seconds) ^ size_t(m_nanoseconds);
