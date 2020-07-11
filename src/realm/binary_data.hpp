@@ -19,6 +19,7 @@
 #ifndef REALM_BINARY_DATA_HPP
 #define REALM_BINARY_DATA_HPP
 
+#include <realm/null.hpp>
 #include <realm/owned_data.hpp>
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
@@ -56,6 +57,12 @@ public:
     }
     template <class T, class A>
     explicit BinaryData(const std::basic_string<char, T, A>&);
+
+    BinaryData(const null&) noexcept
+        : m_data(nullptr)
+        , m_size(0)
+    {
+    }
 
     // BinaryData does not store data, callers must manage their own strings.
     template <class T, class A>

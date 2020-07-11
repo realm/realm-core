@@ -37,6 +37,22 @@ inline Timestamp convert_for_test<Timestamp>(int64_t v)
 }
 
 template <>
+inline BinaryData convert_for_test<BinaryData>(int64_t v)
+{
+    static const char letters[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static const size_t num_letters = 10 + 26;
+    return BinaryData(letters, v % num_letters);
+}
+
+template <>
+inline StringData convert_for_test<StringData>(int64_t v)
+{
+    static const char letters[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static const size_t num_letters = 10 + 26;
+    return StringData(letters, v % num_letters);
+}
+
+template <>
 inline ObjectId convert_for_test<ObjectId>(int64_t v)
 {
     static const char hex_digits[] = "0123456789abcdef";

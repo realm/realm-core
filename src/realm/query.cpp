@@ -309,14 +309,161 @@ struct MakeConditionNode<StringNode<Cond>> {
     }
 };
 
+template <class T>
+struct ReverseCond {
+    using RCond = T;
+};
+
+template <>
+struct ReverseCond<Greater> {
+    using RCond = Less;
+};
+
+template <>
+struct ReverseCond<Less> {
+    using RCond = Greater;
+};
+
+template <>
+struct ReverseCond<GreaterEqual> {
+    using RCond = LessEqual;
+};
+
+template <>
+struct ReverseCond<LessEqual> {
+    using RCond = GreaterEqual;
+};
+
+template <class Cond>
+std::unique_ptr<ParentNode> make_list_condition_node(const Table& table, ColKey column_key,
+                                                     std::unique_ptr<Subexpr> left)
+{
+    DataType type = DataType(column_key.get_type());
+    if constexpr (realm::is_any_v<Cond, Equal, NotEqual>) {
+        // In order to take advantage of the optimization in Compare<> node where the left side is constant
+        // we swap the order of the operands so that the constant is left. In order for this to work, we
+        // must use the reverse condition
+        using RCond = typename ReverseCond<Cond>::RCond;
+        switch (type) {
+            case type_Int: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Int>>(
+                    std::move(left), table.column<Lst<Int>>(column_key).clone())));
+            }
+            case type_Bool: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Bool>>(
+                    std::move(left), table.column<Lst<Bool>>(column_key).clone())));
+            }
+            case type_Float: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Float>>(
+                    std::move(left), table.column<Lst<Float>>(column_key).clone())));
+            }
+            case type_Double: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Double>>(
+                    std::move(left), table.column<Lst<Double>>(column_key).clone())));
+            }
+            case type_String: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, StringData>>(
+                    std::move(left), table.column<Lst<StringData>>(column_key).clone())));
+            }
+            case type_Binary: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, BinaryData>>(
+                    std::move(left), table.column<Lst<BinaryData>>(column_key).clone())));
+            }
+            case type_Timestamp: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Timestamp>>(
+                    std::move(left), table.column<Lst<Timestamp>>(column_key).clone())));
+            }
+            case type_Decimal: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Decimal>>(
+                    std::move(left), table.column<Lst<Decimal>>(column_key).clone())));
+            }
+            case type_ObjectId: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, ObjectId>>(
+                    std::move(left), table.column<Lst<ObjectId>>(column_key).clone())));
+            }
+            default:
+                break;
+        }
+    }
+    else if constexpr (realm::is_any_v<Cond, Greater, Less, GreaterEqual, LessEqual>) {
+        // In order to take advantage of the optimization in Compare<> node where the left side is constant
+        // we swap the order of the operands so that the constant is left. In order for this to work, we
+        // must use the reverse condition
+        using RCond = typename ReverseCond<Cond>::RCond;
+        switch (type) {
+            case type_Int: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Int>>(
+                    std::move(left), table.column<Lst<Int>>(column_key).clone())));
+            }
+            case type_Float: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Float>>(
+                    std::move(left), table.column<Lst<Float>>(column_key).clone())));
+            }
+            case type_Double: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Double>>(
+                    std::move(left), table.column<Lst<Double>>(column_key).clone())));
+            }
+            case type_Timestamp: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Timestamp>>(
+                    std::move(left), table.column<Lst<Timestamp>>(column_key).clone())));
+            }
+            case type_Decimal: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, Decimal>>(
+                    std::move(left), table.column<Lst<Decimal>>(column_key).clone())));
+            }
+            case type_ObjectId: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<RCond, ObjectId>>(
+                    std::move(left), table.column<Lst<ObjectId>>(column_key).clone())));
+            }
+            default:
+                break;
+        }
+    }
+    else if constexpr (realm::is_any_v<Cond, EqualIns, NotEqualIns, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns,
+                                       Contains, ContainsIns, Like, LikeIns>) {
+        // For these conditions, it is not possible to swap
+        switch (type) {
+            case type_String: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, StringData>>(
+                    table.column<Lst<StringData>>(column_key).clone(), std::move(left))));
+            }
+            case type_Binary: {
+                return std::unique_ptr<ParentNode>(new ExpressionNode(make_expression<Compare<Cond, BinaryData>>(
+                    table.column<Lst<BinaryData>>(column_key).clone(), std::move(left))));
+            }
+            default:
+                break;
+        }
+    }
+
+    throw LogicError{LogicError::type_mismatch};
+    return {};
+}
+
 template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey column_key, T value)
 {
     table.check_column(column_key);
     DataType type = DataType(column_key.get_type());
+
+    if (column_key.is_list()) {
+        std::unique_ptr<Subexpr> left;
+        if constexpr (std::is_same_v<T, null>) {
+            if (!column_key.is_nullable()) {
+                // if column is not nullable, we will never find a null
+                return std::make_unique<NeverNode>();
+            }
+            left = make_subexpr<Value<realm::null>>(null{});
+        }
+        else {
+            left = make_subexpr<Value<T>>(value);
+        }
+        return make_list_condition_node<Cond>(table, column_key, std::move(left));
+    }
+
     switch (type) {
         case type_Int: {
-            if (column_key.get_attrs().test(col_attr_Nullable)) {
+            if (column_key.is_nullable()) {
                 return MakeConditionNode<IntegerNode<ArrayIntNull, Cond>>::make(column_key, value);
             }
             else {

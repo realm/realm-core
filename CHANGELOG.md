@@ -4,6 +4,7 @@
 * None.
 
 ### Fixed
+* Fixed old query syntax not working for list of primitive values. Eg. `table->where().not_equal(col, value_1)`. ([#3809](https://github.com/realm/realm-core/pull/3809))
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Isses fixed by release v6.0.7
 * We would allow converting a table to embedded table in spite some objects had no links to them. ([#3729](https://github.com/realm/realm-core/issues/3729), since v6.1.0-alpha.5)

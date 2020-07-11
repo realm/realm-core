@@ -374,6 +374,32 @@ struct CostHeuristic<ArrayIntNull> {
 // FIXME: Add AdaptiveStringColumn, BasicColumn, etc.
 }
 
+class NeverNode : public ParentNode {
+public:
+    NeverNode() {}
+
+    void init() override {}
+    size_t find_first_local(size_t, size_t) override
+    {
+        return realm::npos;
+    }
+
+    void table_changed() override {}
+    void cluster_changed() override {}
+    void collect_dependencies(std::vector<TableKey>&) const override {}
+
+    std::string describe(util::serializer::SerialisationState&) const override
+    {
+        return "FALSE";
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::make_unique<NeverNode>();
+    }
+};
+
+
 class ColumnNodeBase : public ParentNode {
 protected:
     ColumnNodeBase(ColKey column_key)
@@ -2418,7 +2444,6 @@ private:
     LeafPtr m_array_ptr2;
     const LeafType* m_leaf_ptr2 = nullptr;
 };
-
 
 // For Next-Generation expressions like col1 / col2 + 123 > col4 * 100.
 class ExpressionNode : public ParentNode {
