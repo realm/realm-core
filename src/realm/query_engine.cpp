@@ -105,6 +105,9 @@ void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
         case type_Decimal:
             m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDecimal128>;
             break;
+        case type_Timestamp:
+            m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayTimestamp>;
+            break;
         default:
             REALM_ASSERT(false);
             break;
