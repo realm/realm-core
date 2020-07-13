@@ -77,7 +77,7 @@ public:
         util::Optional<int64_t> seconds = m_seconds.get(ndx);
         return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const final
     {
         return Mixed(get(ndx));
     }
@@ -134,7 +134,6 @@ inline size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t e
 template <>
 class QueryStateMin<Timestamp> : public QueryStateBase {
 public:
-    Timestamp m_state;
     QueryStateMin(size_t limit = -1)
         : QueryStateBase(limit)
     {
@@ -156,12 +155,18 @@ public:
         }
         return (m_limit > m_match_count);
     }
+    Timestamp get_min() const
+    {
+        return m_match_count ? m_state : Timestamp{};
+    }
+
+private:
+    Timestamp m_state;
 };
 
 template <>
 class QueryStateMax<Timestamp> : public QueryStateBase {
 public:
-    Timestamp m_state;
     QueryStateMax(size_t limit = -1)
         : QueryStateBase(limit)
     {
@@ -183,6 +188,13 @@ public:
         }
         return (m_limit > m_match_count);
     }
+    Timestamp get_max() const
+    {
+        return m_match_count ? m_state : Timestamp{};
+    }
+
+private:
+    Timestamp m_state;
 };
 
 template <>

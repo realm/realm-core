@@ -107,7 +107,6 @@ protected:
 template <>
 class QueryStateMin<Decimal128> : public QueryStateBase {
 public:
-    Decimal128 m_state;
     QueryStateMin(size_t limit = -1)
         : QueryStateBase(limit)
     {
@@ -129,12 +128,18 @@ public:
         }
         return (m_limit > m_match_count);
     }
+    Decimal128 get_min() const
+    {
+        return m_match_count ? m_state : Decimal128{};
+    }
+
+private:
+    Decimal128 m_state;
 };
 
 template <>
 class QueryStateMax<Decimal128> : public QueryStateBase {
 public:
-    Decimal128 m_state;
     QueryStateMax(size_t limit = -1)
         : QueryStateBase(limit)
     {
@@ -156,6 +161,13 @@ public:
         }
         return (m_limit > m_match_count);
     }
+    Decimal128 get_max() const
+    {
+        return m_match_count ? m_state : Decimal128{};
+    }
+
+private:
+    Decimal128 m_state;
 };
 
 template <>
