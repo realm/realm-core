@@ -228,6 +228,28 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
     }
 }
 
+TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
+    SyncServer server;
+    TestSyncManager init_sync_manager(server);
+
+    auto user = SyncManager::shared().get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org", dummy_device_id);
+
+    SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
+        auto session = sync_session(user, "/test-close-for-active",
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        REQUIRE(sessions_are_active(*session));
+        session->shutdown_and_wait();
+        session->close();
+        EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        REQUIRE(sessions_are_inactive(*session));
+        // Try closing the session again. This should be a no-op.
+        session->close();
+        REQUIRE(sessions_are_inactive(*session));
+    }
+}
+
 TEST_CASE("SyncSession: update_configuration()", "[sync]") {
     SyncServer server{false};
     TestSyncManager init_sync_manager(server);

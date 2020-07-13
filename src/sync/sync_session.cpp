@@ -93,6 +93,14 @@ struct SyncSession::State {
     // If the error is fatal advance the state to inactive.
     virtual void handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { }
 
+    // Transition immediately to `inactive` state. Calling this function must gurantee that any
+    // sync::Session object in SyncSession::m_session that existed prior to the time of invocation
+    // must have been destroyed upon return. This allows the caller to follow up with a call to
+    // sync::Client::wait_for_session_terminations_or_client_stopped() in order to wait for the
+    // Realm file to be closed. This works so long as this SyncSession object remains in the
+    // `inactive` state after the invocation of shutdown_and_wait().
+    virtual void shutdown_and_wait(std::unique_lock<std::mutex>&, SyncSession&) const { }
+
     // Register a handler to wait for sync session uploads, downloads, or synchronization.
     // PRECONDITION: the session state lock must be held at the time this method is called, until after it returns.
     virtual void wait_for_completion(SyncSession&, _impl::SyncProgressNotifier::NotifierType) const { }
@@ -151,6 +159,11 @@ struct sync_session_states::Active : public SyncSession::State {
         }
     }
 
+    void shutdown_and_wait(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    {
+        session.advance_state(lock, inactive);
+    }
+
     void wait_for_completion(SyncSession& session, _impl::SyncProgressNotifier::NotifierType direction) const override
     {
         REALM_ASSERT(session.m_session);
@@ -202,6 +215,11 @@ struct sync_session_states::Dying : public SyncSession::State {
     }
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    {
+        session.advance_state(lock, inactive);
+    }
+
+    void shutdown_and_wait(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
     }
@@ -707,6 +725,15 @@ void SyncSession::close()
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     m_state->close(lock, *this);
+}
+
+void SyncSession::shutdown_and_wait()
+{
+    {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        m_state->shutdown_and_wait(lock, *this);
+    }
+    m_client.wait_for_session_terminations();
 }
 
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)

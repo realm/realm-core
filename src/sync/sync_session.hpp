@@ -199,6 +199,10 @@ public:
     // Inform the sync session that it should log out.
     void log_out();
 
+    // Shut down the synchronization session (sync::Session) and wait for the Realm file to no
+    // longer be open on behalf of it.
+    void shutdown_and_wait();
+
     // Override the address and port of the server that this `SyncSession` is connected to. If the
     // session is already connected, it will disconnect and then reconnect to the specified address.
     // If it's not already connected, future connection attempts will be to the specified address.

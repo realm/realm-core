@@ -115,6 +115,11 @@ struct SyncClient {
         return m_client.decompose_server_url(url, protocol, address, port, path);
     }
 
+    void wait_for_session_terminations()
+    {
+        m_client.wait_for_session_terminations_or_client_stopped();
+    }
+
     ~SyncClient()
     {
         stop();
