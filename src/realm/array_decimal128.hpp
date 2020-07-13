@@ -105,6 +105,60 @@ protected:
 };
 
 template <>
+class QueryStateMin<Decimal128> : public QueryStateBase {
+public:
+    Decimal128 m_state;
+    QueryStateMin(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = Decimal128("+inf");
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<Decimal128>() < m_state) {
+                m_state = value.get<Decimal128>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+};
+
+template <>
+class QueryStateMax<Decimal128> : public QueryStateBase {
+public:
+    Decimal128 m_state;
+    QueryStateMax(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = Decimal128("-inf");
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<Decimal128>() > m_state) {
+                m_state = value.get<Decimal128>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+};
+
+template <>
 class QueryState<Decimal128> : public QueryStateBase {
 public:
     Decimal128 m_state;

@@ -343,8 +343,9 @@ private:
     template <typename T, bool Nullable>
     double average(ColKey column_key, size_t* resultcount = nullptr) const;
 
-    template <Action action, typename T, typename R>
-    R aggregate(ColKey column_key, size_t* resultcount = nullptr, ObjKey* return_ndx = nullptr) const;
+    template <typename T>
+    void aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount = nullptr,
+                   ObjKey* return_ndx = nullptr) const;
 
     size_t find_best_node(ParentNode* pn) const;
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,

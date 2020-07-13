@@ -131,6 +131,59 @@ inline size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t e
     return find_first<Equal>(value, begin, end);
 }
 
+template <>
+class QueryStateMin<Timestamp> : public QueryStateBase {
+public:
+    Timestamp m_state;
+    QueryStateMin(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = Timestamp{std::numeric_limits<int64_t>::max(), 0};
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<Timestamp>() < m_state) {
+                m_state = value.get<Timestamp>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+};
+
+template <>
+class QueryStateMax<Timestamp> : public QueryStateBase {
+public:
+    Timestamp m_state;
+    QueryStateMax(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = Timestamp{std::numeric_limits<int64_t>::min(), 0};
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<Timestamp>() > m_state) {
+                m_state = value.get<Timestamp>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+};
 
 template <>
 class QueryState<Timestamp> : public QueryStateBase {
