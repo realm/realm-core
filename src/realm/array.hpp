@@ -760,6 +760,21 @@ public:
 };
 
 // Implementation:
+
+class QueryStateFindAll : public QueryStateBase {
+public:
+    QueryStateFindAll(KeyColumn& keys, size_t limit = -1)
+        : QueryStateBase(limit)
+        , m_keys(keys)
+    {
+    }
+    bool match(size_t index, Mixed) final;
+
+private:
+    KeyColumn& m_keys;
+};
+
+
 template <>
 class QueryState<int64_t> : public QueryStateBase {
 public:

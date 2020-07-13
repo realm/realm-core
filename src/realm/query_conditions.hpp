@@ -25,6 +25,7 @@
 #include <realm/unicode.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/query_value.hpp>
+#include <realm/mixed.hpp>
 #include <realm/utilities.hpp>
 
 namespace realm {
@@ -65,12 +66,40 @@ public:
     {
     }
 
+    virtual bool match(size_t, Mixed)
+    {
+        ++m_match_count;
+        return (m_limit > m_match_count);
+    }
+
+protected:
 private:
     virtual void dyncast();
 };
 
 template <class>
 class QueryState;
+
+template <class>
+class QueryStateSum;
+
+template <class>
+class QueryStateMin;
+
+template <class>
+class QueryStateMax;
+
+class QueryStateCount : public QueryStateBase {
+public:
+    QueryStateCount(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+    }
+    size_t get_count() const
+    {
+        return m_match_count;
+    }
+};
 
 
 // Array::VTable only uses the first 4 conditions (enums) in an array of function pointers

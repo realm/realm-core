@@ -184,8 +184,6 @@ public:
 
         if (m_child)
             m_child->init(will_query_ranges);
-
-        m_column_action_specializer = nullptr;
     }
 
     void get_link_dependencies(std::vector<TableKey>& tables) const
@@ -222,34 +220,6 @@ public:
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
-
-    virtual void aggregate_local_prepare(Action TAction, DataType col_id, bool nullable);
-    template <Action action>
-    void aggregate_local_prepare(DataType col_id, bool nullable);
-
-    template <Action TAction, class LeafType>
-    bool column_action_specialization(QueryStateBase* st, ArrayPayload* source_column, size_t r)
-    {
-        // TResult: type of query result
-        // TSourceValue: type of aggregate source
-        using TSourceValue = typename LeafType::value_type;
-        using TResult = typename AggregateResultType<TSourceValue, TAction>::result_type;
-
-        // Sum of float column must accumulate in double
-        static_assert(
-            !(TAction == act_Sum && (std::is_same_v<TSourceValue, float> && !std::is_same_v<TResult, double>)), "");
-
-        TSourceValue av{};
-        // uses_val test because compiler cannot see that IntegerColumn::get has no side effect and result is
-        // discarded
-        if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != nullptr) {
-            REALM_ASSERT_DEBUG(dynamic_cast<LeafType*>(source_column) != nullptr);
-            av = static_cast<LeafType*>(source_column)->get(r);
-        }
-        REALM_ASSERT_DEBUG(dynamic_cast<QueryState<TResult>*>(st) != nullptr);
-        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, av);
-        return cont;
-    }
 
     virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    ArrayPayload* source_column);
@@ -347,8 +317,6 @@ public:
     size_t m_matches = 0;
 
 protected:
-    typedef bool (ParentNode::*Column_action_specialized)(QueryStateBase*, ArrayPayload*, size_t);
-    Column_action_specialized m_column_action_specializer = nullptr;
     ConstTableRef m_table = ConstTableRef();
     const Cluster* m_cluster = nullptr;
     QueryStateBase* m_state = nullptr;

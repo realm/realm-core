@@ -192,8 +192,6 @@ using namespace realm::util;
 
 void QueryStateBase::dyncast() {}
 
-ArrayPayload::~ArrayPayload() {}
-
 size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
@@ -1650,4 +1648,15 @@ void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1
     const char* data = get_data_from_header(header);
     uint_least8_t width = get_width_from_header(header);
     ::get_three(data, width, ndx, v0, v1, v2);
+}
+
+bool QueryStateFindAll::match(size_t index, Mixed)
+{
+    ++m_match_count;
+
+    REALM_ASSERT(m_key_values);
+    int64_t key_value = m_key_values->get(index) + m_key_offset;
+    m_keys.add(ObjKey(key_value));
+
+    return (m_limit > m_match_count);
 }

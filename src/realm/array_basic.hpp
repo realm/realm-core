@@ -20,6 +20,7 @@
 #define REALM_ARRAY_BASIC_HPP
 
 #include <realm/array.hpp>
+#include <realm/column_type_traits.hpp>
 
 namespace realm {
 
@@ -205,79 +206,93 @@ public:
     void find_all_null(IntegerColumn* result, size_t add_offset = 0, size_t begin = 0, size_t end = npos) const;
 };
 
-// Used only for Basic-types: currently float and double
+template <class T>
+class QueryStateSum : public QueryStateBase {
+public:
+    using ResultType = typename AggregateResultType<T, act_Sum>::result_type;
+    ResultType m_state;
+    QueryStateSum(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = ResultType{};
+    }
+    bool match(size_t, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            m_state += value.get<T>();
+        }
+        return (m_limit > m_match_count);
+    }
+};
+
+template <class R>
+class QueryStateMin : public QueryStateBase {
+public:
+    R m_state;
+    QueryStateMin(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = std::numeric_limits<R>::max();
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<R>() < m_state) {
+                m_state = value.get<R>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+};
+
+template <class R>
+class QueryStateMax : public QueryStateBase {
+public:
+    R m_state;
+    QueryStateMax(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = std::numeric_limits<R>::lowest();
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<R>() > m_state) {
+                m_state = value.get<R>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+};
+
 template <class R>
 class QueryState : public QueryStateBase {
 public:
     R m_state;
-
-    template <Action action>
-    bool uses_val()
-    {
-        return (action == act_Max || action == act_Min || action == act_Sum);
-    }
-
-    QueryState(Action action, Array* = nullptr, size_t limit = -1)
+    QueryState(Action, Array* = nullptr, size_t limit = -1)
         : QueryStateBase(limit)
     {
-        REALM_ASSERT((std::is_same<R, float>::value || std::is_same<R, double>::value));
-        if (action == act_Max)
-            m_state = -std::numeric_limits<R>::infinity();
-        else if (action == act_Min)
-            m_state = std::numeric_limits<R>::infinity();
-        else if (action == act_Sum)
-            m_state = 0.0;
-        else if (action == act_Count)
-            m_state = 0.0;
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
     }
 
     template <Action action, bool pattern, typename resulttype>
-    inline bool match(size_t index, uint64_t /*indexpattern*/, resulttype value)
+    inline bool match(size_t, uint64_t /*indexpattern*/, resulttype)
     {
-        if (pattern)
-            return false;
-
-        static_assert(action == act_Sum || action == act_Max || action == act_Min || action == act_Count,
-                      "Search action not supported");
-
-        if (action == act_Count) {
-            ++m_match_count;
-        }
-        else if (!null::is_null_float(value)) {
-            ++m_match_count;
-            if (action == act_Max) {
-                if (value > m_state) {
-                    m_state = value;
-                    if (m_key_values) {
-                        m_minmax_index = m_key_values->get(index) + m_key_offset;
-                    }
-                    else {
-                        m_minmax_index = int64_t(index);
-                    }
-                }
-            }
-            else if (action == act_Min) {
-                if (value < m_state) {
-                    m_state = value;
-                    if (m_key_values) {
-                        m_minmax_index = m_key_values->get(index) + m_key_offset;
-                    }
-                    else {
-                        m_minmax_index = int64_t(index);
-                    }
-                }
-            }
-            else if (action == act_Sum)
-                m_state += value;
-            else {
-                REALM_ASSERT_DEBUG(false);
-            }
-        }
-
-        return (m_limit > m_match_count);
+        return false;
     }
 };
 

@@ -77,7 +77,7 @@ public:
         util::Optional<int64_t> seconds = m_seconds.get(ndx);
         return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
     }
-    Mixed get_any(size_t ndx) const override
+    Mixed get_any(size_t ndx) const final
     {
         return Mixed(get(ndx));
     }
@@ -131,6 +131,71 @@ inline size_t ArrayTimestamp::find_first(Timestamp value, size_t begin, size_t e
     return find_first<Equal>(value, begin, end);
 }
 
+template <>
+class QueryStateMin<Timestamp> : public QueryStateBase {
+public:
+    QueryStateMin(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = Timestamp{std::numeric_limits<int64_t>::max(), 0};
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<Timestamp>() < m_state) {
+                m_state = value.get<Timestamp>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+    Timestamp get_min() const
+    {
+        return m_match_count ? m_state : Timestamp{};
+    }
+
+private:
+    Timestamp m_state;
+};
+
+template <>
+class QueryStateMax<Timestamp> : public QueryStateBase {
+public:
+    QueryStateMax(size_t limit = -1)
+        : QueryStateBase(limit)
+    {
+        m_state = Timestamp{std::numeric_limits<int64_t>::min(), 0};
+    }
+    bool match(size_t index, Mixed value) override
+    {
+        if (!value.is_null()) {
+            ++m_match_count;
+            if (value.get<Timestamp>() > m_state) {
+                m_state = value.get<Timestamp>();
+                if (m_key_values) {
+                    m_minmax_index = m_key_values->get(index) + m_key_offset;
+                }
+                else {
+                    m_minmax_index = int64_t(index);
+                }
+            }
+        }
+        return (m_limit > m_match_count);
+    }
+    Timestamp get_max() const
+    {
+        return m_match_count ? m_state : Timestamp{};
+    }
+
+private:
+    Timestamp m_state;
+};
 
 template <>
 class QueryState<Timestamp> : public QueryStateBase {
