@@ -10,7 +10,7 @@ function usage {
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
-    echo "   target_os=<android|ios|watchos|tvos>"
+    echo "   target_os=<android|ios|watchos|tvos|macos>"
     echo "   android_abi=<armeabi-v7a|x86|x86_64|arm64-v8a>"
     exit 1;
 }
@@ -23,7 +23,8 @@ while getopts ":o:a:t:v:f:" opt; do
             [ "${OS}" == "android" ] ||
             [ "${OS}" == "ios" ] ||
             [ "${OS}" == "watchos" ] ||
-            [ "${OS}" == "tvos" ] || usage
+            [ "${OS}" == "tvos" ] ||
+            [ "${OS}" == "macos" ] || usage
             ;;
         a)
             ARCH=${OPTARG}
@@ -75,6 +76,30 @@ if [ "${OS}" == "android" ]; then
 
     ninja -v
     ninja package
+elif [ "${OS}" == "macos" ]; then 
+		    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
+	SDK="macosx"
+
+    function configure_xcode {
+        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
+              -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
+              -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+              -D REALM_NO_TESTS=1 \
+              -D REALM_VERSION="${VERSION}" \
+              -D CPACK_SYSTEM_NAME="${SDK}" \
+              ${CMAKE_FLAGS} \
+              -G Xcode ..
+    }
+
+    mkdir -p "build-${OS}-${BUILD_TYPE}"
+    cd "build-${OS}-${BUILD_TYPE}" || exit 1
+
+    configure_xcode
+    xcodebuild -sdk "${SDK}" \
+               -configuration "${BUILD_TYPE}" \
+               ONLY_ACTIVE_ARCH=NO
+    # mkdir -p "src/realm/${BUILD_TYPE}"
+    # mkdir -p "src/realm/parser/${BUILD_TYPE}"
 else
     case "${OS}" in
         ios) SDK="iphone";;
