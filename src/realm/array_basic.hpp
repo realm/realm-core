@@ -280,22 +280,6 @@ public:
     }
 };
 
-template <class R>
-class QueryState : public QueryStateBase {
-public:
-    R m_state;
-    QueryState(Action, Array* = nullptr, size_t limit = -1)
-        : QueryStateBase(limit)
-    {
-    }
-
-    template <Action action, bool pattern, typename resulttype>
-    inline bool match(size_t, uint64_t /*indexpattern*/, resulttype)
-    {
-        return false;
-    }
-};
-
 // Class typedefs for BasicArray's: ArrayFloat and ArrayDouble
 typedef BasicArray<float> ArrayFloat;
 typedef BasicArray<double> ArrayDouble;

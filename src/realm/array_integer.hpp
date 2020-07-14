@@ -121,15 +121,14 @@ public:
 
     void move(size_t begin, size_t end, size_t dest_begin);
 
-    bool find(int cond, Action action, value_type value, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state) const;
+    bool find(int cond, value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     // This is the one installed into the m_finder slots.
     template <class cond, Action action, size_t bitwidth>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <class cond, Action action, class Callback>
-    bool find(value_type value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool find(value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
               Callback callback) const;
 
     // Wrappers for backwards compatibility and for simple use without
@@ -268,21 +267,21 @@ inline void ArrayIntNull::move(size_t begin, size_t end, size_t dest_begin)
     Array::move(begin + 1, end + 1, dest_begin + 1);
 }
 
-inline bool ArrayIntNull::find(int cond, Action action, value_type value, size_t start, size_t end, size_t baseindex,
-                               QueryState<int64_t>* state) const
+inline bool ArrayIntNull::find(int cond, value_type value, size_t start, size_t end, size_t baseindex,
+                               QueryStateBase* state) const
 {
     if (value) {
-        return Array::find(cond, action, *value, start, end, baseindex, state, true /*treat as nullable array*/,
+        return Array::find(cond, *value, start, end, baseindex, state, true /*treat as nullable array*/,
                            false /*search parameter given in 'value' argument*/);
     }
     else {
-        return Array::find(cond, action, 0 /* unused dummy*/, start, end, baseindex, state,
-                           true /*treat as nullable array*/, true /*search for null, ignore value argument*/);
+        return Array::find(cond, 0 /* unused dummy*/, start, end, baseindex, state, true /*treat as nullable array*/,
+                           true /*search for null, ignore value argument*/);
     }
 }
 
 template <class cond, Action action, size_t bitwidth>
-bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
+bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     return Array::find<cond, action>(value, start, end, baseindex, state, true /*treat as nullable array*/,
                                      false /*search parameter given in 'value' argument*/);
@@ -290,7 +289,7 @@ bool ArrayIntNull::find(int64_t value, size_t start, size_t end, size_t baseinde
 
 
 template <class cond, Action action, class Callback>
-bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                         Callback callback) const
 {
     if (value) {
@@ -309,7 +308,7 @@ bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t basei
 template <class cond>
 size_t ArrayIntNull::find_first(value_type value, size_t start, size_t end) const
 {
-    QueryState<int64_t> state(act_ReturnFirst, 1);
+    QueryStateFindFirst state;
     if (value) {
         Array::find<cond, act_ReturnFirst>(*value, start, end, 0, &state, Array::CallbackDummy(),
                                            true /*treat as nullable array*/,

@@ -37,11 +37,7 @@ enum Action {
     act_Min,
     act_Count,
     act_FindAll,
-    act_CallIdx,
     act_CallbackIdx,
-    act_CallbackVal,
-    act_CallbackNone,
-    act_CallbackBoth,
     act_Average
 };
 
@@ -70,6 +66,11 @@ public:
     {
         ++m_match_count;
         return (m_limit > m_match_count);
+    }
+
+    virtual bool match_pattern(size_t, uint64_t)
+    {
+        return false;
     }
 
 protected:

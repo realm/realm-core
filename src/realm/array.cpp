@@ -1588,33 +1588,33 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
     if (end == npos)
         end = m_size;
 
-    QueryState<int64_t> state(act_FindAll, result);
+    QueryStateFindAll state(*result);
     REALM_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
 
     return;
 }
 
 
-bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
-                 QueryState<int64_t>* state, bool nullable_array, bool find_null) const
+bool Array::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                 bool nullable_array, bool find_null) const
 {
     if (cond == cond_Equal) {
-        return find<Equal>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Equal>(value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_NotEqual) {
-        return find<NotEqual>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<NotEqual>(value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_Greater) {
-        return find<Greater>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Greater>(value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_Less) {
-        return find<Less>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Less>(value, start, end, baseindex, state, nullable_array, find_null);
     }
     if (cond == cond_None) {
-        return find<None>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<None>(value, start, end, baseindex, state, nullable_array, find_null);
     }
     else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(action, value, start, end, baseindex, state, nullable_array, find_null);
+        return find<NotNull>(value, start, end, baseindex, state, nullable_array, find_null);
     }
     REALM_ASSERT_DEBUG(false);
     return false;
@@ -1650,13 +1650,23 @@ void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1
     ::get_three(data, width, ndx, v0, v1, v2);
 }
 
-bool QueryStateFindAll::match(size_t index, Mixed)
+template <>
+bool QueryStateFindAll<KeyColumn>::match(size_t index, Mixed)
 {
     ++m_match_count;
 
     REALM_ASSERT(m_key_values);
     int64_t key_value = m_key_values->get(index) + m_key_offset;
     m_keys.add(ObjKey(key_value));
+
+    return (m_limit > m_match_count);
+}
+
+template <>
+bool QueryStateFindAll<IntegerColumn>::match(size_t index, Mixed)
+{
+    ++m_match_count;
+    m_keys.add(index);
 
     return (m_limit > m_match_count);
 }

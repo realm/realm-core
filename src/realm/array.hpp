@@ -135,6 +135,34 @@ struct TreeInsertBase {
     size_t m_split_offset;
     size_t m_split_size;
 };
+template <class T>
+class QueryStateFindAll : public QueryStateBase {
+public:
+    QueryStateFindAll(T& keys, size_t limit = -1)
+        : QueryStateBase(limit)
+        , m_keys(keys)
+    {
+    }
+    bool match(size_t index, Mixed) final;
+
+private:
+    T& m_keys;
+};
+
+class QueryStateFindFirst : public QueryStateBase {
+public:
+    size_t m_state = realm::not_found;
+    QueryStateFindFirst()
+        : QueryStateBase(1)
+    {
+    }
+    bool match(size_t index, Mixed) final
+    {
+        m_match_count++;
+        m_state = index;
+        return false;
+    }
+};
 
 class Array : public Node, public ArrayParent {
 public:
@@ -450,82 +478,52 @@ public:
     static ref_type write(ref_type, Allocator&, _impl::ArrayWriterBase&, bool only_if_modified);
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
-    bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state, bool nullable_array = false, bool find_null = false) const;
+    bool find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+              bool nullable_array = false, bool find_null = false) const;
 
     // Templated find function to avoid conversion to and from integer represenation of condition
     template <class cond>
-    bool find(Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
               bool nullable_array = false, bool find_null = false) const
     {
-        if (action == act_ReturnFirst) {
-            REALM_TEMPEX3(return find, cond, act_ReturnFirst, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Sum) {
-            REALM_TEMPEX3(return find, cond, act_Sum, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Min) {
-            REALM_TEMPEX3(return find, cond, act_Min, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Max) {
-            REALM_TEMPEX3(return find, cond, act_Max, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_Count) {
-            REALM_TEMPEX3(return find, cond, act_Count, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_FindAll) {
-            REALM_TEMPEX3(return find, cond, act_FindAll, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        else if (action == act_CallbackIdx) {
-            REALM_TEMPEX3(return find, cond, act_CallbackIdx, m_width,
-                                 (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
-        }
-        REALM_ASSERT_DEBUG(false);
-        return false;
+        REALM_TEMPEX3(return find, cond, act_FindAll, m_width,
+                             (value, start, end, baseindex, state, CallbackDummy(), nullable_array, find_null))
     }
 
 
     /*
     bool find(int cond, Action action, null, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state) const;
+              QueryStateBase* state) const;
     */
 
     template <class cond, Action action, size_t bitwidth, class Callback>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-              Callback callback, bool nullable_array = false, bool find_null = false) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state, Callback callback,
+              bool nullable_array = false, bool find_null = false) const;
 
     // This is the one installed into the m_vtable->finder slots.
     template <class cond, Action action, size_t bitwidth>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
 
     template <class cond, Action action, class Callback>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-              Callback callback, bool nullable_array = false, bool find_null = false) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state, Callback callback,
+              bool nullable_array = false, bool find_null = false) const;
 
     /*
     template <class cond, Action action, class Callback>
     bool find(null, size_t start, size_t end, size_t baseindex,
-              QueryState<int64_t>* state, Callback callback) const;
+              QueryStateBase* state, Callback callback) const;
     */
 
     // Optimized implementation for release mode
     template <class cond, Action action, size_t bitwidth, class Callback>
-    bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                         Callback callback, bool nullable_array = false, bool find_null = false) const;
 
     // Called for each search result
     template <Action action, class Callback>
-    bool find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state,
-                     Callback callback) const;
+    bool find_action(size_t index, util::Optional<int64_t> value, QueryStateBase* state, Callback callback) const;
 
-    template <Action action, class Callback>
-    bool find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const;
+    bool find_action_pattern(size_t index, uint64_t pattern, QueryStateBase* state) const;
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
@@ -539,44 +537,44 @@ public:
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template <class cond, Action action, size_t bitwidth, class Callback>
-    bool compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                  Callback callback) const;
 
     // Non-SSE find for Equal/NotEqual
     template <bool eq, Action action, size_t width, class Callback>
-    inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
-                                 QueryState<int64_t>* state, Callback callback) const;
+    inline bool compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                                 Callback callback) const;
 
     // Non-SSE find for Less/Greater
     template <bool gt, Action action, size_t bitwidth, class Callback>
-    bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                           Callback callback) const;
 
     template <class cond, Action action, size_t foreign_width, class Callback, size_t width>
-    bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                          Callback callback) const;
 
     template <class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
-    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                        Callback callback) const;
 
     template <class cond, Action action, class Callback>
-    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                        Callback callback) const;
 
     template <class cond, Action action, size_t width, class Callback>
-    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                        Callback callback) const;
 
 // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef REALM_COMPILER_SSE
     template <class cond, Action action, size_t width, class Callback>
-    bool find_sse(int64_t value, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex,
+    bool find_sse(int64_t value, __m128i* data, size_t items, QueryStateBase* state, size_t baseindex,
                   Callback callback) const;
 
     template <class cond, Action action, size_t width, class Callback>
-    REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
-                                           QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+    REALM_FORCEINLINE bool find_sse_intern(__m128i* action_data, __m128i* data, size_t items, QueryStateBase* state,
+                                           size_t baseindex, Callback callback) const;
 
 #endif
 
@@ -604,12 +602,12 @@ public:
 
     // Find value greater/less in 64-bit chunk - only works for positive values
     template <bool gt, Action action, size_t width, class Callback>
-    bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex,
+    bool find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryStateBase* state, size_t baseindex,
                         Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
     template <bool gt, Action action, size_t width, class Callback>
-    bool find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+    bool find_gtlt(int64_t v, uint64_t chunk, QueryStateBase* state, size_t baseindex, Callback callback) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -707,7 +705,7 @@ protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryState<int64_t>*) const;
+    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryStateBase*) const;
     typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
     struct VTable {
@@ -761,160 +759,6 @@ public:
 
 // Implementation:
 
-class QueryStateFindAll : public QueryStateBase {
-public:
-    QueryStateFindAll(KeyColumn& keys, size_t limit = -1)
-        : QueryStateBase(limit)
-        , m_keys(keys)
-    {
-    }
-    bool match(size_t index, Mixed) final;
-
-private:
-    KeyColumn& m_keys;
-};
-
-
-template <>
-class QueryState<int64_t> : public QueryStateBase {
-public:
-    int64_t m_state = 0;
-
-    template <Action action>
-    bool uses_val()
-    {
-        if (action == act_Max || action == act_Min || action == act_Sum)
-            return true;
-        else
-            return false;
-    }
-
-    QueryState(Action action, size_t limit = -1)
-        : QueryState(action, int64_t(0), limit)
-    {
-    }
-
-    QueryState(Action action, KeyColumn* akku, size_t limit = -1)
-        : QueryState(action, reinterpret_cast<int64_t>(akku), limit)
-    {
-    }
-    QueryState(Action action, IntegerColumn* akku, size_t limit = -1)
-        : QueryState(action, reinterpret_cast<int64_t>(akku), limit)
-    {
-    }
-
-    template <Action action, bool pattern>
-    inline bool match(size_t index, uint64_t indexpattern, int64_t value)
-    {
-        if (pattern) {
-            if (action == act_Count) {
-                // If we are close to 'limit' argument in query, we cannot count-up a complete chunk. Count up single
-                // elements instead
-                if (m_match_count + 64 >= m_limit)
-                    return false;
-
-                m_state += fast_popcount64(indexpattern);
-                m_match_count = size_t(m_state);
-                return true;
-            }
-            // Other aggregates cannot (yet) use bit pattern for anything. Make Array-finder call with pattern = false
-            // instead
-            return false;
-        }
-
-        ++m_match_count;
-
-        if (action == act_Max) {
-            if (value > m_state) {
-                m_state = value;
-                m_minmax_index = m_key_values ? m_key_values->get(index) + m_key_offset : index;
-            }
-        }
-        else if (action == act_Min) {
-            if (value < m_state) {
-                m_state = value;
-                m_minmax_index = m_key_values ? m_key_values->get(index) + m_key_offset : index;
-            }
-        }
-        else if (action == act_Sum)
-            m_state += value;
-        else if (action == act_Count) {
-            m_state++;
-            m_match_count = size_t(m_state);
-        }
-        else if (action == act_FindAll) {
-            if (m_key_values) {
-                int64_t key_value = m_key_values->get(index) + m_key_offset;
-                Array::add_to_column(reinterpret_cast<KeyColumn*>(m_state), key_value);
-            }
-            else {
-                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
-            }
-        }
-        else if (action == act_ReturnFirst) {
-            m_state = index;
-            return false;
-        }
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
-        return (m_limit > m_match_count);
-    }
-
-    template <Action action, bool pattern>
-    inline bool match(size_t index, uint64_t indexpattern, util::Optional<int64_t> value)
-    {
-        // FIXME: This is a temporary hack for nullable integers.
-        if (value) {
-            return match<action, pattern>(index, indexpattern, *value);
-        }
-
-        // If value is null, the only sensible actions are count, find_all, and return first.
-        // Max, min, and sum should all have no effect.
-        if (action == act_Count) {
-            m_state++;
-            m_match_count = size_t(m_state);
-        }
-        else if (action == act_FindAll) {
-            if (m_key_values) {
-                int64_t key_value = m_key_values->get(index) + m_key_offset;
-                Array::add_to_column(reinterpret_cast<KeyColumn*>(m_state), key_value);
-            }
-            else {
-                Array::add_to_column(reinterpret_cast<IntegerColumn*>(m_state), index);
-            }
-        }
-        else if (action == act_ReturnFirst) {
-            m_match_count++;
-            m_state = index;
-            return false;
-        }
-        return m_limit > m_match_count;
-    }
-
-private:
-    QueryState(Action action, int64_t akku, size_t limit)
-        : QueryStateBase(limit)
-    {
-        if (action == act_Max)
-            m_state = std::numeric_limits<int64_t>::min();
-        else if (action == act_Min)
-            m_state = std::numeric_limits<int64_t>::max();
-        else if (action == act_ReturnFirst)
-            m_state = not_found;
-        else if (action == act_Sum)
-            m_state = 0;
-        else if (action == act_Count)
-            m_state = 0;
-        else if (action == act_FindAll)
-            m_state = akku;
-        else if (action == act_CallbackIdx) {
-        }
-        else {
-            REALM_ASSERT_DEBUG(false);
-        }
-    }
-};
 
 inline bool RefOrTagged::is_ref() const noexcept
 {
@@ -1327,24 +1171,18 @@ such a pattern.
 // unused, such that caller's computation of these values will not be made. Only works if find_action() and
 // find_action_pattern() rewritten as macros. Note: This problem has been fixed in next upcoming array.hpp version
 template <Action action, class Callback>
-bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state,
-                        Callback callback) const
+bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryStateBase* state, Callback callback) const
 {
     if (action == act_CallbackIdx)
         return callback(index);
     else
-        return state->match<action, false>(index, 0, value);
+        return state->match(index, value);
 }
-template <Action action, class Callback>
-bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
+
+inline bool Array::find_action_pattern(size_t /*index*/, uint64_t /*pattern*/, QueryStateBase* /*st*/) const
 {
-    static_cast<void>(callback);
-    if (action == act_CallbackIdx) {
-        // Possible future optimization: call callback(index) like in above find_action(), in a loop for each bit set
-        // in 'pattern'
-        return false;
-    }
-    return state->match<action, true>(index, pattern, 0);
+    // return st->match_pattern(index, pattern);
+    return false;
 }
 
 
@@ -1466,7 +1304,7 @@ uint64_t Array::cascade(uint64_t a) const
 // If find_null is set, it means that we search for a null. In that case, `value` is ignored. If find_null is set,
 // then nullable_array must be set too.
 template <class cond, Action action, size_t bitwidth, class Callback>
-bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                            Callback callback, bool nullable_array, bool find_null) const
 {
     REALM_ASSERT(!(find_null && !nullable_array));
@@ -1568,29 +1406,9 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
             size_t process = state->m_limit - state->m_match_count;
             end2 = end - start2 > process ? start2 + process : end;
         }
-        if (action == act_Sum || action == act_Max || action == act_Min) {
-            int64_t res;
-            size_t res_ndx = 0;
-            if (action == act_Sum)
-                res = Array::sum(start2, end2);
-            if (action == act_Max)
-                Array::maximum(res, start2, end2, &res_ndx);
-            if (action == act_Min)
-                Array::minimum(res, start2, end2, &res_ndx);
-
-            find_action<action, Callback>(res_ndx + baseindex, res, state, callback);
-            // find_action will increment match count by 1, so we need to `-1` from the number of elements that
-            // we performed the fast Array methods on.
-            state->m_match_count += end2 - start2 - 1;
-        }
-        else if (action == act_Count) {
-            state->m_state += end2 - start2;
-        }
-        else {
-            for (; start2 < end2; start2++)
-                if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
-                    return false;
-        }
+        for (; start2 < end2; start2++)
+            if (!find_action<action, Callback>(start2 + baseindex, get<bitwidth>(start2), state, callback))
+                return false;
         return true;
     }
 
@@ -1742,7 +1560,7 @@ int64_t Array::find_gtlt_magic(int64_t v) const
 }
 
 template <bool gt, Action action, size_t width, class Callback>
-bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex,
+bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryStateBase* state, size_t baseindex,
                            Callback callback) const
 {
     // Tests if a a chunk of values contains values that are greater (if gt == true) or less (if gt == false) than v.
@@ -1757,7 +1575,7 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* 
                     : ((chunk - magic) & ~chunk & ~0ULL / no0(mask1) * (mask2 + 1));
     size_t p = 0;
     while (m) {
-        if (find_action_pattern<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
+        if (find_action_pattern(baseindex, m >> (no0(width) - 1), state))
             break; // consumed, so do not call find_action()
 
         size_t t = first_set_bit64(m) / no0(width);
@@ -1777,7 +1595,7 @@ bool Array::find_gtlt_fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* 
 
 // clang-format off
 template <bool gt, Action action, size_t width, class Callback>
-bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryStateBase* state, size_t baseindex, Callback callback) const
 {
     // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
@@ -1932,8 +1750,8 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
 
 /// Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 template <bool eq, Action action, size_t width, class Callback>
-inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex,
-                                    QueryState<int64_t>* state, Callback callback) const
+inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                                    Callback callback) const
 {
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
 
@@ -1966,7 +1784,7 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
 
             while (eq ? test_zero<width>(v2) : v2) {
 
-                if (find_action_pattern<action, Callback>(start + baseindex, cascade<width, eq>(v2), state, callback))
+                if (find_action_pattern(start + baseindex, cascade<width, eq>(v2), state))
                     break; // consumed
 
                 size_t t = find_zero<eq, width>(v2);
@@ -2007,22 +1825,22 @@ inline bool Array::compare_equality(int64_t value, size_t start, size_t end, siz
 
 // This is the one installed into the m_vtable->finder slots.
 template <class cond, Action action, size_t bitwidth>
-bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
 {
     return find<cond, action, bitwidth>(value, start, end, baseindex, state, CallbackDummy());
 }
 
 template <class cond, Action action, class Callback>
-bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback, bool nullable_array, bool find_null) const
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state, Callback callback,
+                 bool nullable_array, bool find_null) const
 {
     REALM_TEMPEX4(return find, cond, action, m_width, Callback,
                          (value, start, end, baseindex, state, callback, nullable_array, find_null));
 }
 
 template <class cond, Action action, size_t bitwidth, class Callback>
-bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback, bool nullable_array, bool find_null) const
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state, Callback callback,
+                 bool nullable_array, bool find_null) const
 {
     return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback,
                                                             nullable_array, find_null);
@@ -2032,7 +1850,7 @@ bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first
 // chunk
 template <class cond, Action action, size_t width, class Callback>
-bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex,
+bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryStateBase* state, size_t baseindex,
                      Callback callback) const
 {
     __m128i search = {0};
@@ -2057,7 +1875,7 @@ bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryState<int6
 // find_all, etc) on value inside action_data for first match, if any
 template <class cond, Action action, size_t width, class Callback>
 REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* data, size_t items,
-                                              QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+                                              QueryStateBase* state, size_t baseindex, Callback callback) const
 {
     size_t i = 0;
     __m128i compare_result = {0};
@@ -2114,7 +1932,7 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
             uint64_t pattern =
                 resmask &
                 upper; // fixme, bits at wrong offsets. Only OK because we only use them in 'count' aggregate
-            if (find_action_pattern<action, Callback>(s + baseindex, pattern, state, callback))
+            if (find_action_pattern(s + baseindex, pattern, state))
                 break;
 
             size_t idx = first_set_bit(resmask) * 8 / no0(width);
@@ -2132,8 +1950,8 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 #endif // REALM_COMPILER_SSE
 
 template <class cond, Action action, class Callback>
-bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                          QueryState<int64_t>* state, Callback callback) const
+bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                          Callback callback) const
 {
     cond c;
     REALM_ASSERT_3(start, <=, end);
@@ -2182,8 +2000,8 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
 
 
 template <class cond, Action action, size_t width, class Callback>
-bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                          QueryState<int64_t>* state, Callback callback) const
+bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                          Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;
@@ -2194,8 +2012,8 @@ bool Array::compare_leafs(const Array* foreign, size_t start, size_t end, size_t
 
 
 template <class cond, Action action, size_t width, class Callback, size_t foreign_width>
-bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex,
-                            QueryState<int64_t>* state, Callback callback) const
+bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+                            Callback callback) const
 {
     cond c;
     char* foreign_m_data = foreign->m_data;
@@ -2268,7 +2086,7 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
 
 
 template <class cond, Action action, size_t bitwidth, class Callback>
-bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                     Callback callback) const
 {
     bool ret = false;
@@ -2288,7 +2106,7 @@ bool Array::compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
 }
 
 template <bool gt, Action action, size_t bitwidth, class Callback>
-bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::compare_relation(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
                              Callback callback) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
@@ -2378,7 +2196,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
     REALM_ASSERT(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
     // todo, would be nice to avoid this in order to speed up find_first loops
-    QueryState<int64_t> state(act_ReturnFirst, 1);
+    QueryStateFindFirst state;
     Finder finder = m_vtable->finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 
