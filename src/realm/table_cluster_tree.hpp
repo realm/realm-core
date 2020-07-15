@@ -31,11 +31,8 @@ public:
     TableClusterTree(Table* owner, Allocator& alloc, size_t top_position_for_cluster_tree);
     ~TableClusterTree() override;
 
-    Obj insert(ObjKey k, const FieldValues& values)
-    {
-        auto state = ClusterTree::insert(k, values);
-        return Obj(get_table_ref(), state.mem, k, state.index);
-    }
+    Obj insert(ObjKey k, const FieldValues& values);
+
     Obj get(ObjKey k) const
     {
         auto state = ClusterTree::get(k);

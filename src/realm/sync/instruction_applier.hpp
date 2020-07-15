@@ -24,6 +24,7 @@
 #include <realm/sync/object.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include <tuple>
 
@@ -99,6 +100,10 @@ private:
 
     // Same as get_field, but expects the field in question to be a list.
     LstBase& get_list(const Instruction::PathInstruction&, const char* instr = "(unspecified)");
+
+    // Same as get_list, but expects the field in question to be an entry in a dictionary.
+    std::tuple<std::unique_ptr<Dictionary>, Mixed> get_dictionary(const Instruction::PathInstruction&,
+                                                                  const char* instr = "(unspecified)");
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
     ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&, const char* instr = "(unspecified)") const;

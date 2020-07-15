@@ -368,6 +368,19 @@ void Changeset::Reflector::operator()(const Instruction::ArrayClear& p) const
     m_tracer.field("prior_size", p.prior_size);
 }
 
+void Changeset::Reflector::operator()(const Instruction::DictionaryInsert& p) const
+{
+    m_tracer.name("DictionaryInsert");
+    path_instr(p);
+    m_tracer.field("value", p.value);
+}
+
+void Changeset::Reflector::operator()(const Instruction::DictionaryErase& p) const
+{
+    m_tracer.name("DictionaryErase");
+    path_instr(p);
+}
+
 void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
 {
     m_tracer.name("AddColumn");
@@ -380,7 +393,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
         m_tracer.field("type", "Mixed");
     }
     m_tracer.field("nullable", p.nullable);
-    m_tracer.field("list", p.list);
+    m_tracer.field("collection_type", p.collection_type);
     if (p.type == Instruction::Payload::Type::Link) {
         m_tracer.field("target_table", p.link_target_table);
     }
@@ -448,6 +461,11 @@ void Changeset::Printer::field(StringData n, InternString value)
 void Changeset::Printer::field(StringData n, Instruction::Payload::Type type)
 {
     print_field(n, get_type_name(type));
+}
+
+void Changeset::Printer::field(StringData n, Instruction::AddColumn::CollectionType type)
+{
+    print_field(n, get_collection_type(type));
 }
 
 std::string Changeset::Printer::primary_key_to_string(const Instruction::PrimaryKey& key)

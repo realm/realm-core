@@ -35,7 +35,9 @@ namespace sync {
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
     X(ArrayErase)                                                                                                    \
-    X(ArrayClear)
+    X(ArrayClear)                                                                                                    \
+    X(DictionaryInsert)                                                                                              \
+    X(DictionaryErase)
 
 struct StringBufferRange {
     uint32_t offset, size;
@@ -430,13 +432,19 @@ struct AddColumn : TableInstruction {
     Payload::Type type;
 
     bool nullable;
-    bool list;
+
+    // This is backwards compatible with previous boolean type where 0
+    // indicated simple type and 1 indicated list.
+    enum class CollectionType : uint8_t { Single, List, Dictionary, Set };
+    CollectionType collection_type;
+
     InternString link_target_table;
 
     bool operator==(const AddColumn& rhs) const noexcept
     {
         return TableInstruction::operator==(rhs) && field == rhs.field && type == rhs.type &&
-               nullable == rhs.nullable && list == rhs.list && link_target_table == rhs.link_target_table;
+               nullable == rhs.nullable && collection_type == rhs.collection_type &&
+               link_target_table == rhs.link_target_table;
     }
 };
 
@@ -550,6 +558,25 @@ struct ArrayClear : PathInstruction {
     }
 };
 
+struct DictionaryInsert : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+
+    bool operator==(const DictionaryInsert& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value;
+    }
+};
+
+struct DictionaryErase : PathInstruction {
+    using PathInstruction::PathInstruction;
+
+    bool operator==(const DictionaryErase& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs);
+    }
+};
+
 } // namespace instr
 
 struct Instruction {
@@ -580,6 +607,8 @@ struct Instruction {
         ArrayMove = 9,
         ArrayErase = 10,
         ArrayClear = 11,
+        DictionaryInsert = 12,
+        DictionaryErase = 13,
     };
 
     template <Type t>
@@ -702,6 +731,22 @@ inline const char* get_type_name(Instruction::Payload::Type type)
             return "Link";
         case Type::ObjectId:
             return "ObjectId";
+    }
+    return "(unknown)";
+}
+
+inline const char* get_collection_type(Instruction::AddColumn::CollectionType type)
+{
+    using Type = Instruction::AddColumn::CollectionType;
+    switch (type) {
+        case Type::Single:
+            return "simple";
+        case Type::List:
+            return "List";
+        case Type::Dictionary:
+            return "Dictionary";
+        case Type::Set:
+            return "Set";
     }
     return "(unknown)";
 }

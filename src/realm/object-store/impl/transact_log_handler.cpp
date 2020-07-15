@@ -291,6 +291,14 @@ public:
     {
         return true;
     }
+    bool dictionary_insert(Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(Mixed)
+    {
+        return true;
+    }
 };
 
 

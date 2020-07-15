@@ -160,7 +160,8 @@ void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
     // Mixed columns are always nullable.
     REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
 
-    append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.list);
+    append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable,
+           uint8_t(instr.collection_type));
     if (instr.type == Instruction::Payload::Type::Link) {
         append_value(instr.link_target_table);
     }
@@ -189,6 +190,16 @@ void ChangesetEncoder::operator()(const Instruction::ArrayErase& instr)
 void ChangesetEncoder::operator()(const Instruction::ArrayClear& instr)
 {
     append_path_instr(Instruction::Type::ArrayClear, instr, instr.prior_size);
+}
+
+void ChangesetEncoder::operator()(const Instruction::DictionaryInsert& instr)
+{
+    append_path_instr(Instruction::Type::DictionaryInsert, instr, instr.value);
+}
+
+void ChangesetEncoder::operator()(const Instruction::DictionaryErase& instr)
+{
+    append_path_instr(Instruction::Type::DictionaryErase, instr);
 }
 
 InternString ChangesetEncoder::intern_string(StringData str)

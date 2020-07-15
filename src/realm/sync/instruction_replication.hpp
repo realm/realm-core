@@ -86,6 +86,8 @@ public:
     void list_erase(const CollectionBase&, size_t link_ndx) override;
     void list_clear(const CollectionBase&) override;
 
+    void dictionary_insert(const CollectionBase&, Mixed key, Mixed val) override;
+    void dictionary_erase(const CollectionBase&, Mixed key) override;
 
     void remove_object(const Table*, ObjKey) override;
 
