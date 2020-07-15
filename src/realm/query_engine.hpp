@@ -410,14 +410,14 @@ protected:
     size_t find_all_local(size_t start, size_t end)
     {
         if (run_single()) {
-            m_leaf_ptr->find(TConditionFunction::condition, m_value, start, end, 0, m_state);
+            m_leaf_ptr->template find<TConditionFunction>(m_value, start, end, 0, m_state, nullptr);
         }
         else {
             auto callback = [this](size_t index) {
                 auto val = m_source_column->get_any(index);
                 return m_state->match(index, val);
             };
-            m_leaf_ptr->template find<TConditionFunction, act_CallbackIdx>(m_value, start, end, 0, m_state, callback);
+            m_leaf_ptr->template find<TConditionFunction>(m_value, start, end, 0, m_state, callback);
         }
 
         return end;
