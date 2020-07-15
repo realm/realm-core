@@ -5,6 +5,8 @@
 
 ### Fixed
 * Re-enable compilation using SSE (since v6.0.7)
+* Risk of aborting from Table::migrate_indexes() reduced.
+* Improved error messages when top ref is invalid.
  
 ### Breaking changes
 * None.
