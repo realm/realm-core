@@ -1354,10 +1354,10 @@ struct Array::VTableForWidth {
             getter = &Array::get<width>;
             setter = &Array::set<width>;
             chunk_getter = &Array::get_chunk<width>;
-            finder[cond_Equal] = &Array::find<Equal, act_ReturnFirst, width>;
-            finder[cond_NotEqual] = &Array::find<NotEqual, act_ReturnFirst, width>;
-            finder[cond_Greater] = &Array::find<Greater, act_ReturnFirst, width>;
-            finder[cond_Less] = &Array::find<Less, act_ReturnFirst, width>;
+            finder[cond_Equal] = &Array::find_vtable<Equal, width>;
+            finder[cond_NotEqual] = &Array::find_vtable<NotEqual, width>;
+            finder[cond_Greater] = &Array::find_vtable<Greater, width>;
+            finder[cond_Less] = &Array::find_vtable<Less, width>;
         }
     };
     static const PopulatedVTable vtable;
@@ -1580,7 +1580,7 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
         end = m_size;
 
     QueryStateFindAll state(*result);
-    REALM_TEMPEX3(find, Equal, act_FindAll, m_width, (value, begin, end, col_offset, &state, CallbackDummy()));
+    REALM_TEMPEX2(find_optimized, Equal, m_width, (value, begin, end, col_offset, &state, nullptr));
 
     return;
 }
@@ -1590,22 +1590,22 @@ bool Array::find(int cond, int64_t value, size_t start, size_t end, size_t basei
                  bool nullable_array, bool find_null) const
 {
     if (cond == cond_Equal) {
-        return find<Equal>(value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Equal>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
     }
     if (cond == cond_NotEqual) {
-        return find<NotEqual>(value, start, end, baseindex, state, nullable_array, find_null);
+        return find<NotEqual>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
     }
     if (cond == cond_Greater) {
-        return find<Greater>(value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Greater>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
     }
     if (cond == cond_Less) {
-        return find<Less>(value, start, end, baseindex, state, nullable_array, find_null);
+        return find<Less>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
     }
     if (cond == cond_None) {
-        return find<None>(value, start, end, baseindex, state, nullable_array, find_null);
+        return find<None>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
     }
     else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(value, start, end, baseindex, state, nullable_array, find_null);
+        return find<NotNull>(value, start, end, baseindex, state, nullptr, nullable_array, find_null);
     }
     REALM_ASSERT_DEBUG(false);
     return false;
