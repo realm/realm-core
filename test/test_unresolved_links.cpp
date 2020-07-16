@@ -162,7 +162,7 @@ TEST(Unresolved_InvalidateObject)
 
     auto wheels = g.add_embedded_table("Wheels");
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
-    auto col_wheels = cars->add_column_link(type_LinkList, "wheels", *wheels);
+    auto col_wheels = cars->add_column_list(*wheels, "wheels");
     auto col_price = cars->add_column(type_Decimal, "price");
     auto dealers = g.add_table("Dealer");
     auto col_has = dealers->add_column_list(*cars, "stock");

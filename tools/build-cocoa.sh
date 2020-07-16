@@ -7,21 +7,23 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 VERSION=$(git describe)
 
 function usage {
-    echo "Usage: ${SCRIPT} [-b] [-m] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
+    echo "Usage: ${SCRIPT} [-b] [-m] [-x] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
     echo ""
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
+    echo "   -x : build as an xcframework"
     echo "   -c : copy core to the specified folder instead of packaging it"
     echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 
 # Parse the options
-while getopts ":bmc:f:" opt; do
+while getopts ":bmxc:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
+        x) BUILD_XCFRAMEWORK=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
         f) CMAKE_FLAGS=${OPTARG};;
@@ -90,10 +92,56 @@ for bt in "${BUILD_TYPES[@]}"; do
         libtool -static -o core/librealm-${p}${suffix}.a \
             core/librealm-${p}${suffix}.a \
             core/lib/librealm-sync${suffix}.a
+
+        # extract arch slices for iOS, Watch, TV
+        if [[ "$p" != "macosx" && "$p" != "maccatalyst" ]]; then
+            case "${p}" in
+                ios) SDK="iphone";;
+                watchos) SDK="watch";;
+                tvos) SDK="appletv";;
+            esac
+            tar -C core -zxvf "${filename}" "lib/librealm-${SDK}-device${suffix}.a"
+            mv "core/lib/librealm-${SDK}-device${suffix}.a" "core/librealm-${SDK}-device${suffix}.a"
+            tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}-device${suffix}.a"
+            mv "core/lib/librealm-parser-${SDK}-device${suffix}.a" "core/librealm-parser-${SDK}-device${suffix}.a"
+            tar -C core -zxvf "${filename}" "lib/librealm-${SDK}-simulator${suffix}.a"
+            mv "core/lib/librealm-${SDK}-simulator${suffix}.a" "core/librealm-${SDK}-simulator${suffix}.a"
+            tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}-simulator${suffix}.a"
+            mv "core/lib/librealm-parser-${SDK}-simulator${suffix}.a" "core/librealm-parser-${SDK}-simulator${suffix}.a"
+        fi
         rm -rf core/lib
     done
 done
 
+# Produce xcframeworks
+if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+    for bt in "${BUILD_TYPES[@]}"; do
+        make_core_xcframework=()
+        [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
+        for p in "${PLATFORMS[@]}"; do
+            if [[ "$p" == "macosx" ]]; then
+                build_dir="core/librealm-macosx${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir} -headers core/include/)
+            elif [[ "$p" == "maccatalyst" ]]; then
+                build_dir="core/librealm-maccatalyst${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir} -headers core/include/)
+            else
+                case "${p}" in
+                    ios) SDK="iphone";;
+                    watchos) SDK="watch";;
+                    tvos) SDK="appletv";;
+                esac
+                build_dir_device="core/librealm-${SDK}-device${suffix}.a"
+                build_dir_simulator="core/librealm-${SDK}-simulator${suffix}.a"
+                make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
+                make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
+            fi
+        done
+        xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
+    done
+fi
+
+# Package artifacts
 if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
     mkdir -p "${DESTINATION}"

@@ -460,6 +460,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             auto oid_col = k->get_column_key("!OID");
             if (oid_col)
                 k->remove_column(oid_col);
+            k->do_set_primary_key_column(pk_cols[k]);
         }
 
         if (pk_table) {
@@ -623,20 +624,26 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
 
             // Logical file size must never exceed actual file size.
-            // First two entries must be valid refs pointing inside the file
             auto file_size = alloc.get_baseline();
-            if (logical_file_size > file_size || table_names_ref == 0 || table_names_ref > logical_file_size ||
-                (table_names_ref & 7) || tables_ref == 0 || tables_ref > logical_file_size || (tables_ref & 7)) {
-                std::string err = "Invalid top array (ref, [0], [1], [2]): " + util::to_string(top_ref) + ", " +
-                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref) + ", " +
-                                  util::to_string(logical_file_size);
+            if (logical_file_size > file_size) {
+                std::string err = "Invalid logical file size: " + util::to_string(logical_file_size) +
+                                  ", actual file size: " + util::to_string(file_size);
+                throw InvalidDatabase(err, "");
+            }
+            // First two entries must be valid refs pointing inside the file
+            auto invalid_ref = [logical_file_size](ref_type ref) {
+                return ref == 0 || (ref & 7) || ref > logical_file_size;
+            };
+            if (invalid_ref(table_names_ref) || invalid_ref(tables_ref)) {
+                std::string err = "Invalid top array (top_ref, [0], [1]): " + util::to_string(top_ref) + ", " +
+                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref);
                 throw InvalidDatabase(err, "");
             }
             break;
         }
         default: {
-            std::string err =
-                "Invalid top array (ref: " + util::to_string(top_ref) + ", size: " + util::to_string(top_size) + ")";
+            std::string err = "Invalid top array size (ref: " + util::to_string(top_ref) +
+                              ", size: " + util::to_string(top_size) + ")";
             throw InvalidDatabase(err, "");
             break;
         }
@@ -1690,9 +1697,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;
-    _impl::TransactLogParser parser; // Throws
-    TransactAdvancer advancer(*this, schema_changed);
-    parser.parse(in, advancer); // Throws
+    if (has_schema_change_notification_handler()) {
+        _impl::TransactLogParser parser; // Throws
+        TransactAdvancer advancer(*this, schema_changed);
+        parser.parse(in, advancer); // Throws
+    }
 
     m_top.detach();                                           // Soft detach
     bool create_group_when_missing = false;                   // See Group::attach_shared().

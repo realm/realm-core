@@ -1038,14 +1038,21 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
         Array col_refs(m_alloc);
         col_refs.set_parent(&m_top, top_position_for_columns);
         col_refs.init_from_ref(top_ref);
+        auto col_count = m_spec.get_column_count();
+        size_t col_ndx = 0;
 
-        for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
+        // If col_refs.size() equals col_count, there are no indexes to migrate
+        while (col_ndx < col_count && col_refs.size() > col_count) {
             if (m_spec.get_column_attr(col_ndx).test(col_attr_Indexed) && !m_index_refs.get(col_ndx)) {
                 // Simply delete entry. This will have the effect that we will not have to take
                 // extra entries into account
                 auto old_index_ref = to_ref(col_refs.get(col_ndx + 1));
                 col_refs.erase(col_ndx + 1);
-                Array::destroy_deep(old_index_ref, m_alloc);
+                if (old_index_ref) {
+                    // It should not be possible for old_index_ref to be 0, but we have seen some error
+                    // reports on freeing a null ref, so just to be sure ...
+                    Array::destroy_deep(old_index_ref, m_alloc);
+                }
                 changes = true;
 
                 // Primary key columns does not need an index
@@ -1058,6 +1065,7 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
                     m_index_refs.set(col_ndx, index->get_ref());
                 }
             }
+            col_ndx++;
         };
         if (changes) {
             commit_and_continue();
@@ -1436,8 +1444,10 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
 
     REALM_ASSERT(number_of_objects != size_t(-1));
 
-    if (m_clusters.size() == number_of_objects)
+    if (m_clusters.size() == number_of_objects) {
+        // We have migrated all objects
         return;
+    }
 
     /******************** Optionally create !OID accessor ********************/
 
@@ -1570,7 +1580,6 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         rot = RefOrTagged::make_tagged(max_key_value + 1);
         m_top.set(top_position_for_sequence_number, rot);
     }
-    this->do_set_primary_key_column(pk_col_key);
 
     commit_and_continue();
 #if 0
@@ -2656,7 +2665,7 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     }
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, bool* did_create)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
@@ -2667,6 +2676,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
                  primary_key.get_type() == type);
 
     REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+
+    if (did_create)
+        *did_create = false;
 
     // Generate local ObjKey
     GlobalKey object_id{primary_key};
@@ -2704,6 +2716,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     if (auto repl = get_repl()) {
         repl->create_object_with_primary_key(this, object_id, primary_key);
+    }
+    if (did_create) {
+        *did_create = true;
     }
 
     field_values.emplace_back(primary_key_col, primary_key);

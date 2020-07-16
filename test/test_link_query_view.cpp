@@ -1105,9 +1105,9 @@ TEST(LinkList_QueryOnLinkListWithNonTableOrderThroughLinkWithIndex)
     auto int_col = target->add_column(type_Int, "col1");
     target->add_search_index(int_col);
     TableRef middle = group.add_table("middle");
-    auto link_col = middle->add_column_link(type_Link, "link", *target);
+    auto link_col = middle->add_column(*target, "link");
     TableRef origin = group.add_table("origin");
-    auto list_col = origin->add_column_link(type_LinkList, "linklist", *middle);
+    auto list_col = origin->add_column_list(*middle, "linklist");
 
     auto target_obj = target->create_object().set_all(1);
 
