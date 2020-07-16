@@ -190,12 +190,12 @@ jobWrapper {
         stage('Aggregate') {
             parallel (
                 cocoa: {
-                    node('docker') {
+                    node('osx') {
                         getArchive()
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
                         }
-                        sh 'tools/build-cocoa.sh'
+                        sh 'tools/build-cocoa.sh -x'
                         archiveArtifacts('realm-core-cocoa*.tar.xz')
                         def stashName = 'cocoa'
                         stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
@@ -639,7 +639,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 30, unit: 'MINUTES') {
+                    timeout(time: 45, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}

@@ -208,9 +208,14 @@ public:
     // Create an object with specific GlobalKey - or return already existing object
     // Potential tombstone will be resurrected
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
-    // Create an object with primary key - or return already existing object
+    // Create an object with primary key. If an object with the given primary key already exists, it
+    // will be returned and did_create (if supplied) will be set to false.
     // Potential tombstone will be resurrected
-    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&& = {});
+    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&&, bool* did_create = nullptr);
+    Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr)
+    {
+        return create_object_with_primary_key(primary_key, {{}}, did_create);
+    }
     // Return key for existing object or return null key.
     ObjKey find_primary_key(Mixed value) const;
     // Return ObjKey for object identified by id. If objects does not exist, return null key

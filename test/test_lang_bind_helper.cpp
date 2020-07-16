@@ -1085,7 +1085,6 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         TableRef target = wt.add_table("target");
         target->add_column(type_Int, "value");
         auto col = origin->add_column_link(type_LinkList, "list", *target);
-        // origin->add_search_index(0);
         std::vector<ObjKey> keys;
         target->create_objects(10, keys);
 
@@ -1112,6 +1111,19 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
     auto ll2 = obj1.get_linklist(col_link); // lv2[0] -> target[2]
     CHECK_EQUAL(ll1.size(), 1);
     CHECK_EQUAL(ll2.size(), 1);
+
+    ObjKey ll1_target = ll1.get_object(0).get_key();
+    CHECK_EQUAL(ll1.find_first(ll1_target), 0);
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_table("origin")->get_object(ObjKey(0)).get_linklist(col_link).clear();
+        wt.commit();
+    }
+    rt->advance_read();
+    rt->verify();
+
+    CHECK_EQUAL(ll1.find_first(ll1_target), not_found);
 }
 
 namespace {
