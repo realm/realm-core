@@ -1,23 +1,11 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 10.0.0-beta.2 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Isses fixed by release v6.0.7 to v6.0.10
 * We would allow converting a table to embedded table in spite some objects had no links to them. ([#3729](https://github.com/realm/realm-core/issues/3729), since v6.1.0-alpha.5)
 * Fixed parsing queries with substitutions in a subquery, for example on a named linking object property. This also enables support for substitution chains. ([realm-js 2977](https://github.com/realm/realm-js/issues/2977), since the parser supported subqueries).
 * Receiving an EraseObject instruction from server would not cause any embedded objects to be erased.  ([RSYNC-128](https://jira.mongodb.org/browse/RSYNC-128), since v6.1.0-alpha.5)
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 10.0.0-beta.1 Release notes
