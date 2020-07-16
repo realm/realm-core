@@ -1,21 +1,12 @@
-# NEXT RELEASE
+# 6.0.10 Release notes
 
 ### Enhancements
-* None.
+* Upgrade process made more robust. Some progran crashes with assertion failure may be avoided.
 
 ### Fixed
 * Re-enable compilation using SSE (since v6.0.7)
-* Risk of aborting from Table::migrate_indexes() reduced.
 * Improved error messages when top ref is invalid.
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.0.9 Release notes
