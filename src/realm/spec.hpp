@@ -63,6 +63,8 @@ public:
 
     // Column Attributes
     ColumnAttrMask get_column_attr(size_t column_ndx) const noexcept;
+    void set_value_type(size_t column_ndx, DataType value_type);
+    DataType get_value_type(size_t column_ndx) const;
 
     // Auto Enumerated string columns
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref);
@@ -232,7 +234,19 @@ inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
 inline ColumnAttrMask Spec::get_column_attr(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
-    return ColumnAttrMask(m_attr.get(ndx));
+    return ColumnAttrMask(m_attr.get(ndx) & 0xFF);
+}
+
+inline void Spec::set_value_type(size_t ndx, DataType value_type)
+{
+    ColumnAttrMask attr = get_column_attr(ndx);
+    m_attr.set(ndx, attr.m_value | (int64_t(value_type) << 8));
+}
+
+inline DataType Spec::get_value_type(size_t ndx) const
+{
+    REALM_ASSERT(ndx < get_column_count());
+    return DataType(m_attr.get(ndx) >> 8);
 }
 
 inline void Spec::set_column_attr(size_t column_ndx, ColumnAttrMask attr)

@@ -430,6 +430,8 @@ struct AddColumn : TableInstruction {
 
     // `none` for Mixed columns. Mixed columns are always nullable.
     Payload::Type type;
+    // `none` for other than dictionary columns
+    Payload::Type value_type;
 
     bool nullable;
 
@@ -443,7 +445,7 @@ struct AddColumn : TableInstruction {
     bool operator==(const AddColumn& rhs) const noexcept
     {
         return TableInstruction::operator==(rhs) && field == rhs.field && type == rhs.type &&
-               nullable == rhs.nullable && collection_type == rhs.collection_type &&
+               value_type == rhs.value_type && nullable == rhs.nullable && collection_type == rhs.collection_type &&
                link_target_table == rhs.link_target_table;
     }
 };

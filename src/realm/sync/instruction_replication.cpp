@@ -331,23 +331,28 @@ void SyncReplication::rename_group_level_table(TableKey, StringData)
     unsupported_instruction();
 }
 
-void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType type, StringData name,
+void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType type, StringData name,
                                     Table* target_table)
 {
-    TrivialReplication::insert_column(table, col_ndx, type, name, target_table);
+    TrivialReplication::insert_column(table, col_key, type, name, target_table);
 
     if (select_table(*table)) {
         Instruction::AddColumn instr;
         instr.table = m_last_class_name;
         instr.field = m_encoder.intern_string(name);
-        instr.nullable = col_ndx.is_nullable();
+        instr.nullable = col_key.is_nullable();
         instr.type = get_payload_type(type);
         instr.collection_type = Instruction::AddColumn::CollectionType::Single;
-        if (col_ndx.is_list()) {
+        if (col_key.is_list()) {
             instr.collection_type = Instruction::AddColumn::CollectionType::List;
         }
-        if (col_ndx.is_dictionary()) {
+        if (col_key.is_dictionary()) {
             instr.collection_type = Instruction::AddColumn::CollectionType::Dictionary;
+            auto value_type = table->get_dictionary_value_type(col_key);
+            instr.value_type = get_payload_type(value_type);
+        }
+        else {
+            instr.value_type = Instruction::Payload::Type::Null;
         }
 
         // Mixed columns are always nullable.

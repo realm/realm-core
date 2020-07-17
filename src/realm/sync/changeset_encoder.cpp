@@ -165,6 +165,9 @@ void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
     if (instr.type == Instruction::Payload::Type::Link) {
         append_value(instr.link_target_table);
     }
+    if (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
+        append_value(instr.value_type);
+    }
 }
 
 void ChangesetEncoder::operator()(const Instruction::EraseColumn& instr)

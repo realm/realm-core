@@ -70,6 +70,11 @@ size_t Dictionary::size() const
     return m_clusters->size();
 }
 
+DataType Dictionary::get_value_data_type() const
+{
+    return m_obj.get_table()->get_dictionary_value_type(m_col_key);
+}
+
 bool Dictionary::is_null(size_t ndx) const
 {
     return get_any(ndx).is_null();

@@ -386,13 +386,13 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     }
 }
 
-ColKey Table::add_column_dictionary(DataType type, StringData name)
+ColKey Table::add_column_dictionary(DataType type, StringData name, DataType value_type)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link); // Throws
+    return do_insert_column(col_key, type, name, invalid_link, value_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -565,9 +565,10 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table)
+ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
+                               DataType value_type)
 {
-    col_key = do_insert_root_column(col_key, ColumnType(type), name); // Throws
+    col_key = do_insert_root_column(col_key, ColumnType(type), name, value_type); // Throws
 
     // When the inserted column is a link-type column, we must also add a
     // backlink column to the target table.
@@ -837,7 +838,7 @@ void Table::erase_root_column(ColKey col_key)
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, DataType value_type)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
@@ -850,6 +851,9 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
     }
 
     m_spec.insert_column(spec_ndx, col_key, type, name, col_key.get_attrs().m_value); // Throws
+    if (col_key.is_dictionary()) {
+        m_spec.set_value_type(spec_ndx, value_type);
+    }
     auto col_ndx = col_key.get_index().val;
     build_column_mapping();
     REALM_ASSERT(col_ndx <= m_index_refs.size());

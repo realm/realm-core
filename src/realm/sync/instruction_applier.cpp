@@ -436,9 +436,11 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
             case Instruction::AddColumn::CollectionType::List:
                 table->add_column_list(type, col_name, instr.nullable);
                 break;
-            case Instruction::AddColumn::CollectionType::Dictionary:
-                table->add_column_dictionary(type, col_name);
+            case Instruction::AddColumn::CollectionType::Dictionary: {
+                DataType value_type = (instr.value_type == Type::Null) ? type_Mixed : get_data_type(instr.value_type);
+                table->add_column_dictionary(type, col_name, value_type);
                 break;
+            }
             case Instruction::AddColumn::CollectionType::Set:
                 // table->add_column_set(type, col_name);
                 break;
