@@ -80,13 +80,17 @@ elif [ "${OS}" == "macos" ]; then
 		    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
 	SDK="macosx"
 
-    function configure_xcode {
-        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
+    function configure_xcode_for_mac {
+        cmake -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/${OS}.toolchain.cmake" \
               -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
               -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
               -D REALM_NO_TESTS=1 \
               -D REALM_VERSION="${VERSION}" \
               -D CPACK_SYSTEM_NAME="${SDK}" \
+              -D CMAKE_XCODE_ARCHS="x86_64" \
+              -В CMAKE_OSX_ARCHITECTURES="x86_64" \
+              --verbose \
+              --clean-first \
               ${CMAKE_FLAGS} \
               -G Xcode ..
     }
@@ -94,12 +98,14 @@ elif [ "${OS}" == "macos" ]; then
     mkdir -p "build-${OS}-${BUILD_TYPE}"
     cd "build-${OS}-${BUILD_TYPE}" || exit 1
 
-    configure_xcode
+    mkdir -p "src/realm/${BUILD_TYPE}"
+    mkdir -p "src/realm/parser/${BUILD_TYPE}"
+
+    configure_xcode_for_mac
     xcodebuild -sdk "${SDK}" \
                -configuration "${BUILD_TYPE}" \
-               ONLY_ACTIVE_ARCH=NO
-    # mkdir -p "src/realm/${BUILD_TYPE}"
-    # mkdir -p "src/realm/parser/${BUILD_TYPE}"
+               ONLY_ACTIVE_ARCH=NO \
+               -UseModernBuildSystem=YES
 else
     case "${OS}" in
         ios) SDK="iphone";;
