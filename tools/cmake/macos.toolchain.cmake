@@ -10,12 +10,12 @@ set(CMAKE_INSTALL_LIBDIR "lib")
 # set(CMAKE_OSX_ARCHITECTURES "x86_64 arm64") # This should work
 #  error: /Users/py/Downloads/Xcode-beta_macs.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool: can't open file: /Users/py/Documents/GitHub/armmac/realm-core/build-macos-Release/src/realm/RealmCore.build/Release/CoreObjects.build/Objects-normal/x86_64 arm64/interprocess_mutex.o (No such file or directory)
 #
-set(CMAKE_OSX_ARCHITECTURES "x86_64") # This should work
+set(CMAKE_OSX_ARCHITECTURES "x86_64; arm64") # This should work
 
 set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "macosx")
 set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-macosx")
-set(CMAKE_XCODE_ATTRIBUTE_ARCHS "x86_64")
-set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS "x86_64")
+set(CMAKE_XCODE_ATTRIBUTE_ARCHS "x86_64 arm64")
+set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS "x86_64 arm64")
 # set(CMAKE_XCODE_ATTRIBUTE_ARCHS "arm64")
 # set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS "arm64")
 # set(CMAKE_XCODE_ATTRIBUTE_ARCHS $(ARCHS_STANDARD))
