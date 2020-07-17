@@ -20,6 +20,7 @@
 #include <external/json/json.hpp>
 #include <stack>
 #include <algorithm>
+#include <sstream>
 
 namespace realm {
 namespace bson {
@@ -374,7 +375,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         }
         case Bson::Type::String:
-            out << '"' << static_cast<std::string>(b) << '"';
+            out << nlohmann::json(b.operator const std::string&()).dump();
             break;
         case Bson::Type::Binary: {
             const std::vector<char>& vec = static_cast<std::vector<char>>(b);
@@ -435,27 +436,38 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         case Bson::Type::Document: {
             const BsonDocument& doc = static_cast<BsonDocument>(b);
             out << "{";
+            bool first = true;
             for (auto const& pair : doc) {
-                out << '"' << pair.first << "\":" << pair.second << ",";
+                if (!first)
+                    out << ',';
+                first = false;
+                out << nlohmann::json(pair.first).dump() << ':' << pair.second;
             }
-            if (doc.size())
-                out.seekp(-1, std::ios_base::end);
             out << "}";
             break;
         }
         case Bson::Type::Array: {
             const BsonArray& arr = static_cast<BsonArray>(b);
             out << "[";
+            bool first = true;
             for (auto const& b : arr) {
-                out << b << ",";
+                if (!first)
+                    out << ',';
+                first = false;
+                out << b;
             }
-            if (arr.size())
-                out.seekp(-1, std::ios_base::end);
             out << "]";
             break;
         }
     }
     return out;
+}
+
+std::string Bson::toJson() const
+{
+    std::stringstream s;
+    s << *this;
+    return s.str();
 }
 
 namespace {
@@ -704,7 +716,7 @@ Bson dom_obj_to_bson(const Json& json)
 
 } // anonymous namespace
 
-Bson parse(const std::string& json)
+Bson parse(const std::string_view& json)
 {
     return dom_elem_to_bson(Json::parse(json));
 }

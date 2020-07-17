@@ -23,6 +23,12 @@
 #include <string>
 
 namespace realm {
+namespace bson {
+class Bson;
+template <typename>
+class IndexedMap;
+using BsonDocument = IndexedMap<Bson>;
+} // namespace bson
 namespace app {
 
 typedef std::string IdentityProvider;
@@ -95,7 +101,7 @@ struct AppCredentials {
 
     // Construct and return credentials with the payload.
     // The payload is a MongoDB document as json
-    static AppCredentials function(std::string payload_json);
+    static AppCredentials function(const bson::BsonDocument& payload);
 
     // Construct and return credentials with the user api key.
     static AppCredentials user_api_key(std::string api_key);
