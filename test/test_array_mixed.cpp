@@ -83,6 +83,7 @@ TEST(ArrayMixed_Basics)
     CHECK_EQUAL(arr.get(7).get_timestamp(), Timestamp(1234, 5678));
     CHECK(arr.is_null(8));
     CHECK(arr.get(8).is_null());
+    CHECK_EQUAL(arr.get(8).get_timestamp(), Timestamp());
     CHECK_EQUAL(arr.get(9).get_timestamp(), Timestamp(2345, 6789));
 
     CHECK_NOT(arr.get(4) == arr.get(5));
@@ -104,6 +105,7 @@ TEST(ArrayMixed_Basics)
     CHECK(arr.is_null(3));
 
     arr.set(8, Mixed()); // null replaces Timestamp
+    CHECK_EQUAL(arr.get(8).get_timestamp(), Timestamp());
     CHECK_EQUAL(arr.get(10).get_timestamp(), Timestamp(2345, 6789));
 
     arr.set(4, 123.456); // double replaces float
