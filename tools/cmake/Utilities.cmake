@@ -74,4 +74,15 @@ macro(install_arch_slices_for_platform _platform)
             DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-parser-${_platform}-simulator${BUILD_SUFFIX}.a
             COMPONENT devel
     )
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/src/realm/sync/${CMAKE_BUILD_TYPE}-${_platform}os/librealm-sync${BUILD_SUFFIX}.a
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-sync-${_platform}-device${BUILD_SUFFIX}.a
+            COMPONENT devel
+    )
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/src/realm/sync/${CMAKE_BUILD_TYPE}-${_platform}simulator/librealm-sync${BUILD_SUFFIX}.a
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-sync-${_platform}-simulator${BUILD_SUFFIX}.a
+            COMPONENT devel
+    )
+
 endmacro()

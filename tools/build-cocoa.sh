@@ -88,6 +88,8 @@ for bt in "${BUILD_TYPES[@]}"; do
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
         tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
         mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${p}${suffix}.a"
+
+        # package up fat libs for all platforms
         tar -C core -zxvf "${filename}" "lib/librealm-sync${suffix}.a"
         libtool -static -o core/librealm-${p}${suffix}.a \
             core/librealm-${p}${suffix}.a \
@@ -108,6 +110,17 @@ for bt in "${BUILD_TYPES[@]}"; do
             mv "core/lib/librealm-${SDK}-simulator${suffix}.a" "core/librealm-${SDK}-simulator${suffix}.a"
             tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}-simulator${suffix}.a"
             mv "core/lib/librealm-parser-${SDK}-simulator${suffix}.a" "core/librealm-parser-${SDK}-simulator${suffix}.a"
+
+            # FIXME: This is just copied from Sync repo. Should be adjusted
+            tar -C core -zxvf "${package}" "lib/librealm-sync-${SDK}-device${suffix}.a"
+            libtool -static -o core/librealm-sync-${SDK}-device${suffix}.a \
+                core/librealm-${SDK}-device${suffix}.a \
+                core/lib/librealm-sync-${SDK}-device${suffix}.a
+            rm -rf core/lib
+            tar -C core -zxvf "${package}" "lib/librealm-sync-${SDK}-simulator${suffix}.a"
+            libtool -static -o core/librealm-sync-${SDK}-simulator${suffix}.a \
+                core/librealm-${SDK}-simulator${suffix}.a \
+                core/lib/librealm-sync-${SDK}-simulator${suffix}.a
         fi
         rm -rf core/lib
     done
@@ -146,10 +159,23 @@ if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
+
+    if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+        rm -rf "${DESTINATION}/realm-sync.xcframework"
+        cp -Rc realm-sync.xcframework "${DESTINATION}"
+        rm -rf "${DESTINATION}/realm-sync-dbg.xcframework"
+        cp -Rc realm-sync-dbg.xcframework "${DESTINATION}"
+    fi
 else
     rm -f "realm-core-cocoa-${VERSION}.tar.xz"
     # .tar.gz package is used by realm-js, which uses the parser
     tar -czvf "realm-core-cocoa-${VERSION}.tar.gz" core
     # .tar.xz package is used by cocoa, which doesn't use the parser
     tar -cJvf "realm-core-cocoa-${VERSION}.tar.xz" --exclude 'librealm-parser*' core
+
+    if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+        rm -f "realm-sync-xcframework-${VERSION}.tar.xz"
+        # until realmjs requires an xcframework, only package as .xz
+        tar -cJvf "realm-sync-xcframework-${VERSION}.tar.xz" realm-sync.xcframework realm-sync-dbg.xcframework
+    fi
 fi

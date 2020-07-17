@@ -77,7 +77,7 @@ inline auto TimestampFormatter::format(std::chrono::time_point<B> time) -> strin
         --time_2;
         time_3 = clock_type::from_time_t(time_2);
     }
-    long nanoseconds = int(std::chrono::duration_cast<std::chrono::nanoseconds>(time - time_3).count());
+    long nanoseconds = long(std::chrono::duration_cast<std::chrono::nanoseconds>(time - time_3).count());
     REALM_ASSERT(nanoseconds >= 0 && nanoseconds < 1000000000);
     return format(time_2, nanoseconds); // Throws
 }
