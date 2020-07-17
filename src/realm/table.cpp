@@ -2400,10 +2400,10 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, bool* did_cr
         // Check for collision
         if (is_valid(object_key)) {
             Obj existing_obj = get_object(object_key);
-            StringData existing_pk_value = existing_obj.get<String>(primary_key_col);
+            Mixed existing_pk_value{existing_obj.get<String>(primary_key_col)};
 
             // It may just be the same object
-            if (existing_pk_value == primary_key.get_string()) {
+            if (existing_pk_value == primary_key) {
                 return existing_obj;
             }
 
