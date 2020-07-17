@@ -361,8 +361,8 @@ inline double Mixed::get_double() const
 template <>
 inline StringData Mixed::get<StringData>() const noexcept
 {
-    REALM_ASSERT(is_null() || get_type() == type_String);
-    return is_null() ? StringData() : StringData(str_val, ushort_val);
+    REALM_ASSERT(get_type() == type_String);
+    return StringData(str_val, ushort_val);
 }
 
 inline StringData Mixed::get_string() const
@@ -373,8 +373,8 @@ inline StringData Mixed::get_string() const
 template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
-    REALM_ASSERT(is_null() || get_type() == type_Binary);
-    return is_null() ? BinaryData() : BinaryData(str_val, ushort_val);
+    REALM_ASSERT(get_type() == type_Binary);
+    return BinaryData(str_val, ushort_val);
 }
 
 inline BinaryData Mixed::get_binary() const
@@ -385,8 +385,8 @@ inline BinaryData Mixed::get_binary() const
 template <>
 inline Timestamp Mixed::get<Timestamp>() const noexcept
 {
-    REALM_ASSERT(is_null() || get_type() == type_Timestamp);
-    return is_null() ? Timestamp() : Timestamp(int_val, short_val);
+    REALM_ASSERT(get_type() == type_Timestamp);
+    return Timestamp(int_val, short_val);
 }
 
 inline Timestamp Mixed::get_timestamp() const
@@ -397,8 +397,8 @@ inline Timestamp Mixed::get_timestamp() const
 template <>
 inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
-    REALM_ASSERT(is_null() || get_type() == type_Link);
-    return is_null() ? ObjKey() : ObjKey(int_val);
+    REALM_ASSERT(get_type() == type_Link);
+    return ObjKey(int_val);
 }
 
 inline bool Mixed::is_null() const
