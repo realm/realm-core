@@ -1,19 +1,7 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.11 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Table::create_object_with_primary_key(null) would hit an assertion failure when the primary key type is a string and the object already existed.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
