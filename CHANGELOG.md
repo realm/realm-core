@@ -1,20 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.12 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix upgrade bug. Could cause assertions like "Assertion failed: ref != 0" during opning of a realm. ([#6644](https://github.com/realm/realm-cocoa/issues/6644), since V6.0.7)
 * A use-after-free would occur if a Realm was compacted, opened on multiple threads prior to the first write, then written to while reads were happening on other threads. This could result in a variety of crashes, often inside realm::util::EncryptedFileMapping::read_barrier. (Since v6.0.0, [Cocoa #6652](https://github.com/realm/realm-cocoa/issues/6652), [Cocoa #6628](https://github.com/realm/realm-cocoa/issues/6628), [Cocoa #6655](https://github.com/realm/realm-cocoa/issues/6555)).
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
