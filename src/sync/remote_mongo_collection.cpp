@@ -507,9 +507,12 @@ void WatchStream::feed_sse(ServerSentEvent sse) {
         size_t start = 0;
         while (true) {
             auto percent = start == 0 ? first_percent : sse.data.find('%', start);
-            buffer += sse.data.substr(start, percent - start);
-            if (percent == std::string::npos)
+            if (percent == std::string::npos) {
+                buffer += sse.data.substr(start);
                 break;
+            }
+
+            buffer += sse.data.substr(start, percent - start);
 
             auto encoded = sse.data.substr(percent, 3); // may be smaller than 3 if string ends with %
             if (encoded == "%25") {
