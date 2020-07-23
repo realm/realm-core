@@ -112,10 +112,10 @@ if [[ -n $BUILD_XCFRAMEWORK ]]; then
         for p in "${PLATFORMS[@]}"; do
             if [[ "$p" == "macosx" ]]; then
                 build_dir="core/librealm-macosx${suffix}.a"
-                make_core_xcframework+=( -library "${build_dir}")
+                make_core_xcframework+=( -library "${build_dir}" -headers core/include)
             elif [[ "$p" == "maccatalyst" ]]; then
                 build_dir="core/librealm-maccatalyst${suffix}.a"
-                make_core_xcframework+=( -library "${build_dir}")
+                make_core_xcframework+=( -library "${build_dir}" -headers core/include)
             else
                 build_dir="core/librealm-${p}${suffix}.a"
                 output_prefix="xcf-tmp/librealm-${p}${suffix}"
@@ -130,11 +130,10 @@ if [[ -n $BUILD_XCFRAMEWORK ]]; then
                 done
                 extract_slices "$build_dir" "${output_prefix}-device.a" "$device"
                 extract_slices "$build_dir" "${output_prefix}-simulator.a" "$simulator"
-                make_core_xcframework+=( -library "${output_prefix}-device.a")
-                make_core_xcframework+=( -library "${output_prefix}-simulator.a")
+                make_core_xcframework+=( -library "${output_prefix}-device.a" -headers core/include)
+                make_core_xcframework+=( -library "${output_prefix}-simulator.a" -headers core/include)
             fi
         done
-        make_core_xcframework+=( -headers core/include)
         xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
         rm -rf xcf-tmp
     done
