@@ -110,28 +110,30 @@ if [[ -n $BUILD_XCFRAMEWORK ]]; then
         rm -rf xcf-tmp
         mkdir xcf-tmp
         for p in "${PLATFORMS[@]}"; do
-            if [[ "$p" == "macosx" ]]; then
-                build_dir="core/librealm-macosx${suffix}.a"
-                make_core_xcframework+=( -library "${build_dir}" -headers core/include)
-            elif [[ "$p" == "maccatalyst" ]]; then
-                build_dir="core/librealm-maccatalyst${suffix}.a"
-                make_core_xcframework+=( -library "${build_dir}" -headers core/include)
+            source_lib="core/librealm-${p}${suffix}.a"
+            if [[ "$p" == "macosx" || "$p" == "maccatalyst" ]]; then
+                mkdir "xcf-tmp/$p${suffix}"
+                ln "$source_lib" "xcf-tmp/$p${suffix}/librealm.a"
+                make_core_xcframework+=( -library xcf-tmp/$p${suffix}/librealm.a -headers core/include)
             else
-                build_dir="core/librealm-${p}${suffix}.a"
-                output_prefix="xcf-tmp/librealm-${p}${suffix}"
+                sim_lib_dir="xcf-tmp/${p}${suffix}-simulator"
+                device_lib_dir="xcf-tmp/${p}${suffix}-device"
+                mkdir "$sim_lib_dir"
+                mkdir "$device_lib_dir"
+
                 device=''
                 simulator=''
-                for arch in $(lipo -archs "$build_dir"); do
+                for arch in $(lipo -archs "$source_lib"); do
                     if [[ "$arch" == arm* ]]; then
                         device+="-extract $arch "
                     else
                         simulator+="-extract $arch "
                     fi
                 done
-                extract_slices "$build_dir" "${output_prefix}-device.a" "$device"
-                extract_slices "$build_dir" "${output_prefix}-simulator.a" "$simulator"
-                make_core_xcframework+=( -library "${output_prefix}-device.a" -headers core/include)
-                make_core_xcframework+=( -library "${output_prefix}-simulator.a" -headers core/include)
+                extract_slices "$source_lib" "${device_lib_dir}/librealm.a" "$device"
+                extract_slices "$source_lib" "${sim_lib_dir}/librealm.a" "$simulator"
+                make_core_xcframework+=( -library "${device_lib_dir}/librealm.a" -headers core/include)
+                make_core_xcframework+=( -library "${sim_lib_dir}/librealm.a" -headers core/include)
             fi
         done
         xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
