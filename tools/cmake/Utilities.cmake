@@ -49,29 +49,3 @@ macro(set_target_xcode_attributes _target)
     )
 endmacro()
 
-include(GNUInstallDirs)
-macro(install_arch_slices_for_platform _platform)
-    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-        set(BUILD_SUFFIX "-dbg")
-    endif()
-    # Device builds will contain '-device' so it does not collide with the fat libs
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/src/realm/${CMAKE_BUILD_TYPE}-${_platform}os/librealm${BUILD_SUFFIX}.a
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-${_platform}-device${BUILD_SUFFIX}.a
-            COMPONENT devel
-    )
-
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/src/realm/${CMAKE_BUILD_TYPE}-${_platform}simulator/librealm${BUILD_SUFFIX}.a
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-${_platform}-simulator${BUILD_SUFFIX}.a
-            COMPONENT devel
-    )
-
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/src/realm/parser/${CMAKE_BUILD_TYPE}-${_platform}os/librealm-parser${BUILD_SUFFIX}.a
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-parser-${_platform}-device${BUILD_SUFFIX}.a
-            COMPONENT devel
-    )
-
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/src/realm/parser/${CMAKE_BUILD_TYPE}-${_platform}simulator/librealm-parser${BUILD_SUFFIX}.a
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/ RENAME librealm-parser-${_platform}-simulator${BUILD_SUFFIX}.a
-            COMPONENT devel
-    )
-endmacro()

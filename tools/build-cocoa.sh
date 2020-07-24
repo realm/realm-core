@@ -55,7 +55,7 @@ function build_macos {
     )
 }
 
-if [[ ! -z $BUILD ]]; then
+if [[ -n $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
         build_macos macosx "$bt"
     done
@@ -65,7 +65,7 @@ if [[ ! -z $BUILD ]]; then
         done
         for os in ios watchos tvos; do
             for bt in "${BUILD_TYPES[@]}"; do
-                tools/cross_compile.sh -o $os -t $bt -v $(git describe) -f "${CMAKE_FLAGS}"
+                tools/cross_compile.sh -o "$os" -t "$bt" -v "$(git describe)" -f "${CMAKE_FLAGS}"
             done
         done
     fi
@@ -85,57 +85,64 @@ for bt in "${BUILD_TYPES[@]}"; do
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
         tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
         mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${p}${suffix}.a"
-
-        # extract arch slices for iOS, Watch, TV
-        if [[ "$p" != "macosx" && "$p" != "maccatalyst" ]]; then
-            case "${p}" in
-                ios) SDK="iphone";;
-                watchos) SDK="watch";;
-                tvos) SDK="appletv";;
-            esac
-            tar -C core -zxvf "${filename}" "lib/librealm-${SDK}-device${suffix}.a"
-            mv "core/lib/librealm-${SDK}-device${suffix}.a" "core/librealm-${SDK}-device${suffix}.a"
-            tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}-device${suffix}.a"
-            mv "core/lib/librealm-parser-${SDK}-device${suffix}.a" "core/librealm-parser-${SDK}-device${suffix}.a"
-            tar -C core -zxvf "${filename}" "lib/librealm-${SDK}-simulator${suffix}.a"
-            mv "core/lib/librealm-${SDK}-simulator${suffix}.a" "core/librealm-${SDK}-simulator${suffix}.a"
-            tar -C core -zxvf "${filename}" "lib/librealm-parser-${SDK}-simulator${suffix}.a"
-            mv "core/lib/librealm-parser-${SDK}-simulator${suffix}.a" "core/librealm-parser-${SDK}-simulator${suffix}.a"
-        fi
-        rm -rf core/lib
     done
 done
 
+function extract_slices {
+    local input="$1"
+    local output="$2"
+    local archs="$3"
+
+    # create-xcframework does not like fat libraries with a single arch but
+    # also doesn't like two thin libraries for one platform, so we have to
+    # create different types of libraries depending on the arch count
+    if [ $(wc -w <<< "$archs") == 2 ]; then
+        archs=$(sed 's/extract/thin/' <<< "$archs")
+    fi
+    lipo $archs -output "$output" "$input"
+}
+
 # Produce xcframeworks
-if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+if [[ -n $BUILD_XCFRAMEWORK ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
         make_core_xcframework=()
         [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
+        rm -rf xcf-tmp
+        mkdir xcf-tmp
         for p in "${PLATFORMS[@]}"; do
-            if [[ "$p" == "macosx" ]]; then
-                build_dir="core/librealm-macosx${suffix}.a"
-                make_core_xcframework+=( -library ${build_dir} -headers core/include/)
-            elif [[ "$p" == "maccatalyst" ]]; then
-                build_dir="core/librealm-maccatalyst${suffix}.a"
-                make_core_xcframework+=( -library ${build_dir} -headers core/include/)
+            source_lib="core/librealm-${p}${suffix}.a"
+            if [[ "$p" == "macosx" || "$p" == "maccatalyst" ]]; then
+                mkdir "xcf-tmp/$p${suffix}"
+                ln "$source_lib" "xcf-tmp/$p${suffix}/librealm.a"
+                make_core_xcframework+=( -library xcf-tmp/$p${suffix}/librealm.a -headers core/include)
             else
-                case "${p}" in
-                    ios) SDK="iphone";;
-                    watchos) SDK="watch";;
-                    tvos) SDK="appletv";;
-                esac
-                build_dir_device="core/librealm-${SDK}-device${suffix}.a"
-                build_dir_simulator="core/librealm-${SDK}-simulator${suffix}.a"
-                make_core_xcframework+=( -library ${build_dir_device} -headers core/include/)
-                make_core_xcframework+=( -library ${build_dir_simulator} -headers core/include/)
+                sim_lib_dir="xcf-tmp/${p}${suffix}-simulator"
+                device_lib_dir="xcf-tmp/${p}${suffix}-device"
+                mkdir "$sim_lib_dir"
+                mkdir "$device_lib_dir"
+
+                device=''
+                simulator=''
+                for arch in $(lipo -archs "$source_lib"); do
+                    if [[ "$arch" == arm* ]]; then
+                        device+="-extract $arch "
+                    else
+                        simulator+="-extract $arch "
+                    fi
+                done
+                extract_slices "$source_lib" "${device_lib_dir}/librealm.a" "$device"
+                extract_slices "$source_lib" "${sim_lib_dir}/librealm.a" "$simulator"
+                make_core_xcframework+=( -library "${device_lib_dir}/librealm.a" -headers core/include)
+                make_core_xcframework+=( -library "${sim_lib_dir}/librealm.a" -headers core/include)
             fi
         done
         xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
+        rm -rf xcf-tmp
     done
 fi
 
 # Package artifacts
-if [[ ! -z $COPY ]]; then
+if [[ -n $COPY ]]; then
     rm -rf "${DESTINATION}/core"
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
