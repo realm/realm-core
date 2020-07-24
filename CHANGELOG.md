@@ -1,19 +1,7 @@
-# NEXT RELEASE
+# 6.0.13 Release notes
 
 ### Enhancements
 * Add support for the 64-bit watchOS simulator.
-
-### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
