@@ -10,7 +10,7 @@ function usage {
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
-    echo "   target_os=<android|ios|watchos|tvos|macos>"
+    echo "   target_os=<android|ios|watchos|tvos>"
     echo "   android_abi=<armeabi-v7a|x86|x86_64|arm64-v8a>"
     exit 1;
 }
@@ -23,8 +23,7 @@ while getopts ":o:a:t:v:f:" opt; do
             [ "${OS}" == "android" ] ||
             [ "${OS}" == "ios" ] ||
             [ "${OS}" == "watchos" ] ||
-            [ "${OS}" == "tvos" ] ||
-            [ "${OS}" == "macos" ] || usage
+            [ "${OS}" == "tvos" ] || usage
             ;;
         a)
             ARCH=${OPTARG}
@@ -76,36 +75,6 @@ if [ "${OS}" == "android" ]; then
 
     ninja -v
     ninja package
-elif [ "${OS}" == "macos" ]; then 
-		    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
-	SDK="macosx"
-
-    function configure_xcode_for_mac {
-        cmake -D CMAKE_TOOLCHAIN_FILE="./tools/cmake/${OS}.toolchain.cmake" \
-              -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
-              -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-              -D REALM_NO_TESTS=1 \
-              -D REALM_VERSION="${VERSION}" \
-              -D CPACK_SYSTEM_NAME="${SDK}" \
-              -D CMAKE_XCODE_ARCHS="x86_64" \
-              -В CMAKE_OSX_ARCHITECTURES="x86_64" \
-              --verbose \
-              --clean-first \
-              ${CMAKE_FLAGS} \
-              -G Xcode ..
-    }
-
-    mkdir -p "build-${OS}-${BUILD_TYPE}"
-    cd "build-${OS}-${BUILD_TYPE}" || exit 1
-
-    mkdir -p "src/realm/${BUILD_TYPE}"
-    mkdir -p "src/realm/parser/${BUILD_TYPE}"
-
-    configure_xcode_for_mac
-    xcodebuild -sdk "${SDK}" \
-               -configuration "${BUILD_TYPE}" \
-               ONLY_ACTIVE_ARCH=NO \
-               -UseModernBuildSystem=YES
 else
     case "${OS}" in
         ios) SDK="iphone";;
@@ -137,13 +106,13 @@ else
                ONLY_ACTIVE_ARCH=NO
     mkdir -p "src/realm/${BUILD_TYPE}"
     mkdir -p "src/realm/parser/${BUILD_TYPE}"
-    lipo -create \
-         -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
-    lipo -create \
-         -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
-         "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
-         "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+
+    ../tools/mergeLibs.sh "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
+                    "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
+                    "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
+    ../tools/mergeLibs.sh "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
+                    "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
+                    "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+
     cpack -C "${BUILD_TYPE}" || exit 1
 fi
