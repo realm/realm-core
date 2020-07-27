@@ -120,6 +120,14 @@ else
     mkdir -p "src/realm/${BUILD_TYPE}"
     mkdir -p "src/realm/parser/${BUILD_TYPE}"
 
+    isArm64Available=$(lipo "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" -verify_arch arm64)
+    if [[ $isArm64Available -eq 0 ]]; then
+        lipo "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" -output "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" -remove arm64
+    fi
+    if [[ $isArm64Available -eq 0 ]]; then
+        lipo "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a" -output "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a" -remove arm64
+    fi
+
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
