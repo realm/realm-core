@@ -71,6 +71,16 @@ const char* type_to_str<Link>()
 {
     return "Link";
 }
+template <>
+const char* type_to_str<ObjectId>()
+{
+    return "ObjectId";
+}
+template <>
+const char* type_to_str<Decimal128>()
+{
+    return "Decimal128";
+}
 
 const char* data_type_to_str(DataType type)
 {
@@ -91,6 +101,10 @@ const char* data_type_to_str(DataType type)
             return "DateTime";
         case type_Timestamp:
             return "Timestamp";
+        case type_Decimal:
+            return "Decimal";
+        case type_ObjectId:
+            return "ObjectId";
         case type_OldTable:
             return "Table";
         case type_OldMixed:
@@ -128,22 +142,20 @@ const char* collection_operator_to_str(parser::Expression::KeyPathOp op)
     return "";
 }
 
-const char* comparison_type_to_str(parser::Predicate::ComparisonType type)
+const char* comparison_type_to_str(parser::Expression::ComparisonType type)
 {
     switch (type) {
-        case parser::Predicate::ComparisonType::Unspecified:
+        case parser::Expression::ComparisonType::Unspecified:
             return "";
-        case parser::Predicate::ComparisonType::All:
+        case parser::Expression::ComparisonType::All:
             return "ALL";
-        case parser::Predicate::ComparisonType::None:
+        case parser::Expression::ComparisonType::None:
             return "NONE";
-        case parser::Predicate::ComparisonType::Any:
+        case parser::Expression::ComparisonType::Any:
             return "ANY";
     }
     return "";
 }
-
-using KeyPath = std::vector<std::string>;
 
 KeyPath key_path_from_string(const std::string &s) {
     std::stringstream ss(s);

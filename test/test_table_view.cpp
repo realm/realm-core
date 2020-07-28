@@ -559,7 +559,9 @@ TEST(TableView_Distinct_Follows_Changes)
         table.create_object().set_all(i, "Foo");
     }
 
-    TableView distinct_ints = table.get_distinct_view(col_int);
+    DescriptorOrdering order;
+    order.append_distinct(DistinctDescriptor({{col_int}}));
+    TableView distinct_ints = table.where().find_all(order);
     CHECK_EQUAL(5, distinct_ints.size());
     CHECK(distinct_ints.is_in_sync());
 
@@ -1650,9 +1652,6 @@ TEST(TableView_IsInTableOrder)
     auto ll = src_obj.get_linklist_ptr(col_link);
     tv = ll->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
-
-    tv = target->get_distinct_view(col_id);
-    CHECK_EQUAL(true, tv.is_in_table_order());
 
     // … unless sorted.
     tv = target->get_sorted_view(col_id);
@@ -2799,15 +2798,23 @@ TEST(TableView_SortNull)
     auto col_double = table.add_column(type_Double, "double", true);
     auto col_str = table.add_column(type_String, "string", true);
     auto col_date = table.add_column(type_Timestamp, "date", true);
+    auto col_oid = table.add_column(type_ObjectId, "oid", true);
+    auto col_decimal = table.add_column(type_Decimal, "decimal", true);
+    auto col_int2 = table.add_column(type_Int, "int2", true);
 
     std::vector<ObjKey> keys;
-    auto k = table.create_object().set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1)).get_key();
+    auto k = table.create_object()
+                 .set_all(1, false, 1.0f, 1.0, "1", Timestamp(1, 1), ObjectId("000000000000000000000001"),
+                          Decimal128("1"), 1)
+                 .get_key();
     keys.push_back(k);
     auto all_cols = table.get_column_keys();
     int i = 0;
     for (auto col : all_cols) {
         Obj o = table.create_object();
-        o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i));
+        std::string oid_init = "00000000000000000000000" + util::to_string(i);
+        o.set_all(int64_t(i), false, float(i), double(i), util::to_string(i), Timestamp(i, i),
+                  ObjectId(oid_init.c_str()), Decimal128(i), 1);
         // Set one field to Null. This element must come first when sorting by this column
         o.set_null(col);
         keys.push_back(o.get_key());
@@ -2832,6 +2839,12 @@ TEST(TableView_SortNull)
     CHECK_EQUAL(tv.get_object(0).get_key(), keys[5]);
     tv.sort(col_date);
     CHECK_EQUAL(tv.get_object(0).get_key(), keys[6]);
+    tv.sort(col_oid);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[7]);
+    tv.sort(col_decimal);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[8]);
+    tv.sort(col_int2);
+    CHECK_EQUAL(tv.get_object(0).get_key(), keys[9]);
 }
 
 // Verify that copy-constructed and copy-assigned TableViews work normally.

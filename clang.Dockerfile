@@ -10,7 +10,6 @@ RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
 RUN apt-get update \
     && apt-get install -y \
        libprocps-dev \
-       libssl-dev \
        ninja-build \
        git \
        gnupg \

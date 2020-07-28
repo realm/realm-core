@@ -1,3 +1,259 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Isses fixed by releases v6.0.11 to v6.0.13
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 10.0.0-beta.2 Release notes
+
+### Fixed
+* Isses fixed by release v6.0.7 to v6.0.10
+* We would allow converting a table to embedded table in spite some objects had no links to them. ([#3729](https://github.com/realm/realm-core/issues/3729), since v6.1.0-alpha.5)
+* Fixed parsing queries with substitutions in a subquery, for example on a named linking object property. This also enables support for substitution chains. ([realm-js 2977](https://github.com/realm/realm-js/issues/2977), since the parser supported subqueries).
+* Receiving an EraseObject instruction from server would not cause any embedded objects to be erased.  ([RSYNC-128](https://jira.mongodb.org/browse/RSYNC-128), since v6.1.0-alpha.5)
+ 
+----------------------------------------------
+
+# 10.0.0-beta.1 Release notes
+
+### Enhancements
+* Validation errors when opening a DB now provide more information about the invalid values
+
+### Fixed
+* When opening Realms on Apple devices where the file resided on a filesystem that does not support preallocation, such as ExFAT, you may get 'Operation not supported' exception. ([cocoa-6508](https://github.com/realm/realm-cocoa/issues/6508)).
+* After upgrading of a realm file, you may at some point receive a 'NoSuchTable' exception. ([#3701](https://github.com/realm/realm-core/issues/3701), since 6.0.0)
+* If the upgrade process was interrupted/killed for various reasons, the following run could stop with some assertions failing. We don't have evidence that this has actually happened so we will not refer to any specific issue report.
+* When querying on a LnkLst where the target property over a link has an index and the LnkLst has a different order from the target table, you may get incorrect results. ([Cocoa #6540](https://github.com/realm/realm-cocoa/issues/6540), since 5.23.6.
+ 
+-----------
+
+### Internals
+* Work around an issue with MSVC in Visual Studio 2019 where Release optimizations crash the compiler because of a regression in 64bit atomic loads on 32bit Windows.
+
+----------------------------------------------
+
+# 10.0.0-alpha.9 Release notes
+
+### Fixed
+* Embedded objects would in some cases not be deleted when parent object was deleted.
+ 
+-----------
+
+### Internals
+* 'using namespace realm::util' removed from header. This means that this namespace is no longer used automatically.
+* Some unused functionality has been removed.
+
+----------------------------------------------
+
+# 10.0.0-alpha.8 Release notes
+
+### Enhancements
+
+* Add native core query support for ALL/NONE on some query expressions
+* Add query parser support for lists of primitives
+  * ANY/ALL/NONE support
+  * all existing comparison operators supported for appropriate types
+  * `.@count` (or `.@size`) for number of items in a list can be compared to other numeric expressions (numeric values or columns)
+  * a new operation `.length` (case insensitive) is supported for string and binary lists which evaluates the length of each item in the list
+* Add query parser support for keypath comparisons to null over links
+* Use the new core support for ALL/NONE queries instead of rewriting these queries as subqueries (optimizaiton)
+
+### Fixed
+* Fix an assertion failure when querying a list of primitives over a link
+* Fix serialisation of list of primitive queries
+* Fix queries of lists of nullable ObjectId, Int and Bool
+* Fix count of list of primitives with size 0
+* Fix aggregate queries of list of primitives which are nullable types
+* Throw an exception when someone tries to add a search index to a list of primitives instead of crashing
+* Changed query parser ALL/NONE support to belong to one side of a comparison instead of the entire expression, this enables support for reversing expressions (in addition to `ALL prices > 20` we now also support `20 < ALL prices`)
+
+-----------
+
+### Internals
+* Replication interface for adding tables and creating objects changed. Adaptation required in Sync.
+
+----------------------------------------------
+
+# 10.0.0-alpha.7 Release notes
+
+### Enhancements
+* Query::sum_decimal128 added.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Switch back to default off_t size so consumers don't need to define _FILE_OFFSET_BITS=64
+
+----------------------------------------------
+
+# 10.0.0-alpha.6 Release notes
+
+### Enhancements
+* Produces builds for RaspberryPi.
+
+### Fixed
+* Requirement to have a contiguous memory mapping of the entire realm file is removed. (Now fixed)
+ 
+-----------
+
+### Internals
+* Table::insert_column and Table::insert_column_link methods are removed.
+* Can now be built with MSVC 2019
+
+----------------------------------------------
+
+# 10.0.0-alpha.5 Release notes
+
+### Enhancements
+* average, min and max operations added to Decimal128 queries.
+* 'between' condition added to Decimal128 queries.
+
+### Fixed
+* Querying for a null ObjectId value over links could crash.
+* Several fixes around tombstone handling
+ 
+----------------------------------------------
+
+# 10.0.0-alpha.4 Release notes
+
+### Enhancements
+* 'old-query' support added for Decimal128 and ObjectId
+
+### Fixed
+* Previous enhancement "Requirement to have a contiguous memory mapping of the entire realm file is removed." is reverted. Caused various problems.
+* When upgrading a realm file containing a table with integer primary keys, the program could sometimes crash.
+ 
+### This release also includes the fixes contained in v5.27.9:
+* Fix a crash on startup on macOS 10.10 and 10.11. ([Cocoa #6403](https://github.com/realm/realm-cocoa/issues/6403), since 2.9.0).
+
+----------------------------------------------
+
+# 10.0.0-alpha.3 Release notes
+
+### Enhancements
+* Requirement to have a contiguous memory mapping of the entire realm file is removed.
+
+### Fixed
+* ConstLnkLst filters out unresolved links.
+ 
+-----------
+
+### Internals
+* Migrated to the final `std::filesystem` implementation on Windows from the experimental one.
+* Exception class InvalidKey is replaced with KeyNotFound, KeyAlreadyUsed, ColumnNotFound and ColumnAlreadyExists
+* Calling `Table::create_object(ObjKey)` on a table with a primary key column is now an error.
+* Objects created with `Table::create_object(GlobalKey)` are now subject to tombstone resurrection.
+* Table::get_objkey_from_global_key() was introduced to allow getting the ObjKey of an object (dead or alive) identified by its GlobalKey.
+* ChunkedBinaryData moved from Sync to Core
+
+----------------------------------------------
+
+# 10.0.0-alpha.2 Release notes
+
+This release also contains the changes introduced by v6.0.4
+
+### Fixed
+* Table::find_first<T> on a primary key column would sometimes return the wrong object. Since v10.0.0-alpha.1.
+ 
+-----------
+
+### Internals
+* 'clear_table' and 'list_swap' removed from the replication interface.
+* Some 'safe_int_ops' has been removed.
+
+----------------------------------------------
+
+# 10.0.0-alpha.1 Release notes
+
+### Fixed
+* Table::find_first() now handles tables with int primary key correctly.
+* We will not delete dangling links when otherwise modifying a list.
+
+-----------
+
+### Internals
+* Sync should now use Lst<ObjKey> interface when setting possibly dangling links
+
+# 6.1.0-alpha.5 Release notes
+
+### Enhancements
+* Initial support for dangling links: Table::get_objkey_from_primary_key() and Table::invalidate_object() added.
+* Several minor enhancements for Decimal128 and ObjectId.
+* It is now possible to switch embeddedness of a table.
+
+### Fixed
+* None.
+ 
+-----------
+
+### Internals
+* Now uses c++17!!!!
+
+----------------------------------------------
+
+# 6.1.0-alpha.4 Release notes
+
+### Fixed
+* Fixed a segfault when a list of Decimal128 expanded over 1000 elements.
+* Fixed min/max of a list of Decimal128 when the list contained numbers larger than a min/max int64 type.
+* Fixed sum/avg of a list of Decimal128 when the list contained nulls.
+* Added missing TableView aggregate functions for Decimal128.
+* Fixed min/max Decimal128 via Table not returning the result index.
+* Fixed sorting Decimal128 behaviour including position of NaN.
+* Fixed crash sorting a nullable ObjectID column.
+
+----------------------------------------------
+
+# 6.1.0-alpha.3 Release notes
+
+### Fixes
+* Ability to create Decimal128 lists was missing
+* No replication of create/delete operations on embedded tables.
+ 
+----------------------------------------------
+
+# 6.1.0-alpha.2 Release notes
+
+### Fixes
+* Fixed issue regarding opening a file format version 10 realm file in RO mode.
+ 
+----------------------------------------------
+
+# 6.1.0-alpha.1 Release notes
+
+### Enhancements
+* Added new data types - Decimal128 and ObjectId types.
+* Added support for embedded objects.
+
+### Fixes
+* Fixes parsing float and double constants which had been serialised to scientific notation (eg. 1.23E-24). ([#3076](https://github.com/realm/realm-core/issues/3076)).
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* File format bumped to 11.
+
+----------------------------------------------
+
 # 6.0.13 Release notes
 
 ### Enhancements
@@ -76,7 +332,6 @@
 * Work around an issue with MSVC in Visual Studio 2019 where Release optimizations crash the compiler because of a regression in 64bit atomic loads on 32bit Windows.
 
 ----------------------------------------------
-
 # 6.0.5 Release notes
 
 ### Fixed

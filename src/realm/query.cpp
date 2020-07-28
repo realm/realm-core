@@ -42,10 +42,6 @@ Query::Query(ConstTableRef table, const LnkLst& list)
     , m_source_link_list(list.clone())
 {
     m_view = m_source_link_list.get();
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
     create();
 }
@@ -55,10 +51,6 @@ Query::Query(ConstTableRef table, LnkLstPtr&& ll)
     , m_source_link_list(std::move(ll))
 {
     m_view = m_source_link_list.get();
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
 }
@@ -68,10 +60,6 @@ Query::Query(ConstTableRef table, ConstTableView* tv)
     , m_view(tv)
     , m_source_table_view(tv)
 {
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     create();
 }
 
@@ -81,10 +69,6 @@ Query::Query(ConstTableRef table, std::unique_ptr<ConstTableView> tv)
     , m_source_table_view(tv.get())
     , m_owned_source_table_view(std::move(tv))
 {
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
     create();
 }
 
@@ -356,6 +340,12 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         }
         case type_Timestamp: {
             return MakeConditionNode<TimestampNode<Cond>>::make(column_key, value);
+        }
+        case type_Decimal: {
+            return MakeConditionNode<DecimalNode<Cond>>::make(column_key, value);
+        }
+        case type_ObjectId: {
+            return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -777,6 +767,66 @@ Query& Query::less(ColKey column_key, Timestamp value)
     return add_condition<Less>(column_key, value);
 }
 
+// ------------- ObjectId
+Query& Query::greater(ColKey column_key, ObjectId value)
+{
+    return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey column_key, ObjectId value)
+{
+    return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, ObjectId value)
+{
+    return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater_equal(ColKey column_key, ObjectId value)
+{
+    return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey column_key, ObjectId value)
+{
+    return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey column_key, ObjectId value)
+{
+    return add_condition<Less>(column_key, value);
+}
+
+// ------------- Decimal128
+Query& Query::greater(ColKey column_key, Decimal128 value)
+{
+    return add_condition<Greater>(column_key, value);
+}
+Query& Query::equal(ColKey column_key, Decimal128 value)
+{
+    return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, Decimal128 value)
+{
+    return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater_equal(ColKey column_key, Decimal128 value)
+{
+    return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey column_key, Decimal128 value)
+{
+    return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey column_key, Decimal128 value)
+{
+    return add_condition<Less>(column_key, value);
+}
+Query& Query::between(ColKey column_key, Decimal128 from, Decimal128 to)
+{
+    group();
+    greater_equal(column_key, from);
+    less_equal(column_key, to);
+    end_group();
+    return *this;
+}
+
 // ------------- size
 Query& Query::size_equal(ColKey column_key, int64_t value)
 {
@@ -867,17 +917,13 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 bool Query::eval_object(ConstObj& obj) const
 {
-#ifdef REALM_DEBUG
-    if (m_view)
-        m_view->check_cookie();
-#endif
-
     if (has_conditions())
         return root_node()->match(obj);
 
     // Query has no conditions, so all rows match, also the user given argument
     return true;
 }
+
 
 template <Action action, typename T, typename R>
 R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) const
@@ -908,28 +954,29 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
                         return false;
                     }
                 });
-                return st.m_state;
             }
-            // no index, traverse cluster tree
-            node = pn;
-            LeafType leaf(m_table.unchecked_ptr()->get_alloc());
-            bool nullable = m_table->is_nullable(column_key);
+            else {
+                // no index, traverse cluster tree
+                node = pn;
+                LeafType leaf(m_table.unchecked_ptr()->get_alloc());
+                bool nullable = m_table->is_nullable(column_key);
 
-            for (size_t c = 0; c < node->m_children.size(); c++)
-                node->m_children[c]->aggregate_local_prepare(action, ColumnTypeTraits<T>::id, nullable);
+                for (size_t c = 0; c < node->m_children.size(); c++)
+                    node->m_children[c]->aggregate_local_prepare(action, ColumnTypeTraits<T>::id, nullable);
 
-            auto f = [column_key, &leaf, &node, &st, this](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                node->set_cluster(cluster);
-                cluster->init_leaf(column_key, &leaf);
-                st.m_key_offset = cluster->get_offset();
-                st.m_key_values = cluster->get_key_array();
-                aggregate_internal(node, &st, 0, e, &leaf);
-                // Continue
-                return false;
-            };
+                auto f = [column_key, &leaf, &node, &st, this](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    node->set_cluster(cluster);
+                    cluster->init_leaf(column_key, &leaf);
+                    st.m_key_offset = cluster->get_offset();
+                    st.m_key_values = cluster->get_key_array();
+                    aggregate_internal(node, &st, 0, e, &leaf);
+                    // Continue
+                    return false;
+                };
 
-            m_table.unchecked_ptr()->traverse_clusters(f);
+                m_table.unchecked_ptr()->traverse_clusters(f);
+            }
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
@@ -1027,6 +1074,15 @@ double Query::sum_double(ColKey column_key) const
     return aggregate<act_Sum, double, double>(column_key);
 }
 
+Decimal128 Query::sum_decimal128(ColKey column_key) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Sum);
+#endif
+
+    return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
+}
+
 // Maximum
 
 int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
@@ -1056,6 +1112,15 @@ double Query::maximum_double(ColKey column_key, ObjKey* return_ndx) const
 #endif
 
     return aggregate<act_Max, double, double>(column_key, nullptr, return_ndx);
+}
+
+Decimal128 Query::maximum_decimal128(ColKey column_key, ObjKey* return_ndx) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Maximum);
+#endif
+
+    return aggregate<act_Max, Decimal128, Decimal128>(column_key, nullptr, return_ndx);
 }
 
 
@@ -1096,6 +1161,15 @@ Timestamp Query::minimum_timestamp(ColKey column_key, ObjKey* return_ndx)
 #endif
 
     return aggregate<act_Min, Timestamp, Timestamp>(column_key, nullptr, return_ndx);
+}
+
+Decimal128 Query::minimum_decimal128(ColKey column_key, ObjKey* return_ndx) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Minimum);
+#endif
+
+    return aggregate<act_Min, Decimal128, Decimal128>(column_key, nullptr, return_ndx);
 }
 
 Timestamp Query::maximum_timestamp(ColKey column_key, ObjKey* return_ndx)
@@ -1147,6 +1221,20 @@ double Query::average_double(ColKey column_key, size_t* resultcount) const
         return average<double, true>(column_key, resultcount);
     }
     return average<double, false>(column_key, resultcount);
+}
+Decimal128 Query::average_decimal128(ColKey column_key, size_t* resultcount) const
+{
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Average);
+#endif
+    size_t resultcount2 = 0;
+    auto sum1 = aggregate<act_Sum, Decimal128, Decimal128>(column_key, &resultcount2);
+    Decimal128 avg1;
+    if (resultcount2 != 0)
+        avg1 = sum1 / resultcount2;
+    if (resultcount)
+        *resultcount = resultcount2;
+    return avg1;
 }
 
 
@@ -1280,7 +1368,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
             ConstObj obj = m_view->get_object(t);
             if (eval_object(obj)) {
-                ret.m_key_values->add(obj.get_key());
+                ret.m_key_values.add(obj.get_key());
             }
         }
     }
@@ -1288,9 +1376,9 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (end == size_t(-1))
             end = m_table->size();
         if (!has_conditions()) {
-            KeyColumn* refs = ret.m_key_values;
+            KeyColumn& refs = ret.m_key_values;
 
-            auto f = [&begin, &end, &limit, refs](const Cluster* cluster) {
+            auto f = [&begin, &end, &limit, &refs](const Cluster* cluster) {
                 size_t e = cluster->node_size();
                 if (begin < e) {
                     if (e > end) {
@@ -1299,7 +1387,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     auto offset = cluster->get_offset();
                     auto key_values = cluster->get_key_array();
                     for (size_t i = begin; (i < e) && limit; i++) {
-                        refs->add(ObjKey(key_values->get(i) + offset));
+                        refs.add(ObjKey(key_values->get(i) + offset));
                         --limit;
                     }
                     begin = 0;
@@ -1321,7 +1409,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 // translate begin/end limiters into corresponding keys
                 auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
                 auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
-                KeyColumn* refs = ret.m_key_values;
+                KeyColumn& refs = ret.m_key_values;
                 node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
                     auto key = obj.get_key();
                     if (begin_key && key < begin_key)
@@ -1329,7 +1417,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     if (end_key && !(key < end_key))
                         return false;
                     if (eval_object(obj)) {
-                        refs->add(key);
+                        refs.add(key);
                         return true;
                     }
                     else {
@@ -1340,7 +1428,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
             }
             // no index on best node (and likely no index at all), descend B+-tree
             node = pn;
-            QueryState<int64_t> st(act_FindAll, ret.m_key_values, limit);
+            QueryState<int64_t> st(act_FindAll, &ret.m_key_values, limit);
 
             for (size_t c = 0; c < node->m_children.size(); c++)
                 node->m_children[c]->aggregate_local_prepare(act_FindAll, type_Int, false);

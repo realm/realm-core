@@ -113,13 +113,13 @@ void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMap
 void inline encryption_read_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping,
                                     HeaderToSize header_to_size = nullptr)
 {
-    if (mapping)
+    if (REALM_UNLIKELY(mapping))
         do_encryption_read_barrier(addr, size, header_to_size, mapping);
 }
 
 void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
 {
-    if (mapping)
+    if (REALM_UNLIKELY(mapping))
         do_encryption_write_barrier(addr, size, mapping);
 }
 

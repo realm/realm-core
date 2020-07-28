@@ -89,7 +89,7 @@ public:
 protected:
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
-        m_incoming_changeset = Buffer<char>(size); // Throws
+        m_incoming_changeset = util::Buffer<char>(size); // Throws
         std::copy(data, data + size, m_incoming_changeset.data());
         // Make space for the new changeset in m_changesets such that we can be
         // sure no exception will be thrown whan adding the changeset in
@@ -105,8 +105,8 @@ protected:
         m_changesets.push_back(std::move(m_incoming_changeset));
     }
 
-    Buffer<char> m_incoming_changeset;
-    std::vector<Buffer<char>> m_changesets;
+    util::Buffer<char> m_incoming_changeset;
+    std::vector<util::Buffer<char>> m_changesets;
     Group* m_group;
 };
 

@@ -72,6 +72,11 @@ public:
         , m_int(value)
     {
     }
+    Printable(double value)
+        : m_type(Type::Double)
+        , m_double(value)
+    {
+    }
     Printable(const char* value)
         : m_type(Type::String)
         , m_string(value)
@@ -94,12 +99,14 @@ private:
         Bool,
         Int,
         Uint,
+        Double,
         String,
     } m_type;
 
     union {
         uintmax_t m_uint;
         intmax_t m_int;
+        double m_double;
         const char* m_string;
     };
 };
@@ -114,6 +121,12 @@ std::string to_string(const T& v)
 
 std::string format(const char* fmt, std::initializer_list<Printable>);
 
+// format string format:
+//  "%%" - literal '%'
+//  "%1" - substitutes Nth argument, 1-indexed
+//
+// format("Hello %1, meet %2. %3%% complete.", "Alice", "Bob", 97)
+//  -> "Hello Alice, meet Bob. 97% complete."
 template<typename... Args>
 std::string format(const char* fmt, Args&&... args)
 {

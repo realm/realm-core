@@ -1071,11 +1071,13 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 }
 #endif
 
+
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_6_to_7.realm";
 
+#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1111,6 +1113,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_int(col, row, 123);
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+#endif
 }
 
 TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1118,6 +1121,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_7_to_8.realm";
 
+#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1153,6 +1157,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_int(col, row, 123);
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+#endif
 }
 
 
@@ -1161,6 +1166,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
     std::string validation_str = "test string";
+#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1201,6 +1207,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_string(str_col, row, validation_str);
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+#endif
 }
 
 TEST(Upgrade_Database_6_10)
@@ -1557,6 +1564,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     // NOTE: This code must be executed from an old file-format-version 9
     // core in order to create a file-format-version 9 test file!
 
+#ifndef REALM_CLUSTER_IF
     Group g;
     TableRef t = g.add_table("table");
     TableRef o = g.add_table("other");
@@ -1674,6 +1682,54 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     t->set_binary(col_binary, 17, BinaryData(bigbin));
     t->insert_empty_row(insert_pos);
     t->set_string(col_string_i, insert_pos, "This is a rather long string, that should not be very much shorter");
+
+    g.write(path);
+#endif
+#endif // TEST_READ_UPGRADE_MODE
+}
+
+TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_10_to_11.realm";
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    auto rt = sg->start_read();
+
+    auto t = rt->get_table("table");
+    auto o = rt->get_table("origin");
+    auto col = o->get_column_key("link");
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = t->get_object_with_primary_key(id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col), obj.get_key());
+        ++it;
+    }
+
+#else
+    // NOTE: This code must be executed from an old file-format-version 10
+    // core in order to create a file-format-version 10 test file!
+
+    Group g;
+    TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
+    TableRef o = g.add_table("origin");
+    auto col = o->add_column_link(type_Link, "link", *t);
+
+    for (auto id : ids) {
+        auto obj = t->create_object_with_primary_key(id);
+        o->create_object().set(col, obj.get_key());
+    }
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE

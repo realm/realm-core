@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/array_string.hpp>
-#include <realm/array_integer.hpp>
 #include <realm/spec.hpp>
 
 using namespace realm;
@@ -50,7 +49,7 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
             m_type = Type::small_strings;
         }
         else {
-            auto arr = new (&m_storage.m_enum) ArrayInteger(m_alloc);
+            auto arr = new (&m_storage.m_enum) Array(m_alloc);
             arr->init_from_mem(mem);
             m_string_enum_values = std::make_unique<ArrayString>(m_alloc);
             ArrayParent* p;
@@ -86,7 +85,14 @@ void ArrayString::init_from_parent()
 
 void ArrayString::destroy()
 {
-    Array::destroy_deep(m_arr->get_ref(), m_arr->get_alloc());
+    if (m_arr->is_attached()) {
+        Array::destroy_deep(m_arr->get_ref(), m_alloc);
+
+        // Make sure the object is in a state like right after construction
+        // Next call must be to create()
+        m_arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
+        m_type = Type::small_strings;
+    }
 }
 
 size_t ArrayString::size() const
@@ -99,7 +105,7 @@ size_t ArrayString::size() const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->size();
         case Type::enum_strings:
-            return static_cast<ArrayInteger*>(m_arr)->size();
+            return static_cast<Array*>(m_arr)->size();
     }
     return {};
 }
@@ -117,7 +123,7 @@ void ArrayString::add(StringData value)
             static_cast<ArrayBigBlobs*>(m_arr)->add_string(value);
             break;
         case Type::enum_strings: {
-            auto a = static_cast<ArrayInteger*>(m_arr);
+            auto a = static_cast<Array*>(m_arr);
             size_t ndx = a->size();
             a->add(0);
             set(ndx, value);
@@ -145,7 +151,7 @@ void ArrayString::set(size_t ndx, StringData value)
                 m_string_enum_values->add(value);
                 res = sz;
             }
-            static_cast<ArrayInteger*>(m_arr)->set(ndx, res);
+            static_cast<Array*>(m_arr)->set(ndx, res);
             break;
         }
     }
@@ -164,7 +170,7 @@ void ArrayString::insert(size_t ndx, StringData value)
             static_cast<ArrayBigBlobs*>(m_arr)->insert_string(ndx, value);
             break;
         case Type::enum_strings: {
-            static_cast<ArrayInteger*>(m_arr)->insert(ndx, 0);
+            static_cast<Array*>(m_arr)->insert(ndx, 0);
             set(ndx, value);
         }
     }
@@ -180,7 +186,7 @@ StringData ArrayString::get(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
         case Type::enum_strings: {
-            size_t index = size_t(static_cast<ArrayInteger*>(m_arr)->get(ndx));
+            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
             return m_string_enum_values->get(index);
         }
     }
@@ -197,7 +203,7 @@ StringData ArrayString::get_legacy(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->get_string(ndx);
         case Type::enum_strings: {
-            size_t index = size_t(static_cast<ArrayInteger*>(m_arr)->get(ndx));
+            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
             return m_string_enum_values->get(index);
         }
     }
@@ -214,7 +220,7 @@ bool ArrayString::is_null(size_t ndx) const
         case Type::big_strings:
             return static_cast<ArrayBigBlobs*>(m_arr)->is_null(ndx);
         case Type::enum_strings: {
-            size_t index = size_t(static_cast<ArrayInteger*>(m_arr)->get(ndx));
+            size_t index = size_t(static_cast<Array*>(m_arr)->get(ndx));
             return m_string_enum_values->is_null(index);
         }
     }
@@ -234,7 +240,7 @@ void ArrayString::erase(size_t ndx)
             static_cast<ArrayBigBlobs*>(m_arr)->erase(ndx);
             break;
         case Type::enum_strings:
-            static_cast<ArrayInteger*>(m_arr)->erase(ndx);
+            static_cast<Array*>(m_arr)->erase(ndx);
             break;
     }
 }
@@ -276,7 +282,7 @@ void ArrayString::clear()
             static_cast<ArrayBigBlobs*>(m_arr)->clear();
             break;
         case Type::enum_strings:
-            static_cast<ArrayInteger*>(m_arr)->clear();
+            static_cast<Array*>(m_arr)->clear();
             break;
     }
 }
@@ -300,7 +306,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             size_t sz = m_string_enum_values->size();
             size_t res = m_string_enum_values->find_first(value, 0, sz);
             if (res != realm::not_found) {
-                return static_cast<ArrayInteger*>(m_arr)->find_first(res, begin, end);
+                return static_cast<Array*>(m_arr)->find_first(res, begin, end);
             }
             break;
         }
@@ -456,7 +462,7 @@ void ArrayString::verify() const
             static_cast<ArrayBigBlobs*>(m_arr)->verify();
             break;
         case Type::enum_strings:
-            static_cast<ArrayInteger*>(m_arr)->verify();
+            static_cast<Array*>(m_arr)->verify();
             break;
     }
 #endif

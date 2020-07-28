@@ -28,11 +28,15 @@
 namespace realm {
 
 struct ObjKey;
+class Decimal128;
+class ObjectId;
+class Mixed;
 class Timestamp;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
 class ArrayBinary;
+class ArrayMixed;
 class ArrayTimestamp;
 class ArrayInteger;
 class ArrayRef;
@@ -41,6 +45,9 @@ class ArrayBool;
 class ArrayBoolNull;
 class ArrayKey;
 class ArrayKeyNonNullable;
+class ArrayDecimal128;
+class ArrayObjectId;
+class ArrayObjectIdNull;
 template <class>
 class BasicArray;
 template <class>
@@ -73,6 +80,7 @@ struct ColumnTypeTraits<int64_t> {
     using cluster_leaf_type = ArrayInteger;
     using sum_type = int64_t;
     using minmax_type = int64_t;
+    using average_type = double;
     static const DataType id = type_Int;
     static const ColumnType column_id = col_type_Int;
     static const ColumnType real_column_type = col_type_Int;
@@ -91,6 +99,7 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
     using cluster_leaf_type = ArrayIntNull;
     using sum_type = int64_t;
     using minmax_type = int64_t;
+    using average_type = double;
     static const DataType id = type_Int;
     static const ColumnType column_id = col_type_Int;
     static const ColumnType real_column_type = col_type_Int;
@@ -118,6 +127,13 @@ struct ColumnTypeTraits<ObjKey> {
 };
 
 template <>
+struct ColumnTypeTraits<Mixed> {
+    using cluster_leaf_type = ArrayMixed;
+    static const DataType id = type_OldMixed;
+    static const ColumnType column_id = col_type_OldMixed;
+};
+
+template <>
 struct ColumnTypeTraits<Link> {
     static const ColumnType column_id = col_type_Link;
 };
@@ -127,6 +143,7 @@ struct ColumnTypeTraits<float> {
     using cluster_leaf_type = BasicArray<float>;
     using sum_type = double;
     using minmax_type = float;
+    using average_type = double;
     static const DataType id = type_Float;
     static const ColumnType column_id = col_type_Float;
     static const ColumnType real_column_type = col_type_Float;
@@ -137,6 +154,7 @@ struct ColumnTypeTraits<util::Optional<float>> {
     using cluster_leaf_type = BasicArrayNull<float>;
     using sum_type = double;
     using minmax_type = float;
+    using average_type = double;
     static const DataType id = type_Float;
     static const ColumnType column_id = col_type_Float;
     static const ColumnType real_column_type = col_type_Float;
@@ -147,6 +165,7 @@ struct ColumnTypeTraits<double> {
     using cluster_leaf_type = BasicArray<double>;
     using sum_type = double;
     using minmax_type = double;
+    using average_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
@@ -157,6 +176,7 @@ struct ColumnTypeTraits<util::Optional<double>> {
     using cluster_leaf_type = BasicArrayNull<double>;
     using sum_type = double;
     using minmax_type = double;
+    using average_type = double;
     static const DataType id = type_Double;
     static const ColumnType column_id = col_type_Double;
     static const ColumnType real_column_type = col_type_Double;
@@ -168,6 +188,20 @@ struct ColumnTypeTraits<Timestamp> {
     using minmax_type = Timestamp;
     static const DataType id = type_Timestamp;
     static const ColumnType column_id = col_type_Timestamp;
+};
+
+template <>
+struct ColumnTypeTraits<ObjectId> {
+    using cluster_leaf_type = ArrayObjectId;
+    static const DataType id = type_ObjectId;
+    static const ColumnType column_id = col_type_ObjectId;
+};
+
+template <>
+struct ColumnTypeTraits<util::Optional<ObjectId>> {
+    using cluster_leaf_type = ArrayObjectIdNull;
+    static const DataType id = type_ObjectId;
+    static const ColumnType column_id = col_type_ObjectId;
 };
 
 template <>
@@ -185,6 +219,25 @@ struct ColumnTypeTraits<BinaryData> {
     static const ColumnType column_id = col_type_Binary;
     static const ColumnType real_column_type = col_type_Binary;
 };
+
+template <>
+struct ColumnTypeTraits<Decimal128> {
+    using cluster_leaf_type = ArrayDecimal128;
+    using sum_type = Decimal128;
+    using minmax_type = Decimal128;
+    using average_type = Decimal128;
+    static const DataType id = type_Decimal;
+    static const ColumnType column_id = col_type_Decimal;
+};
+
+template <typename T>
+using ColumnClusterLeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
+template <typename T>
+using ColumnSumType = typename ColumnTypeTraits<T>::sum_type;
+template <typename T>
+using ColumnMinMaxType = typename ColumnTypeTraits<T>::minmax_type;
+template <typename T>
+using ColumnAverageType = typename ColumnTypeTraits<T>::average_type;
 
 template <class T>
 struct ColumnTypeTraits<Lst<T>> {
@@ -216,6 +269,11 @@ struct GetLeafType<type_Timestamp, N> {
     // FIXME: Null definition
     using type = ArrayTimestamp;
 };
+template <bool N>
+struct GetLeafType<type_Decimal, N> {
+    // FIXME: Null definition
+    using type = ArrayDecimal128;
+};
 
 template <class T>
 inline bool value_is_null(const T& val)
@@ -227,27 +285,26 @@ inline bool value_is_null(const util::Optional<T>& val)
 {
     return !val;
 }
-template <>
 inline bool value_is_null(const int64_t&)
 {
     return false;
 }
-template <>
 inline bool value_is_null(const bool&)
 {
     return false;
 }
-template <>
+inline bool value_is_null(const ObjectId&)
+{
+    return false;
+}
 inline bool value_is_null(const float& val)
 {
     return null::is_null_float(val);
 }
-template <>
 inline bool value_is_null(const double& val)
 {
     return null::is_null_float(val);
 }
-template <>
 inline bool value_is_null(const ObjKey& val)
 {
     return !val;
