@@ -7,6 +7,24 @@ function usage {
     exit 1;
 }
 
+function mergeWithoutArm64 {
+    local outputFile="$1"
+    local fileA="$2"
+    local fileB="$3"
+
+    isArm64Available=$(lipo "$fileB" -verify_arch arm64)
+    if [[ $isArm64Available -eq 0 ]]; then
+      cp "$fileB" "$fileB.tmp"
+      lipo "$fileB.tmp" -output "$fileB.tmp" -remove arm64
+      lipo -create -output $outputFile \
+           $fileA \
+           "$fileB.tmp"
+      rm -f "$fileB.tmp"
+    else
+      lipo -create -output "$outputFile" "$fileA" "$fileB"
+    fi
+}
+
 function mergeLibs {
     local outputFile="$1"
     local fileA="$2"
@@ -49,4 +67,5 @@ if [[ ! -e $fileA || ! -e $fileB ]]; then
     usage
 fi
 
-mergeLibs "$outputFile" "$fileA" "$fileB"
+mergeWithoutArm64 "$outputFile" "$fileA" "$fileB"
+# mergeLibs "$outputFile" "$fileA" "$fileB"

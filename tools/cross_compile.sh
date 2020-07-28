@@ -120,33 +120,18 @@ else
     mkdir -p "src/realm/${BUILD_TYPE}"
     mkdir -p "src/realm/parser/${BUILD_TYPE}"
 
-    isArm64Available=$(lipo "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" -verify_arch arm64)
-    if [[ $isArm64Available -eq 0 ]]; then
-      cp "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a.tmp"
-      cp "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a" "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a.tmp"
-      lipo "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a.tmp" -output "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a.tmp" -remove arm64
-      lipo "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a.tmp" -output "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a.tmp" -remove arm64
+    ../tools/mergeLibs.sh "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
+           "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
+           "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
+    if [[ -z ${WATCHOS_EXTRA_LIB} ]]; then
       lipo -create \
            -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a.tmp" \
+           "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
            ${WATCHOS_EXTRA_LIB}
-      lipo -create \
-           -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
-           "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
-           "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a.tmp"
-      rm -f "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a.tmp"
-      rm -f "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a.tmp"
-    else
-      lipo -create \
-           -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" \
-           ${WATCHOS_EXTRA_LIB}
-      lipo -create \
-           -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
-           "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
-           "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
     fi
+    ../tools/mergeLibs.sh  "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
+        "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
+        "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+
     cpack -C "${BUILD_TYPE}" || exit 1
 fi
