@@ -111,7 +111,7 @@ AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
                           [=] {
                               return nlohmann::json({
                                   {kAppProviderKey, IdentityProviderFacebook},
-                                  {"access_token", access_token}
+                                  {"accessToken", access_token}
                               }).dump();
                           });
 }
