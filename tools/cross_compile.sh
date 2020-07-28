@@ -137,7 +137,6 @@ else
         popd
     fi
 
-
     mkdir -p "build-${OS}-${BUILD_TYPE}"
     cd "build-${OS}-${BUILD_TYPE}" || exit 1
 
@@ -147,22 +146,20 @@ else
                ONLY_ACTIVE_ARCH=NO
     xcodebuild -sdk "${SDK}simulator" \
                -configuration "${BUILD_TYPE}" \
-               ONLY_ACTIVE_ARCH=NO
+               ONLY_ACTIVE_ARCH=NO \
+               EXCLUDED_ARCHS='arm64'
     mkdir -p "src/realm/${BUILD_TYPE}"
     mkdir -p "src/realm/parser/${BUILD_TYPE}"
 
-    ../tools/mergeLibs.sh "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
-    if [[ -z ${WATCHOS_EXTRA_LIB} ]]; then
-      lipo -create \
-           -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-           "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-           ${WATCHOS_EXTRA_LIB}
-    fi
-    ../tools/mergeLibs.sh  "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
-        "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
-        "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
+    lipo -create \
+         -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" \
+         ${WATCHOS_EXTRA_LIB}
+    lipo -create \
+         -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
+         "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
+         "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
 
     cpack -C "${BUILD_TYPE}" || exit 1
 fi
