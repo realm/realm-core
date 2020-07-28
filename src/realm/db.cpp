@@ -1465,6 +1465,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.encryption_key = write_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg);
+        m_alloc.m_youngest_live_version = info->latest_version_number;
         info->number_of_versions = 1;
         // info->latest_version_number is unchanged
         SharedInfo* r_info = m_reader_map.get_addr();

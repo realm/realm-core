@@ -501,6 +501,31 @@ TEST(Shared_CompactingOnTheFly)
 }
 
 
+TEST(Shared_ReadAfterCompact)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->create_object().set_all(1);
+        wt.commit();
+    }
+    sg->compact();
+    auto rt = sg->start_read();
+    auto table = rt->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+
+    CHECK_EQUAL(table->size(), 1);
+    CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
+}
+
+
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.

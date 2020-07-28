@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Isses fixed by releases v6.0.11 to v6.0.13
  
 ### Breaking changes
 * None.
@@ -251,6 +251,28 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+
+----------------------------------------------
+
+# 6.0.13 Release notes
+
+### Enhancements
+* Add support for the 64-bit watchOS simulator.
+
+----------------------------------------------
+
+# 6.0.12 Release notes
+
+### Fixed
+* Fix upgrade bug. Could cause assertions like "Assertion failed: ref != 0" during opning of a realm. ([#6644](https://github.com/realm/realm-cocoa/issues/6644), since V6.0.7)
+* A use-after-free would occur if a Realm was compacted, opened on multiple threads prior to the first write, then written to while reads were happening on other threads. This could result in a variety of crashes, often inside realm::util::EncryptedFileMapping::read_barrier. (Since v6.0.0, [Cocoa #6652](https://github.com/realm/realm-cocoa/issues/6652), [Cocoa #6628](https://github.com/realm/realm-cocoa/issues/6628), [Cocoa #6655](https://github.com/realm/realm-cocoa/issues/6555)).
+
+----------------------------------------------
+
+# 6.0.11 Release notes
+
+### Fixed
+* Table::create_object_with_primary_key(null) would hit an assertion failure when the primary key type is a string and the object already existed.
 
 ----------------------------------------------
 

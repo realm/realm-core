@@ -1198,6 +1198,7 @@ void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
 
 void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
 {
+    size_t nb_columns = m_spec.get_public_column_count();
     ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
     if (!top_ref) {
         // All objects migrated
@@ -1208,6 +1209,11 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
     col_refs.set_parent(&m_top, top_position_for_columns);
     col_refs.init_from_ref(top_ref);
 
+    if (nb_columns > col_refs.size()) {
+        // We have created !ROW_INDEX column. We are done here
+        return;
+    }
+
     /************************ Create column accessors ************************/
 
     std::map<ColKey, std::unique_ptr<BPlusTreeBase>> column_accessors;
@@ -1215,7 +1221,6 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
     std::map<ColKey, std::unique_ptr<BPlusTree<int64_t>>> list_accessors;
     std::vector<size_t> cols_to_destroy;
     bool has_link_columns = false;
-    size_t nb_columns = m_spec.get_public_column_count();
 
     // helper function to determine the number of objects in the table
     size_t number_of_objects = (nb_columns == 0) ? 0 : size_t(-1);
