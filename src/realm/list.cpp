@@ -768,6 +768,19 @@ template class ConstLst<BinaryData>;
 template class ConstLst<Timestamp>;
 template class ConstLst<ObjKey>;
 
+template class ConstLstIf<int64_t>;
+template class ConstLstIf<util::Optional<Int>>;
+template class ConstLstIf<bool>;
+template class ConstLstIf<util::Optional<bool>>;
+template class ConstLstIf<float>;
+template class ConstLstIf<util::Optional<float>>;
+template class ConstLstIf<double>;
+template class ConstLstIf<util::Optional<double>>;
+template class ConstLstIf<StringData>;
+template class ConstLstIf<BinaryData>;
+template class ConstLstIf<Timestamp>;
+template class ConstLstIf<ObjKey>;
+
 template class Lst<int64_t>;
 template class Lst<util::Optional<Int>>;
 template class Lst<bool>;
