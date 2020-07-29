@@ -368,36 +368,6 @@ void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 }
 
 
-/************************* template instantiations ***************************/
-
-namespace realm {
-template ConstLst<int64_t>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<Int>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<bool>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<bool>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<float>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<float>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<double>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<util::Optional<double>>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<StringData>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<BinaryData>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<Timestamp>::ConstLst(const ConstObj& obj, ColKey col_key);
-template ConstLst<ObjKey>::ConstLst(const ConstObj& obj, ColKey col_key);
-
-template Lst<int64_t>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<Int>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<bool>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<bool>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<float>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<float>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<double>::Lst(const Obj& obj, ColKey col_key);
-template Lst<util::Optional<double>>::Lst(const Obj& obj, ColKey col_key);
-template Lst<StringData>::Lst(const Obj& obj, ColKey col_key);
-template Lst<BinaryData>::Lst(const Obj& obj, ColKey col_key);
-template Lst<Timestamp>::Lst(const Obj& obj, ColKey col_key);
-template Lst<ObjKey>::Lst(const Obj& obj, ColKey col_key);
-}
-
 ConstObj ConstLnkLst::get_object(size_t link_ndx) const
 {
     return m_const_obj->get_target_table(m_col_key)->get_object(ConstLstIf<ObjKey>::get(link_ndx));
@@ -782,15 +752,46 @@ void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
         repl->list_insert_null(*this, ndx);
     }
 }
-}
 
-#ifdef _WIN32
-// For some strange reason these functions needs to be explicitly instantiated
-// on Visual Studio 2017. Otherwise the code is not generated.
-namespace realm {
-template void Lst<ObjKey>::add(ObjKey target_key);
-template void Lst<ObjKey>::insert(size_t ndx, ObjKey target_key);
-template ObjKey Lst<ObjKey>::remove(size_t ndx);
-template void Lst<ObjKey>::clear();
-}
-#endif
+/************************* template instantiations ***************************/
+
+template class ConstLstIf<int64_t>;
+template class ConstLstIf<util::Optional<Int>>;
+template class ConstLstIf<bool>;
+template class ConstLstIf<util::Optional<bool>>;
+template class ConstLstIf<float>;
+template class ConstLstIf<util::Optional<float>>;
+template class ConstLstIf<double>;
+template class ConstLstIf<util::Optional<double>>;
+template class ConstLstIf<StringData>;
+template class ConstLstIf<BinaryData>;
+template class ConstLstIf<Timestamp>;
+template class ConstLstIf<ObjKey>;
+
+template class ConstLst<int64_t>;
+template class ConstLst<util::Optional<Int>>;
+template class ConstLst<bool>;
+template class ConstLst<util::Optional<bool>>;
+template class ConstLst<float>;
+template class ConstLst<util::Optional<float>>;
+template class ConstLst<double>;
+template class ConstLst<util::Optional<double>>;
+template class ConstLst<StringData>;
+template class ConstLst<BinaryData>;
+template class ConstLst<Timestamp>;
+template class ConstLst<ObjKey>;
+
+template class Lst<int64_t>;
+template class Lst<util::Optional<Int>>;
+template class Lst<bool>;
+template class Lst<util::Optional<bool>>;
+template class Lst<float>;
+template class Lst<util::Optional<float>>;
+template class Lst<double>;
+template class Lst<util::Optional<double>>;
+template class Lst<StringData>;
+template class Lst<BinaryData>;
+template class Lst<Timestamp>;
+template class Lst<ObjKey>;
+
+} // namespace realm
