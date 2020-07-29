@@ -755,6 +755,7 @@ void Lst<ObjKey>::insert_repl(Replication* repl, size_t ndx, ObjKey key)
 
 /************************* template instantiations ***************************/
 
+
 template class ConstLst<int64_t>;
 template class ConstLst<util::Optional<Int>>;
 template class ConstLst<bool>;
@@ -780,6 +781,7 @@ template class ConstLstIf<StringData>;
 template class ConstLstIf<BinaryData>;
 template class ConstLstIf<Timestamp>;
 template class ConstLstIf<ObjKey>;
+
 
 template class Lst<int64_t>;
 template class Lst<util::Optional<Int>>;
