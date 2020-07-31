@@ -128,7 +128,7 @@ Timestamp ValueExpression::value_of_type_for_query<Timestamp>()
     } else if (value->type == parser::Expression::Type::Null) {
         return Timestamp(realm::null());
     }
-    throw std::logic_error("Attempting to compare Timestamp property to a non-Timestamp value");
+    throw std::logic_error("Timestamp properties must be compared against an Timestamp or ObjectId argument.");
 }
 
 template <>
@@ -243,12 +243,6 @@ ObjectId ValueExpression::value_of_type_for_query<ObjectId>()
 {
     if (value->type == parser::Expression::Type::Argument) {
         return arguments->objectid_for_argument(string_to<int>(value->s));
-    }
-    else if (value->type == parser::Expression::Type::Timestamp) {
-        return ObjectId(from_timestamp_values(value->time_inputs));
-    }
-    else if (value->type == parser::Expression::Type::Null) {
-        return ObjectId();
     }
     else if (value->type == parser::Expression::Type::ObjectId) {
         // expect oid(...) from the parser, and pass in the contents
