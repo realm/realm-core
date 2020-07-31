@@ -179,7 +179,7 @@ struct ClientErrorCategory : public std::error_category {
     {
         return "realm::app::ClientError";
     }
-    
+
     std::string message(int code) const override final
     {
         return util::format("code %1", code);

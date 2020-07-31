@@ -244,13 +244,13 @@ public:
 
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);
-    
+
     util::Optional<SyncAppMetadata> get_app_metadata();
     void set_app_metadata(const std::string& deployment_model,
                           const std::string& location,
                           const std::string& hostname,
                           const std::string& ws_hostname) const;
-    
+
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
@@ -269,11 +269,11 @@ private:
     SyncClientMetadata::Schema m_current_user_identity_schema;
     SyncUserMetadata::Schema m_profile_schema;
     SyncAppMetadata::Schema m_app_metadata_schema;
-    
+
     std::string m_client_uuid;
 
     std::shared_ptr<Realm> get_realm() const;
-    
+
     util::Optional<SyncAppMetadata> m_app_metadata;
 };
 

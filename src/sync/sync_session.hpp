@@ -279,7 +279,7 @@ private:
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
-    
+
     class ConnectionChangeNotifier {
     public:
         uint64_t add_callback(std::function<ConnectionStateCallback> callback);
@@ -313,11 +313,11 @@ private:
         return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config), force_client_resync);
     }
     // }
-    
+
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr <SyncSession>);
-    
+
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
-    
+
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };
@@ -337,7 +337,7 @@ private:
     void did_drop_external_reference();
 
     void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
-        
+
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;

@@ -184,7 +184,7 @@ public:
         /// @param completion_block A callback to be invoked once the call is complete.
         void resend_confirmation_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
-        
+
         void send_reset_password_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
@@ -234,7 +234,7 @@ public:
 
     /// Logout the current user.
     void log_out(std::function<void(util::Optional<AppError>)>);
-            
+
     /// Refreshes the custom data for a specified user
     /// @param sync_user The user you want to refresh
     void refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
@@ -242,7 +242,7 @@ public:
 
     /// Log out the given user if they are not already logged out.
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
-    
+
     /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
     /// specified as a parameter. This will only be successful if this `SyncUser` is the currently authenticated
     /// with the client from which it was created. On success the user will be returned with the new identity.
@@ -264,7 +264,7 @@ public:
     /// @param user The user to switch to
     /// @returns A shared pointer to the new current user
     std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
-    
+
     /// Logs out and removes the provided user
     /// this is a local operation and does not invoke any server side function
     /// @param user the user to remove
@@ -292,7 +292,7 @@ public:
         static const std::string& sync_route(const App& app) {
             return app.m_sync_route;
         }
-        
+
         static void set_sync_route(App& app, std::string sync_route) {
             app.m_sync_route = std::move(sync_route);
         }
@@ -312,7 +312,7 @@ public:
                        const std::string&,
                        const bson::BsonArray& args_bson,
                        std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
-    
+
     void call_function(const std::string& name,
                        const bson::BsonArray& args_bson,
                        const util::Optional<std::string>& service_name,
@@ -338,11 +338,11 @@ public:
             if (value) {
                 return completion_block(error, util::some<T>(static_cast<T>(*value)));
             }
-            
+
             return completion_block(error, util::none);
         });
     }
-    
+
     template <typename T>
     void call_function(const std::string& name,
                        const bson::BsonArray& args_bson,
@@ -361,7 +361,7 @@ public:
 
     // MARK: Push notification client
     PushClient push_notification_client(const std::string& service_name);
-    
+
 private:
     friend class Internal;
     friend class OnlyForTesting;
@@ -373,7 +373,7 @@ private:
     std::string m_auth_route;
     std::string m_sync_route;
     uint64_t m_request_timeout_ms;
-    
+
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
     void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
@@ -396,26 +396,26 @@ private:
     std::string url_for_path(const std::string& path) const override;
 
     void init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block);
-    
+
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
     /// @param completion_block Returns the response from the server
     void do_request(Request request,
                     std::function<void (Response)> completion_block);
-    
+
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
     /// @param completion_block Returns the response from the server
     void do_authenticated_request(Request request,
                                   std::shared_ptr<SyncUser> sync_user,
                                   std::function<void (Response)> completion_block) override;
-        
-    
+
+
     /// Gets the social profile for a `SyncUser`
     /// @param completion_block Callback will pass the `SyncUser` with the social profile details
     void get_profile(std::shared_ptr<SyncUser> sync_user,
                      std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
-    
+
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
@@ -428,7 +428,7 @@ private:
     void log_in_with_credentials(const AppCredentials& credentials,
                                  const std::shared_ptr<SyncUser> linking_user,
                                  std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
-    
+
     /// Provides MongoDB Realm Cloud with metadata related to the users session
     void attach_auth_options(bson::BsonDocument& body);
 

@@ -46,7 +46,7 @@ public:
                                const util::Optional<std::string>& service_name,
                                std::function<void (util::Optional<AppError>,
                                                    util::Optional<bson::Bson>)> completion_block) = 0;
-    
+
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param user The sync user to perform this request.
     /// @param name The name of the Realm Cloud function to be called.
@@ -57,7 +57,7 @@ public:
                                const bson::BsonArray& args_bson,
                                std::function<void (util::Optional<AppError>,
                                                    util::Optional<bson::Bson>)> completion_block) = 0;
-    
+
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// This will use the current logged in user to perform the request
     /// @param name The name of the Realm Cloud function to be called.
@@ -69,7 +69,7 @@ public:
                                const util::Optional<std::string>& service_name,
                                std::function<void (util::Optional<AppError>,
                                                    util::Optional<bson::Bson>)> completion_block) = 0;
-    
+
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// This will use the current logged in user to perform the request
     /// @param name The name of the Realm Cloud function to be called.

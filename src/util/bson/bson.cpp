@@ -127,7 +127,7 @@ Bson& Bson::operator=(const Bson& v) {
     this->~Bson();
 
     m_type = v.m_type;
-    
+
     switch (v.m_type) {
         case Type::Null:
             break;
@@ -619,7 +619,7 @@ constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& 
 // TODO do this instead in C++20
 // static_assert(std::ranges::is_sorted(bson_fancy_parsers, parser_comp));
 #if REALM_DEBUG
-[[maybe_unused]] bool check_sort_on_startup = [] { 
+[[maybe_unused]] bool check_sort_on_startup = [] {
     REALM_ASSERT(std::is_sorted(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers), parser_comp));
     return false;
 }();

@@ -39,7 +39,7 @@ static const std::string metadata_path = base_path + "/metadata.realm";
 TEST_CASE("sync_metadata: migration", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     const std::string identity_1 = "id_1";
     const std::string identity_2 = "id_2";
     const std::string identity_3 = "id_3";
@@ -206,7 +206,7 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
 TEST_CASE("sync_metadata: user metadata", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
@@ -303,7 +303,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
 TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
@@ -340,7 +340,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
 TEST_CASE("sync_metadata: file action metadata", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SyncMetadataManager manager(metadata_path, false);
 
     const std::string local_uuid_1 = "asdfg";
@@ -388,7 +388,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
 TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SyncMetadataManager manager(metadata_path, false);
     SECTION("properly list all pending actions, reflecting their deletion") {
         const auto filename1 = tmp_dir() + "foobar/file1";
@@ -412,7 +412,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
 TEST_CASE("sync_metadata: results", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SyncMetadataManager manager(metadata_path, false);
     const auto identity1 = "testcase3a1";
     const auto identity2 = "testcase3a1";   // same as identity 1
@@ -461,7 +461,7 @@ TEST_CASE("sync_metadata: results", "[sync]") {
 TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SECTION("works for the basic case") {
         const auto identity = "testcase4a";
         const std::string provider_type = "any-type";
@@ -489,7 +489,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
 TEST_CASE("sync_metadata: encryption", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    
+
     SECTION("prohibits opening the metadata Realm with different keys") {
         SECTION("different keys") {
             SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));

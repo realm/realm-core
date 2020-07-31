@@ -181,10 +181,10 @@ public:
 
     // Log out a given user
     void log_out_user(const std::string& user_id);
-    
+
     // Sets the currently active user.
     void set_current_user(const std::string& user_id);
-    
+
     // Removes a user
     void remove_user(const std::string& user_id);
 
@@ -212,7 +212,7 @@ public:
 
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const;
-    
+
     std::shared_ptr<app::App> app() const {
         return m_app;
     }

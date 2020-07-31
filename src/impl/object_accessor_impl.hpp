@@ -21,6 +21,8 @@
 
 #include "object_accessor.hpp"
 
+#include "schema.hpp"
+
 #include <realm/util/any.hpp>
 
 namespace realm {

@@ -293,7 +293,7 @@ void SyncUser::log_out()
 
     SyncManager::shared().log_out_user(m_identity);
     m_access_token.token = "";
-    
+
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {

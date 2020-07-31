@@ -195,7 +195,7 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
         { "token", token },
         { "tokenId", token_id }
     };
-    
+
     m_parent->do_request(Request {
         HttpMethod::post,
         route,
@@ -210,11 +210,11 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
 {
     REALM_ASSERT(m_parent);
     std::string route = util::format("%1/providers/%2/confirm/send", m_parent->m_auth_route, username_password_provider_key);
-    
+
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
     };
-    
+
     nlohmann::json body {
         { "email", email }
     };
@@ -258,11 +258,11 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
 {
     REALM_ASSERT(m_parent);
     std::string route = util::format("%1/providers/%2/reset", m_parent->m_auth_route, username_password_provider_key);
-    
+
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
     };
-    
+
     nlohmann::json body = {
         { "password", password },
         { "token", token },
@@ -363,7 +363,7 @@ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std:
     req.url = route;
     req.body = body.dump();
     req.uses_refresh_token = true;
-    
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -441,7 +441,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
             return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
-    
+
     Request req;
     req.method = HttpMethod::get;
     req.url = route;
@@ -463,7 +463,7 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
             return completion_block({});
         }
     };
-    
+
     Request req;
     req.method = HttpMethod::del;
     req.url = route;
@@ -573,9 +573,9 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
         return completion_block(sync_user, {});
     };
-    
+
     std::string profile_route = util::format("%1/auth/profile", m_base_route);
-    
+
     Request req;
     req.method = HttpMethod::get;
     req.url = profile_route;
@@ -588,11 +588,11 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 void App::attach_auth_options(bson::BsonDocument& body)
 {
     bson::BsonDocument options;
-    
+
     if (m_config.local_app_version) {
         options["appVersion"] = *m_config.local_app_version;
     }
-    
+
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.platform;
     options["platformVersion"] = m_config.platform_version;
@@ -640,11 +640,11 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         App::get_profile(linking_user ? linking_user : sync_user, completion_block);
     };
-    
+
     bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
     bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
     attach_auth_options(body);
-    
+
     std::stringstream s;
     s << bson::Bson(body);
 
@@ -658,7 +658,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
             }
         }
     }
-    
+
     do_request({
         HttpMethod::post,
         route,
@@ -690,13 +690,13 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     };
 
     std::string route = util::format("%1/auth/session", m_base_route);
-    
+
     Request req;
     req.method = HttpMethod::del;
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = true;
-    
+
     do_authenticated_request(req, user, handler);
 }
 
@@ -710,12 +710,12 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
         throw AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
                        "User is no longer valid or is logged out");
     }
-    
+
     auto users = SyncManager::shared().all_users();
     auto it = std::find(users.begin(),
                         users.end(),
                         user);
-    
+
     if (it == users.end()) {
         throw AppError(make_client_error_code(ClientErrorCode::user_not_found),
                        "User does not exist");
@@ -732,17 +732,17 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
         return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                          "User has already been removed"));
     }
-    
+
     auto users = SyncManager::shared().all_users();
     auto it = std::find(users.begin(),
                         users.end(),
                         user);
-    
+
     if (it == users.end()) {
         return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                          "No user has been found"));
     }
-    
+
     if (user->is_logged_in()) {
         log_out(user, [user, completion_block](const Optional<AppError>& error){
             SyncManager::shared().remove_user(user->identity());
@@ -762,7 +762,7 @@ void App::link_user(std::shared_ptr<SyncUser> user,
         return completion_block(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                                   "The specified user is not logged in"));
     }
-    
+
     auto users = SyncManager::shared().all_users();
     auto it = std::find(users.begin(),
                         users.end(),
@@ -772,10 +772,10 @@ void App::link_user(std::shared_ptr<SyncUser> user,
         return completion_block(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                                   "The specified user was not found"));
     }
-    
+
     App::log_in_with_credentials(credentials, user, completion_block);
 }
-    
+
 void App::refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
                               std::function<void(Optional<AppError>)> completion_block)
 {
@@ -801,7 +801,7 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
     req.method = HttpMethod::get;
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
-    
+
     m_config.transport_generator()->send_request_to_server(req, [this, completion_block](const Response& response) {
         nlohmann::json json;
         try {
@@ -836,7 +836,7 @@ void App::do_request(Request request,
                      std::function<void (Response)> completion_block)
 {
     request.timeout_ms = default_timeout_ms;
-    
+
     // if we do not have metadata yet, we need to initialize it
     if (!SyncManager::shared().app_metadata()) {
         init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
@@ -844,14 +844,14 @@ void App::do_request(Request request,
             if (error) {
                 return completion_block(*response);
             }
-            
+
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
             if (SyncManager::shared().app_metadata()->deployment_model != "GLOBAL" && request.url.rfind(m_base_url, 0) != std::string::npos) {
                 request.url.replace(0, m_base_url.size(), SyncManager::shared().app_metadata()->hostname);
             }
-            
+
             m_config.transport_generator()->send_request_to_server(request, completion_block);
         });
     } else {
@@ -866,7 +866,7 @@ void App::do_authenticated_request(Request request,
     request.headers = get_request_headers(sync_user,
                                           request.uses_refresh_token ?
                                           RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
-    
+
     do_request(request, [completion_block, request, sync_user, this](Response response) {
         if (auto error = check_for_errors(response)) {
             App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);

@@ -88,10 +88,10 @@ struct AppCredentials {
 
     // Construct and return credentials from an Apple account token.
     static AppCredentials apple(const AppCredentialsToken id_token);
-    
+
     // Construct and return credentials from a google account token.
     static AppCredentials google(const AppCredentialsToken id_token);
-    
+
     // Construct and return credentials from a jwt token.
     static AppCredentials custom(const AppCredentialsToken token);
 

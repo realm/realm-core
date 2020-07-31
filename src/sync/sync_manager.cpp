@@ -24,6 +24,7 @@
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 #include "sync/app.hpp"
+#include "util/uuid.hpp"
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
@@ -72,6 +73,9 @@ void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_
 
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
+            // No metadata means we use a new client uuid each time
+            if (!m_metadata_manager)
+                m_client_uuid = util::uuid_string();
             return;
         }
 
@@ -219,7 +223,7 @@ void SyncManager::reset_for_testing()
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
-    
+
     {
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
@@ -445,16 +449,16 @@ void SyncManager::remove_user(const std::string& user_id)
                            [user_id](const auto& user) {
         return user->identity() == user_id;
     });
-    
+
     if (it == m_users.end())
         return;
-    
+
     auto user = *it;
-    
+
     if (!m_metadata_manager) {
         return;
     }
-    
+
     for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
         auto metadata = m_metadata_manager->all_unmarked_users().get(i);
         if (user->identity() == metadata.identity()) {
@@ -485,31 +489,22 @@ struct UnsupportedBsonPartition : public std::logic_error {
 
 static std::string string_from_partition(const std::string& partition)
 {
-    std::string result = partition;
     try {
         bson::Bson partition_value = bson::parse(partition);
-        std::stringstream ss;
-        switch(partition_value.type()) {
+        switch (partition_value.type()) {
             case bson::Bson::Type::Int32:
-                ss << "i_" << static_cast<int32_t>(partition_value);
-                break;
+                return util::format("i_%1", static_cast<int32_t>(partition_value));
             case bson::Bson::Type::Int64:
-                ss << "l_" << static_cast<int64_t>(partition_value);
-                break;
+                return util::format("l_%1", static_cast<int64_t>(partition_value));
             case bson::Bson::Type::String:
-                ss << "s_" << static_cast<std::string>(partition_value);
-                break;
+                return util::format("s_%1", static_cast<std::string>(partition_value));
             case bson::Bson::Type::ObjectId:
-                ss << "o_" << static_cast<ObjectId>(partition_value);
-                break;
+                return util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
             case bson::Bson::Type::Null:
-                ss << "null";
-                break;
+                return "null";
             default:
-                ss << partition_value;
-                throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", ss.str()));
+                throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", partition_value.to_string()));
         }
-        result = ss.str();
     }
     catch (const UnsupportedBsonPartition&) {
         throw;
@@ -518,8 +513,8 @@ static std::string string_from_partition(const std::string& partition)
         // FIXME: the partition wasn't a bson formatted string, this can happen when using the
         // test sync server which only accepts filesystem type paths, in this case return the raw partition.
         // Once we migrate away from using the sync server in tests, this code path should not be necessary.
+        return partition;
     }
-    return result;
 }
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& realm_file_name) const

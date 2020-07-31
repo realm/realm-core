@@ -35,14 +35,14 @@ void PushClient::register_device(const std::string& registration_token,
     };
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
     std::string route = m_auth_request_client->url_for_path(push_route);
-    
+
     bson::BsonDocument args {
         {"registrationToken", registration_token}
     };
-    
+
     std::stringstream s;
     s << bson::Bson(args);
-    
+
     m_auth_request_client->do_authenticated_request({
         HttpMethod::put,
         route,
@@ -67,7 +67,7 @@ void PushClient::deregister_device(std::shared_ptr<SyncUser> sync_user,
     };
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
     std::string route = m_auth_request_client->url_for_path(push_route);
-        
+
     m_auth_request_client->do_authenticated_request({
         HttpMethod::del,
         route,

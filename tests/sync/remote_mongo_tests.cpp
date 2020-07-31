@@ -40,7 +40,7 @@ std::string operator ""_nows(const char* str, size_t len) {
     auto out = std::string();
     auto first = true;
     for (auto line = std::string(); std::getline(stream, line); ) {
-        if (first) { 
+        if (first) {
             first = false;
             if (line.empty())
                 continue;
@@ -143,7 +143,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
     }
-              
+
     SECTION("errors") {
         SECTION("well-formed server error") {
             SECTION("simple") {
@@ -248,7 +248,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
 
 TEST_CASE("WatchStream line processing", "[mongo]") {
     WatchStream ws;
-    
+
     SECTION("simple") {
         ws.feed_line(R"(event: message)");
         REQ_ND;
@@ -474,7 +474,7 @@ TEST_CASE("WatchStream line processing", "[mongo]") {
 
 TEST_CASE("WatchStream buffer processing", "[mongo]") {
     WatchStream ws;
-    
+
     SECTION("simple") {
         ws.feed_buffer(R"(
             event: message

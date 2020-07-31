@@ -38,7 +38,7 @@ public:
     m_app_id(app_id),
     m_timeout_ms(timeout_ms),
     m_auth_request_client(auth_request_client) { }
-    
+
     ~PushClient() = default;
     PushClient(const PushClient&) = default;
     PushClient(PushClient&&) = default;
@@ -64,7 +64,7 @@ public:
 
 private:
     friend class App;
-    
+
     std::string m_service_name;
     std::string m_app_id;
     uint64_t m_timeout_ms;

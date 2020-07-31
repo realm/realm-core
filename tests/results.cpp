@@ -999,6 +999,7 @@ TEST_CASE("notifications: TableView delivery") {
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.max_number_of_active_versions = 5;
 
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
@@ -1110,6 +1111,15 @@ TEST_CASE("notifications: TableView delivery") {
         r->begin_transaction();
         REQUIRE(results.size() == 11);
         r->cancel_transaction();
+    }
+
+    SECTION("unused background TVs do not pin old versions forever") {
+        // This will exceed the maximum active version count (5) if any
+        // transactions are being pinned, resulting in make_remote_change() throwing
+        for (int i = 0; i < 10; ++i) {
+            REQUIRE_NOTHROW(make_remote_change());
+            advance_and_notify(*r);
+        }
     }
 }
 
@@ -3232,7 +3242,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
         r.set_property_value(ctx, "string array", util::Any(AnyVec{"a"s, "b"s, "c"s}));
         check_array(table->get_column_key("string array"), StringData("a"), StringData("b"), StringData("c"));
- 
+
         r.set_property_value(ctx, "data array", util::Any(AnyVec{"d"s, "e"s, "f"s}));
         check_array(table->get_column_key("data array"), BinaryData("d",1), BinaryData("e",1), BinaryData("f",1));
 

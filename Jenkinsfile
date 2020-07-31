@@ -9,14 +9,12 @@ dependencies = null
 
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
-  def tag = readFile('tag.txt').trim()
-  return tag
+  return readFile('tag.txt').trim()
 }
 
 def readGitSha() {
   sh "git rev-parse HEAD | cut -b1-8 > sha.txt"
-  def sha = readFile('sha.txt').readLines().last().trim()
-  return sha
+  return readFile('sha.txt').readLines().last().trim()
 }
 
 def publishCoverageReport(String label) {
@@ -65,17 +63,11 @@ def nodeWithSources(String nodespec, Closure steps) {
   }
 }
 
-def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, String sanitizerFlags = "") {
+def doDockerBuild(String flavor, Boolean enableSync, String sanitizerFlags = "") {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
   def buildDir = "build"
-  def cmakeFlags = ""
-  if (withCoverage) {
-    cmakeFlags += "-DCMAKE_BUILD_TYPE=Coverage "
-  } else {
-    cmakeFlags += "-DCMAKE_BUILD_TYPE=RelWithDebInfo "
-  }
-  cmakeFlags += sanitizerFlags;
+  def cmakeFlags = "-DCMAKE_BUILD_TYPE=RelWithDebInfo " + sanitizerFlags
 
   return {
     nodeWithSources('docker') {
@@ -93,15 +85,8 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
               cmakeFlags += "-DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=\"http://mongodb-realm:9090\" -DREALM_STITCH_CONFIG=\"${sourcesDir}/tests/mongodb/stitch.json\" "
             }
             sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags}"
-            if (withCoverage) {
-              sh "cmake --build ${buildDir} --target generate-coverage-cobertura" // builds and runs tests
-              sh "mv ${buildDir}/coverage.xml coverage-${label}.xml"
-              echo "Stashing coverage-${label}"
-              stash includes: "coverage-${label}.xml", name: "coverage-${label}"
-            } else {
-              sh "cmake --build ${buildDir} --target tests"
-              sh "./${buildDir}/tests/tests ${testArguments}"
-            }
+            sh "cmake --build ${buildDir} --target tests"
+            sh "./${buildDir}/tests/tests ${testArguments}"
           }
         }
       }
@@ -213,11 +198,13 @@ jobWrapper { // sets the max build time to 2 hours
 
   stage('unit-tests') {
     parallel(
-      linux: doDockerBuild('linux', false, false),
-      linux_sync: doDockerBuild('linux', true, true),
+      linux: doDockerBuild('linux', false),
+      linux_sync: doDockerBuild('linux', true),
+      linux_asan: doDockerBuild('linux', true, '-DSANITIZE_ADDRESS=1'),
       macos_asan: doBuild('osx', 'macOS', true, '-DSANITIZE_ADDRESS=1'),
       // FIXME: the tsan build works, but it's reporting legit races that need to be fixed
       // see https://github.com/realm/realm-object-store/pull/905
+      // linux_tsan: doDockerBuild('linux', true, '-DSANITIZE_THREAD=1'),
       // macos_tsan: doBuild('osx', 'macOS', true, '-DSANITIZE_THREAD=1'),
       android: doAndroidDockerBuild(),
       macos: doBuild('osx', 'macOS', false),
@@ -232,11 +219,10 @@ jobWrapper { // sets the max build time to 2 hours
     node('docker') {
       // we need sources to allow the coverage report to display them
       rlmCheckout(scm)
-      // coverage reports assume sources are in the parent directory
-      dir("build") {
-        publishCoverageReport('linux-sync')
-      }
+        // coverage reports assume sources are in the parent directory
+        dir("build") {
+          publishCoverageReport('macOS-sync')
+        }
     }
   }
-
 } // jobWrapper

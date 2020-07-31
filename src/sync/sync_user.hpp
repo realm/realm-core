@@ -166,7 +166,7 @@ public:
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
-    
+
     /// Returns true id the users access_token and refresh_token are set.
     bool is_logged_in() const;
 
@@ -188,16 +188,16 @@ public:
     std::string access_token() const;
 
     std::string refresh_token() const;
-    
+
     RealmJWT refresh_jwt() const
     {
         return m_refresh_token;
     }
-    
+
     std::string device_id() const;
-    
+
     bool has_device_id() const;
-    
+
     SyncUserProfile user_profile() const;
 
     std::vector<SyncUserIdentity> identities() const;
@@ -207,7 +207,7 @@ public:
 
     State state() const;
     void set_state(SyncUser::State state);
-    
+
     std::shared_ptr<SyncUserContext> binding_context() const
     {
         return m_binding_context.load();
@@ -218,10 +218,10 @@ public:
     // immediately, or upon the user becoming Active.
     // Note that this is called by the SyncManager, and should not be directly called.
     void register_session(std::shared_ptr<SyncSession>);
-    
+
     /// Refreshes the custom data for this user
     void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
-    
+
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
@@ -264,7 +264,7 @@ private:
     std::vector<SyncUserIdentity> m_user_identities;
 
     SyncUserProfile m_user_profile;
-    
+
     const std::string m_device_id;
 };
 
