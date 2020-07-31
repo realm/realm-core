@@ -1400,14 +1400,11 @@ public:
     }
 
     template <class X, class Y>
-    static constexpr bool IsNullToObjectId = false;
-    template <>
-    static constexpr bool IsNullToObjectId<realm::null, ObjectId> = true;
+    static constexpr bool IsNullToObjectId = std::is_same<X, realm::null>::value&& std::is_same<Y, ObjectId>::value;
 
     template <class X, class Y>
-    static constexpr bool IsObjectIdToTimestamp = false;
-    template <>
-    static constexpr bool IsObjectIdToTimestamp<ObjectId, Timestamp> = true;
+    static constexpr bool IsObjectIdToTimestamp =
+        std::is_same<X, ObjectId>::value&& std::is_same<Y, Timestamp>::value;
 
     // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
