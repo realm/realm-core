@@ -194,6 +194,28 @@ inline int only_numeric(const BinaryData&)
     return 0;
 }
 
+
+template <class T>
+inline int only_numeric(const realm::null&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template <class T>
+inline std::enable_if_t<std::is_same_v<T, Timestamp>, int> only_numeric(const ObjectId&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template <class T>
+inline std::enable_if_t<std::is_same_v<T, ObjectId>, int> only_numeric(const Timestamp&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
 template <class T>
 inline StringData only_string_op_types(T in)
 {
@@ -1378,7 +1400,14 @@ public:
     }
 
     template <class X, class Y>
-    static constexpr bool IsNullToObjectId = std::is_same<X, realm::null>::value&& std::is_same<Y, ObjectId>::value;
+    static constexpr bool IsNullToObjectId = false;
+    template <>
+    static constexpr bool IsNullToObjectId<realm::null, ObjectId> = true;
+
+    template <class X, class Y>
+    static constexpr bool IsObjectIdToTimestamp = false;
+    template <>
+    static constexpr bool IsObjectIdToTimestamp<ObjectId, Timestamp> = true;
 
     // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
@@ -1391,8 +1420,25 @@ public:
         }
     }
 
+    // we specialize here because the conversion from ObjectId to Timestamp has been made explicit in order to catch
+    // wrong auto conversions
     template <class D>
-    std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D>>
+    std::enable_if_t<IsObjectIdToTimestamp<T, D>> REALM_FORCEINLINE export2(ValueBase& destination) const
+    {
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            if (m_storage.is_null(t)) {
+                d.m_storage.set_null(t);
+            }
+            else {
+                d.m_storage.set(t, m_storage[t].get_timestamp());
+            }
+        }
+    }
+
+    template <class D>
+    std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D> && !IsObjectIdToTimestamp<T, D>>
         REALM_FORCEINLINE export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never

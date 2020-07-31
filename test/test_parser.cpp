@@ -3946,10 +3946,12 @@ TEST(Parser_ObjectIdTimestamp)
     Timestamp ts_t25{now + std::chrono::seconds(25)};
     Timestamp ts_00{0, 0};
     std::vector<Timestamp> times = {ts_t1, ts_now, ts_t25, ts_00};
-    ObjectId t1{ts_t1};
-    ObjectId tNow{ts_now};
-    ObjectId t25{ts_t25};
-    ObjectId t00{ts_00};
+    int machine_id = 0;
+    int process_id = 0;
+    ObjectId t1{ts_t1, machine_id, process_id};
+    ObjectId tNow{ts_now, machine_id, process_id};
+    ObjectId t25{ts_t25, machine_id, process_id};
+    ObjectId t00{ts_00, machine_id, process_id};
     std::vector<ObjectId> ids = {t1, tNow, t25, t00};
 
     for (size_t i = 0; i < times.size(); ++i) {

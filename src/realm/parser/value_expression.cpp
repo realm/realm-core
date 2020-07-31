@@ -128,7 +128,7 @@ Timestamp ValueExpression::value_of_type_for_query<Timestamp>()
     } else if (value->type == parser::Expression::Type::Null) {
         return Timestamp(realm::null());
     }
-    throw std::logic_error("Attempting to compare Timestamp property to a non-Timestamp value");
+    throw std::logic_error("Timestamp properties must be compared against an Timestamp or ObjectId argument.");
 }
 
 template <>

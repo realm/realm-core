@@ -34,7 +34,7 @@ TEST(ObjectId_Basics)
     ObjectId id1(t0, 0xff0000, 0xefbe);
     CHECK_EQUAL(id1.to_string().substr(0, 18), init_str.substr(0, 18));
     CHECK_EQUAL(id1.get_timestamp(), t0);
-    ObjectId id2(Timestamp(0x54321, 0));
+    ObjectId id2(Timestamp(0x54321, 0), 0, 0);
     CHECK_GREATER(id2, id1);
     CHECK_LESS(id1, id2);
 
@@ -198,7 +198,7 @@ TEST(ObjectId_PrimaryKey)
     {
         auto wt = db->start_write();
         auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
-        table->create_object_with_primary_key(ObjectId(now));
+        table->create_object_with_primary_key(ObjectId(now, 0, 0));
         key = table->create_object_with_primary_key(id).get_key();
         wt->commit();
     }
@@ -342,7 +342,7 @@ TEST_TYPES(ObjectId_QueryTimestamp, std::true_type, std::false_type)
         auto col_ts = table->add_column(type_Timestamp, "ts");
 
         for (size_t i = 0; i < times.size(); ++i) {
-            auto obj = table->create_object_with_primary_key(ObjectId(times[i]));
+            auto obj = table->create_object_with_primary_key(ObjectId(times[i], 0, 0));
             obj.set(col_ts, times[i]);
         }
         wt->commit();
@@ -354,8 +354,8 @@ TEST_TYPES(ObjectId_QueryTimestamp, std::true_type, std::false_type)
         auto col_ts = table->get_column_key("ts");
 
         for (size_t i = 0; i < times.size(); ++i) {
-            // none are equal because a newly generated ObjectID also has random bits
-            CHECK_EQUAL((table->column<ObjectId>(col) == ObjectId(times[i])).count(), 0);
+            // none are equal because a newly generated ObjectID also has atomically increasing bits
+            CHECK_EQUAL((table->column<ObjectId>(col) == ObjectId(times[i], 0, 0)).count(), 0);
 
             // only equal if nanoseconds are zero, because ObjectId only stores seconds
             const size_t num_equal = times[i].get_nanoseconds() == 0 ? 1 : 0;
