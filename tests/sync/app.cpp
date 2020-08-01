@@ -3124,22 +3124,36 @@ TEST_CASE("app: auth providers", "[sync][app]") {
 
 }
 
+template<typename Factory>
+static App::Config get_config(Factory factory)
+{
+    return {
+        app_name,
+        factory,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+}
+
 TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
+    auto setup_user = []() {
+        if (SyncManager::shared().get_current_user()) {
+            return;
+        }
+
+        SyncManager::shared().get_user("a_user_id",
+                                       good_access_token,
+                                       good_access_token,
+                                       "anon-user",
+                                       dummy_device_id);
+    };
 
     SECTION("refresh custom data happy path") {
-
-        auto setup_user = []() {
-            if (realm::SyncManager::shared().get_current_user()) {
-                return;
-            }
-
-            realm::SyncManager::shared().get_user("a_user_id",
-                                                  good_access_token,
-                                                  good_access_token,
-                                                  "anon-user",
-                                                  dummy_device_id);
-        };
-
         static bool session_route_hit = false;
 
         std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
@@ -3149,8 +3163,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                 {
                     if (request.url.find("/session") != std::string::npos) {
                         session_route_hit = true;
-                        nlohmann::json json {
-                            { "access_token", good_access_token }
+                        nlohmann::json json{
+                            {"access_token", good_access_token}
                         };
                         completion_block({ 200, 0, {}, json.dump() });
                     } else if (request.url.find("/location") != std::string::npos) {
@@ -3162,18 +3176,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
 
-        auto config = App::Config {
-            app_name,
-            generic_factory,
-            util::none,
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"
-        };
-
+        auto config = get_config(generic_factory);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3191,19 +3194,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
     }
 
     SECTION("refresh custom data sad path") {
-
-        auto setup_user = []() {
-            if (realm::SyncManager::shared().get_current_user()) {
-                return;
-            }
-
-            realm::SyncManager::shared().get_user("a_user_id",
-                                                  good_access_token,
-                                                  good_access_token,
-                                                  "anon-user",
-                                                  dummy_device_id);
-        };
-
         static bool session_route_hit = false;
 
         std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
@@ -3226,18 +3216,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
 
-        auto config = App::Config {
-            app_name,
-            generic_factory,
-            util::none,
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"
-        };
-
+        auto config = get_config(generic_factory);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3256,19 +3235,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
     }
 
     SECTION("refresh token ensure flow is correct") {
-
-        auto setup_user = []() {
-            if (realm::SyncManager::shared().get_current_user()) {
-                return;
-            }
-
-            realm::SyncManager::shared().get_user("a_user_id",
-                                                  good_access_token,
-                                                  good_access_token,
-                                                  "anon-user",
-                                                  dummy_device_id);
-        };
-
         /*
          Expected flow:
          Login - this gets access and refresh tokens
@@ -3339,18 +3305,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
 
-        auto config = App::Config {
-            app_name,
-            factory,
-            util::none,
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"
-        };
-
+        auto config = get_config(factory);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3397,19 +3352,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new transport);
     };
 
-    auto config = App::Config {
-        app_name,
-        generic_factory,
-        util::none,
-        util::none,
-        Optional<std::string>("A Local App Version"),
-        util::none,
-        "Object Store Platform Tests",
-        "Object Store Platform Version Blah",
-        "An sdk version"
-    };
-
-    TestSyncManager sync_manager(config);
+    auto config = get_config(generic_factory);
+    TestSyncManager sync_manager(get_config(generic_factory), true, SyncManager::MetadataMode::NoEncryption);
     {
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
@@ -3430,112 +3374,102 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
 }
 
 TEST_CASE("app: make_streaming_request", "[sync][app]") {
-        UnitTestTransport::access_token = good_access_token;
+    UnitTestTransport::access_token = good_access_token;
 
-        constexpr auto timeout_ms = 60000;
-        auto config = App::Config {
-            app_name,
-            []{ return std::make_unique<UnitTestTransport>(); },
-            util::none,
-            util::none,
-            util::Optional<std::string>("A Local App Version"),
-            timeout_ms,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"
-        };
+    constexpr auto timeout_ms = 60000;
+    auto config = get_config([]{ return std::make_unique<UnitTestTransport>(); });
+    config.default_request_timeout_ms = timeout_ms;
+    TestSyncManager tsm(config);
+    auto app = tsm.app();
 
-        TestSyncManager tsm(config);
-        auto app = tsm.app();
+    std::shared_ptr<realm::SyncUser> user;
+    app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                 [&](std::shared_ptr<realm::SyncUser> user_arg,
+                                     util::Optional<app::AppError> error) {
+        REQUIRE(!error);
+        REQUIRE(user_arg);
+        user = std::move(user_arg);
+    });
+    REQUIRE(user);
 
-        std::shared_ptr<realm::SyncUser> user;
-        app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
-                                    [&](std::shared_ptr<realm::SyncUser> user_arg,
-                                        util::Optional<app::AppError> error) {
-            REQUIRE(!error);
-            REQUIRE(user_arg);
-            user = std::move(user_arg);
-        });
-        REQUIRE(user);
+    using Headers = decltype(Request().headers);
 
-        using Headers = decltype(Request().headers);
-
-        const auto url_prefix = "field/api/client/v2.0/app/django/functions/call?stitch_request="sv;
-        const auto get_request_args = [&] (const Request& req) {
-            REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
-            auto args = req.url.substr(url_prefix.size());
-            if (auto amp = args.find('&'); amp != std::string::npos) {
-                args.resize(amp);
-            }
-
-            auto vec = util::base64_decode_to_vector(util::uri_percent_decode(args));
-            REQUIRE(!!vec);
-            auto parsed = bson::parse({vec->data(), vec->size()});
-            REQUIRE(parsed.type() == bson::Bson::Type::Document);
-            auto out = parsed.operator const bson::BsonDocument&();
-            CHECK(out.size() == 3);
-            return out;
-        };
-
-        const auto common_checks = [&] (const Request& req) {
-            CHECK(req.method == HttpMethod::get);
-            CHECK(req.body == "");
-            CHECK(req.headers == Headers{{"Accept", "text/event-stream"}});
-            CHECK(req.timeout_ms == timeout_ms);
-            CHECK(req.uses_refresh_token == false);
-        };
-
-        SECTION("no args") {
-            auto args = bson::BsonArray{};
-            auto req = app->make_streaming_request(nullptr, "func", args, {"svc"});
-            common_checks(req);
-            auto req_args = get_request_args(req);
-            CHECK(req_args["name"] == "func");
-            CHECK(req_args["service"] == "svc");
-            CHECK(req_args["arguments"] == args);
-
-            CHECK(req.url.find('&') == std::string::npos);
+    const auto url_prefix = "field/api/client/v2.0/app/django/functions/call?stitch_request="sv;
+    const auto get_request_args = [&] (const Request& req) {
+        REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
+        auto args = req.url.substr(url_prefix.size());
+        if (auto amp = args.find('&'); amp != std::string::npos) {
+            args.resize(amp);
         }
-        SECTION("args") {
-            auto args = bson::BsonArray{"arg1", "arg2"};
-            auto req = app->make_streaming_request(nullptr, "func", args, {"svc"});
-            common_checks(req);
-            auto req_args = get_request_args(req);
-            CHECK(req_args["name"] == "func");
-            CHECK(req_args["service"] == "svc");
-            CHECK(req_args["arguments"] == args);
 
-            CHECK(req.url.find('&') == std::string::npos);
-        }
-        SECTION("percent encoding") {
-            // These force the base64 encoding to have + and / bytes and = padding, all of which are uri encoded.
-            auto args = bson::BsonArray{">>>>>?????"};
-            auto req = app->make_streaming_request(nullptr, "func", args, {"svc"});
-            common_checks(req);
-            auto req_args = get_request_args(req);
-            CHECK(req_args["name"] == "func");
-            CHECK(req_args["service"] == "svc");
-            CHECK(req_args["arguments"] == args);
+        auto vec = util::base64_decode_to_vector(util::uri_percent_decode(args));
+        REQUIRE(!!vec);
+        auto parsed = bson::parse({vec->data(), vec->size()});
+        REQUIRE(parsed.type() == bson::Bson::Type::Document);
+        auto out = parsed.operator const bson::BsonDocument&();
+        CHECK(out.size() == 3);
+        return out;
+    };
 
-            CHECK(req.url.find('&') == std::string::npos);
+    const auto common_checks = [&] (const Request& req) {
+        CHECK(req.method == HttpMethod::get);
+        CHECK(req.body == "");
+        CHECK(req.headers == Headers{{"Accept", "text/event-stream"}});
+        CHECK(req.timeout_ms == timeout_ms);
+        CHECK(req.uses_refresh_token == false);
+    };
 
-            CHECK(req.url.find("%2B") != std::string::npos); // + (from >)
-            CHECK(req.url.find("%2F") != std::string::npos); // / (from ?)
-            CHECK(req.url.find("%3D") != std::string::npos); // = (tail padding)
-            CHECK(req.url.rfind("%3D") == req.url.size() - 3); // = (tail padding)
-        }
-        SECTION("with user") {
-            auto args = bson::BsonArray{"arg1", "arg2"};
-            auto req = app->make_streaming_request(user, "func", args, {"svc"});
-            common_checks(req);
-            auto req_args = get_request_args(req);
-            CHECK(req_args["name"] == "func");
-            CHECK(req_args["service"] == "svc");
-            CHECK(req_args["arguments"] == args);
+    SECTION("no args") {
+        auto args = bson::BsonArray{};
+        auto req = app->make_streaming_request(nullptr, "func", args, {"svc"});
+        common_checks(req);
+        auto req_args = get_request_args(req);
+        CHECK(req_args["name"] == "func");
+        CHECK(req_args["service"] == "svc");
+        CHECK(req_args["arguments"] == args);
 
-            auto amp = req.url.find('&');
-            REQUIRE(amp != std::string::npos);
-            auto tail = req.url.substr(amp);
-            REQUIRE(tail == ("&stitch_at=" + user->access_token()));
-        }
+        CHECK(req.url.find('&') == std::string::npos);
+    }
+    SECTION("args") {
+        auto args = bson::BsonArray{"arg1", "arg2"};
+        auto req = app->make_streaming_request(nullptr, "func", args, {"svc"});
+        common_checks(req);
+        auto req_args = get_request_args(req);
+        CHECK(req_args["name"] == "func");
+        CHECK(req_args["service"] == "svc");
+        CHECK(req_args["arguments"] == args);
+
+        CHECK(req.url.find('&') == std::string::npos);
+    }
+    SECTION("percent encoding") {
+        // These force the base64 encoding to have + and / bytes and = padding, all of which are uri encoded.
+        auto args = bson::BsonArray{">>>>>?????"};
+        auto req = app->make_streaming_request(nullptr, "func", args, {"svc"});
+        common_checks(req);
+        auto req_args = get_request_args(req);
+        CHECK(req_args["name"] == "func");
+        CHECK(req_args["service"] == "svc");
+        CHECK(req_args["arguments"] == args);
+
+        CHECK(req.url.find('&') == std::string::npos);
+
+        CHECK(req.url.find("%2B") != std::string::npos); // + (from >)
+        CHECK(req.url.find("%2F") != std::string::npos); // / (from ?)
+        CHECK(req.url.find("%3D") != std::string::npos); // = (tail padding)
+        CHECK(req.url.rfind("%3D") == req.url.size() - 3); // = (tail padding)
+    }
+    SECTION("with user") {
+        auto args = bson::BsonArray{"arg1", "arg2"};
+        auto req = app->make_streaming_request(user, "func", args, {"svc"});
+        common_checks(req);
+        auto req_args = get_request_args(req);
+        CHECK(req_args["name"] == "func");
+        CHECK(req_args["service"] == "svc");
+        CHECK(req_args["arguments"] == args);
+
+        auto amp = req.url.find('&');
+        REQUIRE(amp != std::string::npos);
+        auto tail = req.url.substr(amp);
+        REQUIRE(tail == ("&stitch_at=" + user->access_token()));
+    }
 }

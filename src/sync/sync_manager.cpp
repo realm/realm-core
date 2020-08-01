@@ -228,6 +228,7 @@ void SyncManager::reset_for_testing()
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
         m_users.clear();
+        m_current_user = nullptr;
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -341,6 +342,8 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                    SyncUser::State::LoggedIn,
                                                    device_id);
         m_users.emplace(m_users.begin(), new_user);
+        if (!m_metadata_manager)
+            m_current_user = new_user;
         return new_user;
     } else {
         auto user = *it;
@@ -371,40 +374,33 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
     return m_users;
 }
 
+std::shared_ptr<SyncUser> SyncManager::get_user_for_identity(std::string const& identity) const noexcept
+{
+    auto is_active_user = [identity](auto& el) {
+        return el->identity() == identity;
+    };
+    auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
+    return it == m_users.end() ? nullptr : *it;
+}
+
 std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
-    if (!m_metadata_manager) {
+    if (m_current_user)
+        return m_current_user;
+    if (!m_metadata_manager)
         return nullptr;
-    }
 
     auto cur_user_ident = m_metadata_manager->get_current_user_identity();
-    if (!cur_user_ident) {
-        return nullptr;
-    }
-
-    std::string ident = *cur_user_ident;
-    auto is_active_user = [&](auto& el) {
-        return el->identity() == ident;
-    };
-
-    auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
-    if (it == m_users.end())
-        return nullptr;
-
-    return *it;
+    return cur_user_ident ? get_user_for_identity(*cur_user_ident) : nullptr;
 }
 
 void SyncManager::log_out_user(const std::string& user_id)
 {
-    // Erase and insert this user as the end of the vector
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
-    if (!m_metadata_manager) {
-        return;
-    }
-
+    // Move this user to the end of the vector
     if (m_users.size() > 1) {
         auto it = std::find_if(m_users.begin(),
                                m_users.end(),
@@ -412,58 +408,54 @@ void SyncManager::log_out_user(const std::string& user_id)
             return user->identity() == user_id;
         });
 
-        if (it == m_users.end())
-            return;
-
-        std::rotate(it, it + 1, m_users.end());
+        if (it != m_users.end())
+            std::rotate(it, it + 1, m_users.end());
     }
+
+    bool was_active = (m_current_user && m_current_user->identity() == user_id)
+        || (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user_id);
+    if (!was_active)
+        return;
 
     // Set the current active user to the next logged in user, or null if none
     for (auto& user : m_users) {
         if (user->state() == SyncUser::State::LoggedIn) {
-            m_metadata_manager->set_current_user_identity(user->identity());
+            if (m_metadata_manager)
+                m_metadata_manager->set_current_user_identity(user->identity());
+            m_current_user = user;
             return;
         }
     }
 
-    m_metadata_manager->set_current_user_identity("");
+    if (m_metadata_manager)
+        m_metadata_manager->set_current_user_identity("");
+    m_current_user = nullptr;
 }
 
 void SyncManager::set_current_user(const std::string& user_id)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
-    if (!m_metadata_manager) {
-        return;
-    }
-
-    m_metadata_manager->set_current_user_identity(user_id);
+    m_current_user = get_user_for_identity(user_id);
+    if (m_metadata_manager)
+        m_metadata_manager->set_current_user_identity(user_id);
 }
 
 void SyncManager::remove_user(const std::string& user_id)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-
-    auto it = std::find_if(m_users.begin(),
-                           m_users.end(),
-                           [user_id](const auto& user) {
-        return user->identity() == user_id;
-    });
-
-    if (it == m_users.end())
+    auto user = get_user_for_identity(user_id);
+    if (!user)
         return;
+    user->set_state(SyncUser::State::Removed);
 
-    auto user = *it;
-
-    if (!m_metadata_manager) {
+    if (!m_metadata_manager)
         return;
-    }
 
     for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
         auto metadata = m_metadata_manager->all_unmarked_users().get(i);
         if (user->identity() == metadata.identity()) {
             metadata.mark_for_removal();
-            user->set_state(SyncUser::State::Removed);
         }
     }
 }
@@ -471,16 +463,8 @@ void SyncManager::remove_user(const std::string& user_id)
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = std::find_if(m_users.begin(),
-                           m_users.end(),
-                           [user_id](const auto& user) {
-        return user->identity() == user_id;
-    });
-    if (it == m_users.end())
-        return nullptr;
-
-    auto user = *it;
-    return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
+    auto user = get_user_for_identity(user_id);
+    return user && user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
 
 struct UnsupportedBsonPartition : public std::logic_error {

@@ -234,6 +234,8 @@ private:
 
     std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const;
 
+    std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept;
+
     mutable std::mutex m_mutex;
 
     bool run_file_action(const SyncFileActionMetadata&);
@@ -244,6 +246,7 @@ private:
 
     // A vector of all SyncUser objects.
     std::vector<std::shared_ptr<SyncUser>> m_users;
+    std::shared_ptr<SyncUser> m_current_user;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
