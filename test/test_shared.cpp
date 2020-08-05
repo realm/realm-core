@@ -523,6 +523,90 @@ TEST(Shared_ReadAfterCompact)
     CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
 }
 
+TEST(Shared_ReadOverRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->create_object().set_all(1);
+        wt.commit();
+    }
+    DBRef sg2 = DB::create(path);
+    auto rt2 = sg2->start_read();
+    auto table2 = rt2->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg2);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table2->size(), 1);
+    CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
+}
+
+TEST(Shared_ReadOverReadAfterCompact)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->create_object().set_all(1);
+        wt.commit();
+    }
+    sg->compact();
+    DBRef sg2 = DB::create(path);
+    auto rt = sg->start_read();
+    auto rt2 = sg2->start_read();
+    auto table = rt->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table->size(), 1);
+    CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
+
+    auto table2 = rt2->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg2);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table2->size(), 1);
+    CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
+}
+
+
+TEST(Shared_ReadOverRead2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        DBRef sg = DB::create(path);
+        {
+            WriteTransaction wt(sg);
+            auto table = wt.add_table("table");
+            table->add_column(type_Int, "col");
+            table->create_object().set_all(1);
+            wt.commit();
+        }
+    }
+    DBRef sg3 = DB::create(path);
+    DBRef sg2 = DB::create(path);
+    auto rt2 = sg2->start_read();
+    auto table2 = rt2->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg2);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table2->size(), 1);
+    CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
+}
+
 
 TEST(Shared_EncryptedRemap)
 {
