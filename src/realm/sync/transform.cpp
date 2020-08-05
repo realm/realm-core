@@ -1597,7 +1597,7 @@ DEFINE_MERGE(Instruction::EraseColumn, Instruction::Update)
 DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Update)
 {
     if (same_container(left, right)) {
-        REALM_ASSERT(right.is_array_update());
+        REALM_MERGE_ASSERT(right.is_array_update());
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         right.prior_size += 1;
         if (right.index() >= left.index()) {
@@ -1609,7 +1609,7 @@ DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Update)
 DEFINE_MERGE(Instruction::ArrayMove, Instruction::Update)
 {
     if (same_container(left, right)) {
-        REALM_ASSERT(right.is_array_update());
+        REALM_MERGE_ASSERT(right.is_array_update());
         // FIXME: This marks both sides as dirty, even when they are unmodified.
         merge_get_vs_move(right.index(), left.index(), left.ndx_2);
     }
@@ -1618,7 +1618,7 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::Update)
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 {
     if (same_container(left, right)) {
-        REALM_ASSERT(right.is_array_update());
+        REALM_MERGE_ASSERT(right.is_array_update());
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         right.prior_size -= 1;
 
