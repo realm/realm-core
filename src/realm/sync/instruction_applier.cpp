@@ -483,10 +483,19 @@ void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 {
+    if (instr.index() > instr.prior_size) {
+        bad_transaction_log("ArrayInsert: Invalid insertion index (index = %1, prior_size = %2)", instr.index(),
+                            instr.prior_size);
+    }
+
     auto& list = get_list(instr, "ArrayInsert");
 
     if (instr.index() > list.size()) {
         bad_transaction_log("ArrayInsert out of bounds");
+    }
+    if (instr.prior_size != list.size()) {
+        bad_transaction_log("ArrayInsert: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                            instr.prior_size);
     }
 
     auto table = list.get_table();
@@ -550,6 +559,10 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
         // FIXME: Does this really need to be an error?
         bad_transaction_log("ArrayMove to same location (%1)", instr.index());
     }
+    if (instr.prior_size != list.size()) {
+        bad_transaction_log("ArrayMove: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                            instr.prior_size);
+    }
 
     list.move(instr.index(), instr.ndx_2);
 }
@@ -558,8 +571,16 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
     auto& list = get_list(instr, "ArrayErase");
 
+    if (instr.index() > instr.prior_size) {
+        bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", instr.index(),
+                            instr.prior_size);
+    }
     if (instr.index() >= list.size()) {
         bad_transaction_log("ArrayErase out of bounds (%1 >= %2)", instr.index(), list.size());
+    }
+    if (instr.prior_size != list.size()) {
+        bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                            instr.prior_size);
     }
 
     list.remove(instr.index(), instr.index() + 1);
@@ -568,6 +589,10 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 {
     auto& list = get_list(instr, "ArrayClear");
+    if (instr.prior_size != list.size()) {
+        bad_transaction_log("ArrayClear: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                            instr.prior_size);
+    }
 
     list.clear();
 }
