@@ -1355,6 +1355,10 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
     m_youngest_live_version = youngest_live_version;
 }
 
+void SlabAlloc::init_mapping_management(uint64_t currently_live_version)
+{
+    m_youngest_live_version = currently_live_version;
+}
 
 const SlabAlloc::Chunks& SlabAlloc::get_free_read_only() const
 {

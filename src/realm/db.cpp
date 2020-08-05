@@ -1147,9 +1147,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 info->number_of_versions = 1;
 
                 info->latest_version_number = version;
-                // there isn't really any old mappings to purge, but this has the side effect of properly
-                // setting up the memory mapping machinery.
-                alloc.purge_old_mappings(version, version);
+                alloc.init_mapping_management(version);
 
                 SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();
@@ -1225,9 +1223,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // We need to setup the allocators version information, as it is needed
                 // to correctly age and later reclaim memory mappings.
                 version_type version = info->latest_version_number;
-                // there isn't really any old mappings to purge, but this has the side effect of properly
-                // setting up the memory mapping machinery.
-                alloc.purge_old_mappings(version, version);
+                alloc.init_mapping_management(version);
             }
 
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
@@ -1466,9 +1462,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.encryption_key = write_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg);
-        // there isn't really any old mappings to purge, but this has the side effect of properly
-        // setting up the memory mapping machinery.
-        m_alloc.purge_old_mappings(info->latest_version_number, info->latest_version_number);
+        m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
         SharedInfo* r_info = m_reader_map.get_addr();
         size_t file_size = m_alloc.get_baseline();
