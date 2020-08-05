@@ -329,6 +329,33 @@ TEST(ObjectId_Query)
     }
 }
 
+TEST(ObjectId_Distinct)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+
+    {
+        std::vector<ObjectId> ids{"000004560000000000170232", "000004560000000000170233", "000004550000000000170232"};
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_id = table->add_column(type_ObjectId, "id", true);
+        for (int i = 1; i < 10; i++) {
+            auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
+        }
+
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        ColKey col = table->get_column_key("id");
+        DescriptorOrdering order;
+        order.append_distinct(DistinctDescriptor({{col}}));
+        auto tv = table->where().find_all(order);
+        CHECK_EQUAL(tv.size(), 3);
+    }
+}
+
 TEST(ObjectId_Gen)
 {
     auto a = ObjectId::gen();

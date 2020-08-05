@@ -242,6 +242,32 @@ TEST(Decimal_Query)
     }
 }
 
+TEST(Decimal_Distinct)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_dec = table->add_column(type_Decimal, "price", true);
+        for (int i = 1; i < 100; i++) {
+            auto obj = table->create_object().set(col_dec, Decimal128(i % 10));
+        }
+
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        ColKey col = table->get_column_key("price");
+        DescriptorOrdering order;
+        order.append_distinct(DistinctDescriptor({{col}}));
+        auto tv = table->where().find_all(order);
+        CHECK_EQUAL(tv.size(), 10);
+    }
+}
+
 TEST(Decimal_Aggregates)
 {
     SHARED_GROUP_TEST_PATH(path);

@@ -67,10 +67,12 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Quote
 {
     std::locale loc = out.getloc();
     const std::ctype<C>& ctype = std::use_facet<std::ctype<C>>(loc);
+    C dquote = ctype.widen('"');
+    C bslash = ctype.widen('\\');
     util::BasicStringView<C, T> view = quoted.view;
     if (quoted.smart && !view.empty()) {
         for (C ch : view) {
-            if (ch == '"' || ch == '\\' || !ctype.is(ctype.graph, ch))
+            if (ch == dquote || ch == bslash || !ctype.is(ctype.graph, ch))
                 goto quote;
         }
         return out << view; // Throws
@@ -78,40 +80,41 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Quote
 quote:
     typename std::basic_ostream<C, T>::sentry sentry{out};
     if (REALM_LIKELY(sentry)) {
-        C dquote = ctype.widen('"');
-        C bslash = ctype.widen('\\');
         out.put(dquote); // Throws
         bool follows_hex = false;
         for (C ch : view) {
             if (REALM_LIKELY(ctype.is(ctype.print, ch))) {
                 if (REALM_LIKELY(!follows_hex || !ctype.is(ctype.xdigit, ch))) {
-                    if (REALM_LIKELY(ch != '"' || ch != '\\'))
+                    if (REALM_LIKELY(ch != dquote && ch != bslash))
                         goto put_char;
                     goto escape_char;
                 }
             }
-            switch (ch) {
-                case '\a':
-                    ch = ctype.widen('a');
-                    goto escape_char;
-                case '\b':
-                    ch = ctype.widen('b');
-                    goto escape_char;
-                case '\f':
-                    ch = ctype.widen('f');
-                    goto escape_char;
-                case '\n':
-                    ch = ctype.widen('n');
-                    goto escape_char;
-                case '\r':
-                    ch = ctype.widen('r');
-                    goto escape_char;
-                case '\t':
-                    ch = ctype.widen('t');
-                    goto escape_char;
-                case '\v':
-                    ch = ctype.widen('v');
-                    goto escape_char;
+            {
+                char ch_2 = ctype.narrow(ch, '\0');
+                switch (ch_2) {
+                    case '\a':
+                        ch = ctype.widen('a');
+                        goto escape_char;
+                    case '\b':
+                        ch = ctype.widen('b');
+                        goto escape_char;
+                    case '\f':
+                        ch = ctype.widen('f');
+                        goto escape_char;
+                    case '\n':
+                        ch = ctype.widen('n');
+                        goto escape_char;
+                    case '\r':
+                        ch = ctype.widen('r');
+                        goto escape_char;
+                    case '\t':
+                        ch = ctype.widen('t');
+                        goto escape_char;
+                    case '\v':
+                        ch = ctype.widen('v');
+                        goto escape_char;
+                }
             }
             goto numeric;
         escape_char:

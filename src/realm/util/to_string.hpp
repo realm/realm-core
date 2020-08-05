@@ -121,6 +121,12 @@ std::string to_string(const T& v)
 
 std::string format(const char* fmt, std::initializer_list<Printable>);
 
+// format string format:
+//  "%%" - literal '%'
+//  "%1" - substitutes Nth argument, 1-indexed
+//
+// format("Hello %1, meet %2. %3%% complete.", "Alice", "Bob", 97)
+//  -> "Hello Alice, meet Bob. 97% complete."
 template<typename... Args>
 std::string format(const char* fmt, Args&&... args)
 {

@@ -201,6 +201,8 @@ public:
 
     Type type() const noexcept;
 
+    std::string toJson() const;
+
     bool operator==(const Bson& other) const;
     bool operator!=(const Bson& other) const;
 
@@ -346,7 +348,7 @@ using BsonArray = std::vector<Bson>;
 
 std::ostream& operator<<(std::ostream& out, const Bson& b);
 
-Bson parse(const std::string& json);
+Bson parse(const std::string_view& json);
 
 } // namespace bson
 } // namespace realm

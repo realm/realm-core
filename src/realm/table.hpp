@@ -142,7 +142,7 @@ public:
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have at most 1 backlink. Return value
+    // not have a primary key and all objects must have exactly 1 backlink. Return value
     // indicates if the conversion was done
     bool set_embedded(bool embedded);
     //@}
@@ -217,9 +217,14 @@ public:
     // Create an object with specific GlobalKey - or return already existing object
     // Potential tombstone will be resurrected
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
-    // Create an object with primary key - or return already existing object
+    // Create an object with primary key. If an object with the given primary key already exists, it
+    // will be returned and did_create (if supplied) will be set to false.
     // Potential tombstone will be resurrected
-    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&& = {});
+    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&&, bool* did_create = nullptr);
+    Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr)
+    {
+        return create_object_with_primary_key(primary_key, {{}}, did_create);
+    }
     // Return key for existing object or return null key.
     ObjKey find_primary_key(Mixed value) const;
     // Return ObjKey for object identified by id. If objects does not exist, return null key
@@ -394,10 +399,6 @@ public:
     ConstTableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     ConstTableView find_all_null(ColKey col_key) const;
-
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
-    TableView get_distinct_view(ColKey col_key);
-    ConstTableView get_distinct_view(ColKey col_key) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;
@@ -627,12 +628,10 @@ private:
 
     // Migration support
     void migrate_column_info(util::FunctionRef<void()>);
-    void migrate_indexes(util::FunctionRef<void()>);
+    void migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_subspec(util::FunctionRef<void()>);
-    void convert_links_from_ndx_to_key(util::FunctionRef<void()>);
-    ref_type get_oid_column_ref() const;
     void create_columns(util::FunctionRef<void()>);
-    void migrate_objects(util::FunctionRef<void()>);
+    void migrate_objects(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_links(util::FunctionRef<void()>);
     void finalize_migration();
 

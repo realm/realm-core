@@ -218,22 +218,22 @@ void Group::set_size() const noexcept
     m_num_tables = retval;
 }
 
-void Group::remove_pk_table()
+std::map<TableRef, ColKey> Group::get_primary_key_columns_from_pk_table(TableRef pk_table)
 {
-    TableRef pk_table = get_table("pk");
-    if (pk_table) {
-        ColKey col_table = pk_table->get_column_key("pk_table");
-        ColKey col_prop = pk_table->get_column_key("pk_property");
-        for (auto pk_obj : *pk_table) {
-            auto object_type = pk_obj.get<String>(col_table);
-            auto name = std::string(g_class_name_prefix) + std::string(object_type);
-            auto table = get_table(name);
-            auto pk_col_name = pk_obj.get<String>(col_prop);
-            auto pk_col = table->get_column_key(pk_col_name);
-            table->do_set_primary_key_column(pk_col);
-        }
-        this->remove_table("pk");
+    std::map<TableRef, ColKey> ret;
+    REALM_ASSERT(pk_table);
+    ColKey col_table = pk_table->get_column_key("pk_table");
+    ColKey col_prop = pk_table->get_column_key("pk_property");
+    for (auto pk_obj : *pk_table) {
+        auto object_type = pk_obj.get<String>(col_table);
+        auto name = std::string(g_class_name_prefix) + std::string(object_type);
+        auto table = get_table(name);
+        auto pk_col_name = pk_obj.get<String>(col_prop);
+        auto pk_col = table->get_column_key(pk_col_name);
+        ret.emplace(table, pk_col);
     }
+
+    return ret;
 }
 
 TableKey Group::ndx2key(size_t ndx) const
@@ -322,6 +322,42 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     return 11;
 }
 
+void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
+                                         int& history_schema_version) noexcept
+{
+    using version_type = _impl::History::version_type;
+    version_type version_2 = 0;
+    int history_type_2 = 0;
+    int history_schema_version_2 = 0;
+    if (top.is_attached()) {
+        if (top.size() > s_version_ndx) {
+            version_2 = version_type(top.get_as_ref_or_tagged(s_version_ndx).get_as_int());
+        }
+        if (top.size() > s_hist_type_ndx) {
+            history_type_2 = int(top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
+        }
+        if (top.size() > s_hist_version_ndx) {
+            history_schema_version_2 = int(top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
+        }
+    }
+    // Version 0 is not a legal initial version, so it has to be set to 1
+    // instead.
+    if (version_2 == 0)
+        version_2 = 1;
+    version = version_2;
+    history_type = history_type_2;
+    history_schema_version = history_schema_version_2;
+}
+
+int Group::get_history_schema_version() noexcept
+{
+    bool history_schema_version = (m_top.is_attached() && m_top.size() > s_hist_version_ndx);
+    if (history_schema_version) {
+        return int(m_top.get_as_ref_or_tagged(s_hist_version_ndx).get_as_int());
+    }
+    return 0;
+}
+
 uint64_t Group::get_sync_file_id() const noexcept
 {
     if (m_top.is_attached() && m_top.size() > s_sync_file_id_ndx) {
@@ -371,40 +407,69 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     if (current_file_format_version <= 9 && target_file_format_version >= 10) {
         DisableReplication disable_replication(*this);
 
-        std::vector<TableKey> table_keys;
+        std::vector<TableRef> table_accessors;
+        TableRef pk_table;
+        std::map<TableRef, ColKey> pk_cols;
+        // Use table lookup by name. The table keys are not generated yet
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
+            // In file format version 9 files, all names represent existing tables.
             auto table = get_table(name);
-            table_keys.push_back(table->get_key());
+            if (name == "pk") {
+                pk_table = table;
+            }
+            else {
+                table_accessors.push_back(table);
+            }
         }
-
         auto commit_and_continue = [this]() {
             commit_and_continue_writing();
         };
-        for (auto k : table_keys) {
-            get_table(k)->migrate_column_info(commit_and_continue);
+
+        for (auto k : table_accessors) {
+            k->migrate_column_info(commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_indexes(commit_and_continue);
+
+        if (pk_table) {
+            pk_table->migrate_column_info(commit_and_continue);
+            pk_table->migrate_indexes(ColKey(), commit_and_continue);
+            pk_table->create_columns(commit_and_continue);
+            pk_table->migrate_objects(ColKey(), commit_and_continue);
+            pk_cols = get_primary_key_columns_from_pk_table(pk_table);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_subspec(commit_and_continue);
+
+        for (auto k : table_accessors) {
+            k->migrate_indexes(pk_cols[k], commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->convert_links_from_ndx_to_key(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->migrate_subspec(commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->create_columns(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->create_columns(commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_objects(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->migrate_objects(pk_cols[k], commit_and_continue);
         }
-        for (auto k : table_keys) {
-            get_table(k)->migrate_links(commit_and_continue);
+        for (auto k : table_accessors) {
+            k->migrate_links(commit_and_continue);
         }
-        remove_pk_table();
+        for (auto k : table_accessors) {
+            auto orig_row_ndx_col = k->get_column_key("!ROW_INDEX");
+            if (orig_row_ndx_col)
+                k->remove_column(orig_row_ndx_col);
+            auto oid_col = k->get_column_key("!OID");
+            if (oid_col)
+                k->remove_column(oid_col);
+            k->do_set_primary_key_column(pk_cols[k]);
+        }
+
+        if (pk_table) {
+            remove_table("pk");
+        }
     }
-    if (current_file_format_version <= 10 && target_file_format_version >= 11) {
+    // If we come from a file format version lower than 10, all objects with primary keys
+    // will be upgraded correctly by the above process
+    if (current_file_format_version == 10 && target_file_format_version >= 11) {
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);
@@ -559,20 +624,26 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
 
             // Logical file size must never exceed actual file size.
-            // First two entries must be valid refs pointing inside the file
             auto file_size = alloc.get_baseline();
-            if (logical_file_size > file_size || table_names_ref == 0 || table_names_ref > logical_file_size ||
-                (table_names_ref & 7) || tables_ref == 0 || tables_ref > logical_file_size || (tables_ref & 7)) {
-                std::string err = "Invalid top array (ref, [0], [1], [2]): " + util::to_string(top_ref) + ", " +
-                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref) + ", " +
-                                  util::to_string(logical_file_size);
+            if (logical_file_size > file_size) {
+                std::string err = "Invalid logical file size: " + util::to_string(logical_file_size) +
+                                  ", actual file size: " + util::to_string(file_size);
+                throw InvalidDatabase(err, "");
+            }
+            // First two entries must be valid refs pointing inside the file
+            auto invalid_ref = [logical_file_size](ref_type ref) {
+                return ref == 0 || (ref & 7) || ref > logical_file_size;
+            };
+            if (invalid_ref(table_names_ref) || invalid_ref(tables_ref)) {
+                std::string err = "Invalid top array (top_ref, [0], [1]): " + util::to_string(top_ref) + ", " +
+                                  util::to_string(table_names_ref) + ", " + util::to_string(tables_ref);
                 throw InvalidDatabase(err, "");
             }
             break;
         }
         default: {
-            std::string err =
-                "Invalid top array (ref: " + util::to_string(top_ref) + ", size: " + util::to_string(top_size) + ")";
+            std::string err = "Invalid top array size (ref: " + util::to_string(top_ref) +
+                              ", size: " + util::to_string(top_size) + ")";
             throw InvalidDatabase(err, "");
             break;
         }
@@ -1639,9 +1710,11 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;
-    _impl::TransactLogParser parser; // Throws
-    TransactAdvancer advancer(*this, schema_changed);
-    parser.parse(in, advancer); // Throws
+    if (has_schema_change_notification_handler()) {
+        _impl::TransactLogParser parser; // Throws
+        TransactAdvancer advancer(*this, schema_changed);
+        parser.parse(in, advancer); // Throws
+    }
 
     m_top.detach();                                           // Soft detach
     bool create_group_when_missing = false;                   // See Group::attach_shared().

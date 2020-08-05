@@ -191,6 +191,8 @@ private:
     std::unique_ptr<Strut[]> m_memory_owner;
 
     // Index of first element in allocated memory chunk.
+    //
+    // INVARIANT: m_allocated_size == 0 ? m_begin == 0 : m_begin < m_allocated_size
     size_type m_begin = 0;
 
     // The number of elements within the allocated memory chunk, that are
@@ -204,7 +206,7 @@ private:
     // than m_size. This is required to ensure that the iterators returned by
     // begin() and end() are equal only when the buffer is empty.
     //
-    // INVARIANT: m_size == 0 ? m_allocated_size == 0 : m_size < m_allocated_size
+    // INVARIANT: m_size == 0 || m_allocated_size > m_size
     size_type m_allocated_size = 0;
 
     T* get_memory_ptr() noexcept;
@@ -768,13 +770,13 @@ inline auto CircularBuffer<T>::push_back(const T& value) -> reference
 template <class T>
 inline auto CircularBuffer<T>::push_front(T&& value) -> reference
 {
-    return emplace_front(value); // Throws
+    return emplace_front(std::move(value)); // Throws
 }
 
 template <class T>
 inline auto CircularBuffer<T>::push_back(T&& value) -> reference
 {
-    return emplace_back(value); // Throws
+    return emplace_back(std::move(value)); // Throws
 }
 
 template <class T>
@@ -1005,7 +1007,7 @@ template <class T>
 inline void CircularBuffer<T>::destroy(size_type offset) noexcept
 {
     T* memory = get_memory_ptr();
-    size_type j = m_begin;
+    size_type j = wrap(offset);
     for (size_type i = offset; i < m_size; ++i) {
         memory[j].~T();
         j = circular_inc(j);

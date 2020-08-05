@@ -23,6 +23,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/to_string.hpp>
 
 namespace realm {
 
@@ -64,12 +65,11 @@ public:
 /// constructor when opening a database that uses a deprecated file format
 /// and/or a deprecated history schema which this version of Realm cannot
 /// upgrade from.
-class UnsupportedFileFormatVersion : public ExceptionWithBacktrace<std::exception> {
+class UnsupportedFileFormatVersion : public ExceptionWithBacktrace<> {
 public:
     UnsupportedFileFormatVersion(int source_version);
     /// The unsupported version of the file.
     int source_version = 0;
-    const char* message() const noexcept override;
 };
 
 
@@ -342,13 +342,10 @@ inline const char* DescriptorMismatch::message() const noexcept
 }
 
 inline UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)
-: source_version(version)
+    : ExceptionWithBacktrace<>(
+          util::format("Database has an unsupported version (%1) and cannot be upgraded", version))
+    , source_version(version)
 {
-}
-
-inline const char* UnsupportedFileFormatVersion::message() const noexcept
-{
-    return "Database has an unsupported version and cannot be upgraded";
 }
 
 inline const char* MultipleSyncAgents::message() const noexcept

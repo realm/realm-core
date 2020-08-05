@@ -51,6 +51,22 @@ public:
         return !(*this == other);
     }
 
+    bool operator<(const ConstTableRef& other) const
+    {
+        if (m_table == other.m_table)
+            return m_instance_version < other.m_instance_version;
+        else
+            return m_table < other.m_table;
+    }
+
+    bool operator>(const ConstTableRef& other) const
+    {
+        if (m_table == other.m_table)
+            return m_instance_version > other.m_instance_version;
+        else
+            return m_table > other.m_table;
+    }
+
     std::ostream& print(std::ostream& o) const
     {
         return o << "TableRef(" << m_table << ", " << m_instance_version << ")";

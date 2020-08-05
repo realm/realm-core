@@ -46,8 +46,9 @@ double local_time_microseconds();
 template <class C, class T>
 inline void put_time(std::basic_ostream<C, T>& out, const std::tm& tm, const C* format)
 {
-    const auto& facet = std::use_facet<std::time_put<C>>(out.getloc());                             // Throws
-    facet.put(std::ostreambuf_iterator<C>(out), out, ' ', &tm, format, format + T::length(format)); // Throws
+    const auto& facet = std::use_facet<std::time_put<C>>(out.getloc()); // Throws
+    facet.put(std::ostreambuf_iterator<C>(out), out, out.widen(' '), &tm, format,
+              format + T::length(format)); // Throws
 }
 
 inline std::string format_local_time(std::time_t time, const char* format)

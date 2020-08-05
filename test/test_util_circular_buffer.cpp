@@ -1,6 +1,7 @@
 #include <type_traits>
 #include <algorithm>
 #include <iterator>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
@@ -545,6 +546,29 @@ TEST(Util_CircularBuffer_Resize)
     CHECK(buffer == CircularBuffer<int>({7, 7}));
     buffer.resize(3);
     CHECK(buffer == CircularBuffer<int>({7, 7, 0}));
+}
+
+
+TEST(Util_CircularBuffer_Resize2)
+{
+    CircularBuffer<std::unique_ptr<int>> buffer;
+    buffer.push_back(std::make_unique<int>(1));
+    buffer.push_back(std::make_unique<int>(2));
+    buffer.push_back(std::make_unique<int>(3));
+    buffer.resize(2);
+    CHECK_EQUAL(2, buffer.size());
+    CHECK_EQUAL(1, *buffer[0]);
+    CHECK_EQUAL(2, *buffer[1]);
+    buffer.push_back(std::make_unique<int>(4));
+    buffer.resize(2);
+    CHECK_EQUAL(2, buffer.size());
+    CHECK_EQUAL(1, *buffer[0]);
+    CHECK_EQUAL(2, *buffer[1]);
+    buffer.push_front(std::make_unique<int>(5));
+    buffer.resize(2);
+    CHECK_EQUAL(2, buffer.size());
+    CHECK_EQUAL(5, *buffer[0]);
+    CHECK_EQUAL(1, *buffer[1]);
 }
 
 

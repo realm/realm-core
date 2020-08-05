@@ -70,7 +70,6 @@ auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
 DataType to_core_type(PropertyType type)
 {
     REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
-    REALM_ASSERT(type != PropertyType::Any);    // Mixed columns can't be created
     switch (type & ~PropertyType::Flags) {
         case PropertyType::Int:
             return type_Int;
@@ -90,6 +89,8 @@ DataType to_core_type(PropertyType type)
             return type_ObjectId;
         case PropertyType::Decimal:
             return type_Decimal;
+        case PropertyType::Any:
+            return type_Mixed;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }

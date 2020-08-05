@@ -219,6 +219,7 @@ jobWrapper {
                             unstash name: cocoaStash
                         }
                         sh 'tools/build-cocoa.sh'
+                        sh 'tools/build-cocoa.sh -x'
                         archiveArtifacts('realm-core-cocoa*.tar.gz')
                         archiveArtifacts('realm-core-cocoa*.tar.xz')
                         stash includes: 'realm-core-cocoa*.tar.xz', name: "cocoa-xz"
@@ -673,7 +674,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir("build-macosx-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -758,9 +759,9 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx_pro') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-10.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
                 retry(3) {
-                    timeout(time: 30, unit: 'MINUTES') {
+                    timeout(time: 45, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
                             tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
