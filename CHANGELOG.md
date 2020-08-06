@@ -1,3 +1,21 @@
+# NEXT RELEASE
+
+### Enhancements
+* None.
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+ 
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 10.0.0-beta.3 Release notes
 
 ### Fixed

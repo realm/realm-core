@@ -20,6 +20,7 @@
 
 #include "parser.hpp"
 #include "parser_utils.hpp"
+#include "property_expression.hpp"
 #include "expression_container.hpp"
 
 #include <realm.hpp>
@@ -362,11 +363,30 @@ void add_link_constraint_to_query(realm::Query &query,
     add_link_constraint_to_query(query, op, prop_expr, value_expr);
 }
 
+template <typename A, typename B, typename KnownType, typename PossibleMixedType>
+void add_mixed_type_numeric_comparison_to_query(Query& query, const Predicate::Comparison& cmp, A& lhs, B& rhs)
+{
+    if constexpr (std::is_same_v<B, ValueExpression>) {
+        if (rhs.template is_type<PossibleMixedType>()) {
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<KnownType>(),
+                                            rhs.template value_of_type_for_query<PossibleMixedType>());
+            return;
+        }
+    }
+    if constexpr (std::is_same_v<A, ValueExpression>) {
+        if (lhs.template is_type<PossibleMixedType>()) {
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<PossibleMixedType>(),
+                                            rhs.template value_of_type_for_query<KnownType>());
+            return;
+        }
+    }
+    add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<KnownType>(),
+                                    rhs.template value_of_type_for_query<KnownType>());
+}
 
 template <typename A, typename B>
 void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, A& lhs, B& rhs, DataType type)
 {
-
     switch (type) {
         case type_Bool:
             add_bool_constraint_to_query(query, cmp.op,
@@ -374,41 +394,33 @@ void do_add_comparison_to_query(Query& query, const Predicate::Comparison& cmp, 
                                          rhs. template value_of_type_for_query<bool>());
             break;
         case type_Timestamp:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Timestamp>(),
-                                            rhs. template value_of_type_for_query<Timestamp>());
+            add_mixed_type_numeric_comparison_to_query<A, B, Timestamp, ObjectId>(query, cmp, lhs, rhs);
             break;
         case type_Double:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Double>(),
-                                            rhs. template value_of_type_for_query<Double>());
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Double>(),
+                                            rhs.template value_of_type_for_query<Double>());
             break;
         case type_Float:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Float>(),
-                                            rhs. template value_of_type_for_query<Float>());
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Float>(),
+                                            rhs.template value_of_type_for_query<Float>());
             break;
         case type_Int:
-            add_numeric_constraint_to_query(query, cmp.op,
-                                            lhs. template value_of_type_for_query<Int>(),
-                                            rhs. template value_of_type_for_query<Int>());
+            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Int>(),
+                                            rhs.template value_of_type_for_query<Int>());
             break;
         case type_String:
-            add_string_constraint_to_query(query, cmp,
-                                           lhs. template value_of_type_for_query<String>(),
-                                           rhs. template value_of_type_for_query<String>());
+            add_string_constraint_to_query(query, cmp, lhs.template value_of_type_for_query<String>(),
+                                           rhs.template value_of_type_for_query<String>());
             break;
         case type_Binary:
-            add_binary_constraint_to_query(query, cmp,
-                                           lhs. template value_of_type_for_query<Binary>(),
-                                           rhs. template value_of_type_for_query<Binary>());
+            add_binary_constraint_to_query(query, cmp, lhs.template value_of_type_for_query<Binary>(),
+                                           rhs.template value_of_type_for_query<Binary>());
             break;
         case type_Link:
             add_link_constraint_to_query(query, cmp.op, lhs, rhs);
             break;
         case type_ObjectId:
-            add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<ObjectId>(),
-                                            rhs.template value_of_type_for_query<ObjectId>());
+            add_mixed_type_numeric_comparison_to_query<A, B, ObjectId, Timestamp>(query, cmp, lhs, rhs);
             break;
         case type_Decimal:
             add_numeric_constraint_to_query(query, cmp.op, lhs.template value_of_type_for_query<Decimal128>(),

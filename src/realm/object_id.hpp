@@ -32,10 +32,6 @@ public:
      */
     ObjectId() noexcept = default;
 
-    ObjectId(null) noexcept
-        : ObjectId()
-    {
-    }
     /**
      * Checks if the given string is a valid object id.
      */
@@ -46,7 +42,10 @@ public:
      */
     ObjectId(const char* init) noexcept;
 
-    ObjectId(Timestamp d, int machine_id = 0, int process_id = 0) noexcept;
+    /**
+     * Constructs an ObjectId with the specified inputs, and a random number
+     */
+    ObjectId(Timestamp d, int machine_id, int process_id) noexcept;
 
     /**
      * Generates a new ObjectId using the algorithm to attempt to avoid collisions.
@@ -76,6 +75,10 @@ public:
     bool operator<=(const ObjectId& other) const
     {
         return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) <= 0;
+    }
+    explicit operator Timestamp() const
+    {
+        return get_timestamp();
     }
 
     Timestamp get_timestamp() const;
