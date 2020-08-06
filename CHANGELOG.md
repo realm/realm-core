@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
- 
+* Issues fixed by releases v6.0.14 to v6.0.15
+
 ### Breaking changes
 * None.
 
@@ -16,17 +17,18 @@
 
 ----------------------------------------------
 
+<<<<<<< HEAD
 # 10.0.0-beta.3 Release notes
 
 ### Fixed
-* Isses fixed by releases v6.0.11 to v6.0.13
+* Issues fixed by releases v6.0.11 to v6.0.13
 
 ----------------------------------------------
 
 # 10.0.0-beta.2 Release notes
 
 ### Fixed
-* Isses fixed by release v6.0.7 to v6.0.10
+* Issues fixed by release v6.0.7 to v6.0.10
 * We would allow converting a table to embedded table in spite some objects had no links to them. ([#3729](https://github.com/realm/realm-core/issues/3729), since v6.1.0-alpha.5)
 * Fixed parsing queries with substitutions in a subquery, for example on a named linking object property. This also enables support for substitution chains. ([realm-js 2977](https://github.com/realm/realm-js/issues/2977), since the parser supported subqueries).
 * Receiving an EraseObject instruction from server would not cause any embedded objects to be erased.  ([RSYNC-128](https://jira.mongodb.org/browse/RSYNC-128), since v6.1.0-alpha.5)
@@ -257,6 +259,19 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+=======
+# 6.0.15 Release notes
+
+### Fixed
+* Fix bug in memory mapping management. This bug could result in multiple different asserts as well as segfaults. In many cases stack backtraces would include members of the EncyptedFileMapping near the top - even if encryption was not used at all. In other cases asserts or crashes would be in methods reading an array header or array element. In all cases the application would terminate immediately. ([#3838](https://github.com/realm/realm-core/pull/3838), since v6)
+
+----------------------------------------------
+
+# 6.0.14 Release notes
+
+### Fixed
+* Fix missing `Lst` symbols when the library is built as a shared library with LTO. ([Cocoa #6625](https://github.com/realm/realm-cocoa/issues/6625), since v6.0.0).
+>>>>>>> master
 
 ----------------------------------------------
 

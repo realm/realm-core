@@ -395,6 +395,19 @@ public:
     {
         return sum(start, end);
     }
+    /// \brief Search the \c Array for a value greater or equal than \a target,
+    /// starting the search at the \a start index.
+    ///
+    /// The \c Array must be sorted in ascending order.
+    ///
+    /// Behaviour is undefined if:
+    /// - sorting conditions are not respected;
+    /// - \a start is greater than the number of elements in this \c Array
+    ///
+    /// \param target the smallest value to search for
+    /// \param start the offset at which to start searching in the array
+    /// \return the index of the value if found, or realm::not_found otherwise
+    size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
 
     /// This information is guaranteed to be cached in the array accessor.
     bool is_inner_bptree_node() const noexcept;
