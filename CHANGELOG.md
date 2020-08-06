@@ -17,7 +17,6 @@
 
 ----------------------------------------------
 
-<<<<<<< HEAD
 # 10.0.0-beta.3 Release notes
 
 ### Fixed
@@ -259,7 +258,7 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
-=======
+
 # 6.0.15 Release notes
 
 ### Fixed
@@ -271,7 +270,6 @@ This release also contains the changes introduced by v6.0.4
 
 ### Fixed
 * Fix missing `Lst` symbols when the library is built as a shared library with LTO. ([Cocoa #6625](https://github.com/realm/realm-cocoa/issues/6625), since v6.0.0).
->>>>>>> master
 
 ----------------------------------------------
 
