@@ -7,11 +7,12 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 VERSION=$(git describe)
 
 function usage {
-    echo "Usage: ${SCRIPT} [-b] [-m] [-x] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
+    echo "Usage: ${SCRIPT} [-b] [-m|i] [-x] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
     echo ""
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
+    echo "   -i : build for iOS only"
     echo "   -x : build as an xcframework"
     echo "   -c : copy core to the specified folder instead of packaging it"
     echo "   -f : additional configuration flags to pass to cmake"
@@ -19,10 +20,11 @@ function usage {
 }
 
 # Parse the options
-while getopts ":bmxc:f:" opt; do
+while getopts ":bmixc:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
+        i) IOS_ONLY=1;;
         x) BUILD_XCFRAMEWORK=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
@@ -34,7 +36,14 @@ done
 shift $((OPTIND-1))
 
 BUILD_TYPES=( Release MinSizeDebug )
-[[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst ios watchos tvos ) || PLATFORMS=( macosx )
+
+if [[ -n $MACOS_ONLY ]]; then
+    PLATFORMS=( macosx )
+elif [[ -n $IOS_ONLY ]]; then
+    PLATFORMS=( ios maccatalyst )
+else
+    PLATFORMS=( macosx maccatalyst ios watchos tvos )
+fi
 
 function build_macos {
     local platform="$1"
@@ -56,25 +65,28 @@ function build_macos {
 }
 
 if [[ -n $BUILD ]]; then
-    for bt in "${BUILD_TYPES[@]}"; do
-        build_macos macosx "$bt"
-    done
-    if [[ -z $MACOS_ONLY ]]; then
-        for bt in "${BUILD_TYPES[@]}"; do
-            build_macos maccatalyst "$bt"
-        done
-        for os in ios watchos tvos; do
+    for pl in ${PLATFORMS[*]}; do
+    case "${pl}" in
+        macosx | maccatalyst)
             for bt in "${BUILD_TYPES[@]}"; do
-                tools/cross_compile.sh -o "$os" -t "$bt" -v "$(git describe)" -f "${CMAKE_FLAGS}"
+                build_macos $pl "$bt"
             done
-        done
-    fi
+        ;;
+        *) # ios watchos tvos
+            for bt in "${BUILD_TYPES[@]}"; do
+                tools/cross_compile.sh -o "$pl" -t "$bt" -v "$(git describe)" -f "${CMAKE_FLAGS}"
+            done
+        ;;
+    esac
+    done
 fi
 
 rm -rf core
 mkdir core
 
-filename="build-macosx-Release/realm-core-Release-${VERSION}-macosx-devel.tar.gz"
+# copy headers from macosx or maccatalyst (one or both will be there depending on build options)
+[[ -n $IOS_ONLY ]] && filename="build-maccatalyst-Release/realm-core-Release-${VERSION}-maccatalyst-devel.tar.gz" \
+                   || filename="build-macosx-Release/realm-core-Release-${VERSION}-macosx-devel.tar.gz"
 tar -C core -zxvf "${filename}" include doc
 
 for bt in "${BUILD_TYPES[@]}"; do
@@ -116,9 +128,7 @@ if [[ -n $BUILD_XCFRAMEWORK ]]; then
                 ln "$source_lib" "xcf-tmp/$p${suffix}/librealm.a"
                 make_core_xcframework+=( -library xcf-tmp/$p${suffix}/librealm.a -headers core/include)
             else
-                sim_lib_dir="xcf-tmp/${p}${suffix}-simulator"
                 device_lib_dir="xcf-tmp/${p}${suffix}-device"
-                mkdir "$sim_lib_dir"
                 mkdir "$device_lib_dir"
 
                 device=''
@@ -131,9 +141,14 @@ if [[ -n $BUILD_XCFRAMEWORK ]]; then
                     fi
                 done
                 extract_slices "$source_lib" "${device_lib_dir}/librealm.a" "$device"
-                extract_slices "$source_lib" "${sim_lib_dir}/librealm.a" "$simulator"
                 make_core_xcframework+=( -library "${device_lib_dir}/librealm.a" -headers core/include)
-                make_core_xcframework+=( -library "${sim_lib_dir}/librealm.a" -headers core/include)
+
+                if [ "$p" != "ios" ]; then
+                    sim_lib_dir="xcf-tmp/${p}${suffix}-simulator"
+                    mkdir "$sim_lib_dir"
+                    extract_slices "$source_lib" "${sim_lib_dir}/librealm.a" "$simulator"
+                    make_core_xcframework+=( -library "${sim_lib_dir}/librealm.a" -headers core/include)
+                fi
             fi
         done
         xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
