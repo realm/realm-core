@@ -210,6 +210,7 @@ ColKey Spec::generate_converted_colkey(size_t column_ndx, TableKey table_key)
 bool Spec::convert_column_attributes()
 {
     bool changes = false;
+    size_t enumkey_ndx = 0;
     for (size_t column_ndx = 0; column_ndx < m_types.size(); column_ndx++) {
         if (column_ndx < m_names.size()) {
             StringData name = m_names.get(column_ndx);
@@ -239,6 +240,17 @@ bool Spec::convert_column_attributes()
                 changes = true;
                 break;
             }
+            case col_type_OldStringEnum: {
+                m_types.set(column_ndx, col_type_String);
+                // We need to padd zeroes into the m_enumkeys so that the index in
+                // m_enumkeys matches the column index.
+                for (size_t i = enumkey_ndx; i < column_ndx; i++) {
+                    m_enumkeys.insert(i, 0);
+                }
+                enumkey_ndx = column_ndx + 1;
+                changes = true;
+                break;
+            }
             case col_type_Link:
                 if (!attr.test(col_attr_Nullable)) {
                     attr.set(col_attr_Nullable);
@@ -255,6 +267,11 @@ bool Spec::convert_column_attributes()
                 break;
             default:
                 break;
+        }
+    }
+    if (m_enumkeys.is_attached()) {
+        while (m_enumkeys.size() < m_num_public_columns) {
+            m_enumkeys.add(0);
         }
     }
     return changes;
