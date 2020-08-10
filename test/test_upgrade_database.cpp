@@ -1231,20 +1231,21 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     "pk":[
         {"_key":0,"pk_table":"link origin","pk_property":"pk"}
         {"_key":1,"pk_table":"object","pk_property":"pk"}
-    ]
-    ,"metadata":[
+    ],
+    "metadata":[
         {"_key":0,"version":0}
-    ]
-    ,"class_dog":[]
-    ,"class_link origin":[
+    ],
+    "class_dog":[
+    ],
+    "class_link origin":[
         {"_key":0,"pk":5,"object":null,"array":{"table": "class_object", "keys": []}},
         {"_key":1,"pk":6,"object":{"table": "class_object", "key": 0},"array":{"table": "class_object", "keys": []}},
         {"_key":2,"pk":7,"object":null,"array":{"table": "class_object", "keys": [1,2]}}
-    ]
-    ,"class_object":[
-        {"_key":0,"pk":"hello","value":7,"optional":null},
-        {"_key":1,"pk":"world","value":35,"optional":null},
-        {"_key":2,"pk":"goodbye","value":800,"optional":-87}
+    ],
+    "class_object":[
+        {"_key":0,"pk":"hello","value":7,"enum":"red","optional":null},
+        {"_key":1,"pk":"world","value":35,"enum":"blue","optional":null},
+        {"_key":2,"pk":"goodbye","value":800,"enum":"red","optional":-87}
     ]
     }
     */
@@ -1271,6 +1272,9 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     auto hello_key = t_object->find_first_string(pk_col, "hello");
     auto obj1 = t_object->get_object(hello_key);
     CHECK_EQUAL(obj1.get<Int>("value"), 7);
+    auto enum_col_key = t_object->get_column_key("enum");
+    CHECK(t_object->is_enumerated(enum_col_key));
+    CHECK_EQUAL(obj1.get<String>(enum_col_key), "red");
 
     pk_col = t_origin->get_primary_key_column();
     CHECK(pk_col);

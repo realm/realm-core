@@ -956,9 +956,19 @@ namespace {
 
 class LegacyStringColumn : public BPlusTree<StringData> {
 public:
-    LegacyStringColumn(Allocator& alloc)
+    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx)
         : BPlusTree(alloc)
+        , m_spec(spec)
+        , m_col_ndx(col_ndx)
     {
+    }
+
+    std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
+    {
+        auto leaf = std::make_unique<LeafNode>(this);
+        leaf->ArrayString::set_spec(m_spec, m_col_ndx);
+        leaf->init_from_ref(ref);
+        return leaf;
     }
 
     StringData get_legacy(size_t n) const
@@ -979,6 +989,10 @@ public:
             return value;
         }
     }
+
+private:
+    Spec* m_spec;
+    size_t m_col_ndx;
 };
 
 // We need an accessor that can read old Timestamp columns.
@@ -1112,7 +1126,7 @@ void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& 
         // Actual list is in the columns array position 0
         Array cols(alloc);
         cols.init_from_ref(sub_table_ref);
-        LegacyStringColumn from_list(alloc);
+        LegacyStringColumn from_list(alloc, nullptr, 0); // List of strings cannot be enumerated
         from_list.set_parent(&cols, 0);
         from_list.init_from_parent();
         size_t list_size = from_list.size();
@@ -1232,7 +1246,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
                     acc = std::make_unique<BPlusTree<double>>(m_alloc);
                     break;
                 case col_type_String:
-                    acc = std::make_unique<LegacyStringColumn>(m_alloc);
+                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx);
                     break;
                 case col_type_Binary:
                     acc = std::make_unique<BPlusTree<Binary>>(m_alloc);
