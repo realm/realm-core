@@ -1260,6 +1260,7 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     auto sg = DB::create(*hist);
     ReadTransaction rt(sg);
     rt.get_group().verify();
+    CHECK_EQUAL(rt.get_group().size(), 4);
     // rt.get_group().to_json(std::cout);
 
     ConstTableRef t_object = rt.get_table("class_object");

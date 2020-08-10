@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Upgrade logic changed so that progress is recorded explicitly in a table. This makes the logic simpler and reduces the chance of errors. It will also make it easier to see if we receive a partly upgraded file from a costumer.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
