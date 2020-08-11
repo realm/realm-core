@@ -57,7 +57,7 @@ bool has_object_ids(const Table&);
 /// The Group is assumed to be in a read transaction.
 bool is_object_id_stability_achieved(const DB&, const Transaction&);
 
-/// Create a table with an object ID column.
+/// Create a table with an object ID primary key column.
 ///
 /// It is an error to add tables to Groups with a sync history type directly.
 /// This function or related functions must be used instead.
@@ -71,7 +71,18 @@ bool is_object_id_stability_achieved(const DB&, const Transaction&);
 /// The Group must be in a write transaction.
 inline TableRef create_table(Transaction& wt, StringData name)
 {
-    return wt.get_or_add_table(name);
+    if (TableRef table = wt.get_table(name)) {
+        if (!table->get_primary_key_column()) {
+            throw std::runtime_error("Tables without primary keys are not supported.");
+        }
+
+        if (table->get_column_type(table->get_primary_key_column()) != type_ObjectId) {
+            throw std::runtime_error("Inconsistent schema.");
+        }
+
+        return table;
+    }
+    return wt.add_table_with_primary_key(name, type_ObjectId, "_id", false);
 }
 
 /// Create a table with an object ID column and a primary key column.

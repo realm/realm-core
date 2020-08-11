@@ -2602,6 +2602,10 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
+    if (m_primary_key_col && m_primary_key_col.get_type() == type_ObjectId) {
+        return create_object_with_primary_key(ObjectId::gen(), std::move(values), nullptr);
+    }
+
     if (m_is_embedded || m_primary_key_col)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (key == null_key) {
@@ -2665,7 +2669,7 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     }
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, bool* did_create)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, const FieldValues& field_values, bool* did_create)
 {
     if (m_is_embedded)
         throw LogicError(LogicError::wrong_kind_of_table);
@@ -2721,8 +2725,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         *did_create = true;
     }
 
-    field_values.emplace_back(primary_key_col, primary_key);
-    Obj ret = m_clusters.insert(object_key, field_values);
+    FieldValues values = field_values;
+    values.emplace_back(primary_key_col, primary_key);
+    Obj ret = m_clusters.insert(object_key, values);
 
     // Check if unresolved exists
     if (needs_resurrection) {
@@ -2844,7 +2849,7 @@ GlobalKey Table::get_object_id(ObjKey key) const
     return {};
 }
 
-Obj Table::get_object_with_primary_key(Mixed primary_key)
+Obj Table::get_object_with_primary_key(Mixed primary_key) const
 {
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);

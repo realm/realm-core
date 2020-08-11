@@ -168,8 +168,8 @@ struct Payload {
     enum class Type : int8_t {
         // Special value indicating that an embedded object should be created at
         // the position.
-        ObjectValue = -2,
-        GlobalKey = -1,
+        ObjectValue = -1,
+
         Null = 0,
         Int = 1,
         Bool = 2,
@@ -306,8 +306,6 @@ struct Payload {
             switch (lhs.type) {
                 case Type::ObjectValue:
                     return true;
-                case Type::GlobalKey:
-                    return lhs.data.key == rhs.data.key;
                 case Type::Null:
                     return true;
                 case Type::Int:
@@ -707,8 +705,6 @@ inline const char* get_type_name(Instruction::Payload::Type type)
     switch (type) {
         case Type::ObjectValue:
             return "ObjectValue";
-        case Type::GlobalKey:
-            return "GlobalKey";
         case Type::Null:
             return "Null";
         case Type::Int:
@@ -777,8 +773,6 @@ inline bool is_valid_key_type(Instruction::Payload::Type type) noexcept
         case Type::String:
             [[fallthrough]];
         case Type::ObjectId:
-            [[fallthrough]];
-        case Type::GlobalKey:
             return true;
         default:
             return false;
@@ -810,8 +804,6 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
         case Type::ObjectId:
             return type_ObjectId;
         case Type::ObjectValue:
-            [[fallthrough]];
-        case Type::GlobalKey:
             [[fallthrough]];
         case Type::Null:
             REALM_TERMINATE("Invalid data type");

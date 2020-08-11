@@ -220,7 +220,7 @@ public:
     // Create an object with primary key. If an object with the given primary key already exists, it
     // will be returned and did_create (if supplied) will be set to false.
     // Potential tombstone will be resurrected
-    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&&, bool* did_create = nullptr);
+    Obj create_object_with_primary_key(const Mixed& primary_key, const FieldValues&, bool* did_create = nullptr);
     Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr)
     {
         return create_object_with_primary_key(primary_key, {{}}, did_create);
@@ -258,7 +258,8 @@ public:
         return m_clusters.get(ndx);
     }
     // Get object based on primary key
-    Obj get_object_with_primary_key(Mixed pk);
+    Obj get_object_with_primary_key(Mixed pk) const;
+    Obj operator[](Mixed pk) const;
     // Get primary key based on ObjKey
     Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
@@ -1191,6 +1192,17 @@ inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
 inline bool Table::is_group_level() const noexcept
 {
     return bool(get_parent_group());
+}
+
+inline Obj Table::operator[](Mixed pk) const
+{
+    auto col = get_primary_key_column();
+    if (col) {
+        return get_object_with_primary_key(pk);
+    }
+    else {
+        return get_object(pk.get<ObjKey>());
+    }
 }
 
 inline bool Table::operator==(const Table& t) const

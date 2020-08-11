@@ -450,6 +450,17 @@ Mixed Obj::get_any(ColKey col_key) const
     return {};
 }
 
+Mixed Obj::get_primary_key() const
+{
+    auto col = m_table->get_primary_key_column();
+    if (col) {
+        return get_any(col);
+    }
+    else {
+        return Mixed{get_key()};
+    }
+}
+
 /* FIXME: Make this one fast too!
 template <>
 ObjKey Obj::_get(size_t col_ndx) const
@@ -1634,6 +1645,11 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     REALM_ASSERT(col_key.is_dictionary());
     update_if_needed();
     return Dictionary(Obj(*this), col_key);
+}
+
+Dictionary Obj::get_dictionary(StringData col_name) const
+{
+    return get_dictionary(get_column_key(col_name));
 }
 
 void Obj::assign_pk_and_backlinks(const Obj& other)

@@ -106,6 +106,7 @@ public:
     U get(ColKey col_key) const;
 
     Mixed get_any(ColKey col_key) const;
+    Mixed get_primary_key() const;
 
     template <typename U>
     U get(StringData col_name) const
@@ -222,6 +223,7 @@ public:
     void assign(const Obj& other);
 
     Obj get_linked_object(ColKey link_col_key) const;
+    Obj get_linked_object(StringData link_col_name) const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
@@ -241,6 +243,7 @@ public:
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     Dictionary get_dictionary(ColKey col_key) const;
+    Dictionary get_dictionary(StringData col_name) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
@@ -438,6 +441,12 @@ std::vector<U> Obj::get_list_values(ColKey col_key) const
     return values;
 }
 
+inline Obj Obj::get_linked_object(StringData link_col_name) const
+{
+    ColKey col = get_column_key(link_col_name);
+    return get_linked_object(col);
+}
+
 template <class Val>
 inline Obj& Obj::_set(size_t col_ndx, Val v)
 {
@@ -454,7 +463,15 @@ inline Obj& Obj::_set(size_t col_ndx, Head v, Tail... tail)
 template <class Head, class... Tail>
 inline Obj& Obj::set_all(Head v, Tail... tail)
 {
-    return _set(0, v, tail...);
+    size_t start_index = 0;
+
+    // Avoid trying to set the PK column.
+    if (m_table->get_primary_key_column()) {
+        REALM_ASSERT(m_table->colkey2spec_ndx(m_table->get_primary_key_column()) == 0);
+        start_index = 1;
+    }
+
+    return _set(start_index, v, tail...);
 }
 } // namespace realm
 

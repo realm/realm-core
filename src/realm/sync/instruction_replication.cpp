@@ -234,22 +234,8 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
 
 void SyncReplication::create_object(const Table* table, GlobalKey oid)
 {
-    if (table->is_embedded()) {
-        unsupported_instruction(); // FIXME: TODO
-    }
-
-    TrivialReplication::create_object(table, oid);
-    if (select_table(*table)) {
-        if (table->get_primary_key_column()) {
-            // Trying to create object without a primary key in a table that
-            // has a primary key column.
-            unsupported_instruction();
-        }
-        Instruction::CreateObject instr;
-        instr.table = m_last_class_name;
-        instr.object = oid;
-        emit(instr);
-    }
+    // Tables without primary keys are not supported.
+    unsupported_instruction();
 }
 
 Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
@@ -437,6 +423,13 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
 void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed value, _impl::Instruction variant)
 {
     TrivialReplication::set(table, col, key, value, variant);
+
+    if (col == table->get_primary_key_column()) {
+        // Core emits Set instructions for PK values, but we don't want to record those.
+        return;
+    }
+
+    REALM_ASSERT(!key.is_unresolved());
 
     if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
         // If link is unresolved, it should not be communicated.
@@ -631,9 +624,9 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 
         unsupported_instruction(); // Unsupported PK type
     }
-
-    GlobalKey global_key = table.get_object_id(key);
-    return global_key;
+    else {
+        unsupported_instruction(); // Tables without PKs not supported.
+    }
 }
 
 void SyncReplication::populate_path_instr(Instruction::PathInstruction& instr, const Table& table, ObjKey key,
