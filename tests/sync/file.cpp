@@ -23,7 +23,9 @@
 #include "shared_realm.hpp"
 #include "sync/sync_manager.hpp"
 #include <realm/util/file.hpp>
+#include <realm/util/hex_dump.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/sha_crypto.hpp>
 
 #include <fstream>
 
@@ -146,13 +148,14 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
 TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string local_identity = "123456789";
     const std::string manager_path = base_path + "syncmanager/";
+    const std::string app_id = "test_app_id*$#@!%1";
+    const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
-    auto manager = SyncFileManager(manager_path);
+    auto manager = SyncFileManager(manager_path, app_id);
 
     SECTION("user directory APIs") {
-        const std::string expected = manager_path + "realm-object-server/" + local_identity + "/";
-
+        const std::string expected = manager_path + "mongodb-realm/" + expected_clean_app_id + "/" + local_identity + "/";
         SECTION("getting a user directory") {
             SECTION("that didn't exist before succeeds") {
                 auto actual = manager.user_directory(local_identity);
@@ -183,36 +186,84 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
     SECTION("Realm path APIs") {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
+        auto expected_name = manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+        auto expected_name_with_suffix = expected_name + ".realm";
+
+        auto hashed_file_name = [](const std::string& name) -> std::string {
+            std::array<unsigned char, 32> hash;
+            util::sha256(name.data(), name.size(), hash.data());
+            return util::hex_dump(hash.data(), hash.size(), "");
+        };
 
         SECTION("getting a Realm path") {
-            const std::string expected = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-            auto actual = manager.path(local_identity, relative_path);
-            REQUIRE(expected == actual);
+            auto actual = manager.realm_file_path(local_identity, relative_path);
+            REQUIRE(expected_name_with_suffix == actual);
         }
 
         SECTION("deleting a Realm for a valid user") {
-            manager.path(local_identity, relative_path);
+            manager.realm_file_path(local_identity, relative_path);
             // Create the required files
-            auto realm_base_path = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-            REQUIRE(create_dummy_realm(realm_base_path));
-            REQUIRE(File::exists(realm_base_path));
-            REQUIRE(File::exists(realm_base_path + ".lock"));
-            REQUIRE_DIR_EXISTS(realm_base_path + ".management");
+            REQUIRE(create_dummy_realm(expected_name));
+            REQUIRE(File::exists(expected_name));
+            REQUIRE(File::exists(expected_name + ".lock"));
+            REQUIRE_DIR_EXISTS(expected_name + ".management");
             // Delete the Realm
-            manager.remove_realm(local_identity, relative_path);
+            REQUIRE(manager.remove_realm(local_identity, relative_path));
             // Ensure the files don't exist anymore
-            REQUIRE(!File::exists(realm_base_path));
-            REQUIRE(!File::exists(realm_base_path + ".lock"));
-            REQUIRE_DIR_DOES_NOT_EXIST(realm_base_path + ".management");
+            REQUIRE(!File::exists(expected_name));
+            REQUIRE(!File::exists(expected_name + ".lock"));
+            REQUIRE_DIR_DOES_NOT_EXIST(expected_name + ".management");
         }
 
         SECTION("deleting a Realm for an invalid user") {
-            manager.remove_realm("invalid_user", relative_path);
+            REQUIRE(!manager.remove_realm("invalid_user", relative_path));
+        }
+
+        SECTION("hashed path is used if it already exists") {
+            const std::string hashed_path = manager_path + "mongodb-realm/" + hashed_file_name(expected_name) + ".realm";
+            const std::string traditional_path = manager_path + expected_name + ".realm";
+            util::try_make_dir(manager_path + "mongodb-realm/");
+
+            REQUIRE(!File::exists(hashed_path));
+            REQUIRE(!File::exists(traditional_path));
+            REQUIRE(create_dummy_realm(hashed_path));
+            REQUIRE(File::exists(hashed_path));
+            REQUIRE(!File::exists(traditional_path));
+            auto actual = manager.realm_file_path(local_identity, relative_path);
+            REQUIRE(actual == hashed_path);
+            REQUIRE(File::exists(hashed_path));
+            REQUIRE(!File::exists(traditional_path));
+        }
+
+        SECTION("legacy sync paths are detected and used") {
+            const std::string legacy_dir = "realm-object-server/";
+            const std::string old_path = manager_path + legacy_dir + local_identity + "/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+
+            REQUIRE(!File::exists(old_path));
+            REQUIRE(!File::exists(expected_name_with_suffix));
+            util::try_make_dir(manager_path + legacy_dir);
+            util::try_make_dir(manager_path + legacy_dir + local_identity);
+            REQUIRE(create_dummy_realm(old_path));
+            REQUIRE(File::exists(old_path));
+            REQUIRE(!File::exists(expected_name_with_suffix));
+            auto actual = manager.realm_file_path(local_identity, relative_path);
+            REQUIRE(actual == old_path);
+            REQUIRE(File::exists(old_path));
+            REQUIRE(!File::exists(expected_name_with_suffix));
+        }
+
+        SECTION("paths have a fallback hashed location if the preferred path is too long") {
+            const std::string long_path_name = std::string(300, 'a');
+            REQUIRE(long_path_name.length() > 255); // linux name length limit
+            auto actual = manager.realm_file_path(local_identity, long_path_name);
+            REQUIRE(actual.length() < 300);
+            REQUIRE(create_dummy_realm(actual));
+            REQUIRE(File::exists(actual));
         }
     }
 
     SECTION("Utility path APIs") {
-        auto metadata_dir = manager_path + "realm-object-server/io.realm.object-server-utility/metadata/";
+        auto metadata_dir = manager_path + "mongodb-realm/server-utility/metadata/";
 
         SECTION("getting the metadata path") {
             auto path = manager.metadata_path();

@@ -38,16 +38,8 @@ SyncManager& SyncManager::shared()
     static SyncManager& manager = *new SyncManager;
     return manager;
 }
-
-void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Config> app_config)
+void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_id)
 {
-    auto defer = util::make_scope_exit([this, app_config]() noexcept {
-        if (app_config) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_app = std::make_shared<app::App>(*app_config);
-        }
-    });
-
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
@@ -64,7 +56,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         SyncUser::State state;
         std::string device_id;
     };
-    
+
     std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);
@@ -75,7 +67,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             // first, and otherwise isn't supported
             REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
         } else {
-            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
+            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app_id);
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
@@ -168,6 +160,15 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             m_users.emplace_back(std::move(user));
         }
     }
+}
+
+void SyncManager::configure(SyncClientConfig config, app::App::Config app_config)
+{
+    init_metadata(config, app_config.app_id);
+    // App must be created last as the constructor depends on the SyncFileManager and
+    // SyncMetadataManager being available.
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_app = std::make_shared<app::App>(app_config);
 }
 
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
@@ -478,23 +479,73 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
     return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
 
-std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
+struct UnsupportedBsonPartition : public std::logic_error {
+    UnsupportedBsonPartition(std::string msg) : std::logic_error(msg) {}
+};
+
+static std::string string_from_partition(const std::string& partition)
+{
+    std::string result = partition;
+    try {
+        bson::Bson partition_value = bson::parse(partition);
+        std::stringstream ss;
+        switch(partition_value.type()) {
+            case bson::Bson::Type::Int32:
+                ss << "i_" << static_cast<int32_t>(partition_value);
+                break;
+            case bson::Bson::Type::Int64:
+                ss << "l_" << static_cast<int64_t>(partition_value);
+                break;
+            case bson::Bson::Type::String:
+                ss << "s_" << static_cast<std::string>(partition_value);
+                break;
+            case bson::Bson::Type::ObjectId:
+                ss << "o_" << static_cast<ObjectId>(partition_value);
+                break;
+            default:
+                ss << partition_value;
+                throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", ss.str()));
+        }
+        result = ss.str();
+    }
+    catch (const UnsupportedBsonPartition&) {
+        throw;
+    }
+    catch (...) {
+        // FIXME: the partition wasn't a bson formatted string, this can happen when using the
+        // test sync server which only accepts filesystem type paths, in this case return the raw partition.
+        // Once we migrate away from using the sync server in tests, this code path should not be necessary.
+    }
+    return result;
+}
+
+std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& realm_file_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->path(user.local_identity(), raw_realm_url);
+    return m_file_manager->realm_file_path(user.local_identity(), realm_file_name);
 }
 
 std::string SyncManager::path_for_realm(const SyncConfig& config) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
+    REALM_ASSERT(config.user);
 
+    // We used to hash the string value of the partition. For compatibility, check that SHA256
+    // hash file name exists, and if it does, continue to use it.
     std::array<unsigned char, 32> hash;
     util::sha256(config.partition_value.data(), config.partition_value.size(), hash.data());
+    std::string legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
+    std::string legacy_file_path = m_file_manager->realm_file_path(config.user->local_identity(), legacy_hashed_file_name);
+    if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
+        return legacy_file_path;
+    }
 
-    std::string hex_string = util::hex_dump(hash.data(), hash.size(), "");
-    return m_file_manager->path(config.user->local_identity(), hex_string);
+    // Attempt to make a nicer filename which will ease debugging when
+    // locating files in the filesystem.
+    std::string file_name = string_from_partition(config.partition_value);
+    return m_file_manager->realm_file_path(config.user->local_identity(), file_name);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const

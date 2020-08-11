@@ -106,8 +106,7 @@ public:
     // Configure the metadata and file management subsystems and sync client
     // options. This must be called before a SyncSession is first created, and
     // will not reconfigure anything if the SyncClient already exists.
-    // FIXME: App should not be a member of the singleton SyncManager
-    void configure(SyncClientConfig, util::Optional<app::App::Config> = none);
+    void configure(SyncClientConfig, app::App::Config);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -190,9 +189,14 @@ public:
     void remove_user(const std::string& user_id);
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
-    std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
+    // If the default path of `<rootDir>/<appId>/<userId>/<realm_file_name>.realm` cannot
+    // be created, this function may pass back `<rootDir>/<hashedFileName>.realm`
+    std::string path_for_realm(const SyncUser& user, const std::string& realm_file_name) const;
 
     // Get the default path for a Realm for the given configuration.
+    // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
+    // If the file cannot be created at this location, for example due to path length restrictions,
+    // this function may pass back `<rootDir>/<hashedFileName>.realm`
     std::string path_for_realm(const SyncConfig& config) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
@@ -233,6 +237,7 @@ private:
     mutable std::mutex m_mutex;
 
     bool run_file_action(const SyncFileActionMetadata&);
+    void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Protects m_users
     mutable std::mutex m_user_mutex;

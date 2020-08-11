@@ -405,7 +405,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
 }
 
 void SyncMetadataManager::make_file_action_metadata(StringData original_name,
-                                                    StringData url,
+                                                    StringData partition_key_value,
                                                     StringData local_uuid,
                                                     SyncFileActionMetadata::Action action,
                                                     StringData new_name) const
@@ -428,7 +428,7 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name,
 
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
-    obj.set(schema.idx_url, url);
+    obj.set(schema.idx_url, partition_key_value);
     obj.set(schema.idx_user_identity, local_uuid);
     transaction.commit();
 }

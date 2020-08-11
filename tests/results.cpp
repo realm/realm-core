@@ -1324,7 +1324,7 @@ TEST_CASE("notifications: sync") {
 
     SyncServer server(false);
     TestSyncManager init_sync_manager(server);
-    SyncTestFile config(init_sync_manager.app());
+    SyncTestFile config(init_sync_manager.app(), "test");
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},

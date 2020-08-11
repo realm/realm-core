@@ -75,7 +75,7 @@ std::shared_ptr<SyncSession> sync_session(std::shared_ptr<SyncUser> user, const 
                                           util::Optional<Schema> schema=none,
                                           Realm::Config* out_config=nullptr)
 {
-    SyncTestFile config({user, path}, std::move(stop_policy), std::forward<ErrorHandler>(error_handler));
+    SyncTestFile config(SyncConfig{user, path}, std::move(stop_policy), std::forward<ErrorHandler>(error_handler));
 
     // File should not be deleted when we leave this function
     config.persist();

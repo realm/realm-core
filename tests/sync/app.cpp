@@ -1694,7 +1694,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     };
     auto setup_and_get_config = [&base_path](std::shared_ptr<App> app) -> realm::Realm::Config {
         realm::Realm::Config config;
-        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), "\"foo\"");
+        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
             std::cout<<error.message<<std::endl;
@@ -1827,6 +1827,22 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
             REQUIRE(dogs.get(0).get<String>("realm_id") == "foo");
         }
+    }
+
+    SECTION("invalid partition error handling")
+    {
+        auto app = get_app_and_login();
+        auto config = setup_and_get_config(app);
+        config.sync_config->partition_value = "not a bson serialized string";
+        std::atomic<bool> error_did_occur = false;
+        config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
+            REQUIRE(error.message == "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+            error_did_occur.store(true);
+        };
+        auto r = realm::Realm::get_shared_realm(config);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+        util::EventLoop::main().run_until([&]{ return error_did_occur.load(); });
+        REQUIRE(error_did_occur.load());
     }
 }
 

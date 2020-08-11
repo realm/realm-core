@@ -137,7 +137,7 @@ TEST_CASE("sync_user: logout", "[sync]") {
 
 TEST_CASE("sync_user: user persistence", "[sync]") {
     TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
-    auto file_manager = SyncFileManager(base_path);
+    auto file_manager = SyncFileManager(base_path, "baz_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 
