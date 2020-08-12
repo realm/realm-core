@@ -194,17 +194,20 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
-ColKey Spec::generate_converted_colkey(size_t column_ndx, TableKey table_key)
+ColKey Spec::update_colkey(ColKey existing_key, size_t spec_ndx, TableKey table_key)
 {
-    auto attr = get_column_attr(column_ndx);
+    auto attr = get_column_attr(spec_ndx);
     // index and uniqueness are not passed on to the key, so clear them
     attr.reset(col_attr_Indexed);
     attr.reset(col_attr_Unique);
-    auto type = get_column_type(column_ndx);
-    unsigned upper = unsigned(column_ndx ^ table_key.value);
+    auto type = get_column_type(spec_ndx);
+    if (existing_key.get_type() != type || existing_key.get_attrs() != attr) {
+        unsigned upper = unsigned(table_key.value);
 
-    // columns get the same leaf index as in the spec during conversion.
-    return ColKey(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, upper);
+        return ColKey(ColKey::Idx{existing_key.get_index().val}, type, attr, upper);
+    }
+    // Existing key is valid
+    return existing_key;
 }
 
 bool Spec::convert_column_attributes()
@@ -279,12 +282,14 @@ bool Spec::convert_column_attributes()
 
 bool Spec::convert_column_keys(TableKey table_key)
 {
+    // This step will ensure that the column keys has right attribute and type info
     bool changes = false;
-    for (size_t column_ndx = 0; column_ndx < m_types.size(); column_ndx++) {
-        ColKey col_key = generate_converted_colkey(column_ndx, table_key);
-        ColKey existing_key = ColKey{m_keys.get(column_ndx)};
-        if (col_key.value != existing_key.value) {
-            m_keys.set(column_ndx, col_key.value);
+    auto sz = m_types.size();
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        ColKey existing_key = ColKey{m_keys.get(ndx)};
+        ColKey col_key = update_colkey(existing_key, ndx, table_key);
+        if (col_key != existing_key) {
+            m_keys.set(ndx, col_key.value);
             changes = true;
         }
     }

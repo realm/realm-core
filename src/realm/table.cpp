@@ -834,7 +834,7 @@ bool Table::has_search_index(ColKey col_key) const noexcept
     return m_index_accessors[col_key.get_index().val] != nullptr;
 }
 
-void Table::migrate_column_info(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_column_info()
 {
     bool changes = false;
     TableKey tk = (get_name() == "pk") ? TableKey(0) : get_key();
@@ -843,17 +843,15 @@ void Table::migrate_column_info(util::FunctionRef<void()> commit_and_continue)
 
     if (changes) {
         build_column_mapping();
-        commit_and_continue();
     }
 }
 
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns
-void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_indexes(ColKey pk_col_key)
 {
     if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
-        bool changes = false;
         Array col_refs(m_alloc);
         col_refs.set_parent(&m_top, top_position_for_columns);
         col_refs.init_from_ref(top_ref);
@@ -872,7 +870,6 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
                     // reports on freeing a null ref, so just to be sure ...
                     Array::destroy_deep(old_index_ref, m_alloc);
                 }
-                changes = true;
 
                 // Tables with string primary key does not need an index
                 if (m_leaf_ndx2colkey[col_ndx] != pk_col_key || pk_col_key.get_type() != col_type_String) {
@@ -886,9 +883,6 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
             }
             col_ndx++;
         };
-        if (changes) {
-            commit_and_continue();
-        }
     }
 }
 
@@ -897,59 +891,57 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
 // This information is now held in "opposite" arrays directly in Table structure
 // At the same time the backlink columns are destroyed
 // If there is no subspec, this stage is done
-void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_subspec()
 {
     if (!m_spec.has_subspec())
         return;
 
-    if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
-        Array col_refs(m_alloc);
-        col_refs.set_parent(&m_top, top_position_for_columns);
-        col_refs.init_from_ref(top_ref);
-        Group* group = get_parent_group();
+    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
+    Array col_refs(m_alloc);
+    col_refs.set_parent(&m_top, top_position_for_columns);
+    col_refs.init_from_ref(top_ref);
+    Group* group = get_parent_group();
 
-        for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
-            ColumnType col_type = m_spec.get_column_type(col_ndx);
+    for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
+        ColumnType col_type = m_spec.get_column_type(col_ndx);
 
-            if (is_link_type(col_type)) {
-                auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
-                auto target_table = group->get_table(target_key);
-                Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
-                // The target table spec may already be migrated.
-                // If it has, the new functions should be used.
-                ColKey backlink_col_key = target_spec.has_subspec()
-                                              ? target_spec.find_backlink_column(m_key, col_ndx)
-                                              : target_table->find_opposite_column(m_spec.get_key(col_ndx));
-                REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
-                if (m_opposite_table.get(col_ndx) != target_key.value) {
-                    m_opposite_table.set(col_ndx, target_key.value);
-                }
-                if (m_opposite_column.get(col_ndx) != backlink_col_key.value) {
-                    m_opposite_column.set(col_ndx, backlink_col_key.value);
-                }
+        if (is_link_type(col_type)) {
+            auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
+            auto target_table = group->get_table(target_key);
+            Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
+            // The target table spec may already be migrated.
+            // If it has, the new functions should be used.
+            ColKey backlink_col_key = target_spec.has_subspec()
+                                          ? target_spec.find_backlink_column(m_key, col_ndx)
+                                          : target_table->find_opposite_column(m_spec.get_key(col_ndx));
+            REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
+            if (m_opposite_table.get(col_ndx) != target_key.value) {
+                m_opposite_table.set(col_ndx, target_key.value);
             }
-            else if (col_type == col_type_BackLink) {
-                auto origin_key = m_spec.get_opposite_link_table_key(col_ndx);
-                size_t origin_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
-                auto origin_table = group->get_table(origin_key);
-                Spec& origin_spec = _impl::TableFriend::get_spec(*origin_table);
-                ColKey origin_col_key = origin_spec.get_key(origin_col_ndx);
-                REALM_ASSERT(is_link_type(origin_col_key.get_type()));
-                if (m_opposite_table.get(col_ndx) != origin_key.value) {
-                    m_opposite_table.set(col_ndx, origin_key.value);
-                }
-                if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
-                    m_opposite_column.set(col_ndx, origin_col_key.value);
-                }
-                if (auto ref = to_ref(col_refs.get(col_ndx))) {
-                    Array::destroy_deep(ref, m_alloc);
-                    col_refs.set(col_ndx, 0);
-                }
+            if (m_opposite_column.get(col_ndx) != backlink_col_key.value) {
+                m_opposite_column.set(col_ndx, backlink_col_key.value);
             }
-        };
-    }
+        }
+        else if (col_type == col_type_BackLink) {
+            auto origin_key = m_spec.get_opposite_link_table_key(col_ndx);
+            size_t origin_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
+            auto origin_table = group->get_table(origin_key);
+            Spec& origin_spec = _impl::TableFriend::get_spec(*origin_table);
+            ColKey origin_col_key = origin_spec.get_key(origin_col_ndx);
+            REALM_ASSERT(is_link_type(origin_col_key.get_type()));
+            if (m_opposite_table.get(col_ndx) != origin_key.value) {
+                m_opposite_table.set(col_ndx, origin_key.value);
+            }
+            if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
+                m_opposite_column.set(col_ndx, origin_col_key.value);
+            }
+            if (auto ref = to_ref(col_refs.get(col_ndx))) {
+                Array::destroy_deep(ref, m_alloc);
+                col_refs.set(col_ndx, 0);
+            }
+        }
+    };
     m_spec.destroy_subspec();
-    commit_and_continue();
 }
 
 namespace {
@@ -1157,7 +1149,7 @@ void copy_list<Timestamp>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocato
 
 } // namespace
 
-void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
+void Table::create_columns()
 {
     size_t cnt;
     auto get_column_cnt = [&cnt](const Cluster* cluster) {
@@ -1171,26 +1163,28 @@ void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
         for (size_t col_ndx = 0; col_ndx < column_count; col_ndx++) {
             m_clusters.insert_column(m_spec.get_key(col_ndx));
         }
-        commit_and_continue();
     }
 }
 
-void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
+bool Table::migrate_objects(ColKey pk_col_key)
 {
     size_t nb_columns = m_spec.get_public_column_count();
-    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
-    if (!top_ref) {
-        // All objects migrated
-        return;
+    if (!nb_columns) {
+        // No columns - this means no objects
+        return true;
     }
 
+    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
+    if (!top_ref) {
+        // Has already been done
+        return true;
+    }
     Array col_refs(m_alloc);
     col_refs.set_parent(&m_top, top_position_for_columns);
     col_refs.init_from_ref(top_ref);
 
-    if (nb_columns > col_refs.size()) {
-        // We have created !ROW_INDEX column. We are done here
-        return;
+    if (m_spec.get_column_name(nb_columns - 1) == "!ROW_INDEX") {
+        nb_columns--;
     }
 
     /************************ Create column accessors ************************/
@@ -1219,6 +1213,10 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         std::unique_ptr<BPlusTreeBase> acc;
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
+
+        if (!(col_ndx < col_refs.size())) {
+            throw std::runtime_error("File corrupted by previous upgrade attempt");
+        }
 
         if (!col_refs.get(col_ndx)) {
             // This column has been migrated
@@ -1296,7 +1294,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
 
     if (m_clusters.size() == number_of_objects) {
         // We have migrated all objects
-        return;
+        return !has_link_columns;
     }
 
     /******************** Optionally create !OID accessor ********************/
@@ -1410,16 +1408,11 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         }
     }
 
-    if (!has_link_columns) {
-        // No link columns to update - mark that we are done with this table
-        finalize_migration();
-    }
-    else {
-        // Destroy values in the old columns that has been copied
-        for (auto col_ndx : cols_to_destroy) {
-            Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-            col_refs.set(col_ndx, 0);
-        }
+    // Destroy values in the old columns that has been copied.
+    // This frees up space in the file
+    for (auto col_ndx : cols_to_destroy) {
+        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
+        col_refs.set(col_ndx, 0);
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
@@ -1431,15 +1424,15 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         m_top.set(top_position_for_sequence_number, rot);
     }
 
-    commit_and_continue();
 #if 0
     if (fastrand(100) < 20) {
         throw util::runtime_error("Upgrade interrupted");
     }
 #endif
+    return !has_link_columns;
 }
 
-void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_links()
 {
     ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
     if (!top_ref) {
@@ -1509,18 +1502,24 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
             }
         }
     }
-
-    finalize_migration();
-    commit_and_continue();
 }
 
-void Table::finalize_migration()
+void Table::finalize_migration(ColKey pk_col_key)
 {
-    ref_type ref = m_top.get_as_ref(top_position_for_columns);
-    if (ref) {
+    if (ref_type ref = m_top.get_as_ref(top_position_for_columns)) {
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
     }
+
+    if (auto orig_row_ndx_col = get_column_key("!ROW_INDEX")) {
+        remove_column(orig_row_ndx_col);
+    }
+
+    if (auto oid_col = get_column_key("!OID")) {
+        remove_column(oid_col);
+    }
+
+    do_set_primary_key_column(pk_col_key);
 }
 
 StringData Table::get_name() const noexcept

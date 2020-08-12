@@ -699,13 +699,13 @@ private:
     void populate_search_index(ColKey col_key);
 
     // Migration support
-    void migrate_column_info(util::FunctionRef<void()>);
-    void migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()>);
-    void migrate_subspec(util::FunctionRef<void()>);
-    void create_columns(util::FunctionRef<void()>);
-    void migrate_objects(ColKey pk_col_key, util::FunctionRef<void()>);
-    void migrate_links(util::FunctionRef<void()>);
-    void finalize_migration();
+    void migrate_column_info();
+    void migrate_indexes(ColKey pk_col_key);
+    void migrate_subspec();
+    void create_columns();
+    bool migrate_objects(ColKey pk_col_key); // Returns true if there are no links to migrate
+    void migrate_links();
+    void finalize_migration(ColKey pk_col_key);
 
     /// Disable copying assignment.
     ///
