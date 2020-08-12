@@ -89,6 +89,10 @@ public:
     {
         return m_value == other.m_value;
     }
+    bool operator!=(const ColumnAttrMask& other) const
+    {
+        return m_value != other.m_value;
+    }
 
 private:
     friend class Spec;

@@ -1684,4 +1684,16 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+TEST(Upgrade_progress)
+{
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+
+    for (int i = 1; i <= 7; i++) {
+        auto fn = test_util::get_test_resource_path() + "test_upgrade_progress_" + util::to_string(i) + ".realm";
+        File::copy(fn, temp_copy);
+        DB::create(*hist)->start_read()->verify();
+    }
+}
+
 #endif // TEST_GROUP

@@ -4,7 +4,7 @@
 * Upgrade logic changed so that progress is recorded explicitly in a table. This makes the logic simpler and reduces the chance of errors. It will also make it easier to see if we receive a partly upgraded file from a costumer.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* If a realm needs upgrade during opening, the program might abort in the "migrate_links" stage. ([#6680](https://github.com/realm/realm-cocoa/issues/6680), since v6.0.0)
 * None.
  
 ### Breaking changes
