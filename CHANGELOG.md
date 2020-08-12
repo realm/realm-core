@@ -6,6 +6,11 @@
 ### Fixed
 * If a realm needs upgrade during opening, the program might abort in the "migrate_links" stage. ([#6680](https://github.com/realm/realm-cocoa/issues/6680), since v6.0.0)
  
+-----------
+
+### Internals
+* Using Visual Studio 2019 for Windows builds.
+
 ----------------------------------------------
 
 # 6.0.15 Release notes
