@@ -55,7 +55,7 @@ public:
 
     /// Called during construction of the associated DB object.
     ///
-    /// \param shared_group The associated DB object.
+    /// \param db The associated DB object.
     virtual void initialize(DB& db) = 0;
 
 
