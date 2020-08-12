@@ -409,7 +409,11 @@ void Transaction::upgrade_file_format(int target_file_format_version)
 
         std::vector<TableRef> table_accessors;
         TableRef pk_table;
+        TableRef progress_info;
+        ColKey col_objects;
+        ColKey col_links;
         std::map<TableRef, ColKey> pk_cols;
+
         // Use table lookup by name. The table keys are not generated yet
         for (size_t t = 0; t < m_table_names.size(); t++) {
             StringData name = m_table_names.get(t);
@@ -418,52 +422,80 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             if (name == "pk") {
                 pk_table = table;
             }
+            else if (name == "!UPDATE_PROGRESS") {
+                progress_info = table;
+            }
             else {
                 table_accessors.push_back(table);
             }
         }
-        auto commit_and_continue = [this]() { commit_and_continue_writing(); };
 
-        for (auto k : table_accessors) {
-            k->migrate_column_info(commit_and_continue);
+        if (!progress_info) {
+            // This is the first time. Prepare for moving objects in one go.
+            progress_info = this->add_table_with_primary_key("!UPDATE_PROGRESS", type_String, "table_name");
+            col_objects = progress_info->add_column(type_Bool, "objects_migrated");
+            col_links = progress_info->add_column(type_Bool, "links_migrated");
+
+
+            for (auto k : table_accessors) {
+                k->migrate_column_info();
+            }
+
+            if (pk_table) {
+                pk_table->migrate_column_info();
+                pk_table->migrate_indexes(ColKey());
+                pk_table->create_columns();
+                pk_table->migrate_objects(ColKey());
+                pk_cols = get_primary_key_columns_from_pk_table(pk_table);
+            }
+
+            for (auto k : table_accessors) {
+                k->migrate_indexes(pk_cols[k]);
+            }
+            for (auto k : table_accessors) {
+                k->migrate_subspec();
+            }
+            for (auto k : table_accessors) {
+                k->create_columns();
+            }
+            commit_and_continue_writing();
+        }
+        else {
+            if (pk_table) {
+                pk_cols = get_primary_key_columns_from_pk_table(pk_table);
+            }
+            col_objects = progress_info->get_column_key("objects_migrated");
+            col_links = progress_info->get_column_key("links_migrated");
         }
 
-        if (pk_table) {
-            pk_table->migrate_column_info(commit_and_continue);
-            pk_table->migrate_indexes(ColKey(), commit_and_continue);
-            pk_table->create_columns(commit_and_continue);
-            pk_table->migrate_objects(ColKey(), commit_and_continue);
-            pk_cols = get_primary_key_columns_from_pk_table(pk_table);
+        // Migrate objects
+        for (auto k : table_accessors) {
+            auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
+            if (!progress_status.get<bool>(col_objects)) {
+                bool no_links = k->migrate_objects(pk_cols[k]);
+                progress_status.set(col_objects, true);
+                progress_status.set(col_links, no_links);
+                commit_and_continue_writing();
+            }
+        }
+        for (auto k : table_accessors) {
+            auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
+            if (!progress_status.get<bool>(col_links)) {
+                k->migrate_links();
+                progress_status.set(col_links, true);
+                commit_and_continue_writing();
+            }
         }
 
+        // Final cleanup
         for (auto k : table_accessors) {
-            k->migrate_indexes(pk_cols[k], commit_and_continue);
-        }
-        for (auto k : table_accessors) {
-            k->migrate_subspec(commit_and_continue);
-        }
-        for (auto k : table_accessors) {
-            k->create_columns(commit_and_continue);
-        }
-        for (auto k : table_accessors) {
-            k->migrate_objects(pk_cols[k], commit_and_continue);
-        }
-        for (auto k : table_accessors) {
-            k->migrate_links(commit_and_continue);
-        }
-        for (auto k : table_accessors) {
-            auto orig_row_ndx_col = k->get_column_key("!ROW_INDEX");
-            if (orig_row_ndx_col)
-                k->remove_column(orig_row_ndx_col);
-            auto oid_col = k->get_column_key("!OID");
-            if (oid_col)
-                k->remove_column(oid_col);
-            k->do_set_primary_key_column(pk_cols[k]);
+            k->finalize_migration(pk_cols[k]);
         }
 
         if (pk_table) {
             remove_table("pk");
         }
+        remove_table(progress_info->get_key());
     }
     // If we come from a file format version lower than 10, all objects with primary keys
     // will be upgraded correctly by the above process

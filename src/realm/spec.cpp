@@ -190,22 +190,26 @@ MemRef Spec::create_empty_spec(Allocator& alloc)
     return spec_set.get_mem();
 }
 
-ColKey Spec::generate_converted_colkey(size_t column_ndx, TableKey table_key)
+ColKey Spec::update_colkey(ColKey existing_key, size_t spec_ndx, TableKey table_key)
 {
-    auto attr = get_column_attr(column_ndx);
+    auto attr = get_column_attr(spec_ndx);
     // index and uniqueness are not passed on to the key, so clear them
     attr.reset(col_attr_Indexed);
     attr.reset(col_attr_Unique);
-    auto type = get_column_type(column_ndx);
-    unsigned upper = unsigned(column_ndx ^ table_key.value);
+    auto type = get_column_type(spec_ndx);
+    if (existing_key.get_type() != type || existing_key.get_attrs() != attr) {
+        unsigned upper = unsigned(table_key.value);
 
-    // columns get the same leaf index as in the spec during conversion.
-    return ColKey(ColKey::Idx{static_cast<unsigned>(column_ndx)}, type, attr, upper);
+        return ColKey(ColKey::Idx{existing_key.get_index().val}, type, attr, upper);
+    }
+    // Existing key is valid
+    return existing_key;
 }
 
 bool Spec::convert_column_attributes()
 {
     bool changes = false;
+    size_t enumkey_ndx = 0;
     for (size_t column_ndx = 0; column_ndx < m_types.size(); column_ndx++) {
         if (column_ndx < m_names.size()) {
             StringData name = m_names.get(column_ndx);
@@ -235,6 +239,17 @@ bool Spec::convert_column_attributes()
                 changes = true;
                 break;
             }
+            case col_type_OldStringEnum: {
+                m_types.set(column_ndx, col_type_String);
+                // We need to padd zeroes into the m_enumkeys so that the index in
+                // m_enumkeys matches the column index.
+                for (size_t i = enumkey_ndx; i < column_ndx; i++) {
+                    m_enumkeys.insert(i, 0);
+                }
+                enumkey_ndx = column_ndx + 1;
+                changes = true;
+                break;
+            }
             case col_type_Link:
                 if (!attr.test(col_attr_Nullable)) {
                     attr.set(col_attr_Nullable);
@@ -253,17 +268,24 @@ bool Spec::convert_column_attributes()
                 break;
         }
     }
+    if (m_enumkeys.is_attached()) {
+        while (m_enumkeys.size() < m_num_public_columns) {
+            m_enumkeys.add(0);
+        }
+    }
     return changes;
 }
 
 bool Spec::convert_column_keys(TableKey table_key)
 {
+    // This step will ensure that the column keys has right attribute and type info
     bool changes = false;
-    for (size_t column_ndx = 0; column_ndx < m_types.size(); column_ndx++) {
-        ColKey col_key = generate_converted_colkey(column_ndx, table_key);
-        ColKey existing_key = ColKey{m_keys.get(column_ndx)};
-        if (col_key.value != existing_key.value) {
-            m_keys.set(column_ndx, col_key.value);
+    auto sz = m_types.size();
+    for (size_t ndx = 0; ndx < sz; ndx++) {
+        ColKey existing_key = ColKey{m_keys.get(ndx)};
+        ColKey col_key = update_colkey(existing_key, ndx, table_key);
+        if (col_key != existing_key) {
+            m_keys.set(ndx, col_key.value);
             changes = true;
         }
     }

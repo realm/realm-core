@@ -260,6 +260,35 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
 
+# 6.0.16 Release notes
+
+### Enhancements
+* Upgrade logic changed so that progress is recorded explicitly in a table. This makes the logic simpler and reduces the chance of errors. It will also make it easier to see if we receive a partly upgraded file from a costumer.
+
+### Fixed
+* If a realm needs upgrade during opening, the program might abort in the "migrate_links" stage. ([#6680](https://github.com/realm/realm-cocoa/issues/6680), since v6.0.0)
+ 
+-----------
+
+### Internals
+* Using Visual Studio 2019 for Windows builds.
+
+----------------------------------------------
+
+# 6.0.15 Release notes
+
+### Fixed
+* Fix bug in memory mapping management. This bug could result in multiple different asserts as well as segfaults. In many cases stack backtraces would include members of the EncyptedFileMapping near the top - even if encryption was not used at all. In other cases asserts or crashes would be in methods reading an array header or array element. In all cases the application would terminate immediately. ([#3838](https://github.com/realm/realm-core/pull/3838), since v6)
+
+----------------------------------------------
+
+# 6.0.14 Release notes
+
+### Fixed
+* Fix missing `Lst` symbols when the library is built as a shared library with LTO. ([Cocoa #6625](https://github.com/realm/realm-cocoa/issues/6625), since v6.0.0).
+
+----------------------------------------------
+
 # 6.0.13 Release notes
 
 ### Enhancements
