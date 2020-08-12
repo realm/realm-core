@@ -197,7 +197,7 @@ public:
     // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
     // If the file cannot be created at this location, for example due to path length restrictions,
     // this function may pass back `<rootDir>/<hashedFileName>.realm`
-    std::string path_for_realm(const SyncConfig& config) const;
+    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name = none) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;

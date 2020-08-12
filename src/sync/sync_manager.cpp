@@ -526,7 +526,7 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
     return m_file_manager->realm_file_path(user.local_identity(), realm_file_name);
 }
 
-std::string SyncManager::path_for_realm(const SyncConfig& config) const
+std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
@@ -544,7 +544,7 @@ std::string SyncManager::path_for_realm(const SyncConfig& config) const
 
     // Attempt to make a nicer filename which will ease debugging when
     // locating files in the filesystem.
-    std::string file_name = string_from_partition(config.partition_value);
+    std::string file_name = (custom_file_name) ? custom_file_name.value() : string_from_partition(config.partition_value);
     return m_file_manager->realm_file_path(config.user->local_identity(), file_name);
 }
 
