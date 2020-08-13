@@ -1,5 +1,17 @@
 # 6.0.16 Release notes
 
+### Fixed
+* None
+ 
+-----------
+
+### Internals
+* Workaround for compiler bug in Visual Studio 2019
+
+----------------------------------------------
+
+# 6.0.16 Release notes
+
 ### Enhancements
 * Upgrade logic changed so that progress is recorded explicitly in a table. This makes the logic simpler and reduces the chance of errors. It will also make it easier to see if we receive a partly upgraded file from a costumer.
 
