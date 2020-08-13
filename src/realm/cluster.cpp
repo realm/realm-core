@@ -2298,9 +2298,8 @@ auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
-        m_position = const_cast<ClusterTree::ConstIterator*>(this)->get_position();
         ObjKey k = load_leaf(m_key);
-        m_leaf_invalid = (k != m_key);
+        m_leaf_invalid = !k || (k != m_key);
         if (m_leaf_invalid) {
             throw std::runtime_error("Outdated iterator");
         }

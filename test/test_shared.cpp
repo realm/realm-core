@@ -3770,6 +3770,7 @@ TEST(Shared_ConstObjectIterator)
     // so, should still throw
     CHECK_THROW(*i5, std::runtime_error);
     CHECK_THROW(i5[0], std::runtime_error);
+    CHECK(i5 == t4->end());
 }
 
 TEST(Shared_ConstList)
