@@ -1618,7 +1618,7 @@ void Obj::assign(const Obj& other)
                     break;
                 }
                 default:
-                    this->set(col, val);
+                    this->set_any(col, val);
                     break;
             }
         }
@@ -1664,7 +1664,7 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
     REALM_ASSERT(get_table() == other.get_table());
     if (auto col_pk = m_table->get_primary_key_column()) {
         Mixed val = other.get_any(col_pk);
-        this->set(col_pk, val);
+        this->set_any(col_pk, val);
     }
 
     auto copy_links = [this, &other](ColKey col) {
