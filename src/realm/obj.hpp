@@ -347,6 +347,9 @@ Obj& Obj::set(ColKey, int64_t value, bool is_default);
 template <>
 Obj& Obj::set(ColKey, ObjKey value, bool is_default);
 
+template <>
+Obj& Obj::set(ColKey, ObjLink value, bool is_default);
+
 
 template <>
 inline Obj& Obj::set(ColKey col_key, int value, bool is_default)
