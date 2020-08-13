@@ -957,8 +957,12 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 
     if (type != col_type_Mixed)
         throw LogicError(LogicError::illegal_type);
-    if (value_is_null(value) && !attrs.test(col_attr_Nullable))
-        throw LogicError(LogicError::column_not_nullable);
+    if (value_is_null(value)) {
+        if (!attrs.test(col_attr_Nullable)) {
+            throw LogicError(LogicError::column_not_nullable);
+        }
+        return set_null(col_key, is_default);
+    }
 
     if (value.get_type() == type_TypedLink) {
         ObjLink new_link = value.template get<ObjLink>();
