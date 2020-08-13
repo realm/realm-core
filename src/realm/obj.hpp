@@ -191,7 +191,7 @@ public:
     // default state. If the object does not exist, create a
     // new object and link it. (To Be Implemented)
     Obj clear_linked_object(ColKey col_key);
-    Obj& set(ColKey col_key, Mixed value);
+    Obj& set_any(ColKey col_key, Mixed value, bool is_default = false);
 
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)

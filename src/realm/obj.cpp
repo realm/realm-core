@@ -1000,7 +1000,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     return *this;
 }
 
-Obj& Obj::set(ColKey col_key, Mixed value)
+Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
 {
     if (value.is_null()) {
         REALM_ASSERT(col_key.get_attrs().test(col_attr_Nullable));
