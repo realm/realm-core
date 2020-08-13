@@ -99,7 +99,7 @@ TEST(InstructionReplication_ClearTable)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        auto t = wt.get_or_add_table("class_foo");
+        auto t = sync::create_table(wt, "class_foo");
         for (size_t i = 0; i < 10; i++)
             t->create_object();
         wt.commit();
@@ -266,9 +266,9 @@ TEST(InstructionReplication_EraseObject)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.get_or_add_table("class_foo");
+        TableRef foo = sync::create_table(wt, "class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        TableRef bar = wt.get_or_add_table("class_bar");
+        TableRef bar = sync::create_table(wt, "class_bar");
         ColKey col_link = bar->add_column(*foo, "link");
 
         Obj obj = foo->create_object().set(col_ndx, 123);
@@ -298,9 +298,9 @@ TEST(InstructionReplication_InvalidateObject)
     Fixture fixture{test_context};
     {
         WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.get_or_add_table("class_foo");
+        TableRef foo = sync::create_table(wt, "class_foo");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        TableRef bar = wt.get_or_add_table("class_bar");
+        TableRef bar = sync::create_table(wt, "class_bar");
         ColKey col_link = bar->add_column(*foo, "link");
         ColKey col_linklist = bar->add_column_list(*foo, "linklist");
 
@@ -333,6 +333,9 @@ TEST(InstructionReplication_InvalidateObject)
 TEST(InstructionReplication_SetLink)
 {
     Fixture fixture{test_context};
+
+    Mixed bar_1_key, bar_2_key;
+
     {
         WriteTransaction wt{fixture.sg_1};
         TableRef foo = sync::create_table(wt, "class_foo");
@@ -340,12 +343,19 @@ TEST(InstructionReplication_SetLink)
         ColKey foo_i = foo->add_column(type_Int, "i");
         ColKey bar_l = bar->add_column(*foo, "l");
 
-        auto foo_1 = foo->create_object().set(foo_i, 123).get_key();
-        auto foo_2 = foo->create_object().set(foo_i, 456).get_key();
+        auto foo_1 = foo->create_object().set(foo_i, 123);
+        auto foo_2 = foo->create_object().set(foo_i, 456);
+        CHECK_EQUAL(foo_1.get<Int>(foo_i), 123);
+        CHECK_EQUAL(foo_2.get<Int>(foo_i), 456);
 
-        bar->create_object().set(bar_l, foo_1);
-        bar->create_object().set(bar_l, foo_2);
+        auto bar_1 = bar->create_object();
+        auto bar_2 = bar->create_object();
 
+        bar_1.set(bar_l, foo_1.get_key());
+        bar_2.set(bar_l, foo_2.get_key());
+
+        bar_1_key = bar_1.get_any(bar->get_primary_key_column());
+        bar_2_key = bar_2.get_any(bar->get_primary_key_column());
 
         wt.commit();
     }
@@ -362,10 +372,13 @@ TEST(InstructionReplication_SetLink)
 
         ColKey foo_i = foo->get_column_key("i");
         ColKey bar_l = bar->get_column_key("l");
-        ObjKey bar_0 = bar->begin()->get_key();
-        ObjKey bar_1 = (bar->begin() + 1)->get_key();
-        CHECK_EQUAL(foo->get_object(bar->get_object(bar_0).get<ObjKey>(bar_l)).get<Int>(foo_i), 123);
-        CHECK_EQUAL(foo->get_object(bar->get_object(bar_1).get<ObjKey>(bar_l)).get<Int>(foo_i), 456);
+        Obj bar_0 = bar->get_object_with_primary_key(bar_1_key);
+        Obj bar_1 = bar->get_object_with_primary_key(bar_2_key);
+        Obj foo_0 = bar_0.get_linked_object(bar_l);
+        Obj foo_1 = bar_1.get_linked_object(bar_l);
+
+        CHECK_EQUAL(foo_0.get<Int>(foo_i), 123);
+        CHECK_EQUAL(foo_1.get<Int>(foo_i), 456);
     }
 }
 

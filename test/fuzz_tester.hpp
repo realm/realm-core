@@ -862,7 +862,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                     m_array_columns.clear();
                     size_t n = table->get_column_count();
                     for (ColKey key : table->get_column_keys()) {
-                        if (table->get_column_name(key) == "pk")
+                        if (table->get_primary_key_column() == key)
                             continue; // don't make normal modifications to primary keys
                         DataType type = table->get_column_type(key);
                         if (type == type_LinkList) {

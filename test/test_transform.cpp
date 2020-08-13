@@ -481,22 +481,26 @@ TEST(Transform_AdjustSetLinkPayload)
     client_2->create_schema(schema);
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
-    client_1->transaction([](Peer& client_1) {
+    Mixed l1_key, l2_key;
+
+    client_1->transaction([&](Peer& client_1) {
         TableRef t = client_1.table("class_t");
         TableRef l = client_1.table("class_l");
         t->create_object();
         t->begin()->set("i", 123);
-        l->create_object();
-        l->begin()->set("l", t->begin()->get_key());
+        auto obj = l->create_object();
+        l1_key = obj.get_primary_key();
+        obj.set("l", t->begin()->get_key());
     });
 
-    client_2->transaction([](Peer& client_2) {
+    client_2->transaction([&](Peer& client_2) {
         TableRef t = client_2.table("class_t");
         TableRef l = client_2.table("class_l");
         t->create_object();
         t->begin()->set("i", 456);
-        client_2.table("class_l")->create_object();
-        l->begin()->set("l", t->begin()->get_key());
+        auto obj = l->create_object();
+        l2_key = obj.get_primary_key();
+        obj.set("l", t->begin()->get_key());
     });
 
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -510,10 +514,10 @@ TEST(Transform_AdjustSetLinkPayload)
     {
         ConstTableRef t = read_client_1.get_table("class_t");
         ConstTableRef l = read_client_1.get_table("class_l");
-        ObjKey link0 = l->begin()->get<ObjKey>("l");
-        ObjKey link1 = (l->begin() + 1)->get<ObjKey>("l");
-        CHECK_EQUAL(123, t->get_object(link0).get<int64_t>("i"));
-        CHECK_EQUAL(456, t->get_object(link1).get<int64_t>("i"));
+        Obj link0 = (*l)[l1_key].get_linked_object("l");
+        Obj link1 = (*l)[l2_key].get_linked_object("l");
+        CHECK_EQUAL(123, link0.get<int64_t>("i"));
+        CHECK_EQUAL(456, link1.get<int64_t>("i"));
     }
 }
 
@@ -535,19 +539,23 @@ TEST(Transform_AdjustLinkListSetPayload)
     client_2->create_schema(schema);
     synchronize(server.get(), {client_1.get(), client_2.get()});
 
-    client_1->transaction([](Peer& client_1) {
+    Mixed ll1_key, ll2_key;
+
+    client_1->transaction([&](Peer& client_1) {
         client_1.table("class_t")->create_object();
         client_1.table("class_t")->begin()->set("i", 123);
-        client_1.table("class_ll")->create_object();
-        LnkLst ll = client_1.table("class_ll")->begin()->get_linklist("ll");
+        auto obj = client_1.table("class_ll")->create_object();
+        ll1_key = obj.get_primary_key();
+        LnkLst ll = obj.get_linklist("ll");
         ll.add((ll.get_target_table()->begin() + 0)->get_key());
     });
 
-    client_2->transaction([](Peer& client_2) {
+    client_2->transaction([&](Peer& client_2) {
         client_2.table("class_t")->create_object();
         client_2.table("class_t")->begin()->set("i", 456);
-        client_2.table("class_ll")->create_object();
-        LnkLst ll = client_2.table("class_ll")->begin()->get_linklist("ll");
+        auto obj = client_2.table("class_ll")->create_object();
+        ll2_key = obj.get_primary_key();
+        LnkLst ll = obj.get_linklist("ll");
         ll.add((ll.get_target_table()->begin() + 0)->get_key());
     });
 
@@ -560,9 +568,10 @@ TEST(Transform_AdjustLinkListSetPayload)
     CHECK(compare_groups(read_server, read_client_2));
 
     ConstTableRef client_1_table_link = read_client_1.get_table("class_ll");
-    LnkLst ll = (client_1_table_link->begin() + 0)->get_linklist("ll");
-    CHECK_EQUAL(123, ll.get_object(0).get<int64_t>("i"));
-    CHECK_EQUAL(456, (client_1_table_link->begin() + 1)->get_linklist("ll").get_object(0).get<int64_t>("i"));
+    LnkLst ll1 = (*client_1_table_link)[ll1_key].get_linklist("ll");
+    LnkLst ll2 = (*client_1_table_link)[ll2_key].get_linklist("ll");
+    CHECK_EQUAL(123, ll1.get_object(0).get<int64_t>("i"));
+    CHECK_EQUAL(456, ll2.get_object(0).get<int64_t>("i"));
 }
 
 TEST(Transform_MergeInsertSetAndErase)

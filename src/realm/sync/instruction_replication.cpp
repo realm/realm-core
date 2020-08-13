@@ -200,13 +200,8 @@ void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
             instr.type = Instruction::AddTable::EmbeddedTable{};
         }
         else {
-            auto field = m_encoder.intern_string(""); // FIXME: Should this be "_id"?
-            const bool is_nullable = false;
-            instr.type = Instruction::AddTable::PrimaryKeySpec{
-                field,
-                Instruction::Payload::Type::GlobalKey,
-                is_nullable,
-            };
+            // Top-level tables without primary keys are not supported.
+            unsupported_instruction();
         }
         emit(instr);
     }

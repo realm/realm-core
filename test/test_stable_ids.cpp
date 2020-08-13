@@ -96,7 +96,11 @@ TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, 
     auto rt = sg->start_read();
     ConstTableRef foo = rt->get_table("class_foo");
     CHECK(foo);
-    CHECK_EQUAL(foo->get_column_count(), 0);
+
+    // Check that a primary-key column of type ObjectID was created.
+    CHECK_EQUAL(foo->get_column_count(), 1);
+    CHECK(foo->get_primary_key_column());
+    CHECK_EQUAL(foo->get_primary_key_column().get_type(), type_ObjectId);
 }
 
 TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, MakeServerHistory)
@@ -107,19 +111,6 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     DBRef sg = DB::create(*history);
 
     auto client_file_ident = TEST_TYPE::get_client_file_ident(*history);
-
-    // Tables without primary keys:
-    {
-        WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
-
-        auto obj0 = t0->create_object();
-        auto obj1 = t0->create_object();
-
-        // Object IDs should be peerID plus a sequence number
-        CHECK_EQUAL(obj0.get_object_id(), GlobalKey(client_file_ident, 0));
-        CHECK_EQUAL(obj1.get_object_id(), GlobalKey(client_file_ident, 1));
-    }
 
     // Tables with integer primary keys:
     {
@@ -164,114 +155,6 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
 
     // Attempting to create a table that already exists causes an assertion failure if different primary key name,
     // type, or nullability is specified. This is not currently testable.
-}
-
-TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
-{
-    SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = make_client_replication(test_dir);
-
-    DBRef sg = DB::create(*history);
-
-    ColKey link_col;
-    {
-        WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
-        TableRef t1 = sync::create_table(wt, "class_t1");
-        link_col = t0->add_column(*t1, "link");
-
-        Obj t1_k1 = t1->create_object();
-        Obj t0_k1 = t0->create_object().set(link_col, t1_k1.get_key());
-        Obj t0_k2 = t0->create_object();
-
-        // Object IDs should be peerID plus a sequence number
-        CHECK_EQUAL(t0_k1.get_object_id(), GlobalKey(0, 0));
-        CHECK_EQUAL(t0_k2.get_object_id(), GlobalKey(0, 1));
-        wt.commit();
-    }
-
-    bool fix_up_object_ids = true;
-    history->set_client_file_ident({1, 123}, fix_up_object_ids);
-
-    // Save the changeset to replay later
-    UploadCursor upload_cursor{0, 0};
-    std::vector<ClientReplication::UploadChangeset> changesets;
-    version_type locked_server_version; // Dummy
-    history->find_uploadable_changesets(upload_cursor, 2, changesets, locked_server_version);
-    CHECK_GREATER_EQUAL(changesets.size(), 1);
-    auto& changeset = changesets[0].changeset;
-    ChunkedBinaryInputStream stream{changeset};
-    Changeset result;
-    sync::parse_changeset(stream, result);
-
-    // Check that ObjectIds gets translated correctly
-    {
-        ReadTransaction rt{sg};
-        ConstTableRef t0 = rt.get_table("class_t0");
-        ConstTableRef t1 = rt.get_table("class_t1");
-        auto it = t0->begin();
-        GlobalKey oid0 = it->get_object_id();
-        ObjKey link_ndx = it->get<ObjKey>(link_col);
-        ++it;
-        GlobalKey oid1 = it->get_object_id();
-        CHECK_EQUAL(oid0, GlobalKey(1, 0));
-        CHECK_EQUAL(oid1, GlobalKey(1, 1));
-        GlobalKey oid2 = t1->get_object_id(link_ndx);
-        CHECK_EQUAL(oid2.hi(), 1);
-        CHECK_EQUAL(oid2, t1->begin()->get_object_id());
-    }
-
-    // Replay the transaction to see that the instructions were modified.
-    {
-        SHARED_GROUP_TEST_PATH(test_dir_2);
-        auto history_2 = make_client_replication(test_dir_2);
-        DBRef sg_2 = DB::create(*history_2);
-
-        WriteTransaction wt{sg_2};
-        InstructionApplier applier{wt};
-        applier.apply(result, &test_context.logger);
-        wt.commit();
-
-        // Check same invariants as above.
-        ReadTransaction rt{sg_2};
-        ConstTableRef t0 = rt.get_table("class_t0");
-        ConstTableRef t1 = rt.get_table("class_t1");
-        auto it = t0->begin();
-        GlobalKey oid0 = it->get_object_id();
-        ObjKey link_ndx = it->get<ObjKey>(link_col);
-        ++it;
-        GlobalKey oid1 = it->get_object_id();
-        CHECK_EQUAL(oid0, GlobalKey(1, 0));
-        CHECK_EQUAL(oid1, GlobalKey(1, 1));
-        GlobalKey oid2 = t1->get_object_id(link_ndx);
-        CHECK_EQUAL(oid2.hi(), 1);
-        CHECK_EQUAL(oid2, t1->begin()->get_object_id());
-    }
-}
-
-TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServerHistory)
-{
-    SHARED_GROUP_TEST_PATH(test_dir);
-    {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
-        t0->create_object();
-        t0->create_object();
-        CHECK_EQUAL(t0->size(), 2);
-        wt.commit();
-    }
-    {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
-        WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
-        t0->create_object();
-        t0->create_object();
-        CHECK_EQUAL(t0->size(), 4);
-        wt.commit();
-    }
 }
 
 TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
