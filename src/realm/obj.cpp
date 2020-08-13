@@ -1817,4 +1817,14 @@ ColKey Obj::spec_ndx2colkey(size_t col_ndx)
     return get_table()->spec_ndx2colkey(col_ndx);
 }
 
+size_t Obj::colkey2spec_ndx(ColKey key)
+{
+    return get_table()->colkey2spec_ndx(key);
+}
+
+ColKey Obj::get_primary_key_column() const
+{
+    return m_table->get_primary_key_column();
+}
+
 } // namespace realm

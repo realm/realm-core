@@ -281,6 +281,7 @@ private:
 
     const TableClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
+    ColKey get_primary_key_column() const;
     TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
     TableRef get_target_table(ObjLink link) const;
@@ -304,6 +305,7 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     ColKey spec_ndx2colkey(size_t col_ndx);
+    size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
     void bump_content_version();
     void bump_both_versions();
@@ -469,8 +471,8 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
     size_t start_index = 0;
 
     // Avoid trying to set the PK column.
-    if (m_table->get_primary_key_column()) {
-        REALM_ASSERT(m_table->colkey2spec_ndx(m_table->get_primary_key_column()) == 0);
+    if (get_primary_key_column()) {
+        REALM_ASSERT(colkey2spec_ndx(get_primary_key_column()) == 0);
         start_index = 1;
     }
 
