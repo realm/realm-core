@@ -1012,40 +1012,41 @@ Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
         switch (col_key.get_type()) {
             case col_type_Int:
                 if (col_key.get_attrs().test(col_attr_Nullable)) {
-                    set(col_key, util::Optional<Int>(value.get_int()));
+                    set(col_key, util::Optional<Int>(value.get_int()), is_default);
                 }
                 else {
-                    set(col_key, value.get_int());
+                    set(col_key, value.get_int(), is_default);
                 }
                 break;
             case col_type_Bool:
-                set(col_key, value.get_bool());
+                set(col_key, value.get_bool(), is_default);
                 break;
             case col_type_Float:
-                set(col_key, value.get_float());
+                set(col_key, value.get_float(), is_default);
                 break;
             case col_type_Double:
-                set(col_key, value.get_double());
+                set(col_key, value.get_double(), is_default);
                 break;
             case col_type_String:
-                set(col_key, value.get_string());
+                set(col_key, value.get_string(), is_default);
                 break;
             case col_type_Binary:
-                set(col_key, value.get<Binary>());
+                set(col_key, value.get<Binary>(), is_default);
                 break;
             case col_type_Mixed:
-                set(col_key, value, false);
+                set(col_key, value, is_default);
                 break;
             case col_type_Timestamp:
-                set(col_key, value.get<Timestamp>());
+                set(col_key, value.get<Timestamp>(), is_default);
                 break;
             case col_type_ObjectId:
-                set(col_key, value.get<ObjectId>());
+                set(col_key, value.get<ObjectId>(), is_default);
                 break;
             case col_type_Decimal:
-                set(col_key, value.get<Decimal128>());
+                set(col_key, value.get<Decimal128>(), is_default);
                 break;
             case col_type_Link:
+                set(col_key, value.get<ObjKey>(), is_default);
                 set(col_key, value.get<ObjKey>());
                 break;
             default:
