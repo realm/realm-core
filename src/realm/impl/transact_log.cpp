@@ -124,6 +124,18 @@ inline void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase&
     m_encoder.dictionary_insert(key);
 }
 
+bool TransactLogEncoder::dictionary_clear()
+{
+    append_simple_instr(instr_DictionaryClear); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::dictionary_clear(const CollectionBase& dict)
+{
+    select_collection(dict);
+    m_encoder.dictionary_clear();
+}
+
 REALM_NORETURN
 void TransactLogParser::parser_error() const
 {

@@ -88,6 +88,7 @@ public:
 
     void dictionary_insert(const CollectionBase&, Mixed key, Mixed val) override;
     void dictionary_erase(const CollectionBase&, Mixed key) override;
+    void dictionary_clear(const CollectionBase&) override;
 
     void remove_object(const Table*, ObjKey) override;
 

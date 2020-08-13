@@ -68,6 +68,7 @@ enum Instruction {
 
     instr_DictionaryInsert = 37,
     instr_DictionaryErase = 38,
+    instr_DictionaryClear = 39,
 };
 
 class TransactLogStream {
@@ -173,6 +174,10 @@ public:
     {
         return true;
     }
+    bool dictionary_clear()
+    {
+        return true;
+    }
 
     // Must have descriptor selected:
     bool insert_column(ColKey)
@@ -244,7 +249,7 @@ public:
     bool rename_column(ColKey col_key);
     bool set_link_type(ColKey col_key);
 
-    // Must have list selected:
+    // Must have collection selected:
     bool select_collection(ColKey col_key, ObjKey key);
     bool list_set(size_t list_ndx);
     bool list_insert(size_t ndx);
@@ -252,8 +257,9 @@ public:
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
 
-    bool dictionary_insert(Mixed);
-    bool dictionary_erase(Mixed);
+    bool dictionary_insert(Mixed key);
+    bool dictionary_erase(Mixed key);
+    bool dictionary_clear();
 
     /// End of methods expected by parser.
 
@@ -351,6 +357,7 @@ public:
 
     virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value);
     virtual void dictionary_erase(const CollectionBase& dict, Mixed key);
+    virtual void dictionary_clear(const CollectionBase& dict);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
@@ -998,6 +1005,13 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_DictionaryClear: {
+            int type = read_int<int>(); // Throws
+            REALM_ASSERT(type == type_String);
+            if (!handler.dictionary_clear()) // Throws
+                parser_error();
+            return;
+        }
         case instr_SelectList: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
@@ -1222,6 +1236,12 @@ public:
     bool dictionary_erase(Mixed key)
     {
         m_encoder.dictionary_insert(key);
+        return true;
+    }
+
+    bool dictionary_clear()
+    {
+        m_encoder.dictionary_clear();
         return true;
     }
 

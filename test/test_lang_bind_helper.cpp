@@ -1920,6 +1920,10 @@ public:
     {
         return false;
     }
+    bool dictionary_clear()
+    {
+        return false;
+    }
     bool modify_object(ColKey, ObjKey)
     {
         return false;
