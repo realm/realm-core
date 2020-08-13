@@ -991,7 +991,7 @@ inline ConstTableRef Group::get_table(TableKey key) const
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-REALM_NOINLINE inline TableRef Group::get_table(StringData name)
+inline TableRef Group::get_table(StringData name)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
