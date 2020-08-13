@@ -35,9 +35,7 @@ namespace sync {
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
     X(ArrayErase)                                                                                                    \
-    X(ArrayClear)                                                                                                    \
-    X(DictionaryInsert)                                                                                              \
-    X(DictionaryErase)
+    X(ArrayClear)
 
 struct StringBufferRange {
     uint32_t offset, size;
@@ -80,7 +78,7 @@ struct Instruction;
 
 namespace instr {
 
-using PrimaryKey = mpark::variant<mpark::monostate, int64_t, InternString, GlobalKey, ObjectId>;
+using PrimaryKey = mpark::variant<mpark::monostate, int64_t, InternString, ObjectId>;
 
 struct Path {
     using Element = mpark::variant<InternString, uint32_t>;
@@ -147,18 +145,37 @@ struct Path {
     {
         return lhs.m_path == rhs.m_path;
     }
+
+    using const_iterator = typename std::vector<Element>::const_iterator;
+    const_iterator begin() const noexcept
+    {
+        return m_path.begin();
+    }
+    const_iterator end() const noexcept
+    {
+        return m_path.end();
+    }
 };
 
 struct Payload {
+    /// Create a new object in-place (embedded object).
     struct ObjectValue {
+    };
+    /// Create an empty dictionary in-place (does not clear an existing dictionary).
+    struct Dictionary {
+    };
+    /// Sentinel value for an erased dictionary element.
+    struct Erased {
     };
 
     /// Payload data types, corresponding loosely to the `DataType` enum in
     /// Core, but with some special values:
     ///
     /// - Null (0) indicates a NULL value of any type.
-    /// - GlobalKey (-1) indicates an internally generated object ID.
-    /// - ObjectValue (-2) indicates the creation of an embedded object.
+    /// - ObjectValue (-1) indicates the creation of an embedded object.
+    /// - Dictionary (-2) indicates the creation of a dictionary.
+    /// - Erased (-3) indicates that a dictionary element should be erased.
+    /// - Undefined (-4) indicates the
     ///
     /// Furthermore, link values for both Link and LinkList columns are
     /// represented by a single Link type.
@@ -166,6 +183,12 @@ struct Payload {
     /// Note: For Mixed columns (including typed links), no separate value is required, because the
     /// instruction set encodes the type of each value in the instruction.
     enum class Type : int8_t {
+        // Special value indicating that a dictionary element should be erased.
+        Erased = -3,
+
+        // Special value indicating that a dictionary should be created at the position.
+        Dictionary = -2,
+
         // Special value indicating that an embedded object should be created at
         // the position.
         ObjectValue = -1,
@@ -260,6 +283,12 @@ struct Payload {
     // Note: Intentionally implicit.
     Payload(const ObjectValue&) noexcept
         : type(Type::ObjectValue)
+    {
+    }
+
+    // Note: Intentionally implicit.
+    Payload(const Erased&) noexcept
+        : type(Type::Erased)
     {
     }
 
@@ -424,16 +453,17 @@ struct EraseTable : TableInstruction {
 struct AddColumn : TableInstruction {
     using TableInstruction::TableInstruction;
 
+    enum class CollectionType : uint8_t { Single, List, Dictionary, Set };
+
     InternString field;
 
-    // `none` for Mixed columns. Mixed columns are always nullable.
     Payload::Type type;
 
     bool nullable;
 
-    // This is backwards compatible with previous boolean type where 0
-    // indicated simple type and 1 indicated list.
-    enum class CollectionType : uint8_t { Single, List, Dictionary, Set };
+    // For Mixed columns, this is `none`. Mixed columns are always nullable.
+    //
+    // For dictionaries, this must always be `Type::String`.
     CollectionType collection_type;
 
     InternString link_target_table;
@@ -556,25 +586,6 @@ struct ArrayClear : PathInstruction {
     }
 };
 
-struct DictionaryInsert : PathInstruction {
-    using PathInstruction::PathInstruction;
-    Payload value;
-
-    bool operator==(const DictionaryInsert& rhs) const noexcept
-    {
-        return PathInstruction::operator==(rhs) && value == rhs.value;
-    }
-};
-
-struct DictionaryErase : PathInstruction {
-    using PathInstruction::PathInstruction;
-
-    bool operator==(const DictionaryErase& rhs) const noexcept
-    {
-        return PathInstruction::operator==(rhs);
-    }
-};
-
 } // namespace instr
 
 struct Instruction {
@@ -605,8 +616,6 @@ struct Instruction {
         ArrayMove = 9,
         ArrayErase = 10,
         ArrayClear = 11,
-        DictionaryInsert = 12,
-        DictionaryErase = 13,
     };
 
     template <Type t>
@@ -736,7 +745,7 @@ inline const char* get_collection_type(Instruction::AddColumn::CollectionType ty
     using Type = Instruction::AddColumn::CollectionType;
     switch (type) {
         case Type::Single:
-            return "simple";
+            return "Single";
         case Type::List:
             return "List";
         case Type::Dictionary:
