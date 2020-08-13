@@ -1572,7 +1572,7 @@ public:
     {
         return true; // No-op
     }
-    bool dictionary_clear(size_t)
+    bool dictionary_clear()
     {
         return true; // No-op
     }
