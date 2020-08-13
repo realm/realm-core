@@ -88,9 +88,6 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
     switch (value.type) {
         case Type::ObjectValue:
             break;
-        case Type::GlobalKey:
-            os << data.key;
-            break;
         case Type::Null:
             break;
         case Type::Int:

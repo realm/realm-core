@@ -50,9 +50,6 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
     const auto& data = payload.data;
 
     switch (payload.type) {
-        case Type::GlobalKey: {
-            return append_value(data.key);
-        }
         case Type::Int: {
             return append_value(data.integer);
         }
@@ -85,6 +82,10 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
         }
         case Type::ObjectValue:
             [[fallthrough]];
+        case Type::Dictionary:
+            [[fallthrough]];
+        case Type::Erased:
+            [[fallthrough]];
         case Type::Null:
             // The payload type does not carry additional data.
             return;
@@ -95,6 +96,11 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
 void ChangesetEncoder::append_value(Instruction::Payload::Type type)
 {
     append_value(int64_t(type));
+}
+
+void ChangesetEncoder::append_value(Instruction::AddColumn::CollectionType type)
+{
+    append_value(uint8_t(type));
 }
 
 void ChangesetEncoder::append_value(const Instruction::Payload::Link& link)
@@ -119,10 +125,6 @@ void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
             // StringBufferRange, but here it denotes to an InternString.
             append_value(Type::String);
             append_value(str);
-        },
-        [&](GlobalKey key) {
-            append_value(Type::GlobalKey);
-            append_value(key);
         },
         [&](ObjectId id) {
             append_value(Type::ObjectId);
@@ -160,8 +162,7 @@ void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
     // Mixed columns are always nullable.
     REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
 
-    append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable,
-           uint8_t(instr.collection_type));
+    append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.collection_type);
     if (instr.type == Instruction::Payload::Type::Link) {
         append_value(instr.link_target_table);
     }
@@ -190,16 +191,6 @@ void ChangesetEncoder::operator()(const Instruction::ArrayErase& instr)
 void ChangesetEncoder::operator()(const Instruction::ArrayClear& instr)
 {
     append_path_instr(Instruction::Type::ArrayClear, instr, instr.prior_size);
-}
-
-void ChangesetEncoder::operator()(const Instruction::DictionaryInsert& instr)
-{
-    append_path_instr(Instruction::Type::DictionaryInsert, instr, instr.value);
-}
-
-void ChangesetEncoder::operator()(const Instruction::DictionaryErase& instr)
-{
-    append_path_instr(Instruction::Type::DictionaryErase, instr);
 }
 
 InternString ChangesetEncoder::intern_string(StringData str)
