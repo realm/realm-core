@@ -5488,7 +5488,7 @@ TEST(Sync_CancelReconnectDelay)
 // changesets larger than 16 MB.
 //
 // Fails with 'bad alloc' around 1 GB mem usage on 32-bit Windows + 32-bit Linux
-TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
+TEST_IF(Sync_MergeLargeBinary, false && !(REALM_ARCHITECTURE_X86_32))
 {
     // Two binaries are inserted in each transaction such that the total size
     // of the changeset exceeds 16 MB. A single set_binary operation does not
@@ -5653,7 +5653,7 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
 // This test checks that it is possible to create, upload, download, and merge
 // changesets larger than 16 MB. This test uses less memory than
 // Sync_MergeLargeBinary.
-TEST(Sync_MergeLargeBinaryReducedMemory)
+TEST_IF(Sync_MergeLargeBinaryReducedMemory, false)
 {
     // Two binaries are inserted in a transaction such that the total size
     // of the changeset exceeds 16MB. A single set_binary operation does not
@@ -5818,7 +5818,7 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
 
 // This test checks that it is possible to create, upload, download, and merge
 // changesets larger than 16MB.
-TEST(Sync_MergeLargeChangesets)
+TEST_IF(Sync_MergeLargeChangesets, false)
 {
     constexpr int number_of_rows = 200;
 
@@ -6164,7 +6164,7 @@ TEST(Sync_BatchedUploadMessages)
 }
 
 
-TEST(Sync_UploadLogCompactionEnabled)
+TEST_IF(Sync_UploadLogCompactionEnabled, false)
 {
     TEST_DIR(server_dir);
     SHARED_GROUP_TEST_PATH(path_1);
@@ -6232,7 +6232,7 @@ TEST(Sync_UploadLogCompactionEnabled)
 }
 
 
-TEST(Sync_UploadLogCompactionDisabled)
+TEST_IF(Sync_UploadLogCompactionDisabled, false)
 {
     TEST_DIR(server_dir);
     SHARED_GROUP_TEST_PATH(path_1);
@@ -7858,7 +7858,7 @@ TEST(Sync_TypedLinks)
     }
 }
 
-TEST(Sync_Dictionary)
+TEST_IF(Sync_Dictionary, false)
 {
     // Test replication and synchronization of Mixed values and lists.
 

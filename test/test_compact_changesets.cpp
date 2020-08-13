@@ -9,6 +9,8 @@ using namespace realm;
 using namespace realm::sync;
 using namespace realm::_impl;
 
+#if 0
+
 namespace {
 struct InstructionBuilder : InstructionHandler {
     using Instruction = realm::sync::Instruction;
@@ -52,21 +54,21 @@ TEST_IF(CompactChangesets_RedundantSets, false)
 
     Instruction::Update set1;
     set1.table = table;
-    set1.object = GlobalKey{1, 1};
+    set1.object = 1;
     set1.field = changeset.intern_string("foo");
     set1.value = Instruction::Payload(int64_t(123));
     push(set1);
 
     Instruction::Update set2;
     set2.table = table;
-    set2.object = GlobalKey{1, 1};
+    set2.object = 1;
     set2.field = changeset.intern_string("foo");
     set2.value = Instruction::Payload(int64_t(345));
     push(set2);
 
     Instruction::Update set3;
     set3.table = table;
-    set3.object = GlobalKey{1, 1};
+    set3.object = 1;
     set3.field = changeset.intern_string("foo");
     set3.value = Instruction::Payload(int64_t(123));
     push(set3);
@@ -253,7 +255,7 @@ TEST_IF(CompactChangesets_EraseRecreate, false)
 }
 
 
-#if 0
+
 TEST(CompactChangesets_PrimaryKeysRescueObjects)
 {
     using Instruction = realm::sync::Instruction;

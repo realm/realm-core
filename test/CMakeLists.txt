@@ -248,7 +248,6 @@ if(REALM_ENABLE_SYNC)
 	    test_instruction_replication.cpp
 	    test_lang_bind_helper_sync.cpp
 	    test_server_history.cpp
-	    test_server_legacy_migration.cpp
 	    test_scratch_allocator.cpp
 	    test_stable_ids.cpp
 	    test_sync.cpp
