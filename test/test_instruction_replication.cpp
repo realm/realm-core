@@ -533,3 +533,39 @@ TEST(InstructionReplication_NullablePrimaryKeys)
         CHECK_EQUAL(third.get<int64_t>(col_ndx), 789);
     }
 }
+
+TEST(InstructionReplication_Dictionary)
+{
+    Fixture fixture{test_context};
+    {
+        WriteTransaction wt{fixture.sg_1};
+        TableRef foo = sync::create_table(wt, "class_foo");
+        ColKey col_ndx = foo->add_column_dictionary(type_String, "dict");
+        Obj obj = foo->create_object();
+        auto dict = obj.get_dictionary(col_ndx);
+        dict.insert("a", 123);
+        dict.insert("b", 45.0);
+        dict.insert("c", "Hello");
+        dict.insert("d", true);
+        dict.insert("erase_me", "erase_me");
+        dict.erase("erase_me");
+        wt.commit();
+    }
+    fixture.replay_transactions();
+    fixture.check_equal();
+    {
+        ReadTransaction rt{fixture.sg_2};
+        auto foo = rt.get_table("class_foo");
+        CHECK(foo);
+        CHECK_EQUAL(foo->size(), 1);
+        auto obj = *foo->begin();
+        ColKey col_ndx = foo->get_column_key("dict");
+        CHECK(foo->is_dictionary(col_ndx));
+        auto dict = obj.get_dictionary(col_ndx);
+        CHECK_EQUAL(dict.size(), 4);
+        CHECK_EQUAL(dict.get("a"), 123);
+        CHECK_EQUAL(dict.get("b"), 45.0);
+        CHECK_EQUAL(dict.get("c"), "Hello");
+        CHECK_EQUAL(dict.get("d"), true);
+    }
+}

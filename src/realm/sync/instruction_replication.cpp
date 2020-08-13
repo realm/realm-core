@@ -321,6 +321,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType
                                     Table* target_table)
 {
     TrivialReplication::insert_column(table, col_ndx, type, name, target_table);
+    using CollectionType = Instruction::AddColumn::CollectionType;
 
     if (select_table(*table)) {
         Instruction::AddColumn instr;
@@ -328,12 +329,17 @@ void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType
         instr.field = m_encoder.intern_string(name);
         instr.nullable = col_ndx.is_nullable();
         instr.type = get_payload_type(type);
-        instr.collection_type = Instruction::AddColumn::CollectionType::Single;
+
         if (col_ndx.is_list()) {
-            instr.collection_type = Instruction::AddColumn::CollectionType::List;
+            instr.collection_type = CollectionType::List;
         }
-        if (col_ndx.is_dictionary()) {
-            instr.collection_type = Instruction::AddColumn::CollectionType::Dictionary;
+        else if (col_ndx.is_dictionary()) {
+            REALM_ASSERT(type == type_String);
+            instr.collection_type = CollectionType::Dictionary;
+        }
+        else {
+            REALM_ASSERT(!col_ndx.is_collection());
+            instr.collection_type = CollectionType::Single;
         }
 
         // Mixed columns are always nullable.
@@ -507,13 +513,13 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
     TrivialReplication::dictionary_insert(dict, key, val);
 
     if (select_collection(dict)) {
-        Instruction::DictionaryInsert instr;
+        Instruction::Update instr;
         REALM_ASSERT(key.get_type() == type_String);
         populate_path_instr(instr, dict);
         StringData key_value = key.get_string();
-        InternString interned_key_value = m_encoder.intern_string(key_value);
-        instr.path.m_path.push_back(interned_key_value);
+        instr.path.push_back(m_encoder.intern_string(key_value));
         instr.value = as_payload(dict, val);
+        instr.is_default = false;
         emit(instr);
     }
 }
@@ -524,12 +530,25 @@ void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
     TrivialReplication::dictionary_erase(dict, key);
 
     if (select_collection(dict)) {
-        Instruction::DictionaryErase instr;
+        Instruction::Update instr;
         REALM_ASSERT(key.get_type() == type_String);
         populate_path_instr(instr, dict);
         StringData key_value = key.get_string();
-        InternString interned_key_value = m_encoder.intern_string(key_value);
-        instr.path.m_path.push_back(interned_key_value);
+        instr.path.push_back(m_encoder.intern_string(key_value));
+        instr.value = Instruction::Payload::Erased{};
+        instr.is_default = false;
+        emit(instr);
+    }
+}
+
+void SyncReplication::dictionary_clear(const CollectionBase& dict)
+{
+    TrivialReplication::dictionary_clear(dict);
+
+    if (select_collection(dict)) {
+        // FIXME: Rename instruction.
+        Instruction::ArrayClear instr;
+        populate_path_instr(instr, dict);
         emit(instr);
     }
 }

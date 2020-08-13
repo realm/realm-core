@@ -368,19 +368,6 @@ void Changeset::Reflector::operator()(const Instruction::ArrayClear& p) const
     m_tracer.field("prior_size", p.prior_size);
 }
 
-void Changeset::Reflector::operator()(const Instruction::DictionaryInsert& p) const
-{
-    m_tracer.name("DictionaryInsert");
-    path_instr(p);
-    m_tracer.field("value", p.value);
-}
-
-void Changeset::Reflector::operator()(const Instruction::DictionaryErase& p) const
-{
-    m_tracer.name("DictionaryErase");
-    path_instr(p);
-}
-
 void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
 {
     m_tracer.name("AddColumn");
