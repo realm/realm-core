@@ -1047,7 +1047,9 @@ Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
                 break;
             case col_type_Link:
                 set(col_key, value.get<ObjKey>(), is_default);
-                set(col_key, value.get<ObjKey>());
+                break;
+            case col_type_TypedLink:
+                set(col_key, value.get<ObjLink>(), is_default);
                 break;
             default:
                 break;
