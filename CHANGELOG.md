@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* We no longer throw when an invalid ConstIterator is copied ([#698](https://github.com/realm/realm-cocoa/issues/6597), since v6.0)
  
 ### Breaking changes
 * None.

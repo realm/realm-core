@@ -3754,6 +3754,13 @@ TEST(Shared_ConstObjectIterator)
     CHECK_EQUAL(i3->get<int64_t>(col), 7);
     ++i3;
     CHECK_EQUAL(i3->get<int64_t>(col), 8);
+    reader.reset();
+    // Verify that we can copy a ConstIterator - even an invalid one
+    TransactionRef writer = sg->start_write();
+    TableRef t4 = writer->get_table("Foo");
+    auto i4 = t4->begin();
+    t4->clear();
+    auto i5(i4);
 }
 
 TEST(Shared_ConstList)

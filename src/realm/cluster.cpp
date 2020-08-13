@@ -2233,12 +2233,7 @@ ClusterTree::ConstIterator::ConstIterator(const ConstIterator& other)
     , m_leaf_invalid(other.m_leaf_invalid)
     , m_position(other.m_position)
 {
-    if (m_key) {
-        auto k = load_leaf(m_key);
-        if (k != m_key)
-            throw std::runtime_error("ConstIterator copy failed");
-    }
-    m_leaf_start_pos = m_position -  m_state.m_current_index;
+    m_leaf_start_pos = m_position - m_state.m_current_index;
 }
 
 size_t ClusterTree::ConstIterator::get_position()
