@@ -260,6 +260,18 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
 
+# 6.0.17 Release notes
+
+### Fixed
+* None
+ 
+-----------
+
+### Internals
+* Workaround for compiler bug in Visual Studio 2019
+
+----------------------------------------------
+
 # 6.0.16 Release notes
 
 ### Enhancements
