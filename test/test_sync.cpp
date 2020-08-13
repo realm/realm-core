@@ -7858,7 +7858,7 @@ TEST(Sync_TypedLinks)
     }
 }
 
-TEST_IF(Sync_Dictionary, false)
+TEST(Sync_Dictionary)
 {
     // Test replication and synchronization of Mixed values and lists.
 
