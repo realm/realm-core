@@ -2265,7 +2265,7 @@ ObjKey ClusterTree::ConstIterator::load_leaf(ObjKey key) const
 
 auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
 {
-    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         // reload
         m_position = get_position(); // Will throw if base object is deleted
         load_leaf(m_key);
@@ -2298,6 +2298,7 @@ auto ClusterTree::ConstIterator::operator[](size_t n) -> reference
 ClusterTree::ConstIterator::pointer Table::ConstIterator::operator->() const
 {
     if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+        m_position = const_cast<ClusterTree::ConstIterator*>(this)->get_position();
         ObjKey k = load_leaf(m_key);
         m_leaf_invalid = (k != m_key);
         if (m_leaf_invalid) {
