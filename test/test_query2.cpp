@@ -5152,7 +5152,12 @@ TEST(Query_StringOrShortStrings)
     }
 
     for (auto& str : strings) {
-        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        Query q = table->where()
+                      .group()
+                      .equal(col_value, StringData(str))
+                      .Or()
+                      .equal(col_value, StringData("not present"))
+                      .end_group();
         CHECK_EQUAL(q.count(), 1);
     }
 }
@@ -5170,7 +5175,12 @@ TEST(Query_StringOrMediumStrings)
     }
 
     for (auto& str : strings) {
-        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        Query q = table->where()
+                      .group()
+                      .equal(col_value, StringData(str))
+                      .Or()
+                      .equal(col_value, StringData("not present"))
+                      .end_group();
         CHECK_EQUAL(q.count(), 1);
     }
 }
@@ -5188,7 +5198,12 @@ TEST(Query_StringOrLongStrings)
     }
 
     for (auto& str : strings) {
-        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        Query q = table->where()
+                      .group()
+                      .equal(col_value, StringData(str))
+                      .Or()
+                      .equal(col_value, StringData("not present"))
+                      .end_group();
         CHECK_EQUAL(q.count(), 1);
     }
 }
@@ -5311,6 +5326,110 @@ TEST(Query_NotImmediatelyBeforeKnownRange)
 
     Query q = child->where(list).Not().equal(col_str, "a");
     CHECK_EQUAL(q.count(), 1);
+}
+
+TEST(Query_Mixed)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_any = table->add_column(type_Mixed, "any");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    size_t expected = 0;
+    for (int64_t i = 0; i < 100; i++) {
+        if (i % 4) {
+            if (i > 50)
+                expected++;
+            table->create_object().set(col_any, Mixed(i)).set(col_int, i);
+        }
+        else {
+            std::string str = "String" + util::to_string(i);
+            table->create_object().set(col_any, Mixed(str)).set(col_int, i);
+        }
+    }
+
+    table->get_object(75).set(col_any, Mixed(75.));
+    table->get_object(25).set(col_any, Mixed(3.));
+    table->get_object(35).set(col_any, Mixed(Decimal128("3")));
+
+    auto it = table->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+        auto ll = obj.get_linklist(col_links);
+
+        obj.set(col_link, it->get_key());
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    auto tv = (table->column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), expected);
+
+    tv = (table->column<Mixed>(col_any) == "String48").find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any) == 3.).find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv = (table->column<Mixed>(col_any) == table->column<Int>(col_int)).find_all();
+    CHECK_EQUAL(tv.size(), 73);
+
+    tv = (origin->link(col_links).column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 5);
+    tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
+TEST(Query_ListOfMixed)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_any = table->add_column_list(type_Mixed, "any");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    size_t expected = 0;
+
+    for (int64_t i = 0; i < 100; i++) {
+        auto obj = table->create_object();
+        obj.set(col_int, i);
+        auto list = obj.get_list<Mixed>(col_any);
+        if (i % 4) {
+            list.add(i);
+            if (i > 50)
+                expected++;
+        }
+        else if ((i % 10) == 0) {
+            list.add(100.);
+            expected++;
+        }
+        if (i % 3) {
+            std::string str = "String" + util::to_string(i);
+            list.add(str);
+        }
+    }
+    auto it = table->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+        auto ll = obj.get_linklist(col_links);
+
+        obj.set(col_link, it->get_key());
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // g.to_json(std::cout, 2);
+    auto tv = (table->column<Lst<Mixed>>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), expected);
+    tv = (origin->link(col_links).column<Lst<Mixed>>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 8);
+    tv = (origin->link(col_link).column<Lst<Mixed>>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 7);
 }
 
 #endif // TEST_QUERY

@@ -87,6 +87,191 @@ inline int compare_float(Float a_raw, Float b_raw)
 }
 } // namespace _impl
 
+void Mixed::import(DataType target_type, Mixed source) noexcept
+{
+    m_type = 0; // Initially set to NULL
+    if (!source.is_null()) {
+        DataType this_type = source.get_type();
+        if (target_type != type_Mixed && this_type != target_type) {
+            switch (target_type) {
+                case type_Double:
+                    switch (this_type) {
+                        case type_Int:
+                            *this = double(source.int_val);
+                            break;
+                        case type_Float:
+                            *this = double(source.float_val);
+                            break;
+                        default:
+                            REALM_ASSERT(false);
+                            break;
+                    }
+                    break;
+
+                case type_Float:
+                    switch (this_type) {
+                        case type_Int:
+                            *this = float(source.int_val);
+                            break;
+                        default:
+                            REALM_ASSERT(false);
+                            break;
+                    }
+                    break;
+
+                default:
+                    REALM_ASSERT(false);
+                    break;
+            }
+        }
+        else {
+            *this = source;
+        }
+    }
+}
+
+Mixed Mixed::export_to(DataType target_type) const noexcept
+{
+    if (!is_null()) {
+        if (target_type == get_type()) {
+            // Type matches
+            return *this;
+        }
+        switch (target_type) {
+            case type_Int:
+                switch (get_type()) {
+                    case type_Bool:
+                        return Mixed(int_val);
+                    default:
+                        break;
+                }
+                break;
+            case type_Float:
+                switch (get_type()) {
+                    case type_Int:
+                    case type_Bool:
+                        return Mixed(float(int_val));
+                    case type_Float:
+                        return Mixed(float(float_val));
+                    default:
+                        break;
+                }
+                break;
+            case type_Double:
+                switch (get_type()) {
+                    case type_Int:
+                    case type_Bool:
+                        return Mixed(double(int_val));
+                    case type_Float:
+                        return Mixed(double(float_val));
+                    default:
+                        break;
+                }
+                break;
+            case type_Decimal:
+                switch (get_type()) {
+                    case type_Int:
+                    case type_Bool:
+                        return Mixed(Decimal128(int_val));
+                    case type_Float:
+                        return Mixed(Decimal128(double(float_val)));
+                    case type_Double:
+                        return Mixed(Decimal128(double_val));
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+util::Optional<DataType> Mixed::get_common_type(const Mixed& l, const Mixed& r)
+{
+    util::Optional<DataType> ret;
+    if (!(l.is_null() && r.is_null())) {
+        if (l.is_null())
+            return r.get_type();
+        if (r.is_null())
+            return l.get_type();
+        DataType l_type = l.get_type();
+        DataType r_type = r.get_type();
+        if (l_type == r_type)
+            return l_type;
+        switch (l_type) {
+            case type_Bool:
+                switch (r_type) {
+                    case type_Int:
+                        return type_Int;
+                    case type_Decimal:
+                        return type_Decimal;
+                    case type_Float:
+                        return type_Float;
+                    case type_Double:
+                        return type_Double;
+                    default:
+                        break;
+                }
+                break;
+            case type_Int:
+                switch (r_type) {
+                    case type_Bool:
+                        return type_Int;
+                    case type_Decimal:
+                        return type_Decimal;
+                    case type_Float:
+                        return type_Float;
+                    case type_Double:
+                        return type_Double;
+                    default:
+                        break;
+                }
+                break;
+            case type_Float:
+                switch (r_type) {
+                    case type_Int:
+                    case type_Bool:
+                    case type_Double:
+                        return type_Double;
+                    case type_Decimal:
+                        return type_Decimal;
+                    default:
+                        break;
+                }
+                break;
+            case type_Double:
+                switch (r_type) {
+                    case type_Int:
+                    case type_Bool:
+                    case type_Float:
+                        return type_Double;
+                    case type_Decimal:
+                        return type_Decimal;
+                    default:
+                        break;
+                }
+                break;
+            case type_Decimal:
+                switch (r_type) {
+                    case type_Int:
+                    case type_Bool:
+                    case type_Float:
+                    case type_Double:
+                        return type_Decimal;
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    return ret;
+}
+
+
 int Mixed::compare(const Mixed& b) const
 {
     // Comparing types first makes it possible to make a sort of a list of Mixed

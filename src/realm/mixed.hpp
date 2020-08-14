@@ -116,6 +116,7 @@ public:
         : Mixed(int64_t(i))
     {
     }
+
     Mixed(int64_t) noexcept;
     Mixed(bool) noexcept;
     Mixed(float) noexcept;
@@ -158,6 +159,11 @@ public:
         return DataType(m_type - 1);
     }
 
+    void import(DataType target_type, Mixed source) noexcept;
+    Mixed export_to(DataType target_type) const noexcept;
+
+    static util::Optional<DataType> get_common_type(const Mixed& l, const Mixed& r);
+
     template <class T>
     T get() const noexcept;
 
@@ -188,6 +194,14 @@ public:
     bool operator>(const Mixed& other) const
     {
         return compare(other) > 0;
+    }
+    bool operator<=(const Mixed& other) const
+    {
+        return compare(other) <= 0;
+    }
+    bool operator>=(const Mixed& other) const
+    {
+        return compare(other) >= 0;
     }
     size_t hash() const;
 
@@ -472,6 +486,12 @@ inline ObjLink Mixed::get<ObjLink>() const noexcept
 {
     REALM_ASSERT(get_type() == type_TypedLink);
     return link_val;
+}
+
+template <>
+inline Mixed Mixed::get<Mixed>() const noexcept
+{
+    return *this;
 }
 
 inline ObjLink Mixed::get_link() const
