@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Go back to using Visual Studio 2017
 
 ----------------------------------------------
 
