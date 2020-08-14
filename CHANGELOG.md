@@ -1,15 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.18 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * We no longer throw when an invalid ConstIterator is copied ([#698](https://github.com/realm/realm-cocoa/issues/6597), since v6.0)
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
