@@ -935,10 +935,6 @@ void Table::migrate_subspec()
             if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
                 m_opposite_column.set(col_ndx, origin_col_key.value);
             }
-            if (auto ref = to_ref(col_refs.get(col_ndx))) {
-                Array::destroy_deep(ref, m_alloc);
-                col_refs.set(col_ndx, 0);
-            }
         }
     };
     m_spec.destroy_subspec();
@@ -1172,7 +1168,8 @@ void Table::create_columns()
 
 bool Table::migrate_objects(ColKey pk_col_key)
 {
-    size_t nb_columns = m_spec.get_public_column_count();
+    size_t nb_public_columns = m_spec.get_public_column_count();
+    size_t nb_columns = m_spec.get_column_count();
     if (!nb_columns) {
         // No columns - this means no objects
         return true;
@@ -1186,10 +1183,6 @@ bool Table::migrate_objects(ColKey pk_col_key)
     Array col_refs(m_alloc);
     col_refs.set_parent(&m_top, top_position_for_columns);
     col_refs.init_from_ref(top_ref);
-
-    if (m_spec.get_column_name(nb_columns - 1) == "!ROW_INDEX") {
-        nb_columns--;
-    }
 
     /************************ Create column accessors ************************/
 
@@ -1211,6 +1204,11 @@ bool Table::migrate_objects(ColKey pk_col_key)
     };
 
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        if (col_ndx < nb_public_columns && m_spec.get_column_name(col_ndx) == "!ROW_INDEX") {
+            // If this column has been added, we can break here
+            break;
+        }
+
         ColKey col_key = m_spec.get_key(col_ndx);
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
         ColumnType col_type = m_spec.get_column_type(col_ndx);
@@ -1267,6 +1265,14 @@ bool Table::migrate_objects(ColKey pk_col_key)
                     has_link_columns = true;
                     break;
                 }
+                case col_type_BackLink: {
+                    BPlusTree<int64_t> arr(m_alloc);
+                    arr.set_parent(&col_refs, col_ndx);
+                    arr.init_from_parent();
+                    update_size(arr.size());
+                    cols_to_destroy.push_back(col_ndx);
+                    break;
+                }
                 default:
                     break;
             }
@@ -1307,7 +1313,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
     ColKey oid_col;
     BPlusTree<Int>* oid_column = nullptr;
     std::unique_ptr<BPlusTreeBase> oid_column_store;
-    if (m_spec.get_column_name(0) == "!OID") {
+    if (nb_public_columns > 0 && m_spec.get_column_name(0) == "!OID") {
         // The !OID column should not be migrated, but we need an accessor
         // to the old column
         oid_col = m_spec.get_key(0);
@@ -1415,9 +1421,9 @@ bool Table::migrate_objects(ColKey pk_col_key)
 
     // Destroy values in the old columns that has been copied.
     // This frees up space in the file
-    for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-        col_refs.set(col_ndx, 0);
+    for (auto ndx : cols_to_destroy) {
+        Array::destroy_deep(to_ref(col_refs.get(ndx)), m_alloc);
+        col_refs.set(ndx, 0);
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
