@@ -4,7 +4,7 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Issues fixed by releases v6.0.14 to v6.0.18
  
 ### Breaking changes
 * None.
@@ -205,7 +205,7 @@ This release also contains the changes introduced by v6.0.4
 
 ### Fixed
 * None.
- 
+
 -----------
 
 ### Internals
@@ -257,6 +257,14 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+
+# 6.0.18 Release notes
+
+### Fixed
+* We no longer throw when an invalid ConstIterator is copied ([#698](https://github.com/realm/realm-cocoa/issues/6597), since v6.0)
+
+### Internals
+* Go back to using Visual Studio 2017
 
 ----------------------------------------------
 
