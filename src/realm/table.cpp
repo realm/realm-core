@@ -948,10 +948,11 @@ namespace {
 
 class LegacyStringColumn : public BPlusTree<StringData> {
 public:
-    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx)
+    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx, bool nullable)
         : BPlusTree(alloc)
         , m_spec(spec)
         , m_col_ndx(col_ndx)
+        , m_nullable(nullable)
     {
     }
 
@@ -959,6 +960,7 @@ public:
     {
         auto leaf = std::make_unique<LeafNode>(this);
         leaf->ArrayString::set_spec(m_spec, m_col_ndx);
+        leaf->set_nullability(m_nullable);
         leaf->init_from_ref(ref);
         return leaf;
     }
@@ -985,6 +987,7 @@ public:
 private:
     Spec* m_spec;
     size_t m_col_ndx;
+    bool m_nullable;
 };
 
 // We need an accessor that can read old Timestamp columns.
@@ -1116,9 +1119,10 @@ void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& 
 {
     if (sub_table_ref) {
         // Actual list is in the columns array position 0
+        bool nullable = col.get_attrs().test(col_attr_Nullable);
         Array cols(alloc);
         cols.init_from_ref(sub_table_ref);
-        LegacyStringColumn from_list(alloc, nullptr, 0); // List of strings cannot be enumerated
+        LegacyStringColumn from_list(alloc, nullptr, 0, nullable); // List of strings cannot be enumerated
         from_list.set_parent(&cols, 0);
         from_list.init_from_parent();
         size_t list_size = from_list.size();
@@ -1210,6 +1214,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
         ColKey col_key = m_spec.get_key(col_ndx);
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
         ColumnType col_type = m_spec.get_column_type(col_ndx);
+        bool nullable = attr.test(col_attr_Nullable);
         std::unique_ptr<BPlusTreeBase> acc;
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
@@ -1230,7 +1235,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
             switch (col_type) {
                 case col_type_Int:
                 case col_type_Bool:
-                    if (attr.test(col_attr_Nullable)) {
+                    if (nullable) {
                         acc = std::make_unique<BPlusTree<util::Optional<Int>>>(m_alloc);
                     }
                     else {
@@ -1244,7 +1249,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
                     acc = std::make_unique<BPlusTree<double>>(m_alloc);
                     break;
                 case col_type_String:
-                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx);
+                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx, nullable);
                     break;
                 case col_type_Binary:
                     acc = std::make_unique<BPlusTree<Binary>>(m_alloc);

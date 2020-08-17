@@ -5,6 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* If you upgrade a file where you have null elements in a primitive list column that should not contain nulls, the program will crash ([#3836](https://github.com/realm/realm-core/issues/3836), since v6.0.0)
 * None.
  
 ### Breaking changes

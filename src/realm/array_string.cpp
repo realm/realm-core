@@ -45,7 +45,7 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
         // Small strings
         bool is_small = Array::get_wtype_from_header(header) == Array::wtype_Multiply;
         if (is_small) {
-            auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, true);
+            auto arr = new (&m_storage.m_string_short) ArrayStringShort(m_alloc, m_nullable);
             arr->init_from_mem(mem);
             m_type = Type::small_strings;
         }
@@ -70,7 +70,7 @@ void ArrayString::init_from_mem(MemRef mem) noexcept
             m_type = Type::medium_strings;
         }
         else {
-            auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, true);
+            auto arr = new (&m_storage.m_big_blobs) ArrayBigBlobs(m_alloc, m_nullable);
             arr->init_from_mem(mem);
             m_type = Type::big_strings;
         }

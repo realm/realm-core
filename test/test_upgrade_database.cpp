@@ -1696,4 +1696,12 @@ TEST(Upgrade_progress)
     }
 }
 
+/*
+TEST(Upgrade_bug)
+{
+    auto hist = make_in_realm_history("/home/joergen/default.realm");
+    DB::create(*hist)->start_read()->verify();
+}
+*/
+
 #endif // TEST_GROUP

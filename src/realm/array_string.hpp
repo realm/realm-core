@@ -38,6 +38,11 @@ public:
         return nullable ? StringData{} : StringData{""};
     }
 
+    // This is only used in the upgrade process
+    void set_nullability(bool n)
+    {
+        m_nullable = n;
+    }
     void create();
 
     bool is_attached() const
@@ -130,6 +135,7 @@ private:
     Array* m_arr;
     mutable Spec* m_spec = nullptr;
     mutable size_t m_col_ndx = realm::npos;
+    bool m_nullable = true;
 
     std::unique_ptr<ArrayString> m_string_enum_values;
 
