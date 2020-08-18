@@ -571,7 +571,7 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
     auto& list = get_list(instr, "ArrayErase");
 
-    if (instr.index() > instr.prior_size) {
+    if (instr.index() >= instr.prior_size) {
         bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", instr.index(),
                             instr.prior_size);
     }
