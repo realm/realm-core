@@ -2848,7 +2848,7 @@ GlobalKey Table::get_object_id(ObjKey key) const
     return {};
 }
 
-Obj Table::get_object_with_primary_key(Mixed primary_key)
+Obj Table::get_object_with_primary_key(Mixed primary_key) const
 {
     auto primary_key_col = get_primary_key_column();
     REALM_ASSERT(primary_key_col);
