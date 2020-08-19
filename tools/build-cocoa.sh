@@ -117,21 +117,95 @@ rm core/*.a
 mv out/*.a core
 rmdir out
 
+function add_to_xcframework() {
+    local xcf="$1"
+    local os="$2"
+    local platform="$3"
+    local build_type="$4"
+
+    local suffix
+    [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
+
+    local variant=""
+    if [[ "$platform" = *simulator ]]; then
+        variant="-simulator"
+    elif [[ "$platform" = *catalyst ]]; then
+        variant="-maccatalyst"
+    fi
+
+    # Extract the library from the source tar
+    local source_tar="build-${platform}-${build_type}/realm-core-${build_type}-${VERSION}-${platform}-devel.tar.gz"
+    tar -C "$xcf" -zxvf "${source_tar}" "lib/librealm${suffix}.a"
+
+    # Populate the actual directory structure
+    local archs="$(lipo -archs "$xcf/lib/librealm${suffix}.a")"
+    local dir="$os-$(echo "$archs" | tr ' ' '_')$variant"
+    mkdir -p "$xcf/$dir/Headers"
+    mv "$xcf/lib/librealm${suffix}.a" "$xcf/$dir"
+    cp -R core/include/* "$xcf/$dir/Headers"
+
+    # Add this library to the Plist
+    cat << EOF >> "$xcf/Info.plist"
+		<dict>
+			<key>HeadersPath</key>
+			<string>Headers</string>
+			<key>LibraryIdentifier</key>
+			<string>$dir</string>
+			<key>LibraryPath</key>
+			<string>librealm$suffix.a</string>
+			<key>SupportedArchitectures</key>
+			<array>$(for arch in $archs; do echo "<string>$arch</string>"; done)</array>
+			<key>SupportedPlatform</key>
+			<string>$os</string>
+EOF
+    if [[ "$platform" = *simulator ]]; then
+        echo >> "$xcf/Info.plist" '			<key>SupportedPlatformVariant</key>'
+        echo >> "$xcf/Info.plist" '			<string>simulator</string>'
+    elif [[ "$platform" = *catalyst ]]; then
+        echo >> "$xcf/Info.plist" '			<key>SupportedPlatformVariant</key>'
+        echo >> "$xcf/Info.plist" '			<string>maccatalyst</string>'
+    fi
+    echo >> "$xcf/Info.plist" '		</dict>'
+}
+
 # Produce xcframeworks
 if [[ -n $BUILD_XCFRAMEWORK ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
-        make_core_xcframework=()
         [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
-        rm -rf xcf-tmp
-        mkdir xcf-tmp
-        for p in "${PLATFORMS[@]}"; do
-            mkdir "xcf-tmp/$p"
-            filename="build-${p}-${bt}/realm-core-${bt}-${VERSION}-${p}-devel.tar.gz"
-            tar -C "xcf-tmp/$p" -zxvf "${filename}" "lib/librealm${suffix}.a"
-            make_core_xcframework+=( -library "xcf-tmp/$p/lib/librealm${suffix}.a" -headers core/include)
-        done
-        xcodebuild -create-xcframework "${make_core_xcframework[@]}" -output core/realm-core${suffix}.xcframework
-        rm -rf xcf-tmp
+        xcf="core/realm-core${suffix}.xcframework"
+        rm -rf "$xcf"
+        mkdir "$xcf"
+
+        cat << EOF > "$xcf/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AvailableLibraries</key>
+	<array>
+EOF
+        add_to_xcframework "$xcf" "macos" "macosx" "$bt"
+
+        if [[ -z $MACOS_ONLY ]]; then
+            add_to_xcframework "$xcf" "ios" "iphoneos" "$bt"
+            add_to_xcframework "$xcf" "ios" "iphonesimulator" "$bt"
+            add_to_xcframework "$xcf" "ios" "maccatalyst" "$bt"
+            add_to_xcframework "$xcf" "watchos" "watchos" "$bt"
+            add_to_xcframework "$xcf" "watchos" "watchsimulator" "$bt"
+            add_to_xcframework "$xcf" "tvos" "appletvos" "$bt"
+            add_to_xcframework "$xcf" "tvos" "appletvsimulator" "$bt"
+        fi
+        rmdir "$xcf/lib"
+
+        cat << EOF >> "$xcf/Info.plist"
+	</array>
+	<key>CFBundlePackageType</key>
+	<string>XFWK</string>
+	<key>XCFrameworkFormatVersion</key>
+	<string>1.0</string>
+</dict>
+</plist>
+EOF
     done
 fi
 

@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Added an enum to `DescriptorOrdering::append_sort` which allows users to choose the merge order of how sorts are applied. The default is the historical behaviour sor this is not a breaking change. ([#3869](https://github.com/realm/realm-core/issues/3869))
+* Add arm64 simulator slices to the xcframework release package.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
