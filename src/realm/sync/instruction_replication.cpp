@@ -474,6 +474,7 @@ void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, siz
         Instruction::ArrayMove instr;
         populate_path_instr(instr, view, uint32_t(from_ndx));
         instr.ndx_2 = uint32_t(to_ndx);
+        instr.prior_size = uint32_t(view.size());
         emit(instr);
     }
 }
