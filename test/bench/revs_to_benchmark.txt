@@ -19,3 +19,5 @@ tags/v10.0.0-alpha.4
 tags/v10.0.0-alpha.5
 tags/v10.0.0-alpha.6
 tags/v10.0.0-alpha.8
+tags/v10.0.0-beta.3
+tags/v10.0.0-beta.4
