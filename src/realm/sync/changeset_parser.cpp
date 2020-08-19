@@ -47,6 +47,7 @@ struct ChangesetParser::State {
 
     util::Optional<Instruction::Payload::Type> read_optional_payload_type();
     Instruction::Payload::Type read_payload_type();
+    Instruction::AddColumn::CollectionType read_collection_type();
     Instruction::Payload read_payload();
     Instruction::Payload::Link read_link();
     Instruction::PrimaryKey read_object_key();
@@ -96,9 +97,13 @@ Instruction::Payload::Type ChangesetParser::State::read_payload_type()
     auto type = Instruction::Payload::Type(read_int());
     // Validate the type.
     switch (type) {
-        case Type::ObjectValue:
-            [[fallthrough]];
         case Type::GlobalKey:
+            [[fallthrough]];
+        case Type::Erased:
+            [[fallthrough]];
+        case Type::Dictionary:
+            [[fallthrough]];
+        case Type::ObjectValue:
             [[fallthrough]];
         case Type::Null:
             [[fallthrough]];
@@ -124,6 +129,24 @@ Instruction::Payload::Type ChangesetParser::State::read_payload_type()
             return type;
     }
     parser_error("Unsupported data type");
+}
+
+Instruction::AddColumn::CollectionType ChangesetParser::State::read_collection_type()
+{
+    using CollectionType = Instruction::AddColumn::CollectionType;
+    auto type = Instruction::AddColumn::CollectionType(read_int<uint8_t>());
+    // Validate the type.
+    switch (type) {
+        case CollectionType::Single:
+            [[fallthrough]];
+        case CollectionType::List:
+            [[fallthrough]];
+        case CollectionType::Dictionary:
+            [[fallthrough]];
+        case CollectionType::Set:
+            return type;
+    }
+    parser_error("Unsupported collection type");
 }
 
 Instruction::Payload ChangesetParser::State::read_payload()
@@ -181,6 +204,10 @@ Instruction::Payload ChangesetParser::State::read_payload()
         }
 
         case Type::Null:
+            [[fallthrough]];
+        case Type::Dictionary:
+            [[fallthrough]];
+        case Type::Erased:
             [[fallthrough]];
         case Type::ObjectValue:
             return payload;
@@ -332,7 +359,7 @@ void ChangesetParser::State::parse_one()
             instr.field = read_intern_string();
             instr.type = read_payload_type();
             instr.nullable = read_bool();
-            instr.collection_type = Instruction::AddColumn::CollectionType(read_int<uint8_t>());
+            instr.collection_type = read_collection_type();
             if (instr.type == Instruction::Payload::Type::Link) {
                 instr.link_target_table = read_intern_string();
             }
@@ -388,19 +415,6 @@ void ChangesetParser::State::parse_one()
             Instruction::ArrayClear instr;
             read_path_instr(instr);
             instr.prior_size = read_int<uint32_t>();
-            m_handler(instr);
-            return;
-        }
-        case Instruction::Type::DictionaryInsert: {
-            Instruction::DictionaryInsert instr;
-            read_path_instr(instr);
-            instr.value = read_payload();
-            m_handler(instr);
-            return;
-        }
-        case Instruction::Type::DictionaryErase: {
-            Instruction::DictionaryErase instr;
-            read_path_instr(instr);
             m_handler(instr);
             return;
         }

@@ -244,7 +244,7 @@ public:
     bool rename_column(ColKey col_key);
     bool set_link_type(ColKey col_key);
 
-    // Must have list selected:
+    // Must have collection selected:
     bool select_collection(ColKey col_key, ObjKey key);
     bool list_set(size_t list_ndx);
     bool list_insert(size_t ndx);
@@ -252,8 +252,8 @@ public:
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
 
-    bool dictionary_insert(Mixed);
-    bool dictionary_erase(Mixed);
+    bool dictionary_insert(Mixed key);
+    bool dictionary_erase(Mixed key);
 
     /// End of methods expected by parser.
 

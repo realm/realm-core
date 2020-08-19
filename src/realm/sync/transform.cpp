@@ -1401,8 +1401,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddTable);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::AddTable);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::AddTable);
 
 /// EraseTable rules
 
@@ -1447,8 +1445,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseTable);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::EraseTable);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::EraseTable);
 
 
 /// CreateObject rules
@@ -1482,8 +1478,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::CreateObject);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::CreateObject);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::CreateObject);
 
 
 /// Erase rules
@@ -1509,8 +1503,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseObject);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::EraseObject);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::EraseObject);
 
 
 /// Set rules
@@ -1654,8 +1646,6 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 
 // Handled by nested rule
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Update);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::Update);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::Update);
 
 /// AddInteger rules
 
@@ -1667,8 +1657,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddInteger);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::AddInteger);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::AddInteger);
 
 
 /// AddColumn rules
@@ -1695,9 +1683,25 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
         }
 
         if (left.collection_type != right.collection_type) {
+            auto collection_type_name = [](Instruction::AddColumn::CollectionType type) -> const char* {
+                switch (type) {
+                    case Instruction::AddColumn::CollectionType::Single:
+                        return "single value";
+                    case Instruction::AddColumn::CollectionType::List:
+                        return "list";
+                    case Instruction::AddColumn::CollectionType::Dictionary:
+                        return "dictionary";
+                    case Instruction::AddColumn::CollectionType::Set:
+                        return "set";
+                }
+                REALM_TERMINATE("");
+            };
+
             std::stringstream ss;
+            const char* left_type = collection_type_name(left.collection_type);
+            const char* right_type = collection_type_name(right.collection_type);
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
-               << "' is one collection type on one side and a different one on the other.";
+               << "' is a " << left_type << " on one side, and a " << right_type << " on the other.";
             throw SchemaMismatchError(ss.str());
         }
 
@@ -1731,8 +1735,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddColumn);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::AddColumn);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::AddColumn);
 
 
 /// EraseColumn rules
@@ -1751,8 +1753,6 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseColumn);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::EraseColumn);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::EraseColumn);
 
 /// ArrayInsert rules
 
@@ -1844,8 +1844,6 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayInsert)
 
 // Handled by nested rules
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayInsert);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::ArrayInsert);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::ArrayInsert);
 
 
 /// ArrayMove rules
@@ -1974,8 +1972,6 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
 
 // Handled by nested rule.
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayMove);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::ArrayMove);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::ArrayMove);
 
 
 /// ArrayErase rules
@@ -2023,8 +2019,6 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 
 // Handled by nested rules.
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayErase);
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::ArrayErase);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::ArrayErase);
 
 
 /// ArrayClear rules
@@ -2052,42 +2046,6 @@ DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayClear)
             right_side.discard();
         }
     }
-}
-
-DEFINE_MERGE_NOOP(Instruction::DictionaryInsert, Instruction::ArrayClear);
-DEFINE_MERGE_NOOP(Instruction::DictionaryErase, Instruction::ArrayClear);
-
-/// DictionaryInsert rules
-
-DEFINE_NESTED_MERGE(Instruction::DictionaryInsert)
-{
-    if (is_prefix_of(outer, inner)) {
-        inner_side.discard();
-    }
-}
-
-DEFINE_MERGE(Instruction::DictionaryInsert, Instruction::DictionaryInsert)
-{
-    if (same_path(left, right)) {
-        // FIXME: Implement
-    }
-}
-
-DEFINE_MERGE(Instruction::DictionaryErase, Instruction::DictionaryInsert)
-{
-    // FIXME: Implement
-}
-
-/// DictionaryErase rules
-
-DEFINE_NESTED_MERGE(Instruction::DictionaryErase)
-{
-    // FIXME: Implement
-}
-
-DEFINE_MERGE(Instruction::DictionaryErase, Instruction::DictionaryErase)
-{
-    // FIXME: Implement
 }
 
 ///
