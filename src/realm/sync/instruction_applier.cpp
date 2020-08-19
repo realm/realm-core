@@ -507,8 +507,18 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
+            if (index > instr.prior_size) {
+                bad_transaction_log("ArrayInsert: Invalid insertion index (index = %1, prior_size = %2)", index,
+                                    instr.prior_size);
+            }
+
             if (index > list.size()) {
                 bad_transaction_log("ArrayInsert: Index out of bounds (%1 > %2)", index, list.size());
+            }
+
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayInsert: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
             }
 
             auto inserter = util::overloaded{
@@ -608,6 +618,10 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
                 bad_transaction_log("ArrayMove to same location (%1)", instr.index());
             }
 
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayMove: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
             list.move(index, instr.ndx_2);
         },
         [&](auto&&...) {
@@ -621,9 +635,18 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
     auto callback = util::overloaded{
         [&](LstBase& list, size_t index) {
+            if (index >= instr.prior_size) {
+                bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
+                                    instr.prior_size);
+            }
             if (index >= list.size()) {
                 bad_transaction_log("ArrayErase: Index out of bounds (%1 >= %2)", index, list.size());
             }
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
+
             list.remove(index, index + 1);
         },
         [&](auto&&...) {
@@ -636,7 +659,11 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 {
     auto callback = util::overloaded{
-        [](LstBase& list) {
+        [&](LstBase& list) {
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayClear: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
             list.clear();
         },
         [](Dictionary& dict) {

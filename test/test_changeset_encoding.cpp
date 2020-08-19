@@ -196,6 +196,7 @@ TEST(ChangesetEncoding_ArrayInsert)
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(5);
     instr.value = Payload{changeset.append_string("Hello, World!")};
+    instr.prior_size = 123;
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
@@ -214,6 +215,7 @@ TEST(ChangesetEncoding_ArrayMove)
     instr.path.push_back(234);
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(5);
+    instr.prior_size = 123;
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
@@ -232,6 +234,7 @@ TEST(ChangesetEncoding_ArrayErase)
     instr.path.push_back(234);
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(5);
+    instr.prior_size = 123;
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
@@ -250,6 +253,7 @@ TEST(ChangesetEncoding_ArrayClear)
     instr.path.push_back(234);
     instr.path.push_back(changeset.intern_string("lol"));
     instr.path.push_back(5);
+    instr.prior_size = 123;
     changeset.push_back(instr);
 
     auto parsed = encode_then_parse(changeset);
