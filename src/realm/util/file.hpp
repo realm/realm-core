@@ -604,6 +604,7 @@ private:
     bool m_have_lock; // Only valid when m_fd is not null
 #else
     int m_fd;
+    int m_pipe_fd; // -1 if no pipe has been allocated for emulation
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
     std::string m_path;
@@ -978,6 +979,7 @@ inline File::File(const std::string& path, Mode m)
     m_fd = nullptr;
 #else
     m_fd = -1;
+    m_pipe_fd = -1;
 #endif
 
     open(path, m);
@@ -989,6 +991,7 @@ inline File::File() noexcept
     m_fd = nullptr;
 #else
     m_fd = -1;
+    m_pipe_fd = -1;
 #endif
 }
 
@@ -1005,7 +1008,9 @@ inline File::File(File&& f) noexcept
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
+    m_pipe_fd = f.m_pipe_fd;
     f.m_fd = -1;
+    f.m_pipe_fd = -1;
 #endif
     m_encryption_key = std::move(f.m_encryption_key);
 }
@@ -1020,6 +1025,8 @@ inline File& File::operator=(File&& f) noexcept
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
+    m_pipe_fd = f.m_pipe_fd;
+    f.m_pipe_fd = -1;
 #endif
     m_encryption_key = std::move(f.m_encryption_key);
     return *this;
