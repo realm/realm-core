@@ -1243,9 +1243,9 @@ TEST(Upgrade_Database_9_10_with_pk_table)
         {"_key":2,"pk":7,"object":null,"array":{"table": "class_object", "keys": [1,2]}}
     ],
     "class_object":[
-        {"_key":0,"pk":"hello","value":7,"enum":"red","optional":null},
-        {"_key":1,"pk":"world","value":35,"enum":"blue","optional":null},
-        {"_key":2,"pk":"goodbye","value":800,"enum":"red","optional":-87}
+        {"_key":0,"pk":"hello","value":7,"enum":"red","list":[""],"optional":null},
+        {"_key":1,"pk":"world","value":35,"enum":"blue","list":[],"optional":null},
+        {"_key":2,"pk":"goodbye","value":800,"enum":"red","list":[],"optional":-87}
     ]
     }
     */
@@ -1276,6 +1276,9 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     auto enum_col_key = t_object->get_column_key("enum");
     CHECK(t_object->is_enumerated(enum_col_key));
     CHECK_EQUAL(obj1.get<String>(enum_col_key), "red");
+    auto list = obj1.get_list<String>(t_object->get_column_key("list"));
+    CHECK_EQUAL(list.size(), 1);
+    CHECK_EQUAL(list.get(0), "");
 
     pk_col = t_origin->get_primary_key_column();
     CHECK(pk_col);
