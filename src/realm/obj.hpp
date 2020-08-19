@@ -106,6 +106,7 @@ public:
     U get(ColKey col_key) const;
 
     Mixed get_any(ColKey col_key) const;
+    Mixed get_primary_key() const;
 
     template <typename U>
     U get(StringData col_name) const
@@ -190,7 +191,7 @@ public:
     // default state. If the object does not exist, create a
     // new object and link it. (To Be Implemented)
     Obj clear_linked_object(ColKey col_key);
-    Obj& set(ColKey col_key, Mixed value);
+    Obj& set_any(ColKey col_key, Mixed value, bool is_default = false);
 
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)
@@ -222,6 +223,7 @@ public:
     void assign(const Obj& other);
 
     Obj get_linked_object(ColKey link_col_key) const;
+    Obj get_linked_object(StringData link_col_name) const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
@@ -241,6 +243,7 @@ public:
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     Dictionary get_dictionary(ColKey col_key) const;
+    Dictionary get_dictionary(StringData col_name) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
@@ -278,6 +281,7 @@ private:
 
     const TableClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
+    ColKey get_primary_key_column() const;
     TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
     TableRef get_target_table(ObjLink link) const;
@@ -301,6 +305,7 @@ private:
     template <class Head, class... Tail>
     Obj& _set(size_t col_ndx, Head v, Tail... tail);
     ColKey spec_ndx2colkey(size_t col_ndx);
+    size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
     void bump_content_version();
     void bump_both_versions();
@@ -343,6 +348,9 @@ Obj& Obj::set(ColKey, int64_t value, bool is_default);
 
 template <>
 Obj& Obj::set(ColKey, ObjKey value, bool is_default);
+
+template <>
+Obj& Obj::set(ColKey, ObjLink value, bool is_default);
 
 
 template <>
@@ -438,6 +446,12 @@ std::vector<U> Obj::get_list_values(ColKey col_key) const
     return values;
 }
 
+inline Obj Obj::get_linked_object(StringData link_col_name) const
+{
+    ColKey col = get_column_key(link_col_name);
+    return get_linked_object(col);
+}
+
 template <class Val>
 inline Obj& Obj::_set(size_t col_ndx, Val v)
 {
@@ -454,7 +468,15 @@ inline Obj& Obj::_set(size_t col_ndx, Head v, Tail... tail)
 template <class Head, class... Tail>
 inline Obj& Obj::set_all(Head v, Tail... tail)
 {
-    return _set(0, v, tail...);
+    size_t start_index = 0;
+
+    // Avoid trying to set the PK column.
+    if (get_primary_key_column()) {
+        REALM_ASSERT(colkey2spec_ndx(get_primary_key_column()) == 0);
+        start_index = 1;
+    }
+
+    return _set(start_index, v, tail...);
 }
 } // namespace realm
 

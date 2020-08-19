@@ -839,15 +839,6 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
     insert_fast(k, init_values, state);
     update_indexes(k, init_values);
 
-    // Replicate setting of values
-    if (const Table* table = get_owning_table()) {
-        if (Replication* repl = table->get_repl()) {
-            for (const auto& v : values) {
-                repl->set(table, v.col_key, k, v.value, _impl::instr_Set);
-            }
-        }
-    }
-
     bump_content_version();
     bump_storage_version();
 
