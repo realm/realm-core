@@ -83,6 +83,12 @@ function combine_libraries {
     local device_suffix="$1"
     local simulator_suffix="$2"
     local output_suffix="$3"
+
+    # Remove the arm64 slice from the simulator library if it exists as we
+    # can't have two arm64 slices in the universal library
+    lipo "core/librealm-${simulator_suffix}.a" -remove arm64 -output "core/librealm-${simulator_suffix}.a" || true
+    lipo "core/librealm-parser-${simulator_suffix}.a" -remove arm64 -output "core/librealm-parser-${simulator_suffix}.a" || true
+
     lipo "core/librealm-${device_suffix}.a" \
          "core/librealm-${simulator_suffix}.a" \
          -create -output "out/librealm-${output_suffix}.a"

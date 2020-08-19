@@ -601,7 +601,13 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+            // Builds for Apple devices have to be done with the oldest Xcode
+            // version we support because bitcode is not backwards-compatible.
+            // This doesn't apply to simulators, and Xcode 12 supports more
+            // architectures than 11, so we want to use 12 for simulator builds.
+            def xcodeVersion = sdk.contains('simulator') ? '12' : '11'
+
+            withEnv(["DEVELOPER_DIR=/Applications/Xcode-${xcodeVersion}.app/Contents/Developer/"]) {
                 retry(3) {
                     timeout(time: 45, unit: 'MINUTES') {
                         sh """
