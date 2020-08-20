@@ -605,6 +605,8 @@ private:
 #else
     int m_fd;
     int m_pipe_fd; // -1 if no pipe has been allocated for emulation
+    bool m_has_exclusive_lock = false;
+    bool m_has_shared_lock = false;
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
     std::string m_path;
@@ -1009,6 +1011,10 @@ inline File::File(File&& f) noexcept
 #else
     m_fd = f.m_fd;
     m_pipe_fd = f.m_pipe_fd;
+    m_has_exclusive_lock = f.m_has_exclusive_lock;
+    m_has_shared_lock = f.m_has_shared_lock;
+    f.m_has_exclusive_lock = false;
+    f.m_has_shared_lock = false;
     f.m_fd = -1;
     f.m_pipe_fd = -1;
 #endif
@@ -1027,6 +1033,10 @@ inline File& File::operator=(File&& f) noexcept
     f.m_fd = -1;
     m_pipe_fd = f.m_pipe_fd;
     f.m_pipe_fd = -1;
+    m_has_exclusive_lock = f.m_has_exclusive_lock;
+    m_has_shared_lock = f.m_has_shared_lock;
+    f.m_has_exclusive_lock = false;
+    f.m_has_shared_lock = false;
 #endif
     m_encryption_key = std::move(f.m_encryption_key);
     return *this;
