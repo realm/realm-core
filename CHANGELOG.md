@@ -16,6 +16,18 @@
 
 ----------------------------------------------
 
+# 10.0.0-beta.4 Release notes
+
+### Enhancements
+* Parser support for ObjectId vs Timestamp
+
+### Fixed in v6.0.14..v6.0.17
+* If a realm needs upgrade during opening, the program might abort in the "migrate_links" stage. ([#6680](https://github.com/realm/realm-cocoa/issues/6680), since v6.0.0)
+* Fix bug in memory mapping management. This bug could result in multiple different asserts as well as segfaults. In many cases stack backtraces would include members of the EncyptedFileMapping near the top - even if encryption was not used at all. In other cases asserts or crashes would be in methods reading an array header or array element. In all cases the application would terminate immediately. ([#3838](https://github.com/realm/realm-core/pull/3838), since v6)
+* Fix missing `Lst` symbols when the library is built as a shared library with LTO. ([Cocoa #6625](https://github.com/realm/realm-cocoa/issues/6625), since v6.0.0).
+ 
+----------------------------------------------
+
 # 10.0.0-beta.3 Release notes
 
 ### Fixed
