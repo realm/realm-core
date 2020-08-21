@@ -5906,6 +5906,11 @@ TEST(LangBindHelper_getCoreFiles)
             file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
             continue;
         }
+        const std::string fifo_suffix = ".lock.fifo";
+        if (file.size() >= fifo_suffix.size() &&
+            file.compare(file.size() - fifo_suffix.size(), fifo_suffix.size(), fifo_suffix) == 0) {
+            continue;
+        }
         std::string path(std::string(dir) + "/" + file);
         auto file_pair = std::make_pair(path, File::is_dir(path));
         CHECK(core_files.size() != 0);
