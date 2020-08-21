@@ -958,7 +958,8 @@ void File::sync()
 }
 
 // little helper
-void _unlock(int m_fd) {
+void _unlock(int m_fd)
+{
     int r;
     do {
         r = flock(m_fd, LOCK_UN);
@@ -1007,7 +1008,9 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (non_blocking)
         operation |= LOCK_NB;
     int status;
-    do { status = flock(m_fd, operation); } while ( status != 0 && errno == EINTR);
+    do {
+        status = flock(m_fd, operation);
+    } while (status != 0 && errno == EINTR);
     if (status != 0 && errno == EWOULDBLOCK)
         return false;
     if (status != 0)
@@ -1032,7 +1035,7 @@ bool File::lock(bool exclusive, bool non_blocking)
         if (fd == -1 && errno != ENXIO)
             throw std::system_error(errno, std::system_category(), "opening fifo for writing failed");
         if (fd != -1) {
-            status = ::write(fd," ",1);
+            status = ::write(fd, " ", 1);
             ::close(fd);
             if (status == 1)
                 available_for_writing = true;
@@ -1121,7 +1124,9 @@ void File::unlock() noexcept
     if (m_has_shared_lock) {
         // shared lock. We need to reacquire the exclusive lock on the file
         int status;
-        do { status = flock(m_fd, LOCK_EX); } while ( status != 0 && errno == EINTR);
+        do {
+            status = flock(m_fd, LOCK_EX);
+        } while (status != 0 && errno == EINTR);
         REALM_ASSERT(status == 0);
         // close the pipe (== release the shared lock)
         ::close(m_pipe_fd);
