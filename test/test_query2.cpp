@@ -5369,6 +5369,12 @@ TEST(Query_Mixed)
     auto tv = (table->column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), expected);
 
+    tv = table->where().greater(col_any, 50).find_all();
+    CHECK_EQUAL(tv.size(), expected);
+
+    tv = table->where().begins_with(col_any, "String2").find_all(); // 20, 24, 28
+    CHECK_EQUAL(tv.size(), 3);
+
     tv = (table->column<Mixed>(col_any) == "String48").find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (table->column<Mixed>(col_any) == 3.).find_all();

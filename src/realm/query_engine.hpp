@@ -97,6 +97,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_object_id.hpp>
+#include <realm/array_mixed.hpp>
 #include <realm/array_list.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/array_backlink.hpp>
@@ -1482,6 +1483,104 @@ public:
 protected:
     ObjectIdNode(const ObjectIdNode& from, Transaction* tr)
         : ObjectIdNode(from, tr)
+    {
+    }
+};
+
+class MixedNodeBase : public ParentNode {
+public:
+    using TConditionValue = Mixed;
+    static const bool special_null_node = false;
+
+    MixedNodeBase(Mixed v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    MixedNodeBase(null, ColKey column)
+        : MixedNodeBase(Mixed{}, column)
+    {
+        m_value_is_null = true;
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayMixed(m_table.unchecked_ptr()->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+protected:
+    MixedNodeBase(const MixedNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+        , m_value_is_null(from.m_value_is_null)
+    {
+    }
+
+    Mixed m_value;
+    bool m_value_is_null = false;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayMixed), alignof(ArrayMixed)>::type;
+    using LeafPtr = std::unique_ptr<ArrayMixed, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayMixed* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class MixedNode : public MixedNodeBase {
+public:
+    using MixedNodeBase::MixedNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        for (size_t i = start; i < end; i++) {
+            Mixed val = m_leaf_ptr->get(i);
+            if (auto common_type = Mixed::get_common_type(val, m_value)) {
+                Mixed l = val.export_to(*common_type);
+                Mixed r = m_value.export_to(*common_type);
+                if constexpr (realm::is_any_v<TConditionFunction, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns,
+                                              Like, LikeIns, Contains, ContainsIns>) {
+                    // For some strange reason the parameters are swapped for string conditions
+                    if (cond(r, l, r.is_null(), l.is_null()))
+                        return i;
+                }
+                else {
+                    if (cond(l, r, l.is_null(), r.is_null()))
+                        return i;
+                }
+            }
+        }
+        return realm::npos;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " +
+               (m_value_is_null ? util::serializer::print_value(realm::null())
+                                : util::serializer::print_value(MixedNode::m_value));
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new MixedNode(*this));
+    }
+
+protected:
+    MixedNode(const MixedNode& from, Transaction* tr)
+        : MixedNode(from, tr)
     {
     }
 };

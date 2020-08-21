@@ -112,6 +112,11 @@ public:
     {
     }
 
+    Mixed(realm::null) noexcept
+        : Mixed()
+    {
+    }
+
     Mixed(int i) noexcept
         : Mixed(int64_t(i))
     {

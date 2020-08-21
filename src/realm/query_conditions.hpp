@@ -24,6 +24,7 @@
 
 #include <realm/unicode.hpp>
 #include <realm/binary_data.hpp>
+#include <realm/mixed.hpp>
 #include <realm/utilities.hpp>
 
 namespace realm {
@@ -202,6 +203,20 @@ struct BeginsWith : public HackClass {
     bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const
     {
         return v2.begins_with(v1);
+    }
+
+    bool operator()(const Mixed& m1, const Mixed& m2, bool m1_is_null, bool m2_is_null) const
+    {
+        if (m1_is_null && m2_is_null)
+            return true;
+
+        if (auto ct = Mixed::get_common_type(m1, m2)) {
+            if (*ct == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            if (*ct == type_Binary)
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
     }
 
     template <class A, class B, class C, class D>
