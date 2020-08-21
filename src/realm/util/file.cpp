@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
+#include <signal.h> // well...we'll be incompatible with any use that relies on handling SIGPIPE. don't do this at home
 #endif
 
 #include <realm/exceptions.hpp>
@@ -999,12 +1000,14 @@ bool File::lock(bool exclusive, bool non_blocking)
     // If we already have any form of lock, release it before trying to acquire a new
     if (m_has_exclusive_lock || m_has_shared_lock)
         unlock();
+    // FIXME: Only do this once!
+    signal(SIGPIPE, SIG_IGN);
     // First obtain an exclusive lock on the file proper
     int operation = LOCK_EX;
     if (non_blocking)
         operation |= LOCK_NB;
     int status;
-    while (status = flock(m_fd, operation) && status != 0 && errno == EINTR);
+    do { status = flock(m_fd, operation); } while ( status != 0 && errno == EINTR);
     if (status != 0 && errno == EWOULDBLOCK)
         return false;
     if (status != 0)
@@ -1028,18 +1031,16 @@ bool File::lock(bool exclusive, bool non_blocking)
         int fd = ::open(fifo_name.c_str(), O_WRONLY | O_NONBLOCK);
         if (fd == -1 && errno != ENXIO)
             throw std::system_error(errno, std::system_category(), "opening fifo for writing failed");
-        if (fd == -1 && errno == ENXIO)
-            available_for_writing = false;
-        else {
+        if (fd != -1) {
             status = ::write(fd," ",1);
-            if (status == 0)
+            ::close(fd);
+            if (status == 1)
                 available_for_writing = true;
-            if (status != 0 && errno == EAGAIN)
+            if (status == -1 && errno == EAGAIN)
                 available_for_writing = true;
         }
         if (available_for_writing) {
             // shared locks exist. Back out. Release exclusive lock on file
-            ::close(fd);
             _unlock(m_fd);
             return false;
         }
@@ -1120,15 +1121,18 @@ void File::unlock() noexcept
     if (m_has_shared_lock) {
         // shared lock. We need to reacquire the exclusive lock on the file
         int status;
-        while (status = flock(m_fd, LOCK_EX) && status != 0 && errno == EINTR);
+        do { status = flock(m_fd, LOCK_EX); } while ( status != 0 && errno == EINTR);
         REALM_ASSERT(status == 0);
         // close the pipe (== release the shared lock)
         ::close(m_pipe_fd);
         m_pipe_fd = -1;
         m_has_shared_lock = false;
+        _unlock(m_fd);
     }
-    _unlock(m_fd);
-    m_has_exclusive_lock = false;
+    if (m_has_exclusive_lock) {
+        m_has_exclusive_lock = false;
+        _unlock(m_fd);
+    }
 
 /*
     // The Linux man page for flock() does not state explicitely that
