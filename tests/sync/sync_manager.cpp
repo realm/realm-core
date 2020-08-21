@@ -151,12 +151,15 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
-    SECTION("should throw for a null partition") {
+    SECTION("should produce the expected path for a Null partition") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
         const bson::Bson partition;
         REQUIRE(partition.type() == bson::Bson::Type::Null);
         SyncConfig config(user, partition);
-        REQUIRE_THROWS_WITH(SyncManager::shared().path_for_realm(config), "Unsupported partition key value: 'null'. Only int, string and ObjectId types are currently supported.");
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/null.realm";
+        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 }
 

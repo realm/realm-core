@@ -502,6 +502,9 @@ static std::string string_from_partition(const std::string& partition)
             case bson::Bson::Type::ObjectId:
                 ss << "o_" << static_cast<ObjectId>(partition_value);
                 break;
+            case bson::Bson::Type::Null:
+                ss << "null";
+                break;
             default:
                 ss << partition_value;
                 throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", ss.str()));
