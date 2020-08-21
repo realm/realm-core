@@ -957,6 +957,7 @@ void File::sync()
 #endif
 }
 
+#ifndef _WIN32
 // little helper
 void _unlock(int m_fd)
 {
@@ -966,6 +967,7 @@ void _unlock(int m_fd)
     } while (r != 0 && errno == EINTR);
     REALM_ASSERT_RELEASE_EX(r == 0 && "File::unlock()", r, errno);
 }
+#endif
 
 bool File::lock(bool exclusive, bool non_blocking)
 {
