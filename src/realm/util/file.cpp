@@ -20,6 +20,7 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
+#include <mutex>
 
 #include <cerrno>
 #include <cstring>
@@ -969,6 +970,8 @@ void _unlock(int m_fd)
 }
 #endif
 
+std::once_flag flag;
+
 bool File::lock(bool exclusive, bool non_blocking)
 {
     REALM_ASSERT_RELEASE(is_attached());
@@ -1003,8 +1006,8 @@ bool File::lock(bool exclusive, bool non_blocking)
     // If we already have any form of lock, release it before trying to acquire a new
     if (m_has_exclusive_lock || m_has_shared_lock)
         unlock();
-    // FIXME: Only do this once!
-    signal(SIGPIPE, SIG_IGN);
+    // thread safe call-once:
+    std::call_once(flag, []() { signal(SIGPIPE, SIG_IGN); });
     // First obtain an exclusive lock on the file proper
     int operation = LOCK_EX;
     if (non_blocking)
@@ -1027,13 +1030,14 @@ bool File::lock(bool exclusive, bool non_blocking)
     //                (unlock must close the pipe for reading)
     REALM_ASSERT_RELEASE(m_pipe_fd == -1);
     // TODO create the pipe if it doesn't exist.
-    std::string fifo_name = m_path + ".fifo";
-    status = mkfifo(fifo_name.c_str(), 0666);
+    if (m_fifo_path.empty())
+        m_fifo_path = m_path + ".fifo";
+    status = mkfifo(m_fifo_path.c_str(), 0666);
     REALM_ASSERT(status == 0 || (status == -1 && errno == EEXIST));
     if (exclusive) {
         // check if any shared locks are already taken by trying to write to the pipe
         bool available_for_writing = false;
-        int fd = ::open(fifo_name.c_str(), O_WRONLY | O_NONBLOCK);
+        int fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
         if (fd == -1 && errno != ENXIO)
             throw std::system_error(errno, std::system_category(), "opening fifo for writing failed");
         if (fd != -1) {
@@ -1058,7 +1062,7 @@ bool File::lock(bool exclusive, bool non_blocking)
         // lock shared. We need to release the real exclusive lock on the file,
         // but first we must mark the lock as shared by opening the pipe for reading
         // Open pipe for reading!
-        int fd = ::open(fifo_name.c_str(), O_RDONLY | O_NONBLOCK);
+        int fd = ::open(m_fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
         if (fd == -1)
             throw std::system_error(errno, std::system_category(), "opening fifo for reading failed");
         m_pipe_fd = fd;

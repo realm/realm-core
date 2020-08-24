@@ -19,6 +19,11 @@
 #ifndef REALM_UTIL_FILE_HPP
 #define REALM_UTIL_FILE_HPP
 
+#ifndef _WIN32
+// should be changed into #ifdef IOS
+#define FILELOCK_EMULATION
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -369,6 +374,10 @@ public:
     /// Get the encryption key set by set_encryption_key(),
     /// null_ptr if no key set.
     const char* get_encryption_key() const;
+
+    /// Set the path used for emulating file locks. If not set explicitly,
+    /// the emulation will use the path of the file itself suffixed by ".fifo"
+    void set_fifo_path(const std::string& fifo_path);
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
@@ -607,6 +616,7 @@ private:
     int m_pipe_fd; // -1 if no pipe has been allocated for emulation
     bool m_has_exclusive_lock = false;
     bool m_has_shared_lock = false;
+    std::string m_fifo_path;
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
     std::string m_path;
@@ -1000,6 +1010,13 @@ inline File::File() noexcept
 inline File::~File() noexcept
 {
     close();
+}
+
+inline void File::set_fifo_path(const std::string& fifo_path)
+{
+#ifdef FILELOCK_EMULATION
+    m_fifo_path = fifo_path;
+#endif
 }
 
 inline File::File(File&& f) noexcept

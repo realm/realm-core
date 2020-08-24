@@ -5869,6 +5869,8 @@ TEST(LangBindHelper_callWithLock)
 
     // call_with_lock should run the callback if the lock file doesn't exist.
     CHECK_NOT(File::exists(path.get_lock_path()));
+    // make sure the management dir exists...
+    try_make_dir(std::string(path) + ".management");
     CHECK(DB::call_with_lock(path, callback));
     CHECK(File::exists(path.get_lock_path()));
 
@@ -5904,11 +5906,6 @@ TEST(LangBindHelper_getCoreFiles)
         const std::string lock_suffix = ".lock";
         if (file.size() >= lock_suffix.size() &&
             file.compare(file.size() - lock_suffix.size(), lock_suffix.size(), lock_suffix) == 0) {
-            continue;
-        }
-        const std::string fifo_suffix = ".lock.fifo";
-        if (file.size() >= fifo_suffix.size() &&
-            file.compare(file.size() - fifo_suffix.size(), fifo_suffix.size(), fifo_suffix) == 0) {
             continue;
         }
         std::string path(std::string(dir) + "/" + file);
