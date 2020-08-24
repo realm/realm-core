@@ -1037,11 +1037,12 @@ bool File::lock(bool exclusive, bool non_blocking)
         if (fd == -1 && errno != ENXIO)
             throw std::system_error(errno, std::system_category(), "opening fifo for writing failed");
         if (fd != -1) {
-            status = ::write(fd, " ", 1);
+            ssize_t num_written;
+            num_written = ::write(fd, " ", 1);
             ::close(fd);
-            if (status == 1)
+            if (num_written == 1)
                 available_for_writing = true;
-            if (status == -1 && errno == EAGAIN)
+            if (num_written == -1 && errno == EAGAIN)
                 available_for_writing = true;
         }
         if (available_for_writing) {
