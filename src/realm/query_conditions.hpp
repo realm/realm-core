@@ -113,6 +113,17 @@ struct Contains : public HackClass {
         return v2.contains(v1, charmap);
     }
 
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -162,6 +173,17 @@ struct Like : public HackClass {
         return s2.like(s1);
     }
 
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -205,15 +227,12 @@ struct BeginsWith : public HackClass {
         return v2.begins_with(v1);
     }
 
-    bool operator()(const Mixed& m1, const Mixed& m2, bool m1_is_null, bool m2_is_null) const
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
-        if (m1_is_null && m2_is_null)
-            return true;
-
-        if (auto ct = Mixed::get_common_type(m1, m2)) {
-            if (*ct == type_String)
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
                 return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            if (*ct == type_Binary)
+            else
                 return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
         }
         return false;
@@ -253,6 +272,17 @@ struct EndsWith : public HackClass {
     bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const
     {
         return v2.ends_with(v1);
+    }
+
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
     }
 
     template <class A, class B>
@@ -395,6 +425,16 @@ struct ContainsIns : public HackClass {
         return contains_ins(v2, v1_upper, v1_lower, v1.size(), charmap);
     }
 
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
+    }
 
     template <class A, class B>
     bool operator()(A, B) const
@@ -468,6 +508,17 @@ struct LikeIns : public HackClass {
         return string_like_ins(s2, s1_lower, s1_upper);
     }
 
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -521,6 +572,17 @@ struct BeginsWithIns : public HackClass {
         StringData s1(b1.data(), b1.size());
         StringData s2(b2.data(), b2.size());
         return this->operator()(s1, s2, false, false);
+    }
+
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
     }
 
     template <class A, class B>
@@ -579,6 +641,17 @@ struct EndsWithIns : public HackClass {
         return this->operator()(s1, s2, false, false);
     }
 
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -634,6 +707,17 @@ struct EqualIns : public HackClass {
         return this->operator()(s1, s2, false, false);
     }
 
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
+    }
+
     template <class A, class B>
     bool operator()(A, B) const
     {
@@ -686,6 +770,17 @@ struct NotEqualIns : public HackClass {
         StringData s1(b1.data(), b1.size());
         StringData s2(b2.data(), b2.size());
         return this->operator()(s1, s2, false, false);
+    }
+
+    bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
+    {
+        if (Mixed::is_comparable(m1, m2)) {
+            if (m1.get_type() == type_String && m2.get_type() == type_String)
+                return this->operator()(m1.get_string(), m2.get_string(), false, false);
+            else
+                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+        }
+        return false;
     }
 
     template <class A, class B>

@@ -1546,17 +1546,15 @@ public:
         TConditionFunction cond;
         for (size_t i = start; i < end; i++) {
             Mixed val = m_leaf_ptr->get(i);
-            if (auto common_type = Mixed::get_common_type(val, m_value)) {
-                Mixed l = val.export_to(*common_type);
-                Mixed r = m_value.export_to(*common_type);
+            if (Mixed::is_comparable(val, m_value)) {
                 if constexpr (realm::is_any_v<TConditionFunction, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns,
                                               Like, LikeIns, Contains, ContainsIns>) {
                     // For some strange reason the parameters are swapped for string conditions
-                    if (cond(r, l, r.is_null(), l.is_null()))
+                    if (cond(m_value, val, m_value.is_null(), val.is_null()))
                         return i;
                 }
                 else {
-                    if (cond(l, r, l.is_null(), r.is_null()))
+                    if (cond(val, m_value, val.is_null(), m_value.is_null()))
                         return i;
                 }
             }

@@ -5351,6 +5351,7 @@ TEST(Query_Mixed)
     }
 
     table->get_object(75).set(col_any, Mixed(75.));
+    table->get_object(28).set(col_any, Mixed(BinaryData("String2Binary")));
     table->get_object(25).set(col_any, Mixed(3.));
     table->get_object(35).set(col_any, Mixed(Decimal128("3")));
 
@@ -5375,6 +5376,9 @@ TEST(Query_Mixed)
     tv = table->where().begins_with(col_any, "String2").find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
 
+    tv = table->where().ends_with(col_any, "4").find_all(); // 4, 24, 44, 64, 84
+    CHECK_EQUAL(tv.size(), 5);
+
     tv = (table->column<Mixed>(col_any) == "String48").find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (table->column<Mixed>(col_any) == 3.).find_all();
@@ -5394,14 +5398,13 @@ TEST(Query_ListOfMixed)
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
     auto col_any = table->add_column_list(type_Mixed, "any");
-    auto col_int = table->add_column(type_Int, "int");
+    auto col_int = origin->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
     size_t expected = 0;
 
     for (int64_t i = 0; i < 100; i++) {
         auto obj = table->create_object();
-        obj.set(col_int, i);
         auto list = obj.get_list<Mixed>(col_any);
         if (i % 4) {
             list.add(i);
@@ -5420,6 +5423,7 @@ TEST(Query_ListOfMixed)
     auto it = table->begin();
     for (int64_t i = 0; i < 10; i++) {
         auto obj = origin->create_object();
+        obj.set(col_int, 100);
         auto ll = obj.get_linklist(col_links);
 
         obj.set(col_link, it->get_key());
@@ -5436,6 +5440,8 @@ TEST(Query_ListOfMixed)
     CHECK_EQUAL(tv.size(), 8);
     tv = (origin->link(col_link).column<Lst<Mixed>>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 7);
+    tv = (origin->link(col_links).column<Lst<Mixed>>(col_any) == origin->column<Int>(col_int)).find_all();
+    CHECK_EQUAL(tv.size(), 5);
 }
 
 #endif // TEST_QUERY

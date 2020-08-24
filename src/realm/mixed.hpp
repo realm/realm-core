@@ -164,10 +164,7 @@ public:
         return DataType(m_type - 1);
     }
 
-    void import(DataType target_type, Mixed source) noexcept;
-    Mixed export_to(DataType target_type) const noexcept;
-
-    static util::Optional<DataType> get_common_type(const Mixed& l, const Mixed& r);
+    static bool is_comparable(const Mixed& l, const Mixed& r);
 
     template <class T>
     T get() const noexcept;
@@ -432,6 +429,8 @@ inline double Mixed::get_double() const
 template <>
 inline StringData Mixed::get<StringData>() const noexcept
 {
+    if (is_null())
+        return StringData();
     REALM_ASSERT(get_type() == type_String);
     return string_val;
 }
@@ -444,7 +443,9 @@ inline StringData Mixed::get_string() const
 template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
-    REALM_ASSERT(get_type() == type_Binary);
+    if (is_null())
+        return BinaryData();
+    REALM_ASSERT(get_type() == type_Binary || get_type() == type_String);
     return binary_val;
 }
 

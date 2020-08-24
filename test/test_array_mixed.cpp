@@ -161,4 +161,39 @@ TEST(Mixed_Table)
 }
 
 
+TEST(Mixed_SortNumeric)
+{
+    Table t;
+    auto col_data = t.add_column(type_Mixed, "data");
+    t.create_object().set(col_data, Mixed(5));
+    t.create_object().set(col_data, Mixed(false));
+    t.create_object().set(col_data, Mixed(-258));
+    t.create_object().set(col_data, Mixed(256.256f));
+    t.create_object().set(col_data, Mixed(34.8));
+    t.create_object().set(col_data, Mixed(Decimal128("-500")));
+    t.create_object().set(col_data, Mixed(7.5f));
+    t.create_object().set(col_data, Mixed(500));
+    t.create_object().set(col_data, Mixed(Decimal128("129.85")));
+    t.create_object().set(col_data, Mixed(100));
+    t.create_object().set(col_data, Mixed(42));
+    t.create_object().set(col_data, Mixed(0.0001f));
+    t.create_object().set(col_data, Mixed(-278987.9071));
+    t.create_object().set(col_data, Mixed(Decimal128("10000")));
+    t.create_object().set(col_data, Mixed(true));
+    t.create_object().set(col_data, Mixed(42.1f));
+
+    auto tv = t.where().find_all();
+    auto sz = tv.size();
+    CHECK_EQUAL(tv.size(), 16);
+    tv.sort(col_data);
+    Mixed last;
+    for (size_t i = 0; i < sz; i++) {
+        Mixed val = tv.get(i).get<Mixed>(col_data);
+        CHECK_LESS(last, val); // Not really a check as it uses the same compare function as the sort
+        // std::cout << val << std::endl; // For human inspection
+        last = val;
+    }
+}
+
+
 #endif // TEST_ARRAY_VARIANT

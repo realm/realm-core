@@ -85,273 +85,207 @@ inline int compare_float(Float a_raw, Float b_raw)
     // nans are treated as being less than all non-nan values
     return a_nan ? -1 : 1;
 }
+
+template <typename T>
+inline int compare_generic(T lhs, T rhs)
+{
+    return lhs == rhs ? 0 : lhs < rhs ? -1 : 1;
+}
+
+inline int compare_decimals(Decimal128 lhs, Decimal128 rhs)
+{
+    return lhs.compare(rhs);
+}
+
+inline int compare_decimal_to_double(Decimal128 lhs, double rhs)
+{
+    return lhs.compare(Decimal128(rhs)); // FIXME: slow and not accurate in all cases
+}
+
+// This is the tricky one. Needs to support the following cases:
+// * Doubles with a fractional component.
+// * Longs that can't be precisely represented as a double.
+// * Doubles outside of the range of Longs (including +/- Inf).
+// * NaN (defined by us as less than all Longs)
+// * Return value is always -1, 0, or 1 to ensure it is safe to negate.
+inline int compare_long_to_double(int64_t lhs, double rhs)
+{
+    // All Longs are > NaN
+    if (std::isnan(rhs))
+        return 1;
+
+    // Ints with magnitude <= 2**53 can be precisely represented as doubles.
+    // Additionally, doubles outside of this range can't have a fractional component.
+    static const int64_t kEndOfPreciseDoubles = 1ll << 53;
+    if (lhs <= kEndOfPreciseDoubles && lhs >= -kEndOfPreciseDoubles) {
+        return compare_float(double(lhs), rhs);
+    }
+
+    // Large magnitude doubles (including +/- Inf) are strictly > or < all Longs.
+    static const double kBoundOfLongRange = -static_cast<double>(LLONG_MIN); // positive 2**63
+    if (rhs >= kBoundOfLongRange)
+        return -1; // Can't be represented in a Long.
+    if (rhs < -kBoundOfLongRange)
+        return 1; // Can be represented in a Long.
+
+    // Remaining Doubles can have their integer component precisely represented as long longs.
+    // If they have a fractional component, they must be strictly > or < lhs even after
+    // truncation of the fractional component since low-magnitude lhs were handled above.
+    return compare_generic(lhs, int64_t(rhs));
+}
 } // namespace _impl
 
-void Mixed::import(DataType target_type, Mixed source) noexcept
+bool Mixed::is_comparable(const Mixed& l, const Mixed& r)
 {
-    m_type = 0; // Initially set to NULL
-    if (!source.is_null()) {
-        DataType this_type = source.get_type();
-        if (target_type != type_Mixed && this_type != target_type) {
-            switch (target_type) {
-                case type_Double:
-                    switch (this_type) {
-                        case type_Int:
-                            *this = double(source.int_val);
-                            break;
-                        case type_Float:
-                            *this = double(source.float_val);
-                            break;
-                        default:
-                            REALM_ASSERT(false);
-                            break;
-                    }
-                    break;
+    if (l.is_null() || r.is_null())
+        return true;
 
-                case type_Float:
-                    switch (this_type) {
-                        case type_Int:
-                            *this = float(source.int_val);
-                            break;
-                        default:
-                            REALM_ASSERT(false);
-                            break;
-                    }
-                    break;
-
-                default:
-                    REALM_ASSERT(false);
-                    break;
-            }
-        }
-        else {
-            *this = source;
-        }
+    DataType l_type = l.get_type();
+    DataType r_type = r.get_type();
+    if (l_type == r_type)
+        return true;
+    bool l_is_numeric = l_type == type_Int || l_type == type_Bool || l_type == type_Float || l_type == type_Double ||
+                        l_type == type_Decimal;
+    bool r_is_numeric = r_type == type_Int || r_type == type_Bool || r_type == type_Float || r_type == type_Double ||
+                        r_type == type_Decimal;
+    if (l_is_numeric && r_is_numeric) {
+        return true;
     }
-}
-
-Mixed Mixed::export_to(DataType target_type) const noexcept
-{
-    if (!is_null()) {
-        if (target_type == get_type()) {
-            // Type matches
-            return *this;
-        }
-        switch (target_type) {
-            case type_Int:
-                switch (get_type()) {
-                    case type_Bool:
-                        return Mixed(int_val);
-                    default:
-                        break;
-                }
-                break;
-            case type_Float:
-                switch (get_type()) {
-                    case type_Int:
-                    case type_Bool:
-                        return Mixed(float(int_val));
-                    case type_Float:
-                        return Mixed(float(float_val));
-                    default:
-                        break;
-                }
-                break;
-            case type_Double:
-                switch (get_type()) {
-                    case type_Int:
-                    case type_Bool:
-                        return Mixed(double(int_val));
-                    case type_Float:
-                        return Mixed(double(float_val));
-                    default:
-                        break;
-                }
-                break;
-            case type_Decimal:
-                switch (get_type()) {
-                    case type_Int:
-                    case type_Bool:
-                        return Mixed(Decimal128(int_val));
-                    case type_Float:
-                        return Mixed(Decimal128(double(float_val)));
-                    case type_Double:
-                        return Mixed(Decimal128(double_val));
-                    default:
-                        break;
-                }
-                break;
-            default:
-                break;
-        }
+    if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
+        return true;
     }
-    return {};
-}
-
-util::Optional<DataType> Mixed::get_common_type(const Mixed& l, const Mixed& r)
-{
-    util::Optional<DataType> ret;
-    if (!(l.is_null() && r.is_null())) {
-        if (l.is_null())
-            return r.get_type();
-        if (r.is_null())
-            return l.get_type();
-        DataType l_type = l.get_type();
-        DataType r_type = r.get_type();
-        if (l_type == r_type)
-            return l_type;
-        switch (l_type) {
-            case type_Bool:
-                switch (r_type) {
-                    case type_Int:
-                        return type_Int;
-                    case type_Decimal:
-                        return type_Decimal;
-                    case type_Float:
-                        return type_Float;
-                    case type_Double:
-                        return type_Double;
-                    default:
-                        break;
-                }
-                break;
-            case type_Int:
-                switch (r_type) {
-                    case type_Bool:
-                        return type_Int;
-                    case type_Decimal:
-                        return type_Decimal;
-                    case type_Float:
-                        return type_Float;
-                    case type_Double:
-                        return type_Double;
-                    default:
-                        break;
-                }
-                break;
-            case type_Float:
-                switch (r_type) {
-                    case type_Int:
-                    case type_Bool:
-                    case type_Double:
-                        return type_Double;
-                    case type_Decimal:
-                        return type_Decimal;
-                    default:
-                        break;
-                }
-                break;
-            case type_Double:
-                switch (r_type) {
-                    case type_Int:
-                    case type_Bool:
-                    case type_Float:
-                        return type_Double;
-                    case type_Decimal:
-                        return type_Decimal;
-                    default:
-                        break;
-                }
-                break;
-            case type_Decimal:
-                switch (r_type) {
-                    case type_Int:
-                    case type_Bool:
-                    case type_Float:
-                    case type_Double:
-                        return type_Decimal;
-                    default:
-                        break;
-                }
-                break;
-            default:
-                break;
-        }
-    }
-    return ret;
+    return false;
 }
 
 
 int Mixed::compare(const Mixed& b) const
 {
-    // Comparing types first makes it possible to make a sort of a list of Mixed
-    // This will also handle the case where null values are considered lower than all other values
-    if (m_type > b.m_type)
-        return 1;
-    else if (m_type < b.m_type)
-        return -1;
-
-    // Now we are sure the two types are the same
     if (is_null()) {
-        // Both are null
-        return 0;
+        return b.is_null() ? 0 : -1;
     }
+    if (b.is_null())
+        return 1;
 
+    // None is null
     switch (get_type()) {
+        case type_Bool: {
+            int64_t i_val = bool_val ? 1 : 0;
+            switch (b.get_type()) {
+                case type_Int:
+                    return _impl::compare_generic(i_val, b.int_val);
+                case type_Bool:
+                    return _impl::compare_generic(bool_val, b.bool_val);
+                case type_Float:
+                    return _impl::compare_long_to_double(i_val, b.float_val);
+                case type_Double:
+                    return _impl::compare_long_to_double(i_val, b.double_val);
+                case type_Decimal:
+                    return _impl::compare_decimals(Decimal128(i_val), b.decimal_val);
+                default:
+                    break;
+            }
+            break;
+        }
         case type_Int:
-            if (get<int64_t>() > b.get<int64_t>())
-                return 1;
-            else if (get<int64_t>() < b.get<int64_t>())
-                return -1;
+            switch (b.get_type()) {
+                case type_Int:
+                    return _impl::compare_generic(int_val, b.int_val);
+                case type_Bool:
+                    return _impl::compare_generic(int_val, int64_t(b.bool_val ? 1 : 0));
+                case type_Float:
+                    return _impl::compare_long_to_double(int_val, b.float_val);
+                case type_Double:
+                    return _impl::compare_long_to_double(int_val, b.double_val);
+                case type_Decimal:
+                    return _impl::compare_decimals(Decimal128(int_val), b.decimal_val);
+                default:
+                    break;
+            }
             break;
         case type_String:
-            return _impl::compare_string(get<StringData>(), b.get<StringData>());
-            break;
+            if (b.get_type() == type_String)
+                return _impl::compare_string(get<StringData>(), b.get<StringData>());
+            [[fallthrough]];
         case type_Binary:
-            return _impl::compare_binary(get<BinaryData>(), b.get<BinaryData>());
+            if (b.get_type() == type_String || b.get_type() == type_Binary)
+                return _impl::compare_binary(get<BinaryData>(), b.get<BinaryData>());
             break;
         case type_Float:
-            return _impl::compare_float(get<float>(), b.get<float>());
+            switch (b.get_type()) {
+                case type_Int:
+                    return -_impl::compare_long_to_double(b.int_val, float_val);
+                case type_Bool:
+                    return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, float_val);
+                case type_Float:
+                    return _impl::compare_float(float_val, b.float_val);
+                case type_Double:
+                    return _impl::compare_float(double(float_val), b.double_val);
+                case type_Decimal:
+                    return -_impl::compare_decimal_to_double(b.decimal_val, double(float_val));
+                default:
+                    break;
+            }
+            break;
         case type_Double:
-            return _impl::compare_float(get<double>(), b.get<double>());
-        case type_Bool:
-            if (get<bool>() > b.get<bool>())
-                return 1;
-            else if (get<bool>() < b.get<bool>())
-                return -1;
+            switch (b.get_type()) {
+                case type_Int:
+                    return -_impl::compare_long_to_double(b.int_val, double_val);
+                case type_Bool:
+                    return -_impl::compare_long_to_double(b.bool_val ? 1 : 0, double_val);
+                case type_Float:
+                    return _impl::compare_float(double_val, double(b.float_val));
+                case type_Double:
+                    return _impl::compare_float(double_val, b.double_val);
+                case type_Decimal:
+                    return -_impl::compare_decimal_to_double(b.decimal_val, double_val);
+                default:
+                    break;
+            }
             break;
         case type_Timestamp:
-            if (get<Timestamp>() > b.get<Timestamp>())
-                return 1;
-            else if (get<Timestamp>() < b.get<Timestamp>())
-                return -1;
+            if (b.get_type() == type_Timestamp) {
+                return _impl::compare_generic(date_val, b.date_val);
+            }
             break;
-        case type_ObjectId: {
-            auto l = get<ObjectId>();
-            auto r = b.get<ObjectId>();
-            if (l > r)
-                return 1;
-            else if (l < r)
-                return -1;
+        case type_ObjectId:
+            if (b.get_type() == type_ObjectId) {
+                return _impl::compare_generic(id_val, b.id_val);
+            }
             break;
-        }
-        case type_Decimal: {
-            auto l = get<Decimal128>();
-            auto r = b.get<Decimal128>();
-            if (l > r)
-                return 1;
-            else if (l < r)
-                return -1;
+        case type_Decimal:
+            switch (b.get_type()) {
+                case type_Int:
+                    return _impl::compare_decimals(decimal_val, Decimal128(b.int_val));
+                case type_Bool:
+                    return _impl::compare_decimals(decimal_val, Decimal128(b.bool_val ? 1 : 0));
+                case type_Float:
+                    return _impl::compare_decimal_to_double(decimal_val, double(b.float_val));
+                case type_Double:
+                    return _impl::compare_decimal_to_double(decimal_val, b.double_val);
+                case type_Decimal:
+                    return _impl::compare_decimals(decimal_val, b.decimal_val);
+                default:
+                    break;
+            }
             break;
-        }
         case type_Link:
-            if (get<ObjKey>() > b.get<ObjKey>())
-                return 1;
-            else if (get<ObjKey>() < b.get<ObjKey>())
-                return -1;
+            if (b.get_type() == type_Link) {
+                return _impl::compare_generic(int_val, b.int_val);
+            }
             break;
         case type_TypedLink:
-            if (get<ObjLink>() > b.get<ObjLink>())
-                return 1;
-            else if (get<ObjLink>() < b.get<ObjLink>())
-                return -1;
+            if (b.get_type() == type_TypedLink) {
+                return _impl::compare_generic(link_val, b.link_val);
+            }
             break;
         default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
     }
 
-    return 0;
+    // Comparing types ass a fallback option makes it possible to make a sort of a list of Mixed
+    // This will also handle the case where null values are considered lower than all other values
+    return (m_type > b.m_type) ? 1 : -1;
 }
 
 size_t Mixed::hash() const
@@ -429,7 +363,7 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << (m.bool_val ? "true" : "false");
                 break;
             case type_Float:
-                out << m.float_val;
+                out << m.float_val << 'f';
                 break;
             case type_Double:
                 out << m.double_val;
