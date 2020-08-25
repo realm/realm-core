@@ -232,7 +232,7 @@ public:
         // that Realm instance for other requests for a cached Realm. Useful
         // for dynamic Realms and for tests that need multiple instances on
         // one thread
-        bool cache = true;
+        bool cache = false;
 
         // Throw an exception rather than automatically upgrading the file
         // format. Used by the browser to warn the user that it'll modify

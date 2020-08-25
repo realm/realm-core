@@ -59,6 +59,7 @@ using namespace realm;
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
     TestFile config;
+    config.cache = true;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
@@ -1906,6 +1907,7 @@ TEST_CASE("BindingContext is notified in case of notifier errors") {
 
 TEST_CASE("RealmCoordinator: get_unbound_realm()") {
     TestFile config;
+    config.cache = true;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int}
