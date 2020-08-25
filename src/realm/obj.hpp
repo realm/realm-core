@@ -223,6 +223,7 @@ public:
     void assign(const Obj& other);
 
     Obj get_linked_object(ColKey link_col_key) const;
+    Obj get_linked_object(StringData link_col_name) const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
@@ -438,6 +439,12 @@ std::vector<U> Obj::get_list_values(ColKey col_key) const
         values.push_back(v);
 
     return values;
+}
+
+inline Obj Obj::get_linked_object(StringData link_col_name) const
+{
+    ColKey col = get_column_key(link_col_name);
+    return get_linked_object(col);
 }
 
 template <class Val>
