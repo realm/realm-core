@@ -331,18 +331,33 @@ void SyncReplication::rename_group_level_table(TableKey, StringData)
     unsupported_instruction();
 }
 
-void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType type, StringData name,
+void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType type, StringData name,
                                     Table* target_table)
 {
-    TrivialReplication::insert_column(table, col_ndx, type, name, target_table);
+    TrivialReplication::insert_column(table, col_key, type, name, target_table);
+    using CollectionType = Instruction::AddColumn::CollectionType;
 
     if (select_table(*table)) {
         Instruction::AddColumn instr;
         instr.table = m_last_class_name;
         instr.field = m_encoder.intern_string(name);
-        instr.nullable = col_ndx.is_nullable();
+        instr.nullable = col_key.is_nullable();
         instr.type = get_payload_type(type);
-        instr.list = col_ndx.is_list();
+
+        if (col_key.is_list()) {
+            instr.collection_type = CollectionType::List;
+        }
+        else if (col_key.is_dictionary()) {
+            REALM_ASSERT(type == type_String);
+            instr.collection_type = CollectionType::Dictionary;
+            auto value_type = table->get_dictionary_value_type(col_key);
+            instr.value_type = get_payload_type(value_type);
+        }
+        else {
+            REALM_ASSERT(!col_key.is_collection());
+            instr.collection_type = CollectionType::Single;
+            instr.value_type = Instruction::Payload::Type::Null;
+        }
 
         // Mixed columns are always nullable.
         REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
@@ -502,6 +517,41 @@ void SyncReplication::list_clear(const CollectionBase& view)
         emit(instr);
     }
 }
+
+
+void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
+{
+    TrivialReplication::dictionary_insert(dict, key, val);
+
+    if (select_collection(dict)) {
+        Instruction::Update instr;
+        REALM_ASSERT(key.get_type() == type_String);
+        populate_path_instr(instr, dict);
+        StringData key_value = key.get_string();
+        instr.path.push_back(m_encoder.intern_string(key_value));
+        instr.value = as_payload(dict, val);
+        instr.is_default = false;
+        emit(instr);
+    }
+}
+
+
+void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
+{
+    TrivialReplication::dictionary_erase(dict, key);
+
+    if (select_collection(dict)) {
+        Instruction::Update instr;
+        REALM_ASSERT(key.get_type() == type_String);
+        populate_path_instr(instr, dict);
+        StringData key_value = key.get_string();
+        instr.path.push_back(m_encoder.intern_string(key_value));
+        instr.value = Instruction::Payload::Erased{};
+        instr.is_default = false;
+        emit(instr);
+    }
+}
+
 
 void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
 {

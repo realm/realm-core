@@ -1984,8 +1984,8 @@ TEST(Group_SetColumnWithNullPrimaryKeyy)
 
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
-    table->get_object(keys[0]).set(string_col, {"first"});
-    table->get_object(keys[1]).set(string_col, {});
+    table->get_object(keys[0]).set_any(string_col, {"first"});
+    table->get_object(keys[1]).set_any(string_col, {});
     CHECK(!table->get_object(keys[0]).is_null(string_col));
     CHECK_EQUAL(table->get_object(keys[0]).get<StringData>(string_col), "first");
     CHECK(table->get_object(keys[1]).is_null(string_col));

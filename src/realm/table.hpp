@@ -110,6 +110,7 @@ public:
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
+    DataType get_dictionary_value_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
@@ -131,7 +132,7 @@ public:
     ColKey add_column(Table& target, StringData name);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name);
+    ColKey add_column_dictionary(DataType type, StringData name, DataType value_type);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
     ColKey
@@ -258,7 +259,7 @@ public:
         return m_clusters.get(ndx);
     }
     // Get object based on primary key
-    Obj get_object_with_primary_key(Mixed pk);
+    Obj get_object_with_primary_key(Mixed pk) const;
     // Get primary key based on ObjKey
     Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
@@ -662,14 +663,15 @@ private:
 
     void set_key(TableKey key);
 
-    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table);
+    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
+                            DataType value_type = DataType(0));
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     void erase_root_column(ColKey col_key);
-    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name);
+    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType value_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
 
     bool has_any_embedded_objects();
@@ -1066,6 +1068,13 @@ inline DataType Table::get_column_type(ColKey column_key) const
 inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 {
     return column_key.get_attrs();
+}
+
+inline DataType Table::get_dictionary_value_type(ColKey column_key) const noexcept
+{
+    auto spec_ndx = colkey2spec_ndx(column_key);
+    REALM_ASSERT_3(spec_ndx, <, get_column_count());
+    return m_spec.get_value_type(spec_ndx);
 }
 
 

@@ -1875,4 +1875,77 @@ TEST(Transform_DanglingLinks)
     });
 }
 
+TEST(Transform_Dictionary)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    Associativity assoc{test_context, 2, changeset_dump_dir_gen.get()};
+    assoc.for_each_permutation([&](auto& it) {
+        auto server = &*it.server;
+        auto client_1 = &*it.clients[0];
+        auto client_2 = &*it.clients[1];
+
+        // Create baseline
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+            table->add_column_dictionary(type_String, "dict", type_String);
+            table->create_object_with_primary_key(0);
+            table->create_object_with_primary_key(1);
+        });
+
+        it.sync_all();
+
+        // Populate dictionary on both sides.
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj0 = table->get_object_with_primary_key(0);
+            auto obj1 = table->get_object_with_primary_key(1);
+            auto dict0 = obj0.get_dictionary("dict");
+            auto dict1 = obj1.get_dictionary("dict");
+
+            dict0.insert("a", 123);
+            dict0.insert("b", "Hello");
+            dict0.insert("c", 45.0);
+
+            dict1.insert("a", 456);
+        });
+
+        // Since client_2 has a higher peer ID, it should win this conflict.
+        client_2->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj0 = table->get_object_with_primary_key(0);
+            auto obj1 = table->get_object_with_primary_key(1);
+            auto dict0 = obj0.get_dictionary("dict");
+            auto dict1 = obj1.get_dictionary("dict");
+
+            dict0.insert("b", "Hello, World!");
+            dict0.insert("d", true);
+
+            dict1.insert("b", 789.f);
+        });
+
+        it.sync_all();
+
+        ReadTransaction rt{server->shared_group};
+        auto table = rt.get_table("class_Table");
+        CHECK(table);
+        auto obj0 = table->get_object_with_primary_key(0);
+        auto obj1 = table->get_object_with_primary_key(1);
+        auto dict0 = obj0.get_dictionary("dict");
+        auto dict1 = obj1.get_dictionary("dict");
+
+        CHECK_EQUAL(dict0.size(), 4);
+        CHECK_EQUAL(dict0.get("a"), Mixed{123});
+        CHECK_EQUAL(dict0.get("b"), Mixed{"Hello, World!"});
+        CHECK_EQUAL(dict0.get("c"), Mixed{45.0});
+        CHECK_EQUAL(dict0.get("d"), Mixed{true});
+
+        CHECK_EQUAL(dict1.size(), 2);
+        CHECK_EQUAL(dict1.get("a"), 456);
+        CHECK_EQUAL(dict1.get("b"), 789.f);
+    });
+}
+
 } // unnamed namespace

@@ -78,7 +78,7 @@ struct Instruction;
 
 namespace instr {
 
-using PrimaryKey = mpark::variant<mpark::monostate, int64_t, InternString, GlobalKey, ObjectId>;
+using PrimaryKey = mpark::variant<mpark::monostate, int64_t, GlobalKey, InternString, ObjectId>;
 
 struct Path {
     using Element = mpark::variant<InternString, uint32_t>;
@@ -145,10 +145,27 @@ struct Path {
     {
         return lhs.m_path == rhs.m_path;
     }
+
+    using const_iterator = typename std::vector<Element>::const_iterator;
+    const_iterator begin() const noexcept
+    {
+        return m_path.begin();
+    }
+    const_iterator end() const noexcept
+    {
+        return m_path.end();
+    }
 };
 
 struct Payload {
+    /// Create a new object in-place (embedded object).
     struct ObjectValue {
+    };
+    /// Create an empty dictionary in-place (does not clear an existing dictionary).
+    struct Dictionary {
+    };
+    /// Sentinel value for an erased dictionary element.
+    struct Erased {
     };
 
     /// Payload data types, corresponding loosely to the `DataType` enum in
@@ -157,6 +174,9 @@ struct Payload {
     /// - Null (0) indicates a NULL value of any type.
     /// - GlobalKey (-1) indicates an internally generated object ID.
     /// - ObjectValue (-2) indicates the creation of an embedded object.
+    /// - Dictionary (-3) indicates the creation of a dictionary.
+    /// - Erased (-4) indicates that a dictionary element should be erased.
+    /// - Undefined (-5) indicates the
     ///
     /// Furthermore, link values for both Link and LinkList columns are
     /// represented by a single Link type.
@@ -164,6 +184,12 @@ struct Payload {
     /// Note: For Mixed columns (including typed links), no separate value is required, because the
     /// instruction set encodes the type of each value in the instruction.
     enum class Type : int8_t {
+        // Special value indicating that a dictionary element should be erased.
+        Erased = -4,
+
+        // Special value indicating that a dictionary should be created at the position.
+        Dictionary = -3,
+
         // Special value indicating that an embedded object should be created at
         // the position.
         ObjectValue = -2,
@@ -261,6 +287,12 @@ struct Payload {
     {
     }
 
+    // Note: Intentionally implicit.
+    Payload(const Erased&) noexcept
+        : type(Type::Erased)
+    {
+    }
+
     explicit Payload(Timestamp value) noexcept
         : type(value.is_null() ? Type::Null : Type::Timestamp)
     {
@@ -302,6 +334,10 @@ struct Payload {
     {
         if (lhs.type == rhs.type) {
             switch (lhs.type) {
+                case Type::Erased:
+                    return true;
+                case Type::Dictionary:
+                    return lhs.data.key == rhs.data.key;
                 case Type::ObjectValue:
                     return true;
                 case Type::GlobalKey:
@@ -424,19 +460,31 @@ struct EraseTable : TableInstruction {
 struct AddColumn : TableInstruction {
     using TableInstruction::TableInstruction;
 
+    // This is backwards compatible with previous boolean type where 0
+    // indicated simple type and 1 indicated list.
+    enum class CollectionType : uint8_t { Single, List, Dictionary, Set };
+
     InternString field;
 
     // `none` for Mixed columns. Mixed columns are always nullable.
     Payload::Type type;
+    // `none` for other than dictionary columns
+    Payload::Type value_type;
 
     bool nullable;
-    bool list;
+
+    // For Mixed columns, this is `none`. Mixed columns are always nullable.
+    //
+    // For dictionaries, this must always be `Type::String`.
+    CollectionType collection_type;
+
     InternString link_target_table;
 
     bool operator==(const AddColumn& rhs) const noexcept
     {
         return TableInstruction::operator==(rhs) && field == rhs.field && type == rhs.type &&
-               nullable == rhs.nullable && list == rhs.list && link_target_table == rhs.link_target_table;
+               value_type == rhs.value_type && nullable == rhs.nullable && collection_type == rhs.collection_type &&
+               link_target_table == rhs.link_target_table;
     }
 };
 
@@ -676,6 +724,10 @@ inline const char* get_type_name(Instruction::Payload::Type type)
 {
     using Type = Instruction::Payload::Type;
     switch (type) {
+        case Type::Erased:
+            return "Erased";
+        case Type::Dictionary:
+            return "Dictionary";
         case Type::ObjectValue:
             return "ObjectValue";
         case Type::GlobalKey:
@@ -702,6 +754,22 @@ inline const char* get_type_name(Instruction::Payload::Type type)
             return "Link";
         case Type::ObjectId:
             return "ObjectId";
+    }
+    return "(unknown)";
+}
+
+inline const char* get_collection_type(Instruction::AddColumn::CollectionType type)
+{
+    using Type = Instruction::AddColumn::CollectionType;
+    switch (type) {
+        case Type::Single:
+            return "Single";
+        case Type::List:
+            return "List";
+        case Type::Dictionary:
+            return "Dictionary";
+        case Type::Set:
+            return "Set";
     }
     return "(unknown)";
 }
@@ -764,6 +832,10 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
             return type_Link;
         case Type::ObjectId:
             return type_ObjectId;
+        case Type::Erased:
+            [[fallthrough]];
+        case Type::Dictionary:
+            [[fallthrough]];
         case Type::ObjectValue:
             [[fallthrough]];
         case Type::GlobalKey:

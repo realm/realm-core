@@ -80,7 +80,7 @@ TEST(Dictionary_Basics)
     };
 
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_String, "dictionaries");
+    auto col_dict = foo->add_column_dictionary(type_String, "dictionaries", type_Mixed);
 
     Obj obj1 = foo->create_object();
     Obj obj2 = foo->create_object();
@@ -134,7 +134,7 @@ TEST(Dictionary_Links)
 
     auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
     auto persons = g.add_table_with_primary_key("person", type_String, "name");
-    auto col_dict = persons->add_column_dictionary(type_String, "dictionaries");
+    auto col_dict = persons->add_column_dictionary(type_String, "dictionaries", type_TypedLink);
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
@@ -181,7 +181,7 @@ TEST(Dictionary_Transaction)
     {
         WriteTransaction wt(db);
         auto foo = wt.add_table("foo");
-        col_dict = foo->add_column_dictionary(type_String, "dictionaries");
+        col_dict = foo->add_column_dictionary(type_String, "dictionaries", type_Mixed);
 
         Obj obj1 = foo->create_object();
         Obj obj2 = foo->create_object();
@@ -229,7 +229,7 @@ TEST(Dictionary_Aggregate)
 {
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries");
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
@@ -275,7 +275,7 @@ TEST(Dictionary_Performance)
 
     Group g;
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries");
+    auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries", type_Int);
 
     Obj obj1 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);

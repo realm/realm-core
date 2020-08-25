@@ -91,6 +91,10 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
         case Type::GlobalKey:
             os << data.key;
             break;
+        case Type::Erased:
+            break;
+        case Type::Dictionary:
+            break;
         case Type::Null:
             break;
         case Type::Int:
@@ -380,9 +384,12 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
         m_tracer.field("type", "Mixed");
     }
     m_tracer.field("nullable", p.nullable);
-    m_tracer.field("list", p.list);
+    m_tracer.field("collection_type", p.collection_type);
     if (p.type == Instruction::Payload::Type::Link) {
         m_tracer.field("target_table", p.link_target_table);
+    }
+    if (p.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
+        m_tracer.field("value_type", p.value_type);
     }
 }
 
@@ -448,6 +455,11 @@ void Changeset::Printer::field(StringData n, InternString value)
 void Changeset::Printer::field(StringData n, Instruction::Payload::Type type)
 {
     print_field(n, get_type_name(type));
+}
+
+void Changeset::Printer::field(StringData n, Instruction::AddColumn::CollectionType type)
+{
+    print_field(n, get_collection_type(type));
 }
 
 std::string Changeset::Printer::primary_key_to_string(const Instruction::PrimaryKey& key)
