@@ -77,6 +77,12 @@ public:
     {
         return m_size;
     }
+    void remove_zero_term()
+    {
+        REALM_ASSERT(m_size > 0);
+        REALM_ASSERT(m_data[m_size - 1] == '\0');
+        m_size--;
+    }
 
     /// Is this a null reference?
     ///

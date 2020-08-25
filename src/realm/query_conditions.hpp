@@ -116,10 +116,15 @@ struct Contains : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            BinaryData v1;
+            if (m1.get_type() == type_String) {
+                auto s1 = m1.get_string();
+                v1 = BinaryData(s1.data(), s1.size());
+            }
+            else {
+                v1 = m1.get_binary();
+            }
+            return this->operator()(v1, m2.get_binary(), false, false);
         }
         return false;
     }
@@ -176,10 +181,15 @@ struct Like : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            BinaryData v1;
+            if (m1.get_type() == type_String) {
+                auto s1 = m1.get_string();
+                v1 = BinaryData(s1.data(), s1.size());
+            }
+            else {
+                v1 = m1.get_binary();
+            }
+            return this->operator()(v1, m2.get_binary(), false, false);
         }
         return false;
     }
@@ -230,10 +240,15 @@ struct BeginsWith : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            BinaryData v1;
+            if (m1.get_type() == type_String) {
+                auto s1 = m1.get_string();
+                v1 = BinaryData(s1.data(), s1.size());
+            }
+            else {
+                v1 = m1.get_binary();
+            }
+            return this->operator()(v1, m2.get_binary(), false, false);
         }
         return false;
     }
@@ -277,10 +292,7 @@ struct EndsWith : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
         }
         return false;
     }
@@ -428,10 +440,15 @@ struct ContainsIns : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            BinaryData v1;
+            if (m1.get_type() == type_String) {
+                auto s1 = m1.get_string();
+                v1 = BinaryData(s1.data(), s1.size());
+            }
+            else {
+                v1 = m1.get_binary();
+            }
+            return this->operator()(v1, m2.get_binary(), false, false);
         }
         return false;
     }
@@ -511,10 +528,15 @@ struct LikeIns : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            BinaryData v1;
+            if (m1.get_type() == type_String) {
+                auto s1 = m1.get_string();
+                v1 = BinaryData(s1.data(), s1.size());
+            }
+            else {
+                v1 = m1.get_binary();
+            }
+            return this->operator()(v1, m2.get_binary(), false, false);
         }
         return false;
     }
@@ -577,10 +599,15 @@ struct BeginsWithIns : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            BinaryData v1;
+            if (m1.get_type() == type_String) {
+                auto s1 = m1.get_string();
+                v1 = BinaryData(s1.data(), s1.size());
+            }
+            else {
+                v1 = m1.get_binary();
+            }
+            return this->operator()(v1, m2.get_binary(), false, false);
         }
         return false;
     }
@@ -644,10 +671,7 @@ struct EndsWithIns : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
         }
         return false;
     }
@@ -710,10 +734,7 @@ struct EqualIns : public HackClass {
     bool operator()(const Mixed& m1, const Mixed& m2, bool = false, bool = false) const
     {
         if (Mixed::is_comparable(m1, m2)) {
-            if (m1.get_type() == type_String && m2.get_type() == type_String)
-                return this->operator()(m1.get_string(), m2.get_string(), false, false);
-            else
-                return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
+            return this->operator()(m1.get_binary(), m2.get_binary(), false, false);
         }
         return false;
     }

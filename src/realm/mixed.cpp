@@ -135,13 +135,13 @@ inline int compare_long_to_double(int64_t lhs, double rhs)
 }
 } // namespace _impl
 
-bool Mixed::is_comparable(const Mixed& l, const Mixed& r)
+bool Mixed::is_comparable(const Mixed& lhs, const Mixed& rhs)
 {
-    if (l.is_null() || r.is_null())
+    if (lhs.is_null() || rhs.is_null())
         return true;
 
-    DataType l_type = l.get_type();
-    DataType r_type = r.get_type();
+    DataType l_type = lhs.get_type();
+    DataType r_type = rhs.get_type();
     if (l_type == r_type)
         return true;
     bool l_is_numeric = l_type == type_Int || l_type == type_Bool || l_type == type_Float || l_type == type_Double ||
@@ -283,7 +283,7 @@ int Mixed::compare(const Mixed& b) const
             break;
     }
 
-    // Comparing types ass a fallback option makes it possible to make a sort of a list of Mixed
+    // Comparing types as a fallback option makes it possible to make a sort of a list of Mixed
     // This will also handle the case where null values are considered lower than all other values
     return (m_type > b.m_type) ? 1 : -1;
 }

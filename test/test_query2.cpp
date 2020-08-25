@@ -5375,9 +5375,25 @@ TEST(Query_Mixed)
 
     tv = table->where().begins_with(col_any, "String2").find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
+    tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
+    CHECK_EQUAL(tv.size(), 3);
+
+    tv = table->where().contains(col_any, "trin").find_all();
+    CHECK_EQUAL(tv.size(), 25);
+
+    tv = table->where().like(col_any, "Strin*").find_all();
+    CHECK_EQUAL(tv.size(), 25);
 
     tv = table->where().ends_with(col_any, "4").find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
+    tv = table->where().ends_with(col_any, BinaryData("4")).find_all(); // 4, 24, 44, 64, 84
+    CHECK_EQUAL(tv.size(), 5);
+
+    tv = table->where().equal(col_any, "String2Binary").find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, "string2binary", false).find_all();
+    CHECK_EQUAL(tv.size(), 1);
 
     tv = (table->column<Mixed>(col_any) == "String48").find_all();
     CHECK_EQUAL(tv.size(), 1);
