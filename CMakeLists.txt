@@ -245,11 +245,11 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE OR REALM_FORCE_OPENSSL)
     set(REALM_HAVE_OPENSSL "1")
 endif()
 
-if(APPLE)
+if(APPLE AND NOT REALM_FORCE_OPENSSL)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
