@@ -1647,6 +1647,11 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
+Dictionary Obj::get_dictionary(StringData col_name) const
+{
+    return get_dictionary(get_column_key(col_name));
+}
+
 void Obj::assign_pk_and_backlinks(const Obj& other)
 {
     REALM_ASSERT(get_table() == other.get_table());

@@ -242,6 +242,7 @@ public:
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     Dictionary get_dictionary(ColKey col_key) const;
+    Dictionary get_dictionary(StringData col_name) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
