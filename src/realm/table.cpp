@@ -846,6 +846,44 @@ void Table::migrate_column_info()
     }
 }
 
+bool Table::verify_column_keys()
+{
+    size_t nb_public_columns = m_spec.get_public_column_count();
+    size_t nb_columns = m_spec.get_column_count();
+    bool modified = false;
+
+    auto check = [&]() {
+        for (size_t spec_ndx = nb_public_columns; spec_ndx < nb_columns; spec_ndx++) {
+            if (m_spec.get_column_type(spec_ndx) == col_type_BackLink) {
+                auto col_key = m_spec.get_key(spec_ndx);
+                // This function checks for a specific error in the m_keys array where the
+                // backlink column keys are wrong. It can be detected by trying to find the
+                // corresponding origin table. If the error exists some of the results will
+                // give null TableKeys back.
+                if (!get_opposite_table_key(col_key))
+                    return false;
+                auto t = get_opposite_table(col_key);
+                auto c = get_opposite_column(col_key);
+                if (!t->valid_column(c))
+                    return false;
+                if (t->get_opposite_column(c) != col_key) {
+                    t->set_opposite_column(c, get_key(), col_key);
+                }
+            }
+        }
+        return true;
+    };
+
+    if (!check()) {
+        m_spec.fix_column_keys(get_key());
+        build_column_mapping();
+        refresh_index_accessors();
+        REALM_ASSERT_RELEASE(check());
+        modified = true;
+    }
+    return modified;
+}
+
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns

@@ -136,6 +136,7 @@ private:
     // Migration
     bool convert_column_attributes();
     bool convert_column_keys(TableKey table_key);
+    void fix_column_keys(TableKey table_key);
     bool has_subspec()
     {
         return m_oldsubspecs.is_attached();

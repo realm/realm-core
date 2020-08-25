@@ -1699,6 +1699,18 @@ TEST(Upgrade_progress)
     }
 }
 
+TEST(Upgrade_FixColumnKeys)
+{
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    // The "object" table in this file contains an m_keys array where the keys for the
+    // backlink columns are wrong.
+    auto fn = test_util::get_test_resource_path() + "test_upgrade_colkey_error.realm";
+    File::copy(fn, temp_copy);
+
+    auto hist = make_in_realm_history(temp_copy);
+    DB::create(*hist)->start_read()->verify();
+}
+
 /*
 TEST(Upgrade_bug)
 {
