@@ -442,8 +442,7 @@ void File::close() noexcept
 
     if (m_fd < 0)
         return;
-    if (m_pipe_fd >= 1) // only works for the shared lock. what about unlocking the exclusive lock?
-        unlock();
+    unlock();
     int r = ::close(m_fd);
     REALM_ASSERT_RELEASE(r == 0);
     m_fd = -1;
@@ -998,7 +997,8 @@ bool File::lock(bool exclusive, bool non_blocking)
         return false;
     throw std::system_error(err, std::system_category(), "LockFileEx() failed");
 
-#else // BSD / Linux flock()
+#else
+#ifdef FILELOCK_EMULATION
     // If we already have any form of lock, release it before trying to acquire a new
     if (m_has_exclusive_lock || m_has_shared_lock)
         unlock();
@@ -1059,6 +1059,8 @@ bool File::lock(bool exclusive, bool non_blocking)
         return true;
     }
 
+
+#else // BSD / Linux flock()
     // NOTE: It would probably have been more portable to use fcntl()
     // based POSIX locks, however these locks are not recursive within
     // a single process, and since a second attempt to acquire such a
@@ -1076,7 +1078,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     //
     // Fortunately, on both Linux and Darwin, flock() does not suffer
     // from this 'spurious unlocking issue'.
-/*
+
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
         operation |= LOCK_NB;
@@ -1088,7 +1090,8 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (err == EWOULDBLOCK)
         return false;
     throw std::system_error(err, std::system_category(), "flock() failed");
-*/
+
+#endif
 #endif
 }
 
@@ -1110,7 +1113,8 @@ void File::unlock() noexcept
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
 
-#else // BSD / Linux flock()
+#else
+#ifdef FILELOCK_EMULATION
 
     // Coming here with an exclusive lock, we must release that lock.
     // Coming here with a shared lock, we must close the pipe that we have opened for reading.
@@ -1134,17 +1138,15 @@ void File::unlock() noexcept
         _unlock(m_fd);
     }
 
-/*
+#else // BSD / Linux flock()
+
     // The Linux man page for flock() does not state explicitely that
     // unlocking is idempotent, however, we will assume it since there
     // is no mention of the error that would be reported if a
     // non-locked file were unlocked.
-    int r;
-    do {
-        r = flock(m_fd, LOCK_UN);
-    } while (r != 0 && errno == EINTR);
-    REALM_ASSERT_RELEASE_EX(r == 0 && "File::unlock()", r, errno);
-*/
+    _unlock(m_fd);
+
+#endif
 #endif
 }
 
