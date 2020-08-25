@@ -46,6 +46,7 @@ public:
 
     // Overriding members of CollectionBase:
     size_t size() const final;
+    DataType get_value_data_type() const;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
 

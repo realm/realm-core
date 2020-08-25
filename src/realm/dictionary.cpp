@@ -20,6 +20,7 @@
 #include <realm/dictionary_cluster_tree.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/group.hpp>
+#include <realm/replication.hpp>
 #include <algorithm>
 
 namespace realm {
@@ -67,6 +68,11 @@ size_t Dictionary::size() const
         return 0;
 
     return m_clusters->size();
+}
+
+DataType Dictionary::get_value_data_type() const
+{
+    return m_obj.get_table()->get_dictionary_value_type(m_col_key);
 }
 
 bool Dictionary::is_null(size_t ndx) const
@@ -231,7 +237,7 @@ Mixed Dictionary::get(Mixed key) const
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         return do_get(m_clusters->get(k));
     }
-    throw std::out_of_range("Key not found");
+    throw realm::KeyNotFound("Dictionary::get");
     return {};
 }
 
@@ -274,6 +280,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->dictionary_insert(*this, key, value);
+    }
+
     m_obj.bump_content_version();
     try {
         auto state = m_clusters->insert(k, key, value);
@@ -282,7 +292,6 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             CascadeState cascade_state;
             m_obj.replace_backlink(m_col_key, ObjLink(), new_link, cascade_state);
         }
-
         return {Iterator(this, state.index), true};
     }
     catch (const KeyAlreadyUsed&) {
@@ -349,6 +358,9 @@ void Dictionary::erase(Mixed key)
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         CascadeState state;
         m_clusters->erase(k, state);
+        if (Replication* repl = this->m_obj.get_replication()) {
+            repl->dictionary_erase(*this, key);
+        }
     }
 }
 
@@ -374,6 +386,12 @@ void Dictionary::nullify(Mixed key)
 void Dictionary::clear()
 {
     if (size() > 0) {
+        // TODO: Should we have a "dictionary_clear" instruction?
+        if (Replication* repl = this->m_obj.get_replication()) {
+            for (auto&& elem : *this) {
+                repl->dictionary_erase(*this, elem.first);
+            }
+        }
         // Just destroy the whole cluster
         m_clusters->destroy();
         delete m_clusters;

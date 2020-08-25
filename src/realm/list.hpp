@@ -65,6 +65,7 @@ public:
         return m_obj.get_listbase_ptr(m_col_key);
     }
     virtual void set_null(size_t ndx) = 0;
+    virtual void set_any(size_t ndx, Mixed val) = 0;
     virtual void insert_null(size_t ndx) = 0;
     virtual void insert_any(size_t ndx, Mixed val) = 0;
     virtual void resize(size_t new_size) = 0;
@@ -104,6 +105,7 @@ public:
 
     // Overriding members of LstBase:
     void set_null(size_t ndx) override;
+    void set_any(size_t ndx, Mixed val) override;
     void insert_null(size_t ndx) override;
     void insert_any(size_t ndx, Mixed val) override;
     void resize(size_t new_size) override;
@@ -370,6 +372,22 @@ template <class T>
 void Lst<T>::set_null(size_t ndx)
 {
     set(ndx, BPlusTree<T>::default_value(m_nullable));
+}
+
+template <class T>
+void Lst<T>::set_any(size_t ndx, Mixed val)
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        set(ndx, val);
+    }
+    else {
+        if (val.is_null()) {
+            set_null(ndx);
+        }
+        else {
+            set(ndx, val.get<typename util::RemoveOptional<T>::type>());
+        }
+    }
 }
 
 template <class T>

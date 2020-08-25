@@ -957,8 +957,12 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 
     if (type != col_type_Mixed)
         throw LogicError(LogicError::illegal_type);
-    if (value_is_null(value) && !attrs.test(col_attr_Nullable))
-        throw LogicError(LogicError::column_not_nullable);
+    if (value_is_null(value)) {
+        if (!attrs.test(col_attr_Nullable)) {
+            throw LogicError(LogicError::column_not_nullable);
+        }
+        return set_null(col_key, is_default);
+    }
 
     if (value.get_type() == type_TypedLink) {
         ObjLink new_link = value.template get<ObjLink>();
@@ -1000,7 +1004,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     return *this;
 }
 
-Obj& Obj::set(ColKey col_key, Mixed value)
+Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
 {
     if (value.is_null()) {
         REALM_ASSERT(col_key.get_attrs().test(col_attr_Nullable));
@@ -1012,41 +1016,44 @@ Obj& Obj::set(ColKey col_key, Mixed value)
         switch (col_key.get_type()) {
             case col_type_Int:
                 if (col_key.get_attrs().test(col_attr_Nullable)) {
-                    set(col_key, util::Optional<Int>(value.get_int()));
+                    set(col_key, util::Optional<Int>(value.get_int()), is_default);
                 }
                 else {
-                    set(col_key, value.get_int());
+                    set(col_key, value.get_int(), is_default);
                 }
                 break;
             case col_type_Bool:
-                set(col_key, value.get_bool());
+                set(col_key, value.get_bool(), is_default);
                 break;
             case col_type_Float:
-                set(col_key, value.get_float());
+                set(col_key, value.get_float(), is_default);
                 break;
             case col_type_Double:
-                set(col_key, value.get_double());
+                set(col_key, value.get_double(), is_default);
                 break;
             case col_type_String:
-                set(col_key, value.get_string());
+                set(col_key, value.get_string(), is_default);
                 break;
             case col_type_Binary:
-                set(col_key, value.get<Binary>());
+                set(col_key, value.get<Binary>(), is_default);
                 break;
             case col_type_Mixed:
-                set(col_key, value, false);
+                set(col_key, value, is_default);
                 break;
             case col_type_Timestamp:
-                set(col_key, value.get<Timestamp>());
+                set(col_key, value.get<Timestamp>(), is_default);
                 break;
             case col_type_ObjectId:
-                set(col_key, value.get<ObjectId>());
+                set(col_key, value.get<ObjectId>(), is_default);
                 break;
             case col_type_Decimal:
-                set(col_key, value.get<Decimal128>());
+                set(col_key, value.get<Decimal128>(), is_default);
                 break;
             case col_type_Link:
-                set(col_key, value.get<ObjKey>());
+                set(col_key, value.get<ObjKey>(), is_default);
+                break;
+            case col_type_TypedLink:
+                set(col_key, value.get<ObjLink>(), is_default);
                 break;
             default:
                 break;
@@ -1611,7 +1618,7 @@ void Obj::assign(const Obj& other)
                     break;
                 }
                 default:
-                    this->set(col, val);
+                    this->set_any(col, val);
                     break;
             }
         }
@@ -1657,7 +1664,7 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
     REALM_ASSERT(get_table() == other.get_table());
     if (auto col_pk = m_table->get_primary_key_column()) {
         Mixed val = other.get_any(col_pk);
-        this->set(col_pk, val);
+        this->set_any(col_pk, val);
     }
 
     auto copy_links = [this, &other](ColKey col) {

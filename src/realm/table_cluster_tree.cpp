@@ -36,6 +36,20 @@ TableClusterTree::TableClusterTree(Table* owner, Allocator& alloc, size_t top_po
 
 TableClusterTree::~TableClusterTree() {}
 
+Obj TableClusterTree::insert(ObjKey k, const FieldValues& values)
+{
+    auto state = ClusterTree::insert(k, values);
+
+    // Replicate setting of values
+    if (Replication* repl = m_owner->get_repl()) {
+        for (const auto& v : values) {
+            repl->set(m_owner, v.col_key, k, v.value, _impl::instr_Set);
+        }
+    }
+
+    return Obj(get_table_ref(), state.mem, k, state.index);
+}
+
 void TableClusterTree::clear(CascadeState& state)
 {
     m_owner->clear_indexes();
