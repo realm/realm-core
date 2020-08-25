@@ -106,6 +106,7 @@ public:
     U get(ColKey col_key) const;
 
     Mixed get_any(ColKey col_key) const;
+    Mixed get_primary_key() const;
 
     template <typename U>
     U get(StringData col_name) const
