@@ -1,0 +1,250 @@
+functions:
+  "fetch cmake binaries":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        script: |-
+          set -o errexit
+          set -o verbose
+
+          if [ "$OS" = "Windows_NT" ]; then
+            curl -L -o cmake_binaries.zip ${cmake_url}
+            unzip -q cmake_binaries.zip
+          else
+            mkdir cmake_binaries && cd cmake_binaries
+            curl -L ${cmake_url} | tar -xz --strip-components=1
+            cd ..
+          fi
+
+  "fetch source":
+    - command: git.get_project
+      params: {directory: realm-core}
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        script: |-
+          set -o errexit
+          git submodule update --init --recursive
+
+tasks:
+- name: compile
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [ -d cmake_vars ]; then
+            rm cmake_vars/*.txt
+        else
+            mkdir cmake_vars
+        fi
+
+        set_cmake_var() {
+            file=$1
+            var_name=$2
+            var_type=$3
+            shift; shift; shift;
+            var_arg=$@
+            echo "set($var_name $var_arg CACHE $var_type \"\")" >> cmake_vars/$file.txt
+        }
+        ensure_cmake_var_file() {
+            touch cmake_vars/$1.txt
+        }
+
+        ensure_cmake_var_file compiler_vars
+        if [ -n "${c_compiler}" ]; then
+            [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
+            set_cmake_var compiler_vars CMAKE_C_COMPILER PATH ${c_compiler}
+            set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH ${cxx_compiler}
+        fi
+
+        ensure_cmake_var_file zlib_vars
+        if [ "$OS" = "Windows_NT" ]; then
+            if [ -z "${cmake_generator}" ]; then
+              echo "Must specify cmake generator to build on Windows"
+              exit 1
+            fi
+
+            zlib_prefix=$(cygpath -aw "./zlib_prefix")
+            mkdir zlib_source
+            curl -L https://github.com/madler/zlib/archive/v1.2.11.tar.gz | tar -xz --strip-components=1 -C zlib_source
+            ${cmake_bindir}/cmake \
+              -B zlib_build \
+              -S zlib_source \
+              -G "${cmake_generator}" \
+              -C cmake_vars/compiler_vars.txt \
+              -DCMAKE_INSTALL_PREFIX="$zlib_prefix" \
+              ${extra_flags}
+            ${cmake_bindir}/cmake --build zlib_build --config Release
+            ${cmake_bindir}/cmake --install zlib_build
+
+            set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH $(cygpath -am zlib_prefix/include)
+            set_cmake_var zlib_vars ZLIB_LIBRARY PATH $(cygpath -am zlib_prefix/lib/zlibstatic.lib)
+
+            rm -rf zlib_build zlib_source
+        fi
+
+        ensure_cmake_var_file realm_vars
+        set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
+        set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
+        set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+
+        cat cmake_vars/*.txt | tee cmake_vars.txt
+        
+        mkdir build
+        ${cmake_bindir}/cmake \
+          -B build \
+          -C cmake_vars.txt ${extra_flags} \
+          -G "${cmake_generator|Unix Makefiles}"
+
+        ${cmake_bindir}/cmake --build build -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+- name: package
+  depends_on:
+  - "compile"
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        set -o errexit
+        cpack=$(realpath ${cmake_bindir}/cpack)
+
+        cd build
+        $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts"
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-core-artifacts-Unspecified.tar.gz'
+      bucket: mciuploads
+      permissions: public-read
+      local_file: 'realm-core/build/realm-core-artifacts-Unspecified.tar.gz'
+      content_type: '${content_type|application/x-gzip}'
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-core-artifacts-devel.tar.gz'
+      bucket: mciuploads
+      permissions: public-read
+      local_file: 'realm-core/build/realm-core-artifacts-devel.tar.gz'
+      content_type: '${content_type|application/x-gzip}'
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-core-artifacts-runtime.tar.gz'
+      bucket: mciuploads
+      permissions: public-read
+      local_file: 'realm-core/build/realm-core-artifacts-runtime.tar.gz'
+      content_type: '${content_type|application/x-gzip}'
+
+- name: test
+  depends_on:
+  - "compile"
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        set -o errexit
+        ctest=$(realpath ${cmake_bindir}/ctest)
+
+        cd build
+        $ctest -V
+
+- name: lint
+  commands:
+  - func: "fetch source"
+  - func: "fetch cmake binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        readonly out=$(git clang-format -v --diff)
+
+        if [[ "$out" == *"no modified files to format"* ]]; then exit 0; fi
+        if [[ "$out" == *"clang-format did not modify any files"* ]]; then exit 0; fi
+
+        echo "ERROR: you need to run git clang-format on your commit"
+        echo $out
+        exit 1
+
+task_groups:
+- name: compile_test_and_package
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch cmake binaries"
+  tasks:
+  - compile
+  - test
+  - package
+ 
+# NOTE: When adding a new variant, update the "upload-all" task.
+buildvariants:
+- name: ubuntu2004
+  display_name: "Ubuntu 20.04"
+  run_on: ubuntu2004-small
+  expansions:
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - ubuntu2004-large
+
+- name: rhel70
+  display_name: "RHEL 7"
+  run_on: rhel70-small
+  expansions:
+    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
+    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - rhel70-large
+
+- name: ubuntu2004-arm64
+  display_name: "Ubuntu 20.04 ARM64"
+  run_on: ubuntu2004-arm64-small
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/boxes.10gen.com/build/cmake/cmake-3.18.2-Linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries"
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - ubuntu2004-arm64-large
+
+- name: macos-1014
+  display_name: "MacOS 10.14"
+  run_on: macos-1014-test
+  expansions:
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Darwin-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - macos-1014
+
+- name: windows-64-vs2019
+  display_name: "Windows x86_64 VS 2019"
+  run_on: windows-64-vs2019-test 
+  expansions:
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-win64-x64.zip"
+    cmake_bindir: "./cmake-3.18.2-win64-x64/bin"
+    cmake_generator: "Visual Studio 16 2019"
+    extra_flags: "-A x64"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - windows-64-vs2019-large
+

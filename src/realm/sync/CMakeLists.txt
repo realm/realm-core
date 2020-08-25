@@ -223,11 +223,12 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 		  target_link_libraries(DumpCommand Sync Storage)
 
-    add_executable(StatCommand stat_command.cpp)
-    set_target_properties(StatCommand PROPERTIES
-                          OUTPUT_NAME "realm-stat"
-                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-    target_link_libraries(StatCommand Sync Storage)
+    # FIXME: RCORE-331 stat command currently fails to build
+    # add_executable(StatCommand stat_command.cpp)
+    # set_target_properties(StatCommand PROPERTIES
+    #                       OUTPUT_NAME "realm-stat"
+    #                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+    # target_link_libraries(StatCommand Sync Storage)
 
     # FIXME: Port realm-hist to new instruction format
     # add_executable(HistCommand sync/hist_command.cpp)
@@ -266,7 +267,7 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
             VacuumCommand
             EncryptionTransformer
             DumpCommand
-            StatCommand
+            # StatCommand
             # HistCommand
             VerifyServerFileCommand
             ServerIndexCommand
