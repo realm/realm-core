@@ -432,6 +432,13 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 {
     TrivialReplication::set(table, col, key, value, variant);
 
+    if (col == table->get_primary_key_column()) {
+        // Core emits Set instructions for PK values, but we don't want to record those.
+        return;
+    }
+
+    REALM_ASSERT(!key.is_unresolved());
+
     if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
         // If link is unresolved, it should not be communicated.
         return;
