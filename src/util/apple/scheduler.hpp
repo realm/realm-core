@@ -110,7 +110,7 @@ bool RunLoopScheduler::is_on_thread() const noexcept
 
 bool RunLoopScheduler::is_same_as(const Scheduler* other) const noexcept
 {
-    const RunLoopScheduler* o = dynamic_cast<const RunLoopScheduler*>(other);
+    auto o = dynamic_cast<const RunLoopScheduler*>(other);
     return (o && (o->m_runloop == m_runloop));
 }
 
@@ -193,7 +193,7 @@ bool DispatchQueueScheduler::is_on_thread() const noexcept
 
 bool DispatchQueueScheduler::is_same_as(const Scheduler* other) const noexcept
 {
-    const DispatchQueueScheduler* o = dynamic_cast<const DispatchQueueScheduler*>(other);
+    auto o = dynamic_cast<const DispatchQueueScheduler*>(other);
     return (o && (o->m_queue == m_queue));
 }
 

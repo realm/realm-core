@@ -41,7 +41,7 @@ public:
     bool is_on_thread() const noexcept override { return m_id == std::this_thread::get_id(); }
     bool is_same_as(const Scheduler* other) const noexcept override
     {
-        const UvMainLoopScheduler* o = dynamic_cast<const UvMainLoopScheduler*>(other);
+        auto o = dynamic_cast<const UvMainLoopScheduler*>(other);
         return (o && (o->m_id == m_id));
     }
     bool can_deliver_notifications() const noexcept override { return true; }

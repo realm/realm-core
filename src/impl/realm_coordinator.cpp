@@ -202,21 +202,24 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config)
+std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler)
 {
     if (!config.cache)
         return nullptr;
     util::CheckedUniqueLock lock(m_realm_mutex);
-    return do_get_cached_realm(config);
+    return do_get_cached_realm(config, scheduler);
 }
 
-std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const& config)
+std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler)
 {
     if (!config.cache)
         return nullptr;
 
+    if (!scheduler) {
+        scheduler = config.scheduler;
+    }
     for (auto& cached_realm : m_weak_realm_notifiers) {
-        if (config.scheduler && !cached_realm.is_cached_for_scheduler(config.scheduler))
+        if (scheduler && !cached_realm.is_cached_for_scheduler(scheduler))
             continue;
         // can be null if we jumped in between ref count hitting zero and
         // unregister_realm() getting the lock
@@ -258,9 +261,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
 std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler)
 {
     std::shared_ptr<Realm> realm;
+    util::CheckedUniqueLock lock(m_realm_mutex);
     auto config = m_config;
     config.scheduler = scheduler ? scheduler : util::Scheduler::make_default();
-    util::CheckedUniqueLock lock(m_realm_mutex);
     if ((realm = do_get_cached_realm(config))) {
         return realm;
     }

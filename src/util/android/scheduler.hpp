@@ -117,7 +117,7 @@ public:
     }
     bool is_same_as(const Scheduler* other) const noexcept override
     {
-        const ALooperScheduler* o = dynamic_cast<const ALooperScheduler*>(other);
+        auto o = dynamic_cast<const ALooperScheduler*>(other);
         return (o && (o->m_thread == m_thread));
     }
 
