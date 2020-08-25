@@ -20,7 +20,6 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
-#include <mutex>
 
 #include <cerrno>
 #include <cstring>
@@ -39,7 +38,6 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/file.h> // BSD / Linux flock()
-#include <signal.h> // well...we'll be incompatible with any use that relies on handling SIGPIPE. don't do this at home
 #endif
 
 #include <realm/exceptions.hpp>
@@ -970,8 +968,6 @@ void _unlock(int m_fd)
 }
 #endif
 
-std::once_flag flag;
-
 bool File::lock(bool exclusive, bool non_blocking)
 {
     REALM_ASSERT_RELEASE(is_attached());
@@ -1006,8 +1002,6 @@ bool File::lock(bool exclusive, bool non_blocking)
     // If we already have any form of lock, release it before trying to acquire a new
     if (m_has_exclusive_lock || m_has_shared_lock)
         unlock();
-    // thread safe call-once:
-    std::call_once(flag, []() { signal(SIGPIPE, SIG_IGN); });
     // First obtain an exclusive lock on the file proper
     int operation = LOCK_EX;
     if (non_blocking)
@@ -1035,28 +1029,22 @@ bool File::lock(bool exclusive, bool non_blocking)
     status = mkfifo(m_fifo_path.c_str(), 0666);
     REALM_ASSERT(status == 0 || (status == -1 && errno == EEXIST));
     if (exclusive) {
-        // check if any shared locks are already taken by trying to write to the pipe
-        bool available_for_writing = false;
+        // check if any shared locks are already taken by trying to open the pipe for writing
+        // shared locks are indicated by one or more readers already having opened the pipe
         int fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
         if (fd == -1 && errno != ENXIO)
             throw std::system_error(errno, std::system_category(), "opening fifo for writing failed");
-        if (fd != -1) {
-            ssize_t num_written;
-            num_written = ::write(fd, " ", 1);
-            ::close(fd);
-            if (num_written == 1)
-                available_for_writing = true;
-            if (num_written == -1 && errno == EAGAIN)
-                available_for_writing = true;
+        if (fd == -1) {
+            // No reader was present so we have the exclusive lock!
+            m_has_exclusive_lock = true;
+            return true;
         }
-        if (available_for_writing) {
+        else {
+            ::close(fd);
             // shared locks exist. Back out. Release exclusive lock on file
             _unlock(m_fd);
             return false;
         }
-        // we have the exclusive lock!
-        m_has_exclusive_lock = true;
-        return true;
     }
     else {
         // lock shared. We need to release the real exclusive lock on the file,
