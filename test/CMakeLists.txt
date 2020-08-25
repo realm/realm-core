@@ -299,9 +299,20 @@ if(REALM_ENABLE_SYNC)
 	add_library(TestUtils STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
 	target_link_libraries(TestUtils PUBLIC Storage)
 
+<<<<<<< HEAD
 	if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
 	    find_package(ProcPS REQUIRED)
 	    target_link_libraries(TestUtils PUBLIC rt PROCPS::PROCPS)
+=======
+	if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
+	    include(Findprocps)
+            if(${PROCPS_FOUND})
+                target_link_libraries(TestUtils rt ${PROCPS_LIBRARY})
+                target_include_directories(TestUtils PRIVATE ${PROCPS_INCLUDE_DIR})
+            else()
+                target_link_libraries(TestUtils rt)
+            endif()
+>>>>>>> RCORE-344 Add initial evergreen config
 	endif()
 
 	if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
