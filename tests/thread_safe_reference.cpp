@@ -72,6 +72,7 @@ TEST_CASE("thread safe reference") {
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.cache = false;
     SharedRealm r = Realm::get_shared_realm(config);
     r->update_schema(schema);
 

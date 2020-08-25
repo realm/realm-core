@@ -293,6 +293,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     using Boxed = typename TestType::Boxed;
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {

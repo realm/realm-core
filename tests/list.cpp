@@ -41,6 +41,7 @@ using namespace realm;
 
 TEST_CASE("list") {
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({

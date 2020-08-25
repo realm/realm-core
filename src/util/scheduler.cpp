@@ -36,6 +36,7 @@ public:
     void notify() override {}
     void set_notify_callback(std::function<void()>) override {}
     bool is_on_thread() const noexcept override { return true; }
+    bool is_same_as(const Scheduler* other) const noexcept override { return dynamic_cast<const FrozenScheduler*>(other); }
     bool can_deliver_notifications() const noexcept override { return false; }
 };
 } // anonymous namespace

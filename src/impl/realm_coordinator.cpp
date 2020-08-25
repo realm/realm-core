@@ -195,9 +195,47 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
         }
 #endif
+        // Mixing cached and uncached Realms is allowed
+        m_config.cache = config.cache;
 
         // Realm::update_schema() handles complaining about schema mismatches
     }
+}
+
+std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config)
+{
+    if (!config.cache)
+        return nullptr;
+    util::CheckedUniqueLock lock(m_realm_mutex);
+    return do_get_cached_realm(config);
+}
+
+std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const& config)
+{
+    if (!config.cache)
+        return nullptr;
+
+    for (auto& cached_realm : m_weak_realm_notifiers) {
+        if (config.scheduler && !cached_realm.is_cached_for_scheduler(config.scheduler))
+            continue;
+        // can be null if we jumped in between ref count hitting zero and
+        // unregister_realm() getting the lock
+        if (auto realm = cached_realm.realm()) {
+            // If the file is uninitialized and was opened without a schema,
+            // do the normal schema init
+            if (realm->schema_version() == ObjectStore::NotVersioned)
+                break;
+
+            // Otherwise if we have a realm schema it needs to be an exact
+            // match (even having the same properties but in different
+            // orders isn't good enough)
+            if (config.schema && realm->schema() != *config.schema)
+                throw MismatchedConfigException("Realm at path '%1' already opened on current thread with different schema.", config.path);
+
+            return realm;
+        }
+    }
+    return nullptr;
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
@@ -210,6 +248,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
     set_config(config);
+    if ((realm = do_get_cached_realm(config))) {
+        return realm;
+    }
     do_get_realm(std::move(config), realm, version, lock);
     return realm;
 }
@@ -217,9 +258,12 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
 std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler)
 {
     std::shared_ptr<Realm> realm;
-    util::CheckedUniqueLock lock(m_realm_mutex);
     auto config = m_config;
     config.scheduler = scheduler ? scheduler : util::Scheduler::make_default();
+    util::CheckedUniqueLock lock(m_realm_mutex);
+    if ((realm = do_get_cached_realm(config))) {
+        return realm;
+    }
     do_get_realm(std::move(config), realm, none, lock);
     return realm;
 }
@@ -254,7 +298,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
                                      get_path(), ex.code().message(), "");
         }
     }
-    m_weak_realm_notifiers.emplace_back(realm);
+    m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
     if (realm->config().sync_config)
         create_sync_session(false);

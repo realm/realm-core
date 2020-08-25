@@ -158,8 +158,11 @@ SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<uti
         scheduler = util::Scheduler::make_default();
     SharedRealm realm = ref.resolve<std::shared_ptr<Realm>>(nullptr);
     REALM_ASSERT(realm);
-    auto& config = realm->config();
+    auto config = realm->config();
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    config.scheduler = scheduler;
+    if (auto realm = coordinator->get_cached_realm(config))
+        return realm;
     realm->m_scheduler = scheduler;
     coordinator->bind_to_context(*realm);
     return realm;
