@@ -1,14 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 10.0.0-beta.5 Release notes
 
 ### Fixed
 * Issues fixed by releases v6.0.14 to v6.0.21
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
