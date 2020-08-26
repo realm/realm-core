@@ -54,6 +54,10 @@ namespace std {
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
+#if REALM_IOS
+#define REALM_FILELOCK_EMULATION
+#endif
+
 
 namespace realm {
 namespace util {
@@ -369,6 +373,10 @@ public:
     /// Get the encryption key set by set_encryption_key(),
     /// null_ptr if no key set.
     const char* get_encryption_key() const;
+
+    /// Set the path used for emulating file locks. If not set explicitly,
+    /// the emulation will use the path of the file itself suffixed by ".fifo"
+    void set_fifo_path(const std::string& fifo_path);
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
@@ -604,6 +612,12 @@ private:
     bool m_have_lock; // Only valid when m_fd is not null
 #else
     int m_fd;
+#ifdef REALM_FILELOCK_EMULATION
+    int m_pipe_fd; // -1 if no pipe has been allocated for emulation
+    bool m_has_exclusive_lock = false;
+    bool m_has_shared_lock = false;
+    std::string m_fifo_path;
+#endif
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
     std::string m_path;
@@ -978,6 +992,9 @@ inline File::File(const std::string& path, Mode m)
     m_fd = nullptr;
 #else
     m_fd = -1;
+#ifdef REALM_FILELOCK_EMULATION
+    m_pipe_fd = -1;
+#endif
 #endif
 
     open(path, m);
@@ -989,12 +1006,24 @@ inline File::File() noexcept
     m_fd = nullptr;
 #else
     m_fd = -1;
+#ifdef REALM_FILELOCK_EMULATION
+    m_pipe_fd = -1;
+#endif
 #endif
 }
 
 inline File::~File() noexcept
 {
     close();
+}
+
+inline void File::set_fifo_path(const std::string& fifo_path)
+{
+#ifdef REALM_FILELOCK_EMULATION
+    m_fifo_path = fifo_path;
+#else
+    static_cast<void>(fifo_path);
+#endif
 }
 
 inline File::File(File&& f) noexcept
@@ -1005,6 +1034,14 @@ inline File::File(File&& f) noexcept
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
+#ifdef REALM_FILELOCK_EMULATION
+    m_pipe_fd = f.m_pipe_fd;
+    m_has_exclusive_lock = f.m_has_exclusive_lock;
+    m_has_shared_lock = f.m_has_shared_lock;
+    f.m_has_exclusive_lock = false;
+    f.m_has_shared_lock = false;
+    f.m_pipe_fd = -1;
+#endif
     f.m_fd = -1;
 #endif
     m_encryption_key = std::move(f.m_encryption_key);
@@ -1020,6 +1057,14 @@ inline File& File::operator=(File&& f) noexcept
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
+#ifdef REALM_FILELOCK_EMULATION
+    m_pipe_fd = f.m_pipe_fd;
+    f.m_pipe_fd = -1;
+    m_has_exclusive_lock = f.m_has_exclusive_lock;
+    m_has_shared_lock = f.m_has_shared_lock;
+    f.m_has_exclusive_lock = false;
+    f.m_has_shared_lock = false;
+#endif
 #endif
     m_encryption_key = std::move(f.m_encryption_key);
     return *this;

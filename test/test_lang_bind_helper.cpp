@@ -5869,6 +5869,8 @@ TEST(LangBindHelper_callWithLock)
 
     // call_with_lock should run the callback if the lock file doesn't exist.
     CHECK_NOT(File::exists(path.get_lock_path()));
+    // make sure the management dir exists...
+    try_make_dir(std::string(path) + ".management");
     CHECK(DB::call_with_lock(path, callback));
     CHECK(File::exists(path.get_lock_path()));
 
