@@ -1,20 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.20 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * If an attempt to upgrade a realm has ended with a crash with "migrate_links" in the call stack, the realm ended in a corrupt state where further upgrade was not possible. A remedy for this situation is now provided. 
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.0.19 Release notes
