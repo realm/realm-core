@@ -998,7 +998,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     throw std::system_error(err, std::system_category(), "LockFileEx() failed");
 
 #else
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     // If we already have any form of lock, release it before trying to acquire a new
     if (m_has_exclusive_lock || m_has_shared_lock)
         unlock();
@@ -1027,13 +1027,16 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (m_fifo_path.empty())
         m_fifo_path = m_path + ".fifo";
     status = mkfifo(m_fifo_path.c_str(), 0666);
-    REALM_ASSERT(status == 0 || (status == -1 && errno == EEXIST));
+    REALM_ASSERT_EX(status == 0 || (status == -1 && errno == EEXIST), status, errno);
     if (exclusive) {
         // check if any shared locks are already taken by trying to open the pipe for writing
         // shared locks are indicated by one or more readers already having opened the pipe
-        int fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+        int fd;
+        do {
+            fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+        } while (fd == -1 && errno == EINTR);
         if (fd == -1 && errno != ENXIO)
-            throw std::system_error(errno, std::system_category(), "opening fifo for writing failed");
+            throw std::system_error(errno, std::system_category(), "opening lock fifo for writing failed");
         if (fd == -1) {
             // No reader was present so we have the exclusive lock!
             m_has_exclusive_lock = true;
@@ -1052,7 +1055,7 @@ bool File::lock(bool exclusive, bool non_blocking)
         // Open pipe for reading!
         int fd = ::open(m_fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
         if (fd == -1)
-            throw std::system_error(errno, std::system_category(), "opening fifo for reading failed");
+            throw std::system_error(errno, std::system_category(), "opening lock fifo for reading failed");
         m_pipe_fd = fd;
         m_has_shared_lock = true;
         _unlock(m_fd);
@@ -1114,7 +1117,7 @@ void File::unlock() noexcept
     m_have_lock = false;
 
 #else
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
 
     // Coming here with an exclusive lock, we must release that lock.
     // Coming here with a shared lock, we must close the pipe that we have opened for reading.

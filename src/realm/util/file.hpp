@@ -55,7 +55,7 @@ namespace std {
 #include <realm/util/safe_int_ops.hpp>
 
 #if REALM_IOS
-#define FILELOCK_EMULATION
+#define REALM_FILELOCK_EMULATION
 #endif
 
 
@@ -612,7 +612,7 @@ private:
     bool m_have_lock; // Only valid when m_fd is not null
 #else
     int m_fd;
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     int m_pipe_fd; // -1 if no pipe has been allocated for emulation
     bool m_has_exclusive_lock = false;
     bool m_has_shared_lock = false;
@@ -992,7 +992,7 @@ inline File::File(const std::string& path, Mode m)
     m_fd = nullptr;
 #else
     m_fd = -1;
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = -1;
 #endif
 #endif
@@ -1006,7 +1006,7 @@ inline File::File() noexcept
     m_fd = nullptr;
 #else
     m_fd = -1;
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = -1;
 #endif
 #endif
@@ -1019,7 +1019,7 @@ inline File::~File() noexcept
 
 inline void File::set_fifo_path(const std::string& fifo_path)
 {
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     m_fifo_path = fifo_path;
 #else
     static_cast<void>(fifo_path);
@@ -1034,7 +1034,7 @@ inline File::File(File&& f) noexcept
     f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     m_has_exclusive_lock = f.m_has_exclusive_lock;
     m_has_shared_lock = f.m_has_shared_lock;
@@ -1057,7 +1057,7 @@ inline File& File::operator=(File&& f) noexcept
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
-#ifdef FILELOCK_EMULATION
+#ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     f.m_pipe_fd = -1;
     m_has_exclusive_lock = f.m_has_exclusive_lock;
