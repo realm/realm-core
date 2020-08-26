@@ -296,6 +296,25 @@ bool Spec::convert_column_keys(TableKey table_key)
     return changes;
 }
 
+void Spec::fix_column_keys(TableKey table_key)
+{
+    if (get_column_name(m_num_public_columns - 1) == "!ROW_INDEX") {
+        unsigned idx = unsigned(m_types.size()) - 1;
+        size_t ndx = m_num_public_columns - 1;
+        // Fixing "!ROW_INDEX" column
+        {
+            ColKey col_key(ColKey::Idx{idx}, col_type_Int, ColumnAttrMask(), table_key.value);
+            m_keys.set(ndx, col_key.value);
+        }
+        // Fix backlink columns
+        idx = unsigned(m_num_public_columns) - 1;
+        for (ndx = m_num_public_columns; ndx < m_types.size(); ndx++, idx++) {
+            ColKey col_key(ColKey::Idx{idx}, col_type_BackLink, ColumnAttrMask(), table_key.value);
+            m_keys.set(ndx, col_key.value);
+        }
+    }
+}
+
 void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, StringData name, int attr)
 {
     REALM_ASSERT(column_ndx <= m_types.size());

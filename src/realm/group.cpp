@@ -465,6 +465,16 @@ void Transaction::upgrade_file_format(int target_file_format_version)
             col_links = progress_info->get_column_key("links_migrated");
         }
 
+        bool updates = false;
+        for (auto k : table_accessors) {
+            if (k->verify_column_keys()) {
+                updates = true;
+            }
+        }
+        if (updates) {
+            commit_and_continue_writing();
+        }
+
         // Migrate objects
         for (auto k : table_accessors) {
             auto progress_status = progress_info->create_object_with_primary_key(k->get_name());
