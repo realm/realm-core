@@ -626,6 +626,7 @@ private:
 
     // Migration support
     void migrate_column_info();
+    bool verify_column_keys();
     void migrate_indexes(ColKey pk_col_key);
     void migrate_subspec();
     void create_columns();

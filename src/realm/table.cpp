@@ -893,6 +893,44 @@ void Table::migrate_column_info()
     }
 }
 
+bool Table::verify_column_keys()
+{
+    size_t nb_public_columns = m_spec.get_public_column_count();
+    size_t nb_columns = m_spec.get_column_count();
+    bool modified = false;
+
+    auto check = [&]() {
+        for (size_t spec_ndx = nb_public_columns; spec_ndx < nb_columns; spec_ndx++) {
+            if (m_spec.get_column_type(spec_ndx) == col_type_BackLink) {
+                auto col_key = m_spec.get_key(spec_ndx);
+                // This function checks for a specific error in the m_keys array where the
+                // backlink column keys are wrong. It can be detected by trying to find the
+                // corresponding origin table. If the error exists some of the results will
+                // give null TableKeys back.
+                if (!get_opposite_table_key(col_key))
+                    return false;
+                auto t = get_opposite_table(col_key);
+                auto c = get_opposite_column(col_key);
+                if (!t->valid_column(c))
+                    return false;
+                if (t->get_opposite_column(c) != col_key) {
+                    t->set_opposite_column(c, get_key(), col_key);
+                }
+            }
+        }
+        return true;
+    };
+
+    if (!check()) {
+        m_spec.fix_column_keys(get_key());
+        build_column_mapping();
+        refresh_index_accessors();
+        REALM_ASSERT_RELEASE(check());
+        modified = true;
+    }
+    return modified;
+}
+
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns
@@ -982,10 +1020,6 @@ void Table::migrate_subspec()
             if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
                 m_opposite_column.set(col_ndx, origin_col_key.value);
             }
-            if (auto ref = to_ref(col_refs.get(col_ndx))) {
-                Array::destroy_deep(ref, m_alloc);
-                col_refs.set(col_ndx, 0);
-            }
         }
     };
     m_spec.destroy_subspec();
@@ -995,10 +1029,11 @@ namespace {
 
 class LegacyStringColumn : public BPlusTree<StringData> {
 public:
-    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx)
+    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx, bool nullable)
         : BPlusTree(alloc)
         , m_spec(spec)
         , m_col_ndx(col_ndx)
+        , m_nullable(nullable)
     {
     }
 
@@ -1006,6 +1041,7 @@ public:
     {
         auto leaf = std::make_unique<LeafNode>(this);
         leaf->ArrayString::set_spec(m_spec, m_col_ndx);
+        leaf->set_nullability(m_nullable);
         leaf->init_from_ref(ref);
         return leaf;
     }
@@ -1032,6 +1068,7 @@ public:
 private:
     Spec* m_spec;
     size_t m_col_ndx;
+    bool m_nullable;
 };
 
 // We need an accessor that can read old Timestamp columns.
@@ -1151,9 +1188,10 @@ void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& 
 {
     if (sub_table_ref) {
         // Actual list is in the columns array position 0
+        bool nullable = col.get_attrs().test(col_attr_Nullable);
         Array cols(alloc);
         cols.init_from_ref(sub_table_ref);
-        LegacyStringColumn from_list(alloc, nullptr, 0); // List of strings cannot be enumerated
+        LegacyStringColumn from_list(alloc, nullptr, 0, nullable); // List of strings cannot be enumerated
         from_list.set_parent(&cols, 0);
         from_list.init_from_parent();
         size_t list_size = from_list.size();
@@ -1203,7 +1241,8 @@ void Table::create_columns()
 
 bool Table::migrate_objects(ColKey pk_col_key)
 {
-    size_t nb_columns = m_spec.get_public_column_count();
+    size_t nb_public_columns = m_spec.get_public_column_count();
+    size_t nb_columns = m_spec.get_column_count();
     if (!nb_columns) {
         // No columns - this means no objects
         return true;
@@ -1217,10 +1256,6 @@ bool Table::migrate_objects(ColKey pk_col_key)
     Array col_refs(m_alloc);
     col_refs.set_parent(&m_top, top_position_for_columns);
     col_refs.init_from_ref(top_ref);
-
-    if (m_spec.get_column_name(nb_columns - 1) == "!ROW_INDEX") {
-        nb_columns--;
-    }
 
     /************************ Create column accessors ************************/
 
@@ -1242,9 +1277,15 @@ bool Table::migrate_objects(ColKey pk_col_key)
     };
 
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        if (col_ndx < nb_public_columns && m_spec.get_column_name(col_ndx) == "!ROW_INDEX") {
+            // If this column has been added, we can break here
+            break;
+        }
+
         ColKey col_key = m_spec.get_key(col_ndx);
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
         ColumnType col_type = m_spec.get_column_type(col_ndx);
+        bool nullable = attr.test(col_attr_Nullable);
         std::unique_ptr<BPlusTreeBase> acc;
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
@@ -1265,7 +1306,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
             switch (col_type) {
                 case col_type_Int:
                 case col_type_Bool:
-                    if (attr.test(col_attr_Nullable)) {
+                    if (nullable) {
                         acc = std::make_unique<BPlusTree<util::Optional<Int>>>(m_alloc);
                     }
                     else {
@@ -1279,7 +1320,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
                     acc = std::make_unique<BPlusTree<double>>(m_alloc);
                     break;
                 case col_type_String:
-                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx);
+                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx, nullable);
                     break;
                 case col_type_Binary:
                     acc = std::make_unique<BPlusTree<Binary>>(m_alloc);
@@ -1295,6 +1336,14 @@ bool Table::migrate_objects(ColKey pk_col_key)
                     arr.init_from_parent();
                     update_size(arr.size());
                     has_link_columns = true;
+                    break;
+                }
+                case col_type_BackLink: {
+                    BPlusTree<int64_t> arr(m_alloc);
+                    arr.set_parent(&col_refs, col_ndx);
+                    arr.init_from_parent();
+                    update_size(arr.size());
+                    cols_to_destroy.push_back(col_ndx);
                     break;
                 }
                 default:
@@ -1337,7 +1386,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
     ColKey oid_col;
     BPlusTree<Int>* oid_column = nullptr;
     std::unique_ptr<BPlusTreeBase> oid_column_store;
-    if (m_spec.get_column_name(0) == "!OID") {
+    if (nb_public_columns > 0 && m_spec.get_column_name(0) == "!OID") {
         // The !OID column should not be migrated, but we need an accessor
         // to the old column
         oid_col = m_spec.get_key(0);
@@ -1445,9 +1494,9 @@ bool Table::migrate_objects(ColKey pk_col_key)
 
     // Destroy values in the old columns that has been copied.
     // This frees up space in the file
-    for (auto col_ndx : cols_to_destroy) {
-        Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-        col_refs.set(col_ndx, 0);
+    for (auto ndx : cols_to_destroy) {
+        Array::destroy_deep(to_ref(col_refs.get(ndx)), m_alloc);
+        col_refs.set(ndx, 0);
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
