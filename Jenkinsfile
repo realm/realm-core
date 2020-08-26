@@ -26,7 +26,7 @@ def publishCoverageReport(String label) {
     $class: 'CoberturaPublisher',
     autoUpdateHealth: false,
     autoUpdateStability: false,
-    coberturaReportFile: "coverage-${label}.xml",
+    coberturaReportFile: "build/coverage.xml",
     failNoReports: true,
     failUnhealthy: false,
     failUnstable: false,
@@ -134,7 +134,7 @@ def doAndroidDockerBuild() {
   }
 }
 
-def doBuild(String nodeSpec, String flavor, Boolean enableSync, String sanitizerFlags = "") {
+def doBuild(String nodeSpec, String flavor, Boolean enableSync, String additionalFlags = "") {
   def sync = enableSync ? "sync" : "false"
   def label = "${flavor}${enableSync ? '-sync' : ''}"
   def buildDir = "build"
@@ -142,12 +142,19 @@ def doBuild(String nodeSpec, String flavor, Boolean enableSync, String sanitizer
   if (enableSync) {
     cmakeFlags += "-DREALM_ENABLE_SYNC=1 "
   }
-  cmakeFlags += sanitizerFlags;
+  cmakeFlags += additionalFlags;
 
   return {
     nodeWithSources(nodeSpec) {
       sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags} && cmake --build ${buildDir}"
-      sh "${buildDir}/tests/tests ${testArguments}"
+      if (additionalFlags.contains('Coverage')) {
+        sh "cd ${buildDir} && ninja -v generate-coverage-cobertura"
+        echo "Stashing coverage-${label}"
+        stash includes: "${buildDir}/coverage.xml", name: "coverage-${label}"
+      }
+      else {
+        sh "${buildDir}/tests/tests ${testArguments}"
+      }
     }
   }
 }
@@ -208,7 +215,7 @@ jobWrapper { // sets the max build time to 2 hours
       // macos_tsan: doBuild('osx', 'macOS', true, '-DSANITIZE_THREAD=1'),
       android: doAndroidDockerBuild(),
       macos: doBuild('osx', 'macOS', false),
-      macos_sync: doBuild('osx', 'macOS', true),
+      macos_sync: doBuild('osx', 'macOS', true, '-DCMAKE_BUILD_TYPE=Coverage'),
       win32: doWindowsBuild(),
       windows_universal: doWindowsUniversalBuild()
     )
