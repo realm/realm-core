@@ -123,30 +123,32 @@ if (MSVC)
     set_source_files_properties(test_query.cpp test_query_big.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
-add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
-set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
-
-if(CMAKE_GENERATOR STREQUAL Xcode)
-    set_target_properties(CoreTests PROPERTIES
-                          MACOSX_BUNDLE YES
-                          RESOURCE "${REQUIRED_TEST_FILES}")
-endif()
-
-target_link_libraries(CoreTests
-                      TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
-)
-
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
      "*.json"
      "*.realm"
      "expect_string.txt")
 
-add_custom_command(
-	TARGET CoreTests POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${REQUIRED_TEST_FILES}
-    $<TARGET_FILE_DIR:CoreTests>)
+add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
+set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
+
+# Resources required for running the tests copied to the target directory
+if(CMAKE_GENERATOR STREQUAL Xcode)
+    # a simple copy doesn't work for an Xcode build because Xcode also needs to sign them
+    set_target_properties(CoreTests PROPERTIES
+                          MACOSX_BUNDLE YES
+                          RESOURCE "${REQUIRED_TEST_FILES}")
+else()
+	add_custom_command(
+		TARGET CoreTests POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		${REQUIRED_TEST_FILES}
+		$<TARGET_FILE_DIR:CoreTests>)
+endif()
+
+target_link_libraries(CoreTests
+                      TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+)
 
 if(WINDOWS_STORE)
     set_target_properties(CoreTests PROPERTIES
