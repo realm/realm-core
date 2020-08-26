@@ -4,7 +4,7 @@
 * None.
 
 ### Fixed
-* Issues fixed by releases v6.0.14 to v6.0.20
+* Issues fixed by releases v6.0.14 to v6.0.21
  
 ### Breaking changes
 * None.
@@ -269,6 +269,13 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+
+# 6.0.21 Release notes
+
+### Fixed
+* Holding a shared lock while being suspended on iOS would cause the app to be terminated. (https://github.com/realm/realm-cocoa/issues/6671)
+ 
+----------------------------------------------
 
 # 6.0.20 Release notes
 

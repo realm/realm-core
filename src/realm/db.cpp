@@ -801,6 +801,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
+        m_file.set_fifo_path(m_coordination_dir + "/lock.fifo");
 
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
@@ -2313,7 +2314,7 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
-
+    lockfile.set_fifo_path(realm_path + ".management/lock.fifo");
     if (lockfile.try_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;
