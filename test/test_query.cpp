@@ -3784,6 +3784,34 @@ TEST(Query_FindWithDescriptorOrdering)
         }
     }
     {
+        // applying sort and sort with prepend
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {true}), SortDescriptor::MergeMode::prepend);
+        ordering.append_sort(SortDescriptor({{t1_int_col}}, {true}), SortDescriptor::MergeMode::prepend);
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k0}, {1, k1}, {1, k2}, {2, k4}, {2, k5}, {2, k3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    {
+        // applying sort and sort with append
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {true}), SortDescriptor::MergeMode::append);
+        ordering.append_sort(SortDescriptor({{t1_int_col}}, {true}), SortDescriptor::MergeMode::append);
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k0}, {1, k1}, {2, k4}, {2, k5}, {1, k2}, {2, k3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    {
         // applying sort and limit
         DescriptorOrdering ordering;
         ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
