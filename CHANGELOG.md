@@ -19,6 +19,22 @@
 
 ----------------------------------------------
 
+# 6.0.20 Release notes
+
+### Fixed
+* If an attempt to upgrade a realm has ended with a crash with "migrate_links" in the call stack, the realm ended in a corrupt state where further upgrade was not possible. A remedy for this situation is now provided. 
+ 
+----------------------------------------------
+
+# 6.0.19 Release notes
+
+### Fixed
+* Upgrading a table with only backlink columns could crash (No issue created)
+* If you upgrade a file where you have "" elements in a list of non-nullable strings, the program would crash ([#3836](https://github.com/realm/realm-core/issues/3836), since v6.0.0)
+* None.
+ 
+----------------------------------------------
+
 # 6.0.18 Release notes
 
 ### Fixed
