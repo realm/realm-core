@@ -12,7 +12,7 @@
 -----------
 
 ### Internals
-* None.
+* When creating objects without primary keys, it is now checked that the generated ObjKey does not collide with an already existing object. This was a problem in some migration scenarios in ObjectStore.
 
 ----------------------------------------------
 

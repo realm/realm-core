@@ -2538,6 +2538,13 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
+        // Check if this key collides with an already existing object
+        // This could happen if objects were at some point created with primary keys,
+        // but later primary key property was removed from the schema.
+        while (m_clusters.is_valid(key)) {
+            object_id = allocate_object_id_squeezed();
+            key = object_id.get_local_key(get_sync_file_id());
+        }
         if (auto repl = get_repl())
             repl->create_object(this, object_id);
     }
