@@ -236,7 +236,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[6].column_key,
         object_schema->persisted_properties[7].column_key
     };
-    
+
     object_schema = realm->schema().find(c_sync_app_metadata);
     m_app_metadata_schema = {
         object_schema->persisted_properties[0].column_key,
@@ -245,7 +245,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key
     };
-    
+
     m_metadata_config = std::move(config);
 
     m_client_uuid = [&]() -> std::string {
@@ -400,7 +400,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             return none;
         }
     }
-    
+
     return SyncUserMetadata(schema, std::move(realm), std::move(*row));
 }
 
@@ -468,7 +468,7 @@ void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
     auto& schema = m_app_metadata_schema;
 
     realm->begin_transaction();
-    
+
     auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
     auto obj = table->create_object_with_primary_key(app_metadata_pk);
     obj.set(schema.idx_deployment_model, deployment_model);
@@ -486,7 +486,7 @@ util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
         auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
         if (!table->size())
             return util::none;
-        
+
         auto obj = table->get_object_with_primary_key(app_metadata_pk);
         auto& schema = m_app_metadata_schema;
         m_app_metadata = SyncAppMetadata {
@@ -496,7 +496,7 @@ util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
             obj.get<String>(schema.idx_ws_hostname)
         };
     }
-    
+
     return m_app_metadata;
 }
 

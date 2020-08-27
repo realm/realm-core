@@ -84,7 +84,7 @@ public:
     Bson(std::string&&) noexcept;
     Bson(IndexedMap<Bson>&&) noexcept;
     Bson(std::vector<Bson>&&) noexcept;
-    
+
     // These are shortcuts for Bson(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
     Bson(char* c_str) noexcept
@@ -352,5 +352,5 @@ Bson parse(const std::string_view& json);
 
 } // namespace bson
 } // namespace realm
-            
+
 #endif // REALM_BSON_HPP

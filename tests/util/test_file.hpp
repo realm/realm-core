@@ -140,14 +140,19 @@ struct SyncTestFile : TestFile {
 };
 
 struct TestSyncManager {
-    TestSyncManager(const realm::app::App::Config& config, bool should_teardown_test_directory = true, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-    TestSyncManager(const std::string& base_url, std::string const& base_path="", realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption, bool should_teardown_test_directory = true);
-    TestSyncManager(const SyncServer& server, std::string const& base_path="", realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption, bool should_teardown_test_directory = true)
-     : TestSyncManager(server.base_url(), base_path, metadataMode, should_teardown_test_directory)
+    TestSyncManager(const realm::app::App::Config& config, bool should_teardown_test_directory = true,
+                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager(const std::string& base_url, std::string const& base_path="",
+                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoMetadata,
+                    bool should_teardown_test_directory = true);
+    TestSyncManager(const SyncServer& server, std::string const& base_path="",
+                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoMetadata,
+                    bool should_teardown_test_directory = true)
+    : TestSyncManager(server.base_url(), base_path, metadataMode, should_teardown_test_directory)
     {
     }
     ~TestSyncManager();
-    
+
     std::shared_ptr<realm::app::App> app() const;
 private:
     std::string m_base_file_path;

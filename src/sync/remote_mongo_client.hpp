@@ -40,11 +40,11 @@ public:
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase operator[](const std::string& name);
-  
+
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase db(const std::string& name);
-    
+
 private:
     friend class App;
 

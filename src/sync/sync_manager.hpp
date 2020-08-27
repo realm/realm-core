@@ -181,10 +181,10 @@ public:
 
     // Log out a given user
     void log_out_user(const std::string& user_id);
-    
+
     // Sets the currently active user.
     void set_current_user(const std::string& user_id);
-    
+
     // Removes a user
     void remove_user(const std::string& user_id);
 
@@ -212,7 +212,7 @@ public:
 
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const;
-    
+
     std::shared_ptr<app::App> app() const {
         return m_app;
     }
@@ -234,6 +234,8 @@ private:
 
     std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const;
 
+    std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept;
+
     mutable std::mutex m_mutex;
 
     bool run_file_action(const SyncFileActionMetadata&);
@@ -244,6 +246,7 @@ private:
 
     // A vector of all SyncUser objects.
     std::vector<std::shared_ptr<SyncUser>> m_users;
+    std::shared_ptr<SyncUser> m_current_user;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 

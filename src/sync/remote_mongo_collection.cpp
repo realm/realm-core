@@ -35,7 +35,7 @@ static void handle_delete_count_response(util::Optional<AppError> error,
             return completion_block(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         }
     }
-    
+
     return completion_block(0, error);
 }
 
@@ -44,11 +44,11 @@ static void handle_update_response(util::Optional<AppError> error,
                                    std::function<void(RemoteMongoCollection::RemoteUpdateResult,
                                                       util::Optional<AppError>)> completion_block)
 {
-    
+
     if (error) {
         return completion_block({}, error);
     }
-    
+
     try {
         auto document = static_cast<bson::BsonDocument>(*value);
         auto matched_count = static_cast<int32_t>(document["matchedCount"]);
@@ -59,7 +59,7 @@ static void handle_update_response(util::Optional<AppError> error,
         if (it != document.end()) {
             upserted_id = static_cast<ObjectId>(document["upsertedId"]);
         }
-        
+
         return completion_block(RemoteMongoCollection::RemoteUpdateResult {
             matched_count,
             modified_count,
@@ -77,17 +77,17 @@ static void handle_document_response(util::Optional<AppError> error,
     if (error) {
         return completion_block(util::none, error);
     }
-    
+
     if (!value) {
         // no docs were found
         return completion_block(util::none, util::none);
     }
-    
+
     if (bson::holds_alternative<util::None>(*value)) {
         // no docs were found
         return completion_block(util::none, util::none);
     }
-    
+
     return completion_block(static_cast<bson::BsonDocument>(*value),
                             util::none);
 }
@@ -111,7 +111,7 @@ void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
         if (options.sort_bson) {
             base_args["sort"] = *options.sort_bson;
         }
-        
+
         m_service->call_function("find",
                                  bson::BsonArray({base_args}),
                                  m_service_name,
@@ -152,7 +152,7 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
         if (options.sort_bson) {
             base_args["sort"] = *options.sort_bson;
         }
-        
+
         m_service->call_function("findOne",
                                  bson::BsonArray({base_args}),
                                  m_service_name,
@@ -178,7 +178,7 @@ void RemoteMongoCollection::insert_one(const bson::BsonDocument& value_bson,
 {
     auto base_args = m_base_operation_args;
     base_args["document"] = value_bson;
-    
+
     m_service->call_function("insertOne",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -199,7 +199,7 @@ void RemoteMongoCollection::aggregate(const bson::BsonArray& pipline,
 {
     auto base_args = m_base_operation_args;
     base_args["pipeline"] = pipline;
-    
+
     m_service->call_function("aggregate",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -218,11 +218,11 @@ void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
-    
+
     if (limit != 0) {
         base_args["limit"] = limit;
     }
-    
+
     m_service->call_function("count",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -247,7 +247,7 @@ void RemoteMongoCollection::insert_many(bson::BsonArray documents,
 {
     auto base_args = m_base_operation_args;
     base_args["documents"] = documents;
-    
+
     m_service->call_function("insertMany",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -267,7 +267,7 @@ void RemoteMongoCollection::delete_one(const bson::BsonDocument& filter_bson,
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
-    
+
     m_service->call_function("deleteOne",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -281,7 +281,7 @@ void RemoteMongoCollection::delete_many(const bson::BsonDocument& filter_bson,
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
-    
+
     m_service->call_function("deleteMany",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -327,7 +327,7 @@ void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
     base_args["query"] = filter_bson;
     base_args["update"] = update_bson;
     base_args["upsert"] = upsert;
-    
+
     m_service->call_function("updateMany",
                              bson::BsonArray({base_args}),
                              m_service_name,
@@ -352,7 +352,7 @@ void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter
     base_args["filter"] = filter_bson;
     base_args["update"] = update_bson;
     options.set_bson(base_args);
-    
+
     m_service->call_function("findOneAndUpdate",
                              bson::BsonArray({base_args}),
                              m_service_name,

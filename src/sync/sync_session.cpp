@@ -113,7 +113,7 @@ struct SyncSession::State {
 struct sync_session_states::Active : public SyncSession::State {
     //msvc needs this to initialize the class correctly
     constexpr Active() {};
-    
+
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         // when entering from the Dying state the session will still be bound
@@ -179,7 +179,7 @@ struct sync_session_states::Active : public SyncSession::State {
 struct sync_session_states::Dying : public SyncSession::State {
     //msvc needs this to initialize the class correctly
     constexpr Dying() {};
-    
+
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // If we have no session, we cannot possibly upload anything.
@@ -234,7 +234,7 @@ struct sync_session_states::Dying : public SyncSession::State {
 struct sync_session_states::Inactive : public SyncSession::State {
     //msvc needs this to initialize the class correctly
     constexpr Inactive() {};
-    
+
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Manually set the disconnected state. Sync would also do this, but

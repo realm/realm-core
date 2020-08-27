@@ -165,12 +165,13 @@ private:
     ValueType get_property_value_impl(ContextType& ctx, const Property &property) const;
 
     template<typename ValueType, typename ContextType>
-    static ObjKey get_for_primary_key_impl(ContextType& ctx, Table const& table,
-                                           const Property &primary_prop,
-                                           ValueType primary_value);
+    static ObjKey get_for_primary_key_in_migration(ContextType& ctx, Table const& table,
+                                                   const Property &primary_prop,
+                                                   ValueType&& primary_value);
 
     void verify_attached() const;
     Property const& property_for_name(StringData prop_name) const;
+    void validate_property_for_setter(Property const&) const;
 };
 
 struct InvalidatedObjectException : public std::logic_error {
