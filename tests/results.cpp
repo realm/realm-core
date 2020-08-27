@@ -1087,12 +1087,43 @@ TEST_CASE("notifications: TableView delivery") {
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("TV can be delivered in a write transaction") {
-        make_remote_change();
-        advance_and_notify(*r);
-        r->begin_transaction();
-        REQUIRE(results.size() == 11);
-        r->cancel_transaction();
+    SECTION("TV can't be delivered in a write transaction") {
+        SECTION("no changes") {
+            make_remote_change();
+            advance_and_notify(*r);
+            r->begin_transaction();
+            REQUIRE(results.size() == 0);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates disabled") {
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 10);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates enabled") {
+            // Use a new Results because AsyncOnly leaves the Results in a
+            // weird state and switching back to Auto doesn't work.
+            Results results(r, table->where());
+            results.evaluate_query_if_needed();
+            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 12);
+            r->cancel_transaction();
+        }
     }
 
     SECTION("unused background TVs do not pin old versions forever") {
