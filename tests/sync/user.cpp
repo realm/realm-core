@@ -146,7 +146,11 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string refresh_token = ENCODE_FAKE_JWT("r-token-1");
         const std::string access_token = ENCODE_FAKE_JWT("a-token-1");
         const std::string server_url = "https://realm.example.org/1/";
+        const std::vector<SyncUserIdentity> identities {
+            { "12345", "test_case_provider" }
+        };
         auto user = SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        user->update_identities(identities);
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(metadata->is_valid());
@@ -154,6 +158,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(metadata->access_token() == access_token);
         REQUIRE(metadata->refresh_token() == refresh_token);
         REQUIRE(metadata->device_id() == dummy_device_id);
+        REQUIRE(metadata->identities() == identities);
     }
 
     SECTION("properly persists a user's information when the user is updated") {

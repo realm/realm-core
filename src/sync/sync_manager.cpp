@@ -157,6 +157,7 @@ void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_
                                                    user_data.access_token,
                                                    user_data.state,
                                                    user_data.device_id);
+            user->update_identities(user_data.identities);
             m_users.emplace_back(std::move(user));
         }
     }
