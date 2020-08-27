@@ -858,6 +858,14 @@ ClusterNode::State ClusterTree::get(ObjKey k) const
     return state;
 }
 
+ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
+{
+    ClusterNode::State state;
+    if (!m_root->try_get(k, state))
+        state.index = realm::npos;
+    return state;
+}
+
 ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {

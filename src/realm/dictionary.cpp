@@ -25,6 +25,9 @@
 
 namespace realm {
 
+// Dummy cluster to be used if dictionary has no cluster created and an iterator is requested
+static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
+
 /************************** DictionaryClusterTree ****************************/
 
 DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_type, Allocator& alloc, size_t ndx)
@@ -247,6 +250,19 @@ Mixed Dictionary::get(Mixed key) const
     return {};
 }
 
+util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
+{
+    update_if_needed();
+    if (m_clusters) {
+        auto hash = key.hash();
+        ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+        auto state = m_clusters->try_get(k);
+        if (state.index != realm::npos)
+            return do_get(m_clusters->get(k));
+    }
+    return {};
+}
+
 Dictionary::Iterator Dictionary::begin() const
 {
     return Iterator(this, 0);
@@ -453,12 +469,12 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
 /************************* Dictionary::Iterator *************************/
 
 Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
-    : ClusterTree::Iterator(*dict->m_clusters, pos)
+    : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
     , m_key_type(dict->get_key_data_type())
 {
 }
 
-auto Dictionary::Iterator::operator*() -> value_type
+auto Dictionary::Iterator::operator*() const -> value_type
 {
     update();
     Mixed key;

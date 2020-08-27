@@ -921,8 +921,14 @@ public:
         auto ct = col_key.get_type();
         if (ct == col_type_LinkList)
             ct = col_type_Link;
-        if (ct != ColumnTypeTraits<T>::column_id)
-            throw LogicError(LogicError::type_mismatch);
+        if constexpr (std::is_same_v<T, Dictionary>) {
+            if (!col_key.is_dictionary())
+                throw LogicError(LogicError::type_mismatch);
+        }
+        else {
+            if (ct != ColumnTypeTraits<T>::column_id)
+                throw LogicError(LogicError::type_mismatch);
+        }
 
         if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
             m_link_cols.push_back(col_key);

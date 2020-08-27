@@ -18,6 +18,7 @@
 
 #include <realm/query_expression.hpp>
 #include <realm/group.hpp>
+#include <realm/dictionary.hpp>
 
 namespace realm {
 
@@ -216,6 +217,104 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
     }
     return ret;
 }
+
+Columns<Dictionary>& Columns<Dictionary>::key(const Mixed& key_value)
+{
+    if (m_key_type != type_Mixed && key_value.get_type() != m_key_type) {
+        throw LogicError(LogicError::collection_type_mismatch);
+    }
+
+    m_key = key_value;
+    if (!key_value.is_null()) {
+        auto hash = key_value.hash();
+        m_objkey = ObjKey(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
+    }
+    return *this;
+}
+
+void Columns<Dictionary>::set_cluster(const Cluster* cluster)
+{
+    m_array_ptr = nullptr;
+    m_leaf_ptr = nullptr;
+    if (links_exist()) {
+        m_link_map.set_cluster(cluster);
+    }
+    else {
+        // Create new Leaf
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayInteger(m_link_map.get_base_table()->get_alloc()));
+        cluster->init_leaf(m_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+}
+
+void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
+{
+    Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
+
+    if (links_exist()) {
+        std::vector<ObjKey> links = m_link_map.get_links(index);
+        auto sz = links.size();
+
+        std::vector<Mixed> values;
+        for (size_t t = 0; t < sz; t++) {
+            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+            auto dict = obj.get_dictionary(m_column_key);
+            if (m_key.is_null()) {
+                // Insert all values
+                dict.for_all_values([&values](const Mixed& value) {
+                    values.emplace_back(value);
+                });
+            }
+            else {
+                auto opt_val = dict.try_get(m_key);
+                if (opt_val)
+                    values.emplace_back(*opt_val);
+            }
+        }
+
+        d.init(!m_link_map.only_unary_links() || m_key.is_null(), values);
+    }
+    else {
+        // Not a link column
+        Allocator& alloc = get_base_table()->get_alloc();
+
+        REALM_ASSERT(m_leaf_ptr != nullptr);
+        if (m_leaf_ptr->get(index)) {
+            DictionaryClusterTree dict_cluster(m_leaf_ptr, m_key_type, alloc, index);
+            dict_cluster.init_from_parent();
+
+            if (m_objkey) {
+                Mixed val;
+                auto state = dict_cluster.try_get(m_objkey);
+                if (state.index != realm::npos) {
+                    ArrayMixed values(alloc);
+                    ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
+                    values.init_from_ref(ref);
+                    val = values.get(state.index);
+                }
+                d.m_storage.set(0, val);
+            }
+            else {
+                d.init(true, dict_cluster.size());
+                ArrayMixed leaf(alloc);
+                size_t n = 0;
+                // Iterate through cluster and insert all values
+                auto f = [&leaf, &d, &n](const Cluster* cluster) {
+                    size_t e = cluster->node_size();
+                    cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+                    for (size_t i = 0; i < e; i++) {
+                        d.m_storage.set(n, leaf.get(i));
+                        n++;
+                    }
+                    // Continue
+                    return false;
+                };
+                dict_cluster.traverse(f);
+            }
+        }
+    }
+}
+
 
 void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {

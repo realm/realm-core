@@ -5482,4 +5482,65 @@ TEST(Query_ListOfMixed)
     CHECK_EQUAL(tv.size(), 5);
 }
 
+TEST(Query_Dictionary)
+{
+    Group g;
+    auto foo = g.add_table("foo");
+    auto origin = g.add_table("origin");
+    auto col_dict = foo->add_column_dictionary(type_Mixed, "dict");
+    auto col_link = origin->add_column(*foo, "link");
+    auto col_links = origin->add_column_list(*foo, "links");
+    size_t expected = 0;
+
+    for (int64_t i = 0; i < 100; i++) {
+        auto obj = foo->create_object();
+        Dictionary dict = obj.get_dictionary(col_dict);
+        bool incr = false;
+        if (i % 4) {
+            dict.insert("Value", i);
+            if (i > 50)
+                incr = true;
+        }
+        else if ((i % 10) == 0) {
+            dict.insert("Value", 100.);
+            incr = true;
+        }
+        if (i % 3) {
+            std::string str = "String" + util::to_string(i);
+            dict.insert("Value", str);
+            incr = false;
+        }
+        dict.insert("Dummy", i);
+        if (incr) {
+            expected++;
+        }
+    }
+
+    auto it = foo->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+
+        obj.set(col_link, it->get_key());
+
+        auto ll = obj.get_linklist(col_links);
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // g.to_json(std::cout);
+    auto tv = (foo->column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    CHECK_EQUAL(tv.size(), expected);
+    tv = (foo->column<Dictionary>(col_dict) > 50).find_all(); // Any key will do
+    CHECK_EQUAL(tv.size(), 50);                               // 0 and 51..99
+
+    tv = (origin->link(col_link).column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    CHECK_EQUAL(tv.size(), 6);
+    tv = (origin->link(col_links).column<Dictionary>(col_dict) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 6);
+}
+
 #endif // TEST_QUERY
