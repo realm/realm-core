@@ -203,9 +203,9 @@ TEST(Mixed_SortNumeric)
 TEST(Mixed_Compare)
 {
     CHECK(Mixed(false) < Mixed(true));
-    CHECK(Mixed(0x1234567812345678) > Mixed(1.311768e18)); // Large int
-    CHECK(Mixed(0x1234567812345678) < Mixed(1.e19));       // double larger than largest int
-    CHECK(Mixed(0 - 0x1234567812345678) > Mixed(-1.e19));  // double more negative than most negative int
+    CHECK(Mixed(int64_t(0x1234567812345678)) > Mixed(1.311768e18)); // Large int
+    CHECK(Mixed(int64_t(0x1234567812345678)) < Mixed(1.e19));       // double larger than largest int
+    CHECK(Mixed(0 - int64_t(0x1234567812345678)) > Mixed(-1.e19));  // double more negative than most negative int
     CHECK(Mixed(nan("123")) < 5);
 
     CHECK(Mixed("Hello") == Mixed(BinaryData("Hello")));
