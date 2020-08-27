@@ -135,15 +135,16 @@ inline int compare_long_to_double(int64_t lhs, double rhs)
 }
 } // namespace _impl
 
-bool Mixed::is_comparable(const Mixed& lhs, const Mixed& rhs)
+bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 {
-    if (lhs.is_null() || rhs.is_null())
+    if (lhs.m_type == rhs.m_type)
         return true;
+
+    if (lhs.is_null() || rhs.is_null())
+        return false;
 
     DataType l_type = lhs.get_type();
     DataType r_type = rhs.get_type();
-    if (l_type == r_type)
-        return true;
     bool l_is_numeric = l_type == type_Int || l_type == type_Bool || l_type == type_Float || l_type == type_Double ||
                         l_type == type_Decimal;
     bool r_is_numeric = r_type == type_Int || r_type == type_Bool || r_type == type_Float || r_type == type_Double ||

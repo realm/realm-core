@@ -164,7 +164,7 @@ public:
         return DataType(m_type - 1);
     }
 
-    static bool is_comparable(const Mixed& l, const Mixed& r);
+    static bool types_are_comparable(const Mixed& l, const Mixed& r);
 
     template <class T>
     T get() const noexcept;

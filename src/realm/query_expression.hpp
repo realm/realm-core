@@ -1543,24 +1543,13 @@ public:
             REALM_ASSERT_DEBUG(comparison ==
                                ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             for (size_t m = 0; m < sz; m++) {
-                if constexpr (std::is_same_v<T, Mixed>) {
-                    if (!Mixed::is_comparable(left->m_storage[0], right->m_storage[m])) {
-                        continue;
-                    }
-                }
                 if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
                     return m;
             }
         }
         else {
             for (size_t m = 0; m < sz; m++) {
-                bool match;
-                if (std::is_same_v<T, Mixed> && !Mixed::is_comparable(left->m_storage[0], right->m_storage[m])) {
-                    match = false;
-                }
-                else {
-                    match = c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m));
-                }
+                bool match = c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m));
                 if (match) {
                     if (comparison == ExpressionComparisonType::Any) {
                         return 0;
@@ -1596,11 +1585,6 @@ public:
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
-                if constexpr (std::is_same_v<T, Mixed>) {
-                    if (!Mixed::is_comparable(left->m_storage[0], right->m_storage[m])) {
-                        continue;
-                    }
-                }
                 if (c(left->m_storage[m], right->m_storage[m], left->m_storage.is_null(m),
                       right->m_storage.is_null(m)))
                     return m;
@@ -1622,13 +1606,7 @@ public:
             T left_val = left->m_storage[0];
             bool left_is_null = left->m_storage.is_null(0);
             for (size_t r = 0; r < num_right_values; r++) {
-                bool match;
-                if (std::is_same_v<T, Mixed> && !Mixed::is_comparable(left_val, right->m_storage[r])) {
-                    match = false;
-                }
-                else {
-                    match = c(left_val, right->m_storage[r], left_is_null, right->m_storage.is_null(r));
-                }
+                bool match = c(left_val, right->m_storage[r], left_is_null, right->m_storage.is_null(r));
                 if (match) {
                     if (right_cmp_type == ExpressionComparisonType::Any) {
                         return 0;
@@ -1654,13 +1632,7 @@ public:
             T right_val = right->m_storage[0];
             bool right_is_null = right->m_storage.is_null(0);
             for (size_t l = 0; l < num_left_values; l++) {
-                bool match;
-                if (std::is_same_v<T, Mixed> && !Mixed::is_comparable(left->m_storage[l], right_val)) {
-                    match = false;
-                }
-                else {
-                    match = c(left->m_storage[l], right_val, left->m_storage.is_null(l), right_is_null);
-                }
+                bool match = c(left->m_storage[l], right_val, left->m_storage.is_null(l), right_is_null);
                 if (match) {
                     if (left_cmp_type == ExpressionComparisonType::Any) {
                         return 0;

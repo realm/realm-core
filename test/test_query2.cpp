@@ -5337,19 +5337,22 @@ TEST(Query_Mixed)
     auto col_int = table->add_column(type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
-    size_t expected = 0;
+    size_t int_over_50 = 0;
+    size_t nb_strings = 0;
     for (int64_t i = 0; i < 100; i++) {
         if (i % 4) {
             if (i > 50)
-                expected++;
+                int_over_50++;
             table->create_object().set(col_any, Mixed(i)).set(col_int, i);
         }
         else {
             std::string str = "String" + util::to_string(i);
             table->create_object().set(col_any, Mixed(str)).set(col_int, i);
+            nb_strings++;
         }
     }
 
+    table->get_object(15).set(col_any, Mixed());
     table->get_object(75).set(col_any, Mixed(75.));
     table->get_object(28).set(col_any, Mixed(BinaryData("String2Binary")));
     table->get_object(25).set(col_any, Mixed(3.));
@@ -5368,10 +5371,25 @@ TEST(Query_Mixed)
     }
 
     auto tv = (table->column<Mixed>(col_any) > 50).find_all();
-    CHECK_EQUAL(tv.size(), expected);
+    CHECK_EQUAL(tv.size(), int_over_50);
+    tv = (table->column<Mixed>(col_any) >= 50).find_all();
+    CHECK_EQUAL(tv.size(), int_over_50 + 1);
+    tv = (table->column<Mixed>(col_any) <= 50).find_all();
+    CHECK_EQUAL(tv.size(), 100 - int_over_50 - nb_strings - 1);
+    tv = (table->column<Mixed>(col_any) < 50).find_all();
+    CHECK_EQUAL(tv.size(), 100 - int_over_50 - nb_strings - 2);
+    tv = (table->column<Mixed>(col_any) < 50 || table->column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 100 - nb_strings - 2);
+    tv = (table->column<Mixed>(col_any) != 50).find_all();
+    CHECK_EQUAL(tv.size(), 99);
 
     tv = table->where().greater(col_any, 50).find_all();
-    CHECK_EQUAL(tv.size(), expected);
+    CHECK_EQUAL(tv.size(), int_over_50);
+
+    tv = table->where().equal(col_any, null()).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().not_equal(col_any, null()).find_all();
+    CHECK_EQUAL(tv.size(), 99);
 
     tv = table->where().begins_with(col_any, "String2").find_all(); // 20, 24, 28
     CHECK_EQUAL(tv.size(), 3);
@@ -5386,7 +5404,8 @@ TEST(Query_Mixed)
 
     tv = table->where().ends_with(col_any, "4").find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
-    tv = table->where().ends_with(col_any, BinaryData("4")).find_all(); // 4, 24, 44, 64, 84
+    char bin[1] = {0x34};
+    tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
     CHECK_EQUAL(tv.size(), 5);
 
     tv = table->where().equal(col_any, "String2Binary").find_all();
@@ -5395,12 +5414,15 @@ TEST(Query_Mixed)
     tv = table->where().equal(col_any, "string2binary", false).find_all();
     CHECK_EQUAL(tv.size(), 1);
 
+    tv = table->where().not_equal(col_any, "string2binary", false).find_all();
+    CHECK_EQUAL(tv.size(), 99);
+
     tv = (table->column<Mixed>(col_any) == "String48").find_all();
     CHECK_EQUAL(tv.size(), 1);
     tv = (table->column<Mixed>(col_any) == 3.).find_all();
     CHECK_EQUAL(tv.size(), 3);
     tv = (table->column<Mixed>(col_any) == table->column<Int>(col_int)).find_all();
-    CHECK_EQUAL(tv.size(), 73);
+    CHECK_EQUAL(tv.size(), 72);
 
     tv = (origin->link(col_links).column<Mixed>(col_any) > 50).find_all();
     CHECK_EQUAL(tv.size(), 5);

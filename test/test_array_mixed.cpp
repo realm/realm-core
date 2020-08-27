@@ -174,6 +174,7 @@ TEST(Mixed_SortNumeric)
     t.create_object().set(col_data, Mixed(7.5f));
     t.create_object().set(col_data, Mixed(500));
     t.create_object().set(col_data, Mixed(Decimal128("129.85")));
+    t.create_object().set(col_data, Mixed());
     t.create_object().set(col_data, Mixed(100));
     t.create_object().set(col_data, Mixed(42));
     t.create_object().set(col_data, Mixed(0.001f));
@@ -184,23 +185,32 @@ TEST(Mixed_SortNumeric)
 
     auto tv = t.where().find_all();
     auto sz = tv.size();
-    CHECK_EQUAL(tv.size(), 16);
+    CHECK_EQUAL(tv.size(), 17);
     tv.sort(col_data);
-    Mixed last;
     std::ostringstream out;
     out.precision(8);
-    std::string expected = "Mixed(-278987.9)\nMixed(-500)\nMixed(-258)\nMixed(false)\nMixed(0.001f)\nMixed(true)\n"
-                           "Mixed(5)\nMixed(7.5f)\nMixed(34.8)\nMixed(42)\nMixed(42.125f)\nMixed(100)\n"
+    std::string expected = "Mixed(null)\nMixed(-278987.9)\nMixed(-500)\nMixed(-258)\nMixed(false)\nMixed(0.001f)\n"
+                           "Mixed(true)\nMixed(5)\nMixed(7.5f)\nMixed(34.8)\nMixed(42)\nMixed(42.125f)\nMixed(100)\n"
                            "Mixed(129.85)\nMixed(256.25f)\nMixed(500)\nMixed(10000)\n";
     for (size_t i = 0; i < sz; i++) {
         Mixed val = tv.get(i).get<Mixed>(col_data);
-        CHECK_LESS(last, val); // Not really a check as it uses the same compare function as the sort
         out << val << std::endl;
-        last = val;
     }
     std::string actual = out.str();
     CHECK_EQUAL(actual, expected);
 }
 
+TEST(Mixed_Compare)
+{
+    CHECK(Mixed(false) < Mixed(true));
+    CHECK(Mixed(0x1234567812345678) > Mixed(1.311768e18)); // Large int
+    CHECK(Mixed(0x1234567812345678) < Mixed(1.e19));       // double larger than largest int
+    CHECK(Mixed(0 - 0x1234567812345678) > Mixed(-1.e19));  // double more negative than most negative int
+    CHECK(Mixed(nan("123")) < 5);
+
+    CHECK(Mixed("Hello") == Mixed(BinaryData("Hello")));
+    CHECK(Mixed::types_are_comparable(Mixed(), Mixed()));
+    CHECK(Mixed() == Mixed());
+}
 
 #endif // TEST_ARRAY_VARIANT
