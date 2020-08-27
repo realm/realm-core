@@ -303,3 +303,27 @@ TEST(Dictionary_Performance)
     std::cout << "    insertion: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/val" << std::endl;
     std::cout << "    lookup: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/val" << std::endl;
 }
+
+TEST(Dictionary_Tombstones)
+{
+    Group g;
+    auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+    auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+    ColKey col_dict = foos->add_column_dictionary(type_String, "dict", type_Mixed);
+
+    auto foo = foos->create_object_with_primary_key(123);
+    auto a = bars->create_object_with_primary_key("a");
+    auto b = bars->create_object_with_primary_key("b");
+
+    auto dict = foo.get_dictionary(col_dict);
+    dict.insert("a", a);
+    dict.insert("b", b);
+
+    a.invalidate();
+
+    // FIXME: Dictionaries currently expose tombstones.
+    // CHECK_EQUAL(dict.size(), 1);
+    // CHECK(dict.find("a") == dict.end());
+
+    CHECK(dict.find("b") != dict.end());
+}
