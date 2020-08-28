@@ -67,6 +67,11 @@ std::string get_test_path(const std::string& path, const std::string& suffix);
 /// prior to any execution of the TEST_PATH or TEST_DIR family of macros.
 void set_test_path_prefix(const std::string&);
 
+/// Check if get_test_path_prefix() will give a path located on an exFAT
+/// filesystem, which does not support all of the features a typical unix
+/// filesystem does.
+bool test_dir_is_exfat();
+
 
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of set_test_resource_path().
