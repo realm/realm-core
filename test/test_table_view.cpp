@@ -2791,7 +2791,7 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 
 TEST(TableView_SortNull)
 {
-    // Verifiest that NULL values will come first when sorting
+    // Verifies that NULL values will come first when sorting
     Table table;
     auto col_int = table.add_column(type_Int, "int", true);
     auto col_bool = table.add_column(type_Bool, "bool", true);

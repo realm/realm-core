@@ -132,14 +132,15 @@ std::unique_ptr<BaseDescriptor> SortDescriptor::clone() const
     return std::unique_ptr<ColumnsDescriptor>(new SortDescriptor(*this));
 }
 
-void SortDescriptor::merge_with(SortDescriptor&& other)
+void SortDescriptor::merge(SortDescriptor&& other, MergeMode mode)
 {
-    m_column_keys.insert(m_column_keys.begin(), other.m_column_keys.begin(), other.m_column_keys.end());
+    m_column_keys.insert(mode == MergeMode::prepend ? m_column_keys.begin() : m_column_keys.end(),
+                         other.m_column_keys.begin(), other.m_column_keys.end());
     // Do not use a move iterator on a vector of bools!
     // It will form a reference to a temporary and return incorrect results.
-    m_ascending.insert(m_ascending.begin(), other.m_ascending.begin(), other.m_ascending.end());
+    m_ascending.insert(mode == MergeMode::prepend ? m_ascending.begin() : m_ascending.end(),
+                       other.m_ascending.begin(), other.m_ascending.end());
 }
-
 
 BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
                                std::vector<bool> const& ascending, Table const& root_table, const IndexPairs& indexes)
@@ -549,14 +550,14 @@ DescriptorOrdering& DescriptorOrdering::operator=(const DescriptorOrdering& rhs)
     return *this;
 }
 
-void DescriptorOrdering::append_sort(SortDescriptor sort)
+void DescriptorOrdering::append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode)
 {
     if (!sort.is_valid()) {
         return;
     }
     if (!m_descriptors.empty()) {
         if (SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get())) {
-            previous_sort->merge_with(std::move(sort));
+            previous_sort->merge(std::move(sort), mode);
             return;
         }
     }

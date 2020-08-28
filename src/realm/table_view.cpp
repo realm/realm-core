@@ -543,7 +543,7 @@ void ConstTableView::sort(ColKey column, bool ascending)
 // Sort according to multiple columns, user specified order on each column
 void ConstTableView::sort(SortDescriptor order)
 {
-    m_descriptor_ordering.append_sort(std::move(order));
+    m_descriptor_ordering.append_sort(std::move(order), SortDescriptor::MergeMode::prepend);
     m_descriptor_ordering.collect_dependencies(m_table.unchecked_ptr());
 
     do_sort(m_descriptor_ordering);
