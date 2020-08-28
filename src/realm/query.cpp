@@ -309,6 +309,15 @@ struct MakeConditionNode<StringNode<Cond>> {
     }
 };
 
+template <class Cond>
+struct MakeConditionNode<MixedNode<Cond>> {
+    template <class T>
+    static std::unique_ptr<ParentNode> make(ColKey col_key, T value)
+    {
+        return std::unique_ptr<ParentNode>{new MixedNode<Cond>(Mixed(value), col_key)};
+    }
+};
+
 template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey column_key, T value)
 {
@@ -346,6 +355,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         }
         case type_ObjectId: {
             return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value);
+        }
+        case type_Mixed: {
+            return MakeConditionNode<MixedNode<Cond>>::make(column_key, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
