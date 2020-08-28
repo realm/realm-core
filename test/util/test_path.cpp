@@ -90,6 +90,9 @@ std::string get_test_path_prefix()
 bool test_dir_is_exfat()
 {
 #ifdef REALM_PLATFORM_APPLE
+    if (test_util::get_test_path_prefix().empty())
+        return false;
+
     struct statfs fsbuf;
     int ret = statfs(test_util::get_test_path_prefix().c_str(), &fsbuf);
     REALM_ASSERT_RELEASE(ret == 0);
