@@ -7886,7 +7886,7 @@ TEST(Sync_Dictionary)
         WriteTransaction tr{db_1};
         auto& g = tr.get_group();
         auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
-        auto col_dict = foos->add_column_dictionary(type_String, "dict", type_Mixed);
+        auto col_dict = foos->add_column_dictionary(type_Mixed, "dict");
 
         auto foo = foos->create_object_with_primary_key(123);
 

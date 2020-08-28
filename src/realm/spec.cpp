@@ -438,15 +438,6 @@ ColKey Spec::find_backlink_column(TableKey origin_table_key, size_t spec_ndx) co
     return ColKey{m_keys.get(col_ndx)};
 }
 
-DataType Spec::get_public_column_type(size_t ndx) const noexcept
-{
-    REALM_ASSERT(ndx < get_column_count());
-
-    ColumnType type = get_column_type(ndx);
-
-    return DataType(type);
-}
-
 namespace {
 
 template <class T>

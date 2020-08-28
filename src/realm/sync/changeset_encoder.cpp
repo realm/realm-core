@@ -166,16 +166,16 @@ void ChangesetEncoder::operator()(const Instruction::AddInteger& instr)
 
 void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
 {
+    bool is_dictionary = (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary);
     // Mixed columns are always nullable.
-    REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
-
+    REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable || is_dictionary);
     append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.collection_type);
 
     if (instr.type == Instruction::Payload::Type::Link) {
         append_value(instr.link_target_table);
     }
-    if (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
-        append_value(instr.value_type);
+    if (is_dictionary) {
+        append_value(instr.key_type);
     }
 }
 

@@ -27,7 +27,7 @@ class DictionaryClusterTree : public ClusterTree {
 public:
     static constexpr ColKey s_values_col = ColKey(ColKey::Idx{1}, col_type_Mixed, ColumnAttrMask(), 0);
 
-    DictionaryClusterTree(ArrayParent* owner, ColumnType, Allocator& alloc, size_t ndx);
+    DictionaryClusterTree(ArrayParent* owner, DataType, Allocator& alloc, size_t ndx);
     ~DictionaryClusterTree() override;
 
     void destroy()

@@ -412,7 +412,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         bad_transaction_log("AddColumn '%1.%3' which already exists", table->get_name(), col_name);
     }
 
-    if (instr.collection_type == CollectionType::Dictionary && instr.type != Type::String) {
+    if (instr.collection_type == CollectionType::Dictionary && instr.key_type != Type::String) {
         bad_transaction_log("AddColumn '%1.%3' adding dictionary column with non-string keys", table->get_name(),
                             col_name);
     }
@@ -421,20 +421,8 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         bad_transaction_log("AddColumn '%1.%3' adding dictinoary with nullable keys", table->get_name(), col_name);
     }
 
-    if (instr.type == Type::Null) {
-        if (instr.collection_type == CollectionType::Single) {
-            table->add_column(type_Mixed, col_name);
-        }
-        else {
-            REALM_ASSERT(instr.collection_type == CollectionType::List);
-            table->add_column_list(type_Mixed, col_name);
-        }
-        return;
-    }
-
-
     if (instr.type != Type::Link) {
-        DataType type = get_data_type(instr.type);
+        DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
         switch (instr.collection_type) {
             case CollectionType::Single: {
                 table->add_column(type, col_name, instr.nullable);
@@ -445,8 +433,8 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 break;
             }
             case CollectionType::Dictionary: {
-                DataType value_type = (instr.value_type == Type::Null) ? type_Mixed : get_data_type(instr.value_type);
-                table->add_column_dictionary(type, col_name, value_type);
+                DataType key_type = (instr.key_type == Type::Null) ? type_Mixed : get_data_type(instr.key_type);
+                table->add_column_dictionary(type, col_name, key_type);
                 break;
             }
             case CollectionType::Set: {
