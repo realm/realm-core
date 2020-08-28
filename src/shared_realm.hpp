@@ -228,6 +228,12 @@ public:
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs
 
+        // If false, always return a new Realm instance, and don't return
+        // that Realm instance for other requests for a cached Realm. Useful
+        // for dynamic Realms and for tests that need multiple instances on
+        // one thread
+        bool cache = false;
+
         // Throw an exception rather than automatically upgrading the file
         // format. Used by the browser to warn the user that it'll modify
         // the file.

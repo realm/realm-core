@@ -80,6 +80,8 @@ public:
     void create_session(const Realm::Config& config) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 #endif
 
+    // Get the existing cached Realm if it exists for the specified scheduler or config.scheduler
+    std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler = nullptr) REQUIRES(!m_realm_mutex);
     // Get a Realm which is not bound to the current execution context
     ThreadSafeReference get_unbound_realm() REQUIRES(!m_realm_mutex);
 
@@ -239,6 +241,7 @@ private:
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void create_sync_session(bool force_client_resync);
+    std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler = nullptr) REQUIRES(m_realm_mutex);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                       util::Optional<VersionID> version,
                       util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);

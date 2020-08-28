@@ -748,6 +748,7 @@ TEST_CASE("notifications: skip") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1110,6 +1111,7 @@ TEST_CASE("notifications: async error handling") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1315,6 +1317,7 @@ TEST_CASE("notifications: sync") {
 
     SyncServer server(false);
     SyncTestFile config(server);
+    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
@@ -1358,6 +1361,7 @@ TEST_CASE("notifications: results") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2005,6 +2009,7 @@ TEST_CASE("results: notifier with no callbacks") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -2104,6 +2109,7 @@ TEST_CASE("results: error messages") {
 
 TEST_CASE("results: snapshots") {
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {
@@ -2431,6 +2437,7 @@ TEST_CASE("results: snapshots") {
 TEST_CASE("results: distinct") {
     const int N = 10;
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2642,6 +2649,7 @@ TEST_CASE("results: distinct") {
 
 TEST_CASE("results: sort") {
     InMemoryTestFile config;
+    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
