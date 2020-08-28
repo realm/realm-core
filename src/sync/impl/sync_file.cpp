@@ -296,10 +296,10 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
     return true;
 }
 
-bool SyncFileManager::remove_realm(const std::string& local_user_identity, const std::string& raw_realm_path) const
+bool SyncFileManager::remove_realm(const std::string& user_identity, const std::string& raw_realm_path) const
 {
     auto escaped = validate_and_clean_path(raw_realm_path);
-    auto realm_path = util::file_path_by_appending_component(user_directory(local_user_identity), escaped);
+    auto realm_path = util::file_path_by_appending_component(user_directory(user_identity), escaped);
     return remove_realm(realm_path);
 }
 
@@ -324,10 +324,10 @@ static bool try_file_remove(const std::string& path) noexcept
     }
 }
 
-std::string SyncFileManager::realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const
+std::string SyncFileManager::realm_file_path(const std::string& user_identity, const std::string& local_user_identity, const std::string& realm_file_name) const
 {
     auto escaped_file_name = validate_and_clean_path(realm_file_name);
-    std::string preferred_name = util::file_path_by_appending_component(user_directory(local_user_identity), escaped_file_name);
+    std::string preferred_name = util::file_path_by_appending_component(user_directory(user_identity), escaped_file_name);
     std::string preferred_path = preferred_name + c_realm_file_suffix;
 
     if (!try_file_exists(preferred_path)) {
@@ -345,6 +345,12 @@ std::string SyncFileManager::realm_file_path(const std::string& local_user_ident
         std::string old_path = legacy_realm_file_path(local_user_identity, realm_file_name);
         if (try_file_exists(old_path)) {
             return old_path;
+        }
+
+        // retain support for legacy local identity paths
+        std::string old_local_identity_path = legacy_local_identity_path(local_user_identity, realm_file_name);
+        if (try_file_exists(old_local_identity_path)) {
+            return old_local_identity_path;
         }
 
         // since this appears to be a new file, test the normal location
@@ -417,6 +423,15 @@ std::string SyncFileManager::legacy_realm_file_path(const std::string& local_use
     auto path = util::file_path_by_appending_component(m_base_path, c_legacy_sync_directory, util::FilePathType::Directory);
     path = util::file_path_by_appending_component(path, validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
     path = util::file_path_by_appending_component(path, validate_and_clean_path(realm_file_name));
+    return path;
+}
+
+std::string SyncFileManager::legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const
+{
+    auto escaped_file_name = validate_and_clean_path(realm_file_name);
+    std::string path_name = util::file_path_by_appending_component(user_directory(local_user_identity), escaped_file_name);
+    std::string path = path_name + c_realm_file_suffix;
+
     return path;
 }
 

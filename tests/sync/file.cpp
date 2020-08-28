@@ -146,6 +146,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
 }
 
 TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
+    const std::string identity = "abcdefghi";
     const std::string local_identity = "123456789";
     const std::string manager_path = base_path + "syncmanager/";
     const std::string app_id = "test_app_id*$#@!%1";
@@ -186,7 +187,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
     SECTION("Realm path APIs") {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
-        auto expected_name = manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+        auto expected_name = manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/abcdefghi/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
         auto expected_name_with_suffix = expected_name + ".realm";
 
         auto hashed_file_name = [](const std::string& name) -> std::string {
@@ -196,19 +197,19 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         };
 
         SECTION("getting a Realm path") {
-            auto actual = manager.realm_file_path(local_identity, relative_path);
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
             REQUIRE(expected_name_with_suffix == actual);
         }
 
         SECTION("deleting a Realm for a valid user") {
-            manager.realm_file_path(local_identity, relative_path);
+            manager.realm_file_path(identity, local_identity, relative_path);
             // Create the required files
             REQUIRE(create_dummy_realm(expected_name));
             REQUIRE(File::exists(expected_name));
             REQUIRE(File::exists(expected_name + ".lock"));
             REQUIRE_DIR_EXISTS(expected_name + ".management");
             // Delete the Realm
-            REQUIRE(manager.remove_realm(local_identity, relative_path));
+            REQUIRE(manager.remove_realm(identity, relative_path));
             // Ensure the files don't exist anymore
             REQUIRE(!File::exists(expected_name));
             REQUIRE(!File::exists(expected_name + ".lock"));
@@ -229,7 +230,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(create_dummy_realm(hashed_path));
             REQUIRE(File::exists(hashed_path));
             REQUIRE(!File::exists(traditional_path));
-            auto actual = manager.realm_file_path(local_identity, relative_path);
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
             REQUIRE(actual == hashed_path);
             REQUIRE(File::exists(hashed_path));
             REQUIRE(!File::exists(traditional_path));
@@ -246,7 +247,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(create_dummy_realm(old_path));
             REQUIRE(File::exists(old_path));
             REQUIRE(!File::exists(expected_name_with_suffix));
-            auto actual = manager.realm_file_path(local_identity, relative_path);
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
             REQUIRE(actual == old_path);
             REQUIRE(File::exists(old_path));
             REQUIRE(!File::exists(expected_name_with_suffix));
@@ -255,7 +256,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         SECTION("paths have a fallback hashed location if the preferred path is too long") {
             const std::string long_path_name = std::string(300, 'a');
             REQUIRE(long_path_name.length() > 255); // linux name length limit
-            auto actual = manager.realm_file_path(local_identity, long_path_name);
+            auto actual = manager.realm_file_path(identity, local_identity, long_path_name);
             REQUIRE(actual.length() < 300);
             REQUIRE(create_dummy_realm(actual));
             REQUIRE(File::exists(actual));

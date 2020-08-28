@@ -83,10 +83,10 @@ public:
     static bool try_file_exists(const std::string& path) noexcept;
 
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string realm_file_path(const std::string& user_identity, const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    bool remove_realm(const std::string& user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -136,6 +136,7 @@ private:
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& local_user_identity) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
     std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };
 
