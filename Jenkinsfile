@@ -100,7 +100,7 @@ jobWrapper {
             checkMacOsRelease       : doBuildMacOs('Release', true),
             checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
-            iosDebug                : doBuildAppleDevice('ios', 'MinSizeDebug'),
+            iosDebug                : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
@@ -155,7 +155,9 @@ jobWrapper {
                 }
             }
 
-            appleSdks = ['ios', 'tvos', 'watchos']
+            appleSdks = ['iphoneos', 'iphonesimulator',
+                         'appletvos', 'appletvsimulator',
+                         'watchos', 'watchsimulator']
             appleBuildTypes = ['MinSizeDebug', 'Release']
 
             for (sdk in appleSdks) {
@@ -599,8 +601,13 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('osx') {
             getArchive()
 
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/',
-                     'XCODE12_DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
+            // Builds for Apple devices have to be done with the oldest Xcode
+            // version we support because bitcode is not backwards-compatible.
+            // This doesn't apply to simulators, and Xcode 12 supports more
+            // architectures than 11, so we want to use 12 for simulator builds.
+            def xcodeVersion = sdk.contains('simulator') ? '12' : '11'
+
+            withEnv(["DEVELOPER_DIR=/Applications/Xcode-${xcodeVersion}.app/Contents/Developer/"]) {
                 retry(3) {
                     timeout(time: 45, unit: 'MINUTES') {
                         sh """
