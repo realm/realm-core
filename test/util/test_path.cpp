@@ -24,7 +24,7 @@
 
 #include "test_path.hpp"
 
-#ifdef REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
 #include <sys/mount.h>
 #include <sys/param.h>
 #endif
@@ -89,7 +89,7 @@ std::string get_test_path_prefix()
 
 bool test_dir_is_exfat()
 {
-#ifdef REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
     if (test_util::get_test_path_prefix().empty())
         return false;
 
