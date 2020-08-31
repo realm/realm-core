@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include "test_all.hpp"
+#include "util/test_path.hpp"
 #ifdef _WIN32
 #include <Windows.h>
 
@@ -48,6 +49,9 @@ int main(int argc, char* argv[])
     if (chdir(directory) < 0) {
         fprintf(stderr, "Failed to change directory.\n");
         return 1;
+    }
+    if (argc > 1) {
+        realm::test_util::set_test_path_prefix(argv[1]);
     }
 #endif
 

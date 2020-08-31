@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix deadlocks when writing to a Realm file on an exFAT partition from macOS. ([Cocoa #6691](https://github.com/realm/realm-cocoa/issues/6691)).
  
 ### Breaking changes
 * None.

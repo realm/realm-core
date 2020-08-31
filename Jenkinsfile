@@ -42,7 +42,6 @@ jobWrapper {
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git merge-base origin/${targetBranch} HEAD").trim()
             }
- 
         }
 
         currentBranch = env.BRANCH_NAME

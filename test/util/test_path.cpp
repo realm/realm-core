@@ -24,6 +24,11 @@
 
 #include "test_path.hpp"
 
+#if REALM_PLATFORM_APPLE
+#include <sys/mount.h>
+#include <sys/param.h>
+#endif
+
 using namespace realm::util;
 
 namespace {
@@ -80,6 +85,23 @@ void set_test_path_prefix(const std::string& prefix)
 std::string get_test_path_prefix()
 {
     return path_prefix;
+}
+
+bool test_dir_is_exfat()
+{
+#if REALM_PLATFORM_APPLE
+    if (test_util::get_test_path_prefix().empty())
+        return false;
+
+    struct statfs fsbuf;
+    int ret = statfs(test_util::get_test_path_prefix().c_str(), &fsbuf);
+    REALM_ASSERT_RELEASE(ret == 0);
+    // The documentation and headers helpfully don't list any of the values of
+    // f_type or provide constants for them
+    return fsbuf.f_type == 28 /* exFAT */;
+#else
+    return false;
+#endif
 }
 
 std::string get_test_resource_path()
