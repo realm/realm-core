@@ -109,7 +109,6 @@ for bt in "${BUILD_TYPES[@]}"; do
     done
 
     mkdir -p out
-    mv core/librealm-parser* out
     mv core/librealm-macosx* out
     if [[ -z $MACOS_ONLY ]]; then
         mv core/librealm-maccatalyst* out
