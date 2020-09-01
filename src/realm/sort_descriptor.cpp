@@ -134,6 +134,12 @@ std::unique_ptr<BaseDescriptor> SortDescriptor::clone() const
 
 void SortDescriptor::merge(SortDescriptor&& other, MergeMode mode)
 {
+    if (mode == MergeMode::replace) {
+        m_column_keys = other.m_column_keys;
+        m_ascending = other.m_ascending;
+        return;
+    }
+
     m_column_keys.insert(mode == MergeMode::prepend ? m_column_keys.begin() : m_column_keys.end(),
                          other.m_column_keys.begin(), other.m_column_keys.end());
     // Do not use a move iterator on a vector of bools!
@@ -556,9 +562,18 @@ void DescriptorOrdering::append_sort(SortDescriptor sort, SortDescriptor::MergeM
         return;
     }
     if (!m_descriptors.empty()) {
-        if (SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get())) {
-            previous_sort->merge(std::move(sort), mode);
-            return;
+        if (mode == SortDescriptor::MergeMode::replace) {
+            for (auto it = m_descriptors.begin(); it != m_descriptors.end(); ++it) {
+                if ((*it)->get_type() == DescriptorType::Sort) {
+                    it = m_descriptors.erase(it);
+                }
+            }
+        }
+        else {
+            if (SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get())) {
+                previous_sort->merge(std::move(sort), mode);
+                return;
+            }
         }
     }
     m_descriptors.emplace_back(new SortDescriptor(std::move(sort)));
