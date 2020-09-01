@@ -389,7 +389,7 @@ void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
         m_tracer.field("target_table", p.link_target_table);
     }
     if (p.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
-        m_tracer.field("value_type", p.value_type);
+        m_tracer.field("key_type", p.key_type);
     }
 }
 

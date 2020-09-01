@@ -110,7 +110,7 @@ public:
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
-    DataType get_dictionary_value_type(ColKey column_key) const noexcept;
+    DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
@@ -132,7 +132,7 @@ public:
     ColKey add_column(Table& target, StringData name);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(Table& target, StringData name);
-    ColKey add_column_dictionary(DataType type, StringData name, DataType value_type);
+    ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
     ColKey
@@ -664,14 +664,14 @@ private:
     void set_key(TableKey key);
 
     ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
-                            DataType value_type = DataType(0));
+                            DataType key_type = DataType(0));
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     void erase_root_column(ColKey col_key);
-    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType value_type = DataType(0));
+    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
 
     bool has_any_embedded_objects();
@@ -1070,11 +1070,11 @@ inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
     return column_key.get_attrs();
 }
 
-inline DataType Table::get_dictionary_value_type(ColKey column_key) const noexcept
+inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
 {
     auto spec_ndx = colkey2spec_ndx(column_key);
     REALM_ASSERT_3(spec_ndx, <, get_column_count());
-    return m_spec.get_value_type(spec_ndx);
+    return m_spec.get_dictionary_key_type(spec_ndx);
 }
 
 

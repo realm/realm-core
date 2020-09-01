@@ -1068,7 +1068,8 @@ void Cluster::verify() const
             }
             for (size_t n = 0; n < sz; n++) {
                 if (arr.get(n)) {
-                    DictionaryClusterTree cluster(&arr, col_type, get_alloc(), n);
+                    auto key_type = get_owning_table()->get_dictionary_key_type(col_key);
+                    DictionaryClusterTree cluster(&arr, key_type, get_alloc(), n);
                     cluster.init_from_parent();
                     cluster.verify();
                 }

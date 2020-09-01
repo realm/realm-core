@@ -27,11 +27,11 @@ namespace realm {
 
 /************************** DictionaryClusterTree ****************************/
 
-DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, ColumnType col_type, Allocator& alloc, size_t ndx)
+DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_type, Allocator& alloc, size_t ndx)
     : ClusterTree(alloc)
     , m_owner(owner)
     , m_ndx_in_cluster(ndx)
-    , m_keys_col(ColKey(ColKey::Idx{0}, col_type, ColumnAttrMask(), 0))
+    , m_keys_col(ColKey(ColKey::Idx{0}, ColumnType(key_type), ColumnAttrMask(), 0))
 {
 }
 
@@ -41,6 +41,7 @@ DictionaryClusterTree::~DictionaryClusterTree() {}
 
 Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     : CollectionBase(obj, col_key)
+    , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
 {
     init_from_parent();
 }
@@ -70,9 +71,14 @@ size_t Dictionary::size() const
     return m_clusters->size();
 }
 
+DataType Dictionary::get_key_data_type() const
+{
+    return m_key_type;
+}
+
 DataType Dictionary::get_value_data_type() const
 {
-    return m_obj.get_table()->get_dictionary_value_type(m_col_key);
+    return DataType(m_col_key.get_type());
 }
 
 bool Dictionary::is_null(size_t ndx) const
@@ -256,7 +262,7 @@ void Dictionary::create()
     if (!m_clusters && m_obj.is_valid()) {
         MemRef mem = Cluster::create_empty_cluster(m_obj.get_alloc());
         update_child_ref(0, mem.get_ref());
-        m_clusters = new DictionaryClusterTree(this, m_col_key.get_type(), m_obj.get_alloc(), m_obj.get_row_ndx());
+        m_clusters = new DictionaryClusterTree(this, m_key_type, m_obj.get_alloc(), m_obj.get_row_ndx());
         m_clusters->init_from_parent();
         m_clusters->add_columns();
     }
@@ -266,7 +272,10 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
     REALM_ASSERT(value.get_type() != type_Link);
 
-    if (m_col_key.get_type() != col_type_Mixed && key.get_type() != DataType(m_col_key.get_type())) {
+    if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
+        throw LogicError(LogicError::collection_type_mismatch);
+    }
+    if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
@@ -408,8 +417,8 @@ bool Dictionary::init_from_parent() const
 
     if (ref) {
         if (!m_clusters)
-            m_clusters = new DictionaryClusterTree(const_cast<Dictionary*>(this), m_col_key.get_type(),
-                                                   m_obj.get_alloc(), m_obj.get_row_ndx());
+            m_clusters = new DictionaryClusterTree(const_cast<Dictionary*>(this), m_key_type, m_obj.get_alloc(),
+                                                   m_obj.get_row_ndx());
 
         m_clusters->init_from_parent();
         valid = true;
@@ -445,7 +454,7 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
 
 Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
     : ClusterTree::Iterator(*dict->m_clusters, pos)
-    , m_key_type(dict->get_col_key().get_type())
+    , m_key_type(dict->get_key_data_type())
 {
 }
 
@@ -454,14 +463,14 @@ auto Dictionary::Iterator::operator*() -> value_type
     update();
     Mixed key;
     switch (m_key_type) {
-        case col_type_String: {
+        case type_String: {
             ArrayString keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);
             key = Mixed(keys.get(m_state.m_current_index));
             break;
         }
-        case col_type_Int: {
+        case type_Int: {
             ArrayInteger keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);

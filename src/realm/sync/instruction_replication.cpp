@@ -348,19 +348,20 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
             instr.collection_type = CollectionType::List;
         }
         else if (col_key.is_dictionary()) {
-            REALM_ASSERT(type == type_String);
             instr.collection_type = CollectionType::Dictionary;
-            auto value_type = table->get_dictionary_value_type(col_key);
-            instr.value_type = get_payload_type(value_type);
+            auto key_type = table->get_dictionary_key_type(col_key);
+            REALM_ASSERT(key_type == type_String);
+            instr.key_type = get_payload_type(key_type);
         }
         else {
             REALM_ASSERT(!col_key.is_collection());
             instr.collection_type = CollectionType::Single;
-            instr.value_type = Instruction::Payload::Type::Null;
+            instr.key_type = Instruction::Payload::Type::Null;
         }
 
         // Mixed columns are always nullable.
-        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
+        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable ||
+                     instr.collection_type == CollectionType::Dictionary);
 
         if (instr.type == Instruction::Payload::Type::Link && target_table) {
             instr.link_target_table = emit_class_name(*target_table);

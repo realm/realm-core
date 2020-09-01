@@ -38,6 +38,7 @@ public:
     Dictionary(const Obj& obj, ColKey col_key);
     Dictionary(const Dictionary& other)
         : CollectionBase(other)
+        , m_key_type(other.m_key_type)
     {
         *this = other;
     }
@@ -46,6 +47,7 @@ public:
 
     // Overriding members of CollectionBase:
     size_t size() const final;
+    DataType get_key_data_type() const;
     DataType get_value_data_type() const;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
@@ -85,6 +87,7 @@ public:
 
 private:
     mutable DictionaryClusterTree* m_clusters = nullptr;
+    DataType m_key_type = type_String;
 
     bool init_from_parent() const final;
     Mixed do_get(ClusterNode::State&&) const;
@@ -104,7 +107,7 @@ private:
     friend class Dictionary;
     using ClusterTree::Iterator::get_position;
 
-    ColumnType m_key_type;
+    DataType m_key_type;
 
     Iterator(const Dictionary* dict, size_t pos);
 };
