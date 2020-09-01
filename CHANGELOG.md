@@ -1,20 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.23 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix an assertion failure when DB::call_with_lock() was called when the management directory did not exist on iOS (since 6.0.21).
 * The non-xcframework Apple release package did not include macOS libraries (since 6.0.22).
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
