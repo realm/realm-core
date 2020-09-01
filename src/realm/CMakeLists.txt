@@ -56,6 +56,7 @@ set(REALM_SOURCES
     sort_descriptor.cpp
     unicode.cpp
     utilities.cpp
+    uuid.cpp
     version.cpp
 ) # REALM_SOURCES
 
@@ -173,6 +174,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     timestamp.hpp
     unicode.hpp
     utilities.hpp
+    uuid.hpp
     version.hpp
     version_id.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS

@@ -80,6 +80,7 @@ set(CORE_TEST_SOURCES
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_util_fixed_size_buffer.cpp
+    test_uuid.cpp
     test_version.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)
