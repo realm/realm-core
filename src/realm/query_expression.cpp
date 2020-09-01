@@ -252,27 +252,45 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
     Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
 
     if (links_exist()) {
+        REALM_ASSERT(m_leaf_ptr == nullptr);
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
 
-        std::vector<Mixed> values;
-        for (size_t t = 0; t < sz; t++) {
-            const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-            auto dict = obj.get_dictionary(m_column_key);
-            if (m_key.is_null()) {
+        if (!m_key.is_null()) {
+            if (m_link_map.only_unary_links()) {
+                // If unary links, we can at most have one link
+                REALM_ASSERT(sz <= 1);
+                d.init(false, 1);
+                d.m_storage.set_null(0);
+            }
+            else {
+                d.init(true, sz);
+            }
+            for (size_t t = 0; t < sz; t++) {
+                const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+                auto dict = obj.get_dictionary(m_column_key);
+                auto opt_val = dict.try_get(m_key);
+                if (opt_val)
+                    d.m_storage.set(t, *opt_val);
+                else
+                    d.m_storage.set_null(t);
+            }
+        }
+        else {
+            // Here we don't really know how many values to expect
+            std::vector<Mixed> values;
+            for (size_t t = 0; t < sz; t++) {
+                const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+                auto dict = obj.get_dictionary(m_column_key);
                 // Insert all values
                 dict.for_all_values([&values](const Mixed& value) {
                     values.emplace_back(value);
                 });
             }
-            else {
-                auto opt_val = dict.try_get(m_key);
-                if (opt_val)
-                    values.emplace_back(*opt_val);
-            }
-        }
 
-        d.init(!m_link_map.only_unary_links() || m_key.is_null(), values);
+            // Copy values over
+            d.init(true, values);
+        }
     }
     else {
         // Not a link column

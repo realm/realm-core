@@ -1410,6 +1410,10 @@ public:
                 d.m_storage.set(t, m_storage[t]);
             }
         }
+        else if constexpr (std::is_same_v<T, null>) {
+            Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
+            d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
+        }
         else if constexpr (realm::is_any_v<T, int, int64_t, bool, float, double, StringData, BinaryData, Timestamp,
                                            Decimal128, ObjectId>) {
             Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
