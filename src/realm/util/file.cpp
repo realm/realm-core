@@ -1023,11 +1023,20 @@ bool File::lock(bool exclusive, bool non_blocking)
     //                before releasing the exclusive lock.
     //                (unlock must close the pipe for reading)
     REALM_ASSERT_RELEASE(m_pipe_fd == -1);
-    // TODO create the pipe if it doesn't exist.
     if (m_fifo_path.empty())
         m_fifo_path = m_path + ".fifo";
     status = mkfifo(m_fifo_path.c_str(), 0666);
-    REALM_ASSERT_EX(status == 0 || (status == -1 && errno == EEXIST), status, errno);
+    if (status) {
+        int err = errno;
+        REALM_ASSERT_EX(status == -1, status);
+        if (exclusive && err == ENOENT) {
+            // The management directory doesn't exist, so there's clearly no
+            // readers. This can happen when calling DB::call_with_lock().
+            m_has_exclusive_lock = true;
+            return true;
+        }
+        REALM_ASSERT_EX(err == EEXIST, err);
+    }
     if (exclusive) {
         // check if any shared locks are already taken by trying to open the pipe for writing
         // shared locks are indicated by one or more readers already having opened the pipe
