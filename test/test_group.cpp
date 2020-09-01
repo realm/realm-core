@@ -245,6 +245,9 @@ TEST(Group_Permissions)
         std::cout << "Group_Permissions test skipped because you are running it as root\n\n";
         return;
     }
+    if (test_util::test_dir_is_exfat()) {
+        return;
+    }
 
     GROUP_TEST_PATH(path);
     {

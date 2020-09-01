@@ -815,7 +815,8 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
                 ordering.append_distinct(DistinctDescriptor(property_columns));
             }
             else {
-                ordering.append_sort(SortDescriptor(property_columns, ascendings));
+                ordering.append_sort(SortDescriptor(property_columns, ascendings),
+                                     SortDescriptor::MergeMode::prepend);
             }
         }
         else if (cur_ordering.type == DescriptorOrderingState::SingleOrderingState::DescriptorType::Include) {

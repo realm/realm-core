@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix an assertion failure when DB::call_with_lock() was called when the management directory did not exist on iOS (since 6.0.21).
  
 ### Breaking changes
 * None.
@@ -282,6 +282,19 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+
+----------------------------------------------
+
+# 6.0.22 Release notes
+
+### Enhancements
+* Added an enum to `DescriptorOrdering::append_sort` which allows users to choose the merge order of how sorts are applied. The default is the historical behaviour sor this is not a breaking change. ([#3869](https://github.com/realm/realm-core/issues/3869))
+* Add arm64 simulator slices to the xcframework release package.
+
+### Fixed
+* Fix deadlocks when writing to a Realm file on an exFAT partition from macOS. ([Cocoa #6691](https://github.com/realm/realm-cocoa/issues/6691)).
+
+----------------------------------------------
 
 # 6.0.21 Release notes
 

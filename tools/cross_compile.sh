@@ -21,9 +21,12 @@ while getopts ":o:a:t:v:f:" opt; do
         o)
             OS=${OPTARG}
             [ "${OS}" == "android" ] ||
-            [ "${OS}" == "ios" ] ||
+            [ "${OS}" == "iphoneos" ] ||
+            [ "${OS}" == "iphonesimulator" ] ||
             [ "${OS}" == "watchos" ] ||
-            [ "${OS}" == "tvos" ] || usage
+            [ "${OS}" == "watchsimulator" ] ||
+            [ "${OS}" == "appletvos" ] ||
+            [ "${OS}" == "appletvsimulator" ] || usage
             ;;
         a)
             ARCH=${OPTARG}
@@ -77,56 +80,25 @@ if [ "${OS}" == "android" ]; then
     ninja package
 else
     case "${OS}" in
-        ios) SDK="iphone";;
-        watchos) SDK="watch";;
-        tvos) SDK="appletv";;
+        iphone*) toolchain="ios";;
+        watch*) toolchain="watchos";;
+        appletv*) toolchain="tvos";;
     esac
     [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
-
-    function configure_xcode {
-        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
-              -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
-              -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-              -D REALM_NO_TESTS=1 \
-              -D REALM_VERSION="${VERSION}" \
-              -D CPACK_SYSTEM_NAME="${SDK}os" \
-              ${CMAKE_FLAGS} \
-              -G Xcode ..
-    }
-
-    if [ "${OS}" == "watchos" ] && [ -n "${XCODE12_DEVELOPER_DIR}" ]; then
-        mkdir -p "build-${OS}-${BUILD_TYPE}-64"
-        pushd "build-${OS}-${BUILD_TYPE}-64" || exit 1
-        (
-            export DEVELOPER_DIR="$XCODE12_DEVELOPER_DIR"
-            configure_xcode
-            xcodebuild -sdk "${SDK}simulator" -configuration "${BUILD_TYPE}" ARCHS='x86_64'
-        )
-        WATCHOS_EXTRA_LIB="$(pwd)/src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
-        popd
-    fi
-
 
     mkdir -p "build-${OS}-${BUILD_TYPE}"
     cd "build-${OS}-${BUILD_TYPE}" || exit 1
 
-    configure_xcode
-    xcodebuild -sdk "${SDK}os" \
+    cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${toolchain}.toolchain.cmake" \
+          -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
+          -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+          -D REALM_NO_TESTS=1 \
+          -D REALM_VERSION="${VERSION}" \
+          ${CMAKE_FLAGS} \
+          -G Xcode ..
+    xcodebuild -sdk "${OS}" \
                -configuration "${BUILD_TYPE}" \
+               -target install \
                ONLY_ACTIVE_ARCH=NO
-    xcodebuild -sdk "${SDK}simulator" \
-               -configuration "${BUILD_TYPE}" \
-               ONLY_ACTIVE_ARCH=NO
-    mkdir -p "src/realm/${BUILD_TYPE}"
-    mkdir -p "src/realm/parser/${BUILD_TYPE}"
-    lipo -create \
-         -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a" \
-         ${WATCHOS_EXTRA_LIB}
-    lipo -create \
-         -output "src/realm/parser/${BUILD_TYPE}/librealm-parser${suffix}.a" \
-         "src/realm/parser/${BUILD_TYPE}-${SDK}os/librealm-parser${suffix}.a" \
-         "src/realm/parser/${BUILD_TYPE}-${SDK}simulator/librealm-parser${suffix}.a"
-    cpack -C "${BUILD_TYPE}" || exit 1
+    tar -cvzf "realm-core-${BUILD_TYPE}-${VERSION}-${OS}-devel.tar.gz" -C install lib include
 fi

@@ -197,7 +197,18 @@ public:
         return util::none;
     }
 
-    void merge_with(SortDescriptor&& other);
+    enum class MergeMode {
+        /// If another sort has just been applied, merge before it, so it takes primary precedence
+        /// this is used for time based scenarios where building the last applied sort is the most important
+        /// default historical behaviour
+        append,
+        /// If another sort has just been applied, merge after it to take secondary precedence
+        /// this is used to construct sorts in a builder pattern where the first applied sort remains the most
+        /// important
+        prepend
+    };
+
+    void merge(SortDescriptor&& other, MergeMode mode);
 
     Sorter sorter(Table const& table, const IndexPairs& indexes) const override;
 
@@ -290,7 +301,7 @@ public:
     DescriptorOrdering& operator=(const DescriptorOrdering&);
     DescriptorOrdering& operator=(DescriptorOrdering&&) = default;
 
-    void append_sort(SortDescriptor sort);
+    void append_sort(SortDescriptor sort, SortDescriptor::MergeMode mode = SortDescriptor::MergeMode::prepend);
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
     void append_include(IncludeDescriptor include);
