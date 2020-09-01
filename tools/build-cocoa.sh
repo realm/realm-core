@@ -109,11 +109,16 @@ for bt in "${BUILD_TYPES[@]}"; do
     done
 
     mkdir -p out
-    combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
-    combine_libraries "watchos${suffix}" "watchsimulator${suffix}" "watchos${suffix}"
-    combine_libraries "appletvos${suffix}" "appletvsimulator${suffix}" "tvos${suffix}"
+    mv core/librealm-parser* out
+    mv core/librealm-macosx* out
+    if [[ -z $MACOS_ONLY ]]; then
+        mv core/librealm-maccatalyst* out
+        combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
+        combine_libraries "watchos${suffix}" "watchsimulator${suffix}" "watchos${suffix}"
+        combine_libraries "appletvos${suffix}" "appletvsimulator${suffix}" "tvos${suffix}"
+    fi
 done
-rm core/*.a
+rm -f core/*.a
 mv out/*.a core
 rmdir out
 
