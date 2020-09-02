@@ -8047,9 +8047,8 @@ TEST(Sync_Dictionary_Links)
         auto foo = foos->get_object_with_primary_key(123);
         auto dict = foo.get_dictionary(col_dict);
 
-        // FIXME: Dictionaries currently expose tombstones.
-        // CHECK_EQUAL(dict.size(), 1);
-        // CHECK(dict.find("a") == dict.end());
+        CHECK_EQUAL(dict.size(), 2);
+        CHECK((*dict.find("a")).second.is_unresolved_link());
 
         CHECK(dict.find("b") != dict.end());
 
@@ -8073,9 +8072,8 @@ TEST(Sync_Dictionary_Links)
         auto foo = foos->get_object_with_primary_key(123);
         auto dict = foo.get_dictionary(col_dict);
 
-        // FIXME: Dictionaries currently expose tombstones.
-        // CHECK_EQUAL(dict.size(), 1);
-        // CHECK(dict.find("a") == dict.end());
+        CHECK_EQUAL(dict.size(), 2);
+        CHECK((*dict.find("a")).second.is_unresolved_link());
 
         CHECK(dict.find("b") != dict.end());
         CHECK((*dict.find("b")).second == Mixed{b.get_link()});

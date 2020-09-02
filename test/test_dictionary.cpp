@@ -321,9 +321,8 @@ TEST(Dictionary_Tombstones)
 
     a.invalidate();
 
-    // FIXME: Dictionaries currently expose tombstones.
-    // CHECK_EQUAL(dict.size(), 1);
-    // CHECK(dict.find("a") == dict.end());
+    CHECK_EQUAL(dict.size(), 2);
+    CHECK((*dict.find("a")).second.is_unresolved_link());
 
     CHECK(dict.find("b") != dict.end());
 }
