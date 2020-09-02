@@ -110,6 +110,7 @@ for bt in "${BUILD_TYPES[@]}"; do
 
     mkdir -p out
     mv core/librealm-macosx* out
+    mv core/librealm-parser-macosx* out
     if [[ -z $MACOS_ONLY ]]; then
         mv core/librealm-maccatalyst* out
         combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
