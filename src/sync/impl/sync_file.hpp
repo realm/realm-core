@@ -68,10 +68,10 @@ public:
         }
 
     /// Return the user directory for a given user, creating it if it does not already exist.
-    std::string user_directory(const std::string& local_identity) const;
+    std::string user_directory(const std::string& identity) const;
 
     /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& local_identity) const;       // throws
+    void remove_user_directory(const std::string& identity) const;       // throws
 
     /// Rename a user directory. Returns true if a directory at `old_name` existed
     /// and was successfully renamed to `new_name`. Returns false if no directory

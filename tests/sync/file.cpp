@@ -156,29 +156,29 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     auto manager = SyncFileManager(manager_path, app_id);
 
     SECTION("user directory APIs") {
-        const std::string expected = manager_path + "mongodb-realm/" + expected_clean_app_id + "/" + local_identity + "/";
+        const std::string expected = manager_path + "mongodb-realm/" + expected_clean_app_id + "/" + identity + "/";
         SECTION("getting a user directory") {
             SECTION("that didn't exist before succeeds") {
-                auto actual = manager.user_directory(local_identity);
+                auto actual = manager.user_directory(identity);
                 REQUIRE(actual == expected);
                 REQUIRE_DIR_EXISTS(expected);
             }
             SECTION("that already existed succeeds") {
-                auto actual = manager.user_directory(local_identity);
+                auto actual = manager.user_directory(identity);
                 REQUIRE(actual == expected);
                 REQUIRE_DIR_EXISTS(expected);
             }
         }
 
         SECTION("deleting a user directory") {
-            manager.user_directory(local_identity);
+            manager.user_directory(identity);
             REQUIRE_DIR_EXISTS(expected);
             SECTION("that wasn't yet deleted succeeds") {
-                manager.remove_user_directory(local_identity);
+                manager.remove_user_directory(identity);
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
             }
             SECTION("that was already deleted succeeds") {
-                manager.remove_user_directory(local_identity);
+                manager.remove_user_directory(identity);
                 REQUIRE(opendir(expected.c_str()) == NULL);
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
             }
