@@ -272,7 +272,7 @@ public:
     // Must have set selected:
     bool set_insert(size_t set_ndx);
     bool set_erase(size_t set_ndx);
-    bool set_clear();
+    bool set_clear(size_t set_ndx);
 
     bool dictionary_insert(Mixed key);
     bool dictionary_erase(Mixed key);
@@ -896,16 +896,16 @@ inline void TransactLogConvenientEncoder::set_erase(const CollectionBase& set, s
     m_encoder.set_erase(set_ndx); // Throws
 }
 
-inline bool TransactLogEncoder::set_clear()
+inline bool TransactLogEncoder::set_clear(size_t set_size)
 {
-    append_simple_instr(instr_SetClear); // Throws
+    append_simple_instr(instr_SetClear, set_size); // Throws
     return true;
 }
 
 inline void TransactLogConvenientEncoder::set_clear(const CollectionBase& set)
 {
-    select_collection(set); // Throws
-    m_encoder.set_clear();  // Throws
+    select_collection(set);          // Throws
+    m_encoder.set_clear(set.size()); // Throws
 }
 
 inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey key)
@@ -1076,7 +1076,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
         case instr_SetClear: {
             size_t set_size = read_int<size_t>(); // Throws
-            if (!handler.set_clear(set_size)) // Throws
+            if (!handler.set_clear(set_size))     // Throws
                 parser_error();
             return;
         }
@@ -1376,19 +1376,22 @@ public:
         return true;
     }
 
-    bool set_insert(size_t ndx) {
+    bool set_insert(size_t ndx)
+    {
         m_encoder.set_erase(ndx);
         append_instruction();
         return true;
     }
 
-    bool set_erase(size_t ndx) {
+    bool set_erase(size_t ndx)
+    {
         m_encoder.set_insert(ndx);
         append_instruction();
         return true;
     }
 
-    bool set_clear(size_t old_set_size) {
+    bool set_clear(size_t old_set_size)
+    {
         for (size_t i = old_set_size; i > 0; --i) {
             m_encoder.set_insert(i - 1);
             append_instruction();
