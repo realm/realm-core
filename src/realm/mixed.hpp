@@ -172,6 +172,7 @@ public:
     ObjLink get_link() const;
 
     bool is_null() const;
+    bool is_unresolved_link() const;
     int compare(const Mixed& b) const;
     bool operator==(const Mixed& other) const
     {
@@ -482,6 +483,20 @@ inline ObjLink Mixed::get_link() const
 inline bool Mixed::is_null() const
 {
     return (m_type == 0);
+}
+
+inline bool Mixed::is_unresolved_link() const
+{
+    if (is_null()) {
+        return false;
+    }
+    else if (get_type() == type_TypedLink) {
+        return get<ObjLink>().is_unresolved();
+    }
+    else if (get_type() == type_Link) {
+        return get<ObjKey>().is_unresolved();
+    }
+    return false;
 }
 
 std::ostream& operator<<(std::ostream& out, const Mixed& m);
