@@ -260,7 +260,6 @@ public:
     }
     // Get object based on primary key
     Obj get_object_with_primary_key(Mixed pk) const;
-    Obj operator[](Mixed pk) const;
     // Get primary key based on ObjKey
     Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
@@ -1201,17 +1200,6 @@ inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
 inline bool Table::is_group_level() const noexcept
 {
     return bool(get_parent_group());
-}
-
-inline Obj Table::operator[](Mixed pk) const
-{
-    auto col = get_primary_key_column();
-    if (col) {
-        return get_object_with_primary_key(pk);
-    }
-    else {
-        return get_object(pk.get<ObjKey>());
-    }
 }
 
 inline bool Table::operator==(const Table& t) const
