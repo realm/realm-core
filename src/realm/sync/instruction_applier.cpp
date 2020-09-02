@@ -665,6 +665,48 @@ void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
     resolve_path(instr, "ArrayClear", callback);
 }
 
+void InstructionApplier::operator()(const Instruction::SetInsert& instr)
+{
+    auto callback = util::overloaded{
+        [&](SetBase& set) {
+            REALM_TERMINATE("Not implemented yet.");
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for SetInsert");
+        },
+    };
+
+    resolve_path(instr, "SetInsert", callback);
+}
+
+void InstructionApplier::operator()(const Instruction::SetErase& instr)
+{
+    auto callback = util::overloaded{
+        [&](SetBase& set) {
+            REALM_TERMINATE("Not implemented yet.");
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for SetErase");
+        },
+    };
+
+    resolve_path(instr, "SetErase", callback);
+}
+
+void InstructionApplier::operator()(const Instruction::SetClear& instr)
+{
+    auto callback = util::overloaded{
+        [&](SetBase& set) {
+            REALM_TERMINATE("Not implemented yet.");
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for SetClear");
+        },
+    };
+
+    resolve_path(instr, "SetClear", callback);
+}
+
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
 {
     if (auto class_name = m_log->try_get_string(instr.table)) {

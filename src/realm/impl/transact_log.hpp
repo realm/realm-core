@@ -210,6 +210,19 @@ public:
         return true;
     }
 
+    bool set_insert(size_t)
+    {
+        return true;
+    }
+    bool set_erase(size_t)
+    {
+        return true;
+    }
+    bool set_clear(size_t)
+    {
+        return true;
+    }
+
     void parse_complete() {}
 };
 // LCOV_EXCL_STOP (NullInstructionObserver)
@@ -1049,6 +1062,24 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_SetInsert: {
+            size_t set_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_insert(set_ndx))    // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetErase: {
+            size_t set_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_erase(set_ndx))     // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetClear: {
+            size_t set_size = read_int<size_t>(); // Throws
+            if (!handler.set_clear(set_size)) // Throws
+                parser_error();
+            return;
+        }
         case instr_SelectList: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
@@ -1345,9 +1376,23 @@ public:
         return true;
     }
 
-    bool dictionary_insert(Mixed)
-    {
-        // m_encoder.dictionary_erase(key);
+    bool set_insert(size_t ndx) {
+        m_encoder.set_erase(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_erase(size_t ndx) {
+        m_encoder.set_insert(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_clear(size_t old_set_size) {
+        for (size_t i = old_set_size; i > 0; --i) {
+            m_encoder.set_insert(i - 1);
+            append_instruction();
+        }
         return true;
     }
 

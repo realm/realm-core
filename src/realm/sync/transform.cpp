@@ -890,9 +890,7 @@ void TransformerImpl::MinorSide::prepend(InputIterator begin, InputIterator end)
 {
     m_transformer.prepend_minor(std::move(begin), std::move(end));
 }
-
 } // namespace _impl
-
 
 namespace {
 
@@ -928,8 +926,8 @@ struct MergeUtils {
         return left_key == right_key;
     }
 
-    bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
-        noexcept
+    bool same_path_element(const Instruction::Path::Element& left,
+                           const Instruction::Path::Element& right) const noexcept
     {
         auto pred = util::overloaded{
             [&](uint32_t lhs, uint32_t rhs) {
@@ -960,14 +958,14 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_table(const Instruction::TableInstruction& left, const Instruction::TableInstruction& right) const
-        noexcept
+    bool same_table(const Instruction::TableInstruction& left,
+                    const Instruction::TableInstruction& right) const noexcept
     {
         return same_string(left.table, right.table);
     }
 
-    bool same_object(const Instruction::ObjectInstruction& left, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool same_object(const Instruction::ObjectInstruction& left,
+                     const Instruction::ObjectInstruction& right) const noexcept
     {
         return same_table(left, right) && same_key(left.object, right.object);
     }
@@ -988,8 +986,8 @@ struct MergeUtils {
         }
     }
 
-    bool same_field(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool same_field(const Instruction::PathInstruction& left,
+                    const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right) && same_string(left.field, right.field);
     }
@@ -1019,8 +1017,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_container(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool same_container(const Instruction::PathInstruction& left,
+                        const Instruction::PathInstruction& right) const noexcept
     {
         return same_field(left, right) && same_container(left.path, right.path);
     }
@@ -1056,8 +1054,8 @@ struct MergeUtils {
         return same_column(left, right);
     }
 
-    bool is_prefix_of(const Instruction::EraseColumn& left, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::EraseColumn& left,
+                      const Instruction::ObjectInstruction& right) const noexcept
     {
         return same_column(left, right);
     }
@@ -1068,8 +1066,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_prefix_of(const Instruction::ObjectInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::ObjectInstruction& left,
+                      const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right);
     }
@@ -1081,8 +1079,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::PathInstruction& left,
+                      const Instruction::PathInstruction& right) const noexcept
     {
         if (left.path.size() < right.path.size() && same_field(left, right)) {
             for (size_t i = 0; i < left.path.size(); ++i) {
@@ -1117,8 +1115,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_table(const Instruction::Payload& value, const Instruction::TableInstruction& right) const
-        noexcept
+    bool value_targets_table(const Instruction::Payload& value,
+                             const Instruction::TableInstruction& right) const noexcept
     {
         if (value.type == Instruction::Payload::Type::Link) {
             StringData target_table = m_left_side.get_string(value.data.link.target_table);
@@ -1128,8 +1126,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_object(const Instruction::Payload& value, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool value_targets_object(const Instruction::Payload& value,
+                              const Instruction::ObjectInstruction& right) const noexcept
     {
         if (value_targets_table(value, right)) {
             return same_key(value.data.link.target, right.object);
@@ -1173,8 +1171,8 @@ struct MergeUtils {
         REALM_UNREACHABLE();
     }
 
-    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx, const uint32_t& move_to_ndx) const
-        noexcept
+    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx,
+                           const uint32_t& move_to_ndx) const noexcept
     {
         if (get_ndx == move_from_ndx) {
             // CONFLICT: Update of a moved element.
@@ -1650,14 +1648,13 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
-            // CONFLICT: Update of a removed element.
-            //
-            // RESOLUTION: Discard the UPDATE operation received on the right side.
-            right_side.discard();
-        }
-        else if (right.index() > left.index()) {
-            right.index() -= 1;
-        }
+        // CONFLICT: Update of a removed element.
+        //
+        // RESOLUTION: Discard the UPDATE operation received on the right side.
+        right_side.discard();
+    }
+    else if (right.index() > left.index()) {
+        right.index() -= 1;
     }
 }
 
@@ -2240,10 +2237,9 @@ DEFINE_MERGE(Instruction::SetClear, Instruction::SetClear)
 /// END OF MERGE RULES!
 ///
 
-} // unnamed namespace
+} // namespace
 
 namespace _impl {
-
 template <class Left, class Right>
 void merge_instructions_2(Left& left, Right& right, TransformerImpl::MajorSide& left_side,
                           TransformerImpl::MinorSide& right_side)
@@ -2300,7 +2296,6 @@ void merge_nested_2(Outer& outer, Inner& inner, OuterSide& outer_side, InnerSide
         }
     }
 }
-
 
 void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, MinorSide& our_side)
 {
@@ -2621,9 +2616,7 @@ size_t TransformerImpl::emit_changesets(const Changeset* changesets, size_t num_
 
 } // namespace _impl
 
-
 namespace sync {
-
 std::unique_ptr<Transformer> make_transformer()
 {
     return std::make_unique<_impl::TransformerImpl>(); // Throws

@@ -435,6 +435,11 @@ struct Collection<T, Interface>::iterator {
         return m_ndx == rhs.m_ndx;
     }
 
+    size_t index() const noexcept
+    {
+        return m_ndx;
+    }
+
 private:
     friend class Lst<T>;
     friend class Collection<T, Interface>;

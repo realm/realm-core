@@ -109,7 +109,7 @@ inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Collection<T, SetBase>(obj, col_key)
 {
     if (m_obj) {
-        init_from_parent();
+        this->init_from_parent();
     }
 }
 
@@ -137,19 +137,19 @@ size_t Set<T>::insert(T value)
     auto it = std::lower_bound(b, e, value);
 
     if (it != e && *it == value) {
-        return it.m_ndx;
+        return it.index();
     }
 
     if (Replication* repl = m_obj.get_replication()) {
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
-        repl->set_insert(*this, it.m_ndx, value);
+        repl->set_insert(*this, it.index(), value);
     }
 
-    m_tree->insert(it.m_ndx, value);
+    m_tree->insert(it.index(), value);
     CollectionBase::m_obj.bump_content_version();
-    return it.m_ndx;
+    return it.index();
 }
 
 template <class T>
@@ -167,24 +167,24 @@ size_t Set<T>::erase(T value)
     }
 
     if (Replication* repl = m_obj.get_replication()) {
-        repl->set_erase(*this, it.m_ndx, value);
+        repl->set_erase(*this, it.index(), value);
     }
-    m_tree->erase(it.m_ndx);
-    CollectionBase::adj_remove(it.m_ndx);
+    m_tree->erase(it.index());
+    CollectionBase::adj_remove(it.index());
     CollectionBase::m_obj.bump_content_version();
-    return it.m_ndx;
+    return it.index();
 }
 
 template <class T>
 inline void Set<T>::insert_null()
 {
-    insert(BPlusTree<T>::default_value(m_nullable));
+    insert(BPlusTree<T>::default_value(this->m_nullable));
 }
 
 template <class T>
 inline void Set<T>::erase_null()
 {
-    erase(BPlusTree<T>::default_value(m_nullable));
+    erase(BPlusTree<T>::default_value(this->m_nullable));
 }
 
 template <class T>
