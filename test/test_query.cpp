@@ -3815,11 +3815,12 @@ TEST(Query_FindWithDescriptorOrdering)
         // applying sort, then a limit, and then sort with replace - the end result should reflect the limit
         // and then the second sort descriptor only
         DescriptorOrdering ordering;
-        ordering.append_sort(SortDescriptor({{t1_str_col}}, {true}));
-        ordering.append_limit(LimitDescriptor(5));
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
+        ordering.append_limit(LimitDescriptor(4));
+        ordering.append_sort(SortDescriptor({{t1_int_col}}, {false}));
         ordering.append_sort(SortDescriptor({{t1_int_col}}, {true}), SortDescriptor::MergeMode::replace);
         TableView tv = t1->where().find_all(ordering);
-        ResultList expected = {{1, k0}, {1, k1}, {1, k2}, {2, k3}, {2, k4}};
+        ResultList expected = {{1, k2}, {1, k0}, {1, k1}, {2, k3}};
         CHECK_EQUAL(tv.size(), expected.size());
         CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
