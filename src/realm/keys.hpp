@@ -272,6 +272,9 @@ public:
     {
         return !bool(*this);
     }
+    bool is_unresolved() const
+    {
+        return m_obj_key.is_unresolved();
     }
     bool operator==(const ObjLink& other) const
     {
