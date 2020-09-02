@@ -3812,8 +3812,8 @@ TEST(Query_FindWithDescriptorOrdering)
         }
     }
     {
-        // applying sort, then a limit, and then sort with replace - the end result should reflect the limit
-        // and then the second sort descriptor only
+        // applying string sort, then a limit, and then a descending integer sort, then replace the last sort with
+        // an ascending integer sort - the end result should reflect the limit and the first and last sort descriptors
         DescriptorOrdering ordering;
         ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
         ordering.append_limit(LimitDescriptor(4));

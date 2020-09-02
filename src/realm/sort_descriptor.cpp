@@ -142,6 +142,8 @@ void SortDescriptor::merge(SortDescriptor&& other, MergeMode mode)
 
     m_column_keys.insert(mode == MergeMode::prepend ? m_column_keys.begin() : m_column_keys.end(),
                          other.m_column_keys.begin(), other.m_column_keys.end());
+    // Do not use a move iterator on a vector of bools!
+    // It will form a reference to a temporary and return incorrect results.
     m_ascending.insert(mode == MergeMode::prepend ? m_ascending.begin() : m_ascending.end(),
                        other.m_ascending.begin(), other.m_ascending.end());
 }
