@@ -22,7 +22,6 @@
 #include <string>
 
 #include "sync/app.hpp"
-#include "sync/sync_user.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -134,7 +133,7 @@ private:
     std::string get_base_sync_directory() const;
 
     // Construct the absolute path to the users directory
-    std::string get_user_directory_path(const std::string& local_user_identity) const;
+    std::string get_user_directory_path(const std::string& user_identity) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
     std::string legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
     std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;

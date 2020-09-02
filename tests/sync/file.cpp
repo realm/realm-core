@@ -221,8 +221,9 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
 
         SECTION("hashed path is used if it already exists") {
+            const std::string traditional_path = expected_name_with_suffix;
+
             const std::string hashed_path = manager_path + "mongodb-realm/" + hashed_file_name(expected_name) + ".realm";
-            const std::string traditional_path = manager_path + expected_name + ".realm";
             util::try_make_dir(manager_path + "mongodb-realm/");
 
             REQUIRE(!File::exists(hashed_path));
@@ -233,6 +234,27 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             auto actual = manager.realm_file_path(identity, local_identity, relative_path);
             REQUIRE(actual == hashed_path);
             REQUIRE(File::exists(hashed_path));
+            REQUIRE(!File::exists(traditional_path));
+        }
+
+        SECTION("legacy local identity path is detected and used") {
+            const std::string traditional_path = expected_name_with_suffix;
+
+            const std::string local_id_expected_name = manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+            const std::string local_id_expected_name_with_suffix = local_id_expected_name + ".realm";
+
+            util::try_make_dir(manager_path + "mongodb-realm/");
+            util::try_make_dir(manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/");
+            util::try_make_dir(manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/" + local_identity);
+            REQUIRE(!File::exists(local_id_expected_name));
+            REQUIRE(!File::exists(traditional_path));
+            REQUIRE(create_dummy_realm(local_id_expected_name_with_suffix));
+            REQUIRE(File::exists(local_id_expected_name_with_suffix));
+            REQUIRE(!File::exists(traditional_path));
+
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
+            REQUIRE(actual == local_id_expected_name_with_suffix);
+            REQUIRE(File::exists(local_id_expected_name_with_suffix));
             REQUIRE(!File::exists(traditional_path));
         }
 

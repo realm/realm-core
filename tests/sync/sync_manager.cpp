@@ -77,9 +77,8 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     // Get a sync user
     const std::string identity = "foobarbaz";
     auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
-    auto local_identity = user->local_identity();
     auto server_identity = user->identity();
-    REQUIRE(local_identity == identity);
+    REQUIRE(server_identity == identity);
 
     SECTION("should work properly without metadata") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
@@ -91,10 +90,10 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
 
     SECTION("should work properly with metadata") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
-        const auto expected = base_path + "mongodb-realm/app_id/" + local_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
+        const auto expected = base_path + "mongodb-realm/app_id/" + server_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/" + local_identity + "/");
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/" + server_identity + "/");
     }
 
     SECTION("should produce the expected path for a string partition") {
@@ -175,7 +174,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     const std::string r_token_2 = ENCODE_FAKE_JWT("bar_token");
     const std::string r_token_3 = ENCODE_FAKE_JWT("baz_token");
 
-    const std::string a_token_1 = ENCODE_FAKE_JWT("wibble");
+    const std::string a_token_1 = ENCODE_FAKE_JWT("wibble");    
     const std::string a_token_2 = ENCODE_FAKE_JWT("wobble");
     const std::string a_token_3 = ENCODE_FAKE_JWT("wubble");
 
@@ -333,9 +332,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         u3->set_refresh_token(r_token_3);
         u3->set_device_id(dummy_device_id);
         // Pre-populate the user directories.
-        const auto user_dir_1 = file_manager.user_directory(u1->local_uuid());
-        const auto user_dir_2 = file_manager.user_directory(u2->local_uuid());
-        const auto user_dir_3 = file_manager.user_directory(u3->local_uuid());
+        const auto user_dir_1 = file_manager.user_directory(u1->identity());
+        const auto user_dir_2 = file_manager.user_directory(u2->identity());
+        const auto user_dir_3 = file_manager.user_directory(u3->identity());
         create_dummy_realm(user_dir_1 + "123456789");
         create_dummy_realm(user_dir_1 + "foo");
         create_dummy_realm(user_dir_2 + "123456789");

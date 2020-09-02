@@ -229,16 +229,16 @@ std::string SyncFileManager::get_base_sync_directory() const
     return sync_path;
 }
 
-std::string SyncFileManager::user_directory(const std::string& local_user_identity) const
+std::string SyncFileManager::user_directory(const std::string& user_identity) const
 {
-    std::string user_path = get_user_directory_path(local_user_identity);
+    std::string user_path = get_user_directory_path(user_identity);
     util::try_make_dir(user_path);
     return user_path;
 }
 
-void SyncFileManager::remove_user_directory(const std::string& local_user_identity) const
+void SyncFileManager::remove_user_directory(const std::string& user_identity) const
 {
-    std::string user_path = get_user_directory_path(local_user_identity);
+    std::string user_path = get_user_directory_path(user_identity);
     util::try_remove_dir_recursive(user_path);
 }
 
@@ -429,18 +429,19 @@ std::string SyncFileManager::legacy_realm_file_path(const std::string& local_use
 std::string SyncFileManager::legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const
 {
     auto escaped_file_name = validate_and_clean_path(realm_file_name);
-    std::string path_name = util::file_path_by_appending_component(user_directory(local_user_identity), escaped_file_name);
+    std::string user_path = get_user_directory_path(local_user_identity);
+    std::string path_name = util::file_path_by_appending_component(user_path, escaped_file_name);
     std::string path = path_name + c_realm_file_suffix;
 
     return path;
 }
 
-std::string SyncFileManager::get_user_directory_path(const std::string& local_user_identity) const {
+std::string SyncFileManager::get_user_directory_path(const std::string& user_identity) const {
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
                                                       validate_and_clean_path(m_app_id),
                                                       util::FilePathType::Directory);
     util::try_make_dir(user_path); // TODO: add a recursive util:mkdirs() in Core
-    return file_path_by_appending_component(user_path, validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
+    return file_path_by_appending_component(user_path, validate_and_clean_path(user_identity), util::FilePathType::Directory);
 }
 
 } // realm

@@ -140,7 +140,7 @@ void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_
             // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
             // launches again, which might not be how some apps want to treat their data.)
             try {
-                m_file_manager->remove_user_directory(user.local_uuid());
+                m_file_manager->remove_user_directory(user.identity());
                 dead_users.emplace_back(std::move(user));
             } catch (util::File::AccessError const&) {
                 continue;
