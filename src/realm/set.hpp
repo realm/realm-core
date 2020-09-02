@@ -104,6 +104,142 @@ private:
     }
 };
 
+/// Compare set elements.
+///
+/// We cannot use `std::less<>` directly, because the ordering of set elements
+/// impacts the file format. For primitive types this is trivial (and can indeed
+/// be just `std::less<>`), but for example `Mixed` has specialized comparison
+/// that defines equality of numeric types.
+template <class T>
+struct SetElementLessThan {
+    bool operator()(const T& a, const T& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+        return a < b;
+    }
+};
+
+template <class T>
+struct SetElementEquals {
+    bool operator()(const T& a, const T& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+        return a == b;
+    }
+};
+
+template <>
+struct SetElementLessThan<Mixed> {
+    bool operator()(const Mixed& a, const Mixed& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+
+        if (a.is_null() != b.is_null()) {
+            // If a is NULL but not b, a < b.
+            return a.is_null();
+        }
+        else if (a.is_null()) {
+            // NULLs are equal.
+            return false;
+        }
+
+        if (a.get_type() != b.get_type()) {
+            return a.get_type() < b.get_type();
+        }
+
+        switch (a.get_type()) {
+            case type_Int:
+                return a.get<int64_t>() < b.get<int64_t>();
+            case type_Bool:
+                return a.get<bool>() < b.get<bool>();
+            case type_String:
+                return a.get<StringData>() < b.get<StringData>();
+            case type_Binary:
+                return a.get<BinaryData>() < b.get<BinaryData>();
+            case type_Timestamp:
+                return a.get<Timestamp>() < b.get<Timestamp>();
+            case type_Float:
+                return a.get<float>() < b.get<float>();
+            case type_Double:
+                return a.get<double>() < b.get<double>();
+            case type_Decimal:
+                return a.get<Decimal128>() < b.get<Decimal128>();
+            case type_ObjectId:
+                return a.get<ObjectId>() < b.get<ObjectId>();
+            case type_TypedLink:
+                return a.get<ObjLink>() < b.get<ObjLink>();
+            case type_OldTable:
+                [[fallthrough]];
+            case type_Mixed:
+                [[fallthrough]];
+            case type_OldDateTime:
+                [[fallthrough]];
+            case type_Link:
+                [[fallthrough]];
+            case type_LinkList:
+                REALM_TERMINATE("Invalid Mixed payload in Set.");
+                return false;
+        }
+    }
+};
+
+template <>
+struct SetElementEquals<Mixed> {
+    bool operator()(const Mixed& a, const Mixed& b) const noexcept
+    {
+        // CAUTION: This routine is technically part of the file format, because
+        // it determines the storage order of Set elements.
+
+        if (a.is_null() != b.is_null()) {
+            return false;
+        }
+        else if (a.is_null()) {
+            return true;
+        }
+
+        if (a.get_type() != b.get_type()) {
+            return false;
+        }
+
+        switch (a.get_type()) {
+            case type_Int:
+                return a.get<int64_t>() == b.get<int64_t>();
+            case type_Bool:
+                return a.get<bool>() == b.get<bool>();
+            case type_String:
+                return a.get<StringData>() == b.get<StringData>();
+            case type_Binary:
+                return a.get<BinaryData>() == b.get<BinaryData>();
+            case type_Timestamp:
+                return a.get<Timestamp>() == b.get<Timestamp>();
+            case type_Float:
+                return a.get<float>() == b.get<float>();
+            case type_Double:
+                return a.get<double>() == b.get<double>();
+            case type_Decimal:
+                return a.get<Decimal128>() == b.get<Decimal128>();
+            case type_ObjectId:
+                return a.get<ObjectId>() == b.get<ObjectId>();
+            case type_TypedLink:
+                return a.get<ObjLink>() == b.get<ObjLink>();
+            case type_OldTable:
+                [[fallthrough]];
+            case type_Mixed:
+                [[fallthrough]];
+            case type_OldDateTime:
+                [[fallthrough]];
+            case type_Link:
+                [[fallthrough]];
+            case type_LinkList:
+                REALM_TERMINATE("Invalid Mixed payload in Set.");
+                return false;
+        }
+    }
+};
+
 template <class T>
 inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Collection<T, SetBase>(obj, col_key)
@@ -134,9 +270,9 @@ size_t Set<T>::insert(T value)
     this->ensure_writeable();
     auto b = this->begin();
     auto e = this->end();
-    auto it = std::lower_bound(b, e, value);
+    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
 
-    if (it != e && *it == value) {
+    if (it != e && SetElementEquals<T>{}(*it, value)) {
         return it.index();
     }
 
@@ -160,9 +296,9 @@ size_t Set<T>::erase(T value)
 
     auto b = this->begin();
     auto e = this->end();
-    auto it = std::lower_bound(b, e, value);
+    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
 
-    if (it == e || *it != value) {
+    if (it == e || !SetElementEquals<T>{}(*it, value)) {
         return not_found;
     }
 
