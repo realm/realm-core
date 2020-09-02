@@ -119,6 +119,9 @@ if(APPLE AND NOT REALM_FORCE_OPENSSL)
     )
     set(PLATFORM_LIBRARIES ${Foundation} ${Security})
 else()
+    if (APPLE)
+        find_package(OpenSSL REQUIRED)
+    endif()
     list(APPEND SYNC_SOURCES
         crypto_server_openssl.cpp
         )
