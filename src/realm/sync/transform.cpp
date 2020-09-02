@@ -395,6 +395,11 @@ public:
             m_fields.emplace(n, get_type_name(type));
         }
 
+        void field(StringData n, Instruction::AddColumn::CollectionType type) override
+        {
+            m_fields.emplace(n, get_collection_type(type));
+        }
+
         void field(StringData n, const Instruction::PrimaryKey& key) override
         {
             auto real_key = m_changeset->get_key(key);
@@ -460,6 +465,11 @@ public:
         void field(StringData n, Instruction::Payload::Type type) override
         {
             diff_field(n, get_type_name(type));
+        }
+
+        void field(StringData n, Instruction::AddColumn::CollectionType type) override
+        {
+            diff_field(n, get_collection_type(type));
         }
 
         void field(StringData n, const Instruction::PrimaryKey& value) override
@@ -1611,6 +1621,8 @@ DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Update)
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        REALM_MERGE_ASSERT(left.index() <= left.prior_size);
+        REALM_MERGE_ASSERT(right.index() < right.prior_size);
         right.prior_size += 1;
         if (right.index() >= left.index()) {
             right.index() += 1; // --->
@@ -1622,6 +1634,10 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::Update)
 {
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
+
+        REALM_MERGE_ASSERT(left.index() < left.prior_size);
+        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+
         // FIXME: This marks both sides as dirty, even when they are unmodified.
         merge_get_vs_move(right.index(), left.index(), left.ndx_2);
     }
@@ -1632,9 +1648,8 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-        right.prior_size -= 1;
-
-        if (left.index() == right.index()) {
+        REALM_MERGE_ASSERT(left.index() < left.prior_size);
+        REALM_MERGE_ASSERT(right.index() < right.prior_size);
             // CONFLICT: Update of a removed element.
             //
             // RESOLUTION: Discard the UPDATE operation received on the right side.
@@ -1691,10 +1706,26 @@ DEFINE_MERGE(Instruction::AddColumn, Instruction::AddColumn)
             throw SchemaMismatchError(ss.str());
         }
 
-        if (left.list != right.list) {
+        if (left.collection_type != right.collection_type) {
+            auto collection_type_name = [](Instruction::AddColumn::CollectionType type) -> const char* {
+                switch (type) {
+                    case Instruction::AddColumn::CollectionType::Single:
+                        return "single value";
+                    case Instruction::AddColumn::CollectionType::List:
+                        return "list";
+                    case Instruction::AddColumn::CollectionType::Dictionary:
+                        return "dictionary";
+                    case Instruction::AddColumn::CollectionType::Set:
+                        return "set";
+                }
+                REALM_TERMINATE("");
+            };
+
             std::stringstream ss;
+            const char* left_type = collection_type_name(left.collection_type);
+            const char* right_type = collection_type_name(right.collection_type);
             ss << "Schema mismatch: Property '" << left_name << "' in class '" << left_side.get_string(left.table)
-               << "' is a list on one side and not on the other.";
+               << "' is a " << left_type << " on one side, and a " << right_type << " on the other.";
             throw SchemaMismatchError(ss.str());
         }
 
@@ -1830,6 +1861,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayInsert)
 {
     if (same_container(left, right)) {
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        REALM_MERGE_ASSERT(left.index() < left.prior_size);
+        REALM_MERGE_ASSERT(right.index() <= right.prior_size);
+
         left.prior_size++;
         right.prior_size--;
         if (right.index() <= left.index()) {
@@ -1861,6 +1895,12 @@ DEFINE_NESTED_MERGE(Instruction::ArrayMove)
 DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayMove)
 {
     if (same_container(left, right)) {
+        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        REALM_MERGE_ASSERT(left.index() < left.prior_size);
+        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+        REALM_MERGE_ASSERT(left.ndx_2 < left.prior_size);
+        REALM_MERGE_ASSERT(right.ndx_2 < right.prior_size);
+
         if (left.index() < right.index()) {
             right.index() -= 1; // <---
         }
@@ -1940,6 +1980,10 @@ DEFINE_MERGE(Instruction::ArrayMove, Instruction::ArrayMove)
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
 {
     if (same_container(left, right)) {
+        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        REALM_MERGE_ASSERT(left.index() < left.prior_size);
+        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+
         if (left.index() == right.index()) {
             // CONFLICT: Removal of a moved element.
             //
@@ -2003,6 +2047,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 {
     if (same_path(left, right)) {
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        REALM_MERGE_ASSERT(left.index() < left.prior_size);
+        REALM_MERGE_ASSERT(right.index() < right.prior_size);
+
         left.prior_size -= 1;
         right.prior_size -= 1;
 
@@ -2042,6 +2089,8 @@ DEFINE_NESTED_MERGE(Instruction::ArrayClear)
 DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayClear)
 {
     if (same_path(left, right)) {
+        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+
         // CONFLICT: Two clears of the same list.
         //
         // RESOLUTION: Discard the clear with the lower timestamp. This has the

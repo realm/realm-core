@@ -1192,7 +1192,7 @@ inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table, Stri
         std::stringstream ss;
         ss << "matches_" << table->get_name();
         std::string matches_col_name = ss.str();
-        matches_col = result_sets->add_column_link(type_LinkList, matches_col_name, *table);
+        matches_col = result_sets->add_column_list(*table, matches_col_name);
     }
 
     Obj result_set = result_sets->create_object();

@@ -83,6 +83,10 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
         case Type::Link: {
             return append_value(data.link);
         }
+        case Type::Erased:
+            [[fallthrough]];
+        case Type::Dictionary:
+            [[fallthrough]];
         case Type::ObjectValue:
             [[fallthrough]];
         case Type::Null:
@@ -95,6 +99,11 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
 void ChangesetEncoder::append_value(Instruction::Payload::Type type)
 {
     append_value(int64_t(type));
+}
+
+void ChangesetEncoder::append_value(Instruction::AddColumn::CollectionType type)
+{
+    append_value(uint8_t(type));
 }
 
 void ChangesetEncoder::append_value(const Instruction::Payload::Link& link)
@@ -157,12 +166,16 @@ void ChangesetEncoder::operator()(const Instruction::AddInteger& instr)
 
 void ChangesetEncoder::operator()(const Instruction::AddColumn& instr)
 {
+    bool is_dictionary = (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary);
     // Mixed columns are always nullable.
-    REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
+    REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable || is_dictionary);
+    append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.collection_type);
 
-    append(Instruction::Type::AddColumn, instr.table, instr.field, instr.type, instr.nullable, instr.list);
     if (instr.type == Instruction::Payload::Type::Link) {
         append_value(instr.link_target_table);
+    }
+    if (is_dictionary) {
+        append_value(instr.key_type);
     }
 }
 

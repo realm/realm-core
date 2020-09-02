@@ -108,7 +108,7 @@ struct ColKey {
         : value(val)
     {
     }
-    explicit ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag) noexcept
+    constexpr ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, unsigned tag) noexcept
         : ColKey((index.val & 0xFFFFUL) | ((type & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
                  ((tag & 0xFFFFFFFFUL) << 30))
     {
@@ -124,6 +124,14 @@ struct ColKey {
     bool is_set() const
     {
         return get_attrs().test(col_attr_Set);
+    }
+    bool is_dictionary()
+    {
+        return get_attrs().test(col_attr_Dictionary);
+    }
+    bool is_collection()
+    {
+        return get_attrs().test(col_attr_Collection);
     }
     ColKey& operator=(int64_t val) noexcept
     {
@@ -209,9 +217,17 @@ struct ObjKey {
     {
         return value < rhs.value;
     }
+    bool operator<=(const ObjKey& rhs) const noexcept
+    {
+        return value <= rhs.value;
+    }
     bool operator>(const ObjKey& rhs) const noexcept
     {
         return value > rhs.value;
+    }
+    bool operator>=(const ObjKey& rhs) const noexcept
+    {
+        return value >= rhs.value;
     }
     explicit operator bool() const noexcept
     {
@@ -248,8 +264,8 @@ struct ObjLink {
 public:
     ObjLink() {}
     ObjLink(TableKey table_key, ObjKey obj_key)
-        : m_table_key(table_key)
-        , m_obj_key(obj_key)
+        : m_obj_key(obj_key)
+        , m_table_key(table_key)
     {
     }
     explicit operator bool() const
@@ -286,8 +302,10 @@ public:
     }
 
 private:
-    TableKey m_table_key;
+    // Having ObjKey first ensures that there will be no uninitialized space
+    // in the first 12 bytes. This is important when generating a hash
     ObjKey m_obj_key;
+    TableKey m_table_key;
 };
 
 inline std::ostream& operator<<(std::ostream& os, ObjLink link)

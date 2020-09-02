@@ -291,34 +291,6 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
     }
 };
 
-struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
-    const char* name() const
-    {
-        return "DistinctStringFewDupes";
-    }
-
-    void operator()(DBRef)
-    {
-        auto table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
-struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
-    const char* name() const
-    {
-        return "DistinctStringManyDupes";
-    }
-
-    void operator()(DBRef)
-    {
-        ConstTableRef table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
 struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     const char* name() const
     {
@@ -374,7 +346,7 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
         TableRef strings = tr.get_table(name());
-        link_col_ndx = t->add_column_link(type_Link, "myLink", *strings);
+        link_col_ndx = t->add_column(*strings, "myLink");
         const size_t num_links = strings->size();
 
 #ifdef REALM_CLUSTER_IF
@@ -560,7 +532,7 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
         TableRef timestamps = tr.get_table(name());
-        link_col_ndx = t->add_column_link(type_Link, "myLink", *timestamps);
+        link_col_ndx = t->add_column(*timestamps, "myLink");
         const size_t num_timestamps = timestamps->size();
 #ifdef REALM_CLUSTER_IF
         auto target = timestamps->begin();
@@ -1136,7 +1108,7 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
         ConstTableRef table = m_table;
         Query query = table->where();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(m_col, values_to_query[i]);
+            query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
@@ -1184,76 +1156,6 @@ struct BenchmarkSortInt : BenchmarkWithInts {
     {
         ConstTableRef table = m_table;
         ConstTableView view = table->get_sorted_view(m_col);
-    }
-};
-
-struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
-    const char* name() const
-    {
-        return "DistinctIntNoDupes";
-    }
-
-    void before_all(DBRef group)
-    {
-        BenchmarkWithIntsTable::before_all(group);
-        WrtTrans tr(group);
-        TableRef t = tr.get_table(name());
-        Random r;
-        for (size_t i = 0; i < BASE_SIZE; ++i) {
-            int64_t val = r.draw_int(0, BASE_SIZE / 2);
-#ifdef REALM_CLUSTER_IF
-            Obj obj = t->create_object();
-            obj.set(m_col, val);
-            m_keys.push_back(obj.get_key());
-#else
-            auto row = t->add_empty_row();
-            t->set_int(m_col, row, val);
-#endif
-        }
-        t->add_search_index(m_col);
-        tr.commit();
-    }
-
-    void operator()(DBRef)
-    {
-        ConstTableRef table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
-    }
-};
-
-struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
-    const char* name() const
-    {
-        return "DistinctIntManyDupes";
-    }
-
-    void before_all(DBRef group)
-    {
-        BenchmarkWithIntsTable::before_all(group);
-        WrtTrans tr(group);
-        TableRef t = tr.get_table(name());
-        Random r;
-        for (size_t i = 0; i < BASE_SIZE; ++i) {
-            int64_t val = r.draw_int(0, 10);
-#ifdef REALM_CLUSTER_IF
-            Obj obj = t->create_object();
-            obj.set(m_col, val);
-            m_keys.push_back(obj.get_key());
-#else
-            auto row = t->add_empty_row();
-            t->set_int(m_col, row, val);
-#endif
-        }
-        t->add_search_index(m_col);
-        tr.commit();
-    }
-
-    void operator()(DBRef)
-    {
-        ConstTableRef table = m_table;
-        REALM_ASSERT_RELEASE(table->has_search_index(m_col));
-        ConstTableView view = table->get_distinct_view(m_col);
     }
 };
 
@@ -1594,7 +1496,7 @@ struct BenchmarkGetLinkList : Benchmark {
         std::string n = std::string(name()) + "_Destination";
         TableRef destination_table = tr.add_table(n);
         TableRef table = tr.add_table(name());
-        m_col_link = table->add_column_link(type_LinkList, "linklist", *destination_table);
+        m_col_link = table->add_column_list(*destination_table, "linklist");
 #ifdef REALM_CLUSTER_IF
         table->create_objects(rows, m_keys);
 #else
@@ -1956,10 +1858,6 @@ int benchmark_common_tasks_main()
 
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
-    BENCH(BenchmarkDistinctIntFewDupes);
-    BENCH(BenchmarkDistinctIntManyDupes);
-    BENCH(BenchmarkDistinctStringFewDupes);
-    BENCH(BenchmarkDistinctStringManyDupes);
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkUnorderedTableViewClearIndexed);

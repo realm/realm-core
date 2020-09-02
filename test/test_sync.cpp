@@ -23,7 +23,7 @@
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
-#include <realm/db.hpp>
+#include <realm.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/history.hpp>
@@ -1238,7 +1238,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
             WriteTransaction wt(sg_1);
             TableRef table = sync::create_table(wt, "class_foo");
             TableRef target = sync::create_table(wt, "class_bar");
-            table->add_column_link(type_Link, "column", *target);
+            table->add_column(*target, "column");
             auto new_version = wt.commit();
             session_1.nonsync_transact_notify(new_version);
         }
@@ -1247,7 +1247,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
             WriteTransaction wt(sg_2);
             TableRef table = sync::create_table(wt, "class_foo");
             TableRef target = sync::create_table(wt, "class_baz");
-            table->add_column_link(type_Link, "column", *target);
+            table->add_column(*target, "column");
             auto new_version = wt.commit();
             session_2.nonsync_transact_notify(new_version);
         }
@@ -6499,7 +6499,7 @@ TEST(Sync_ContainerInsertAndSetLogCompaction)
         auto k1 = table_target->create_object().set(col_ndx, 456).get_key();
 
         TableRef table_source = create_table(wt, "class_source");
-        col_ndx = table_source->add_column_link(type_LinkList, "target_link", *table_target);
+        col_ndx = table_source->add_column_list(*table_target, "target_link");
         Obj obj = table_source->create_object();
         LnkLst ll = obj.get_linklist(col_ndx);
         ll.insert(0, k0);
@@ -7394,7 +7394,7 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 
         TableRef table_source = create_table(wt, "class_source");
         TableRef table_target = create_table(wt, "class_target");
-        auto col_key = table_source->add_column_link(type_LinkList, "target_link", *table_target);
+        auto col_key = table_source->add_column_list(*table_target, "target_link");
 
         auto k0 = table_target->create_object().get_key();
         auto k1 = table_target->create_object().get_key();
@@ -7856,6 +7856,114 @@ TEST(Sync_TypedLinks)
         CHECK_EQUAL(l2_table, fops);
         CHECK_EQUAL(l1.get_obj_key(), bars->begin()->get_key());
         CHECK_EQUAL(l2.get_obj_key(), fops->begin()->get_key());
+    }
+}
+
+TEST(Sync_Dictionary)
+{
+    // Test replication and synchronization of Mixed values and lists.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    Timestamp now{std::chrono::system_clock::now()};
+
+    {
+        WriteTransaction tr{db_1};
+        auto& g = tr.get_group();
+        auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+        auto col_dict = foos->add_column_dictionary(type_Mixed, "dict");
+
+        auto foo = foos->create_object_with_primary_key(123);
+
+        auto dict = foo.get_dictionary(col_dict);
+        dict.insert("hello", "world");
+        dict.insert("cnt", 7);
+        dict.insert("when", now);
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        WriteTransaction tr{db_2};
+        // tr.get_group().to_json(std::cout);
+
+        auto foos = tr.get_table("class_Foo");
+
+        CHECK_EQUAL(foos->size(), 1);
+
+        auto it = foos->begin();
+        auto dict = it->get_dictionary(foos->get_column_key("dict"));
+        CHECK(dict.get_value_data_type() == type_Mixed);
+        CHECK_EQUAL(dict.size(), 3);
+
+        Mixed val = dict["hello"];
+        CHECK_EQUAL(val.get_string(), "world");
+        val = dict.get("cnt");
+        CHECK_EQUAL(val.get_int(), 7);
+        val = dict.get("when");
+        CHECK_EQUAL(val.get<Timestamp>(), now);
+
+        dict.erase("cnt");
+
+        session_2.nonsync_transact_notify(tr.commit());
+    }
+
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+
+    {
+        WriteTransaction tr{db_1};
+        auto foos = tr.get_table("class_Foo");
+        // tr.get_group().to_json(std::cout);
+
+        CHECK_EQUAL(foos->size(), 1);
+
+        auto it = foos->begin();
+        auto dict = it->get_dictionary(foos->get_column_key("dict"));
+        CHECK_EQUAL(dict.size(), 2);
+
+        Mixed val = dict["hello"];
+        CHECK_EQUAL(val.get_string(), "world");
+        val = dict.get("when");
+        CHECK_EQUAL(val.get<Timestamp>(), now);
+
+        dict.clear();
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+        // tr.get_group().to_json(std::cout);
+
+        auto foos = tr.get_table("class_Foo");
+
+        CHECK_EQUAL(foos->size(), 1);
+
+        auto it = foos->begin();
+        auto dict = it->get_dictionary(foos->get_column_key("dict"));
+        CHECK_EQUAL(dict.size(), 0);
     }
 }
 

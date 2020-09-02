@@ -295,6 +295,10 @@ public:
     {
         return true;
     }
+    bool dictionary_erase(Mixed)
+    {
+        return true;
+    }
 };
 
 

@@ -112,10 +112,16 @@ public:
     {
     }
 
+    Mixed(realm::null) noexcept
+        : Mixed()
+    {
+    }
+
     Mixed(int i) noexcept
         : Mixed(int64_t(i))
     {
     }
+
     Mixed(int64_t) noexcept;
     Mixed(bool) noexcept;
     Mixed(float) noexcept;
@@ -158,6 +164,8 @@ public:
         return DataType(m_type - 1);
     }
 
+    static bool types_are_comparable(const Mixed& l, const Mixed& r);
+
     template <class T>
     T get() const noexcept;
 
@@ -189,6 +197,15 @@ public:
     {
         return compare(other) > 0;
     }
+    bool operator<=(const Mixed& other) const
+    {
+        return compare(other) <= 0;
+    }
+    bool operator>=(const Mixed& other) const
+    {
+        return compare(other) >= 0;
+    }
+    size_t hash() const;
 
 private:
     friend std::ostream& operator<<(std::ostream& out, const Mixed& m);
@@ -412,6 +429,8 @@ inline double Mixed::get_double() const
 template <>
 inline StringData Mixed::get<StringData>() const noexcept
 {
+    if (is_null())
+        return StringData();
     REALM_ASSERT(get_type() == type_String);
     return string_val;
 }
@@ -424,8 +443,13 @@ inline StringData Mixed::get_string() const
 template <>
 inline BinaryData Mixed::get<BinaryData>() const noexcept
 {
-    REALM_ASSERT(get_type() == type_Binary);
-    return binary_val;
+    if (is_null())
+        return BinaryData();
+    if (get_type() == type_Binary) {
+        return binary_val;
+    }
+    REALM_ASSERT(get_type() == type_String);
+    return BinaryData(string_val.data(), string_val.size() + 1);
 }
 
 inline BinaryData Mixed::get_binary() const
@@ -471,6 +495,12 @@ inline ObjLink Mixed::get<ObjLink>() const noexcept
 {
     REALM_ASSERT(get_type() == type_TypedLink);
     return link_val;
+}
+
+template <>
+inline Mixed Mixed::get<Mixed>() const noexcept
+{
+    return *this;
 }
 
 inline ObjLink Mixed::get_link() const

@@ -48,6 +48,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 sync::create_table(m_transaction, table_name);
             }
             else {
+
                 if (!is_valid_key_type(spec.type)) {
                     bad_transaction_log("Invalid primary key type");
                 }
@@ -158,266 +159,251 @@ void InstructionApplier::operator()(const Instruction::EraseObject& instr)
 }
 
 template <class F>
-void InstructionApplier::set_value(const SetTargetInfo& info, const Instruction::Payload& value, F&& setter,
-                                   const char* name)
+void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& visitor)
 {
     using Type = Instruction::Payload::Type;
 
-    const auto& data = value.data;
-    switch (value.type) {
-        case Type::ObjectValue: {
-            // FIXME: Handle embedded objects in Mixed.
-            if (!info.is_embedded_link) {
-                bad_transaction_log("%1(Object) on a property that does not contain embedded objects");
-            }
-            setter(Instruction::Payload::ObjectValue{});
-            return;
-        }
-        case Type::GlobalKey: {
-            bad_transaction_log("%1(GlobalKey) is not allowed", name);
-        }
-        case Type::Null: {
-            if (!info.nullable) {
-                bad_transaction_log("%1(NULL) on '%2.%3', which is not nullable", name, info.table_name,
-                                    info.col_name);
-            }
-            setter(realm::util::none);
-            return;
-        }
-        case Type::Int: {
-            if (info.type != type_Int && info.type != type_Mixed) {
-                bad_transaction_log("%1(Int) on '%2.%3' of type %4", name, info.table_name, info.col_name, info.type);
-            }
-            setter(data.integer);
-            return;
-        }
-        case Type::Bool: {
-            if (info.type != type_Bool && info.type != type_Mixed) {
-                bad_transaction_log("%1(Bool) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            setter(data.boolean);
-            return;
-        }
+    const auto& data = payload.data;
+    switch (payload.type) {
+        case Type::ObjectValue:
+            return visitor(Instruction::Payload::ObjectValue{});
+        case Type::Dictionary:
+            return bad_transaction_log("Nested dictionaries not supported yet");
+        case Type::Erased:
+            return visitor(Instruction::Payload::Erased{});
+        case Type::GlobalKey:
+            return visitor(realm::util::none); // FIXME: Not sure about this
+        case Type::Null:
+            return visitor(realm::util::none);
+        case Type::Int:
+            return visitor(data.integer);
+        case Type::Bool:
+            return visitor(data.boolean);
         case Type::String: {
-            if (info.type != type_String && info.type != type_Mixed) {
-                bad_transaction_log("%1(String) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            StringData str = get_string(data.str);
-            setter(str);
-            return;
+            StringData value = get_string(data.str);
+            return visitor(value);
         }
         case Type::Binary: {
-            if (info.type != type_Binary && info.type != type_Mixed) {
-                bad_transaction_log("%1(Binary) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            BinaryData bin = get_binary(data.binary);
-            setter(bin);
-            return;
+            BinaryData value = get_binary(data.binary);
+            return visitor(value);
         }
-        case Type::Timestamp: {
-            if (info.type != type_Timestamp && info.type != type_Mixed) {
-                bad_transaction_log("%1(Timestamp) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            setter(data.timestamp);
-            return;
-        }
-        case Type::Float: {
-            if (info.type != type_Float && info.type != type_Mixed) {
-                bad_transaction_log("%1(Float) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            setter(data.fnum);
-            return;
-        }
-        case Type::Double: {
-            if (info.type != type_Double && info.type != type_Mixed) {
-                bad_transaction_log("%1(Double) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            setter(data.dnum);
-            return;
-        }
-        case Type::Decimal: {
-            if (info.type != type_Decimal && info.type != type_Mixed) {
-                bad_transaction_log("%1(Decimal) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            setter(data.decimal);
-            return;
-        }
+        case Type::Timestamp:
+            return visitor(data.timestamp);
+        case Type::Float:
+            return visitor(data.fnum);
+        case Type::Double:
+            return visitor(data.dnum);
+        case Type::Decimal:
+            return visitor(data.decimal);
         case Type::Link: {
-            if (info.type != type_Link && info.type != type_Mixed && info.type != type_TypedLink) {
-                bad_transaction_log("Set(Link) on '%2.%3' of type %4", name, info.table_name, info.col_name,
-                                    info.type);
-            }
-            TableNameBuffer buffer;
             StringData class_name = get_string(data.link.target_table);
+            TableNameBuffer buffer;
             StringData target_table_name = class_name_to_table_name(class_name, buffer);
             TableRef target_table = m_transaction.get_table(target_table_name);
             if (!target_table) {
-                bad_transaction_log("Set(Link) with invalid target table '%1'", target_table_name);
+                bad_transaction_log("Link with invalid target table '%1'", target_table_name);
             }
-
-            // FIXME: This needs adjustment for embedded objects.
-
-            if (info.type != type_Mixed && info.type != type_TypedLink) {
-                ColKey source_col = m_last_table->get_column_key(info.col_name);
-                TableRef expected_target_table = m_last_table->get_link_target(source_col);
-                if (expected_target_table != target_table) {
-                    bad_transaction_log("Set(Link) with unexpected target table '%1' (expected '%2')",
-                                        target_table_name, expected_target_table->get_name());
-                }
-                ObjKey target = get_object_key(*target_table, data.link.target, "Set(Link)");
-                setter(target);
+            if (target_table->is_embedded()) {
+                bad_transaction_log("Link to embedded table '%1'", target_table_name);
             }
-            else {
-                ObjKey target = get_object_key(*target_table, data.link.target, "Set(Link)");
-                ObjLink link = ObjLink{target_table->get_key(), target};
-                setter(link);
-            }
-            return;
+            ObjKey target = get_object_key(*target_table, data.link.target);
+            ObjLink link = ObjLink{target_table->get_key(), target};
+            return visitor(link);
         }
-        case Type::ObjectId: {
-            if (info.type != type_ObjectId && info.type != type_Mixed) {
-                bad_transaction_log("Set(ObjectId) on column '%1.%2' of type %3", info.table_name, info.col_name,
-                                    info.type);
-            }
-            setter(data.object_id);
-            return;
-        }
+        case Type::ObjectId:
+            return visitor(data.object_id);
     }
 }
 
 
 void InstructionApplier::operator()(const Instruction::Update& instr)
 {
-    if (!instr.is_array_update()) {
-        auto path = get_field(instr, "Set");
-        // FIXME: Would use structured bindings, but they cannot be captured by lamdas.
-        auto obj = std::move(std::get<0>(path));
-        auto col = std::move(std::get<1>(path));
+    auto setter = util::overloaded{
+        [&](Obj& obj, ColKey col) {
+            // Update of object field.
 
-        auto table = obj.get_table();
-        SetTargetInfo info;
-        info.table_name = table->get_name();
-        info.col_name = table->get_column_name(col);
-        info.type = table->get_column_type(col);
-        info.nullable = table->is_nullable(col);
-        info.is_embedded_link = (info.type == type_Link && table->get_link_target(col)->is_embedded());
+            auto table = obj.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
+            auto data_type = DataType(col.get_type());
 
-        auto setter = util::overloaded{
-            [&](const util::None&) {
-                obj.set_null(col, instr.is_default);
-            },
-            [&](const Instruction::Payload::ObjectValue&) {
-                // FIXME: Embedded object creation is not idempotent in Core.
-                if (obj.is_null(col)) {
-                    obj.create_and_set_linked_object(col);
-                }
-            },
-            [&](const ObjLink& link) {
-                if (info.type == type_Mixed) {
-                    obj.set<Mixed>(col, Mixed{link}, instr.is_default);
-                }
-                else if (info.type == type_TypedLink) {
-                    obj.set<ObjLink>(col, link, instr.is_default);
-                }
-            },
-            [&](const auto& val) {
-                if (info.type != type_Mixed) {
-                    obj.set(col, val, instr.is_default);
-                }
-                else {
-                    obj.set<Mixed>(col, val, instr.is_default);
-                }
-            },
-        };
+            auto visitor = util::overloaded{
+                [&](const ObjLink& link) {
+                    if (data_type == type_Mixed || data_type == type_TypedLink) {
+                        obj.set_any(col, link, instr.is_default);
+                    }
+                    else if (data_type == type_Link) {
+                        // Validate target table.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("Update: Target table mismatch (expected %1, got %2)",
+                                                target_table->get_name(),
+                                                m_transaction.get_table(link.get_table_key())->get_name());
+                        }
+                        obj.set<ObjKey>(col, link.get_obj_key(), instr.is_default);
+                    }
+                    else {
+                        bad_transaction_log("Update: Type mismatch in '%2.%1' (expected %3, got %4)", field_name,
+                                            table_name, col.get_type(), type_Link);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null()) {
+                        if (col.is_nullable()) {
+                            obj.set_null(col, instr.is_default);
+                        }
+                        else {
+                            bad_transaction_log("Update: NULL in non-nullable field '%2.%1'", field_name, table_name);
+                        }
+                    }
+                    else if (data_type == type_Mixed || value.get_type() == data_type) {
+                        obj.set_any(col, value, instr.is_default);
+                    }
+                    else {
+                        bad_transaction_log("Update: Type mismatch in '%2.%1' (expected %3, got %4)", field_name,
+                                            table_name, col.get_type(), value.get_type());
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    if (obj.is_null(col)) {
+                        obj.create_and_set_linked_object(col);
+                    }
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("Update: Dictionary erase at object field");
+                },
+            };
 
-        set_value(info, instr.value, std::move(setter), "Set");
-    }
-    else {
-        auto& list = get_list(instr, "ArraySet");
-        auto table = list.get_table();
-        ColKey col = list.get_col_key();
-        SetTargetInfo info;
-        info.table_name = table->get_name();
-        info.col_name = table->get_column_name(col);
-        info.type = table->get_column_type(col);
-        info.nullable = table->is_nullable(col);
+            visit_payload(instr.value, visitor);
+        },
+        [&](LstBase& list, size_t index) {
+            // Update of list element.
 
-        if (info.type == type_LinkList) {
-            info.type = type_Link;
-        }
+            auto col = list.get_col_key();
+            auto data_type = DataType(col.get_type());
+            auto table = list.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
 
-        info.is_embedded_link = (info.type == type_Link && table->get_link_target(col)->is_embedded());
+            auto visitor = util::overloaded{
+                [&](const ObjLink& link) {
+                    if (data_type == type_TypedLink) {
+                        auto& link_list = static_cast<Lst<ObjLink>&>(list);
+                        link_list.set(index, link);
+                    }
+                    else if (data_type == type_Mixed) {
+                        auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                        mixed_list.set(index, link);
+                    }
+                    else if (data_type == type_LinkList || data_type == type_Link) {
+                        auto& link_list = static_cast<Lst<ObjKey>&>(list);
+                        // Validate the target.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("Update: Target table mismatch (expected '%1', got '%2')",
+                                                target_table->get_name(),
+                                                m_transaction.get_table(link.get_table_key())->get_name());
+                        }
+                        link_list.set(index, link.get_obj_key());
+                    }
+                    else {
+                        bad_transaction_log("Update: Type mismatch in list at '%2.%1' (expected link type, was %3)",
+                                            field_name, table_name, data_type);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null()) {
+                        if (col.is_nullable()) {
+                            list.set_null(index);
+                        }
+                        else {
+                            bad_transaction_log("Update: NULL in non-nullable list '%2.%1'", field_name, table_name);
+                        }
+                    }
+                    else {
+                        if (data_type == type_Mixed || value.get_type() == data_type) {
+                            list.set_any(index, value);
+                        }
+                        else {
+                            bad_transaction_log("Update: Type mismatch in list at '%2.%1' (expected %3, got %4)",
+                                                field_name, table_name, data_type, value.get_type());
+                        }
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    // Embedded object creation is idempotent, and link lists cannot
+                    // contain nulls, so this is a no-op.
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("Update: Dictionary erase of list element");
+                },
+            };
 
-        size_t ndx = instr.index();
+            visit_payload(instr.value, visitor);
+        },
+        [&](Dictionary& dict, Mixed key) {
+            // Update (insert) of dictionary element.
 
-        if (ndx >= list.size()) {
-            bad_transaction_log("Set out of bounds on list '%1.%2' (%3 >= %4)", info.table_name, info.col_name, ndx,
-                                list.size());
-        }
+            auto visitor = util::overloaded{
+                [&](Mixed value) {
+                    if (value.is_null()) {
+                        // FIXME: Separate handling of NULL is needed because
+                        // `Mixed::get_type()` asserts on NULL.
+                        dict.insert(key, value);
+                    }
+                    else if (value.get_type() == type_Link) {
+                        bad_transaction_log("Update: Untyped links are not supported in dictionaries.");
+                    }
+                    else {
+                        dict.insert(key, value);
+                    }
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    dict.erase(key);
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    bad_transaction_log("Update: Embedded objects in dictionaries not supported yet.");
+                },
+            };
 
-        auto setter = util::overloaded{
-            [&](const util::None&) {
-                list.set_null(ndx);
-            },
-            [&](const Instruction::Payload::ObjectValue&) {
-                // Embedded object creation is idempotent, and link lists cannot
-                // contain nulls, so this is a no-op.
-            },
-            [&](const ObjLink& link) {
-                if (info.type == type_Mixed) {
-                    auto& lst = static_cast<Lst<Mixed>&>(list);
-                    lst.set(ndx, Mixed{link});
-                }
-                else if (info.type == type_TypedLink) {
-                    auto& lst = static_cast<Lst<ObjLink>&>(list);
-                    lst.set(ndx, link);
-                }
-            },
-            [&](const auto& val) {
-                if (info.type == type_Mixed) {
-                    auto& lst = static_cast<Lst<Mixed>&>(list);
-                    lst.set(ndx, val);
-                }
-                else {
-                    using type = std::remove_cv_t<std::remove_reference_t<decltype(val)>>;
-                    auto& lst = static_cast<Lst<type>&>(list);
-                    lst.set(ndx, val);
-                }
-            },
-        };
+            visit_payload(instr.value, visitor);
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Update: Invalid path");
+        },
+    };
 
-        set_value(info, instr.value, std::move(setter), "ArraySet");
-    }
+    resolve_path(instr, "Update", std::move(setter));
 }
 
 void InstructionApplier::operator()(const Instruction::AddInteger& instr)
 {
-    auto [obj, col] = get_field(instr, "AddInteger");
+    auto setter = util::overloaded{
+        [&](Obj& obj, ColKey col) {
+            // Increment of object field.
 
-    TableRef table = obj.get_table();
-    auto type = table->get_column_type(col);
-    if (type != type_Int) {
-        bad_transaction_log("AddInteger on column '%1.%2' of type %3", table->get_name(), table->get_column_name(col),
-                            type);
-    }
+            if (col.get_type() != col_type_Int) {
+                auto table = obj.get_table();
+                bad_transaction_log("AddInteger: Not an integer field '%2.%1'", table->get_column_name(col),
+                                    table->get_name());
+            }
 
-    if (obj.is_null(col)) {
-        // AddInteger on NULL is a no-op.
-        return;
-    }
-    obj.add_int(col, instr.value);
+            if (!obj.is_null(col)) {
+                obj.add_int(col, instr.value);
+            }
+        },
+        // FIXME: Implement increments of array elements, dictionary values.
+        [&](auto&&...) {
+            bad_transaction_log("AddInteger: Invalid path");
+        },
+    };
+    resolve_path(instr, "AddInteger", std::move(setter));
 }
 
 void InstructionApplier::operator()(const Instruction::AddColumn& instr)
 {
     using Type = Instruction::Payload::Type;
+    using CollectionType = Instruction::AddColumn::CollectionType;
 
     auto table = get_table(instr, "AddColumn");
     auto col_name = get_string(instr.field);
@@ -426,24 +412,35 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         bad_transaction_log("AddColumn '%1.%3' which already exists", table->get_name(), col_name);
     }
 
-    if (instr.type == Type::Null) {
-        if (!instr.list) {
-            table->add_column(type_Mixed, col_name);
-        }
-        else {
-            table->add_column_list(type_Mixed, col_name);
-        }
-        return;
+    if (instr.collection_type == CollectionType::Dictionary && instr.key_type != Type::String) {
+        bad_transaction_log("AddColumn '%1.%3' adding dictionary column with non-string keys", table->get_name(),
+                            col_name);
     }
 
+    if (instr.collection_type == CollectionType::Dictionary && instr.nullable) {
+        bad_transaction_log("AddColumn '%1.%3' adding dictinoary with nullable keys", table->get_name(), col_name);
+    }
 
     if (instr.type != Type::Link) {
-        DataType type = get_data_type(instr.type);
-        if (instr.list) {
-            table->add_column_list(type, col_name, instr.nullable);
-        }
-        else {
-            table->add_column(type, col_name, instr.nullable);
+        DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
+        switch (instr.collection_type) {
+            case CollectionType::Single: {
+                table->add_column(type, col_name, instr.nullable);
+                break;
+            }
+            case CollectionType::List: {
+                table->add_column_list(type, col_name, instr.nullable);
+                break;
+            }
+            case CollectionType::Dictionary: {
+                DataType key_type = (instr.key_type == Type::Null) ? type_Mixed : get_data_type(instr.key_type);
+                table->add_column_dictionary(type, col_name, key_type);
+                break;
+            }
+            case CollectionType::Set: {
+                REALM_ASSERT(false); // TODO: implement
+                break;
+            }
         }
     }
     else {
@@ -455,11 +452,22 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 bad_transaction_log("AddColumn(Link) '%1.%2' to table '%3' which doesn't exist", table->get_name(),
                                     col_name, target_table_name);
             }
-            DataType type = instr.list ? type_LinkList : type_Link;
-            table->add_column_link(type, col_name, *target);
+            if (instr.collection_type == CollectionType::List) {
+                table->add_column_list(*target, col_name);
+            }
+            else {
+                REALM_ASSERT(instr.collection_type == CollectionType::Single);
+                table->add_column(*target, col_name);
+            }
         }
         else {
-            table->add_column(type_TypedLink, col_name);
+            if (instr.collection_type == CollectionType::List) {
+                table->add_column_list(type_TypedLink, col_name);
+            }
+            else {
+                REALM_ASSERT(instr.collection_type == CollectionType::Single);
+                table->add_column(type_TypedLink, col_name);
+            }
         }
     }
 }
@@ -479,208 +487,182 @@ void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 {
-    auto& list = get_list(instr, "ArrayInsert");
+    auto callback = util::overloaded{
+        [&](LstBase& list, size_t index) {
+            auto col = list.get_col_key();
+            auto data_type = DataType(col.get_type());
+            auto table = list.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
 
-    if (instr.index() > list.size()) {
-        bad_transaction_log("ArrayInsert out of bounds");
-    }
+            if (index > instr.prior_size) {
+                bad_transaction_log("ArrayInsert: Invalid insertion index (index = %1, prior_size = %2)", index,
+                                    instr.prior_size);
+            }
 
-    auto table = list.get_table();
-    ColKey col = list.get_col_key();
-    SetTargetInfo info;
-    info.table_name = table->get_name();
-    info.col_name = table->get_column_name(col);
-    info.type = table->get_column_type(col);
-    info.nullable = table->is_nullable(col);
+            if (index > list.size()) {
+                bad_transaction_log("ArrayInsert: Index out of bounds (%1 > %2)", index, list.size());
+            }
 
-    if (info.type == type_LinkList) {
-        info.type = type_Link;
-    }
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayInsert: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
 
-    info.is_embedded_link = (info.type == type_Link && table->get_link_target(col)->is_embedded());
+            auto inserter = util::overloaded{
+                [&](const ObjLink& link) {
+                    if (data_type == type_TypedLink) {
+                        auto& link_list = static_cast<Lst<ObjLink>&>(list);
+                        link_list.insert(index, link);
+                    }
+                    else if (data_type == type_Mixed) {
+                        auto& mixed_list = static_cast<Lst<Mixed>&>(list);
+                        mixed_list.insert(index, link);
+                    }
+                    else if (data_type == type_LinkList || data_type == type_Link) {
+                        auto& link_list = static_cast<Lst<ObjKey>&>(list);
+                        // Validate the target.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("ArrayInsert: Target table mismatch (expected '%1', got '%2')",
+                                                target_table->get_name(),
+                                                m_transaction.get_table(link.get_table_key())->get_name());
+                        }
+                        link_list.insert(index, link.get_obj_key());
+                    }
+                    else {
+                        bad_transaction_log(
+                            "ArrayInsert: Type mismatch in list at '%2.%1' (expected link type, was %3)", field_name,
+                            table_name, data_type);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null()) {
+                        if (col.is_nullable()) {
+                            list.set_null(index);
+                        }
+                        else {
+                            bad_transaction_log("ArrayInsert: NULL in non-nullable list '%2.%1'", field_name,
+                                                table_name);
+                        }
+                    }
+                    else {
+                        if (data_type == type_Mixed || value.get_type() == data_type) {
+                            list.insert_any(index, value);
+                        }
+                        else {
+                            bad_transaction_log("ArrayInsert: Type mismatch in list at '%2.%1' (expected %3, got %4)",
+                                                field_name, table_name, data_type, value.get_type());
+                        }
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    if (col.get_type() == col_type_LinkList || col.get_type() == col_type_Link) {
+                        auto target_table = list.get_table()->get_link_target(col);
+                        if (!target_table->is_embedded()) {
+                            bad_transaction_log("ArrayInsert: Creation of embedded object of type '%1', which is not "
+                                                "an embedded table",
+                                                target_table->get_name());
+                        }
 
-    auto setter = util::overloaded{
-        [&](const util::None&) {
-            list.insert_null(instr.index());
+                        auto& link_list = static_cast<LnkLst&>(list);
+                        link_list.create_and_insert_linked_object(index);
+                    }
+                    else {
+                        bad_transaction_log("ArrayInsert: Creation of embedded object in non-link list field '%2.%1'",
+                                            field_name, table_name);
+                    }
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    bad_transaction_log("Dictionary payload for ArrayInsert");
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("Dictionary erase payload for ArrayInsert");
+                },
+            };
+
+            visit_payload(instr.value, inserter);
         },
-        [&](const Instruction::Payload::ObjectValue&) {
-            auto& lst = static_cast<LnkLst&>(list);
-            lst.create_and_insert_linked_object(instr.index());
-        },
-        [&](const ObjLink& link) {
-            if (info.type == type_Mixed) {
-                auto& lst = static_cast<Lst<Mixed>&>(list);
-                lst.insert(instr.index(), Mixed{link});
-            }
-            else if (info.type == type_TypedLink) {
-                auto& lst = static_cast<Lst<ObjLink>&>(list);
-                lst.insert(instr.index(), link);
-            }
-        },
-        [&](const auto& value) {
-            if (info.type != type_Mixed) {
-                using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-                auto& lst = static_cast<Lst<type>&>(list);
-                lst.insert(instr.index(), value);
-            }
-            else {
-                auto& lst = static_cast<Lst<Mixed>&>(list);
-                lst.insert(instr.index(), value);
-            }
-        },
-    };
-    set_value(info, instr.value, std::move(setter), "ArrayInsert");
-}
-
-void InstructionApplier::operator()(const Instruction::SetInsert& instr)
-{
-    auto& set = get_set(instr, "SetInsert");
-
-    auto table = set.get_table();
-    ColKey col = set.get_col_key();
-    SetTargetInfo info;
-    info.table_name = table->get_name();
-    info.col_name = table->get_column_name(col);
-    info.type = table->get_column_type(col);
-    info.nullable = table->is_nullable(col);
-
-    if (info.type == type_LinkList) {
-        // FIXME: Should sets of links have `type_LinkList`?
-        info.type = type_Link;
-    }
-
-    if (info.type == type_Link && table->get_link_target(col)->is_embedded()) {
-        bad_transaction_log("Sets of embedded objects not supported");
-    }
-
-    auto setter = util::overloaded{
-        [&](const util::None&) {
-            set.insert_null();
-        },
-        [&](const Instruction::Payload::ObjectValue&) {
-            bad_transaction_log("Sets of embedded objects not supported");
-        },
-        [&](const ObjLink& link) {
-            if (info.type == type_Mixed) {
-                auto& st = static_cast<Set<Mixed>&>(set);
-                st.insert(Mixed{link});
-            }
-            else if (info.type == type_TypedLink) {
-                auto& st = static_cast<Set<ObjLink>&>(set);
-                st.insert(link);
-            }
-        },
-        [&](const auto& value) {
-            if (info.type != type_Mixed) {
-                using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-                auto& st = static_cast<Set<type>&>(set);
-                st.insert(value);
-            }
-            else {
-                auto& st = static_cast<Set<Mixed>&>(set);
-                st.insert(value);
-            }
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for ArrayInsert");
         },
     };
 
-    set_value(info, instr.value, std::move(setter), "SetInsert");
-}
-
-void InstructionApplier::operator()(const Instruction::SetErase& instr)
-{
-    auto& set = get_set(instr, "SetInsert");
-
-    auto table = set.get_table();
-    ColKey col = set.get_col_key();
-    SetTargetInfo info;
-    info.table_name = table->get_name();
-    info.col_name = table->get_column_name(col);
-    info.type = table->get_column_type(col);
-    info.nullable = table->is_nullable(col);
-
-    if (info.type == type_LinkList) {
-        // FIXME: Should sets of links have `type_LinkList`?
-        info.type = type_Link;
-    }
-
-    if (info.type == type_Link && table->get_link_target(col)->is_embedded()) {
-        bad_transaction_log("Sets of embedded objects not supported");
-    }
-
-    auto setter = util::overloaded{
-        [&](const util::None&) {
-            set.erase_null();
-        },
-        [&](const Instruction::Payload::ObjectValue&) {
-            bad_transaction_log("Sets of embedded objects not supported");
-        },
-        [&](const ObjLink& link) {
-            if (info.type == type_Mixed) {
-                auto& st = static_cast<Set<Mixed>&>(set);
-                st.erase(Mixed{link});
-            }
-            else if (info.type == type_TypedLink) {
-                auto& st = static_cast<Set<ObjLink>&>(set);
-                st.erase(link);
-            }
-        },
-        [&](const auto& value) {
-            if (info.type != type_Mixed) {
-                using type = std::remove_cv_t<std::remove_reference_t<decltype(value)>>;
-                auto& st = static_cast<Set<type>&>(set);
-                st.erase(value);
-            }
-            else {
-                auto& st = static_cast<Set<Mixed>&>(set);
-                st.erase(value);
-            }
-        },
-    };
-
-    set_value(info, instr.value, std::move(setter), "SetErase");
-}
-
-void InstructionApplier::operator()(const Instruction::SetClear& instr)
-{
-    auto& set = get_set(instr, "SetClear");
-
-    set.clear();
+    resolve_path(instr, "ArrayInsert", callback);
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 {
-    auto& list = get_list(instr, "ArrayMove");
+    auto callback = util::overloaded{
+        [&](LstBase& list, size_t index) {
+            if (index >= list.size()) {
+                bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", instr.index(), list.size());
+            }
+            if (instr.ndx_2 >= list.size()) {
+                bad_transaction_log("ArrayMove to out of bounds (%1 >= %2)", instr.ndx_2, list.size());
+            }
+            if (index == instr.ndx_2) {
+                // FIXME: Does this really need to be an error?
+                bad_transaction_log("ArrayMove to same location (%1)", instr.index());
+            }
 
-    if (instr.index() >= list.size()) {
-        bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", instr.index(), list.size());
-    }
-    if (instr.ndx_2 >= list.size()) {
-        bad_transaction_log("ArrayMove to out of bounds (%1 >= %2)", instr.ndx_2, list.size());
-    }
-    if (instr.index() == instr.ndx_2) {
-        // FIXME: Does this really need to be an error?
-        bad_transaction_log("ArrayMove to same location (%1)", instr.index());
-    }
-
-    list.move(instr.index(), instr.ndx_2);
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayMove: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
+            list.move(index, instr.ndx_2);
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for ArrayMode");
+        },
+    };
+    resolve_path(instr, "ArrayMove", std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
-    auto& list = get_list(instr, "ArrayErase");
+    auto callback = util::overloaded{
+        [&](LstBase& list, size_t index) {
+            if (index >= instr.prior_size) {
+                bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
+                                    instr.prior_size);
+            }
+            if (index >= list.size()) {
+                bad_transaction_log("ArrayErase: Index out of bounds (%1 >= %2)", index, list.size());
+            }
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
 
-    if (instr.index() >= list.size()) {
-        bad_transaction_log("ArrayErase out of bounds (%1 >= %2)", instr.index(), list.size());
-    }
-
-    list.remove(instr.index(), instr.index() + 1);
+            list.remove(index, index + 1);
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for ArrayErase");
+        },
+    };
+    resolve_path(instr, "ArrayErase", callback);
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 {
-    auto& list = get_list(instr, "ArrayClear");
+    auto callback = util::overloaded{
+        [&](LstBase& list) {
+            if (instr.prior_size != list.size()) {
+                bad_transaction_log("ArrayClear: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                    instr.prior_size);
+            }
+            list.clear();
+        },
+        [](Dictionary& dict) {
+            dict.clear();
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for ArrayClear");
+        },
+    };
 
-    list.clear();
+    resolve_path(instr, "ArrayClear", callback);
 }
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
@@ -739,170 +721,164 @@ util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::Object
     }
 }
 
-std::tuple<Obj, ColKey> InstructionApplier::get_field(const Instruction::PathInstruction& instr, const char* name)
+template <class F>
+void InstructionApplier::resolve_path(const Instruction::PathInstruction& instr, const char* instr_name, F&& callback)
 {
-    // First, get the top-level object.
     Obj obj;
-    if (auto o = get_top_object(instr, name)) {
-        obj = std::move(*o);
+    if (auto mobj = get_top_object(instr, instr_name)) {
+        obj = std::move(*mobj);
     }
     else {
-        bad_transaction_log("%1: No such object: %3 in class '%2'", name, get_string(instr.table),
-                            format_pk(m_log->get_key(instr.object)));
+        bad_transaction_log("%1: No such object: %3 in class '%2'", instr_name,
+                            format_pk(m_log->get_key(instr.object)), get_string(instr.table));
     }
 
-    // Find the column corresponding to the field in the path instruction.
-    ColKey col;
-    StringData field_name;
-    if (instr.table == m_last_table_name) {
-        if (instr.field == m_last_field_name) {
-            col = m_last_field;
-        }
-        else {
-            // The last table is unchanged, so we can safely update the m_last_field cache.
-            field_name = get_string(instr.field);
-            col = obj.get_table()->get_column_key(field_name);
-            m_last_field_name = instr.field;
-            m_last_field = col;
-        }
-    }
-    else {
-        // Last table does not match, so just get the column without updating any caches.
-        field_name = get_string(instr.field);
-        col = obj.get_table()->get_column_key(field_name);
-    }
+    resolve_field(obj, instr.field, instr.path.begin(), instr.path.end(), instr_name, std::forward<F>(callback));
+}
 
+template <class F>
+void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction::Path::const_iterator begin,
+                                       Instruction::Path::const_iterator end, const char* instr_name, F&& callback)
+{
+    auto field_name = get_string(field);
+    ColKey col = obj.get_table()->get_column_key(field_name);
     if (!col) {
-        bad_transaction_log("%1: No such field '%2.%3'", name, obj.get_table()->get_name(), field_name);
+        bad_transaction_log("%1: No such field: '%2' in class '%3'", instr_name, field_name,
+                            obj.get_table()->get_name());
     }
 
-    // At this point, 'obj' is the top-level object. Now descend through the path.
-    //
-    // FIXME: This should be refactored into something less horrible.
-    for (size_t i = 0; i < instr.path.size(); ++i) {
-        // If the next path element is a string, expect the current field to be
-        // an embedded link.
-        if (auto pfield = mpark::get_if<InternString>(&instr.path[i])) {
-            if (col.get_type() == col_type_Link) {
-                if (obj.is_null(col)) {
-                    // FIXME: We can consider whether addressing through a NULL
-                    // embedded object should implicitly create it. This is the
-                    // behavior of MongoDB dotted paths.
-                    bad_transaction_log("%1: Invalid path (embedded object is NULL)", name);
-                }
-                obj = obj.get_linked_object(col);
-                TableRef tbl = obj.get_table();
-                if (!tbl->is_embedded()) {
-                    bad_transaction_log("%1: Invalid path (link is not embedded '%2.%3')", name,
-                                        obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-                }
-                StringData col_name = get_string(*pfield);
-                col = tbl->get_column_key(col_name);
-                if (!col) {
-                    bad_transaction_log("%1: Invalid path (no such property on embedded table '%2.%3')", name,
-                                        tbl->get_name(), col_name);
-                }
-            }
-            else {
-                bad_transaction_log("%1: Invalid path (not an embedded object '%2.%3')", name,
-                                    obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-            }
+    if (begin == end) {
+        if (col.is_list()) {
+            auto list = obj.get_listbase_ptr(col);
+            return callback(*list);
         }
-        else {
-            size_t remaining = instr.path.size() - i - 1;
-            if (remaining == 0) {
-                // This was the last element of the path, and it was an
-                // index. Just return the list field.
-                break;
-            }
+        else if (col.is_dictionary()) {
+            auto dict = obj.get_dictionary(col);
+            return callback(dict);
+        }
+        return callback(obj, col);
+    }
 
-            // The next path element is an index, and there are more elements,
-            // so we expect the current field to be a list of embedded objects.
-            uint32_t index = mpark::get<uint32_t>(instr.path[i]);
-            if (col.get_type() == col_type_LinkList) {
-                // We have an index, and further path elements — descend into the list.
-                LnkLst lst = obj.get_linklist(col);
-                if (index >= lst.size()) {
-                    bad_transaction_log("%1: Invalid path (index out of bounds on '%2.%3')", name,
-                                        obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-                }
-                obj = lst.get_object(index);
-                TableRef tbl = obj.get_table();
-                if (!tbl->is_embedded()) {
-                    bad_transaction_log("%1: Invalid path (link list is not embedded '%2.%3')", name,
-                                        obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-                }
-                if (auto psubfield = mpark::get_if<InternString>(&instr.path[i + 1])) {
-                    ++i; // Skip over the index.
-                    StringData col_name = get_string(*psubfield);
-                    col = tbl->get_column_key(col_name);
-                    if (!col) {
-                        bad_transaction_log("%1: Invalid path (no such property on embedded table '%2.%3')", name,
-                                            tbl->get_name(), col_name);
-                    }
+    if (col.is_list()) {
+        if (auto pindex = mpark::get_if<uint32_t>(&*begin)) {
+            // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
+            // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
+            // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
+            // links.
+            std::unique_ptr<LstBase> list;
+            if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
+                auto table = obj.get_table();
+                if (!table->get_link_target(col)->is_embedded()) {
+                    list = std::make_unique<Lst<ObjKey>>(obj, col);
                 }
                 else {
-                    bad_transaction_log("%1: Invalid path (arrays of arrays are not supported)", name);
+                    list = obj.get_listbase_ptr(col);
                 }
             }
             else {
-                bad_transaction_log("%1: Invalid path (index into '%2.%3', which is not a list of embedded objects)",
-                                    name, obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
+                list = obj.get_listbase_ptr(col);
             }
+
+            ++begin;
+            return resolve_list_element(*list, *pindex, begin, end, instr_name, std::forward<F>(callback));
+        }
+        else {
+            bad_transaction_log("%1: List index is not an integer on field '%2' in class '%3'", instr_name,
+                                field_name, obj.get_table()->get_name());
         }
     }
-
-    // This assertion checks that the col key belongs to the table in a
-    // roundabout way.
-    REALM_ASSERT(!obj.get_table()->get_column_name(col).is_null());
-
-    return std::make_tuple(std::move(obj), col);
-}
-
-LstBase& InstructionApplier::get_list(const Instruction::PathInstruction& instr, const char* name)
-{
-    // Note: get_field() returns the last object field in the path, which is to
-    // say that if the last element of the path is an index, it will not be
-    // traversed.
-    auto [obj, col] = get_field(instr, name);
-
-    // Note: Since `get_field()` may return an embedded object (for which we
-    // don't set m_last_table), we have to find the table through the object.
-    //
-    // FIXME: Cache list pointers.
-    auto table = obj.get_table();
-    if (!table->is_list(col)) {
-        bad_transaction_log("%1: '%2.%3' is not a list", name, table->get_name(), table->get_column_name(col));
+    else if (col.is_dictionary()) {
+        if (auto pkey = mpark::get_if<InternString>(&*begin)) {
+            auto dict = obj.get_dictionary(col);
+            ++begin;
+            return resolve_dictionary_element(dict, *pkey, begin, end, instr_name, std::forward<F>(callback));
+        }
+        else {
+            bad_transaction_log("%1: Dictionary key is not a string on field '%2' in class '%3'", instr_name,
+                                field_name, obj.get_table()->get_name());
+        }
     }
+    else if (col.get_type() == col_type_Link) {
+        auto target = obj.get_table()->get_link_target(col);
+        if (!target->is_embedded()) {
+            bad_transaction_log("%1: Reference through non-embedded link in field '%2' in class '%3'", instr_name,
+                                field_name, obj.get_table()->get_name());
+        }
+        if (obj.is_null(col)) {
+            bad_transaction_log("%1: Reference through NULL embedded link in field '%2' in class '%3'", instr_name,
+                                field_name, obj.get_table()->get_name());
+        }
 
-    // FIXME: All of the `get_list` methods on `Obj` return a pointer to a
-    // `LnkLst`, and never a `Lst<ObjKey>`, which means we get condensed indices
-    // rather than uncondensed. For embedded objects, however, we actually want
-    // the condensed interface.
-    if (col.get_type() == col_type_LinkList && !table->get_link_target(col)->is_embedded()) {
-        m_last_list = std::make_unique<Lst<ObjKey>>(obj, col);
+        auto embedded_object = obj.get_linked_object(col);
+        if (auto pfield = mpark::get_if<InternString>(&*begin)) {
+            ++begin;
+            return resolve_field(embedded_object, *pfield, begin, end, instr_name, std::forward<F>(callback));
+        }
+        else {
+            bad_transaction_log("%1: Embedded object field reference is not a string", instr_name);
+        }
     }
     else {
-        m_last_list = obj.get_listbase_ptr(col);
+        bad_transaction_log("%1: Resolving path through unstructured field '%3.%2' of type %4", instr_name,
+                            field_name, obj.get_table()->get_name(), col.get_type());
     }
-
-    return *m_last_list;
 }
 
-SetBase& InstructionApplier::get_set(const Instruction::PathInstruction& instr, const char* name)
+template <class F>
+void InstructionApplier::resolve_list_element(LstBase& list, size_t index, Instruction::Path::const_iterator begin,
+                                              Instruction::Path::const_iterator end, const char* instr_name,
+                                              F&& callback)
 {
-    auto [obj, col] = get_field(instr, name);
-
-    // FIXME: Handle lists of sets.
-
-    auto table = obj.get_table();
-    if (!table->is_set(col)) {
-        bad_transaction_log("%1: '%2.%3' is not a set", name, table->get_name(), table->get_column_name(col));
+    if (begin == end) {
+        return callback(list, index);
     }
 
-    m_last_set = obj.get_setbase_ptr(col);
-    return *m_last_set;
+    auto col = list.get_col_key();
+    auto field_name = list.get_table()->get_column_name(col);
+
+    if (col.get_type() == col_type_LinkList) {
+        auto target = list.get_table()->get_link_target(col);
+        if (!target->is_embedded()) {
+            bad_transaction_log("%1: Reference through non-embedded link at '%3.%2[%4]'", instr_name, field_name,
+                                list.get_table()->get_name(), index);
+        }
+
+        auto& link_list = static_cast<LnkLst&>(list);
+        if (index >= link_list.size()) {
+            bad_transaction_log("%1: Out-of-bounds index through list at '%3.%2[%4]'", instr_name, field_name,
+                                list.get_table()->get_name(), index);
+        }
+        auto embedded_object = link_list.get_object(index);
+
+        if (auto pfield = mpark::get_if<InternString>(&*begin)) {
+            ++begin;
+            return resolve_field(embedded_object, *pfield, begin, end, instr_name, std::forward<F>(callback));
+        }
+        else {
+            bad_transaction_log("%1: Embedded object field reference is not a string", instr_name);
+        }
+    }
+    else {
+        bad_transaction_log(
+            "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
+            instr_name, field_name, list.get_table()->get_name(), col.get_type());
+    }
 }
+
+template <class F>
+void InstructionApplier::resolve_dictionary_element(Dictionary& dict, InternString key,
+                                                    Instruction::Path::const_iterator begin,
+                                                    Instruction::Path::const_iterator end, const char* instr_name,
+                                                    F&& callback)
+{
+    if (begin == end) {
+        auto string_key = get_string(key);
+        return callback(dict, Mixed{string_key});
+    }
+
+    bad_transaction_log("%1: Nested dictionaries are not supported yet", instr_name);
+}
+
 
 ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::PrimaryKey& primary_key,
                                           const char* name) const

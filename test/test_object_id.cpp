@@ -260,8 +260,8 @@ TEST(ObjectId_Query)
 
         col_id = table->add_column(type_ObjectId, "alternative_id", true);
         col_int = table->add_column(type_Int, "int");
-        col_has = table->add_column_link(type_Link, "Has", *target);
-        col_owns = origin->add_column_link(type_Link, "Owns", *table);
+        col_has = table->add_column(*target, "Has");
+        col_owns = origin->add_column(*table, "Owns");
 
         ObjKeys target_keys;
         target->create_objects(16, target_keys);
@@ -326,6 +326,33 @@ TEST(ObjectId_Query)
         CHECK_EQUAL(q5.count(), 1000);
         Query q6 = table->column<ObjectId>(col) <= t25;
         CHECK_EQUAL(q6.count(), 26);
+    }
+}
+
+TEST(ObjectId_Distinct)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+
+    {
+        std::vector<ObjectId> ids{"000004560000000000170232", "000004560000000000170233", "000004550000000000170232"};
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        auto col_id = table->add_column(type_ObjectId, "id", true);
+        for (int i = 1; i < 10; i++) {
+            auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
+        }
+
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        ColKey col = table->get_column_key("id");
+        DescriptorOrdering order;
+        order.append_distinct(DistinctDescriptor({{col}}));
+        auto tv = table->where().find_all(order);
+        CHECK_EQUAL(tv.size(), 3);
     }
 }
 

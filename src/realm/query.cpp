@@ -309,6 +309,15 @@ struct MakeConditionNode<StringNode<Cond>> {
     }
 };
 
+template <class Cond>
+struct MakeConditionNode<MixedNode<Cond>> {
+    template <class T>
+    static std::unique_ptr<ParentNode> make(ColKey col_key, T value)
+    {
+        return std::unique_ptr<ParentNode>{new MixedNode<Cond>(Mixed(value), col_key)};
+    }
+};
+
 template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey column_key, T value)
 {
@@ -346,6 +355,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         }
         case type_ObjectId: {
             return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value);
+        }
+        case type_Mixed: {
+            return MakeConditionNode<MixedNode<Cond>>::make(column_key, value);
         }
         default: {
             throw LogicError{LogicError::type_mismatch};
@@ -1949,7 +1961,6 @@ TableVersions Query::sync_view_if_needed() const
 QueryGroup::QueryGroup(const QueryGroup& other)
     : m_root_node(other.m_root_node ? other.m_root_node->clone() : nullptr)
     , m_pending_not(other.m_pending_not)
-    , m_subtable_column(other.m_subtable_column)
     , m_state(other.m_state)
 {
 }
@@ -1959,8 +1970,6 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     if (this != &other) {
         m_root_node = other.m_root_node ? other.m_root_node->clone() : nullptr;
         m_pending_not = other.m_pending_not;
-        m_subtable_column = other.m_subtable_column;
-        m_state = other.m_state;
     }
     return *this;
 }

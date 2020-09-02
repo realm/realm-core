@@ -20,6 +20,10 @@
 #define REALM_DICTIONARY_HPP
 
 #include <realm/collection.hpp>
+#include <realm/obj.hpp>
+#include <realm/mixed.hpp>
+#include <realm/array_mixed.hpp>
+#include <realm/dictionary_cluster_tree.hpp>
 
 namespace realm {
 
@@ -27,27 +31,114 @@ class DictionaryClusterTree;
 
 class Dictionary : public CollectionBase {
 public:
-    Dictionary(const Obj& obj, ColKey col_key)
-        : CollectionBase(obj, col_key)
+    class Iterator;
+
+    Dictionary() {}
+    ~Dictionary();
+
+    Dictionary(const Obj& obj, ColKey col_key);
+    Dictionary(const Dictionary& other)
+        : CollectionBase(other)
+        , m_key_type(other.m_key_type)
     {
-        if (m_obj) {
-            init_from_parent();
-        }
+        *this = other;
     }
-    void insert(Mixed key, Mixed value)
+    Dictionary& operator=(const Dictionary& other);
+
+
+    // Overriding members of CollectionBase:
+    size_t size() const final;
+    DataType get_key_data_type() const;
+    DataType get_value_data_type() const;
+    bool is_null(size_t ndx) const final;
+    Mixed get_any(size_t ndx) const final;
+
+    Mixed min(size_t* return_ndx = nullptr) const final;
+    Mixed max(size_t* return_ndx = nullptr) const final;
+    Mixed sum(size_t* return_cnt = nullptr) const final;
+    Mixed avg(size_t* return_cnt = nullptr) const final;
+
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+
+
+    void create();
+
+    // first points to inserted/updated element.
+    // second is true if the element was inserted
+    std::pair<Iterator, bool> insert(Mixed key, Mixed value);
+    std::pair<Iterator, bool> insert(Mixed key, const Obj& obj);
+
+    // throws std::out_of_range if key is not found
+    Mixed get(Mixed key) const;
+    // Noexcept version
+    util::Optional<Mixed> try_get(Mixed key) const noexcept;
+    // adds entry if key is not found
+    const Mixed operator[](Mixed key);
+
+    Iterator find(Mixed key);
+
+    void erase(Mixed key);
+    void erase(Iterator it);
+
+    void nullify(Mixed);
+
+    void clear();
+
+    template <class T>
+    void for_all_values(T&& f)
     {
-        if (Replication* repl = this->m_obj.get_replication()) {
-            repl->dictionary_insert(*this, key, value);
+        if (m_clusters) {
+            ArrayMixed leaf(m_obj.get_alloc());
+            // Iterate through cluster and call f on each value
+            auto trv_func = [&leaf, &f](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+                for (size_t i = 0; i < e; i++) {
+                    f(leaf.get(i));
+                }
+                // Continue
+                return false;
+            };
+            m_clusters->traverse(trv_func);
         }
     }
 
+    Iterator begin() const;
+    Iterator end() const;
 
 private:
-    bool init_from_parent() const override
-    {
-        return false;
-    }
+    mutable DictionaryClusterTree* m_clusters = nullptr;
+    DataType m_key_type = type_String;
+
+    bool init_from_parent() const final;
+    Mixed do_get(ClusterNode::State&&) const;
 };
+
+class Dictionary::Iterator : public ClusterTree::Iterator {
+public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef std::pair<const Mixed, Mixed> value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const value_type* pointer;
+    typedef const value_type& reference;
+
+    value_type operator*() const;
+
+private:
+    friend class Dictionary;
+    using ClusterTree::Iterator::get_position;
+
+    DataType m_key_type;
+
+    Iterator(const Dictionary* dict, size_t pos);
+};
+
+inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const Obj& obj)
+{
+    return insert(key, Mixed(obj.get_link()));
+}
+
 } // namespace realm
 
-#endif // REALM_DICTIONARY_HPP
+#endif /* SRC_REALM_DICTIONARY_HPP_ */

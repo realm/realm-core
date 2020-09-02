@@ -19,7 +19,7 @@ TEST(EmbeddedObjects_Basic)
     client_1->create_schema([](WriteTransaction& tr) {
         TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
-        top->add_column_link(type_Link, "sub", *sub);
+        top->add_column(*sub, "sub");
         sub->add_column(type_Int, "i");
     });
 
@@ -50,7 +50,7 @@ TEST(EmbeddedObjects_ArrayOfObjects)
     client_1->create_schema([](WriteTransaction& tr) {
         TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
-        top->add_column_link(type_LinkList, "sub", *sub);
+        top->add_column_list(*sub, "sub");
         sub->add_column(type_Int, "i");
     });
 
@@ -84,8 +84,8 @@ TEST(EmbeddedObjects_NestedArray)
     client_1->create_schema([](WriteTransaction& tr) {
         TableRef threads = sync::create_table_with_primary_key(tr, "class_ForumThread", type_Int, "pk");
         TableRef comments = tr.add_embedded_table("class_Comment");
-        threads->add_column_link(type_LinkList, "comments", *comments);
-        comments->add_column_link(type_LinkList, "replies", *comments);
+        threads->add_column_list(*comments, "comments");
+        comments->add_column_list(*comments, "replies");
         comments->add_column(type_Int, "message");
     });
 
@@ -144,7 +144,7 @@ TEST(EmbeddedObjects_ImplicitErase)
         client_1->create_schema([](WriteTransaction& tr) {
             TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
             TableRef sub = tr.add_embedded_table("class_Sub");
-            top->add_column_link(type_Link, "sub", *sub);
+            top->add_column(*sub, "sub");
             sub->add_column(type_Int, "i");
         });
 
@@ -194,7 +194,7 @@ TEST(EmbeddedObjects_SetDefaultNullIgnored)
         client_1->create_schema([](WriteTransaction& tr) {
             TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
             TableRef sub = tr.add_embedded_table("class_Sub");
-            top->add_column_link(type_Link, "sub", *sub);
+            top->add_column(*sub, "sub");
             sub->add_column(type_Int, "i");
         });
 
@@ -245,7 +245,7 @@ TEST(EmbeddedObjects_DiscardThroughImplicitErase)
         client_1->create_schema([](WriteTransaction& tr) {
             TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
             TableRef sub = tr.add_embedded_table("class_Sub");
-            top->add_column_link(type_Link, "sub", *sub);
+            top->add_column(*sub, "sub");
             sub->add_column(type_Int, "i");
 
             auto top_obj = top->create_object_with_primary_key(123);
@@ -294,8 +294,8 @@ TEST(EmbeddedObjects_AdjustPathOnInsert)
     client_1->create_schema([](WriteTransaction& tr) {
         TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
-        top->add_column_link(type_LinkList, "sub", *sub);
-        sub->add_column_link(type_LinkList, "sub", *sub);
+        top->add_column_list(*sub, "sub");
+        sub->add_column_list(*sub, "sub");
         sub->add_column(type_Int, "i");
 
         auto top_obj = top->create_object_with_primary_key(123);
@@ -368,8 +368,8 @@ TEST(EmbeddedObjects_AdjustPathOnErase)
     client_1->create_schema([](WriteTransaction& tr) {
         TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
-        top->add_column_link(type_LinkList, "sub", *sub);
-        sub->add_column_link(type_LinkList, "sub", *sub);
+        top->add_column_list(*sub, "sub");
+        sub->add_column_list(*sub, "sub");
         sub->add_column(type_Int, "i");
 
         auto top_obj = top->create_object_with_primary_key(123);
@@ -447,7 +447,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject)
             auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
             auto embedded = tr.add_embedded_table("class_embedded");
             embedded->add_column(type_Int, "int");
-            table->add_column_link(type_Link, "embedded", *embedded);
+            table->add_column(*embedded, "embedded");
             auto obj = table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
@@ -514,8 +514,8 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject_Nested)
             auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
             auto embedded = tr.add_embedded_table("class_embedded");
             embedded->add_column(type_Int, "int");
-            embedded->add_column_link(type_Link, "embedded", *embedded);
-            table->add_column_link(type_Link, "embedded", *embedded);
+            embedded->add_column(*embedded, "embedded");
+            table->add_column(*embedded, "embedded");
             auto obj = table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });

@@ -482,7 +482,7 @@ TEST(Sync_Multiserver_PartialSync)
             if (!col_ndx_result_set_matches_property)
                 col_ndx_result_set_matches_property = result_sets->add_column(type_String, "matches_property");
             // 0 = uninitialized, 1 = initialized, -1 = query parsing failed
-            result_sets->add_column_link(type_LinkList, "matches", *table);
+            result_sets->add_column_list(*table, "matches");
             Obj result_set = create_object(wt, *result_sets);
             result_set.set(col_ndx_result_set_query, "TRUEPREDICATE");
             result_set.set(col_ndx_result_set_matches_property, "matches");

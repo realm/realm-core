@@ -37,7 +37,7 @@ template <class T>
 inline void check_column_type(ColKey col)
 {
     if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -45,7 +45,7 @@ template <>
 inline void check_column_type<Int>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -53,7 +53,7 @@ template <>
 inline void check_column_type<util::Optional<Int>>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -61,7 +61,7 @@ template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
     if (col && col.get_type() != col_type_LinkList) {
-        throw LogicError(LogicError::list_type_mismatch);
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -287,6 +287,7 @@ public:
     {
         if (!m_valid && !init_from_parent())
             return not_found;
+        update_if_needed();
         return m_tree->find_first(value);
     }
     template <typename Func>
@@ -381,11 +382,11 @@ protected:
  */
 template <class T, class Interface>
 struct Collection<T, Interface>::iterator {
-    using iterator_category = std::bidirectional_iterator_tag;
-    using value_type = const T;
-    using difference_type = ptrdiff_t;
-    using pointer = const T*;
-    using reference = const T&;
+    typedef std::bidirectional_iterator_tag iterator_category;
+    typedef const T value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const T* pointer;
+    typedef const T& reference;
 
     iterator(const Collection<T, Interface>* l, size_t ndx)
         : m_list(l)
@@ -436,7 +437,6 @@ struct Collection<T, Interface>::iterator {
 
 private:
     friend class Lst<T>;
-    friend class Set<T>;
     friend class Collection<T, Interface>;
 
     mutable T m_val;

@@ -147,6 +147,10 @@ target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
 
+if (APPLE)
+    target_link_libraries(realm-object-store PUBLIC ${Foundation} ${Security})
+endif()
+
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
     target_link_libraries(realm-object-store PUBLIC Sync ${ZLIB_LIBRARIES})

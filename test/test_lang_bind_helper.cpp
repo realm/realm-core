@@ -508,7 +508,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
         foo_w->add_column(type_Timestamp, "t");
         foo_w->add_column(type_Decimal, "dec");
         foo_w->add_column(type_ObjectId, "oid");
-        foo_w->add_column_link(type_Link, "link", *foo_w);
+        foo_w->add_column(*foo_w, "link");
         cols = foo_w->get_column_keys();
         auto obj1 = foo_w->create_object();
         auto obj0 = foo_w->get_object(k0);
@@ -908,7 +908,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
         WriteTransaction wt(sg_w);
         TableRef a_w = wt.get_table("a");
         TableRef b_w = wt.get_or_add_table("b");
-        b_w->add_column_link(type_Link, "foo", *a_w);
+        b_w->add_column(*a_w, "foo");
         wt.commit();
     }
 
@@ -1086,8 +1086,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
         target->add_column(type_Int, "value");
-        auto col = origin->add_column_link(type_LinkList, "list", *target);
-        // origin->add_search_index(0);
+        auto col = origin->add_column_list(*target, "list");
+
         std::vector<ObjKey> keys;
         target->create_objects(10, keys);
 
@@ -1114,6 +1114,19 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
     auto ll2 = obj1.get_linklist(col_link); // lv2[0] -> target[2]
     CHECK_EQUAL(ll1.size(), 1);
     CHECK_EQUAL(ll2.size(), 1);
+
+    ObjKey ll1_target = ll1.get_object(0).get_key();
+    CHECK_EQUAL(ll1.find_first(ll1_target), 0);
+
+    {
+        WriteTransaction wt(sg_w);
+        wt.get_table("origin")->get_object(ObjKey(0)).get_linklist(col_link).clear();
+        wt.commit();
+    }
+    rt->advance_read();
+    rt->verify();
+
+    CHECK_EQUAL(ll1.find_first(ll1_target), not_found);
 }
 
 namespace {
@@ -1242,7 +1255,7 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
         WriteTransaction wt(sg);
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
-        ck = origin->add_column_link(type_LinkList, "ll", *target);
+        ck = origin->add_column_list(*target, "ll");
         origin->create_objects(table_size, o_keys);
         target->create_objects(table_size, t_keys);
         wt.commit();
@@ -1293,7 +1306,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
         WriteTransaction wt(sg);
         TableRef origin_w = wt.add_table("origin");
         TableRef target_w = wt.add_table("target");
-        col = origin_w->add_column_link(type_Link, "", *target_w);
+        col = origin_w->add_column(*target_w, "");
         target_w->add_column(type_Int, "");
         target_key = target_w->create_object().get_key();
         wt.commit();
@@ -1334,7 +1347,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkToNeighbour)
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
         table->add_column(type_Int, "integers");
-        col = table->add_column_link(type_Link, "links", *table);
+        col = table->add_column(*table, "links");
         table->create_objects(10, keys);
         wt.commit();
     }
@@ -1371,10 +1384,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
         TableRef delta_w = wt.add_table("delta");
         TableRef epsilon_w = wt.add_table("epsilon");
         alpha_w->add_column(type_Int, "alpha-1");
-        beta_w->add_column_link(type_Link, "beta-1", *delta_w);
-        gamma_w->add_column_link(type_Link, "gamma-1", *gamma_w);
+        beta_w->add_column(*delta_w, "beta-1");
+        gamma_w->add_column(*gamma_w, "gamma-1");
         delta_w->add_column(type_Int, "delta-1");
-        epsilon_w->add_column_link(type_Link, "epsilon-1", *delta_w);
+        epsilon_w->add_column(*delta_w, "epsilon-1");
         wt.commit();
     }
     rt->advance_read();
@@ -1461,7 +1474,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
         auto target = wt.add_embedded_table("target");
-        col = origin->add_column_link(type_Link, "o_1", *target);
+        col = origin->add_column(*target, "o_1");
         target->add_column(type_Int, "t_1");
         wt.commit();
     }
@@ -1546,7 +1559,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
         auto target = wt.add_embedded_table("target");
-        col = origin->add_column_link(type_LinkList, "o_1", *target);
+        col = origin->add_column_list(*target, "o_1");
         target->add_column(type_Int, "t_1");
         wt.commit();
     }
@@ -1903,6 +1916,10 @@ public:
     {
         return false;
     }
+    bool dictionary_erase(Mixed)
+    {
+        return false;
+    }
     bool modify_object(ColKey, ObjKey)
     {
         return false;
@@ -2067,8 +2084,8 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         // Add a table with some links
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("link origin");
-        c2 = table->add_column_link(type_Link, "link", *wt.get_table("table 1"));
-        c3 = table->add_column_link(type_LinkList, "linklist", *wt.get_table("table 2"));
+        c2 = table->add_column(*wt.get_table("table 1"), "link");
+        c3 = table->add_column_list(*wt.get_table("table 2"), "linklist");
         Obj o = table->create_object();
         o.set(c2, o.get_key());
         o.get_linklist(c3).add(o.get_key());
@@ -2357,8 +2374,8 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
         group->promote_to_write();
         TableRef alpha = group->get_or_add_table("alpha");
         TableRef beta = group->get_or_add_table("beta");
-        ca = alpha->add_column_link(type_Link, "beta-1", *beta);
-        cb = beta->add_column_link(type_Link, "alpha-1", *alpha);
+        ca = alpha->add_column(*beta, "beta-1");
+        cb = beta->add_column(*alpha, "alpha-1");
         group->commit_and_continue_as_read();
     }
     group->verify();
@@ -2430,9 +2447,9 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
         TableRef t2 = group->get_or_add_table("t2");
         TableRef t3 = group->get_or_add_table("t3");
         TableRef t4 = group->get_or_add_table("t4");
-        t1->add_column_link(type_Link, "l12", *t2);
-        t2->add_column_link(type_Link, "l23", *t3);
-        t3->add_column_link(type_Link, "l34", *t4);
+        t1->add_column(*t2, "l12");
+        t2->add_column(*t3, "l23");
+        t3->add_column(*t4, "l34");
         group->commit_and_continue_as_read();
     }
     group->verify();
@@ -2463,7 +2480,7 @@ TEST(LangBindHelper_RollbackTableRemove)
         group->promote_to_write();
         TableRef alpha = group->get_or_add_table("alpha");
         TableRef beta = group->get_or_add_table("beta");
-        beta->add_column_link(type_Link, "alpha-1", *alpha);
+        beta->add_column(*alpha, "alpha-1");
         group->commit_and_continue_as_read();
     }
     group->verify();
@@ -2494,8 +2511,8 @@ TEST(LangBindHelper_RollbackTableRemove2)
         TableRef b = group->get_or_add_table("b");
         TableRef c = group->get_or_add_table("c");
         TableRef d = group->get_or_add_table("d");
-        c->add_column_link(type_Link, "a", *a);
-        d->add_column_link(type_Link, "b", *b);
+        c->add_column(*a, "a");
+        d->add_column(*b, "b");
         group->commit_and_continue_as_read();
     }
     group->verify();
@@ -2553,7 +2570,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
         group->promote_to_write();
         t = group->get_or_add_table("a_table");
         t2 = group->get_or_add_table("b_table");
-        col = t->add_column_link(type_Link, "bruno", *t2);
+        col = t->add_column(*t2, "bruno");
         CHECK_EQUAL(1, t->get_column_count());
         group->commit_and_continue_as_read();
     }
@@ -2609,7 +2626,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
     group->promote_to_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    auto col0 = origin->add_column_link(type_LinkList, "", *target);
+    auto col0 = origin->add_column_list(*target, "");
     target->add_column(type_Int, "");
     auto o0 = origin->create_object();
     auto t0 = target->create_object();
@@ -2645,7 +2662,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
     group->promote_to_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    auto col0 = origin->add_column_link(type_Link, "", *target);
+    auto col0 = origin->add_column(*target, "");
     target->add_column(type_Int, "");
     auto o0 = origin->create_object();
     auto t0 = target->create_object();
@@ -2680,7 +2697,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
     group->promote_to_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    auto col0 = origin->add_column_link(type_LinkList, "", *target);
+    auto col0 = origin->add_column_list(*target, "");
     target->add_column(type_Int, "");
     auto o0 = origin->create_object();
     auto t0 = target->create_object();
@@ -2730,9 +2747,9 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
 
-    auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
+    auto c1 = origin->add_column_list(*target, "linklist");
     target->add_column(type_Int, "int");
-    auto c2 = origin->add_column_link(type_Link, "link", *target);
+    auto c2 = origin->add_column(*target, "link");
 
     Obj t = target->create_object();
     Obj o = origin->create_object();
@@ -2813,8 +2830,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
         // Add a table with some links
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("link origin");
-        c2 = table->add_column_link(type_Link, "link", *wt.get_table("table 1"));
-        c3 = table->add_column_link(type_LinkList, "linklist", *wt.get_table("table 2"));
+        c2 = table->add_column(*wt.get_table("table 1"), "link");
+        c3 = table->add_column_list(*wt.get_table("table 2"), "linklist");
         Obj o = table->create_object();
         o.set(c2, o.get_key());
         o.get_linklist(c3).add(o.get_key());
@@ -2925,7 +2942,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
     auto group = sg->start_write();
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
-    auto col = origin->add_column_link(type_LinkList, "", *target);
+    auto col = origin->add_column_list(*target, "");
     target->add_column(type_Int, "");
     auto O0 = origin->create_object();
     auto T0 = target->create_object();
@@ -3221,7 +3238,7 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     auto group_w = sg->start_write();
 
     TableRef table_w = group_w->add_table("table");
-    auto col = table_w->add_column_link(type_LinkList, "flubber", *table_w);
+    auto col = table_w->add_column_list(*table_w, "flubber");
     auto obj = table_w->create_object();
     auto link_list_w = obj.get_linklist(col);
     link_list_w.add(obj.get_key());
@@ -3389,7 +3406,7 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
         table2->add_column(type_Int, "int");
         auto key = table2->create_object().set_all(42).get_key();
 
-        auto col = table->add_column_link(type_LinkList, "first", *table2);
+        auto col = table->add_column_list(*table2, "first");
         auto obj = table->create_object();
         auto link_view = obj.get_linklist(col);
 
@@ -4007,7 +4024,7 @@ TEST(LangBindHelper_HandoverTableViewWithLnkLst)
             ok1 = table1->create_object().set_all(100, "alfa").get_key();
             ok2 = table1->create_object().set_all(200, "beta").get_key();
 
-            col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+            col_link2 = table2->add_column_list(*table1, "linklist");
 
             auto o = table2->create_object();
             auto lvr = o.get_linklist(col_link2);
@@ -4074,7 +4091,7 @@ TEST(LangBindHelper_HandoverTableViewWithQueryOnLink)
             TableRef table1 = group_w->add_table("table1");
             TableRef table2 = group_w->add_table("table2");
             table1->add_column(type_Int, "col1");
-            auto col_link = table2->add_column_link(type_Link, "link", *table1);
+            auto col_link = table2->add_column(*table1, "link");
 
             target = table1->create_object().set_all(300).get_key();
             auto o = table2->create_object().set_all(target);
@@ -4276,7 +4293,7 @@ TEST(LangBindHelper_HandoverLinkView)
     auto to2 = table1->create_object().set_all(100, "alfa");
     auto to3 = table1->create_object().set_all(200, "beta");
 
-    ColKey col_link2 = table2->add_column_link(type_LinkList, "linklist", *table1);
+    ColKey col_link2 = table2->add_column_list(*table1, "linklist");
 
     auto o1 = table2->create_object();
     auto o2 = table2->create_object();
@@ -4420,7 +4437,7 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     source->add_column(type_Int, "int");
 
     TableRef links = group_w->add_table("links");
-    ColKey col = links->add_column_link(type_Link, "link", *source);
+    ColKey col = links->add_column(*source, "link");
 
     std::vector<ObjKey> dummies;
     source->create_objects(100, dummies);
@@ -4463,7 +4480,7 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
     target->add_column(type_Int, "int");
 
     TableRef links = group_w->add_table("links");
-    auto col = links->add_column_link(type_Link, "link", *target);
+    auto col = links->add_column(*target, "link");
 
     auto obj_t = target->create_object().set_all(0);
 
@@ -4517,7 +4534,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
     auto o21 = table2->create_object().set_all(500, "world");
     auto o22 = table2->create_object().set_all(600, "!");
 
-    ColKey col_link2 = table1->add_column_link(type_LinkList, "link", *table2);
+    ColKey col_link2 = table1->add_column_list(*table2, "link");
 
     // set some links
     auto links1 = o10.get_linklist(col_link2);
@@ -4581,7 +4598,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         TableRef source = group_w->add_table("source");
         TableRef target = group_w->add_table("target");
 
-        ColKey col_link = source->add_column_link(type_Link, "link", *target);
+        ColKey col_link = source->add_column(*target, "link");
         ColKey col_name = target->add_column(type_String, "name");
 
         std::vector<ObjKey> keys;
@@ -4673,7 +4690,7 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
         TableRef source = group_w->add_table("source");
         TableRef target = group_w->add_table("target");
 
-        ColKey col_link = source->add_column_link(type_Link, "link", *target);
+        ColKey col_link = source->add_column(*target, "link");
         ColKey col_name = target->add_column(type_String, "name");
 
         std::vector<ObjKey> keys;
@@ -5013,10 +5030,10 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
         TableRef dog = rt->add_table("Dog");
 
         c0 = owner->add_column(type_String, "name");
-        c1 = owner->add_column_link(type_LinkList, "link", *dog);
+        c1 = owner->add_column_list(*dog, "link");
 
         c2 = dog->add_column(type_String, "name");
-        c3 = dog->add_column_link(type_Link, "link", *owner);
+        c3 = dog->add_column(*owner, "link");
 
         for (size_t i = 0; i < numberOfOwner; i++) {
 
@@ -5128,7 +5145,7 @@ TEST(LangBindHelper_TableViewClear)
 
         col0 = history->add_column(type_Int, "id");
         col1 = history->add_column(type_Int, "parent");
-        col2 = history->add_column_link(type_LinkList, "lines", *line);
+        col2 = history->add_column_list(*line, "lines");
         history->add_search_index(col1);
 
         colA = line->add_column(type_Int, "id");
@@ -5274,7 +5291,7 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
     auto t0 = g->add_table("t0");
     auto t1 = g->add_table("t1");
 
-    auto col = t0->add_column_link(type_Link, "t0_link_to_t1", *t1);
+    auto col = t0->add_column(*t1, "t0_link_to_t1");
     auto o0 = t0->create_object();
     auto o1 = t0->create_object();
     auto v0 = t1->create_object();
@@ -5314,7 +5331,7 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
     auto t0 = g->add_table("t0");
     auto t1 = g->add_table("t1");
 
-    auto col = t0->add_column_link(type_Link, "t0_link_to_t1", *t1);
+    auto col = t0->add_column(*t1, "t0_link_to_t1");
     auto o0 = t0->create_object();
     auto o1 = t0->create_object();
     auto v0 = t1->create_object();
@@ -5448,7 +5465,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     auto t1 = g_w->add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse");
     auto t2 = g_w->add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
     t1->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
-    t2->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *t1);
+    t2->add_column_list(*t1, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr");
     std::vector<ObjKey> keys;
     t1->create_objects(375, keys);
     g_w->add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
@@ -5481,7 +5498,7 @@ TEST(LangBindHelper_Bug2321)
         target->add_column(type_Int, "data");
         target->create_objects(REALM_MAX_BPNODE_SIZE + 2, target_keys);
         TableRef origin = group.add_table("origin");
-        col = origin->add_column_link(type_LinkList, "_link", *target);
+        col = origin->add_column_list(*target, "_link");
         origin->create_objects(2, origin_keys);
         wt.commit();
     }
@@ -5532,7 +5549,7 @@ TEST(LangBindHelper_Bug2295)
         target->add_column(type_Int, "data");
         target->create_objects(REALM_MAX_BPNODE_SIZE + 2, target_keys);
         TableRef origin = group.add_table("origin");
-        col = origin->add_column_link(type_LinkList, "_link", *target);
+        col = origin->add_column_list(*target, "_link");
         origin->create_objects(2, origin_keys);
         wt.commit();
     }
@@ -5894,7 +5911,7 @@ TEST(LangBindHelper_ImportDetachedLinkList)
         WriteTransaction wt(db);
         auto persons = wt.add_table("person");
         auto dogs = wt.add_table("dog");
-        col_pet = persons->add_column_link(type_LinkList, "pet", *dogs);
+        col_pet = persons->add_column_list(*dogs, "pet");
         col_addr = persons->add_column_list(type_String, "address");
         col_name = dogs->add_column(type_String, "name");
         col_age = dogs->add_column(type_Int, "age");

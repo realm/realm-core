@@ -129,8 +129,8 @@ TEST_CASE("ObjectSchema")
         table->add_column(type_ObjectId, "object id");
         table->add_column(type_Decimal, "decimal");
 
-        table->add_column_link(type_Link, "object", *target);
-        table->add_column_link(type_LinkList, "array", *target);
+        table->add_column(*target, "object");
+        table->add_column_list(*target, "array");
 
         table->add_column(type_Int, "int?", true);
         table->add_column(type_Bool, "bool?", true);

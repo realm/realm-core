@@ -256,8 +256,8 @@ TEST(StringIndex_NonIndexable)
     Group group;
     TableRef table = group.add_table("table");
     TableRef target_table = group.add_table("target");
-    table->add_column_link(type_Link, "link", *target_table);
-    table->add_column_link(type_LinkList, "linkList", *target_table);
+    table->add_column(*target_table, "link");
+    table->add_column_list(*target_table, "linkList");
     table->add_column(type_Double, "double");
     table->add_column(type_Float, "float");
     table->add_column(type_Binary, "binary");
@@ -543,22 +543,8 @@ TEST_TYPES(StringIndex_Distinct, string_column, nullable_string_column, enum_col
     col.add(s4);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
-
-    // Get view of unique values
-    // (sorted in alphabetical order, each ref to first match)
-    BPlusTree<ObjKey> results(Allocator::get_default());
-    results.create();
-    ndx.distinct(results);
-
-    CHECK_EQUAL(4, results.size());
-    CHECK_EQUAL(col.key(1), results.get(0)); // s2 = Brian
-    CHECK_EQUAL(col.key(0), results.get(1)); // s1 = John
-    CHECK_EQUAL(col.key(3), results.get(2)); // s3 = Samantha
-    CHECK_EQUAL(col.key(6), results.get(3)); // s4 = Tom
-
-    // Clean up
-    results.destroy();
+    const StringIndex* ndx = col.create_search_index();
+    CHECK(ndx->has_duplicate_values());
 }
 
 TEST_TYPES(StringIndex_FindAllNoCopy, string_column, nullable_string_column, enum_column, nullable_enum_column)
@@ -786,22 +772,8 @@ TEST(StringIndex_Distinct_Int)
         col.add(i);
 
     // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
-
-    BPlusTree<ObjKey> results(Allocator::get_default());
-    results.create();
-
-    ndx.distinct(results);
-
-    std::set<int64_t> s;
-    for (auto i : ints) {
-        s.insert(i);
-    }
-
-    CHECK_EQUAL(s.size(), results.size());
-
-    // Clean up
-    results.destroy();
+    auto ndx = col.create_search_index();
+    CHECK(ndx->has_duplicate_values());
 }
 
 
@@ -1240,15 +1212,9 @@ TEST_TYPES(StringIndex_MaxBytes, string_column, nullable_string_column, enum_col
         }
         CHECK_EQUAL(col.size(), num_dups);
         CHECK(ndx.has_duplicate_values() == (num_dups > 1));
-        BPlusTree<ObjKey> results(Allocator::get_default());
-        results.create();
-        ndx.distinct(results);
-        CHECK_EQUAL(results.size(), 1);
-        CHECK_EQUAL(results.get(0), col.key(0));
         CHECK_EQUAL(col.get(0), s);
         CHECK_EQUAL(col.count(s), num_dups);
         CHECK_EQUAL(col.find_first(s), 0);
-        results.destroy();
         col.clear();
     };
 
@@ -1312,13 +1278,8 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.add(base2_b); // adds a duplicate in the middle of the list
 
     CHECK(ndx.has_duplicate_values());
-    BPlusTree<ObjKey> results(Allocator::get_default());
-    results.create();
     std::vector<ObjKey> find_all_result;
-    ndx.distinct(results);
-    CHECK_EQUAL(results.size(), 7);
     CHECK_EQUAL(col.find_first(base2_b), 4);
-    results.clear();
     ndx.find_all(find_all_result, base2_b);
     CHECK_EQUAL(find_all_result.size(), 2);
     CHECK_EQUAL(find_all_result[0], col.key(4));
@@ -1330,9 +1291,6 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.erase(7);
     CHECK_EQUAL(col.find_first(base2_b), 4);
     CHECK_EQUAL(ndx.count(base2_b), 1);
-    ndx.distinct(results);
-    CHECK_EQUAL(results.size(), 7); // unchanged
-    results.clear();
     ndx.find_all(find_all_result, base2_b);
     CHECK_EQUAL(find_all_result.size(), 1);
     CHECK_EQUAL(find_all_result[0], col.key(4));
@@ -1342,16 +1300,11 @@ TEST_TYPES(StringIndex_InsertLongPrefix, string_column, nullable_string_column, 
     col.set(6, base2_b);
     CHECK_EQUAL(ndx.count(base2_b), 2);
     CHECK_EQUAL(col.find_first(base2_b), 4);
-    ndx.distinct(results);
-    CHECK_EQUAL(results.size(), 6);
-    results.clear();
     ndx.find_all(find_all_result, base2_b);
     CHECK_EQUAL(find_all_result.size(), 2);
     CHECK_EQUAL(find_all_result[0], col.key(4));
     CHECK_EQUAL(find_all_result[1], col.key(6));
     col.verify();
-
-    results.destroy();
 
     col.clear(); // calls recursive function Array::destroy_deep()
 }

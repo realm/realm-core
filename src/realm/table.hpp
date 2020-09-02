@@ -32,7 +32,7 @@
 #include <realm/table_ref.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
-#include <realm/cluster_tree.hpp>
+#include <realm/table_cluster_tree.hpp>
 #include <realm/keys.hpp>
 #include <realm/global_key.hpp>
 
@@ -92,6 +92,10 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    /// If this table is a group-level table, the parent group is returned,
+    /// otherwise null is returned.
+    Group* get_parent_group() const noexcept;
+
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
@@ -109,6 +113,7 @@ public:
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
     ColumnAttrMask get_column_attr(ColKey column_key) const noexcept;
+    DataType get_dictionary_key_type(ColKey column_key) const noexcept;
     ColKey get_column_key(StringData name) const noexcept;
     ColKeys get_column_keys() const;
     typedef util::Optional<std::pair<ConstTableRef, ColKey>> BacklinkOrigin;
@@ -127,17 +132,22 @@ public:
     static const size_t max_column_name_length = 63;
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
+    ColKey add_column(Table& target, StringData name);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
+    ColKey add_column_list(Table& target, StringData name);
     ColKey add_column_set(DataType type, StringData name);
+    ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
 
-    ColKey add_column_link(DataType type, StringData name, Table& target);
+    [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
+    ColKey
+    add_column_link(DataType type, StringData name, Table& target);
 
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
     // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have at most 1 backlink. Return value
+    // not have a primary key and all objects must have exactly 1 backlink. Return value
     // indicates if the conversion was done
     bool set_embedded(bool embedded);
     //@}
@@ -212,9 +222,14 @@ public:
     // Create an object with specific GlobalKey - or return already existing object
     // Potential tombstone will be resurrected
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
-    // Create an object with primary key - or return already existing object
+    // Create an object with primary key. If an object with the given primary key already exists, it
+    // will be returned and did_create (if supplied) will be set to false.
     // Potential tombstone will be resurrected
-    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&& = {});
+    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&&, bool* did_create = nullptr);
+    Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr)
+    {
+        return create_object_with_primary_key(primary_key, {{}}, did_create);
+    }
     // Return key for existing object or return null key.
     ObjKey find_primary_key(Mixed value) const;
     // Return ObjKey for object identified by id. If objects does not exist, return null key
@@ -248,7 +263,7 @@ public:
         return m_clusters.get(ndx);
     }
     // Get object based on primary key
-    Obj get_object_with_primary_key(Mixed pk);
+    Obj get_object_with_primary_key(Mixed pk) const;
     // Get primary key based on ObjKey
     Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
@@ -283,13 +298,10 @@ public:
     }
 
     void clear();
-    using Iterator = ClusterTree::Iterator;
-    using ConstIterator = ClusterTree::ConstIterator;
-    ConstIterator begin() const;
-    ConstIterator end() const;
-    Iterator begin();
-    Iterator end();
-    void remove_object(const ConstIterator& it)
+    using Iterator = TableClusterTree::Iterator;
+    Iterator begin() const;
+    Iterator end() const;
+    void remove_object(const Iterator& it)
     {
         remove_object(it->get_key());
     }
@@ -393,10 +405,6 @@ public:
     TableView find_all_null(ColKey col_key);
     ConstTableView find_all_null(ColKey col_key) const;
 
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
-    TableView get_distinct_view(ColKey col_key);
-    ConstTableView get_distinct_view(ColKey col_key) const;
-
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;
 
@@ -491,7 +499,6 @@ public:
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
     void report_invalid_key(ColKey col_key) const;
-    size_t num_leaf_cols() const;
 
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
@@ -601,13 +608,13 @@ private:
     {
         m_alloc.update_from_underlying_allocator(writable);
     }
-    Spec m_spec;                               // 1st slot in m_top
-    ClusterTree m_clusters;                    // 3rd slot in m_top
-    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
-    TableKey m_key;                            // 4th slot in m_top
-    Array m_index_refs;                        // 5th slot in m_top
-    Array m_opposite_table;                    // 7th slot in m_top
-    Array m_opposite_column;                   // 8th slot in m_top
+    Spec m_spec;                                    // 1st slot in m_top
+    TableClusterTree m_clusters;                    // 3rd slot in m_top
+    std::unique_ptr<TableClusterTree> m_tombstones; // 13th slot in m_top
+    TableKey m_key;                                 // 4th slot in m_top
+    Array m_index_refs;                             // 5th slot in m_top
+    Array m_opposite_table;                         // 7th slot in m_top
+    Array m_opposite_column;                        // 8th slot in m_top
     std::vector<StringIndex*> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
@@ -620,15 +627,16 @@ private:
     size_t do_set_link(ColKey col_key, size_t row_ndx, size_t target_row_ndx);
 
     void populate_search_index(ColKey col_key);
+    void erase_from_search_indexes(ObjKey key);
+    void update_indexes(ObjKey key, const FieldValues& values);
+    void clear_indexes();
 
     // Migration support
     void migrate_column_info(util::FunctionRef<void()>);
-    void migrate_indexes(util::FunctionRef<void()>);
+    void migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_subspec(util::FunctionRef<void()>);
-    void convert_links_from_ndx_to_key(util::FunctionRef<void()>);
-    ref_type get_oid_column_ref() const;
     void create_columns(util::FunctionRef<void()>);
-    void migrate_objects(util::FunctionRef<void()>);
+    void migrate_objects(ColKey pk_col_key, util::FunctionRef<void()>);
     void migrate_links(util::FunctionRef<void()>);
     void finalize_migration();
 
@@ -659,14 +667,15 @@ private:
 
     void set_key(TableKey key);
 
-    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table);
+    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
+                            DataType key_type = DataType(0));
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
     void erase_root_column(ColKey col_key);
-    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name);
+    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, DataType key_type = DataType(0));
     void do_erase_root_column(ColKey col_key);
 
     bool has_any_embedded_objects();
@@ -714,9 +723,6 @@ private:
 
     ColumnType get_real_column_type(ColKey col_key) const noexcept;
 
-    /// If this table is a group-level table, the parent group is returned,
-    /// otherwise null is returned.
-    Group* get_parent_group() const noexcept;
     uint64_t get_sync_file_id() const noexcept;
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
@@ -794,6 +800,7 @@ private:
     friend class Transaction;
     friend class Cluster;
     friend class ClusterTree;
+    friend class TableClusterTree;
     friend class ColKeyIterator;
     friend class Obj;
     friend class LnkLst;
@@ -918,8 +925,14 @@ public:
         auto ct = col_key.get_type();
         if (ct == col_type_LinkList)
             ct = col_type_Link;
-        if (ct != ColumnTypeTraits<T>::column_id)
-            throw LogicError(LogicError::type_mismatch);
+        if constexpr (std::is_same_v<T, Dictionary>) {
+            if (!col_key.is_dictionary())
+                throw LogicError(LogicError::type_mismatch);
+        }
+        else {
+            if (ct != ColumnTypeTraits<T>::column_id)
+                throw LogicError(LogicError::type_mismatch);
+        }
 
         if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
             m_link_cols.push_back(col_key);
@@ -1065,6 +1078,13 @@ inline DataType Table::get_column_type(ColKey column_key) const
 inline ColumnAttrMask Table::get_column_attr(ColKey column_key) const noexcept
 {
     return column_key.get_attrs();
+}
+
+inline DataType Table::get_dictionary_key_type(ColKey column_key) const noexcept
+{
+    auto spec_ndx = colkey2spec_ndx(column_key);
+    REALM_ASSERT_3(spec_ndx, <, get_column_count());
+    return m_spec.get_dictionary_key_type(spec_ndx);
 }
 
 
@@ -1231,11 +1251,6 @@ inline size_t Table::colkey2spec_ndx(ColKey key) const
     auto leaf_idx = key.get_index();
     REALM_ASSERT(leaf_idx.val < m_leaf_ndx2spec_ndx.size());
     return m_leaf_ndx2spec_ndx[leaf_idx.val];
-}
-
-inline size_t Table::num_leaf_cols() const
-{
-    return m_leaf_ndx2spec_ndx.size();
 }
 
 inline ColKey Table::spec_ndx2colkey(size_t spec_ndx) const

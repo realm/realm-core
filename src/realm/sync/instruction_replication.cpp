@@ -82,6 +82,10 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
             REALM_TERMINATE("as_payload() needs table/collection for links");
             break;
         }
+        case type_Mixed:
+            [[fallthrough]];
+        case type_OldTable:
+            [[fallthrough]];
         case type_OldDateTime:
             [[fallthrough]];
         case type_LinkList: {
@@ -327,21 +331,37 @@ void SyncReplication::rename_group_level_table(TableKey, StringData)
     unsupported_instruction();
 }
 
-void SyncReplication::insert_column(const Table* table, ColKey col_ndx, DataType type, StringData name,
+void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType type, StringData name,
                                     Table* target_table)
 {
-    TrivialReplication::insert_column(table, col_ndx, type, name, target_table);
+    TrivialReplication::insert_column(table, col_key, type, name, target_table);
+    using CollectionType = Instruction::AddColumn::CollectionType;
 
     if (select_table(*table)) {
         Instruction::AddColumn instr;
         instr.table = m_last_class_name;
         instr.field = m_encoder.intern_string(name);
-        instr.nullable = col_ndx.is_nullable();
+        instr.nullable = col_key.is_nullable();
         instr.type = get_payload_type(type);
-        instr.list = col_ndx.is_list();
+
+        if (col_key.is_list()) {
+            instr.collection_type = CollectionType::List;
+        }
+        else if (col_key.is_dictionary()) {
+            instr.collection_type = CollectionType::Dictionary;
+            auto key_type = table->get_dictionary_key_type(col_key);
+            REALM_ASSERT(key_type == type_String);
+            instr.key_type = get_payload_type(key_type);
+        }
+        else {
+            REALM_ASSERT(!col_key.is_collection());
+            instr.collection_type = CollectionType::Single;
+            instr.key_type = Instruction::Payload::Type::Null;
+        }
 
         // Mixed columns are always nullable.
-        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
+        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable ||
+                     instr.collection_type == CollectionType::Dictionary);
 
         if (instr.type == Instruction::Payload::Type::Link && target_table) {
             instr.link_target_table = emit_class_name(*target_table);
@@ -442,15 +462,6 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
-{
-    TrivialReplication::dictionary_insert(dict, key, val);
-
-    if (select_collection(dict)) {
-        // FIXME: Implement
-    }
-}
-
 
 void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 {
@@ -479,6 +490,7 @@ void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, siz
         Instruction::ArrayMove instr;
         populate_path_instr(instr, view, uint32_t(from_ndx));
         instr.ndx_2 = uint32_t(to_ndx);
+        instr.prior_size = uint32_t(view.size());
         emit(instr);
     }
 }
@@ -521,6 +533,22 @@ void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixe
     }
 }
 
+void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
+{
+    TrivialReplication::dictionary_insert(dict, key, val);
+
+    if (select_collection(dict)) {
+        Instruction::Update instr;
+        REALM_ASSERT(key.get_type() == type_String);
+        populate_path_instr(instr, dict);
+        StringData key_value = key.get_string();
+        instr.path.push_back(m_encoder.intern_string(key_value));
+        instr.value = as_payload(dict, val);
+        instr.is_default = false;
+        emit(instr);
+    }
+}
+
 void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
 {
     size_t prior_size = set.size();
@@ -539,6 +567,22 @@ void SyncReplication::set_clear(const CollectionBase& set)
     if (select_collection(set)) {
         Instruction::SetClear instr;
         populate_path_instr(instr, set);
+        emit(instr);
+    }
+}
+
+void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
+{
+    TrivialReplication::dictionary_erase(dict, key);
+
+    if (select_collection(dict)) {
+        Instruction::Update instr;
+        REALM_ASSERT(key.get_type() == type_String);
+        populate_path_instr(instr, dict);
+        StringData key_value = key.get_string();
+        instr.path.push_back(m_encoder.intern_string(key_value));
+        instr.value = Instruction::Payload::Erased{};
+        instr.is_default = false;
         emit(instr);
     }
 }

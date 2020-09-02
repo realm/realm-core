@@ -96,6 +96,34 @@ void TransactLogConvenientEncoder::link_list_nullify(const Lst<ObjKey>& list, si
     m_encoder.list_erase(link_ndx);
 }
 
+/******************************** Dictionary *********************************/
+
+bool TransactLogEncoder::dictionary_insert(Mixed key)
+{
+    REALM_ASSERT(key.get_type() == type_String);
+    append_string_instr(instr_DictionaryInsert, key.get_string()); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed)
+{
+    select_collection(dict);
+    m_encoder.dictionary_insert(key);
+}
+
+bool TransactLogEncoder::dictionary_erase(Mixed key)
+{
+    REALM_ASSERT(key.get_type() == type_String);
+    append_string_instr(instr_DictionaryErase, key.get_string()); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase& dict, Mixed key)
+{
+    select_collection(dict);
+    m_encoder.dictionary_insert(key);
+}
+
 REALM_NORETURN
 void TransactLogParser::parser_error() const
 {

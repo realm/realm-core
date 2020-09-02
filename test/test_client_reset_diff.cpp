@@ -112,7 +112,7 @@ TEST(ClientResetDiff_TransferGroup)
 
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_6", type_String, "pk_string");
-            auto col_ndx = table->add_column_link(type_LinkList, "target<ObjKey>", *table);
+            auto col_ndx = table->add_column_list(*table, "target<ObjKey>");
             table->add_column(type_Bool, "something");
 
             Obj obj_a = sync::create_object_with_primary_key(wt, *table, "aaa");
@@ -165,9 +165,9 @@ TEST(ClientResetDiff_TransferGroup)
         {
             TableRef table_3 = group.get_table("class_table_3");
             TableRef table_4 = group.get_table("class_table_4");
-            auto col_3 = table_3->add_column_link(type_LinkList, "target_link3", *table_4);
-            auto col_4 = table_4->add_column_link(type_LinkList, "target_link4", *table_3);
-            auto col_4a = table_4->add_column_link(type_LinkList, "target_link4a", *table_4);
+            auto col_3 = table_3->add_column_list(*table_4, "target_link3");
+            auto col_4 = table_4->add_column_list(*table_3, "target_link4");
+            auto col_4a = table_4->add_column_list(*table_4, "target_link4a");
 
             Obj obj_3 = sync::create_object_with_primary_key(wt, *table_3, 111);
             Obj obj_4 = sync::create_object_with_primary_key(wt, *table_4, StringData{"abc"});
@@ -199,7 +199,7 @@ TEST(ClientResetDiff_TransferGroup)
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_6", type_String, "pk_string");
             table->add_column(type_Int, "something");
-            auto col_ndx = table->add_column_link(type_LinkList, "target_link", *table);
+            auto col_ndx = table->add_column_list(*table, "target_link");
 
             // Opposite order such that the row indices are different.
             Obj obj_f = sync::create_object_with_primary_key(wt, *table, "fff");
@@ -492,7 +492,7 @@ TEST(ClientResetDiff_FailedLocalRecovery)
         TableRef table_0 = create_table_with_primary_key(wt, "class_table_0", type_String, "pk_string");
         TableRef table_1 = create_table_with_primary_key(wt, "class_table_1", type_Int, "pk_int");
 
-        table_0->add_column_link(type_LinkList, "linklist", *table_1);
+        table_0->add_column_list(*table_1, "linklist");
 
         wt.commit();
     }
@@ -510,11 +510,11 @@ TEST(ClientResetDiff_FailedLocalRecovery)
         CHECK_EQUAL(table_2->get_column_count(), 1);
 
         TableRef table_3 = create_table_with_primary_key(wt, "class_table_3", type_String, "pk_string");
-        table_3->add_column_link(type_Link, "links", *table_0);
+        table_3->add_column(*table_0, "links");
         table_3->add_column_list(type_Int, "array_int");
 
         // The target table differs for the same column in remote and local.
-        table_0->add_column_link(type_LinkList, "linklist", *table_2);
+        table_0->add_column_list(*table_2, "linklist");
 
         create_object_with_primary_key(wt, *table_0, "aaa");
         CHECK_EQUAL(table_0->size(), 1);
@@ -578,7 +578,7 @@ TEST(ClientResetDiff_ClientVersion)
     auto create_schema_and_objects = [&](Transaction& wt) {
         TableRef table = create_table_with_primary_key(wt, "class_table", type_String, "pk_string");
         auto col_int = table->add_column(type_Int, "int");
-        auto col_ll = table->add_column_link(type_LinkList, "linklist", *table);
+        auto col_ll = table->add_column_list(*table, "linklist");
         table->add_column_list(type_String, "array");
 
         Obj obj_a = create_object_with_primary_key(wt, *table, "aaa").set(col_int, 100);
@@ -955,7 +955,7 @@ TEST(ClientResetDiff_NonSyncTables)
         WriteTransaction wt{sg};
 
         TableRef table = create_table_with_primary_key(wt, "class_table", type_String, "pk_string");
-        auto col_ndx = table->add_column_link(type_Link, "link", *table);
+        auto col_ndx = table->add_column(*table, "link");
 
         Obj obj_a = sync::create_object_with_primary_key(wt, *table, "aaa");
         Obj obj_b = sync::create_object_with_primary_key(wt, *table, "bbb");
@@ -1055,18 +1055,18 @@ TEST(ClientResetDiff_Links)
         TableRef table_1 = create_table_with_primary_key(wt, "class_table_1", type_String, "pk_string");
         TableRef table_2 = create_table_with_primary_key(wt, "class_table_2", type_Int, "pk_int");
 
-        auto col_link_00 = table_0->add_column_link(type_Link, "link_0", *table_0);
-        auto col_link_01 = table_0->add_column_link(type_Link, "link_1", *table_1);
-        auto col_link_02 = table_0->add_column_link(type_Link, "link_2", *table_2);
+        auto col_link_00 = table_0->add_column(*table_0, "link_0");
+        auto col_link_01 = table_0->add_column(*table_1, "link_1");
+        auto col_link_02 = table_0->add_column(*table_2, "link_2");
         auto col_str_0 = table_0->add_column(type_String, "string");
 
-        auto col_link_10 = table_1->add_column_link(type_Link, "link_0", *table_0);
-        auto col_link_11 = table_1->add_column_link(type_Link, "link_1", *table_1);
-        auto col_link_12 = table_1->add_column_link(type_Link, "link_2", *table_2);
+        auto col_link_10 = table_1->add_column(*table_0, "link_0");
+        auto col_link_11 = table_1->add_column(*table_1, "link_1");
+        auto col_link_12 = table_1->add_column(*table_2, "link_2");
 
-        auto col_link_20 = table_2->add_column_link(type_Link, "link_0", *table_0);
-        auto col_link_21 = table_2->add_column_link(type_Link, "link_1", *table_1);
-        auto col_link_22 = table_2->add_column_link(type_Link, "link_2", *table_2);
+        auto col_link_20 = table_2->add_column(*table_0, "link_0");
+        auto col_link_21 = table_2->add_column(*table_1, "link_1");
+        auto col_link_22 = table_2->add_column(*table_2, "link_2");
 
         Obj remote_0 = create_object(wt, *table_0).set(col_str_0, "remote_0");
         Obj remote_1 = create_object(wt, *table_0).set(col_str_0, "remote_1");
@@ -1129,18 +1129,18 @@ TEST(ClientResetDiff_Links)
         TableRef table_2 = create_table_with_primary_key(wt, "class_table_2", type_Int, "pk_int");
 
         // Same columns in different order.
-        auto col_link_01 = table_0->add_column_link(type_Link, "link_1", *table_1);
-        auto col_link_00 = table_0->add_column_link(type_Link, "link_0", *table_0);
+        auto col_link_01 = table_0->add_column(*table_1, "link_1");
+        auto col_link_00 = table_0->add_column(*table_0, "link_0");
         auto col_str_0 = table_0->add_column(type_String, "string");
-        auto col_link_02 = table_0->add_column_link(type_Link, "link_2", *table_2);
+        auto col_link_02 = table_0->add_column(*table_2, "link_2");
 
-        auto col_link_11 = table_1->add_column_link(type_Link, "link_1", *table_1);
-        auto col_link_12 = table_1->add_column_link(type_Link, "link_2", *table_2);
-        auto col_link_10 = table_1->add_column_link(type_Link, "link_0", *table_0);
+        auto col_link_11 = table_1->add_column(*table_1, "link_1");
+        auto col_link_12 = table_1->add_column(*table_2, "link_2");
+        auto col_link_10 = table_1->add_column(*table_0, "link_0");
 
-        auto col_link_22 = table_2->add_column_link(type_Link, "link_2", *table_2);
-        auto col_link_21 = table_2->add_column_link(type_Link, "link_1", *table_1);
-        auto col_link_20 = table_2->add_column_link(type_Link, "link_0", *table_0);
+        auto col_link_22 = table_2->add_column(*table_2, "link_2");
+        auto col_link_21 = table_2->add_column(*table_1, "link_1");
+        auto col_link_20 = table_2->add_column(*table_0, "link_0");
 
         // Objects.
         Obj local_0 = create_object(wt, *table_0).set(col_str_0, "local_0");

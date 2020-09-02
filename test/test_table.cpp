@@ -378,7 +378,7 @@ TEST(Table_Null)
         TableRef table = group.add_table("table");
 
         auto col_int = target->add_column(type_Int, "int");
-        auto col_link = table->add_column_link(type_Link, "link", *target);
+        auto col_link = table->add_column(*target, "link");
         CHECK(table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
     }
@@ -390,7 +390,7 @@ TEST(Table_Null)
         TableRef table = group.add_table("table");
 
         auto col_int = target->add_column(type_Int, "int");
-        auto col_link = table->add_column_link(type_LinkList, "link", *target);
+        auto col_link = table->add_column_list(*target, "link");
         CHECK(!table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
     }
@@ -912,14 +912,13 @@ TEST(Table_ColumnNameTooLong)
     memset(buf, 'A', buf_size);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_link(type_Link, StringData(buf, buf_size), *table),
-                      LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column(*table, StringData(buf, buf_size)), LogicError::column_name_too_long);
 
     table->add_column(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'B', buf_size); // Column names must be unique
     table->add_column_list(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'C', buf_size);
-    table->add_column_link(type_Link, StringData(buf, buf_size - 1), *table);
+    table->add_column(*table, StringData(buf, buf_size - 1));
 }
 
 TEST(Table_StringOrBinaryTooBig)
@@ -1542,162 +1541,6 @@ TEST(Table_AddIntIndexed)
     obj.add_int(col, 8463800223514590069);
     obj.remove();
 }
-
-TEST(Table_Distinct)
-{
-    Table table;
-    auto col_int = table.add_column(type_Int, "first");
-    auto col_str = table.add_column(type_String, "second");
-
-    ObjKey k0 = table.create_object().set_all(int(Mon), "A").get_key();
-    ObjKey k1 = table.create_object().set_all(int(Tue), "B").get_key();
-    ObjKey k2 = table.create_object().set_all(int(Wed), "C").get_key();
-    ObjKey k3 = table.create_object().set_all(int(Thu), "B").get_key();
-    ObjKey k4 = table.create_object().set_all(int(Fri), "C").get_key();
-    ObjKey k5 = table.create_object().set_all(int(Sat), "D").get_key();
-    ObjKey k6 = table.create_object().set_all(int(Sun), "D").get_key();
-    table.create_object().set_all(int(Mon), "D");
-
-    table.add_search_index(col_int);
-    CHECK(table.has_search_index(col_int));
-
-    auto view = table.get_distinct_view(col_int);
-
-    CHECK_EQUAL(7, view.size());
-    CHECK_EQUAL(k0, view.get_key(0));
-    CHECK_EQUAL(k1, view.get_key(1));
-    CHECK_EQUAL(k2, view.get_key(2));
-    CHECK_EQUAL(k3, view.get_key(3));
-    CHECK_EQUAL(k4, view.get_key(4));
-    CHECK_EQUAL(k5, view.get_key(5));
-    CHECK_EQUAL(k6, view.get_key(6));
-
-    table.add_search_index(col_str);
-    CHECK(table.has_search_index(col_str));
-
-    view = table.get_distinct_view(col_str);
-
-    CHECK_EQUAL(4, view.size());
-    CHECK_EQUAL(k0, view.get_key(0));
-    CHECK_EQUAL(k1, view.get_key(1));
-    CHECK_EQUAL(k2, view.get_key(2));
-    CHECK_EQUAL(k5, view.get_key(3));
-}
-
-
-TEST(Table_DistinctBool)
-{
-    Table table;
-    auto col_bool = table.add_column(type_Bool, "first");
-
-    ObjKey k0 = table.create_object().set(col_bool, true).get_key();
-    ObjKey k1 = table.create_object().set(col_bool, false).get_key();
-    table.create_object().set(col_bool, true);
-    table.create_object().set(col_bool, false);
-
-    table.add_search_index(col_bool);
-    CHECK(table.has_search_index(col_bool));
-
-    TableView view = table.get_distinct_view(col_bool);
-
-    CHECK_EQUAL(2, view.size());
-    CHECK_EQUAL(k0, view.get_key(1));
-    CHECK_EQUAL(k1, view.get_key(0));
-}
-
-
-/*
-// FIXME Commented out because indexes on floats and doubles are not supported (yet).
-
-TEST(Table_DistinctFloat)
-{
-    Table table;
-    table.add_column(type_Float, "first");
-    table.add_empty_row(12);
-    for (size_t i = 0; i < 10; ++i) {
-        table.set_float(0, i, static_cast<float>(i) + 0.5f);
-    }
-    table.set_float(0, 10, 0.5f);
-    table.set_float(0, 11, 1.5f);
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    TableView view = table.get_distinct_view(0);
-    CHECK_EQUAL(10, view.size());
-}
-
-
-TEST(Table_DistinctDouble)
-{
-    Table table;
-    table.add_column(type_Double, "first");
-    table.add_empty_row(12);
-    for (size_t i = 0; i < 10; ++i) {
-        table.set_double(0, i, static_cast<double>(i) + 0.5);
-    }
-    table.set_double(0, 10, 0.5);
-    table.set_double(0, 11, 1.5);
-
-    table.add_search_index(0);
-    CHECK(table.has_search_index(0));
-
-    TableView view = table.get_distinct_view(0);
-    CHECK_EQUAL(10, view.size());
-}
-*/
-
-
-TEST(Table_DistinctTimestamp)
-{
-    Table table;
-    auto col_date = table.add_column(type_Timestamp, "first");
-
-    table.create_object().set(col_date, Timestamp(0, 0));
-    table.create_object().set(col_date, Timestamp(1, 0));
-    table.create_object().set(col_date, Timestamp(3, 0));
-    table.create_object().set(col_date, Timestamp(3, 0));
-
-    table.add_search_index(col_date);
-    CHECK(table.has_search_index(col_date));
-
-    TableView view = table.get_distinct_view(col_date);
-    CHECK_EQUAL(3, view.size());
-}
-
-
-TEST(Table_DistincTBasePersistedTable)
-{
-    GROUP_TEST_PATH(path);
-
-    {
-        Group group;
-        TableRef table = group.add_table("table");
-        auto col = table->add_column(type_Int, "first");
-
-        table->create_object().set(col, 1);
-        table->create_object().set(col, 2);
-        table->create_object().set(col, 3);
-        table->create_object().set(col, 3);
-
-        table->add_search_index(col);
-        CHECK(table->has_search_index(col));
-        group.write(path);
-    }
-
-    {
-        Group group(path, 0, Group::mode_ReadOnly);
-        TableRef table = group.get_table("table");
-        auto col = table->get_column_key("first");
-        TableView view = table->get_distinct_view(col);
-
-        CHECK_EQUAL(3, view.size());
-        CHECK_EQUAL(table->get_object(view.get_key(0)).get<Int>(col), 1);
-        CHECK_EQUAL(table->get_object(view.get_key(1)).get<Int>(col), 2);
-        CHECK_EQUAL(table->get_object(view.get_key(2)).get<Int>(col), 3);
-    }
-}
-
 
 TEST(Table_IndexInt)
 {
@@ -2707,7 +2550,7 @@ TEST(Table_DetachedAccessor)
     auto col_int = table->add_column(type_Int, "i");
     auto col_str = table->add_column(type_String, "s");
     table->add_column(type_Binary, "b");
-    table->add_column_link(type_Link, "l", *table);
+    table->add_column(*table, "l");
     ObjKey key0 = table->create_object().get_key();
     Obj obj1 = table->create_object();
     group.remove_table("table");
@@ -2737,7 +2580,7 @@ TEST(Table_addRowsToTableWithNoColumns)
 
     // Check that links are nulled when connected table is cleared
     TableRef u = g.add_table("u");
-    auto col_link = u->add_column_link(type_Link, "link from u to t", *t);
+    auto col_link = u->add_column(*t, "link from u to t");
     Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
     CHECK_EQUAL(t->size(), 3);
@@ -4088,6 +3931,33 @@ TEST(Table_CollisionMapping)
     }
 }
 
+TEST(Table_CreateObjectWithPrimaryKeyDidCreate)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+
+    auto wt = sg->start_write();
+    TableRef string_table = wt->add_table_with_primary_key("string pk", type_String, "pk");
+
+    bool did_create = false;
+    string_table->create_object_with_primary_key(StringData("1"), &did_create);
+    CHECK(did_create);
+    string_table->create_object_with_primary_key(StringData("1"), &did_create);
+    CHECK_NOT(did_create);
+    string_table->create_object_with_primary_key(StringData("2"), &did_create);
+    CHECK(did_create);
+
+    TableRef int_table = wt->add_table_with_primary_key("int pk", type_Int, "pk");
+
+    did_create = false;
+    int_table->create_object_with_primary_key(1, &did_create);
+    CHECK(did_create);
+    int_table->create_object_with_primary_key(1, &did_create);
+    CHECK_NOT(did_create);
+    int_table->create_object_with_primary_key(2, &did_create);
+    CHECK(did_create);
+}
+
 TEST(Table_PrimaryKeyString)
 {
 #ifdef REALM_DEBUG
@@ -5186,7 +5056,7 @@ TEST(Table_MultipleObjs) {
 
     auto tr = sg->start_write();
     auto table = tr->add_table("my_table");
-    auto col = table->add_column_link(type_LinkList, "the links", *table);
+    auto col = table->add_column_list(*table, "the links");
     auto col_int = table->add_column_list(type_String, "the integers");
     auto obj_key = table->create_object().get_key();
     tr->commit();
@@ -5289,10 +5159,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     {
         auto tr = sg->start_write();
         auto table = tr->add_embedded_table("myEmbeddedStuff");
-        auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
+        auto col_recurse = table->add_column(*table, "theRecursiveBit");
         CHECK_THROW(table->create_object(), LogicError);
         auto parent = tr->add_table("myParentStuff");
-        auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
+        auto ck = parent->add_column(*table, "theGreatColumn");
         Obj o = parent->create_object();
         Obj o2 = o.create_and_set_linked_object(ck);
         o2.create_and_set_linked_object(col_recurse);
@@ -5319,6 +5189,17 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
         CHECK(table->size() == 0);
         // do not commit
     }
+    {
+        // Sync operations
+        auto tr = sg->start_write();
+        auto table = tr->get_table("myEmbeddedStuff");
+        auto parent = tr->get_table("myParentStuff");
+        CHECK(table->size() == 2);
+        auto first = parent->begin();
+        first->invalidate();
+        CHECK(table->size() == 0);
+        // do not commit
+    }
 }
 
 TEST(Table_EmbeddedObjectCreateAndDestroyList)
@@ -5330,10 +5211,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5367,10 +5248,10 @@ TEST(Table_EmbeddedObjectNotifications)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5424,10 +5305,10 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5481,10 +5362,10 @@ TEST(Table_EmbeddedObjectPath)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto gch = collect_path(o);
     CHECK(gch.size() == 0);
@@ -5523,5 +5404,52 @@ TEST(Table_EmbeddedObjectPath)
     CHECK(gyh[1].index == 0);
 }
 
+TEST(Table_IndexOnMixed)
+{
+    Timestamp now{std::chrono::system_clock::now()};
+    Group g;
+
+    auto bars = g.add_table("bar");
+    auto foos = g.add_table("foo");
+    auto col = foos->add_column(type_Mixed, "any");
+    foos->add_search_index(col);
+
+    auto bar = bars->create_object();
+
+    auto k0 = foos->create_object().set(col, Mixed()).get_key();
+    auto k1 = foos->create_object().set(col, Mixed(25)).get_key();
+    auto k2 = foos->create_object().set(col, Mixed(123.456f)).get_key();
+    auto k3 = foos->create_object().set(col, Mixed(987.654)).get_key();
+    auto k4 = foos->create_object().set(col, Mixed("Hello")).get_key();
+    auto k5 = foos->create_object().set(col, Mixed(now)).get_key();
+    auto k6 = foos->create_object().set(col, Mixed(Decimal128("2.25"))).get_key();
+    auto k7 = foos->create_object().set(col, Mixed(1)).get_key();
+    auto k8 = foos->create_object().set(col, Mixed(true)).get_key();
+    auto k9 = foos->create_object().set(col, Mixed(bar.get_link())).get_key();
+
+    CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 123.456f), k2);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 987.654), k3);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, "Hello"), k4);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, now), k5);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, Decimal128("2.25")), k6);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+
+    foos->remove_search_index(col);
+
+    CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 123.456f), k2);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 987.654), k3);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, "Hello"), k4);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, now), k5);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, Decimal128("2.25")), k6);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+}
 
 #endif // TEST_TABLE

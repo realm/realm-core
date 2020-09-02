@@ -2133,7 +2133,7 @@ TEST_CASE("migration: Manual")
                           [&](SharedRealm, SharedRealm realm, Schema&) {
                               auto table = get_table(realm, "link origin");
                               table->remove_column(table->get_column_keys()[1]);
-                              table->add_column_link(type_Link, "object", *table);
+                              table->add_column(*table, "object");
                           });
     }
     SECTION("change linklist target")
@@ -2142,7 +2142,7 @@ TEST_CASE("migration: Manual")
                           [&](SharedRealm, SharedRealm realm, Schema&) {
                               auto table = get_table(realm, "link origin");
                               table->remove_column(table->get_column_keys()[2]);
-                              table->add_column_link(type_LinkList, "array", *table);
+                              table->add_column_list(*table, "array");
                           });
     }
     SECTION("make property optional")

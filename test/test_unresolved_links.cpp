@@ -51,11 +51,11 @@ TEST(Unresolved_Basic)
         auto cars = wt->add_table_with_primary_key("Car", type_String, "model");
         col_price = cars->add_column(type_Decimal, "price");
         auto persons = wt->add_table_with_primary_key("Person", type_String, "e-mail");
-        col_owns = persons->add_column_link(type_Link, "car", *cars);
+        col_owns = persons->add_column(*cars, "car");
         auto dealers = wt->add_table_with_primary_key("Dealer", type_Int, "cvr");
-        col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+        col_has = dealers->add_column_list(*cars, "stock");
         auto parts = wt->add_table("Parts"); // No primary key
-        col_part = cars->add_column_link(type_Link, "part", *parts);
+        col_part = cars->add_column(*parts, "part");
 
         auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
         auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -160,12 +160,14 @@ TEST(Unresolved_InvalidateObject)
 {
     Group g;
 
+    auto wheels = g.add_embedded_table("Wheels");
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
+    auto col_wheels = cars->add_column_list(*wheels, "wheels");
     auto col_price = cars->add_column(type_Decimal, "price");
     auto dealers = g.add_table("Dealer");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
     auto organization = g.add_table("Organization");
-    auto col_members = organization->add_column_link(type_LinkList, "members", *dealers);
+    auto col_members = organization->add_column_list(*dealers, "members");
 
     auto dealer1 = dealers->create_object();
     auto dealer2 = dealers->create_object();
@@ -175,8 +177,17 @@ TEST(Unresolved_InvalidateObject)
     members.add(dealer1.get_key());
     members.add(dealer2.get_key());
 
-    auto skoda = cars->create_object_with_primary_key("Skoda Fabia").set(col_price, Decimal128("149999.5"));
-    auto tesla = cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("499999.5"));
+    auto create_car = [&](const char* name, const char* price) {
+        Obj car = cars->create_object_with_primary_key(name).set(col_price, Decimal128(price));
+        auto list = car.get_linklist(col_wheels);
+        for (int i = 0; i < 4; i++) {
+            list.create_and_insert_linked_object(i);
+        }
+        return car;
+    };
+
+    auto skoda = create_car("Skoda Fabia", "149999.5");
+    auto tesla = create_car("Tesla 10", "499999.5");
 
     auto stock = dealer1.get_linklist(col_has);
     stock.add(tesla.get_key());
@@ -185,6 +196,7 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(members.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
+    CHECK_EQUAL(wheels->size(), 8);
 
     // Tesla goes to the grave. Too expensive
     cars->invalidate_object(tesla.get_key());
@@ -195,6 +207,7 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), skoda.get_key());
     CHECK_EQUAL(cars->size(), 1);
+    CHECK_EQUAL(wheels->size(), 4);
 
     // One dealer goes bankrupt
     dealer2.invalidate();
@@ -202,9 +215,10 @@ TEST(Unresolved_InvalidateObject)
     CHECK_EQUAL(dealers->nb_unresolved(), 1);
 
     // resurrect the tesla
-    cars->create_object_with_primary_key("Tesla 10").set(col_price, Decimal128("399999.5"));
+    create_car("Tesla 10", "399999.5");
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
+    CHECK_EQUAL(wheels->size(), 8);
 }
 
 TEST(Unresolved_LinkList)
@@ -213,7 +227,7 @@ TEST(Unresolved_LinkList)
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
 
     auto dealer = dealers->create_object_with_primary_key(18454033);
     auto stock1 = dealer.get_linklist(col_has);
@@ -252,9 +266,9 @@ TEST(Unresolved_QueryOverLinks)
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto col_price = cars->add_column(type_Decimal, "price");
     auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
-    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+    auto col_owns = persons->add_column(*cars, "car");
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
 
     auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
     auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -305,7 +319,7 @@ TEST(Unresolved_PrimaryKeyInt)
 
     auto foo = g.add_table_with_primary_key("foo", type_Int, "id");
     auto bar = g.add_table("bar");
-    auto col = bar->add_column_link(type_Link, "link", *foo);
+    auto col = bar->add_column(*foo, "link");
 
     auto obj = bar->create_object();
     auto unres = foo->get_objkey_from_primary_key(5);
@@ -322,7 +336,7 @@ TEST(Unresolved_GarbageCollect)
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
-    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+    auto col_owns = persons->add_column(*cars, "car");
 
     auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
     auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -340,7 +354,7 @@ TEST(Unresolved_GarbageCollect)
     // Try the same with linklists. Here you have to clear the lists in order to
     // remove the unresolved links
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
     auto bilcentrum = dealers->create_object_with_primary_key(18454033);
     auto bilmekka = dealers->create_object_with_primary_key(26293995);
 
@@ -415,7 +429,7 @@ TEST(Unresolved_CondensedIndices)
     Group g;
     auto t1 = g.add_table_with_primary_key("Table", type_Int, "id");
     auto t2 = g.add_table_with_primary_key("Table2", type_Int, "id");
-    t1->add_column_link(type_LinkList, "t2s", *t2);
+    t1->add_column_list(*t2, "t2s");
 
     auto obj123 = t2->create_object_with_primary_key(123);
     auto obj456 = t2->create_object_with_primary_key(456);

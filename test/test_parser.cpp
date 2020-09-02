@@ -376,13 +376,13 @@ TEST(Parser_grammar_analysis)
 }
 
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                   size_t num_results)
+                   size_t num_results, parser::KeyPathMapping mapping = {})
 {
     Query q = t->where();
     realm::query_builder::NoArguments args;
 
     parser::ParserResult res = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, res.predicate, args);
+    realm::query_builder::apply_predicate(q, res.predicate, args, mapping);
 
     CHECK_EQUAL(q.count(), num_results);
     std::string description = q.get_description();
@@ -390,7 +390,7 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
-    realm::query_builder::apply_predicate(q2, res2.predicate, args);
+    realm::query_builder::apply_predicate(q2, res2.predicate, args, mapping);
     CHECK_EQUAL(q2.count(), num_results);
     return q2;
 }
@@ -431,7 +431,7 @@ TEST(Parser_ConstrainedQuery)
     std::string table_name = "table";
     TableRef t = g.add_table(table_name);
     auto int_col = t->add_column(type_Int, "age");
-    auto list_col = t->add_column_link(type_LinkList, "self_list", *t);
+    auto list_col = t->add_column_list(*t, "self_list");
 
     Obj obj0 = t->create_object();
     Obj obj1 = t->create_object();
@@ -466,7 +466,7 @@ TEST(Parser_basic_serialisation)
     t->add_column(type_Double, "fees", true);
     t->add_column(type_Float, "float_fees", true);
     t->add_column(type_Bool, "licensed", true);
-    auto link_col = t->add_column_link(type_Link, "buddy", *t);
+    auto link_col = t->add_column(*t, "buddy");
     auto time_col = t->add_column(type_Timestamp, "time", true);
     t->add_search_index(int_col_key);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
@@ -583,7 +583,7 @@ TEST(Parser_LinksToSameTable)
     TableRef t = g.add_table("class_Person");
     ColKey age_col = t->add_column(type_Int, "age");
     ColKey name_col = t->add_column(type_String, "name");
-    ColKey link_col = t->add_column_link(type_Link, "buddy", *t);
+    ColKey link_col = t->add_column(*t, "buddy");
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<ObjKey> people_keys;
     t->create_objects(names.size(), people_keys);
@@ -629,7 +629,7 @@ TEST(Parser_LinksToDifferentTable)
     TableRef items = g.add_table("class_Items");
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
-    ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    ColKey item_discount_col = items->add_column(*discounts, "discount");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
     std::vector<ObjKey> item_keys;
@@ -645,7 +645,7 @@ TEST(Parser_LinksToDifferentTable)
 
     TableRef t = g.add_table("class_Person");
     ColKey id_col = t->add_column(type_Int, "customer_id");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
 
     Obj person0 = t->create_object();
     Obj person1 = t->create_object();
@@ -711,7 +711,7 @@ TEST(Parser_StringOperations)
     Group g;
     TableRef t = g.add_table("person");
     ColKey name_col = t->add_column(type_String, "name", true);
-    ColKey link_col = t->add_column_link(type_Link, "father", *t);
+    ColKey link_col = t->add_column(*t, "father");
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jake", "Joel"};
     std::vector<ObjKey> people_keys;
     t->create_objects(names.size(), people_keys);
@@ -792,7 +792,7 @@ TEST(Parser_Timestamps)
     ColKey birthday_col = t->add_column(type_Timestamp, "birthday");          // disallow null
     ColKey internal_col = t->add_column(type_Timestamp, "T399", true);        // allow null
     ColKey readable_col = t->add_column(type_Timestamp, "T2017-12-04", true); // allow null
-    ColKey link_col = t->add_column_link(type_Link, "linked", *t);
+    ColKey link_col = t->add_column(*t, "linked");
     std::vector<ObjKey> keys;
     t->create_objects(5, keys);
 
@@ -915,7 +915,7 @@ TEST(Parser_NullableBinaries)
     items->get_object(item_keys[2]).set(binary_col, bd2);
     items->get_object(item_keys[2]).set(nullable_binary_col, bd2);
 
-    ColKey fav_item_col = people->add_column_link(type_Link, "fav_item", *items);
+    ColKey fav_item_col = people->add_column(*items, "fav_item");
     std::vector<ObjKey> people_keys;
     people->create_objects(5, people_keys);
     for (size_t i = 0; i < people_keys.size(); ++i) {
@@ -1036,7 +1036,7 @@ TEST(Parser_TwoColumnExpressionBasics)
     ColKey string_col = table->add_column(type_String, "strings");
     ColKey decimal_col = table->add_column(type_Decimal, "decimals");
     ColKey objectid_col = table->add_column(type_ObjectId, "objectids");
-    ColKey link_col = table->add_column_link(type_Link, "link", *table);
+    ColKey link_col = table->add_column(*table, "link");
     std::vector<ObjKey> keys;
     table->create_objects(3, keys);
     for (size_t i = 0; i < keys.size(); ++i) {
@@ -1101,7 +1101,7 @@ TEST(Parser_TwoColumnAggregates)
     ColKey item_price_col = items->add_column(type_Double, "price");
     ColKey item_price_float_col = items->add_column(type_Float, "price_float");
     ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
-    ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
+    ColKey item_discount_col = items->add_column(*discounts, "discount");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
     std::vector<ObjKey> item_keys;
@@ -1120,7 +1120,7 @@ TEST(Parser_TwoColumnAggregates)
     TableRef t = g.add_table("class_Person");
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
     ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
     ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
 
@@ -1269,8 +1269,8 @@ TEST(Parser_substitution)
     ColKey binary_col = t->add_column(type_Binary, "binary", true);
     ColKey float_col = t->add_column(type_Float, "floats", true);
     ColKey nullable_double_col = t->add_column(type_Float, "nuldouble", true);
-    ColKey link_col = t->add_column_link(type_Link, "links", *t);
-    ColKey list_col = t->add_column_link(type_LinkList, "list", *t);
+    ColKey link_col = t->add_column(*t, "links");
+    ColKey list_col = t->add_column_list(*t, "list");
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
     std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
     std::vector<ObjKey> obj_keys;
@@ -1655,7 +1655,7 @@ TEST(Parser_collection_aggregates)
     auto fail_col = courses->add_column(type_Float, "failure_percentage");
     auto int_col = people->add_column(type_Int, "age");
     auto str_col = people->add_column(type_String, "name");
-    auto courses_col = people->add_column_link(type_LinkList, "courses_taken", *courses);
+    auto courses_col = people->add_column_list(*courses, "courses_taken");
     auto binary_col = people->add_column(type_Binary, "hash");
     using info_t = std::pair<std::string, int64_t>;
     std::vector<info_t> person_info = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
@@ -1795,7 +1795,7 @@ TEST(Parser_NegativeAgg)
     TableRef t = g.add_table("class_Person");
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
     ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
     ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
 
@@ -1870,8 +1870,8 @@ TEST(Parser_list_of_primitive_ints)
 
     TableRef t2 = g.add_table("table2");
 
-    auto col_link = t2->add_column_link(type_Link, "link", *t);
-    auto col_list = t2->add_column_link(type_LinkList, "list", *t);
+    auto col_link = t2->add_column(*t, "link");
+    auto col_list = t2->add_column_list(*t, "list");
     {
         // object with link to 1, list with {1}
         Obj obj0 = t2->create_object();
@@ -2133,7 +2133,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     constexpr bool nullable = true;
     auto col_list = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", nullable);
     t->add_column(type_Int, "length"); // "length" is still a usable column name
-    auto col_link = t->add_column_link(type_Link, "link", *t);
+    auto col_link = t->add_column(*t, "link");
 
     Obj obj_empty_list = t->create_object();
     Obj obj_with_null = t->create_object();
@@ -2211,7 +2211,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
     ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
-    auto col_link = t->add_column_link(type_Link, "link", *t);
+    auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
     std::vector<TEST_TYPE> values =
@@ -2272,7 +2272,7 @@ TEST(Parser_SortAndDistinctSerialisation)
 
     ColKey name_col = people->add_column(type_String, "name");
     ColKey age_col = people->add_column(type_Int, "age");
-    ColKey account_col = people->add_column_link(type_Link, "account", *accounts);
+    ColKey account_col = people->add_column(*accounts, "account");
 
     ColKey balance_col = accounts->add_column(type_Double, "balance");
     ColKey transaction_col = accounts->add_column(type_Int, "num_transactions");
@@ -2364,7 +2364,7 @@ TEST(Parser_SortAndDistinct)
 
     ColKey name_col = people->add_column(type_String, "name");
     ColKey age_col = people->add_column(type_Int, "age");
-    ColKey account_col = people->add_column_link(type_Link, "account", *accounts);
+    ColKey account_col = people->add_column(*accounts, "account");
 
     ColKey balance_col = accounts->add_column(type_Double, "balance");
     ColKey transaction_col = accounts->add_column(type_Int, "num_transactions");
@@ -2685,7 +2685,7 @@ TEST(Parser_IncludeDescriptor)
 
     auto name_col = people->add_column(type_String, "name");
     auto age_col = people->add_column(type_Int, "age");
-    auto account_col = people->add_column_link(type_Link, "account", *accounts);
+    auto account_col = people->add_column(*accounts, "account");
     static_cast<void>(age_col);     // silence warning
     static_cast<void>(account_col); // do
 
@@ -2758,16 +2758,16 @@ TEST(Parser_IncludeDescriptorMultiple)
     TableRef languages = g.add_table("language");
 
     auto name_col = people->add_column(type_String, "name");
-    auto account_col = people->add_column_link(type_Link, "account", *accounts);
+    auto account_col = people->add_column(*accounts, "account");
 
     auto balance_col = accounts->add_column(type_Double, "balance");
     auto transaction_col = accounts->add_column(type_Int, "num_transactions");
-    auto account_bank_col = accounts->add_column_link(type_Link, "bank", *banks);
+    auto account_bank_col = accounts->add_column(*banks, "bank");
 
     auto bank_name_col = banks->add_column(type_String, "name");
 
     auto language_name_col = languages->add_column(type_String, "name");
-    auto language_available_col = languages->add_column_link(type_LinkList, "available_from", *banks);
+    auto language_available_col = languages->add_column_list(*banks, "available_from");
 
     auto b0 = banks->create_object().set_all("Danske Bank");
     auto b1 = banks->create_object().set_all("RBC");
@@ -2937,7 +2937,7 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     TableRef people = g.add_table("person");
 
     auto name_col = people->add_column(type_String, "name");
-    auto link_col = people->add_column_link(type_Link, "father", *people);
+    auto link_col = people->add_column(*people, "father");
 
     auto bones = people->create_object().set(name_col, "Bones");
     auto john = people->create_object().set(name_col, "John").set(link_col, bones.get_key());
@@ -2992,8 +2992,8 @@ TEST(Parser_Backlinks)
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey name_col = t->add_column(type_String, "name");
     ColKey account_col = t->add_column(type_Double, "account_balance");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
-    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
+    ColKey fav_col = t->add_column(*items, "fav_item");
     std::vector<ObjKey> people_keys;
     t->create_objects(3, people_keys);
     for (size_t i = 0; i < people_keys.size(); ++i) {
@@ -3080,41 +3080,46 @@ TEST(Parser_Backlinks)
     parser::KeyPathMapping mapping;
     mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
     mapping.add_mapping(t, "money", "account_balance");
-    query_builder::NoArguments args;
 
-    q = items->where();
-    realm::parser::Predicate p = realm::parser::parse("purchasers.@count > 2").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping);
-    CHECK_EQUAL(q.count(), 2);
-
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping);
-    CHECK_EQUAL(q.count(), 3);
+    verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
+    verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
 
     // disable parsing backlink queries
     mapping.set_allow_backlinks(false);
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
-    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
-                         "of property 'items' on type 'Person'");
-
+    {
+        query_builder::NoArguments args;
+        q = items->where();
+        auto p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+        CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
+        CHECK_EQUAL(message,
+                    "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
+                    "of property 'items' on type 'Person'");
+    }
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
     mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
     mapping_with_prefix.add_mapping(t, "money", "account_balance");
+    mapping_with_prefix.add_mapping(t, "funds", "money");     // double indirection
+    mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
+    mapping_with_prefix.add_mapping(t, "banknotes", "finances");
+    mapping_with_prefix.add_mapping(t, "finances", "banknotes"); // indirect loop
 
-    q = items->where();
-    p = realm::parser::parse("purchasers.@count > 2").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
-    CHECK_EQUAL(q.count(), 2);
-
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
-    CHECK_EQUAL(q.count(), 3);
+    verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
+    verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
+    // double substitution via subquery "$x"->"" and "money"->"account_balance"
+    verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
+    // double indirection is allowed
+    verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
+    // infinite loops are detected
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "purchasers.@max.banknotes >= 20", 3, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "Substitution loop detected while processing property 'finances' -> 'banknotes' found in "
+                         "type 'Person'. Check property aliases.");
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "purchasers.@max.capital >= 20", 3, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "Substitution loop detected while processing property 'capital' -> 'capital' found in type "
+                         "'Person'. Check property aliases.");
 }
 
 
@@ -3124,7 +3129,7 @@ TEST(Parser_BacklinkCount)
 
     TableRef items = g.add_table("class_Items");
     items->add_column(type_Int, "item_id");
-    auto item_link_col = items->add_column_link(type_Link, "self", *items);
+    auto item_link_col = items->add_column(*items, "self");
     items->add_column(type_Double, "double_col");
 
     std::vector<int64_t> item_ids{5, 2, 12, 14, 20};
@@ -3136,8 +3141,8 @@ TEST(Parser_BacklinkCount)
 
     TableRef t = g.add_table("class_Person");
     auto id_col = t->add_column(type_Int, "customer_id");
-    auto items_col = t->add_column_link(type_LinkList, "items", *items);
-    auto fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    auto items_col = t->add_column_list(*items, "items");
+    auto fav_col = t->add_column(*items, "fav_item");
     auto float_col = t->add_column(type_Float, "float_col");
 
     for (int i = 0; i < 3; ++i) {
@@ -3312,8 +3317,8 @@ TEST(Parser_Subquery)
     TableRef items = g.add_table("class_Items");
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
-    ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
-    ColKey item_contains_col = items->add_column_link(type_LinkList, "allergens", *ingredients);
+    ColKey item_discount_col = items->add_column(*discounts, "discount");
+    ColKey item_contains_col = items->add_column_list(*ingredients, "allergens");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
     std::vector<ObjKey> item_keys;
@@ -3346,8 +3351,8 @@ TEST(Parser_Subquery)
     TableRef t = g.add_table("class_Person");
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
-    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
+    ColKey fav_col = t->add_column(*items, "fav_item");
     std::vector<ObjKey> people_keys;
     t->create_objects(3, people_keys);
     for (size_t i = 0; i < t->size(); ++i) {
@@ -3474,7 +3479,7 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     TableRef items = g.add_table("class_Items");
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
-    ColKey item_contains_col = items->add_column_link(type_LinkList, "allergens", *allergens);
+    ColKey item_contains_col = items->add_column_list(*allergens, "allergens");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
     std::vector<ObjKey> items_keys;
@@ -3504,8 +3509,8 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     TableRef t = g.add_table("class_Person");
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
-    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
+    ColKey fav_col = t->add_column(*items, "fav_item");
     std::vector<ObjKey> people_keys;
     t->create_objects(3, people_keys);
     for (size_t i = 0; i < people_keys.size(); ++i) {
@@ -3660,7 +3665,7 @@ TEST(Parser_OperatorIN)
     TableRef items = g.add_table("class_Items");
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
-    ColKey item_contains_col = items->add_column_link(type_LinkList, "allergens", *allergens);
+    ColKey item_contains_col = items->add_column_list(*allergens, "allergens");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
     std::vector<ObjKey> items_keys;
@@ -3690,8 +3695,8 @@ TEST(Parser_OperatorIN)
     TableRef t = g.add_table("class_Person");
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
-    ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
-    ColKey fav_col = t->add_column_link(type_Link, "fav_item", *items);
+    ColKey items_col = t->add_column_list(*items, "items");
+    ColKey fav_col = t->add_column(*items, "fav_item");
     std::vector<ObjKey> people_keys;
     t->create_objects(3, people_keys);
     for (size_t i = 0; i < people_keys.size(); ++i) {
@@ -3754,7 +3759,7 @@ TEST(Parser_Object)
     Group g;
     TableRef table = g.add_table("table");
     auto int_col = table->add_column(type_Int, "ints", true);
-    auto link_col = table->add_column_link(type_Link, "link", *table);
+    auto link_col = table->add_column(*table, "link");
     for (size_t i = 0; i < 3; ++i) {
         table->create_object().set<int64_t>(int_col, i);
     }

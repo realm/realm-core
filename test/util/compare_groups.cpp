@@ -7,6 +7,7 @@
 #include <realm/table.hpp>
 #include <realm/sync/object.hpp>
 #include <realm/list.hpp>
+#include <realm/dictionary.hpp>
 
 #include "compare_groups.hpp"
 
@@ -107,11 +108,40 @@ different:
     return false;
 }
 
+bool compare_dictionaries(const Dictionary& a, const Dictionary& b)
+{
+    auto a_it = a.begin();
+    auto b_it = b.begin();
+    if (a.size() != b.size()) {
+#if REALM_DEBUG
+        std::cerr << "LEFT size: " << a.size() << std::endl;
+        std::cerr << "RIGHT size: " << b.size() << std::endl;
+#endif
+        return false;
+    }
+
+    // Compare entries
+    for (; a_it != a.end(); ++a_it, ++b_it) {
+        if (*a_it != *b_it)
+            goto different;
+    }
+
+    return true;
+
+different:
+#if REALM_DEBUG
+    std::cerr << "LEFT: " << (*a_it).first << " => " << (*a_it).second << std::endl;
+    std::cerr << "RIGHT: " << (*b_it).first << " => " << (*b_it).second << std::endl;
+#endif
+    return false;
+}
+
 struct Column {
     StringData name;
     DataType type;
     bool nullable;
     bool is_list;
+    bool is_dictionary;
     ColKey key_1, key_2;
 };
 
@@ -175,6 +205,13 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
                 equal = false;
                 continue;
             }
+            bool is_dictionary_1 = key_1.is_dictionary();
+            bool is_dictionary_2 = key_2.is_dictionary();
+            if (is_dictionary_1 != is_dictionary_2) {
+                logger.error("Dictionary type mismatch on column '%1'", name);
+                equal = false;
+                continue;
+            }
             if (type_1 == type_Link || type_1 == type_LinkList) {
                 ConstTableRef target_1 = table_1.get_link_target(key_1);
                 ConstTableRef target_2 = table_2.get_link_target(key_2);
@@ -185,7 +222,7 @@ bool compare_schemas(const Table& table_1, const Table& table_2, util::Logger& l
                 }
             }
             if (out_columns)
-                out_columns->push_back(Column{name, type_1, nullable_1, is_list_1, key_1, key_2});
+                out_columns->push_back(Column{name, type_1, nullable_1, is_list_1, is_dictionary_1, key_1, key_2});
         }
     }
 
@@ -212,6 +249,17 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                 continue;
             }
         }
+
+        if (col.is_dictionary) {
+            auto a = obj_1.get_dictionary(col.key_1);
+            auto b = obj_2.get_dictionary(col.key_2);
+            if (!compare_dictionaries(a, b)) {
+                logger.error("Dictionary mismatch in column '%1'", col.name);
+                equal = false;
+            }
+            continue;
+        }
+
         if (col.is_list) {
             switch (col.type) {
                 case type_Int: {

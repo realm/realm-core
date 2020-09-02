@@ -495,7 +495,7 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(cnt, 1);
 
     TableRef table3 = group.add_table(StringData("table3"));
-    auto col_link1 = table3->add_column_link(type_Link, "link1", *table2);
+    auto col_link1 = table3->add_column(*table2, "link1");
 
     table3->create_object().set(col_link1, key_2_0);
     table3->create_object().set(col_link1, key_2_1);
@@ -1495,8 +1495,8 @@ TEST(Query_Links)
 
     auto int_col = target2->add_column(type_Int, "integers");
     auto str_col = target1->add_column(type_String, "strings");
-    auto linklist_col = target1->add_column_link(type_LinkList, "linklist", *target2);
-    auto link_col = origin->add_column_link(type_Link, "link", *target1);
+    auto linklist_col = target1->add_column_list(*target2, "linklist");
+    auto link_col = origin->add_column(*target1, "link");
     auto double_col = origin->add_column(type_Double, "doubles");
 
     std::vector<ObjKey> origin_keys;
@@ -1555,12 +1555,12 @@ TEST(Query_size)
     auto string_col = table1->add_column(type_String, "strings");
     auto bin_col = table1->add_column(type_Binary, "binaries", true);
     auto int_list_col = table1->add_column_list(type_Int, "intlist");
-    auto linklist_col = table1->add_column_link(type_LinkList, "linklist", *table2);
+    auto linklist_col = table1->add_column_list(*table2, "linklist");
 
     auto int_col = table2->add_column(type_Int, "integers");
 
-    auto link_col = table3->add_column_link(type_Link, "link", *table1);
-    auto linklist_col1 = table3->add_column_link(type_LinkList, "linklist", *table1);
+    auto link_col = table3->add_column(*table1, "link");
+    auto linklist_col1 = table3->add_column_list(*table1, "linklist");
 
     std::vector<ObjKey> table1_keys;
     table1->create_objects(10, table1_keys);
@@ -1766,8 +1766,8 @@ TEST(Query_ListOfPrimitives)
     CHECK_EQUAL(tv.get_key(1), keys[1]);
 
     TableRef baa = g.add_table("baa");
-    auto col_link = baa->add_column_link(type_Link, "link", *table);
-    auto col_linklist = baa->add_column_link(type_LinkList, "linklist", *table);
+    auto col_link = baa->add_column(*table, "link");
+    auto col_linklist = baa->add_column_list(*table, "linklist");
     Obj obj0 = baa->create_object().set(col_link, keys[1]);
     Obj obj1 = baa->create_object().set(col_link, keys[0]);
 
@@ -3315,10 +3315,10 @@ TEST(Query_SortLinks)
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_string");
-    auto t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
+    auto t1_link_t2_col = t1->add_column(*t2, "t1_link_to_t2");
     t2->add_column(type_Int, "t2_int");
     t2->add_column(type_String, "t2_string");
-    t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
+    t2->add_column(*t1, "t2_link_to_t1");
 
     std::vector<ObjKey> t1_keys;
     std::vector<ObjKey> t2_keys;
@@ -3367,10 +3367,10 @@ TEST(Query_SortLinkChains)
     TableRef t3 = g.add_table("t3");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
 
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    auto t2_link_col = t2->add_column(*t3, "t2_link_t3");
 
     auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
     auto t3_str_col = t3->add_column(type_String, "t3_str");
@@ -3508,9 +3508,9 @@ TEST(Query_LinkChainSortErrors)
     TableRef t2 = g.add_table("t2");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
+    auto t1_linklist_col = t1->add_column_list(*t2, "t1_linklist");
     auto t2_string_col = t2->add_column(type_String, "t2_string");
-    t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
+    t2->add_column(*t1, "t2_link_t1"); // add a backlink to t1
 
     t1->create_object();
 
@@ -3630,7 +3630,7 @@ TEST(Query_DescriptorsWillApply)
     TableRef t1 = g.add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
+    auto t1_link_col = t1->add_column(*t1, "t1_link");
 
     t1->create_object();
 
@@ -3952,7 +3952,7 @@ TEST(Query_DistinctAndSort)
     TableRef t2 = g.add_table("t2");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
 
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5});
@@ -4072,7 +4072,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
     TableRef t1 = g->add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
+    auto t1_link_col = t1->add_column(*t1, "t1_link");
 
     ObjKey k0 = t1->create_object().set_all(100, "A").get_key();
     ObjKey k1 = t1->create_object().set_all(200, "A").get_key();
@@ -4311,10 +4311,10 @@ TEST(Query_DistinctThroughLinks)
     TableRef t3 = g.add_table("t3");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
 
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    auto t2_link_col = t2->add_column(*t3, "t2_link_t3");
 
     auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
     auto t3_str_col = t3->add_column(type_String, "t3_str");
@@ -4487,7 +4487,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
     TableRef t1 = g.add_table("t1");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_self_col = t1->add_column_link(type_Link, "t1_link_self", *t1);
+    auto t1_link_self_col = t1->add_column(*t1, "t1_link_self");
 
     ObjKeys obj_keys;
     t1->create_objects(7, obj_keys);
@@ -4603,7 +4603,7 @@ TEST(Query_IncludeDescriptorOtherLinks)
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_t1", *t1);
+    auto t2_link_t1_col = t2->add_column(*t1, "t2_link_t1");
 
     ObjKeys obj_keys;
     t1->create_objects(7, obj_keys);
@@ -4675,7 +4675,7 @@ TEST(Query_IncludeDescriptorOtherLists)
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_list_t1_col = t2->add_column_link(type_LinkList, "t2_list_t1", *t1);
+    auto t2_list_t1_col = t2->add_column_list(*t1, "t2_list_t1");
 
     ObjKeys obj_keys;
     t1->create_objects(7, obj_keys);
@@ -4759,12 +4759,12 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
     TableRef t4 = g.add_table("t4");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_t2_col = t1->add_column(*t2, "t1_link_t2");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_list_t3_col = t2->add_column_link(type_LinkList, "t2_list_t3", *t3);
+    auto t2_list_t3_col = t2->add_column_list(*t3, "t2_list_t3");
     auto t3_int_col = t3->add_column(type_Int, "t3_int");
     auto t4_int_col = t4->add_column(type_Int, "t4_int");
-    auto t4_link_t3_col = t4->add_column_link(type_Link, "t4_link_t3", *t3);
+    auto t4_link_t3_col = t4->add_column(*t3, "t4_link_t3");
 
     ObjKeys t1_keys;
     ObjKeys t2_keys;

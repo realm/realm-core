@@ -559,7 +559,9 @@ TEST(TableView_Distinct_Follows_Changes)
         table.create_object().set_all(i, "Foo");
     }
 
-    TableView distinct_ints = table.get_distinct_view(col_int);
+    DescriptorOrdering order;
+    order.append_distinct(DistinctDescriptor({{col_int}}));
+    TableView distinct_ints = table.where().find_all(order);
     CHECK_EQUAL(5, distinct_ints.size());
     CHECK(distinct_ints.is_in_sync());
 
@@ -1150,8 +1152,8 @@ TEST(TableView_Backlinks)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    auto col_link = links->add_column_link(type_Link, "link", *source);
-    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column(*source, "link");
+    auto col_linklist = links->add_column_list(*source, "link_list");
 
     std::vector<ObjKey> keys;
     source->create_objects(3, keys);
@@ -1198,8 +1200,8 @@ TEST(TableView_BacklinksAfterMoveAssign)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    auto col_link = links->add_column_link(type_Link, "link", *source);
-    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column(*source, "link");
+    auto col_linklist = links->add_column_list(*source, "link_list");
 
     std::vector<ObjKey> keys;
     source->create_objects(3, keys);
@@ -1244,7 +1246,7 @@ TEST(TableView_SortOverLink)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column(*target, "link");
     auto col_int = origin->add_column(type_Int, "int");
     auto col_str = target->add_column(type_String, "s", true);
 
@@ -1295,8 +1297,8 @@ TEST(TableView_SortOverMultiLink)
     TableRef target = g.add_table("target");
     TableRef between = g.add_table("between");
     TableRef origin = g.add_table("origin");
-    auto col_link1 = origin->add_column_link(type_Link, "link", *between);
-    auto col_link2 = between->add_column_link(type_Link, "link", *target);
+    auto col_link1 = origin->add_column(*between, "link");
+    auto col_link2 = between->add_column(*target, "link");
     auto col_int = origin->add_column(type_Int, "int");
 
     auto col_str = target->add_column(type_String, "str");
@@ -1444,7 +1446,7 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column(*target, "link");
 
     Table& t = *target;
     auto col_str = t.add_column(type_String, "s", true);
@@ -1566,7 +1568,7 @@ TEST(TableView_DistinctOverNullLink)
     ObjKey k1 = target->create_object().set(col_int, 1).get_key();
 
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column(*target, "link");
 
     origin->create_object().set(col_link, k0);
     origin->create_object().set(col_link, k1);
@@ -1612,7 +1614,7 @@ TEST(TableView_IsInTableOrder)
     TableRef source = g.add_table("source");
     TableRef target = g.add_table("target");
 
-    auto col_link = source->add_column_link(type_LinkList, "link", *target);
+    auto col_link = source->add_column_list(*target, "link");
     source->add_column(type_String, "name");
     auto col_id = target->add_column(type_Int, "id");
     target->add_search_index(col_id);
@@ -1650,9 +1652,6 @@ TEST(TableView_IsInTableOrder)
     auto ll = src_obj.get_linklist_ptr(col_link);
     tv = ll->get_sorted_view(col_id);
     CHECK_EQUAL(false, tv.is_in_table_order());
-
-    tv = target->get_distinct_view(col_id);
-    CHECK_EQUAL(true, tv.is_in_table_order());
 
     // … unless sorted.
     tv = target->get_sorted_view(col_id);

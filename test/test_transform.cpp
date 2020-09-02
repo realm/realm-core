@@ -248,7 +248,7 @@ TEST(Transform_LinkListSet_vs_MoveLastOver)
         TableRef foo = sync::create_table(transaction, "class_foo");
         foo->add_column(type_Int, "i");
         TableRef bar = sync::create_table(transaction, "class_bar");
-        bar->add_column_link(type_LinkList, "ll", *foo);
+        bar->add_column_list(*foo, "ll");
     };
     client_1->create_schema(create_schema);
     client_2->create_schema(create_schema);
@@ -291,7 +291,7 @@ TEST(Transform_LinkListInsert_vs_MoveLastOver)
         TableRef foo = sync::create_table(transaction, "class_foo");
         foo->add_column(type_Int, "i");
         TableRef bar = sync::create_table(transaction, "class_bar");
-        bar->add_column_link(type_LinkList, "ll", *foo);
+        bar->add_column_list(*foo, "ll");
     };
     client_1->create_schema(create_schema);
     client_2->create_schema(create_schema);
@@ -334,7 +334,7 @@ TEST(Transform_Experiment)
         TableRef t = sync::create_table(tr, "class_t");
         TableRef t2 = sync::create_table(tr, "class_t2");
         t2->add_column(type_Int, "i");
-        t->add_column_link(type_LinkList, "ll", *t2);
+        t->add_column_list(*t2, "ll");
     };
 
     client_1->create_schema(schema);
@@ -388,7 +388,7 @@ TEST(Transform_SelectLinkList)
         TableRef t = sync::create_table(tr, "class_t");
         TableRef t2 = sync::create_table(tr, "class_t2");
         t2->add_column(type_Int, "i");
-        t->add_column_link(type_LinkList, "ll", *t2);
+        t->add_column_list(*t2, "ll");
     };
 
     client_1->create_schema(schema);
@@ -474,7 +474,7 @@ TEST(Transform_AdjustSetLinkPayload)
         TableRef t = sync::create_table(tr, "class_t");
         t->add_column(type_Int, "i");
         TableRef l = sync::create_table(tr, "class_l");
-        l->add_column_link(type_Link, "l", *t);
+        l->add_column(*t, "l");
     };
 
     client_1->create_schema(schema);
@@ -528,7 +528,7 @@ TEST(Transform_AdjustLinkListSetPayload)
         TableRef t = sync::create_table(tr, "class_t");
         t->add_column(type_Int, "i");
         TableRef l = sync::create_table(tr, "class_ll");
-        l->add_column_link(type_LinkList, "ll", *t);
+        l->add_column_list(*t, "ll");
     };
 
     client_1->create_schema(schema);
@@ -623,7 +623,7 @@ TEST(Transform_MergeSetLinkAndMoveLastOver)
         TableRef t = sync::create_table(tr, "class_t");
         t->add_column(type_Int, "i");
         TableRef l = sync::create_table(tr, "class_l");
-        l->add_column_link(type_Link, "l", *t);
+        l->add_column(*t, "l");
     };
 
     client_1->create_schema(schema);
@@ -719,7 +719,7 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
         TableRef t = sync::create_table_with_primary_key(tr, "class_t", type_Int, "i");
         TableRef t2 = sync::create_table(tr, "class_t2");
         t->add_column(type_String, "s");
-        t->add_column_link(type_LinkList, "ll", *t2);
+        t->add_column_list(*t2, "ll");
         t2->add_column(type_Int, "i2");
     };
 
@@ -908,7 +908,7 @@ TEST(Transform_EraseSelectedLinkView)
     auto init = [](WriteTransaction& tr) {
         TableRef origin = sync::create_table(tr, "class_origin");
         TableRef target = sync::create_table(tr, "class_target");
-        origin->add_column_link(type_LinkList, "ll", *target);
+        origin->add_column_list(*target, "ll");
         target->add_column(type_Int, "");
         origin->create_object();
         origin->create_object();
@@ -1419,7 +1419,7 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
     client_1->transaction([](Peer& c) {
         TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
         TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
-        a->add_column_link(type_LinkList, "ll", *b);
+        a->add_column_list(*b, "ll");
         Obj a_obj = a->create_object_with_primary_key(123);
         Obj b_obj = b->create_object_with_primary_key(456);
         a_obj.get_linklist("ll").add(b_obj.get_key());
@@ -1428,7 +1428,7 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
     client_2->transaction([](Peer& c) {
         TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
         TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
-        a->add_column_link(type_LinkList, "ll", *b);
+        a->add_column_list(*b, "ll");
         Obj a_obj = a->create_object_with_primary_key(123);
         Obj b_obj = b->create_object_with_primary_key(456);
         a_obj.get_linklist("ll").add(b_obj.get_key());
@@ -1454,7 +1454,7 @@ TEST(Transform_ArrayInsert_EraseObject)
     client_1->transaction([&k0, &k1](Peer& c) {
         TableRef source = sync::create_table(*c.group, "class_source");
         TableRef target = sync::create_table(*c.group, "class_target");
-        source->add_column_link(type_LinkList, "ll", *target);
+        source->add_column_list(*target, "ll");
         source->create_object();
         k0 = target->create_object().get_key();
         k1 = target->create_object().get_key();
@@ -1815,7 +1815,7 @@ TEST(Transform_DanglingLinks)
             auto& tr = *c.group;
             auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
             auto table2 = sync::create_table_with_primary_key(tr, "class_table2", type_Int, "pk");
-            table->add_column_link(type_LinkList, "links", *table2);
+            table->add_column_list(*table2, "links");
             auto obj = table->create_object_with_primary_key(0);
             auto obj2 = table2->create_object_with_primary_key(0);
             obj.get_linklist("links").insert(0, obj2.get_key());
@@ -1872,6 +1872,79 @@ TEST(Transform_DanglingLinks)
         // ... But the real list should contain 1 tombstone.
         auto keys = obj.get_list<ObjKey>(table->get_column_key("links"));
         CHECK_EQUAL(keys.size(), 1);
+    });
+}
+
+TEST(Transform_Dictionary)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    Associativity assoc{test_context, 2, changeset_dump_dir_gen.get()};
+    assoc.for_each_permutation([&](auto& it) {
+        auto server = &*it.server;
+        auto client_1 = &*it.clients[0];
+        auto client_2 = &*it.clients[1];
+
+        // Create baseline
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+            table->add_column_dictionary(type_Mixed, "dict");
+            table->create_object_with_primary_key(0);
+            table->create_object_with_primary_key(1);
+        });
+
+        it.sync_all();
+
+        // Populate dictionary on both sides.
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj0 = table->get_object_with_primary_key(0);
+            auto obj1 = table->get_object_with_primary_key(1);
+            auto dict0 = obj0.get_dictionary("dict");
+            auto dict1 = obj1.get_dictionary("dict");
+
+            dict0.insert("a", 123);
+            dict0.insert("b", "Hello");
+            dict0.insert("c", 45.0);
+
+            dict1.insert("a", 456);
+        });
+
+        // Since client_2 has a higher peer ID, it should win this conflict.
+        client_2->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj0 = table->get_object_with_primary_key(0);
+            auto obj1 = table->get_object_with_primary_key(1);
+            auto dict0 = obj0.get_dictionary("dict");
+            auto dict1 = obj1.get_dictionary("dict");
+
+            dict0.insert("b", "Hello, World!");
+            dict0.insert("d", true);
+
+            dict1.insert("b", 789.f);
+        });
+
+        it.sync_all();
+
+        ReadTransaction rt{server->shared_group};
+        auto table = rt.get_table("class_Table");
+        CHECK(table);
+        auto obj0 = table->get_object_with_primary_key(0);
+        auto obj1 = table->get_object_with_primary_key(1);
+        auto dict0 = obj0.get_dictionary("dict");
+        auto dict1 = obj1.get_dictionary("dict");
+
+        CHECK_EQUAL(dict0.size(), 4);
+        CHECK_EQUAL(dict0.get("a"), Mixed{123});
+        CHECK_EQUAL(dict0.get("b"), Mixed{"Hello, World!"});
+        CHECK_EQUAL(dict0.get("c"), Mixed{45.0});
+        CHECK_EQUAL(dict0.get("d"), Mixed{true});
+
+        CHECK_EQUAL(dict1.size(), 2);
+        CHECK_EQUAL(dict1.get("a"), 456);
+        CHECK_EQUAL(dict1.get("b"), 789.f);
     });
 }
 

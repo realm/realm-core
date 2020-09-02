@@ -1807,7 +1807,7 @@ TEST(Shared_ClearColumnWithLinksToSelf)
     {
         WriteTransaction wt(sg);
         TableRef test = wt.add_table("Test");
-        auto col = test->add_column_link(type_Link, "foo", *test);
+        auto col = test->add_column(*test, "foo");
         test->add_column(type_Int, "bar");
         ObjKeys keys;
         test->create_objects(400, keys);             // Ensure non root clusters
@@ -3783,7 +3783,7 @@ TEST(Shared_RemoveTableWithEnumAndLinkColumns)
         tk = table->get_key();
         auto col_key = table->add_column(DataType(2), "string_3", false);
         table->enumerate_string_column(col_key);
-        table->add_column_link(type_Link, "link_5", *table);
+        table->add_column(*table, "link_5");
         table->add_search_index(col_key);
         wt->commit();
     }
@@ -3932,7 +3932,7 @@ TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
         auto t = wt->add_table("Table_0");
         // Create more object that can be held in a single cluster
         t->create_objects(267, keys);
-        auto col = t->add_column_link(type_Link, "link_0", *wt->get_table("Table_0"));
+        auto col = t->add_column(*wt->get_table("Table_0"), "link_0");
 
         // Create two links
         Obj obj = t->get_object(keys[48]);

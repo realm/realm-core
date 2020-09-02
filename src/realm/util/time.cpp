@@ -31,7 +31,7 @@ std::tm gmtime(std::time_t time)
 #ifdef _WIN32
     std::tm tm;
     if (REALM_UNLIKELY(gmtime_s(&tm, &time) != 0))
-        throw util::invalid_argument("gmtime() failed");
+        throw util::invalid_argument("gmtime_s() failed");
     return tm;
 #else
     // Assuming POSIX.1-2008 for now.

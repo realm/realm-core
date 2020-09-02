@@ -66,11 +66,12 @@ enum Instruction {
     instr_ListErase = 35, // Remove an entry from a list
     instr_ListClear = 36, // Remove all entries from a list
 
-    instr_SetInsert = 37, // Insert value into set
-    instr_SetErase = 38,  // Erase value from set
-    instr_SetClear = 39,  // Remove all values in a set
+    instr_DictionaryInsert = 37,
+    instr_DictionaryErase = 38,
 
-    instr_DictionaryInsert = 40,
+    instr_SetInsert = 39, // Insert value into set
+    instr_SetErase = 40,  // Erase value from set
+    instr_SetClear = 41,  // Remove all values in a set
 };
 
 class TransactLogStream {
@@ -168,6 +169,15 @@ public:
         return true;
     }
 
+    bool dictionary_insert(Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(Mixed)
+    {
+        return true;
+    }
+
     // Must have descriptor selected:
     bool insert_column(ColKey)
     {
@@ -196,11 +206,6 @@ public:
         return true;
     }
     bool list_clear(size_t)
-    {
-        return true;
-    }
-
-    bool dictionary_insert(Mixed)
     {
         return true;
     }
@@ -243,7 +248,7 @@ public:
     bool rename_column(ColKey col_key);
     bool set_link_type(ColKey col_key);
 
-    // Must have list selected:
+    // Must have collection selected:
     bool select_collection(ColKey col_key, ObjKey key);
     bool list_set(size_t list_ndx);
     bool list_insert(size_t ndx);
@@ -256,7 +261,8 @@ public:
     bool set_erase(size_t set_ndx);
     bool set_clear();
 
-    bool dictionary_insert(Mixed);
+    bool dictionary_insert(Mixed key);
+    bool dictionary_erase(Mixed key);
 
     /// End of methods expected by parser.
 
@@ -356,7 +362,8 @@ public:
     virtual void set_erase(const CollectionBase& set, size_t list_ndx, Mixed value);
     virtual void set_clear(const CollectionBase& set);
 
-    virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val);
+    virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value);
+    virtual void dictionary_erase(const CollectionBase& dict, Mixed key);
 
     virtual void create_object(const Table*, GlobalKey);
     virtual void create_object_with_primary_key(const Table*, GlobalKey, Mixed);
@@ -696,7 +703,8 @@ void TransactLogEncoder::append_string_instr(Instruction instr, StringData strin
     size_t max_required_bytes = 1 + max_enc_bytes_per_int + string.size();
     char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
-    encode(ptr, int(type_String));
+    ptr = encode(ptr, int(type_String));
+    ptr = encode(ptr, size_t(string.size()));
     ptr = std::copy(string.data(), string.data() + string.size(), ptr);
     advance(ptr);
 }
@@ -887,21 +895,6 @@ inline void TransactLogConvenientEncoder::set_clear(const CollectionBase& set)
     m_encoder.set_clear();  // Throws
 }
 
-/******************************** Dictionary *********************************/
-
-inline bool TransactLogEncoder::dictionary_insert(Mixed key)
-{
-    REALM_ASSERT(key.get_type() == type_String);
-    append_string_instr(instr_DictionaryInsert, key.get_string()); // Throws
-    return true;
-}
-
-inline void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed)
-{
-    select_collection(dict);
-    m_encoder.dictionary_insert(key);
-}
-
 inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey key)
 {
     select_table(t);              // Throws
@@ -1048,7 +1041,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-
+        case instr_DictionaryErase: {
+            int type = read_int<int>(); // Throws
+            REALM_ASSERT(type == type_String);
+            Mixed key = Mixed(read_string(m_string_buffer));
+            if (!handler.dictionary_erase(key)) // Throws
+                parser_error();
+            return;
+        }
         case instr_SelectList: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
@@ -1261,6 +1261,18 @@ public:
     {
         m_encoder.list_erase(ndx);
         append_instruction();
+        return true;
+    }
+
+    bool dictionary_insert(Mixed key)
+    {
+        m_encoder.dictionary_erase(key);
+        return true;
+    }
+
+    bool dictionary_erase(Mixed key)
+    {
+        m_encoder.dictionary_insert(key);
         return true;
     }
 

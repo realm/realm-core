@@ -188,7 +188,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
             col_ndx_result_set_query = result_sets->get_column_key("query");
             col_ndx_result_set_matches_property = result_sets->get_column_key("matches_property");
             // 0 = uninitialized, 1 = initialized, -1 = query parsing failed
-            result_sets->add_column_link(type_LinkList, "people", *people);
+            result_sets->add_column_list(*people, "people");
             Obj res = result_sets->create_object();
             res.set(col_ndx_result_set_query, "age < 10");
             res.set(col_ndx_result_set_matches_property, "people");

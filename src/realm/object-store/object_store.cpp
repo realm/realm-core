@@ -70,7 +70,6 @@ auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
 DataType to_core_type(PropertyType type)
 {
     REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
-    REALM_ASSERT(type != PropertyType::Any);    // Mixed columns can't be created
     switch (type & ~PropertyType::Flags) {
         case PropertyType::Int:
             return type_Int;
@@ -90,6 +89,8 @@ DataType to_core_type(PropertyType type)
             return type_ObjectId;
         case PropertyType::Decimal:
             return type_Decimal;
+        case PropertyType::Any:
+            return type_Mixed;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -111,7 +112,12 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        return table.add_column_link(is_array(property.type) ? type_LinkList : type_Link, property.name, *link_table);
+        if (is_array(property.type)) {
+            return table.add_column_list(*link_table, property.name);
+        }
+        else {
+            return table.add_column(*link_table, property.name);
+        }
     }
     else if (is_array(property.type)) {
         return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags), property.name,

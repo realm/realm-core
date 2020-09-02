@@ -165,7 +165,7 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
         auto make_instructions = [](Peer& peer) {
             peer.start_transaction();
             TableRef t = sync::create_table_with_primary_key(*peer.group, "class_t", type_String, "pk");
-            auto col_key = t->add_column_link(type_Link, "l", *t);
+            auto col_key = t->add_column(*t, "l");
 
             // Everything links to this object!
             auto first_key = sync::create_object_with_primary_key(*peer.group, *t, "Hello").get_key();

@@ -2613,8 +2613,8 @@ TEST(Query_LinkCounts)
 
     TableRef table2 = group.add_table("table2");
     auto col_int = table2->add_column(type_Int, "int");
-    auto col_link = table2->add_column_link(type_Link, "link", *table1);
-    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_link = table2->add_column(*table1, "link");
+    auto col_linklist = table2->add_column_list(*table1, "linklist");
 
     table2->create_object().set_all(0);
     table2->create_object().set_all(1, k1).get_linklist(col_linklist).add(k1);
@@ -2686,7 +2686,7 @@ TEST(Query_Link_Minimum)
     auto k3 = table1->create_object().get_key();
 
     TableRef table2 = group.add_table("table2");
-    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_linklist = table2->add_column_list(*table1, "linklist");
 
     // table2
     // 0: { }
@@ -2771,8 +2771,8 @@ TEST(Query_Link_MaximumSumAverage)
 
     TableRef table2 = group.add_table("table2");
     auto col_double = table2->add_column(type_Double, "double");
-    auto col_link = table2->add_column_link(type_Link, "link", *table1);
-    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_link = table2->add_column(*table1, "link");
+    auto col_linklist = table2->add_column_list(*table1, "linklist");
 
     // table2
     // 0: 456.0 ->0 { }
@@ -2976,7 +2976,7 @@ TEST(Query_OperatorsOverLink)
 
     TableRef table2 = group.add_table("table2");
     auto col_int2 = table2->add_column(type_Int, "int");
-    auto col_linklist = table2->add_column_link(type_LinkList, "linklist", *table1);
+    auto col_linklist = table2->add_column_list(*table1, "linklist");
 
     // table2
     // 0:  0 { }
@@ -3086,8 +3086,8 @@ TEST(Query_CompareLinkedColumnVsColumn)
 
     TableRef table2 = group.add_table("table2");
     auto col_int2 = table2->add_column(type_Int, "int");
-    auto col_link1 = table2->add_column_link(type_Link, "link1", *table1);
-    auto col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+    auto col_link1 = table2->add_column(*table1, "link1");
+    auto col_link2 = table2->add_column(*table1, "link2");
 
     // table2
     // 0: 2 {   } { 0 }
@@ -3139,8 +3139,8 @@ TEST(Query_CompareThroughUnaryLinks)
     table1->get_object(keys[2]).set_all(8, 8.0, "def");
 
     TableRef table2 = group.add_table("table2");
-    auto col_link1 = table2->add_column_link(type_Link, "link1", *table1);
-    auto col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+    auto col_link1 = table2->add_column(*table1, "link1");
+    auto col_link2 = table2->add_column(*table1, "link2");
 
     // table2
     // 0: {   } { 0 }
@@ -3193,7 +3193,7 @@ TEST(Query_DeepLink)
     TableRef table = group.add_table("test");
     table->add_column(type_Int, "int");
     auto col_bool = table->add_column(type_Bool, "bool");
-    auto col_linklist = table->add_column_link(type_LinkList, "list", *table);
+    auto col_linklist = table->add_column_list(*table, "list");
 
     for (int j = 0; j < N; ++j) {
         TableView view = table->where().find_all();
@@ -3218,7 +3218,7 @@ TEST(Query_LinksToDeletedOrMovedRow)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    auto col_link = source->add_column_link(type_Link, "link", *target);
+    auto col_link = source->add_column(*target, "link");
     auto col_name = target->add_column(type_String, "name");
 
     ObjKeys keys({4, 6, 8});
@@ -3777,7 +3777,7 @@ TEST(Query_ReferDeletedLinkView)
     // They will no longer throw exceptions or crash.
     Group group;
     TableRef table = group.add_table("table");
-    auto col_link = table->add_column_link(type_LinkList, "children", *table);
+    auto col_link = table->add_column_list(*table, "children");
     auto col_int = table->add_column(type_Int, "age");
     auto links = table->create_object().set(col_int, 123).get_linklist(col_link);
     Query q = table->where(links);
@@ -3838,7 +3838,7 @@ TEST(Query_SubQueries)
     auto col_int_t = target->add_column(type_Int, "integers");
     auto col_string_t = target->add_column(type_String, "strings");
     // in order to use set_all, columns involved in set_all must be inserted first.
-    auto col_link_o = origin->add_column_link(type_LinkList, "link", *target);
+    auto col_link_o = origin->add_column_list(*target, "link");
 
 
     // add some rows
@@ -4151,7 +4151,7 @@ TEST(Query_SyncViewIfNeeded)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    auto col_links = source->add_column_link(type_LinkList, "link", *target);
+    auto col_links = source->add_column_list(*target, "link");
     auto col_id = target->add_column(type_Int, "id");
 
     auto reset_table_contents = [&] {
@@ -4376,7 +4376,7 @@ TEST(Query_ArrayLeafRelocate)
 
         auto col_int = contact_type->add_column(type_Int, "id");
         auto col_str = contact_type->add_column(type_String, "str");
-        auto col_link = contact->add_column_link(type_LinkList, "link", *contact_type);
+        auto col_link = contact->add_column_list(*contact_type, "link");
 
         std::vector<ObjKey> contact_type_keys;
         std::vector<ObjKey> contact_keys;
@@ -4563,9 +4563,9 @@ TEST(Query_ColumnDeletionLinks)
     auto col_int0 = foobar->add_column(type_Int, "int");
 
     auto col_int1 = bar->add_column(type_Int, "int");
-    auto col_link0 = bar->add_column_link(type_Link, "link", *foobar);
+    auto col_link0 = bar->add_column(*foobar, "link");
 
-    auto col_link1 = foo->add_column_link(type_Link, "link", *bar);
+    auto col_link1 = foo->add_column(*bar, "link");
 
     std::vector<ObjKey> foobar_keys;
     std::vector<ObjKey> bar_keys;
@@ -4754,8 +4754,8 @@ TEST(Query_LinksTo)
     TableRef source = group.add_table("source");
     TableRef target = group.add_table("target");
 
-    auto col_link = source->add_column_link(type_Link, "link", *target);
-    auto col_linklist = source->add_column_link(type_LinkList, "linklist", *target);
+    auto col_link = source->add_column(*target, "link");
+    auto col_linklist = source->add_column_list(*target, "linklist");
 
     std::vector<ObjKey> target_keys;
     target->create_objects(10, target_keys);
@@ -4821,13 +4821,13 @@ TEST(Query_Group_bug)
     TableRef person_table = g.add_table("person");
 
     auto col_service_id = service_table->add_column(type_String, "id");
-    auto col_service_link = service_table->add_column_link(type_LinkList, "profiles", *profile_table);
+    auto col_service_link = service_table->add_column_list(*profile_table, "profiles");
 
     auto col_profile_id = profile_table->add_column(type_String, "role");
-    auto col_profile_link = profile_table->add_column_link(type_Link, "services", *service_table);
+    auto col_profile_link = profile_table->add_column(*service_table, "services");
 
     auto col_person_id = person_table->add_column(type_String, "id");
-    auto col_person_link = person_table->add_column_link(type_LinkList, "services", *service_table);
+    auto col_person_link = person_table->add_column_list(*service_table, "services");
 
     auto sk0 = service_table->create_object().set(col_service_id, "service_1").get_key();
     auto sk1 = service_table->create_object().set(col_service_id, "service_2").get_key();
@@ -5064,7 +5064,7 @@ TEST(Query_IntIndexOverLinkViewNotInTableOrder)
     auto k1 = child_table->create_object().set(col_child_id, 2).get_key();
 
     TableRef parent_table = g.add_table("parent");
-    auto col_parent_children = parent_table->add_column_link(type_LinkList, "children", *child_table);
+    auto col_parent_children = parent_table->add_column_list(*child_table, "children");
 
     auto parent_obj = parent_table->create_object();
     auto children = parent_obj.get_linklist(col_parent_children);
@@ -5106,7 +5106,7 @@ TEST(Query_LinkListIntPastOneIsNull)
     auto table_foo = g.add_table("Foo");
     auto table_bar = g.add_table("Bar");
     auto col_int = table_foo->add_column(type_Int, "int", true);
-    auto col_list = table_bar->add_column_link(type_LinkList, "foo_link", *table_foo);
+    auto col_list = table_bar->add_column_list(*table_foo, "foo_link");
     std::vector<util::Optional<int64_t>> values = {{0}, {1}, {2}, {util::none}};
     auto bar_obj = table_bar->create_object();
     auto list = bar_obj.get_linklist(col_list);
@@ -5129,7 +5129,7 @@ TEST(Query_LinkView_StrIndex)
     auto col_id = table_foo->get_column_key("id");
 
     auto table_bar = g.add_table("class_Bar");
-    auto col_list = table_bar->add_column_link(type_LinkList, "link", *table_foo);
+    auto col_list = table_bar->add_column_list(*table_foo, "link");
 
     auto foo = table_foo->create_object_with_primary_key("97625fdc-d3f8-4c45-9a4d-dc8c83c657a1");
     auto bar = table_bar->create_object();
@@ -5152,7 +5152,12 @@ TEST(Query_StringOrShortStrings)
     }
 
     for (auto& str : strings) {
-        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        Query q = table->where()
+                      .group()
+                      .equal(col_value, StringData(str))
+                      .Or()
+                      .equal(col_value, StringData("not present"))
+                      .end_group();
         CHECK_EQUAL(q.count(), 1);
     }
 }
@@ -5170,7 +5175,12 @@ TEST(Query_StringOrMediumStrings)
     }
 
     for (auto& str : strings) {
-        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        Query q = table->where()
+                      .group()
+                      .equal(col_value, StringData(str))
+                      .Or()
+                      .equal(col_value, StringData("not present"))
+                      .end_group();
         CHECK_EQUAL(q.count(), 1);
     }
 }
@@ -5188,7 +5198,12 @@ TEST(Query_StringOrLongStrings)
     }
 
     for (auto& str : strings) {
-        Query q = table->where().group().equal(col_value, str).Or().equal(col_value, "not present").end_group();
+        Query q = table->where()
+                      .group()
+                      .equal(col_value, StringData(str))
+                      .Or()
+                      .equal(col_value, StringData("not present"))
+                      .end_group();
         CHECK_EQUAL(q.count(), 1);
     }
 }
@@ -5205,7 +5220,7 @@ TEST(Query_LinkViewAnd)
     auto k1 = child_table->create_object().set(col_child_id, 2).set(col_child_name, "Jeff").get_key();
 
     TableRef parent_table = g.add_table("parent");
-    auto col_parent_children = parent_table->add_column_link(type_LinkList, "children", *child_table);
+    auto col_parent_children = parent_table->add_column_list(*child_table, "children");
 
     auto parent_obj = parent_table->create_object();
     auto children = parent_obj.get_linklist(col_parent_children);
@@ -5231,17 +5246,17 @@ TEST(Query_LinksWithIndex)
     target->add_search_index(col_date);
 
     TableRef foo = g.add_table("foo");
-    auto col_foo = foo->add_column_link(type_LinkList, "linklist", *target);
+    auto col_foo = foo->add_column_list(*target, "linklist");
     auto col_location = foo->add_column(type_String, "location");
     auto col_score = foo->add_column(type_Int, "score");
     foo->add_search_index(col_location);
     foo->add_search_index(col_score);
 
     TableRef middle = g.add_table("middle");
-    auto col_link = middle->add_column_link(type_Link, "link", *target);
+    auto col_link = middle->add_column(*target, "link");
 
     TableRef origin = g.add_table("origin");
-    auto col_linklist = origin->add_column_link(type_LinkList, "linklist", *middle);
+    auto col_linklist = origin->add_column_list(*middle, "linklist");
 
     std::vector<StringData> strings{"Copenhagen", "Aarhus", "Odense", "Aalborg", "Faaborg"};
     auto now = std::chrono::system_clock::now();
@@ -5298,7 +5313,7 @@ TEST(Query_NotImmediatelyBeforeKnownRange)
     Group g;
     TableRef parent = g.add_table("parent");
     TableRef child = g.add_table("child");
-    auto col_link = parent->add_column_link(type_LinkList, "list", *child);
+    auto col_link = parent->add_column_list(*child, "list");
     auto col_str = child->add_column(type_String, "value");
     child->add_search_index(col_str);
 
@@ -5311,6 +5326,223 @@ TEST(Query_NotImmediatelyBeforeKnownRange)
 
     Query q = child->where(list).Not().equal(col_str, "a");
     CHECK_EQUAL(q.count(), 1);
+}
+
+TEST(Query_Mixed)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_any = table->add_column(type_Mixed, "any");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    size_t int_over_50 = 0;
+    size_t nb_strings = 0;
+    for (int64_t i = 0; i < 100; i++) {
+        if (i % 4) {
+            if (i > 50)
+                int_over_50++;
+            table->create_object().set(col_any, Mixed(i)).set(col_int, i);
+        }
+        else {
+            std::string str = "String" + util::to_string(i);
+            table->create_object().set(col_any, Mixed(str)).set(col_int, i);
+            nb_strings++;
+        }
+    }
+
+    table->get_object(15).set(col_any, Mixed());
+    table->get_object(75).set(col_any, Mixed(75.));
+    table->get_object(28).set(col_any, Mixed(BinaryData("String2Binary")));
+    table->get_object(25).set(col_any, Mixed(3.));
+    table->get_object(35).set(col_any, Mixed(Decimal128("3")));
+
+    auto it = table->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+        auto ll = obj.get_linklist(col_links);
+
+        obj.set(col_link, it->get_key());
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    auto tv = (table->column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), int_over_50);
+    tv = (table->column<Mixed>(col_any) >= 50).find_all();
+    CHECK_EQUAL(tv.size(), int_over_50 + 1);
+    tv = (table->column<Mixed>(col_any) <= 50).find_all();
+    CHECK_EQUAL(tv.size(), 100 - int_over_50 - nb_strings - 1);
+    tv = (table->column<Mixed>(col_any) < 50).find_all();
+    CHECK_EQUAL(tv.size(), 100 - int_over_50 - nb_strings - 2);
+    tv = (table->column<Mixed>(col_any) < 50 || table->column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 100 - nb_strings - 2);
+    tv = (table->column<Mixed>(col_any) != 50).find_all();
+    CHECK_EQUAL(tv.size(), 99);
+
+    tv = table->where().greater(col_any, 50).find_all();
+    CHECK_EQUAL(tv.size(), int_over_50);
+
+    tv = table->where().equal(col_any, null()).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = table->where().not_equal(col_any, null()).find_all();
+    CHECK_EQUAL(tv.size(), 99);
+
+    tv = table->where().begins_with(col_any, "String2").find_all(); // 20, 24, 28
+    CHECK_EQUAL(tv.size(), 3);
+    tv = table->where().begins_with(col_any, BinaryData("String2", 7)).find_all(); // 20, 24, 28
+    CHECK_EQUAL(tv.size(), 3);
+
+    tv = table->where().contains(col_any, "trin").find_all();
+    CHECK_EQUAL(tv.size(), 25);
+
+    tv = table->where().like(col_any, "Strin*").find_all();
+    CHECK_EQUAL(tv.size(), 25);
+
+    tv = table->where().ends_with(col_any, "4").find_all(); // 4, 24, 44, 64, 84
+    CHECK_EQUAL(tv.size(), 5);
+    char bin[1] = {0x34};
+    tv = table->where().ends_with(col_any, BinaryData(bin)).find_all(); // 4, 24, 44, 64, 84
+    CHECK_EQUAL(tv.size(), 5);
+
+    tv = table->where().equal(col_any, "String2Binary").find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().equal(col_any, "string2binary", false).find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    tv = table->where().not_equal(col_any, "string2binary", false).find_all();
+    CHECK_EQUAL(tv.size(), 99);
+
+    tv = (table->column<Mixed>(col_any) == "String48").find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = (table->column<Mixed>(col_any) == 3.).find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv = (table->column<Mixed>(col_any) == table->column<Int>(col_int)).find_all();
+    CHECK_EQUAL(tv.size(), 72);
+
+    tv = (origin->link(col_links).column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 5);
+    tv = (origin->link(col_link).column<Mixed>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
+TEST(Query_ListOfMixed)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_any = table->add_column_list(type_Mixed, "any");
+    auto col_int = origin->add_column(type_Int, "int");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    size_t expected = 0;
+
+    for (int64_t i = 0; i < 100; i++) {
+        auto obj = table->create_object();
+        auto list = obj.get_list<Mixed>(col_any);
+        if (i % 4) {
+            list.add(i);
+            if (i > 50)
+                expected++;
+        }
+        else if ((i % 10) == 0) {
+            list.add(100.);
+            expected++;
+        }
+        if (i % 3) {
+            std::string str = "String" + util::to_string(i);
+            list.add(str);
+        }
+    }
+    auto it = table->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+        obj.set(col_int, 100);
+        auto ll = obj.get_linklist(col_links);
+
+        obj.set(col_link, it->get_key());
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // g.to_json(std::cout, 2);
+    auto tv = (table->column<Lst<Mixed>>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), expected);
+    tv = (origin->link(col_links).column<Lst<Mixed>>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 8);
+    tv = (origin->link(col_link).column<Lst<Mixed>>(col_any) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 7);
+    tv = (origin->link(col_links).column<Lst<Mixed>>(col_any) == origin->column<Int>(col_int)).find_all();
+    CHECK_EQUAL(tv.size(), 5);
+}
+
+TEST(Query_Dictionary)
+{
+    Group g;
+    auto foo = g.add_table("foo");
+    auto origin = g.add_table("origin");
+    auto col_dict = foo->add_column_dictionary(type_Mixed, "dict");
+    auto col_link = origin->add_column(*foo, "link");
+    auto col_links = origin->add_column_list(*foo, "links");
+    size_t expected = 0;
+
+    for (int64_t i = 0; i < 100; i++) {
+        auto obj = foo->create_object();
+        Dictionary dict = obj.get_dictionary(col_dict);
+        bool incr = false;
+        if (i % 4) {
+            dict.insert("Value", i);
+            if (i > 50)
+                incr = true;
+        }
+        else if ((i % 10) == 0) {
+            dict.insert("Value", 100.);
+            incr = true;
+        }
+        if (i % 3) {
+            std::string str = "String" + util::to_string(i);
+            dict.insert("Value", str);
+            incr = false;
+        }
+        dict.insert("Dummy", i);
+        if (incr) {
+            expected++;
+        }
+    }
+
+    auto it = foo->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+
+        obj.set(col_link, it->get_key());
+
+        auto ll = obj.get_linklist(col_links);
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // g.to_json(std::cout);
+    auto tv = (foo->column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    CHECK_EQUAL(tv.size(), expected);
+    tv = (foo->column<Dictionary>(col_dict) > 50).find_all(); // Any key will do
+    CHECK_EQUAL(tv.size(), 50);                               // 0 and 51..99
+
+    tv = (origin->link(col_link).column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") > 50).find_all();
+    CHECK_EQUAL(tv.size(), 6);
+    tv = (origin->link(col_links).column<Dictionary>(col_dict) > 50).find_all();
+    CHECK_EQUAL(tv.size(), 6);
+    tv = (origin->link(col_links).column<Dictionary>(col_dict).key("Value") == null()).find_all();
+    CHECK_EQUAL(tv.size(), 7);
 }
 
 #endif // TEST_QUERY

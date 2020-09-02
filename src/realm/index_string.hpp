@@ -24,7 +24,7 @@
 #include <array>
 
 #include <realm/array.hpp>
-#include <realm/cluster_tree.hpp>
+#include <realm/table_cluster_tree.hpp>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and
@@ -116,7 +116,7 @@ using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key)
+    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
     {
@@ -125,14 +125,14 @@ public:
     {
         return m_cluster_tree->size();
     }
-    ClusterTree::ConstIterator begin() const
+    TableClusterTree::Iterator begin() const
     {
-        return ClusterTree::ConstIterator(*m_cluster_tree, 0);
+        return TableClusterTree::Iterator(*m_cluster_tree, 0);
     }
 
-    ClusterTree::ConstIterator end() const
+    TableClusterTree::Iterator end() const
     {
-        return ClusterTree::ConstIterator(*m_cluster_tree, size());
+        return TableClusterTree::Iterator(*m_cluster_tree, size());
     }
 
 
@@ -145,7 +145,7 @@ public:
     StringData get_index_data(ObjKey key, StringConversionBuffer& buffer) const;
 
 private:
-    const ClusterTree* m_cluster_tree;
+    const TableClusterTree* m_cluster_tree;
     ColKey m_column_key;
 };
 
@@ -165,7 +165,7 @@ public:
     static bool type_supported(realm::DataType type)
     {
         return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
-                type == type_ObjectId);
+                type == type_ObjectId || type == type_Mixed);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -213,7 +213,6 @@ public:
 
     void clear();
 
-    void distinct(BPlusTree<ObjKey>& result) const;
     bool has_duplicate_values() const noexcept;
 
     void verify() const;
@@ -311,7 +310,7 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key)
+    SortedListComparator(const TableClusterTree* cluster_tree, ColKey column_key)
         : m_column(cluster_tree, column_key)
     {
     }
@@ -370,6 +369,22 @@ struct GetIndexData<StringData> {
     static StringData get_index_data(StringData data, StringConversionBuffer&)
     {
         return data;
+    }
+};
+
+template <>
+struct GetIndexData<Mixed> {
+    static StringData get_index_data(Mixed value, StringConversionBuffer& buffer)
+    {
+        if (value.is_null()) {
+            return null{};
+        }
+
+        auto hash = value.hash();
+        const char* c = reinterpret_cast<const char*>(&hash);
+        realm::safe_copy_n(c, sizeof(size_t), buffer.data());
+
+        return StringData{buffer.data(), sizeof(size_t)};
     }
 };
 
