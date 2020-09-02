@@ -266,11 +266,12 @@ public:
     }
     explicit operator bool() const
     {
-        return m_table_key.operator bool();
+        return bool(m_table_key) && bool(m_obj_key);
     }
     bool is_null() const
     {
-        return !m_table_key.operator bool();
+        return !bool(*this);
+    }
     }
     bool operator==(const ObjLink& other) const
     {
