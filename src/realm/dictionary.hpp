@@ -22,7 +22,8 @@
 #include <realm/collection.hpp>
 #include <realm/obj.hpp>
 #include <realm/mixed.hpp>
-#include <realm/cluster_tree.hpp>
+#include <realm/array_mixed.hpp>
+#include <realm/dictionary_cluster_tree.hpp>
 
 namespace realm {
 
@@ -70,6 +71,8 @@ public:
 
     // throws std::out_of_range if key is not found
     Mixed get(Mixed key) const;
+    // Noexcept version
+    util::Optional<Mixed> try_get(Mixed key) const noexcept;
     // adds entry if key is not found
     const Mixed operator[](Mixed key);
 
@@ -81,6 +84,25 @@ public:
     void nullify(Mixed);
 
     void clear();
+
+    template <class T>
+    void for_all_values(T&& f)
+    {
+        if (m_clusters) {
+            ArrayMixed leaf(m_obj.get_alloc());
+            // Iterate through cluster and call f on each value
+            auto trv_func = [&leaf, &f](const Cluster* cluster) {
+                size_t e = cluster->node_size();
+                cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+                for (size_t i = 0; i < e; i++) {
+                    f(leaf.get(i));
+                }
+                // Continue
+                return false;
+            };
+            m_clusters->traverse(trv_func);
+        }
+    }
 
     Iterator begin() const;
     Iterator end() const;
@@ -101,7 +123,7 @@ public:
     typedef const value_type* pointer;
     typedef const value_type& reference;
 
-    value_type operator*();
+    value_type operator*() const;
 
 private:
     friend class Dictionary;

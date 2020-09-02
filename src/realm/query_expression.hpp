@@ -1410,6 +1410,10 @@ public:
                 d.m_storage.set(t, m_storage[t]);
             }
         }
+        else if constexpr (std::is_same_v<T, null>) {
+            Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
+            d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
+        }
         else if constexpr (realm::is_any_v<T, int, int64_t, bool, float, double, StringData, BinaryData, Timestamp,
                                            Decimal128, ObjectId>) {
             Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
@@ -2265,19 +2269,11 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
     return value;
 }
 
-
-// If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
-// `template <> class Columns<T> : public SimpleQuerySupport<T>` and you're done. Any operators of the set
-// { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
-// automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
-// To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
-// node for it (super fast).
-
+// This class can be used as base for expressions that handle object properties
 template <class T>
-class SimpleQuerySupport : public Subexpr2<T> {
+class ObjPropertyExpr : public Subexpr2<T> {
 public:
-    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-                       ExpressionComparisonType type = ExpressionComparisonType::Any)
+    ObjPropertyExpr(ColKey column, ConstTableRef table, std::vector<ColKey> links, ExpressionComparisonType type)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_comparison_type(type)
@@ -2298,21 +2294,6 @@ public:
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
-        }
-    }
-
-    void set_cluster(const Cluster* cluster) override
-    {
-        m_array_ptr = nullptr;
-        m_leaf_ptr = nullptr;
-        if (links_exist()) {
-            m_link_map.set_cluster(cluster);
-        }
-        else {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
         }
     }
 
@@ -2345,6 +2326,92 @@ public:
     void collect_dependencies(std::vector<TableKey>& tables) const override
     {
         m_link_map.collect_dependencies(tables);
+    }
+
+
+    bool links_exist() const
+    {
+        return m_link_map.has_links();
+    }
+
+    bool only_unary_links() const
+    {
+        return m_link_map.only_unary_links();
+    }
+
+    LinkMap get_link_map() const
+    {
+        return m_link_map;
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return m_comparison_type;
+    }
+
+    ObjPropertyExpr(ObjPropertyExpr const& other)
+        : Subexpr2<T>(other)
+        , m_link_map(other.m_link_map)
+        , m_column_key(other.m_column_key)
+        , m_comparison_type(other.m_comparison_type)
+    {
+    }
+
+    ColKey column_key() const
+    {
+        return m_column_key;
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
+    }
+
+protected:
+    LinkMap m_link_map;
+    // Column key of payload column of m_table
+    mutable ColKey m_column_key;
+    ExpressionComparisonType m_comparison_type; // Any, All, None
+};
+
+// If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
+// `template <> class Columns<T> : public SimpleQuerySupport<T>` and you're done. Any operators of the set
+// { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
+// automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
+// To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
+// node for it (super fast).
+
+template <class T>
+class SimpleQuerySupport : public ObjPropertyExpr<T> {
+public:
+    using ObjPropertyExpr<T>::links_exist;
+    using ObjPropertyExpr<T>::m_link_map;
+    using ObjPropertyExpr<T>::m_column_key;
+
+    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+                       ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ObjPropertyExpr<T>(column, table, std::move(links), type)
+    {
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_array_ptr = nullptr;
+        m_leaf_ptr = nullptr;
+        if (links_exist()) {
+            m_link_map.set_cluster(cluster);
+        }
+        else {
+            // Create new Leaf
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
+            cluster->init_leaf(m_column_key, m_array_ptr.get());
+            m_leaf_ptr = m_array_ptr.get();
+        }
     }
 
     void evaluate(size_t index, ValueBase& destination) override
@@ -2414,47 +2481,9 @@ public:
         d.m_storage.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_key));
     }
 
-    bool links_exist() const
+    SimpleQuerySupport(const SimpleQuerySupport& other)
+        : ObjPropertyExpr<T>(other)
     {
-        return m_link_map.has_links();
-    }
-
-    bool only_unary_links() const
-    {
-        return m_link_map.only_unary_links();
-    }
-
-    LinkMap get_link_map() const
-    {
-        return m_link_map;
-    }
-
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
-    }
-
-    virtual ExpressionComparisonType get_comparison_type() const override
-    {
-        return m_comparison_type;
-    }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
-    }
-
-    SimpleQuerySupport(SimpleQuerySupport const& other)
-        : Subexpr2<T>(other)
-        , m_link_map(other.m_link_map)
-        , m_column_key(other.m_column_key)
-        , m_comparison_type(other.m_comparison_type)
-    {
-    }
-
-    ColKey column_key() const
-    {
-        return m_column_key;
     }
 
     SizeOperator<T> size()
@@ -2463,11 +2492,6 @@ public:
     }
 
 private:
-    LinkMap m_link_map;
-
-    // Column key of payload column of m_table
-    mutable ColKey m_column_key;
-
     // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
@@ -2475,9 +2499,7 @@ private:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     LeafType* m_leaf_ptr = nullptr;
-    ExpressionComparisonType m_comparison_type;
 };
-
 
 template <>
 class Columns<Timestamp> : public SimpleQuerySupport<Timestamp> {
@@ -2504,6 +2526,44 @@ class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
+template <>
+class Columns<Dictionary> : public ObjPropertyExpr<Mixed> {
+public:
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ObjPropertyExpr<Mixed>(column, table, std::move(links), type)
+    {
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+    }
+
+    Columns& key(const Mixed& key_value);
+    void set_cluster(const Cluster* cluster) override;
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns>(static_cast<const Columns&>(*this));
+    }
+
+    Columns(Columns const& other)
+        : ObjPropertyExpr<Mixed>(other)
+        , m_key(other.m_key)
+        , m_objkey(other.m_objkey)
+        , m_key_type(other.m_key_type)
+    {
+    }
+
+private:
+    Mixed m_key;
+    ObjKey m_objkey;
+    DataType m_key_type;
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
+};
 
 // Columns<Mixed> == String
 inline Query operator==(Columns<Mixed>&& left, const char* right)
