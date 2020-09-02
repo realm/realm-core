@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fix an assertion failure when DB::call_with_lock() was called when the management directory did not exist on iOS (since 6.0.21).
+* None.
  
 ### Breaking changes
 * None.
@@ -282,6 +282,14 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+ 
+----------------------------------------------
+
+# 6.0.23 Release notes
+
+### Fixed
+* Fix an assertion failure when DB::call_with_lock() was called when the management directory did not exist on iOS (since 6.0.21).
+* The non-xcframework Apple release package did not include macOS libraries (since 6.0.22).
 
 ----------------------------------------------
 
