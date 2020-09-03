@@ -22,7 +22,6 @@
 #include <string>
 
 #include "sync/app.hpp"
-#include "sync/sync_user.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -69,10 +68,10 @@ public:
         }
 
     /// Return the user directory for a given user, creating it if it does not already exist.
-    std::string user_directory(const std::string& local_identity) const;
+    std::string user_directory(const std::string& identity) const;
 
     /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& local_identity) const;       // throws
+    void remove_user_directory(const std::string& identity) const;       // throws
 
     /// Rename a user directory. Returns true if a directory at `old_name` existed
     /// and was successfully renamed to `new_name`. Returns false if no directory
@@ -83,10 +82,10 @@ public:
     static bool try_file_exists(const std::string& path) noexcept;
 
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string realm_file_path(const std::string& user_identity, const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    bool remove_realm(const std::string& user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -134,8 +133,9 @@ private:
     std::string get_base_sync_directory() const;
 
     // Construct the absolute path to the users directory
-    std::string get_user_directory_path(const std::string& local_user_identity) const;
+    std::string get_user_directory_path(const std::string& user_identity) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
     std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };
 
