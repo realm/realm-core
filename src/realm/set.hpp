@@ -181,8 +181,8 @@ struct SetElementLessThan<Mixed> {
                 [[fallthrough]];
             case type_LinkList:
                 REALM_TERMINATE("Invalid Mixed payload in Set.");
-                return false;
         }
+        return false;
     }
 };
 
@@ -235,8 +235,8 @@ struct SetElementEquals<Mixed> {
                 [[fallthrough]];
             case type_LinkList:
                 REALM_TERMINATE("Invalid Mixed payload in Set.");
-                return false;
         }
+        return false;
     }
 };
 
