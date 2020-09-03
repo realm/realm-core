@@ -91,7 +91,7 @@ TEST(Set_Mixed)
     Group g;
 
     auto t = g.add_table("foo");
-    auto col_set = t->add_column_set(type_Mixed, "mixeds");
+    t->add_column_set(type_Mixed, "mixeds");
     auto obj = t->create_object();
 
     auto set = obj.get_set<Mixed>("mixeds");
