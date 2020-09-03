@@ -1,5 +1,6 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/object.hpp>
+#include <realm/set.hpp>
 
 #include <realm/group.hpp>
 
@@ -797,6 +798,10 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
         else if (col.is_dictionary()) {
             auto dict = obj.get_dictionary(col);
             return callback(dict);
+        }
+        else if (col.is_set()) {
+            auto set = obj.get_setbase_ptr(col);
+            return callback(*set);
         }
         return callback(obj, col);
     }
