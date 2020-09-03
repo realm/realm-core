@@ -410,7 +410,7 @@ public:
     /// \param prior_state The state of the local Realm on which the specified
     /// raw changeset is based.
     ///
-    /// \param changeset, changeset_size The raw changeset.
+    /// \param changeset changeset_size The raw changeset.
     ///
     /// \param buffer The buffer to which the cooked changeset must be written.
     ///

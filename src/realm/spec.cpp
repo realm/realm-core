@@ -226,7 +226,7 @@ bool Spec::convert_column_attributes()
         }
         ColumnType type = ColumnType(m_types.get(column_ndx));
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
-        switch (type) {
+        switch (int(type)) {
             case col_type_OldTable: {
                 Spec sub_spec(get_alloc());
                 size_t subspec_ndx = get_subspec_ndx(column_ndx);
@@ -239,7 +239,7 @@ bool Spec::convert_column_attributes()
                 changes = true;
                 break;
             }
-            case col_type_OldStringEnum: {
+            case /*col_type_OldStringEnum */ 3: {
                 m_types.set(column_ndx, col_type_String);
                 // We need to padd zeroes into the m_enumkeys so that the index in
                 // m_enumkeys matches the column index.

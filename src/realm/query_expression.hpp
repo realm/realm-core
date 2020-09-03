@@ -2434,6 +2434,7 @@ public:
             }
             else {
                 std::vector<ObjKey> links = m_link_map.get_links(index);
+                Value<T> d;
                 d.init(true, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
@@ -2450,6 +2451,7 @@ public:
                         d.m_storage.set(t, obj.get<T>(m_column_key));
                     }
                 }
+                destination.import(d);
             }
         }
         else {
