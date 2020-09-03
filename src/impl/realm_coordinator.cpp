@@ -248,7 +248,7 @@ std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
 {
     if (!config.scheduler)
-        config.scheduler = version ? util::Scheduler::get_frozen() : util::Scheduler::make_default();
+        config.scheduler = version ? util::Scheduler::get_frozen(version.value()) : util::Scheduler::make_default();
     // realm must be declared before lock so that the mutex is released before
     // we release the strong reference to realm, as Realm's destructor may want
     // to acquire the same lock
@@ -256,6 +256,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     util::CheckedUniqueLock lock(m_realm_mutex);
     set_config(config);
     if ((realm = do_get_cached_realm(config))) {
+        if (version) {
+            REALM_ASSERT(realm->read_transaction_version() == version.value());
+        }
         return realm;
     }
     do_get_realm(std::move(config), realm, version, lock);

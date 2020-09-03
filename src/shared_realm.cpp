@@ -904,8 +904,9 @@ bool Realm::is_frozen() const
 SharedRealm Realm::freeze()
 {
     auto config = m_config;
-    config.scheduler = util::Scheduler::get_frozen();
-    return Realm::get_frozen_realm(std::move(config), read_transaction_version());
+    auto version = read_transaction_version();
+    config.scheduler = util::Scheduler::get_frozen(version);
+    return Realm::get_frozen_realm(std::move(config), version);
 }
 
 void Realm::close()

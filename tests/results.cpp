@@ -112,7 +112,7 @@ TEST_CASE("notifications: async delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -785,7 +785,7 @@ TEST_CASE("notifications: skip") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1021,7 +1021,7 @@ TEST_CASE("notifications: TableView delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2061,7 +2061,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -3166,7 +3166,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
         r.set_property_value(ctx, "string array", util::Any(AnyVec{"a"s, "b"s, "c"s}));
         check_array(table->get_column_key("string array"), StringData("a"), StringData("b"), StringData("c"));
- 
+
         r.set_property_value(ctx, "data array", util::Any(AnyVec{"d"s, "e"s, "f"s}));
         check_array(table->get_column_key("data array"), BinaryData("d",1), BinaryData("e",1), BinaryData("f",1));
 
