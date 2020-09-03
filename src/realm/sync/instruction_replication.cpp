@@ -353,6 +353,13 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
             REALM_ASSERT(key_type == type_String);
             instr.key_type = get_payload_type(key_type);
         }
+        else if (col_key.is_set()) {
+            instr.collection_type = CollectionType::Set;
+            auto value_type = table->get_column_type(col_key);
+            REALM_ASSERT(value_type != type_LinkList);
+            instr.type = get_payload_type(value_type);
+            instr.key_type = Instruction::Payload::Type::Null;
+        }
         else {
             REALM_ASSERT(!col_key.is_collection());
             instr.collection_type = CollectionType::Single;
