@@ -17,6 +17,37 @@
 
 ----------------------------------------------
 
+# 10.0.0-beta.5 Release notes
+
+### Fixed
+* Issues fixed by releases v6.0.14 to v6.0.21
+ 
+-----------
+
+### Internals
+* When creating objects without primary keys, it is now checked that the generated ObjKey does not collide with an already existing object. This was a problem in some migration scenarios in ObjectStore.
+
+----------------------------------------------
+
+# 10.0.0-beta.4 Release notes
+
+### Enhancements
+* Parser support for ObjectId vs Timestamp
+
+### Fixed in v6.0.14..v6.0.17
+* If a realm needs upgrade during opening, the program might abort in the "migrate_links" stage. ([#6680](https://github.com/realm/realm-cocoa/issues/6680), since v6.0.0)
+* Fix bug in memory mapping management. This bug could result in multiple different asserts as well as segfaults. In many cases stack backtraces would include members of the EncyptedFileMapping near the top - even if encryption was not used at all. In other cases asserts or crashes would be in methods reading an array header or array element. In all cases the application would terminate immediately. ([#3838](https://github.com/realm/realm-core/pull/3838), since v6)
+* Fix missing `Lst` symbols when the library is built as a shared library with LTO. ([Cocoa #6625](https://github.com/realm/realm-cocoa/issues/6625), since v6.0.0).
+ 
+----------------------------------------------
+
+# 10.0.0-beta.3 Release notes
+
+### Fixed
+* Isses fixed by releases v6.0.11 to v6.0.13
+
+----------------------------------------------
+
 # 10.0.0-beta.2 Release notes
 
 ### Fixed
@@ -199,7 +230,7 @@ This release also contains the changes introduced by v6.0.4
 
 ### Fixed
 * None.
- 
+
 -----------
 
 ### Internals
@@ -251,6 +282,121 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+ 
+----------------------------------------------
+
+# 6.0.23 Release notes
+
+### Fixed
+* Fix an assertion failure when DB::call_with_lock() was called when the management directory did not exist on iOS (since 6.0.21).
+* The non-xcframework Apple release package did not include macOS libraries (since 6.0.22).
+
+----------------------------------------------
+
+# 6.0.22 Release notes
+
+### Enhancements
+* Added an enum to `DescriptorOrdering::append_sort` which allows users to choose the merge order of how sorts are applied. The default is the historical behaviour sor this is not a breaking change. ([#3869](https://github.com/realm/realm-core/issues/3869))
+* Add arm64 simulator slices to the xcframework release package.
+
+### Fixed
+* Fix deadlocks when writing to a Realm file on an exFAT partition from macOS. ([Cocoa #6691](https://github.com/realm/realm-cocoa/issues/6691)).
+
+----------------------------------------------
+
+# 6.0.21 Release notes
+
+### Fixed
+* Holding a shared lock while being suspended on iOS would cause the app to be terminated. (https://github.com/realm/realm-cocoa/issues/6671)
+ 
+----------------------------------------------
+
+# 6.0.20 Release notes
+
+### Fixed
+* If an attempt to upgrade a realm has ended with a crash with "migrate_links" in the call stack, the realm ended in a corrupt state where further upgrade was not possible. A remedy for this situation is now provided. 
+ 
+----------------------------------------------
+
+# 6.0.19 Release notes
+
+### Fixed
+* Upgrading a table with only backlink columns could crash (No issue created)
+* If you upgrade a file where you have "" elements in a list of non-nullable strings, the program would crash ([#3836](https://github.com/realm/realm-core/issues/3836), since v6.0.0)
+* None.
+ 
+----------------------------------------------
+
+# 6.0.18 Release notes
+
+### Fixed
+* We no longer throw when an invalid ConstIterator is copied ([#698](https://github.com/realm/realm-cocoa/issues/6597), since v6.0)
+
+### Internals
+* Go back to using Visual Studio 2017
+
+----------------------------------------------
+
+# 6.0.17 Release notes
+
+### Fixed
+* None
+ 
+-----------
+
+### Internals
+* Workaround for compiler bug in Visual Studio 2019
+
+----------------------------------------------
+
+# 6.0.16 Release notes
+
+### Enhancements
+* Upgrade logic changed so that progress is recorded explicitly in a table. This makes the logic simpler and reduces the chance of errors. It will also make it easier to see if we receive a partly upgraded file from a costumer.
+
+### Fixed
+* If a realm needs upgrade during opening, the program might abort in the "migrate_links" stage. ([#6680](https://github.com/realm/realm-cocoa/issues/6680), since v6.0.0)
+ 
+-----------
+
+### Internals
+* Using Visual Studio 2019 for Windows builds.
+
+----------------------------------------------
+
+# 6.0.15 Release notes
+
+### Fixed
+* Fix bug in memory mapping management. This bug could result in multiple different asserts as well as segfaults. In many cases stack backtraces would include members of the EncyptedFileMapping near the top - even if encryption was not used at all. In other cases asserts or crashes would be in methods reading an array header or array element. In all cases the application would terminate immediately. ([#3838](https://github.com/realm/realm-core/pull/3838), since v6)
+
+----------------------------------------------
+
+# 6.0.14 Release notes
+
+### Fixed
+* Fix missing `Lst` symbols when the library is built as a shared library with LTO. ([Cocoa #6625](https://github.com/realm/realm-cocoa/issues/6625), since v6.0.0).
+
+----------------------------------------------
+
+# 6.0.13 Release notes
+
+### Enhancements
+* Add support for the 64-bit watchOS simulator.
+
+----------------------------------------------
+
+# 6.0.12 Release notes
+
+### Fixed
+* Fix upgrade bug. Could cause assertions like "Assertion failed: ref != 0" during opning of a realm. ([#6644](https://github.com/realm/realm-cocoa/issues/6644), since V6.0.7)
+* A use-after-free would occur if a Realm was compacted, opened on multiple threads prior to the first write, then written to while reads were happening on other threads. This could result in a variety of crashes, often inside realm::util::EncryptedFileMapping::read_barrier. (Since v6.0.0, [Cocoa #6652](https://github.com/realm/realm-cocoa/issues/6652), [Cocoa #6628](https://github.com/realm/realm-cocoa/issues/6628), [Cocoa #6655](https://github.com/realm/realm-cocoa/issues/6555)).
+
+----------------------------------------------
+
+# 6.0.11 Release notes
+
+### Fixed
+* Table::create_object_with_primary_key(null) would hit an assertion failure when the primary key type is a string and the object already existed.
 
 ----------------------------------------------
 

@@ -82,16 +82,20 @@ TEST(File_IsSame)
 {
     TEST_PATH(path_1);
     TEST_PATH(path_2);
-    {
-        File f1(path_1, File::mode_Write);
-        File f2(path_1, File::mode_Read);
-        File f3(path_2, File::mode_Write);
 
-        CHECK(f1.is_same_file(f1));
-        CHECK(f1.is_same_file(f2));
-        CHECK(!f1.is_same_file(f3));
-        CHECK(!f2.is_same_file(f3));
-    }
+    // exFAT does not allocate inode numbers until the file is first non-empty,
+    // so all never-written-to files appear to be the same file
+    File(path_1, File::mode_Write).resize(1);
+    File(path_2, File::mode_Write).resize(1);
+
+    File f1(path_1, File::mode_Append);
+    File f2(path_1, File::mode_Read);
+    File f3(path_2, File::mode_Append);
+
+    CHECK(f1.is_same_file(f1));
+    CHECK(f1.is_same_file(f2));
+    CHECK(!f1.is_same_file(f3));
+    CHECK(!f2.is_same_file(f3));
 }
 
 
@@ -504,6 +508,10 @@ TEST(File_GetUniqueID)
     file1_1.open(path_1, File::mode_Write);
     file1_2.open(path_1, File::mode_Read);
     file2_1.open(path_2, File::mode_Write);
+
+    // exFAT does not allocate inode numbers until the file is first non-empty
+    file1_1.resize(1);
+    file2_1.resize(1);
 
     File::UniqueID uid1_1 = file1_1.get_unique_id();
     File::UniqueID uid1_2 = file1_2.get_unique_id();

@@ -34,7 +34,7 @@ TEST(ObjectId_Basics)
     ObjectId id1(t0, 0xff0000, 0xefbe);
     CHECK_EQUAL(id1.to_string().substr(0, 18), init_str.substr(0, 18));
     CHECK_EQUAL(id1.get_timestamp(), t0);
-    ObjectId id2(Timestamp(0x54321, 0));
+    ObjectId id2(Timestamp(0x54321, 0), 0, 0);
     CHECK_GREATER(id2, id1);
     CHECK_LESS(id1, id2);
 
@@ -193,12 +193,12 @@ TEST(ObjectId_PrimaryKey)
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
     Timestamp now{std::chrono::steady_clock::now()};
-    ObjectId id{now};
+    ObjectId id{now, 0, 0};
     ObjKey key;
     {
         auto wt = db->start_write();
         auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
-        table->create_object_with_primary_key(ObjectId(now));
+        table->create_object_with_primary_key(ObjectId(now, 0, 0));
         key = table->create_object_with_primary_key(id).get_key();
         wt->commit();
     }
@@ -267,7 +267,7 @@ TEST(ObjectId_Query)
         target->create_objects(16, target_keys);
 
         for (int i = 0; i < 1000; i++) {
-            ObjectId id{now + std::chrono::seconds(i / 20)};
+            ObjectId id{now + std::chrono::seconds(i / 20), 0, 0};
             if (i == 0)
                 t0 = id;
             if (i == 25)
@@ -329,6 +329,74 @@ TEST(ObjectId_Query)
     }
 }
 
+TEST_TYPES(ObjectId_QueryTimestamp, std::true_type, std::false_type)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    std::vector<Timestamp> times = {{0, 0}, {1, 0}, {2, 0}, {3, 1}, {4, 1}, {5, 2}};
+
+    {
+        auto wt = db->start_write();
+        constexpr bool nullable_oid = TEST_TYPE::value;
+        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "oid", nullable_oid);
+        auto col_ts = table->add_column(type_Timestamp, "ts");
+
+        for (size_t i = 0; i < times.size(); ++i) {
+            auto obj = table->create_object_with_primary_key(ObjectId(times[i], 0, 0));
+            obj.set(col_ts, times[i]);
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        auto col = table->get_primary_key_column();
+        auto col_ts = table->get_column_key("ts");
+
+        for (size_t i = 0; i < times.size(); ++i) {
+            // none are equal because a newly generated ObjectID also has atomically increasing bits
+            CHECK_EQUAL((table->column<ObjectId>(col) == ObjectId(times[i], 0, 0)).count(), 0);
+
+            // only equal if nanoseconds are zero, because ObjectId only stores seconds
+            const size_t num_equal = times[i].get_nanoseconds() == 0 ? 1 : 0;
+            // test timestamps are stored ascending
+            const size_t num_greater = times.size() - i - 1;
+            // test timestamps are stored ascending and account for nanoseconds in last 3 values
+            const size_t num_less = i + (i >= 3 ? 1 : 0);
+
+            // oid column vs timestamp value
+            CHECK_EQUAL((table->column<ObjectId>(col) == times[i]).count(), num_equal);
+            CHECK_EQUAL((table->column<ObjectId>(col) != times[i]).count(), times.size() - num_equal);
+            CHECK_EQUAL((table->column<ObjectId>(col) > times[i]).count(), num_greater);
+            CHECK_EQUAL((table->column<ObjectId>(col) < times[i]).count(), num_less);
+            CHECK_EQUAL((table->column<ObjectId>(col) >= times[i]).count(), num_equal + num_greater);
+            CHECK_EQUAL((table->column<ObjectId>(col) <= times[i]).count(), num_equal + num_less);
+            // timestamp value vs oid column
+            CHECK_EQUAL((times[i] == table->column<ObjectId>(col)).count(), num_equal);
+            CHECK_EQUAL((times[i] != table->column<ObjectId>(col)).count(), times.size() - num_equal);
+            CHECK_EQUAL((times[i] > table->column<ObjectId>(col)).count(), num_less);
+            CHECK_EQUAL((times[i] < table->column<ObjectId>(col)).count(), num_greater);
+            CHECK_EQUAL((times[i] >= table->column<ObjectId>(col)).count(), num_equal + num_less);
+            CHECK_EQUAL((times[i] <= table->column<ObjectId>(col)).count(), num_equal + num_greater);
+        }
+        // oid column vs ts column
+        CHECK_EQUAL((table->column<ObjectId>(col) == table->column<Timestamp>(col_ts)).count(), 3);
+        CHECK_EQUAL((table->column<ObjectId>(col) != table->column<Timestamp>(col_ts)).count(), 3);
+        CHECK_EQUAL((table->column<ObjectId>(col) > table->column<Timestamp>(col_ts)).count(), 0);
+        CHECK_EQUAL((table->column<ObjectId>(col) < table->column<Timestamp>(col_ts)).count(), 3);
+        CHECK_EQUAL((table->column<ObjectId>(col) >= table->column<Timestamp>(col_ts)).count(), 3);
+        CHECK_EQUAL((table->column<ObjectId>(col) <= table->column<Timestamp>(col_ts)).count(), times.size());
+        // ts column vs oid column
+        CHECK_EQUAL((table->column<Timestamp>(col_ts) == table->column<ObjectId>(col)).count(), 3);
+        CHECK_EQUAL((table->column<Timestamp>(col_ts) != table->column<ObjectId>(col)).count(), 3);
+        CHECK_EQUAL((table->column<Timestamp>(col_ts) > table->column<ObjectId>(col)).count(), 3);
+        CHECK_EQUAL((table->column<Timestamp>(col_ts) < table->column<ObjectId>(col)).count(), 0);
+        CHECK_EQUAL((table->column<Timestamp>(col_ts) >= table->column<ObjectId>(col)).count(), times.size());
+        CHECK_EQUAL((table->column<Timestamp>(col_ts) <= table->column<ObjectId>(col)).count(), 3);
+    }
+}
+
+
 TEST(ObjectId_Distinct)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -342,7 +410,6 @@ TEST(ObjectId_Distinct)
         for (int i = 1; i < 10; i++) {
             auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
         }
-
         wt->commit();
     }
     {
@@ -355,6 +422,7 @@ TEST(ObjectId_Distinct)
         CHECK_EQUAL(tv.size(), 3);
     }
 }
+
 
 TEST(ObjectId_Gen)
 {

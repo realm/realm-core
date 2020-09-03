@@ -169,9 +169,28 @@ semVerRegex = re.compile(r"[v\.\-]")
 def splitTagSemVer(tag):
     return list(filter(None, semVerRegex.split(tag)))
 
+# if the string is a number, return it. Otherwise convert
+# the string to a numeric value that sorts alphabetically
+# Assumes characters have a max value of 255.
+# This function should produce values so that tags are sorted as follows:
+# v0.9       -> 0, 9, 0
+# v1.0-alpha -> 1, 0, -670576722593
+# v1.0-beta  -> 1, 0, -2628935152
+# v1.0       -> 1, 0, 0
+# v1.0-10    -> 1, 0, 10
+def numericValueOf(s):
+    try:
+        return int(s)
+    except ValueError:
+        accumulate = 0
+        ts = s[:min(7, len(s))] # more than 7 can overflow 64 bits
+        for (ndx, char) in enumerate(reversed(ts)):
+            accumulate -= (255 - (ord(ts[ndx]))) * pow(255, ndx)
+        return accumulate
+
 orderingColumns = ['versionMajor', 'versionMinor', 'versionPatch', 'versionExtra', 'versionExtra2', 'versionExtra3']
 def addVersionColumns(data):
-    types = {'names': list(orderingColumns), 'formats': ['int32', 'int32', 'int32', 'U100', 'int32', 'int32']}
+    types = {'names': list(orderingColumns), 'formats': ['int32', 'int32', 'int32', 'int32', 'int32', 'int32']}
     for element in data.dtype.descr:
         types['names'].append(element[0])
         types['formats'].append(element[1])
@@ -182,17 +201,17 @@ def addVersionColumns(data):
     for row in space:
         try:
             splits = splitTagSemVer(row['tag'])
-            row['versionMajor'] = int(splits[0])
-            row['versionMinor'] = int(splits[1])
-            row['versionPatch'] = int(splits[2])
+            row['versionMajor'] = numericValueOf(splits[0])
+            row['versionMinor'] = numericValueOf(splits[1])
+            row['versionPatch'] = numericValueOf(splits[2])
             if len(splits) >= 4:
-                row['versionExtra'] = splits[3]
+                row['versionExtra'] = numericValueOf(splits[3])
             if len(splits) >= 5:
-                row['versionExtra2'] = int(splits[4])
+                row['versionExtra2'] = numericValueOf(splits[4])
             if len(splits) >= 6:
-                row['versionExtra3'] = int(splits[5])
+                row['versionExtra3'] = numericValueOf(splits[5])
         except Exception as e:
-            print("parse error while processing semver of " + str(row['tag']) + str(e))
+            print("parse error while processing semver of " + str(row['tag']) + ": " + str(e))
     return space
 
 def generateStats(outputDirectory, statsfiles):
