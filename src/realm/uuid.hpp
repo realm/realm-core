@@ -31,6 +31,11 @@ public:
     UUID(const char* init) noexcept;
     /// Constructs a null UUID
     UUID() noexcept;
+    UUID(const null&)
+    noexcept
+        : UUID()
+    {
+    }
 
     bool operator==(const UUID& other) const
     {

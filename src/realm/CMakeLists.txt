@@ -16,6 +16,7 @@ set(REALM_SOURCES
     array_mixed.cpp
     array_object_id.cpp
     array_unsigned.cpp
+    array_uuid.cpp
     array_string.cpp
     array_string_short.cpp
     array_timestamp.cpp
@@ -124,6 +125,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_string_short.hpp
     array_timestamp.hpp
     array_unsigned.hpp
+    array_uuid.hpp
     binary_data.hpp
     bplustree.hpp
     chunked_binary.hpp

@@ -19,9 +19,9 @@
 #include <realm.hpp>
 #include <realm/uuid.hpp>
 #include <chrono>
+#include <realm/array_uuid.hpp>
 
 #include "test.hpp"
-
 
 using namespace realm;
 
@@ -128,153 +128,121 @@ TEST(UUID_toAndFromString)
     CHECK_NOT_EQUAL(UUID(s4), UUID(s5));
 }
 
-/*
-TEST(ObjectId_Array)
+TEST(UUID_Array)
 {
-    const char str0[] = "0000012300000000009218a4";
-    const char str1[] = "000004560000000000170232";
-    const char str2[] = "0000078900000000002999f3";
+    const char str0[] = "3b241101-e2bb-4255-8caf-4136c566a960";
+    const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
+    const char str2[] = "3b241101-e2bb-4255-8caf-4136c566a962";
 
-    ArrayObjectId arr(Allocator::get_default());
+    ArrayUUID arr(Allocator::get_default());
     arr.create();
 
+    CHECK_EQUAL(arr.size(), 0);
     arr.add({str0});
+    CHECK_EQUAL(arr.size(), 1);
+    CHECK_EQUAL(arr.get(0), UUID(str0));
     arr.add({str1});
     arr.insert(1, {str2});
+    CHECK_EQUAL(arr.size(), 3);
 
-    ObjectId id2(str2);
-    CHECK_EQUAL(arr.get(0), ObjectId(str0));
+    UUID id2(str2);
+    CHECK_EQUAL(arr.get(0), UUID(str0));
     CHECK_EQUAL(arr.get(1), id2);
-    CHECK_EQUAL(arr.get(2), ObjectId(str1));
+    CHECK_EQUAL(arr.get(2), UUID(str1));
     CHECK_EQUAL(arr.find_first(id2), 1);
 
     arr.erase(1);
-    CHECK_EQUAL(arr.get(1), ObjectId(str1));
+    CHECK_EQUAL(arr.get(1), UUID(str1));
+    CHECK_EQUAL(arr.size(), 2);
 
-    ArrayObjectId arr1(Allocator::get_default());
+    ArrayUUID arr1(Allocator::get_default());
     arr1.create();
     arr.move(arr1, 1);
 
     CHECK_EQUAL(arr.size(), 1);
     CHECK_EQUAL(arr1.size(), 1);
-    CHECK_EQUAL(arr1.get(0), ObjectId(str1));
+    CHECK_EQUAL(arr1.get(0), UUID(str1));
 
     arr.destroy();
     arr1.destroy();
 }
 
-TEST(ObjectId_ArrayNull)
-{
-    const char str0[] = "0000012300000000009218a4";
-    const char str1[] = "DEADDEADDEADDEADDEADDEAD";
-    const char str2[] = "0000078900000000002999f3";
 
-    ArrayObjectIdNull arr(Allocator::get_default());
+TEST(UUID_ArrayNull)
+{
+    const char str0[] = "3b241101-e2bb-4255-8caf-4136c566a960";
+    const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
+    const char str2[] = "3b241101-e2bb-4255-8caf-4136c566a962";
+
+    ArrayUUID arr(Allocator::get_default());
     arr.create();
 
     arr.add({str0});
     arr.add({str1});
     arr.insert(1, {str2});
-    ObjectId id2(str2);
+    UUID id2(str2);
     CHECK(!arr.is_null(0));
-    CHECK_EQUAL(arr.get(0), ObjectId(str0));
+    CHECK_EQUAL(arr.get(0), UUID(str0));
     CHECK(!arr.is_null(1));
     CHECK_EQUAL(arr.get(1), id2);
     CHECK(!arr.is_null(2));
-    CHECK_EQUAL(arr.get(2), ObjectId(str1));
+    CHECK_EQUAL(arr.get(2), UUID(str1));
     CHECK_EQUAL(arr.find_first(id2), 1);
-    CHECK_EQUAL(arr.find_first_null(), npos);
+    CHECK_EQUAL(arr.find_first(UUID()), npos);
 
-    arr.add(util::none);
-    CHECK_EQUAL(arr.find_first_null(0), 3);
-    CHECK_EQUAL(arr.find_first_null(1), 3);
-    CHECK_EQUAL(arr.find_first_null(2), 3);
-    CHECK_EQUAL(arr.find_first_null(3), 3);
-    CHECK_EQUAL(arr.find_first_null(0, 3), npos);
-    CHECK_EQUAL(arr.find_first_null(3, 3), npos);
-    CHECK_EQUAL(arr.find_first_null(4), npos);
+    arr.add(UUID());
+    CHECK_EQUAL(arr.find_first(null(), 0), 3);
+    CHECK_EQUAL(arr.find_first(null(), 1), 3);
+    CHECK_EQUAL(arr.find_first(null(), 2), 3);
+    CHECK_EQUAL(arr.find_first(null(), 3), 3);
+    CHECK_EQUAL(arr.find_first(null(), 0, 3), npos);
+    CHECK_EQUAL(arr.find_first(null(), 3, 3), npos);
+    CHECK_EQUAL(arr.find_first(null(), 4), npos);
 
     arr.erase(1);
-    CHECK_EQUAL(arr.get(1), ObjectId(str1));
-    ArrayObjectIdNull arr1(Allocator::get_default());
+    CHECK_EQUAL(arr.get(1), UUID(str1));
+    ArrayUUID arr1(Allocator::get_default());
     arr1.create();
     arr.move(arr1, 1);
 
     CHECK_EQUAL(arr.size(), 1);
     CHECK_EQUAL(arr1.size(), 2);
-    CHECK_EQUAL(arr1.get(0), ObjectId(str1));
+    CHECK_EQUAL(arr1.get(0), UUID(str1));
     CHECK(!arr1.is_null(0));
     CHECK(arr1.is_null(1));
-    CHECK_EQUAL(arr1.find_first_null(0), 1);
+    CHECK_EQUAL(arr1.find_first(null(), 0), 1);
 
     arr.destroy();
     arr1.destroy();
 }
 
-// This should exhaustively test all cases of ArrayObjectIdNull::find_first_null.
-TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
-{
-    // Test is O(2^N * N^2) in terms of this, so don't go too high...
-    // 17 should be enough to cover all cases, including a middle block that is neither first nor last.
-    const auto MaxSize = 17;
 
-    for (int size = 0; size <= MaxSize; size++) {
-        ArrayObjectIdNull arr(Allocator::get_default());
-        arr.create();
-        for (int i = 0; i < size; i++) {
-            arr.add(util::none);
-        }
-
-        for (unsigned mask = 0; mask < (1u << size); mask++) {
-            // Set nulls to match mask.
-            for (int i = 0; i < size; i++) {
-                if (mask & (1 << i)) {
-                    arr.set(i, util::none);
-                }
-                else {
-                    arr.set(i, ObjectId());
-                }
-            }
-
-            for (int begin = 0; begin <= size; begin++) {
-                for (int end = begin; end <= size; end++) {
-                    auto adjusted_mask = (mask & ~(unsigned(-1) << end)) >> begin;
-                    const size_t expected = adjusted_mask ? begin + ctz(adjusted_mask) : npos;
-                    CHECK_EQUAL(arr.find_first_null(begin, end), expected);
-                }
-            }
-        }
-
-        arr.destroy();
-    }
-}
-
-TEST(ObjectId_Table)
+ONLY(ObjectId_Table)
 {
     const char str0[] = "0000012300000000009218a4";
     const char str1[] = "000004560000000000170232";
 
     Table t;
-    auto col_id = t.add_column(type_ObjectId, "id");
-    auto col_id_null = t.add_column(type_ObjectId, "id_null", true);
-    auto obj0 = t.create_object().set(col_id, ObjectId(str0));
-    auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
+    auto col_id = t.add_column(type_UUID, "id");
+    auto col_id_null = t.add_column(type_UUID, "id_null", true);
+    auto obj0 = t.create_object().set(col_id, UUID(str0));
+    auto obj1 = t.create_object().set(col_id, UUID(str1)).set(col_id_null, UUID(str1));
     auto obj2 = t.create_object();
-    CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
-    CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
+    CHECK_EQUAL(obj0.get<UUID>(col_id), UUID(str0));
+    CHECK_EQUAL(obj1.get<UUID>(col_id), UUID(str1));
     CHECK_NOT(obj2.is_null(col_id));
     CHECK(obj2.is_null(col_id_null));
-    auto id = obj1.get<util::Optional<ObjectId>>(col_id_null);
-    CHECK(id);
-    id = obj2.get<util::Optional<ObjectId>>(col_id_null);
-    CHECK_NOT(id);
-    auto key = t.find_first(col_id, ObjectId(str1));
+    auto id = obj1.get<UUID>(col_id_null);
+    CHECK(!id.is_null());
+    id = obj2.get<UUID>(col_id_null);
+    CHECK_NOT(id.is_null());
+    auto key = t.find_first(col_id, UUID(str1));
     CHECK_EQUAL(key, obj1.get_key());
     t.add_search_index(col_id);
-    key = t.find_first(col_id, ObjectId(str1));
+    key = t.find_first(col_id, UUID(str1));
     CHECK_EQUAL(key, obj1.get_key());
 }
-
+/*
 TEST(ObjectId_PrimaryKey)
 {
     SHARED_GROUP_TEST_PATH(path);
