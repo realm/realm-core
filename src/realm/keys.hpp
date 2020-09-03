@@ -125,7 +125,7 @@ struct ColKey {
     {
         return get_attrs().test(col_attr_Set);
     }
-    bool is_dictionary()
+    bool is_dictionary() const
     {
         return get_attrs().test(col_attr_Dictionary);
     }
