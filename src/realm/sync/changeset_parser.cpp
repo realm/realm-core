@@ -422,7 +422,6 @@ void ChangesetParser::State::parse_one()
             Instruction::SetInsert instr;
             read_path_instr(instr);
             instr.value = read_payload();
-            instr.prior_size = read_int<uint32_t>();
             m_handler(instr);
             return;
         }
@@ -430,7 +429,6 @@ void ChangesetParser::State::parse_one()
             Instruction::SetErase instr;
             read_path_instr(instr);
             instr.value = read_payload();
-            instr.prior_size = read_int<uint32_t>();
             m_handler(instr);
             return;
         }

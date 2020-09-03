@@ -528,14 +528,31 @@ void SyncReplication::list_clear(const CollectionBase& view)
 
 void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed value)
 {
-    size_t prior_size = set.size();
     TrivialReplication::set_insert(set, set_ndx, value);
 
     if (select_collection(set)) {
         Instruction::SetInsert instr;
         populate_path_instr(instr, set);
         instr.value = as_payload(set, value);
-        instr.prior_size = uint32_t(prior_size);
+        emit(instr);
+    }
+}
+
+void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
+{
+    if (select_collection(set)) {
+        Instruction::SetErase instr;
+        populate_path_instr(instr, set);
+        instr.value = as_payload(set, value);
+        emit(instr);
+    }
+}
+
+void SyncReplication::set_clear(const CollectionBase& set)
+{
+    if (select_collection(set)) {
+        Instruction::SetClear instr;
+        populate_path_instr(instr, set);
         emit(instr);
     }
 }
@@ -552,28 +569,6 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
         instr.path.push_back(m_encoder.intern_string(key_value));
         instr.value = as_payload(dict, val);
         instr.is_default = false;
-        emit(instr);
-    }
-}
-
-void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
-{
-    size_t prior_size = set.size();
-
-    if (select_collection(set)) {
-        Instruction::SetErase instr;
-        populate_path_instr(instr, set);
-        instr.value = as_payload(set, value);
-        instr.prior_size = uint32_t(prior_size);
-        emit(instr);
-    }
-}
-
-void SyncReplication::set_clear(const CollectionBase& set)
-{
-    if (select_collection(set)) {
-        Instruction::SetClear instr;
-        populate_path_instr(instr, set);
         emit(instr);
     }
 }

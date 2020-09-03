@@ -604,22 +604,20 @@ struct ArrayClear : PathInstruction {
 struct SetInsert : PathInstruction {
     using PathInstruction::PathInstruction;
     Payload value;
-    uint32_t prior_size;
 
     bool operator==(const SetInsert& rhs) const noexcept
     {
-        return PathInstruction::operator==(rhs) && value == rhs.value && prior_size == rhs.prior_size;
+        return PathInstruction::operator==(rhs) && value == rhs.value;
     }
 };
 
 struct SetErase : PathInstruction {
     using PathInstruction::PathInstruction;
     Payload value;
-    uint32_t prior_size;
 
     bool operator==(const SetErase& rhs) const noexcept
     {
-        return PathInstruction::operator==(rhs) && value == rhs.value && prior_size == rhs.prior_size;
+        return PathInstruction::operator==(rhs) && value == rhs.value;
     }
 };
 
