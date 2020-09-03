@@ -469,9 +469,9 @@ struct AddColumn : TableInstruction {
 
     InternString field;
 
-    // `none` for Mixed columns. Mixed columns are always nullable.
+    // `Type::Null` for Mixed columns. Mixed columns are always nullable.
     Payload::Type type;
-    // `none` for other than dictionary columns
+    // `Type::Null` for other than dictionary columns
     Payload::Type key_type;
 
     bool nullable;
