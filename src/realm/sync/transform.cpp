@@ -1648,13 +1648,21 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
+
         // CONFLICT: Update of a removed element.
         //
         // RESOLUTION: Discard the UPDATE operation received on the right side.
-        right_side.discard();
-    }
-    else if (right.index() > left.index()) {
-        right.index() -= 1;
+        right.prior_size -= 1;
+
+        if (left.index() == right.index()) {
+            // CONFLICT: Update of a removed element.
+            //
+            // RESOLUTION: Discard the UPDATE operation received on the right side.
+            right_side.discard();
+        }
+        else if (right.index() > left.index()) {
+            right.index() -= 1;
+        }
     }
 }
 
