@@ -438,7 +438,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 break;
             }
             case CollectionType::Set: {
-                REALM_ASSERT(false); // TODO: implement
+                table->add_column_set(type, col_name, instr.nullable);
                 break;
             }
         }
