@@ -37,6 +37,8 @@ public:
 
     virtual void insert_null() = 0;
     virtual void erase_null() = 0;
+    virtual void insert_any(Mixed value) = 0;
+    virtual void erase_any(Mixed value) = 0;
     virtual void clear() = 0;
 
 protected:
@@ -77,6 +79,8 @@ public:
     // Overriding members of SetBase:
     void insert_null() override;
     void erase_null() override;
+    void insert_any(Mixed value) override;
+    void erase_any(Mixed value) override;
     void clear() override;
 
 private:
@@ -289,6 +293,22 @@ size_t Set<T>::insert(T value)
 }
 
 template <class T>
+void Set<T>::insert_any(Mixed value)
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        insert(value);
+    }
+    else {
+        if (value.is_null()) {
+            insert_null();
+        }
+        else {
+            insert(value.get<typename util::RemoveOptional<T>::type>());
+        }
+    }
+}
+
+template <class T>
 size_t Set<T>::erase(T value)
 {
     REALM_ASSERT_DEBUG(!update_if_needed());
@@ -309,6 +329,22 @@ size_t Set<T>::erase(T value)
     CollectionBase::adj_remove(it.index());
     CollectionBase::m_obj.bump_content_version();
     return it.index();
+}
+
+template <class T>
+void Set<T>::erase_any(Mixed value)
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        erase(value);
+    }
+    else {
+        if (value.is_null()) {
+            erase_null();
+        }
+        else {
+            erase(value.get<typename util::RemoveOptional<T>::type>());
+        }
+    }
 }
 
 template <class T>
