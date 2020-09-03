@@ -177,9 +177,9 @@ jobWrapper {
                             unstash name: cocoaStash
                         }
                         sh 'tools/build-cocoa.sh -x'
-                        archiveArtifacts('realm-core-cocoa*.tar.xz')
+                        archiveArtifacts('realm-*-cocoa*.tar.xz')
                         def stashName = 'cocoa'
-                        stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
+                        stash includes: 'realm-*-cocoa*.tar.xz', name: stashName
                         publishingStashes << stashName
                     }
                 },
