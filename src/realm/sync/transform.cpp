@@ -926,6 +926,55 @@ struct MergeUtils {
         return left_key == right_key;
     }
 
+    bool same_payload(const Instruction::Payload& left, const Instruction::Payload& right)
+    {
+        using Type = Instruction::Payload::Type;
+
+        if (left.type != right.type)
+            return false;
+
+        switch (left.type) {
+            case Type::Null:
+                return true;
+            case Type::Erased:
+                return true;
+            case Type::Dictionary:
+                return true;
+            case Type::ObjectValue:
+                return true;
+            case Type::GlobalKey:
+                return left.data.key == right.data.key;
+            case Type::Int:
+                return left.data.integer == right.data.integer;
+            case Type::Bool:
+                return left.data.boolean == right.data.boolean;
+            case Type::String:
+                return m_left_side.get_string(left.data.str) == m_right_side.get_string(right.data.str);
+            case Type::Binary:
+                return m_left_side.get_string(left.data.binary) == m_right_side.get_string(right.data.binary);
+            case Type::Timestamp:
+                return left.data.timestamp == right.data.timestamp;
+            case Type::Float:
+                return left.data.fnum == right.data.fnum;
+            case Type::Double:
+                return left.data.dnum == right.data.dnum;
+            case Type::Decimal:
+                return left.data.decimal == right.data.decimal;
+            case Type::Link: {
+                if (!same_key(left.data.link.target, right.data.link.target)) {
+                    return false;
+                }
+                auto left_target = m_left_side.get_string(left.data.link.target_table);
+                auto right_target = m_right_side.get_string(right.data.link.target_table);
+                return left_target == right_target;
+            }
+            case Type::ObjectId:
+                return left.data.object_id == right.data.object_id;
+        }
+
+        REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");
+    }
+
     bool same_path_element(const Instruction::Path::Element& left,
                            const Instruction::Path::Element& right) const noexcept
     {
@@ -2122,8 +2171,6 @@ DEFINE_NESTED_MERGE_NOOP(Instruction::SetInsert);
 DEFINE_MERGE(Instruction::SetInsert, Instruction::SetInsert)
 {
     if (same_path(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-
         // CONFLICT: Two inserts into the same set.
         //
         // RESOLUTION: If the values are the same, discard the insertion with the lower timestamp. Otherwise,
@@ -2132,17 +2179,13 @@ DEFINE_MERGE(Instruction::SetInsert, Instruction::SetInsert)
         // NOTE: Set insertion is idempotent. Keeping the instruction with the higher timestamp is necessary
         // because we want to maintain associativity in the case where intermittent erases (as ordered by
         // timestamp) arrive at a later point in time.
-        if (left.value == right.value) {
+        if (same_payload(left.value, right.value)) {
             if (left_side.timestamp() < right_side.timestamp()) {
                 left_side.discard();
             }
             else {
                 right_side.discard();
             }
-        }
-        else {
-            ++left.prior_size;
-            ++right.prior_size;
         }
     }
 }
@@ -2150,8 +2193,6 @@ DEFINE_MERGE(Instruction::SetInsert, Instruction::SetInsert)
 DEFINE_MERGE(Instruction::SetErase, Instruction::SetInsert)
 {
     if (same_path(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-
         // CONFLICT: Insertion and erase in the same set.
         //
         // RESOLUTION: If the inserted/erased values are the same, discard the instruction with the lower
@@ -2159,17 +2200,13 @@ DEFINE_MERGE(Instruction::SetErase, Instruction::SetInsert)
         //
         // Note: Set insertion and erase are both idempotent. Keeping the instruction with the higher
         // timestamp is necessary because we want to maintain associativity.
-        if (left.value == right.value) {
+        if (same_payload(left.value, right.value)) {
             if (left_side.timestamp() < right_side.timestamp()) {
                 left_side.discard();
             }
             else {
                 right_side.discard();
             }
-        }
-        else {
-            ++left.prior_size;
-            --right.prior_size;
         }
     }
 }
@@ -2193,8 +2230,6 @@ DEFINE_NESTED_MERGE_NOOP(Instruction::SetErase);
 DEFINE_MERGE(Instruction::SetErase, Instruction::SetErase)
 {
     if (same_path(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-
         // CONFLICT: Two erases in the same set.
         //
         // RESOLUTION: If the values are the same, discard the instruction with the lower timestamp.
@@ -2206,10 +2241,6 @@ DEFINE_MERGE(Instruction::SetErase, Instruction::SetErase)
             else {
                 right_side.discard();
             }
-        }
-        else {
-            --left.prior_size;
-            --right.prior_size;
         }
     }
 }
