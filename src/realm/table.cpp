@@ -353,11 +353,13 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
-ColKey Table::add_column_set(DataType type, StringData name)
+ColKey Table::add_column_set(DataType type, StringData name, bool nullable)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Set);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
