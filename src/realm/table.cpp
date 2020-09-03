@@ -887,7 +887,7 @@ bool Table::verify_column_keys()
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns
-void Table::migrate_indexes(ColKey pk_col_key)
+void Table::migrate_indexes()
 {
     if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
         Array col_refs(m_alloc);
@@ -909,15 +909,12 @@ void Table::migrate_indexes(ColKey pk_col_key)
                     Array::destroy_deep(old_index_ref, m_alloc);
                 }
 
-                // Tables with string primary key does not need an index
-                if (m_leaf_ndx2colkey[col_ndx] != pk_col_key || pk_col_key.get_type() != col_type_String) {
-                    // Otherwise create new index. Will be updated when objects are created
-                    StringIndex* index =
-                        new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
-                    m_index_accessors[col_ndx] = index;
-                    index->set_parent(&m_index_refs, col_ndx);
-                    m_index_refs.set(col_ndx, index->get_ref());
-                }
+                // Create new index. Will be updated when objects are created
+                StringIndex* index =
+                    new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
+                m_index_accessors[col_ndx] = index;
+                index->set_parent(&m_index_refs, col_ndx);
+                m_index_refs.set(col_ndx, index->get_ref());
             }
             col_ndx++;
         };

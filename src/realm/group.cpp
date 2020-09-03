@@ -440,14 +440,14 @@ void Transaction::upgrade_file_format(int target_file_format_version)
 
             if (pk_table) {
                 pk_table->migrate_column_info();
-                pk_table->migrate_indexes(ColKey());
+                pk_table->migrate_indexes();
                 pk_table->create_columns();
                 pk_table->migrate_objects(ColKey());
                 pk_cols = get_primary_key_columns_from_pk_table(pk_table);
             }
 
             for (auto k : table_accessors) {
-                k->migrate_indexes(pk_cols[k]);
+                k->migrate_indexes();
             }
             for (auto k : table_accessors) {
                 k->migrate_subspec();

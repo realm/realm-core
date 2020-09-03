@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key (Many issues since 6.0.7)
  
 ### Breaking changes
 * None.

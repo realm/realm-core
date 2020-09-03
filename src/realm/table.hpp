@@ -701,7 +701,7 @@ private:
     // Migration support
     void migrate_column_info();
     bool verify_column_keys();
-    void migrate_indexes(ColKey pk_col_key);
+    void migrate_indexes();
     void migrate_subspec();
     void create_columns();
     bool migrate_objects(ColKey pk_col_key); // Returns true if there are no links to migrate
