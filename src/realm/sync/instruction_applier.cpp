@@ -670,7 +670,62 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 {
     auto callback = util::overloaded{
         [&](SetBase& set) {
-            REALM_TERMINATE("Not implemented yet.");
+            auto col = set.get_col_key();
+            auto data_type = DataType(col.get_type());
+            auto table = set.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
+
+            auto inserter = util::overloaded{
+                [&](const ObjLink& link) {
+                    if (data_type == type_TypedLink) {
+                        auto& link_set = static_cast<Set<ObjLink>&>(set);
+                        link_set.insert(link);
+                    }
+                    else if (data_type == type_Mixed) {
+                        auto& mixed_set = static_cast<Set<Mixed>&>(set);
+                        mixed_set.insert(link);
+                    }
+                    else if (data_type == type_Link) {
+                        auto& link_set = static_cast<Set<ObjKey>&>(set);
+                        // Validate the target.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("SetInsert: Target table mismatch (expected '%1', got '%2')",
+                                                target_table->get_name(), table_name);
+                        }
+                        link_set.insert(link.get_obj_key());
+                    }
+                    else {
+                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected link type, was %3)",
+                                            field_name, table_name, data_type);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null() && !col.is_nullable()) {
+                        bad_transaction_log("SetInsert: NULL in non-nullable set '%2.%1'", field_name, table_name);
+                    }
+
+                    if (data_type == type_Mixed || value.get_type() == data_type) {
+                        set.insert_any(value);
+                    }
+                    else {
+                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected %3, got %4)",
+                                            field_name, table_name, data_type, value.get_type());
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    bad_transaction_log("SetInsert: Sets of embedded objects are not supported.");
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    bad_transaction_log("SetInsert: Sets of dictionaries are not supported.");
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
+                },
+            };
+
+            visit_payload(instr.value, inserter);
         },
         [&](auto&&...) {
             bad_transaction_log("Invalid path for SetInsert");
@@ -684,7 +739,62 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 {
     auto callback = util::overloaded{
         [&](SetBase& set) {
-            REALM_TERMINATE("Not implemented yet.");
+            auto col = set.get_col_key();
+            auto data_type = DataType(col.get_type());
+            auto table = set.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
+
+            auto inserter = util::overloaded{
+                [&](const ObjLink& link) {
+                    if (data_type == type_TypedLink) {
+                        auto& link_set = static_cast<Set<ObjLink>&>(set);
+                        link_set.erase(link);
+                    }
+                    else if (data_type == type_Mixed) {
+                        auto& mixed_set = static_cast<Set<Mixed>&>(set);
+                        mixed_set.erase(link);
+                    }
+                    else if (data_type == type_Link) {
+                        auto& link_set = static_cast<Set<ObjKey>&>(set);
+                        // Validate the target.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("SetInsert: Target table mismatch (expected '%1', got '%2')",
+                                                target_table->get_name(), table_name);
+                        }
+                        link_set.erase(link.get_obj_key());
+                    }
+                    else {
+                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected link type, was %3)",
+                                            field_name, table_name, data_type);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null() && !col.is_nullable()) {
+                        bad_transaction_log("SetInsert: NULL in non-nullable set '%2.%1'", field_name, table_name);
+                    }
+
+                    if (data_type == type_Mixed || value.get_type() == data_type) {
+                        set.erase_any(value);
+                    }
+                    else {
+                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected %3, got %4)",
+                                            field_name, table_name, data_type, value.get_type());
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    bad_transaction_log("SetInsert: Sets of embedded objects are not supported.");
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    bad_transaction_log("SetInsert: Sets of dictionaries are not supported.");
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
+                },
+            };
+
+            visit_payload(instr.value, inserter);
         },
         [&](auto&&...) {
             bad_transaction_log("Invalid path for SetErase");
