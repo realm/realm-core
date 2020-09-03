@@ -35,6 +35,7 @@ public:
     void set_notify_callback(std::function<void()>) override;
 
     bool is_on_thread() const noexcept override;
+    bool is_same_as(const Scheduler* other) const noexcept override;
     bool can_deliver_notifications() const noexcept override;
 
 private:
@@ -107,6 +108,12 @@ bool RunLoopScheduler::is_on_thread() const noexcept
     return CFRunLoopGetCurrent() == m_runloop;
 }
 
+bool RunLoopScheduler::is_same_as(const Scheduler* other) const noexcept
+{
+    auto o = dynamic_cast<const RunLoopScheduler*>(other);
+    return (o && (o->m_runloop == m_runloop));
+}
+
 bool RunLoopScheduler::can_deliver_notifications() const noexcept
 {
     // The main thread may not be in a run loop yet if we're called from
@@ -133,6 +140,7 @@ public:
     void set_notify_callback(std::function<void()>) override;
 
     bool is_on_thread() const noexcept override;
+    bool is_same_as(const Scheduler* other) const noexcept override;
     bool can_deliver_notifications() const noexcept override { return true; }
 
 private:
@@ -182,6 +190,13 @@ bool DispatchQueueScheduler::is_on_thread() const noexcept
 {
     return dispatch_get_specific(c_queue_key) == m_queue;
 }
+
+bool DispatchQueueScheduler::is_same_as(const Scheduler* other) const noexcept
+{
+    auto o = dynamic_cast<const DispatchQueueScheduler*>(other);
+    return (o && (o->m_queue == m_queue));
+}
+
 } // anonymous namespace
 
 namespace realm {

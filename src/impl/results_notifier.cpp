@@ -85,6 +85,8 @@ bool ResultsNotifier::get_tableview(TableView& out)
     if (!m_delivered_tv)
         return false;
     auto& transaction = source_shared_group();
+    if (transaction.get_transact_stage() != DB::transact_Reading)
+        return false;
     if (m_delivered_transaction->get_version_of_current_transaction() != transaction.get_version_of_current_transaction())
         return false;
 

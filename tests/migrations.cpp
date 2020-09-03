@@ -1804,6 +1804,7 @@ TEST_CASE("migration: Additive") {
 
     TestFile config;
     config.schema_mode = SchemaMode::Additive;
+    config.cache = false;
     config.schema = schema;
     auto realm = Realm::get_shared_realm(config);
     realm->update_schema(schema);

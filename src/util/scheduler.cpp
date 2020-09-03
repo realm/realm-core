@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "util/scheduler.hpp"
+#include <realm/version_id.hpp>
 
 #if REALM_USE_UV
 #include "util/uv/scheduler.hpp"
@@ -33,21 +34,33 @@ using namespace realm;
 
 class FrozenScheduler : public util::Scheduler {
 public:
+    FrozenScheduler(VersionID version)
+    : m_version(version)
+    { }
+
     void notify() override {}
     void set_notify_callback(std::function<void()>) override {}
     bool is_on_thread() const noexcept override { return true; }
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        auto o = dynamic_cast<const FrozenScheduler*>(other);
+        return (o && (o->m_version == m_version));
+    }
     bool can_deliver_notifications() const noexcept override { return false; }
+
+private:
+    VersionID m_version;
 };
 } // anonymous namespace
 
 namespace realm {
 namespace util {
+
 Scheduler::~Scheduler() = default;
 
-std::shared_ptr<Scheduler> Scheduler::get_frozen()
+std::shared_ptr<Scheduler> Scheduler::get_frozen(VersionID version)
 {
-    static auto s_shared = std::make_shared<FrozenScheduler>();
-    return s_shared;
+    return std::make_shared<FrozenScheduler>(version);
 }
 } // namespace util
 } // namespace realm

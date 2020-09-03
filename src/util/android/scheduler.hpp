@@ -115,6 +115,11 @@ public:
     {
         return m_thread == pthread_self();
     }
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        auto o = dynamic_cast<const ALooperScheduler*>(other);
+        return (o && (o->m_thread == m_thread));
+    }
 
 private:
     std::function<void()> m_callback;

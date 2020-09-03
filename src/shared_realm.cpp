@@ -143,6 +143,8 @@ SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<uti
     REALM_ASSERT(realm);
     auto& config = realm->config();
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    if (auto realm = coordinator->get_cached_realm(config, scheduler))
+        return realm;
     realm->m_scheduler = scheduler;
     coordinator->bind_to_context(*realm);
     return realm;
@@ -873,8 +875,9 @@ bool Realm::is_frozen() const
 SharedRealm Realm::freeze()
 {
     auto config = m_config;
-    config.scheduler = util::Scheduler::get_frozen();
-    return Realm::get_frozen_realm(std::move(config), read_transaction_version());
+    auto version = read_transaction_version();
+    config.scheduler = util::Scheduler::get_frozen(version);
+    return Realm::get_frozen_realm(std::move(config), version);
 }
 
 void Realm::close()

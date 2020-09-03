@@ -72,6 +72,7 @@ TEST_CASE("thread safe reference") {
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.cache = false;
     SharedRealm r = Realm::get_shared_realm(config);
     r->update_schema(schema);
 
@@ -488,7 +489,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get<int64_t>(2) == 2);
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
-                config.scheduler = util::Scheduler::get_frozen();
+                config.scheduler = util::Scheduler::get_frozen(VersionID());
                 SharedRealm r = Realm::get_shared_realm(config);
                 Results results = ref.resolve<Results>(r);
 
@@ -540,7 +541,7 @@ TEST_CASE("thread safe reference") {
 
             auto ref = ThreadSafeReference(results);
             std::thread([ref = std::move(ref), config]() mutable {
-                config.scheduler = util::Scheduler::get_frozen();
+                config.scheduler = util::Scheduler::get_frozen(VersionID());
                 SharedRealm r = Realm::get_shared_realm(config);
                 Results results = ref.resolve<Results>(r);
 

@@ -20,6 +20,7 @@
 #define REALM_OS_UTIL_SCHEDULER
 
 #include <realm/util/features.h>
+#include <realm/version_id.hpp>
 
 #include <functional>
 #include <memory>
@@ -58,6 +59,11 @@ public:
     // This function can be called from any thread.
     virtual bool is_on_thread() const noexcept = 0;
 
+    // Checks if this scheduler instance wraps the same underlying instance.
+    // This is up to the platforms to define, but if this method returns true,
+    // caching may occur.
+    virtual bool is_same_as(const Scheduler* other) const noexcept = 0;
+
     // Check if this scehduler actually can support notify(). Notify may be
     // either not implemented, not applicable to a scheduler type, or simply not
     // be possible currently (e.g. if the associated event loop is not actually
@@ -72,7 +78,7 @@ public:
 
     // Get the scheduler for frozen Realms. This scheduler does not support
     // notifications and does not perform any thread checking.
-    static std::shared_ptr<Scheduler> get_frozen();
+    static std::shared_ptr<Scheduler> get_frozen(VersionID version);
 
     // Create a new instance of the default scheduler for the current platform.
     // This normally will be a thread-confined scheduler using the current

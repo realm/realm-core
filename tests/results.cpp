@@ -131,7 +131,7 @@ TEST_CASE("notifications: async delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -767,6 +767,7 @@ TEST_CASE("notifications: skip") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -803,7 +804,7 @@ TEST_CASE("notifications: skip") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1039,7 +1040,7 @@ TEST_CASE("notifications: TableView delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1105,12 +1106,43 @@ TEST_CASE("notifications: TableView delivery") {
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("TV can be delivered in a write transaction") {
-        make_remote_change();
-        advance_and_notify(*r);
-        r->begin_transaction();
-        REQUIRE(results.size() == 11);
-        r->cancel_transaction();
+    SECTION("TV can't be delivered in a write transaction") {
+        SECTION("no changes") {
+            make_remote_change();
+            advance_and_notify(*r);
+            r->begin_transaction();
+            REQUIRE(results.size() == 0);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates disabled") {
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 10);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates enabled") {
+            // Use a new Results because AsyncOnly leaves the Results in a
+            // weird state and switching back to Auto doesn't work.
+            Results results(r, table->where());
+            results.evaluate_query_if_needed();
+            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 12);
+            r->cancel_transaction();
+        }
     }
 
     SECTION("unused background TVs do not pin old versions forever") {
@@ -1129,6 +1161,7 @@ TEST_CASE("notifications: async error handling") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1335,6 +1368,7 @@ TEST_CASE("notifications: sync") {
     SyncServer server(false);
     TestSyncManager init_sync_manager(server);
     SyncTestFile config(init_sync_manager.app(), "test");
+    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
@@ -1378,6 +1412,7 @@ TEST_CASE("notifications: results") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2025,6 +2060,7 @@ TEST_CASE("results: notifier with no callbacks") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -2045,7 +2081,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2124,6 +2160,7 @@ TEST_CASE("results: error messages") {
 
 TEST_CASE("results: snapshots") {
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object", {
@@ -2451,6 +2488,7 @@ TEST_CASE("results: snapshots") {
 TEST_CASE("results: distinct") {
     const int N = 10;
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2662,6 +2700,7 @@ TEST_CASE("results: distinct") {
 
 TEST_CASE("results: sort") {
     InMemoryTestFile config;
+    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
