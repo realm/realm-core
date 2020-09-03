@@ -130,6 +130,7 @@ private:
     // Migration
     bool convert_column_attributes();
     bool convert_column_keys(TableKey table_key);
+    void fix_column_keys(TableKey table_key);
     bool has_subspec()
     {
         return m_oldsubspecs.is_attached();
@@ -145,7 +146,7 @@ private:
 
 
     // Generate a column key only from state in the spec.
-    ColKey generate_converted_colkey(size_t column_ndx, TableKey table_key);
+    ColKey update_colkey(ColKey existing_key, size_t spec_ndx, TableKey table_key);
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
     static MemRef create_empty_spec(Allocator&);

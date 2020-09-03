@@ -74,9 +74,9 @@ public:
     //@{
     /// The five callback functions below are called whenever a full message has arrived.
     /// The Socket defragments fragmented messages internally and delivers a full message.
-    /// The message is delivered in the buffer \param data of size \param size.
+    /// \param data size The message is delivered in this buffer
     /// The buffer is only valid until the function returns.
-    /// The return value designates whether the WebSocket object should continue
+    /// \return value designates whether the WebSocket object should continue
     /// processing messages. The normal return value is true. False must be returned if the
     /// websocket object is destroyed during execution of the function.
     virtual bool websocket_text_message_received(const char* data, size_t size);
@@ -132,9 +132,11 @@ public:
     /// The handler is type std::function<void()> and is called when the frame has been successfully
     /// sent. In case of errors, the Config::websocket_write_error_handler() is called.
 
-    /// async_write_frame() sends a single frame with the fin bit set to 0 or 1 from \param fin, and the opcode
-    /// set by \param opcode. The frame payload is taken from \param data of size \param size. \param handler is
-    /// called when the frame has been successfully sent. Error s are reported through
+    /// async_write_frame() sends a single frame with this content:
+    /// \param fin The fin bit set to 0 or 1
+    /// \param opcode Specifies the opcpde.
+    /// \param data size The frame payload is taken from this buffer.
+    /// \param handler Called when the frame has been successfully sent. Error s are reported through
     /// websocket_write_error_handler() in Config.
     /// This function is rather low level and should only be used with knowledge of the WebSocket protocol.
     /// The five utility functions below are recommended for message sending.
