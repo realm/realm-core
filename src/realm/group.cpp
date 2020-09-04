@@ -316,7 +316,7 @@ int Group::get_target_file_format_version_for_session(int /* current_file_format
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    return 10;
+    return 11;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -374,7 +374,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 10, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 11, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -382,7 +382,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when SharedGroup::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 9,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
                     current_file_format_version);
 
 
@@ -504,6 +504,22 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         }
         remove_table(progress_info->get_key());
     }
+    if (current_file_format_version == 10 && target_file_format_version >= 11 &&
+        get_replication()->get_history_type() == Replication::HistoryType::hist_SyncClient) {
+        // If the file is version 10, then we have to check for missing search index on
+        // string primary key columns. If index is not present, we will try to deduce the
+        // ObjKey from the primary key value by hashing. This will often fail as we use a
+        // different hashing function than was used in core-5. So we add the index here.
+        auto table_keys = get_table_keys();
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                if (col.get_type() == col_type_String) {
+                    t->add_search_index(col);
+                }
+            }
+        }
+    }
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -523,7 +539,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 10:
+        case 11:
             file_format_ok = true;
             break;
     }

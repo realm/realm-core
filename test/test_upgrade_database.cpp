@@ -1722,6 +1722,7 @@ TEST(Upgrade_FixColumnKeys)
 /*
 TEST(Upgrade_bug)
 {
+    // ReplSyncClient repl_sync_client("/home/joergen/default.realm", 10, 16);
     auto hist = make_in_realm_history("/home/joergen/default.realm");
     DB::create(*hist)->start_read()->verify();
 }
