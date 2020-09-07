@@ -97,10 +97,17 @@ TEST(Decimal_Arithmetics)
     CHECK_EQUAL(q.to_string(), "30");
     q = d + Decimal128(-20);
     CHECK_EQUAL(q.to_string(), "-10");
+    q = Decimal128(20);
+    q += d;
+    CHECK_EQUAL(q.to_string(), "30");
+
     q = d - Decimal128(15);
     CHECK_EQUAL(q.to_string(), "-5");
     q = d - Decimal128(-15);
     CHECK_EQUAL(q.to_string(), "25");
+    q = Decimal128(20);
+    q -= d;
+    CHECK_EQUAL(q.to_string(), "10");
 
     q = d / int(4);
     CHECK_EQUAL(q.to_string(), "2.5");
@@ -112,6 +119,9 @@ TEST(Decimal_Arithmetics)
     CHECK_EQUAL(q.to_string(), "-2.5");
     q = d / int64_t(-4);
     CHECK_EQUAL(q.to_string(), "-2.5");
+    q = Decimal128(20);
+    q /= d;
+    CHECK_EQUAL(q.to_string(), "2");
 
     q = d * int(4);
     CHECK_EQUAL(q.to_string(), "40");
@@ -123,6 +133,9 @@ TEST(Decimal_Arithmetics)
     CHECK_EQUAL(q.to_string(), "-40");
     q = d * int64_t(-6);
     CHECK_EQUAL(q.to_string(), "-60");
+    q = Decimal128(20);
+    q *= d;
+    CHECK_EQUAL(q.to_string(), "200");
 }
 
 TEST(Decimal_Array)
