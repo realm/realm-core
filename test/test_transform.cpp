@@ -16,6 +16,7 @@
 #include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/object.hpp>
 
@@ -1945,6 +1946,66 @@ TEST(Transform_Dictionary)
         CHECK_EQUAL(dict1.size(), 2);
         CHECK_EQUAL(dict1.get("a"), 456);
         CHECK_EQUAL(dict1.get("b"), 789.f);
+    });
+}
+
+TEST(Transform_Set)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    Associativity assoc{test_context, 2, changeset_dump_dir_gen.get()};
+    assoc.for_each_permutation([&](auto& it) {
+        auto server = &*it.server;
+        auto client_1 = &*it.clients[0];
+        auto client_2 = &*it.clients[1];
+
+        // Create baseline
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+            table->add_column_set(type_Mixed, "set");
+            table->create_object_with_primary_key(0);
+        });
+
+        it.sync_all();
+
+        // Populate set on both sides.
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj = table->get_object_with_primary_key(0);
+            auto set = obj.get_set<Mixed>("set");
+            set.insert(999);
+            set.insert("Hello");
+            set.insert(123.f);
+        });
+        client_2->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj = table->get_object_with_primary_key(0);
+            auto set = obj.get_set<Mixed>("set");
+            set.insert(999);
+            set.insert("World");
+            set.insert(456.f);
+
+            // Erase an element from the set. Since client_2 has higher peer ID,
+            // it should win the conflict.
+            set.erase(999);
+            set.insert(999);
+            set.erase(999);
+        });
+
+        it.sync_all();
+
+        ReadTransaction rt{server->shared_group};
+        auto table = rt.get_table("class_Table");
+        auto obj = table->get_object_with_primary_key(0);
+        auto set = obj.get_set<Mixed>("set");
+        CHECK_EQUAL(set.size(), 4);
+        CHECK_NOT_EQUAL(set.find("Hello"), realm::npos);
+        CHECK_NOT_EQUAL(set.find(123.f), realm::npos);
+        CHECK_NOT_EQUAL(set.find("World"), realm::npos);
+        CHECK_NOT_EQUAL(set.find(456.f), realm::npos);
+        CHECK_EQUAL(set.find(999), realm::npos);
     });
 }
 
