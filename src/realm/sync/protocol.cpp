@@ -29,6 +29,9 @@ namespace sync {
 
 const char* get_protocol_error_message(int error_code) noexcept
 {
+    // FIXME: These human-readable messages are phrased from the perspective of the client, but they may occur on the
+    // server side as well.
+
     switch (ProtocolError(error_code)) {
         case ProtocolError::connection_closed:
             return "Connection closed (no error)";
@@ -43,21 +46,24 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::wrong_protocol_version:
             return "Wrong protocol version (CLIENT)";
         case ProtocolError::bad_session_ident:
-            return "Bad session identifier in input message";
+            return "The server has forgotten about this session (Bad session identifier in input message). "
+                   "Restart the client to resume synchronization";
         case ProtocolError::reuse_of_session_ident:
-            return "Overlapping reuse of session identifier (BIND)";
+            return "An existing synchronization session exists with this session identifier (Overlapping reuse of "
+                   "session identifier (BIND)).";
         case ProtocolError::bound_in_other_session:
-            return "Client file bound in other session (IDENT)";
+            return "An existing synchronization session exists for this client-side file (Client file bound in other "
+                   "session (IDENT))";
         case ProtocolError::bad_message_order:
             return "Bad input message order";
         case ProtocolError::bad_decompression:
-            return "Bad decompression of message";
+            return "The server sent an invalid DOWNLOAD message (Bad decompression of message)";
         case ProtocolError::bad_changeset_header_syntax:
-            return "Bad changeset header syntax";
+            return "The server sent an invalid DOWNLOAD message (Bad changeset header syntax)";
         case ProtocolError::bad_changeset_size:
-            return "Bad changeset size";
+            return "The server sent an invalid DOWNLOAD message (Bad changeset size)";
         case ProtocolError::bad_changesets:
-            return "Bad changesets";
+            return "The server sent an invalid DOWNLOAD message (Bad changeset)";
 
         case ProtocolError::session_closed:
             return "Session closed (no error)";
@@ -74,37 +80,46 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::permission_denied:
             return "Permission denied (BIND, REFRESH)";
         case ProtocolError::bad_server_file_ident:
-            return "Bad server file identifier (IDENT)";
+            return "The server sent an obsolete error code (Bad server file identifier (IDENT))";
         case ProtocolError::bad_client_file_ident:
-            return "Bad client file identifier (IDENT)";
+            return "The server has forgotten about this client-side file (Bad client file identifier (IDENT)). "
+                   "Please wipe the file on the client to resume synchronization";
         case ProtocolError::bad_server_version:
-            return "Bad server version (IDENT, UPLOAD)";
+            return "The client is ahead of the server (Bad server version (IDENT, UPLOAD)). Please wipe the file on "
+                   "the client to resume synchronization";
         case ProtocolError::bad_client_version:
-            return "Bad client version (IDENT, UPLOAD)";
+            return "The server claimed to have received changesets from this client that the client has not produced "
+                   "yet (Bad client version (IDENT, UPLOAD)). Please wipe the file on the client to resume "
+                   "synchronization";
         case ProtocolError::diverging_histories:
-            return "Diverging histories (IDENT)";
+            return "The client and server disagree about the history (Diverging histories (IDENT)). Please wipe the "
+                   "file on the client to resume synchronization";
         case ProtocolError::bad_changeset:
-            return "Bad changeset (UPLOAD)";
+            return "The server sent a changeset that could not be integrated (Bad changeset (UPLOAD)). This is "
+                   "likely due to corruption of the client-side file. Please restore the file on the client by "
+                   "wiping it and resuming synchronization";
         case ProtocolError::superseded:
-            return "Superseded by new session for same client-side file";
+            return "The server sent an obsolete error code (Superseded by new session for same client-side file)";
         case ProtocolError::partial_sync_disabled:
-            return "Partial sync disabled";
+            return "Query-based sync is disabled";
         case ProtocolError::unsupported_session_feature:
             return "Unsupported session-level feature";
         case ProtocolError::bad_origin_file_ident:
-            return "Bad origin file identifier (UPLOAD)";
+            return "The server sent an obsolete error code (Bad origin file identifier (UPLOAD))";
         case ProtocolError::bad_client_file:
-            return "Synchronization no longer possible for client-side file";
+            return "Synchronization no longer possible for client-side file. Please wipe the file on the client to "
+                   "resume synchronization";
         case ProtocolError::server_file_deleted:
-            return "Server file was deleted while session was bound to it";
+            return "Server file was deleted while a session was bound to it";
         case ProtocolError::client_file_blacklisted:
             return "Client file has been blacklisted (IDENT)";
         case ProtocolError::user_blacklisted:
             return "User has been blacklisted (BIND)";
         case ProtocolError::transact_before_upload:
-            return "Serialized transaction before upload completion";
+            return "The server sent an obsolete error code (Serialized transaction before upload completion)";
         case ProtocolError::client_file_expired:
-            return "Client file has expired";
+            return "Client file has expired due to log compaction. Please wipe the file on the client to resume "
+                   "synchronization";
         case ProtocolError::user_mismatch:
             return "User mismatch for client file identifier (IDENT)";
         case ProtocolError::too_many_sessions:

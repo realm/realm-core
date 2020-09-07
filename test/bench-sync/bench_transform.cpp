@@ -201,6 +201,8 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
 
 const int max_lead_text_width = 40;
 
+#define RUN_ALL_BENCHMARKS 0
+
 TEST(BenchMerge1000x1000Instructions)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_1000x1000";
@@ -217,7 +219,7 @@ TEST(BenchMerge2000x2000Instructions)
     bench::transform_instructions<2000>(test_context, results);
 }
 
-TEST(BenchMerge3000x3000Instructions)
+TEST_IF(BenchMerge3000x3000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_3000x3000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -233,7 +235,7 @@ TEST(BenchMerge4000x4000Instructions)
     bench::transform_instructions<4000>(test_context, results);
 }
 
-TEST(BenchMerge5000x5000Instructions)
+TEST_IF(BenchMerge5000x5000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_5000x5000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -241,7 +243,15 @@ TEST(BenchMerge5000x5000Instructions)
     bench::transform_instructions<5000>(test_context, results);
 }
 
-TEST(BenchMerge10000x10000Instructions)
+TEST(BenchMerge8000x8000Instructions)
+{
+    std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_8000x8000";
+    BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
+
+    bench::transform_instructions<8000>(test_context, results);
+}
+
+TEST_IF(BenchMerge10000x10000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_10000x10000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -249,7 +259,7 @@ TEST(BenchMerge10000x10000Instructions)
     bench::transform_instructions<10000>(test_context, results);
 }
 
-TEST(BenchMerge11000x11000Instructions)
+TEST_IF(BenchMerge11000x11000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_11000x11000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -257,7 +267,7 @@ TEST(BenchMerge11000x11000Instructions)
     bench::transform_instructions<11000>(test_context, results);
 }
 
-TEST(BenchMerge12000x12000Instructions)
+TEST_IF(BenchMerge12000x12000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_12000x12000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -265,7 +275,7 @@ TEST(BenchMerge12000x12000Instructions)
     bench::transform_instructions<12000>(test_context, results);
 }
 
-TEST(BenchMerge13000x13000Instructions)
+TEST_IF(BenchMerge13000x13000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_13000x13000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -273,7 +283,7 @@ TEST(BenchMerge13000x13000Instructions)
     bench::transform_instructions<13000>(test_context, results);
 }
 
-TEST(BenchMerge14000x14000Instructions)
+TEST_IF(BenchMerge14000x14000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_14000x14000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -281,7 +291,7 @@ TEST(BenchMerge14000x14000Instructions)
     bench::transform_instructions<14000>(test_context, results);
 }
 
-TEST(BenchMerge15000x15000Instructions)
+TEST_IF(BenchMerge15000x15000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_15000x15000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -297,7 +307,7 @@ TEST(BenchMerge16000x16000Instructions)
     bench::transform_instructions<16000>(test_context, results);
 }
 
-TEST(BenchMerge17000x17000Instructions)
+TEST_IF(BenchMerge17000x17000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_17000x17000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -305,7 +315,7 @@ TEST(BenchMerge17000x17000Instructions)
     bench::transform_instructions<17000>(test_context, results);
 }
 
-TEST(BenchMerge18000x18000Instructions)
+TEST_IF(BenchMerge18000x18000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_18000x18000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -313,7 +323,7 @@ TEST(BenchMerge18000x18000Instructions)
     bench::transform_instructions<18000>(test_context, results);
 }
 
-TEST(BenchMerge19000x19000Instructions)
+TEST_IF(BenchMerge19000x19000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_19000x19000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -321,7 +331,7 @@ TEST(BenchMerge19000x19000Instructions)
     bench::transform_instructions<19000>(test_context, results);
 }
 
-TEST(BenchMerge20000x20000Instructions)
+TEST_IF(BenchMerge20000x20000Instructions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "instructions_20000x20000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -362,13 +372,14 @@ TEST(BenchMerge2000x2000Transactions)
     bench::transform_transactions<2000>(test_context, results);
 }
 
-TEST(BenchMerge3000x3000Transactions)
+TEST_IF(BenchMerge3000x3000Transactions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "transactions_3000x3000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
 
     bench::transform_transactions<3000>(test_context, results);
 }
+
 
 TEST(BenchMerge4000x4000Transactions)
 {
@@ -378,7 +389,7 @@ TEST(BenchMerge4000x4000Transactions)
     bench::transform_transactions<4000>(test_context, results);
 }
 
-TEST(BenchMerge5000x5000Transactions)
+TEST_IF(BenchMerge5000x5000Transactions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "transactions_5000x5000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -386,7 +397,7 @@ TEST(BenchMerge5000x5000Transactions)
     bench::transform_transactions<5000>(test_context, results);
 }
 
-TEST(BenchMerge6000x6000Transactions)
+TEST_IF(BenchMerge6000x6000Transactions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "transactions_6000x6000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
@@ -394,13 +405,14 @@ TEST(BenchMerge6000x6000Transactions)
     bench::transform_transactions<6000>(test_context, results);
 }
 
-TEST(BenchMerge7000x7000Transactions)
+TEST_IF(BenchMerge7000x7000Transactions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "transactions_7000x7000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
 
     bench::transform_transactions<7000>(test_context, results);
 }
+
 
 TEST(BenchMerge8000x8000Transactions)
 {
@@ -410,12 +422,20 @@ TEST(BenchMerge8000x8000Transactions)
     bench::transform_transactions<8000>(test_context, results);
 }
 
-TEST(BenchMerge9000x9000Transactions)
+TEST_IF(BenchMerge9000x9000Transactions, RUN_ALL_BENCHMARKS)
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "transactions_9000x9000";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
 
     bench::transform_transactions<9000>(test_context, results);
+}
+
+TEST(BenchMerge16000x16000Transactions)
+{
+    std::string results_file_stem = test_util::get_test_path_prefix() + "transactions_16000x16000";
+    BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
+
+    bench::transform_transactions<16000>(test_context, results);
 }
 
 TEST(BenchMergeManyConnectedObjects)

@@ -61,8 +61,15 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
             }
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {
-            log("group.add_embedded_table(\"%1\");", table_name);
-            m_transaction.add_embedded_table(table_name);
+            if (TableRef table = m_transaction.get_table(table_name)) {
+                if (!table->is_embedded()) {
+                    bad_transaction_log("AddTable: The existing table '%1' is not embedded", table_name);
+                }
+            }
+            else {
+                log("group.add_embedded_table(\"%1\");", table_name);
+                m_transaction.add_embedded_table(table_name);
+            }
         },
     };
 
@@ -408,8 +415,35 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     auto table = get_table(instr, "AddColumn");
     auto col_name = get_string(instr.field);
 
-    if (table->get_column_key(col_name)) {
-        bad_transaction_log("AddColumn '%1.%3' which already exists", table->get_name(), col_name);
+    if (ColKey existing_key = table->get_column_key(col_name)) {
+        DataType new_type = get_data_type(instr.type);
+        if (existing_key.get_type() != ColumnType(new_type) &&
+            !(new_type == type_Link && existing_key.get_type() == col_type_LinkList)) {
+            bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (expected %3, got %4)",
+                                table->get_name(), col_name, existing_key.get_type(), new_type);
+        }
+        bool existing_is_list = existing_key.is_list();
+        if ((instr.collection_type == CollectionType::List) != existing_is_list) {
+            bad_transaction_log(
+                "AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a list, the other is%4)",
+                table->get_name(), col_name, existing_is_list ? "" : " not", existing_is_list ? " not" : "");
+        }
+        bool existing_is_dict = existing_key.is_dictionary();
+        if ((instr.collection_type == CollectionType::Dictionary) != existing_is_dict) {
+            bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (existing is%3 a "
+                                "dictionary, the other is%4)",
+                                table->get_name(), col_name, existing_is_dict ? "" : " not",
+                                existing_is_dict ? " not" : "");
+        }
+        if (new_type == type_Link) {
+            TableNameBuffer buffer;
+            auto target_table_name = class_name_to_table_name(get_string(instr.link_target_table), buffer);
+            if (target_table_name != table->get_link_target(existing_key)->get_name()) {
+                bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (link targets differ)",
+                                    table->get_name(), col_name);
+            }
+        }
+        return;
     }
 
     if (instr.collection_type == CollectionType::Dictionary && instr.key_type != Type::String) {
