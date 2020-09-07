@@ -68,6 +68,10 @@ public:
 
     int compare(const Decimal128& rhs) const;
 
+    Decimal128 operator*(int64_t mul) const;
+    Decimal128 operator*(size_t mul) const;
+    Decimal128 operator*(int mul) const;
+    Decimal128 operator*(Decimal128 mul) const;
     Decimal128 operator/(int64_t div) const;
     Decimal128 operator/(size_t div) const;
     Decimal128 operator/(int div) const;
@@ -77,6 +81,13 @@ public:
     {
         auto ret(*this);
         ret += rhs;
+        return ret;
+    }
+    Decimal128& operator-=(Decimal128);
+    Decimal128 operator-(Decimal128 rhs) const
+    {
+        auto ret(*this);
+        ret -= rhs;
         return ret;
     }
 

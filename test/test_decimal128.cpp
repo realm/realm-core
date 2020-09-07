@@ -88,19 +88,41 @@ TEST(Decimal_Basics)
     CHECK(d10 >= d);
 }
 
-TEST(Decimal_Aritmethics)
+TEST(Decimal_Arithmetics)
 {
     Decimal128 d(10);
-    auto q = d / 4;
-    CHECK_EQUAL(q.to_string(), "2.5");
+    Decimal128 q;
+
     q = d + Decimal128(20);
     CHECK_EQUAL(q.to_string(), "30");
     q = d + Decimal128(-20);
     CHECK_EQUAL(q.to_string(), "-10");
-    q = d / -4;
-    CHECK_EQUAL(q.to_string(), "-2.5");
+    q = d - Decimal128(15);
+    CHECK_EQUAL(q.to_string(), "-5");
+    q = d - Decimal128(-15);
+    CHECK_EQUAL(q.to_string(), "25");
+
+    q = d / int(4);
+    CHECK_EQUAL(q.to_string(), "2.5");
     q = d / size_t(4);
     CHECK_EQUAL(q.to_string(), "2.5");
+    q = d / int64_t(4);
+    CHECK_EQUAL(q.to_string(), "2.5");
+    q = d / int(-4);
+    CHECK_EQUAL(q.to_string(), "-2.5");
+    q = d / int64_t(-4);
+    CHECK_EQUAL(q.to_string(), "-2.5");
+
+    q = d * int(4);
+    CHECK_EQUAL(q.to_string(), "40");
+    q = d * size_t(5);
+    CHECK_EQUAL(q.to_string(), "50");
+    q = d * int64_t(6);
+    CHECK_EQUAL(q.to_string(), "60");
+    q = d * int(-4);
+    CHECK_EQUAL(q.to_string(), "-40");
+    q = d * int64_t(-6);
+    CHECK_EQUAL(q.to_string(), "-60");
 }
 
 TEST(Decimal_Array)
