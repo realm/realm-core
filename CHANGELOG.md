@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* File format bumped to 12.
 
 ----------------------------------------------
 
@@ -283,6 +283,18 @@ This release also contains the changes introduced by v6.0.4
 ### Internals
 * File format bumped to 11.
  
+----------------------------------------------
+
+# 6.0.24 Release notes
+
+### Fixed
+* Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 6.0.7)
+
+-----------
+
+### Internals
+* File format version bumped to 11.
+
 ----------------------------------------------
 
 # 6.0.23 Release notes
