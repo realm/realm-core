@@ -328,7 +328,6 @@ size_t Set<T>::erase(T value)
         this->erase_repl(repl, it.index(), value);
     }
     m_tree->erase(it.index());
-    CollectionBase::adj_remove(it.index());
     CollectionBase::m_obj.bump_content_version();
     return it.index();
 }
