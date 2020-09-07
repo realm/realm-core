@@ -989,6 +989,21 @@ void verify_list(ArrayRef& arr, size_t sz)
     }
 }
 
+template <typename SetType>
+void verify_set(ArrayRef& arr, size_t sz)
+{
+    for (size_t n = 0; n < sz; ++n) {
+        if (ref_type bp_tree_ref = arr.get(n)) {
+            BPlusTree<SetType> elements(arr.get_alloc());
+            elements.init_from_ref(bp_tree_ref);
+            elements.set_parent(&arr, n);
+            elements.verify();
+
+            // FIXME: Check uniqueness of elements.
+        }
+    }
+}
+
 } // namespace
 
 void Cluster::verify() const
@@ -1052,6 +1067,7 @@ void Cluster::verify() const
                     verify_list<ObjKey>(arr, *sz);
                     break;
                 default:
+                    // FIXME: Nullable primitives
                     break;
             }
             return false;
@@ -1074,6 +1090,59 @@ void Cluster::verify() const
                     cluster.init_from_parent();
                     cluster.verify();
                 }
+            }
+            return false;
+        }
+        else if (attr.test(col_attr_Set)) {
+            ArrayRef arr(get_alloc());
+            arr.set_parent(const_cast<Cluster*>(this), col);
+            arr.init_from_ref(ref);
+            arr.verify();
+            if (sz) {
+                REALM_ASSERT(arr.size() == *sz);
+            }
+            else {
+                sz = arr.size();
+            }
+            switch (col_type) {
+                case col_type_Int:
+                    if (nullable) {
+                        verify_set<util::Optional<int64_t>>(arr, *sz);
+                    }
+                    else {
+                        verify_set<int64_t>(arr, *sz);
+                    }
+                    break;
+                case col_type_Bool:
+                    verify_set<Bool>(arr, *sz);
+                    break;
+                case col_type_Float:
+                    verify_set<Float>(arr, *sz);
+                    break;
+                case col_type_Double:
+                    verify_set<Double>(arr, *sz);
+                    break;
+                case col_type_String:
+                    verify_set<String>(arr, *sz);
+                    break;
+                case col_type_Binary:
+                    verify_set<Binary>(arr, *sz);
+                    break;
+                case col_type_Timestamp:
+                    verify_set<Timestamp>(arr, *sz);
+                    break;
+                case col_type_Decimal:
+                    verify_set<Decimal128>(arr, *sz);
+                    break;
+                case col_type_ObjectId:
+                    verify_set<ObjectId>(arr, *sz);
+                    break;
+                case col_type_Link:
+                    verify_set<ObjKey>(arr, *sz);
+                    break;
+                default:
+                    // FIXME: Nullable primitives
+                    break;
             }
             return false;
         }
