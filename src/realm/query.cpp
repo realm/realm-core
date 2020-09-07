@@ -249,6 +249,11 @@ Query& Query::like(ColKey column_key, BinaryData b, bool case_sensitive)
 
 namespace {
 
+REALM_NOINLINE REALM_COLD REALM_NORETURN void throw_type_mismatch_error()
+{
+    throw LogicError{LogicError::type_mismatch};
+}
+
 template <class Node>
 struct MakeConditionNode {
     static std::unique_ptr<ParentNode> make(ColKey col_key, typename Node::TConditionValue value)
@@ -270,9 +275,9 @@ struct MakeConditionNode {
     }
 
     template <class T>
-    static std::unique_ptr<ParentNode> make(ColKey, T)
+    REALM_FORCEINLINE static std::unique_ptr<ParentNode> make(ColKey, T&&)
     {
-        throw LogicError{LogicError::type_mismatch};
+        throw_type_mismatch_error();
     }
 };
 
@@ -284,9 +289,9 @@ struct MakeConditionNode<IntegerNode<ArrayInteger, Cond>> {
     }
 
     template <class T>
-    static std::unique_ptr<ParentNode> make(ColKey, T)
+    REALM_FORCEINLINE static std::unique_ptr<ParentNode> make(ColKey, T&&)
     {
-        throw LogicError{LogicError::type_mismatch};
+        throw_type_mismatch_error();
     }
 };
 
@@ -303,9 +308,9 @@ struct MakeConditionNode<StringNode<Cond>> {
     }
 
     template <class T>
-    static std::unique_ptr<ParentNode> make(ColKey, T)
+    REALM_FORCEINLINE static std::unique_ptr<ParentNode> make(ColKey, T&&)
     {
-        throw LogicError{LogicError::type_mismatch};
+        throw_type_mismatch_error();
     }
 };
 
@@ -360,7 +365,7 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
             return MakeConditionNode<MixedNode<Cond>>::make(column_key, value);
         }
         default: {
-            throw LogicError{LogicError::type_mismatch};
+            throw_type_mismatch_error();
         }
     }
 }
@@ -398,7 +403,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
                 return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
             }
             default: {
-                throw LogicError{LogicError::type_mismatch};
+                throw_type_mismatch_error();
             }
         }
     }
@@ -410,7 +415,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
             return std::unique_ptr<ParentNode>{new SizeNode<BinaryData, Cond>(value, column_key)};
         }
         default: {
-            throw LogicError{LogicError::type_mismatch};
+            throw_type_mismatch_error();
         }
     }
 }
@@ -418,7 +423,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
 } // anonymous namespace
 
 template <typename TConditionFunction, class T>
-Query& Query::add_condition(ColKey column_key, T value)
+REALM_FORCEINLINE Query& Query::add_condition(ColKey column_key, T value)
 {
     auto node = make_condition_node<TConditionFunction>(*m_table, column_key, value);
     add_node(std::move(node));

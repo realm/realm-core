@@ -30,13 +30,13 @@ enum jsmnerr {
 
 /**
  * JSON token description.
- * @param       type    type (object, array, string etc.)
- * @param       start   start position in JSON data string
- * @param       end     end position in JSON data string
  */
 typedef struct {
+    /// type (object, array, string etc.)
     jsmntype_t type;
+    /// start position in JSON data string
     int start;
+    /// end position in JSON data string
     int end;
     int size;
 #ifdef JSMN_PARENT_LINKS

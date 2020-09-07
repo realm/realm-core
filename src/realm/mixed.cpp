@@ -23,6 +23,28 @@
 namespace realm {
 
 namespace _impl {
+
+static const int sorting_rank[18] = {
+    0, // null
+    0, // type_Int = 0,
+    0, // type_Bool = 1,
+    1, // type_String = 2,
+    -1,
+    1,  // type_Binary = 4,
+    -1, // type_OldTable = 5,
+    -1, // type_Mixed = 6,
+    -1, // type_OldDateTime = 7,
+    2,  // type_Timestamp = 8,
+    0,  // type_Float = 9,
+    0,  // type_Double = 10,
+    0,  // type_Decimal = 11,
+    3,  // type_Link = 12,
+    4,  // type_LinkList = 13,
+    -1,
+    5, // type_ObjectId = 15,
+    6, // type_TypedLink = 16
+};
+
 inline int compare_string(StringData a, StringData b)
 {
     if (a == b)
@@ -286,7 +308,9 @@ int Mixed::compare(const Mixed& b) const
 
     // Comparing types as a fallback option makes it possible to make a sort of a list of Mixed
     // This will also handle the case where null values are considered lower than all other values
-    return (m_type > b.m_type) ? 1 : -1;
+    REALM_ASSERT(_impl::sorting_rank[m_type] != _impl::sorting_rank[b.m_type]);
+    // Using rank table will ensure that all numeric values comes first
+    return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
 }
 
 size_t Mixed::hash() const

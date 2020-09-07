@@ -194,6 +194,28 @@ inline int only_numeric(const BinaryData&)
     return 0;
 }
 
+
+template <class T>
+inline int only_numeric(const realm::null&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template <class T>
+inline std::enable_if_t<std::is_same_v<T, Timestamp>, int> only_numeric(const ObjectId&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template <class T>
+inline std::enable_if_t<std::is_same_v<T, ObjectId>, int> only_numeric(const Timestamp&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
 template <class T>
 inline StringData only_string_op_types(T in)
 {
@@ -1379,8 +1401,7 @@ public:
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
     template <class D>
-    typename std::enable_if<std::is_convertible<T, D>::value>::type REALM_FORCEINLINE
-    export2(ValueBase& destination) const
+    REALM_FORCEINLINE std::enable_if_t<std::is_convertible<T, D>::value> export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
         d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
@@ -1393,8 +1414,45 @@ public:
         }
     }
 
+    template <class X, class Y>
+    static constexpr bool IsNullToObjectId = std::is_same<X, realm::null>::value&& std::is_same<Y, ObjectId>::value;
+
+    template <class X, class Y>
+    static constexpr bool IsObjectIdToTimestamp =
+        std::is_same<X, ObjectId>::value&& std::is_same<Y, Timestamp>::value;
+
+    // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
-    typename std::enable_if<!std::is_convertible<T, D>::value>::type REALM_FORCEINLINE export2(ValueBase&) const
+    REALM_FORCEINLINE std::enable_if_t<IsNullToObjectId<T, D>> export2(ValueBase& destination) const
+    {
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            d.m_storage.set_null(t);
+        }
+    }
+
+    // we specialize here because the conversion from ObjectId to Timestamp has been made explicit in order to catch
+    // wrong auto conversions
+    template <class D>
+    REALM_FORCEINLINE std::enable_if_t<IsObjectIdToTimestamp<T, D>> export2(ValueBase& destination) const
+    {
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            if (m_storage.is_null(t)) {
+                d.m_storage.set_null(t);
+            }
+            else {
+                d.m_storage.set(t, m_storage[t].get_timestamp());
+            }
+        }
+    }
+
+    template <class D>
+    REALM_FORCEINLINE
+        std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D> && !IsObjectIdToTimestamp<T, D>>
+        export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
         // performed at runtime but would result in a compiler error if we did not provide this implementation.
@@ -2416,12 +2474,11 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Value<T>& d = static_cast<Value<T>&>(destination);
-
         if (links_exist()) {
             REALM_ASSERT(m_leaf_ptr == nullptr);
 
             if (m_link_map.only_unary_links()) {
+                Value<T> d;
                 d.init(false, 1);
                 d.m_storage.set_null(0);
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
@@ -2440,9 +2497,11 @@ public:
                         d.m_storage.set(0, obj.get<T>(m_column_key));
                     }
                 }
+                destination.import(d);
             }
             else {
                 std::vector<ObjKey> links = m_link_map.get_links(index);
+                Value<T> d;
                 d.init(true, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
@@ -2459,19 +2518,22 @@ public:
                         d.m_storage.set(t, obj.get<T>(m_column_key));
                     }
                 }
+                destination.import(d);
             }
         }
         else {
             REALM_ASSERT(m_leaf_ptr != nullptr);
+            Value<T> d(false /*not from link list*/, destination.m_values);
             // Not a link column
             for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
                 if (m_leaf_ptr->is_null(index + t)) {
                     d.m_storage.set_null(t);
                 }
                 else {
-                    d.m_storage.set(t, m_leaf_ptr->get(index + t));
+                    d.m_storage.set(t, T(m_leaf_ptr->get(index + t)));
                 }
             }
+            destination.import(d);
         }
     }
 

@@ -801,6 +801,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
         File::CloseGuard fcg(m_file);
+        m_file.set_fifo_path(m_coordination_dir + "/lock.fifo");
 
         if (m_file.try_lock_exclusive()) { // Throws
             File::UnlockGuard ulg(m_file);
@@ -1159,7 +1160,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 info->number_of_versions = 1;
 
                 info->latest_version_number = version;
-                alloc.m_youngest_live_version = version;
+                alloc.init_mapping_management(version);
 
                 SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();
@@ -1231,6 +1232,11 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                 // See upgrade_file_format(). However we cannot get the actual value
                 // at this point as the allocator is not synchronized with the file.
                 // The value will be read in a ReadTransaction later.
+
+                // We need to setup the allocators version information, as it is needed
+                // to correctly age and later reclaim memory mappings.
+                version_type version = info->latest_version_number;
+                alloc.init_mapping_management(version);
             }
 
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
@@ -1443,6 +1449,10 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
+        // if we've written a file with a bumped version number, we need to update the lock file to match.
+        if (bump_version_number) {
+            ++info->latest_version_number;
+        }
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
@@ -1465,8 +1475,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         cfg.encryption_key = write_key;
         ref_type top_ref;
         top_ref = m_alloc.attach_file(m_db_path, cfg);
+        m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
-        // info->latest_version_number is unchanged
         SharedInfo* r_info = m_reader_map.get_addr();
         size_t file_size = m_alloc.get_baseline();
         r_info->init_versioning(top_ref, file_size, info->latest_version_number);
@@ -2304,7 +2314,7 @@ bool DB::call_with_lock(const std::string& realm_path, CallbackWithLock callback
     File lockfile;
     lockfile.open(lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
     File::CloseGuard fcg(lockfile);
-
+    lockfile.set_fifo_path(realm_path + ".management/lock.fifo");
     if (lockfile.try_lock_exclusive()) { // Throws
         callback(realm_path);
         return true;

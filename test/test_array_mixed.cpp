@@ -176,6 +176,7 @@ TEST(Mixed_SortNumeric)
     t.create_object().set(col_data, Mixed(Decimal128("129.85")));
     t.create_object().set(col_data, Mixed());
     t.create_object().set(col_data, Mixed(100));
+    t.create_object().set(col_data, Mixed("Hello"));
     t.create_object().set(col_data, Mixed(42));
     t.create_object().set(col_data, Mixed(0.001f));
     t.create_object().set(col_data, Mixed(-278987.9));
@@ -185,13 +186,13 @@ TEST(Mixed_SortNumeric)
 
     auto tv = t.where().find_all();
     auto sz = tv.size();
-    CHECK_EQUAL(tv.size(), 17);
+    CHECK_EQUAL(tv.size(), 18);
     tv.sort(col_data);
     std::ostringstream out;
     out.precision(8);
     std::string expected = "Mixed(null)\nMixed(-278987.9)\nMixed(-500)\nMixed(-258)\nMixed(false)\nMixed(0.001f)\n"
                            "Mixed(true)\nMixed(5)\nMixed(7.5f)\nMixed(34.8)\nMixed(42)\nMixed(42.125f)\nMixed(100)\n"
-                           "Mixed(129.85)\nMixed(256.25f)\nMixed(500)\nMixed(10000)\n";
+                           "Mixed(129.85)\nMixed(256.25f)\nMixed(500)\nMixed(10000)\nMixed(Hello)\n";
     for (size_t i = 0; i < sz; i++) {
         Mixed val = tv.get(i).get<Mixed>(col_data);
         out << val << std::endl;
@@ -211,6 +212,14 @@ TEST(Mixed_Compare)
     CHECK(Mixed("Hello") == Mixed(BinaryData("Hello")));
     CHECK(Mixed::types_are_comparable(Mixed(), Mixed()));
     CHECK(Mixed() == Mixed());
+    CHECK(Mixed(0.f) < Mixed(1));
+    CHECK(Mixed(1) < Mixed("a"));
+    CHECK(Mixed(0.f) < Mixed("a"));
+    CHECK(Mixed(10.0) < Mixed(BinaryData("b")));
+    CHECK(Mixed("a") < Mixed(BinaryData("b")));
+    CHECK(Mixed(BinaryData("b")) < Mixed("c"));
+    CHECK(Mixed("a") < Mixed(Timestamp(1, 2)));
+    CHECK(Mixed(Decimal128("25")) < Mixed(Timestamp(1, 2)));
 }
 
 #endif // TEST_ARRAY_VARIANT
