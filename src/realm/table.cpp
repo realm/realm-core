@@ -383,6 +383,24 @@ ColKey Table::add_column_list(Table& target, StringData name)
     return do_insert_column(col_key, type_LinkList, name, &target); // Throws
 }
 
+ColKey Table::add_column_set(Table& target, StringData name)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+    if (target.is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_Set);
+    ColKey col_key = generate_col_key(col_type_Link, attr);
+    return do_insert_column(col_key, type_Link, name, &target); // Throws
+}
+
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
 {
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
@@ -3222,8 +3240,8 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
-Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
-    noexcept
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
+                                                  StringData origin_col_name) const noexcept
 {
     BacklinkOrigin ret;
     auto f = [&](ColKey backlink_col_key) {

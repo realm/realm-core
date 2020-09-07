@@ -126,3 +126,80 @@ TEST(Set_Mixed)
     std::sort(begin(sorted2), end(sorted2));
     CHECK(sorted2 == sorted);
 }
+
+TEST(Set_Links)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    auto bars = g.add_table("class_Bar");
+    auto cabs = g.add_table("class_Cab");
+
+    ColKey col_links = foos->add_column_set(*bars, "links");
+    ColKey col_typed_links = foos->add_column_set(type_TypedLink, "typed_links");
+    ColKey col_mixeds = foos->add_column_set(type_Mixed, "mixeds");
+
+    auto foo = foos->create_object();
+
+    auto bar1 = bars->create_object();
+    auto bar2 = bars->create_object();
+    auto bar3 = bars->create_object();
+    auto bar4 = bars->create_object();
+
+    auto cab1 = cabs->create_object();
+    auto cab2 = cabs->create_object();
+    auto cab3 = cabs->create_object();
+
+    auto set_links = foo.get_set<ObjKey>(col_links);
+    auto set_typed_links = foo.get_set<ObjLink>(col_typed_links);
+    auto set_mixeds = foo.get_set<Mixed>(col_mixeds);
+
+    set_links.insert(bar1.get_key());
+    set_links.insert(bar2.get_key());
+    set_links.insert(bar3.get_key());
+    set_links.insert(bar1.get_key());
+    set_links.insert(bar2.get_key());
+    set_links.insert(bar3.get_key());
+
+    CHECK_EQUAL(set_links.size(), 3);
+    CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
+    CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);
+    CHECK_NOT_EQUAL(set_links.find(bar3.get_key()), realm::npos);
+    CHECK_EQUAL(set_links.find(bar4.get_key()), realm::npos);
+
+    set_typed_links.insert(bar1.get_link());
+    set_typed_links.insert(bar2.get_link());
+    set_typed_links.insert(cab1.get_link());
+    set_typed_links.insert(cab2.get_link());
+    CHECK_EQUAL(set_typed_links.size(), 4);
+
+    set_typed_links.insert(bar1.get_link());
+    CHECK_EQUAL(set_typed_links.size(), 4);
+    set_typed_links.insert(bar2.get_link());
+    CHECK_EQUAL(set_typed_links.size(), 4);
+    set_typed_links.insert(cab1.get_link());
+    CHECK_EQUAL(set_typed_links.size(), 4);
+    set_typed_links.insert(cab2.get_link());
+    CHECK_EQUAL(set_typed_links.size(), 4);
+
+    CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_typed_links.find(bar2.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_typed_links.find(cab1.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_typed_links.find(cab2.get_link()), realm::npos);
+    CHECK_EQUAL(set_typed_links.find(bar3.get_link()), realm::npos);
+
+    set_mixeds.insert(bar1.get_link());
+    set_mixeds.insert(bar2.get_link());
+    set_mixeds.insert(cab1.get_link());
+    set_mixeds.insert(cab2.get_link());
+    set_mixeds.insert(bar1.get_link());
+    set_mixeds.insert(bar2.get_link());
+    set_mixeds.insert(cab1.get_link());
+    set_mixeds.insert(cab2.get_link());
+
+    CHECK_EQUAL(set_mixeds.size(), 4);
+    CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_mixeds.find(bar2.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_mixeds.find(cab1.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_mixeds.find(cab2.get_link()), realm::npos);
+    CHECK_EQUAL(set_mixeds.find(bar3.get_link()), realm::npos);
+}

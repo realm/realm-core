@@ -60,8 +60,11 @@ inline void check_column_type<util::Optional<Int>>(ColKey col)
 template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
-    if (col && col.get_type() != col_type_LinkList) {
-        throw LogicError(LogicError::collection_type_mismatch);
+    if (col) {
+        bool is_link_list = (col.get_type() == col_type_LinkList);
+        bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
+        if (!(is_link_list || is_link_set))
+            throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
