@@ -808,7 +808,7 @@ void InstructionApplier::operator()(const Instruction::SetClear& instr)
 {
     auto callback = util::overloaded{
         [&](SetBase& set) {
-            REALM_TERMINATE("Not implemented yet.");
+            set.clear();
         },
         [&](auto&&...) {
             bad_transaction_log("Invalid path for SetClear");
