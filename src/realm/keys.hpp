@@ -286,11 +286,20 @@ public:
     }
     bool operator<(const ObjLink& rhs) const
     {
-        return m_table_key < rhs.m_table_key || m_obj_key < rhs.m_obj_key;
+        if (m_table_key < rhs.m_table_key) {
+            return true;
+        }
+        else if (m_table_key == rhs.m_table_key) {
+            return m_obj_key < rhs.m_obj_key;
+        }
+        else {
+            // m_table_key >= rhs.m_table_key
+            return false;
+        }
     }
     bool operator>(const ObjLink& rhs) const
     {
-        return m_table_key > rhs.m_table_key || m_obj_key > rhs.m_obj_key;
+        return (*this != rhs) && !(*this < rhs);
     }
     TableKey get_table_key() const
     {
