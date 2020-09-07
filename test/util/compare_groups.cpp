@@ -602,6 +602,7 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
 
         if (col.is_set()) {
             if (!compare_sets(col, obj_1, obj_2, logger)) {
+                logger.error("Set mismatch in column '%1'", col.name);
                 equal = false;
             }
             continue;
@@ -879,7 +880,9 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
     for (auto oid : objects_1) {
         if (objects_2.find(oid) != objects_2.end()) {
             ObjectCompareLogger sublogger{oid, logger};
-            compare_objects(oid, table_1, table_2, columns, sublogger);
+            if (!compare_objects(oid, table_1, table_2, columns, sublogger)) {
+                equal = false;
+            }
         }
     }
 
