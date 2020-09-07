@@ -202,4 +202,14 @@ TEST(Set_Links)
     CHECK_NOT_EQUAL(set_mixeds.find(cab1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(cab2.get_link()), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar3.get_link()), realm::npos);
+
+    bar1.invalidate();
+
+    CHECK_EQUAL(set_links.size(), 3);
+    CHECK_EQUAL(set_typed_links.size(), 4);
+    CHECK_EQUAL(set_mixeds.size(), 4);
+
+    CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
+    CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
+    CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
 }
