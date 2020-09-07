@@ -8074,9 +8074,29 @@ TEST(Sync_Set)
     session_1.wait_for_download_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
-    ReadTransaction read_1{db_1};
-    ReadTransaction read_2{db_2};
-    CHECK(compare_groups(read_1, read_2));
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+        CHECK(compare_groups(read_1, read_2));
+    }
+
+    {
+        WriteTransaction wt{db_1};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.clear();
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+        CHECK(compare_groups(read_1, read_2));
+    }
 }
 
 } // unnamed namespace
