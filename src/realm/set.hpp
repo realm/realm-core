@@ -42,6 +42,8 @@ public:
     virtual void clear() = 0;
 
 protected:
+    void insert_repl(Replication* repl, size_t index, Mixed value) const;
+    void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
 };
 
@@ -284,7 +286,7 @@ size_t Set<T>::insert(T value)
         // FIXME: We should emit an instruction regardless of element presence for the purposes of conflict
         // resolution in synchronized databases. The reason is that the new insertion may come at a later time
         // than an interleaving erase instruction, so emitting the instruction ensures that last "write" wins.
-        repl->set_insert(*this, it.index(), value);
+        this->insert_repl(repl, it.index(), value);
     }
 
     m_tree->insert(it.index(), value);
@@ -323,7 +325,7 @@ size_t Set<T>::erase(T value)
     }
 
     if (Replication* repl = m_obj.get_replication()) {
-        repl->set_erase(*this, it.index(), value);
+        this->erase_repl(repl, it.index(), value);
     }
     m_tree->erase(it.index());
     CollectionBase::adj_remove(it.index());
@@ -367,7 +369,7 @@ inline void Set<T>::clear()
     this->ensure_writeable();
     if (size() > 0) {
         if (Replication* repl = this->m_obj.get_replication()) {
-            repl->set_clear(*this);
+            this->clear_repl(repl);
         }
         m_tree->clear();
         m_obj.bump_content_version();

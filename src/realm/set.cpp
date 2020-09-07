@@ -101,4 +101,19 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
     return {};
 }
 
+void SetBase::insert_repl(Replication* repl, size_t index, Mixed value) const
+{
+    repl->set_insert(*this, index, value);
+}
+
+void SetBase::erase_repl(Replication* repl, size_t index, Mixed value) const
+{
+    repl->set_erase(*this, index, value);
+}
+
+void SetBase::clear_repl(Replication* repl) const
+{
+    repl->set_clear(*this);
+}
+
 } // namespace realm
