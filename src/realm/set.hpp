@@ -264,7 +264,13 @@ Set<U> Obj::get_set(ColKey col_key) const
 template <class T>
 size_t Set<T>::find(T value) const
 {
-    return m_tree->find_first(value);
+    auto b = this->begin();
+    auto e = this->end();
+    auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
+    if (it != e && SetElementEquals<T>{}(*it, value)) {
+        return it.index();
+    }
+    return npos;
 }
 
 template <class T>
