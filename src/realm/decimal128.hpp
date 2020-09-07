@@ -80,7 +80,7 @@ public:
     Decimal128 operator/(size_t div) const;
     Decimal128 operator/(int div) const;
     Decimal128 operator/(Decimal128 div) const;
-    Decimal128& operator /=(Decimal128 div)
+    Decimal128& operator/=(Decimal128 div)
     {
         return *this = *this / div;
     }
