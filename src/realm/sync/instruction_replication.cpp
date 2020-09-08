@@ -540,6 +540,8 @@ void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixe
 
 void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
 {
+    TrivialReplication::set_erase(set, set_ndx, value);
+
     if (select_collection(set)) {
         Instruction::SetErase instr;
         populate_path_instr(instr, set);
@@ -550,6 +552,8 @@ void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed
 
 void SyncReplication::set_clear(const CollectionBase& set)
 {
+    TrivialReplication::set_clear(set);
+
     if (select_collection(set)) {
         Instruction::SetClear instr;
         populate_path_instr(instr, set);
