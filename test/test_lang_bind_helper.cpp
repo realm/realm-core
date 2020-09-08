@@ -339,8 +339,8 @@ public:
         m_changesets[m_incoming_version].changes = std::move(m_incoming_changeset);
         m_changesets[m_incoming_version].finalized = true;
     }
-    void get_changesets(version_type begin_version, version_type end_version,
-                        BinaryIterator* buffer) const noexcept override
+    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
+        noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i < n; ++i) {

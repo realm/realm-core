@@ -3314,8 +3314,8 @@ ColKey Table::generate_col_key(ColumnType tp, ColumnAttrMask attr)
     return ColKey(ColKey::Idx{lower}, tp, attr, upper);
 }
 
-Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name,
-                                                  StringData origin_col_name) const noexcept
+Table::BacklinkOrigin Table::find_backlink_origin(StringData origin_table_name, StringData origin_col_name) const
+    noexcept
 {
     BacklinkOrigin ret;
     auto f = [&](ColKey backlink_col_key) {
