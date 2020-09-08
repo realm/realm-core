@@ -123,7 +123,7 @@ TEST(Set_Mixed)
     });
     CHECK(std::equal(begin(sorted), end(sorted), set.begin()));
     auto sorted2 = sorted;
-    std::sort(begin(sorted2), end(sorted2));
+    std::sort(begin(sorted2), end(sorted2), SetElementLessThan<Mixed>{});
     CHECK(sorted2 == sorted);
 }
 
