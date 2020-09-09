@@ -134,6 +134,12 @@ std::unique_ptr<BaseDescriptor> SortDescriptor::clone() const
 
 void SortDescriptor::merge(SortDescriptor&& other, MergeMode mode)
 {
+    if (mode == MergeMode::replace) {
+        m_column_keys = std::move(other.m_column_keys);
+        m_ascending = std::move(other.m_ascending);
+        return;
+    }
+
     m_column_keys.insert(mode == MergeMode::prepend ? m_column_keys.begin() : m_column_keys.end(),
                          other.m_column_keys.begin(), other.m_column_keys.end());
     // Do not use a move iterator on a vector of bools!
