@@ -82,8 +82,8 @@ ObjectId::ObjectId(Timestamp d, int machine_id, int process_id) noexcept
     m_bytes[2] = (sec >> 8) & 0xff;
     m_bytes[3] = sec & 0xff;
 
-    memcpy(m_bytes.begin() + 4, &machine_id, 3);
-    memcpy(m_bytes.begin() + 7, &process_id, 2);
+    std::memcpy(m_bytes.data() + 4, &machine_id, 3);
+    std::memcpy(m_bytes.data() + 7, &process_id, 2);
 
     auto r = g_gen_state.seq.fetch_add(1, std::memory_order_relaxed);
 
