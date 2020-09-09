@@ -298,6 +298,28 @@ protected:
             do_copy_on_write();
         }
     }
+    void copy_on_write(size_t min_size)
+    {
+#if REALM_ENABLE_MEMDEBUG
+        // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
+        // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the
+        // m_no_relocation
+        // member)
+        if (!m_no_relocation) {
+#else
+        if (is_read_only()) {
+#endif
+            do_copy_on_write(min_size);
+        }
+    }
+    void ensure_size(size_t min_size)
+    {
+        char* header = get_header_from_data(m_data);
+        size_t orig_capacity_bytes = get_capacity_from_header(header);
+        if (orig_capacity_bytes < min_size) {
+            do_copy_on_write(min_size);
+        }
+    }
 
     static MemRef create_node(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
                               WidthType width_type = wtype_Ignore, int width = 1);
