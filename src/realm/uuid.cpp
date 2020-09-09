@@ -73,6 +73,11 @@ UUID::UUID(const char* init) noexcept
     }
 }
 
+UUID::UUID(const StringData& init) noexcept
+    : UUID(init.data())
+{
+}
+
 UUID::UUID() noexcept
     : m_bytes{}
 {

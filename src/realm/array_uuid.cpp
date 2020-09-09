@@ -52,8 +52,8 @@ void ArrayUUID::erase(size_t ndx)
     if (ndx < m_size - 1) {
         char* new_begin = m_data + ndx * s_width;
         char* old_begin = new_begin + s_width;
-        char* old_end = m_data + m_size * s_width;
-        realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
+        size_t bytes_to_move = (m_size - ndx - 1) * s_width;
+        memmove(new_begin, old_begin, bytes_to_move);
     }
 
     --m_size;
@@ -69,12 +69,14 @@ void ArrayUUID::move(ArrayUUID& dst_arr, size_t ndx)
 
     const auto n_to_move = old_src_size - ndx;
 
-    // Allocate room for the new value
-    dst_arr.alloc(old_dst_size + n_to_move, s_width); // Throws
+    if (n_to_move) {
+        // Allocate room for the new value
+        dst_arr.alloc(old_dst_size + n_to_move, s_width); // Throws
 
-    char* src = m_data + ndx * s_width;
-    char* dest = dst_arr.m_data;
-    memmove(dest, src, n_to_move * s_width);
+        char* src = m_data + ndx * s_width;
+        char* dest = dst_arr.m_data + old_dst_size * s_width;
+        memmove(dest, src, n_to_move * s_width);
+    }
 
     truncate(ndx);
 }

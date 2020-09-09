@@ -30,6 +30,7 @@
 #include "realm/array_object_id.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
+#include "realm/array_uuid.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
@@ -147,6 +148,8 @@ int Obj::cmp(const Obj& other, ColKey col_key) const
                 return cmp<util::Optional<ObjectId>>(other, col_ndx);
             else
                 return cmp<ObjectId>(other, col_ndx);
+        case type_UUID:
+            return cmp<UUID>(other, col_ndx);
         case type_Link:
             return cmp<ObjKey>(other, col_ndx);
         case type_TypedLink:
@@ -441,6 +444,8 @@ Mixed Obj::get_any(ColKey col_key) const
             return Mixed{_get<Decimal128>(col_ndx)};
         case col_type_ObjectId:
             return Mixed{_get<util::Optional<ObjectId>>(col_ndx)};
+        case col_type_UUID:
+            return Mixed{_get<UUID>(col_ndx)};
         case col_type_Link:
             return Mixed{_get<ObjKey>(col_ndx)};
         default:
@@ -533,6 +538,8 @@ bool Obj::is_null(ColKey col_key) const
                 return do_is_null<ArrayObjectIdNull>(col_ndx);
             case col_type_Decimal:
                 return do_is_null<ArrayDecimal128>(col_ndx);
+            case col_type_UUID:
+                return do_is_null<ArrayUUID>(col_ndx);
             default:
                 REALM_UNREACHABLE();
         }
@@ -790,6 +797,12 @@ void out_mixed(std::ostream& out, const Mixed& val)
         case type_ObjectId:
             out << "\"";
             out << val.get<ObjectId>();
+            out << "\"";
+            break;
+        case type_UUID:
+            out << "\"";
+            out << val.get<UUID>();
+            out << "\"";
             break;
         case type_TypedLink:
             out << "\"";
@@ -1048,6 +1061,9 @@ Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
                 break;
             case col_type_Decimal:
                 set(col_key, value.get<Decimal128>(), is_default);
+                break;
+            case col_type_UUID:
+                set(col_key, value.get<UUID>(), is_default);
                 break;
             case col_type_Link:
                 set(col_key, value.get<ObjKey>(), is_default);
@@ -1715,6 +1731,7 @@ template ObjKey Obj::get<ObjKey>(ColKey col_key) const;
 template Decimal128 Obj::get<Decimal128>(ColKey col_key) const;
 template ObjLink Obj::get<ObjLink>(ColKey col_key) const;
 template Mixed Obj::get<Mixed>(realm::ColKey) const;
+template UUID Obj::get<UUID>(realm::ColKey) const;
 
 template <class T>
 inline void Obj::do_set_null(ColKey col_key)
@@ -1798,6 +1815,9 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                 break;
             case col_type_Mixed:
                 do_set_null<ArrayMixed>(col_key);
+                break;
+            case col_type_UUID:
+                do_set_null<ArrayUUID>(col_key);
                 break;
             default:
                 REALM_UNREACHABLE();

@@ -38,8 +38,11 @@ public:
 
     static UUID default_value(bool nullable)
     {
-        REALM_ASSERT(!nullable);
-        return UUID();
+        if (nullable) {
+            return UUID();
+        }
+        // FIXME: verify this and optimize it
+        return UUID("00000000-0000-0000-0000-000000000001");
     }
 
     void create()
@@ -66,6 +69,11 @@ public:
     bool is_null(size_t ndx) const
     {
         return this->get_width() == 0 || get(ndx).is_null();
+    }
+
+    void set_null(size_t ndx)
+    {
+        set(ndx, UUID());
     }
 
     UUID get(size_t ndx) const

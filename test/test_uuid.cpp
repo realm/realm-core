@@ -217,10 +217,10 @@ TEST(UUID_ArrayNull)
 }
 
 
-ONLY(ObjectId_Table)
+TEST(UUID_Table)
 {
-    const char str0[] = "0000012300000000009218a4";
-    const char str1[] = "000004560000000000170232";
+    const char str0[] = "3b241101-e2bb-4255-8caf-4136c566a960";
+    const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
 
     Table t;
     auto col_id = t.add_column(type_UUID, "id");
@@ -235,25 +235,25 @@ ONLY(ObjectId_Table)
     auto id = obj1.get<UUID>(col_id_null);
     CHECK(!id.is_null());
     id = obj2.get<UUID>(col_id_null);
-    CHECK_NOT(id.is_null());
+    CHECK(id.is_null());
     auto key = t.find_first(col_id, UUID(str1));
     CHECK_EQUAL(key, obj1.get_key());
     t.add_search_index(col_id);
     key = t.find_first(col_id, UUID(str1));
     CHECK_EQUAL(key, obj1.get_key());
 }
-/*
-TEST(ObjectId_PrimaryKey)
+
+
+TEST(UUID_PrimaryKey)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
-    Timestamp now{std::chrono::steady_clock::now()};
-    ObjectId id{now};
+    UUID id{"3b241101-e2bb-4255-8caf-4136c566a960"};
     ObjKey key;
     {
         auto wt = db->start_write();
-        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
-        table->create_object_with_primary_key(ObjectId(now));
+        auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id");
+        table->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
         key = table->create_object_with_primary_key(id).get_key();
         wt->commit();
     }
@@ -261,21 +261,45 @@ TEST(ObjectId_PrimaryKey)
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
         CHECK_EQUAL(table->size(), 2);
-        CHECK_EQUAL(table->find_first_object_id(table->get_primary_key_column(), id), key);
+        CHECK_EQUAL(table->find_first_uuid(table->get_primary_key_column(), id), key);
     }
 }
 
-TEST(ObjectId_Commit)
+TEST(UUID_PrimaryKeyNullable)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    UUID id{"3b241101-e2bb-4255-8caf-4136c566a960"};
+    ObjKey key0;
+    ObjKey key1;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id", true);
+        key0 = table->create_object_with_primary_key(UUID()).get_key();
+        key1 = table->create_object_with_primary_key(id).get_key();
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        CHECK_EQUAL(table->size(), 2);
+        CHECK_EQUAL(table->find_first_uuid(table->get_primary_key_column(), UUID()), key0);
+        CHECK_EQUAL(table->find_first_uuid(table->get_primary_key_column(), id), key1);
+    }
+}
+
+
+TEST(UUID_Commit)
 {
     // Tend to discover errors in the size calculation logic
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
-    ObjectId id("0000002a9a7969d24bea4cf2");
+    UUID id("3b241101-e2bb-4255-8caf-4136c566a960");
     ColKey col;
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        col = table->add_column(type_ObjectId, "id");
+        col = table->add_column(type_UUID, "id");
         wt->commit();
     }
     {
@@ -289,11 +313,11 @@ TEST(ObjectId_Commit)
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
         CHECK_EQUAL(table->size(), 1);
-        CHECK_EQUAL(table->begin()->get<ObjectId>(col), id);
+        CHECK_EQUAL(table->begin()->get<UUID>(col), id);
     }
 }
-
-TEST(ObjectId_Query)
+/*
+ONLY(UUID_Query)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
@@ -311,9 +335,9 @@ TEST(ObjectId_Query)
 
         auto target = wt->add_table("Target");
         auto origin = wt->add_table("Origin");
-        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id");
 
-        col_id = table->add_column(type_ObjectId, "alternative_id", true);
+        col_id = table->add_column(type_UUID, "alternative_id", true);
         col_int = table->add_column(type_Int, "int");
         col_has = table->add_column(*target, "Has");
         col_owns = origin->add_column(*table, "Owns");
@@ -322,7 +346,7 @@ TEST(ObjectId_Query)
         target->create_objects(16, target_keys);
 
         for (int i = 0; i < 1000; i++) {
-            ObjectId id{now + std::chrono::seconds(i / 20)};
+            UUID id{now + std::chrono::seconds(i / 20)};
             if (i == 0)
                 t0 = id;
             if (i == 25)
@@ -342,7 +366,7 @@ TEST(ObjectId_Query)
         auto target = rt->get_table("Target");
         auto col = table->get_primary_key_column();
 
-        Query q = table->column<ObjectId>(col) > t0;
+        Query q = table->column<UUID>(col) > t0;
         CHECK_EQUAL(q.count(), 999);
         q = table->where().greater(col, t0);
         CHECK_EQUAL(q.count(), 999);
@@ -357,33 +381,33 @@ TEST(ObjectId_Query)
         for (int i = 0; i < 25; i++) {
             CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
         }
-        Query q2 = table->column<ObjectId>(col_id) == alternative_id;
+        Query q2 = table->column<UUID>(col_id) == alternative_id;
         // std::cout << q2.get_description() << std::endl;
         CHECK_EQUAL(q2.count(), 34);
-        q2 = table->column<ObjectId>(col_id) == realm::null();
+        q2 = table->column<UUID>(col_id) == realm::null();
         // std::cout << q2.get_description() << std::endl;
         CHECK_EQUAL(q2.count(), 1000 - 34);
         q2 = table->where().equal(col_id, realm::null());
         CHECK_EQUAL(q2.count(), 1000 - 34);
 
         // Test query over links
-        Query q3 = origin->link(col_owns).column<ObjectId>(col_id) == alternative_id;
+        Query q3 = origin->link(col_owns).column<UUID>(col_id) == alternative_id;
         CHECK_EQUAL(q3.count(), 34);
 
         // Test query over backlink (link list)
-        Query q4 = target->backlink(*table, col_has).column<ObjectId>(col_id) == alternative_id;
+        Query q4 = target->backlink(*table, col_has).column<UUID>(col_id) == alternative_id;
         CHECK_EQUAL(q4.count(), 8);
 
         // just check that it does not crash
         std::ostringstream ostr;
         tv.to_json(ostr);
-        Query q5 = table->column<ObjectId>(col) >= t0;
+        Query q5 = table->column<UUID>(col) >= t0;
         CHECK_EQUAL(q5.count(), 1000);
-        Query q6 = table->column<ObjectId>(col) <= t25;
+        Query q6 = table->column<UUID>(col) <= t25;
         CHECK_EQUAL(q6.count(), 26);
     }
 }
-
+/*
 TEST(ObjectId_Distinct)
 {
     SHARED_GROUP_TEST_PATH(path);

@@ -40,6 +40,7 @@
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_object_id.hpp>
+#include <realm/array_uuid.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -629,6 +630,10 @@ void Table::populate_search_index(ColKey col_key)
             ObjectId value = o.get<ObjectId>(col_key);
             index->insert(key, value); // Throws
         }
+        else if (type == type_UUID) {
+            UUID value = o.get<UUID>(col_key);
+            index->insert(key, value); // Throws
+        }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
         }
@@ -715,6 +720,9 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
                     break;
                 case col_type_Mixed:
                     index->insert(key, init_value);
+                    break;
+                case col_type_UUID:
+                    index->insert(key, init_value.get<UUID>());
                     break;
                 default:
                     REALM_UNREACHABLE();
@@ -2260,6 +2268,7 @@ template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 template ObjKey Table::find_first(ColKey col_key, Mixed) const;
+template ObjKey Table::find_first(ColKey col_key, UUID) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -2315,6 +2324,11 @@ ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
 ObjKey Table::find_first_null(ColKey col_key) const
 {
     return where().equal(col_key, null{}).find();
+}
+
+ObjKey Table::find_first_uuid(ColKey col_key, UUID value) const
+{
+    return find_first(col_key, value);
 }
 
 template <class T>
@@ -2752,7 +2766,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int || type == type_UUID);
 
     if (did_create)
         *did_create = false;

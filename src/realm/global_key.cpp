@@ -152,6 +152,18 @@ GlobalKey::GlobalKey(Mixed pk)
             m_lo = uint64_t(pk.get_int());
             break;
 
+        case type_UUID: {
+            union UUIDBuffer {
+                UUIDBuffer() {}
+                char buffer[sizeof(UUID)];
+                UUID id;
+            } inp;
+            inp.id = pk.get<UUID>();
+            util::sha1(inp.buffer, sizeof(UUID), outp.buffer);
+            m_hi = outp.oid.hi;
+            m_lo = outp.oid.lo;
+            break;
+        }
         default:
             m_hi = -1;
             m_lo = -1;

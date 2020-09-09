@@ -151,6 +151,14 @@ Mixed ArrayMixed::get(size_t ndx) const
                             ObjKey(m_int_pairs.get(payload_ndx + 1))};
                 return Mixed(ret);
             }
+            case type_UUID: {
+                ensure_string_array();
+                REALM_ASSERT(size_t(int_val) < m_strings.size());
+                auto s = m_strings.get(payload_ndx);
+                UUID id;
+                memcpy(&id, s.data(), sizeof(UUID));
+                return Mixed(id);
+            }
             default:
                 break;
         }
@@ -410,6 +418,16 @@ int64_t ArrayMixed::store(const Mixed& value)
             m_int_pairs.add(int64_t(t.get_table_key().value));
             m_int_pairs.add(t.get_obj_key().value);
             val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
+            break;
+        }
+        case type_UUID: {
+            ensure_string_array();
+            size_t ndx = m_strings.size();
+            auto id = value.get<UUID>();
+            char buffer[sizeof(UUID)];
+            memcpy(buffer, &id, sizeof(UUID));
+            m_strings.add(StringData(buffer, sizeof(UUID)));
+            val = int64_t(ndx << s_data_shift) | (payload_idx_str << s_payload_idx_shift);
             break;
         }
         default:

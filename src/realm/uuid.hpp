@@ -29,6 +29,8 @@ public:
 
     /// Constructs an ObjectId from 36 hex characters.
     UUID(const char* init) noexcept;
+    UUID(const StringData& init) noexcept;
+
     /// Constructs a null UUID
     UUID() noexcept;
     UUID(const null&)

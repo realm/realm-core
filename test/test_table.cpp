@@ -4464,6 +4464,21 @@ ObjectId generate_value()
 {
     return ObjectId::gen();
 }
+template <>
+UUID generate_value()
+{
+    std::string str;
+    str.resize(36);
+    std::generate<std::string::iterator, char (*)()>(str.begin(), str.end(), []() -> char {
+        char c = test_util::random_int<char>(0, 15);
+        return c >= 10 ? (c - 10 + 'a') : (c + '0');
+    });
+    str.at(8) = '-';
+    str.at(13) = '-';
+    str.at(18) = '-';
+    str.at(23) = '-';
+    return UUID(str.c_str());
+}
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
@@ -4669,6 +4684,7 @@ TEST(List_Ops)
     test_lists<Timestamp>(test_context, sg, type_Timestamp);
     test_lists<Decimal128>(test_context, sg, type_Decimal);
     test_lists<ObjectId>(test_context, sg, type_ObjectId);
+    test_lists<UUID>(test_context, sg, type_UUID);
 
     test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -4678,7 +4694,8 @@ TEST(List_Ops)
     test_lists<Optional<double>>(test_context, sg, type_Double, true);
     test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
-    test_lists<ObjectId>(test_context, sg, type_ObjectId, true);
+    test_lists<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_lists<UUID>(test_context, sg, type_UUID, true);
 }
 
 template <typename T, typename U = T>
@@ -4897,6 +4914,7 @@ TEST(Table_Ops)
     test_tables<Timestamp>(test_context, sg, type_Timestamp);
     test_tables<Decimal128>(test_context, sg, type_Decimal);
     test_tables<ObjectId>(test_context, sg, type_ObjectId);
+    test_tables<UUID>(test_context, sg, type_UUID);
 
     test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -4907,6 +4925,7 @@ TEST(Table_Ops)
     test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_tables<Decimal128>(test_context, sg, type_Decimal, true);
     test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_tables<UUID>(test_context, sg, type_UUID, true);
 }
 
 template <typename TFrom, typename TTo>
@@ -5434,6 +5453,7 @@ TEST(Table_IndexOnMixed)
     auto k7 = foos->create_object().set(col, Mixed(1)).get_key();
     auto k8 = foos->create_object().set(col, Mixed(true)).get_key();
     auto k9 = foos->create_object().set(col, Mixed(bar.get_link())).get_key();
+    auto k10 = foos->create_object().set(col, Mixed(UUID("3b241101-e2bb-4255-8caf-4136c566a962"))).get_key();
 
     CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
     CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
@@ -5445,6 +5465,7 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
     CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
     CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
 
     foos->remove_search_index(col);
 
@@ -5458,6 +5479,7 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
     CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
     CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
 }
 
 #endif // TEST_TABLE

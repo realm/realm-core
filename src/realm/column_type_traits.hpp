@@ -33,6 +33,7 @@ class Decimal128;
 class ObjectId;
 class Mixed;
 class Timestamp;
+class UUID;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
@@ -50,6 +51,7 @@ class ArrayDecimal128;
 class ArrayObjectId;
 class ArrayObjectIdNull;
 class ArrayTypedLink;
+class ArrayUUID;
 template <class>
 class BasicArray;
 template <class>
@@ -237,6 +239,13 @@ struct ColumnTypeTraits<Decimal128> {
     using average_type = Decimal128;
     static const DataType id = type_Decimal;
     static const ColumnType column_id = col_type_Decimal;
+};
+
+template <>
+struct ColumnTypeTraits<UUID> {
+    using cluster_leaf_type = ArrayUUID;
+    static const DataType id = type_UUID;
+    static const ColumnType column_id = col_type_UUID;
 };
 
 template <typename T>

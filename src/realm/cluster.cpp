@@ -31,6 +31,7 @@
 #include "realm/array_ref.hpp"
 #include "realm/array_typed_link.hpp"
 #include "realm/array_backlink.hpp"
+#include "realm/array_uuid.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/replication.hpp"
 #include <iostream>
@@ -143,6 +144,9 @@ void Cluster::create()
                 break;
             case col_type_ObjectId:
                 do_create<ArrayObjectIdNull>(col_key);
+                break;
+            case col_type_UUID:
+                do_create<ArrayUUID>(col_key);
                 break;
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
@@ -340,6 +344,9 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
             case col_type_ObjectId:
                 do_insert_row<ArrayObjectIdNull>(ndx, col_key, init_value, nullable);
                 break;
+            case col_type_UUID:
+                do_insert_row<ArrayUUID>(ndx, col_key, init_value, nullable);
+                break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
                 break;
@@ -429,6 +436,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_ObjectId:
                 do_move<ArrayObjectIdNull>(ndx, col_key, new_leaf);
+                break;
+            case col_type_UUID:
+                do_move<ArrayUUID>(ndx, col_key, new_leaf);
                 break;
             case col_type_Link:
                 do_move<ArrayKey>(ndx, col_key, new_leaf);
@@ -556,6 +566,9 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_ObjectId:
             do_insert_column<ArrayObjectIdNull>(col_key, nullable);
+            break;
+        case col_type_UUID:
+            do_insert_column<ArrayUUID>(col_key, nullable);
             break;
         case col_type_Link:
             do_insert_column<ArrayKey>(col_key, nullable);
@@ -831,6 +844,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
             case col_type_ObjectId:
                 do_erase<ArrayObjectIdNull>(ndx, col_key);
                 break;
+            case col_type_UUID:
+                do_erase<ArrayUUID>(ndx, col_key);
+                break;
             case col_type_Link:
                 do_erase_key(ndx, col_key, state);
                 break;
@@ -1048,6 +1064,9 @@ void Cluster::verify() const
                 case col_type_ObjectId:
                     verify_list<ObjectId>(arr, *sz);
                     break;
+                case col_type_UUID:
+                    verify_list<UUID>(arr, *sz);
+                    break;
                 case col_type_LinkList:
                     verify_list<ObjKey>(arr, *sz);
                     break;
@@ -1113,6 +1132,9 @@ void Cluster::verify() const
                 break;
             case col_type_ObjectId:
                 verify<ArrayObjectIdNull>(ref, col, sz);
+                break;
+            case col_type_UUID:
+                verify<ArrayUUID>(ref, col, sz);
                 break;
             case col_type_Link:
                 verify<ArrayKey>(ref, col, sz);
@@ -1256,6 +1278,19 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                 }
                 case col_type_ObjectId: {
                     ArrayObjectIdNull arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    if (arr.is_null(i)) {
+                        std::cout << ", "
+                                  << "null";
+                    }
+                    else {
+                        std::cout << ", " << arr.get(i);
+                    }
+                    break;
+                }
+                case col_type_UUID: {
+                    ArrayUUID arr(m_alloc);
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {

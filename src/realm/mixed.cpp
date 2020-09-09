@@ -301,6 +301,11 @@ int Mixed::compare(const Mixed& b) const
                 return _impl::compare_generic(link_val, b.link_val);
             }
             break;
+        case type_UUID:
+            if (b.get_type() == type_UUID) {
+                return _impl::compare_generic(uuid_val, b.uuid_val);
+            }
+            break;
         default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
@@ -353,6 +358,10 @@ size_t Mixed::hash() const
         case type_Decimal: {
             std::hash<realm::Decimal128> h;
             hash = h(decimal_val);
+            break;
+        }
+        case type_UUID: {
+            hash = get<UUID>().hash();
             break;
         }
         case type_TypedLink: {
@@ -414,6 +423,9 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 break;
             case type_TypedLink:
                 out << m.link_val;
+                break;
+            case type_UUID:
+                out << m.get<UUID>();
                 break;
             case type_OldDateTime:
             case type_OldTable:

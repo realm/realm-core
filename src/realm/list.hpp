@@ -35,6 +35,7 @@
 #include <realm/array_object_id.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_mixed.hpp>
+#include <realm/array_uuid.hpp>
 #include <realm/array_typed_link.hpp>
 #include <realm/replication.hpp>
 

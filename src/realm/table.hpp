@@ -383,6 +383,7 @@ public:
     ObjKey find_first_string(ColKey col_key, StringData value) const;
     ObjKey find_first_binary(ColKey col_key, BinaryData value) const;
     ObjKey find_first_null(ColKey col_key) const;
+    ObjKey find_first_uuid(ColKey col_key, UUID value) const;
 
     //    TableView find_all_link(Key target_key);
     //    ConstTableView find_all_link(Key target_key) const;

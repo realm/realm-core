@@ -165,7 +165,7 @@ public:
     static bool type_supported(realm::DataType type)
     {
         return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
-                type == type_ObjectId || type == type_Mixed);
+                type == type_ObjectId || type == type_Mixed || type == type_UUID);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -412,6 +412,15 @@ struct GetIndexData<ObjectId> {
     {
         memcpy(&buffer, &value, sizeof(ObjectId));
         return StringData{buffer.data(), sizeof(ObjectId)};
+    }
+};
+
+template <>
+struct GetIndexData<UUID> {
+    static StringData get_index_data(UUID value, StringConversionBuffer& buffer)
+    {
+        memcpy(&buffer, &value, sizeof(UUID));
+        return StringData{buffer.data(), sizeof(UUID)};
     }
 };
 

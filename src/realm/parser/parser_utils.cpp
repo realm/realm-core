@@ -115,6 +115,8 @@ const char* data_type_to_str(DataType type)
             return "TypedLink";
         case type_LinkList:
             return "LinkList";
+        case type_UUID:
+            return "UUID";
     }
     return "type_Unknown"; // LCOV_EXCL_LINE
 }

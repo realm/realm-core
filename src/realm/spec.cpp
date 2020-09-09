@@ -535,6 +535,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Decimal:
             case col_type_BackLink:
             case col_type_ObjectId:
+            case col_type_UUID:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;
