@@ -1,20 +1,8 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 6.0.25 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "key not found" exception ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
+* If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "Key not found" exception when updating an object. If asserts are enabled at the binding level, you may get an "assert(m_has_refs)" instead. ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
  
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
-
 ----------------------------------------------
 
 # 6.0.24 Release notes
