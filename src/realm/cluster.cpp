@@ -941,6 +941,9 @@ inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, O
 
 void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 {
+    // Ensure the cluster array is big enough to hold 64 bit values.
+    copy_on_write(m_size * 8);
+
     if (m_keys.is_attached()) {
         m_keys.insert(ndx, k.value);
     }
