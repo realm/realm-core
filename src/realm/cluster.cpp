@@ -849,6 +849,10 @@ void Cluster::create(size_t nb_leaf_columns)
         return false;
     };
     table->for_each_and_every_column(column_initialize);
+
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    ensure_size(m_size * 8);
 }
 
 void Cluster::init(MemRef mem)
@@ -877,7 +881,10 @@ bool Cluster::update_from_parent(size_t old_baseline) noexcept
 
 MemRef Cluster::ensure_writeable(ObjKey)
 {
-    copy_on_write();
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    copy_on_write(8 * m_size);
+
     return get_mem();
 }
 
@@ -946,6 +953,9 @@ inline void Cluster::do_insert_key(size_t ndx, ColKey col_key, Mixed init_val, O
 
 void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 {
+    // Ensure the cluster array is big enough to hold 64 bit values.
+    copy_on_write(m_size * 8);
+
     if (m_keys.is_attached()) {
         m_keys.insert(ndx, k.value);
     }

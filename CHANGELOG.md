@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* File format bumped to 12.
+* None.
 
 ----------------------------------------------
 
@@ -282,6 +282,14 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+ 
+----------------------------------------------
+
+# 6.0.25 Release notes
+
+### Fixed
+* If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "Key not found" exception when updating an object. If asserts are enabled at the binding level, you may get an "assert(m_has_refs)" instead. ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
+* In cases where you have more than 32 columns in a table, you may get a currrupted file resulting in various crashes ([#7057](https://github.com/realm/realm-java/issues/7057), since v6.0.0)
  
 ----------------------------------------------
 

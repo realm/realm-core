@@ -4146,4 +4146,64 @@ TEST(Shared_TimestampQuery)
 }
 */
 
+TEST_IF(Shared_LargeFile, TEST_DURATION > 0 && !REALM_ANDROID)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.durability = DBOptions::Durability::MemOnly;
+    DBRef db = DB::create(path, false, options);
+
+    auto tr = db->start_write();
+
+    auto foo = tr->add_table("foo");
+    // Create more than 16 columns. The cluster array will always have a minimum
+    // size of 128, so if number of columns is lower than 17, then the array will
+    // always be able to hold 64 bit values.
+    for (size_t i = 0; i < 20; i++) {
+        std::string name = "Prop" + util::to_string(i);
+        foo->add_column(type_Int, name);
+    }
+    auto bar = tr->add_table("bar");
+    auto col_str = bar->add_column(type_String, "str");
+
+    // Create enough objects to have a multi level cluster
+    for (size_t i = 0; i < 400; i++) {
+        foo->create_object();
+    }
+
+    // Add a lot of data (nearly 2 Gb)
+    std::string string_1M(1024 * 1024, 'A');
+    for (size_t i = 0; i < 1900; i++) {
+        bar->create_object().set(col_str, string_1M);
+    }
+    tr->commit();
+    tr = db->start_write();
+    foo = tr->get_table("foo");
+    bar = tr->get_table("bar");
+
+    std::vector<ObjKey> keys;
+    foo->create_objects(10000, keys);
+
+    // By assigning 500 to the properties, we provoke a resize of the
+    // arrays. At some point an array will have a ref larger than
+    // 0x80000000 which will require a resize of the cluster array.
+    // If the cluster array does not have the capacity to accommodate
+    // this resize, then it must be reallocated, which will require
+    // the parent to be updated with the new ref. But as the array
+    // used as accessor to the cluster array in Obj::set does not
+    // have a parent this will cause a subsequent crash. To fix this
+    // we have ensured that the cluster array will always have the
+    // required capacity.
+    for (size_t i = 0; i < 10000; i++) {
+        auto obj = foo->get_object(keys[i]);
+        for (auto col : foo->get_column_keys()) {
+            obj.set(col, 500);
+        }
+    }
+    auto obj = foo->begin();
+    for (auto col : foo->get_column_keys()) {
+        obj->set(col, 500);
+    }
+}
+
 #endif // TEST_SHARED
