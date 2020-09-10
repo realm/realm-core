@@ -4237,4 +4237,47 @@ TEST(Shared_EncryptionBug)
     }
 }
 
+TEST(Shared_ManyColumns)
+{
+    // We had a bug where cluster array has to expand, but the new ref
+    // was not updated in the parent.
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto tr = db->start_write();
+
+    auto foo = tr->add_table("foo");
+    // Create many columns. The cluster array will not be able to
+    // expand from 16 to 32 bits within the minimum allocation of 128 bytes.
+    for (size_t i = 0; i < 50; i++) {
+        std::string name = "Prop" + util::to_string(i);
+        foo->add_column(type_Int, name);
+    }
+    auto bar = tr->add_table("bar");
+
+    tr->commit();
+    tr = db->start_write();
+    foo = tr->get_table("foo");
+    bar = tr->get_table("bar");
+
+    std::vector<ObjKey> keys;
+    foo->create_objects(10000, keys);
+
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+
+    auto first = foo->begin();
+    for (auto col : foo->get_column_keys()) {
+        // 32 bit values will be inserted in the cluster array, so it needs expansion
+        first->set(col, 500);
+    }
+
+    tr->commit();
+
+    auto rt = db->start_read();
+    rt->verify();
+}
+
 #endif // TEST_SHARED
