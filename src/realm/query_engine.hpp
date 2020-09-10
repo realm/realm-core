@@ -101,6 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_list.hpp>
 #include <realm/array_bool.hpp>
 #include <realm/array_backlink.hpp>
+#include <realm/array_uuid.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/query_conditions.hpp>
@@ -1486,6 +1487,93 @@ protected:
     {
     }
 };
+
+class UUIDNodeBase : public ParentNode {
+public:
+    using TConditionValue = UUID;
+    static const bool special_null_node = false;
+
+    UUIDNodeBase(UUID v, ColKey column)
+        : m_value(v)
+    {
+        m_condition_column_key = column;
+    }
+
+    UUIDNodeBase(null, ColKey column)
+        : UUIDNodeBase(UUID{}, column)
+    {
+        m_value_is_null = true;
+    }
+
+    void cluster_changed() override
+    {
+        m_array_ptr = nullptr;
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayUUID(m_table.unchecked_ptr()->get_alloc()));
+        m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
+        m_leaf_ptr = m_array_ptr.get();
+    }
+
+    void init() override
+    {
+        ParentNode::init();
+
+        m_dD = 100.0;
+    }
+
+protected:
+    UUIDNodeBase(const UUIDNodeBase& from)
+        : ParentNode(from)
+        , m_value(from.m_value)
+        , m_value_is_null(from.m_value_is_null)
+    {
+    }
+
+    UUID m_value;
+    bool m_value_is_null = false;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayUUID), alignof(ArrayUUID)>::type;
+    using LeafPtr = std::unique_ptr<ArrayUUID, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    const ArrayUUID* m_leaf_ptr = nullptr;
+};
+
+template <class TConditionFunction>
+class UUIDNode : public UUIDNodeBase {
+public:
+    using UUIDNodeBase::UUIDNodeBase;
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        TConditionFunction cond;
+        for (size_t i = start; i < end; i++) {
+            UUID val = m_leaf_ptr->get(i);
+            if (cond(val, m_value, val.is_null(), m_value_is_null))
+                return i;
+        }
+        return realm::npos;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+               TConditionFunction::description() + " " +
+               (m_value_is_null ? util::serializer::print_value(realm::null())
+                                : util::serializer::print_value(UUIDNode::m_value));
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new UUIDNode(*this));
+    }
+
+protected:
+    UUIDNode(const UUIDNode& from, Transaction* tr)
+        : UUIDNode(from, tr)
+    {
+    }
+};
+
 
 class MixedNodeBase : public ParentNode {
 public:

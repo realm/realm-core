@@ -355,6 +355,7 @@ struct ValueBase {
     virtual void export_BinaryData(ValueBase& destination) const = 0;
     virtual void export_Mixed(ValueBase& destination) const = 0;
     virtual void export_null(ValueBase& destination) const = 0;
+    virtual void export_UUID(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
     // If true, all values in the class come from a link list of a single field in the parent table (m_table). If
@@ -752,6 +753,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, Timestamp>,
                  public Overloads<T, ObjectId>,
                  public Overloads<T, Decimal128>,
+                 public Overloads<T, UUID>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2()
@@ -769,6 +771,7 @@ public:
     RLM_U2(Timestamp, o)                                                                                             \
     RLM_U2(ObjectId, o)                                                                                              \
     RLM_U2(Decimal128, o)                                                                                            \
+    RLM_U2(UUID, o)                                                                                                  \
     RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
@@ -932,7 +935,7 @@ struct NullableVector {
 
     template <typename Type = T>
     typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
-                                          Decimal128, Mixed, ref_type, SizeOfList, null>::value,
+                                          Decimal128, Mixed, ref_type, SizeOfList, null, UUID>::value,
                             void>::type
     set(size_t index, T value)
     {
@@ -1196,6 +1199,18 @@ template <>
 inline void NullableVector<ObjKey>::set_null(size_t index)
 {
     m_first[index] = ObjKey{};
+}
+
+// UUID
+template <>
+inline bool NullableVector<UUID>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+template <>
+inline void NullableVector<UUID>::set_null(size_t index)
+{
+    m_first[index] = UUID();
 }
 
 template <typename Operator>
@@ -1473,7 +1488,7 @@ public:
             d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
         }
         else if constexpr (realm::is_any_v<T, int, int64_t, bool, float, double, StringData, BinaryData, Timestamp,
-                                           Decimal128, ObjectId>) {
+                                           Decimal128, ObjectId, UUID>) {
             Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
             d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
             for (size_t t = 0; t < ValueBase::m_values; t++) {
@@ -1562,6 +1577,10 @@ public:
         Value<null>& d = static_cast<Value<null>&>(destination);
         d.init(m_from_link_list, m_values);
     }
+    REALM_FORCEINLINE void export_UUID(ValueBase& destination) const override
+    {
+        export2<UUID>(destination);
+    }
 
     REALM_FORCEINLINE void import(const ValueBase& source) override
     {
@@ -1589,6 +1608,8 @@ public:
             source.export_Mixed(*this);
         else if (std::is_same_v<T, null>)
             source.export_null(*this);
+        else if (std::is_same_v<T, UUID>)
+            source.export_UUID(*this);
         else
             REALM_ASSERT_DEBUG(false);
     }
@@ -2585,6 +2606,11 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 
 template <>
 class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<UUID> : public SimpleQuerySupport<UUID> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 

@@ -3012,30 +3012,38 @@ TEST(Table_StableIteration)
     CHECK_EQUAL(list[2], 2);
 }
 
-TEST(Table_ListOps)
+TEST_TYPES(Table_ListOps, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>, Optional<float>,
+           Optional<double>, Optional<ObjectId>, UUID)
 {
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+
     Table table;
-    ColKey col = table.add_column_list(type_Int, "integers");
+    ColKey col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
 
     Obj obj = table.create_object();
     Obj obj1 = obj;
-    Lst<Int> list = obj.get_list<Int>(col);
-    list.add(1);
-    list.add(2);
+    Lst<TEST_TYPE> list = obj.get_list<TEST_TYPE>(col);
+    list.add(convert_for_test<underlying_type>(1));
+    list.add(convert_for_test<underlying_type>(2));
     list.swap(0, 1);
-    CHECK_EQUAL(list.get(0), 2);
-    CHECK_EQUAL(list.get(1), 1);
+    CHECK_EQUAL(list.get(0), convert_for_test<underlying_type>(2));
+    CHECK_EQUAL(list.get(1), convert_for_test<underlying_type>(1));
+    CHECK_EQUAL(list.find_first(convert_for_test<underlying_type>(2)), 0);
+    CHECK_EQUAL(list.find_first(convert_for_test<underlying_type>(1)), 1);
 
-    Lst<Int> list1;
+    Lst<TEST_TYPE> list1;
     CHECK_EQUAL(list1.size(), 0);
     list1 = list;
     CHECK_EQUAL(list1.size(), 2);
-    list.add(3);
+    list.add(convert_for_test<underlying_type>(3));
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
 
-    Lst<Int> list2 = list;
+    Lst<TEST_TYPE> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
+    list2.clear();
+    CHECK_EQUAL(list2.size(), 0);
 }
 
 TEST(Table_ListOfPrimitives)
@@ -3168,7 +3176,7 @@ TEST(Table_ListOfPrimitives)
 }
 
 TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
-           Optional<float>, Optional<double>, Optional<ObjectId>)
+           Optional<float>, Optional<double>, Optional<ObjectId>, UUID)
 {
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
@@ -3218,7 +3226,7 @@ TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, Objec
 }
 
 TEST_TYPES(Table_ListOfPrimitivesDistinct, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
-           Optional<float>, Optional<double>, Optional<ObjectId>)
+           Optional<float>, Optional<double>, Optional<ObjectId>, UUID)
 {
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;

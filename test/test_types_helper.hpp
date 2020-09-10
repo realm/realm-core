@@ -31,6 +31,14 @@ inline T convert_for_test(int64_t v)
 }
 
 template <>
+inline UUID convert_for_test<UUID>(int64_t v)
+{
+    UUID id;
+    memcpy(&id, &v, sizeof(v));
+    return id;
+}
+
+template <>
 inline Timestamp convert_for_test<Timestamp>(int64_t v)
 {
     return Timestamp{v, 0};

@@ -364,6 +364,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         case type_Mixed: {
             return MakeConditionNode<MixedNode<Cond>>::make(column_key, value);
         }
+        case type_UUID: {
+            return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
+        }
         default: {
             throw_type_mismatch_error();
         }

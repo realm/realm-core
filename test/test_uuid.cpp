@@ -25,6 +25,21 @@
 
 using namespace realm;
 
+UUID generate_random_uuid()
+{
+    std::string str;
+    str.resize(36);
+    std::generate<std::string::iterator, char (*)()>(str.begin(), str.end(), []() -> char {
+        char c = test_util::random_int<char>(0, 15);
+        return c >= 10 ? (c - 10 + 'a') : (c + '0');
+    });
+    str.at(8) = '-';
+    str.at(13) = '-';
+    str.at(18) = '-';
+    str.at(23) = '-';
+    return UUID(str.c_str());
+}
+
 TEST(UUID_Basics)
 {
     std::string init_str0("3b241101-e2bb-4255-8caf-4136c566a962");
@@ -316,15 +331,14 @@ TEST(UUID_Commit)
         CHECK_EQUAL(table->begin()->get<UUID>(col), id);
     }
 }
-/*
-ONLY(UUID_Query)
+
+TEST(UUID_Query)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
-    auto now = std::chrono::steady_clock::now();
-    ObjectId t0;
-    ObjectId t25;
-    ObjectId alternative_id("000004560000000000170232");
+    UUID uuid1("00000000-0000-0000-0000-000000000001");
+    UUID uuid2("00000000-0000-0000-0000-000000000002");
+    UUID uuid3("ffffffff-ffff-ffff-ffff-ffffffffffff");
     ColKey col_id;
     ColKey col_int;
     ColKey col_owns;
@@ -346,14 +360,14 @@ ONLY(UUID_Query)
         target->create_objects(16, target_keys);
 
         for (int i = 0; i < 1000; i++) {
-            UUID id{now + std::chrono::seconds(i / 20)};
+            UUID id = generate_random_uuid();
             if (i == 0)
-                t0 = id;
+                id = uuid1;
             if (i == 25)
-                t25 = id;
+                id = uuid2;
             auto obj = table->create_object_with_primary_key(id).set(col_int, i);
             if (i % 30 == 0)
-                obj.set(col_id, alternative_id);
+                obj.set(col_id, uuid3);
             origin->create_object().set(col_owns, obj.get_key());
             obj.set(col_has, target_keys[i % target_keys.size()]);
         }
@@ -366,58 +380,74 @@ ONLY(UUID_Query)
         auto target = rt->get_table("Target");
         auto col = table->get_primary_key_column();
 
-        Query q = table->column<UUID>(col) > t0;
+        Query q = table->column<UUID>(col) != uuid1;
         CHECK_EQUAL(q.count(), 999);
-        q = table->where().greater(col, t0);
+        q = table->column<UUID>(col) == uuid1;
+        CHECK_EQUAL(q.count(), 1);
+        q = table->column<UUID>(col) != uuid2;
         CHECK_EQUAL(q.count(), 999);
-        Query q1 = table->column<ObjectId>(col) < t25;
-        CHECK_EQUAL(q1.count(), 25);
-        q1 = table->where().less(col, t25);
-        CHECK_EQUAL(q1.count(), 25);
-        q1 = table->where().less_equal(col, t25);
-        CHECK_EQUAL(q1.count(), 26);
-        auto tv = q1.find_all();
-        tv.sort(col, true);
-        for (int i = 0; i < 25; i++) {
-            CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
+        q = table->column<UUID>(col) == uuid2;
+        CHECK_EQUAL(q.count(), 1);
+        q = table->column<UUID>(col) == UUID();
+        CHECK_EQUAL(q.count(), 0);
+        q = table->column<UUID>(col) > UUID();
+        CHECK_EQUAL(q.count(), 0);
+        q = table->column<UUID>(col) < UUID();
+        CHECK_EQUAL(q.count(), 0);
+        q = table->column<UUID>(col) >= uuid1;
+        CHECK_EQUAL(q.count(), 1000);
+        q = table->column<UUID>(col) <= uuid1;
+        CHECK_EQUAL(q.count(), 1);
+
+        q = table->column<UUID>(col_id) >= uuid3;
+        CHECK_EQUAL(q.count(), 34);
+        q = table->column<UUID>(col_id) <= uuid3;
+        CHECK_EQUAL(q.count(), 34);
+        q = table->column<UUID>(col_id) != uuid3;
+        CHECK_EQUAL(q.count(), 1000 - 34);
+        q = table->column<UUID>(col_id) == uuid3;
+        CHECK_EQUAL(q.count(), 34);
+
+        auto tv = table->get_sorted_view({{{col}}, {true}});
+        auto tv2 = table->get_sorted_view({{{col}}, {false}});
+        CHECK_EQUAL(tv.size(), tv2.size());
+        // check that sorting ascending vs descending is stable
+        for (size_t i = 0; i < tv.size(); i++) {
+            CHECK_EQUAL(tv.get(i).get<UUID>(col), tv2.get(tv2.size() - i - 1).get<UUID>(col));
         }
-        Query q2 = table->column<UUID>(col_id) == alternative_id;
-        // std::cout << q2.get_description() << std::endl;
+
+        Query q2 = table->column<UUID>(col_id) == uuid3;
         CHECK_EQUAL(q2.count(), 34);
         q2 = table->column<UUID>(col_id) == realm::null();
-        // std::cout << q2.get_description() << std::endl;
         CHECK_EQUAL(q2.count(), 1000 - 34);
         q2 = table->where().equal(col_id, realm::null());
         CHECK_EQUAL(q2.count(), 1000 - 34);
 
         // Test query over links
-        Query q3 = origin->link(col_owns).column<UUID>(col_id) == alternative_id;
+        Query q3 = origin->link(col_owns).column<UUID>(col_id) == uuid3;
         CHECK_EQUAL(q3.count(), 34);
 
         // Test query over backlink (link list)
-        Query q4 = target->backlink(*table, col_has).column<UUID>(col_id) == alternative_id;
+        Query q4 = target->backlink(*table, col_has).column<UUID>(col_id) == uuid3;
         CHECK_EQUAL(q4.count(), 8);
 
         // just check that it does not crash
         std::ostringstream ostr;
+        tv = q4.find_all();
         tv.to_json(ostr);
-        Query q5 = table->column<UUID>(col) >= t0;
-        CHECK_EQUAL(q5.count(), 1000);
-        Query q6 = table->column<UUID>(col) <= t25;
-        CHECK_EQUAL(q6.count(), 26);
     }
 }
-/*
-TEST(ObjectId_Distinct)
+
+TEST(UUID_Distinct)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
 
     {
-        std::vector<ObjectId> ids{"000004560000000000170232", "000004560000000000170233", "000004550000000000170232"};
+        std::vector<UUID> ids{generate_random_uuid(), generate_random_uuid(), generate_random_uuid()};
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_id = table->add_column(type_ObjectId, "id", true);
+        auto col_id = table->add_column(type_UUID, "id", true);
         for (int i = 1; i < 10; i++) {
             auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
         }
@@ -434,20 +464,3 @@ TEST(ObjectId_Distinct)
         CHECK_EQUAL(tv.size(), 3);
     }
 }
-
-TEST(ObjectId_Gen)
-{
-    auto a = ObjectId::gen();
-    auto b = ObjectId::gen();
-
-    if (b < a) {
-        // This can only happen if the seq counter rolled over. Since it is 24 bits, this is expected once every 16
-        // million runs. Generate new ones which should not involve another rollover.
-        // This could also happen if the clock goes backwards, and while it could happen again, hopefully it won't.
-        a = ObjectId::gen();
-        b = ObjectId::gen();
-    }
-
-    CHECK_LESS(a, b);
-}
-*/
