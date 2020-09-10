@@ -34,6 +34,7 @@ let package = Package(
                 "realm",
                 "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128.c",
                 "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_compare.c",
+                "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_mul.c",
                 "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_div.c",
                 "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_add.c",
                 "external/IntelRDFPMathLib20U2/LIBRARY/src/bid128_fma.c",

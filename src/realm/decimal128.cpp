@@ -410,6 +410,41 @@ bool Decimal128::operator>=(const Decimal128& rhs) const
     return compare(rhs) >= 0;
 }
 
+Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul)
+{
+    unsigned flags = 0;
+    BID_UINT128 res;
+    bid128_mul(&res, &x, &mul, &flags);
+    return to_decimal128(res);
+}
+
+Decimal128 Decimal128::operator*(int64_t mul) const
+{
+    BID_UINT128 x = to_BID_UINT128(*this);
+    BID_UINT128 y = to_BID_UINT128(Decimal128(mul));
+    return do_multiply(x, y);
+}
+
+Decimal128 Decimal128::operator*(size_t mul) const
+{
+    Decimal128 tmp_mul(static_cast<uint64_t>(mul));
+    return do_multiply(to_BID_UINT128(*this), to_BID_UINT128(tmp_mul));
+}
+
+Decimal128 Decimal128::operator*(int mul) const
+{
+    BID_UINT128 x = to_BID_UINT128(*this);
+    BID_UINT128 y = to_BID_UINT128(Decimal128(mul));
+    return do_multiply(x, y);
+}
+
+Decimal128 Decimal128::operator*(Decimal128 mul) const
+{
+    BID_UINT128 x = to_BID_UINT128(*this);
+    BID_UINT128 y = to_BID_UINT128(mul);
+    return do_multiply(x, y);
+}
+
 Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)
 {
     unsigned flags = 0;
@@ -453,6 +488,18 @@ Decimal128& Decimal128::operator+=(Decimal128 rhs)
 
     BID_UINT128 res;
     bid128_add(&res, &x, &y, &flags);
+    memcpy(this, &res, sizeof(Decimal128));
+    return *this;
+}
+
+Decimal128& Decimal128::operator-=(Decimal128 rhs)
+{
+    unsigned flags = 0;
+    BID_UINT128 x = to_BID_UINT128(*this);
+    BID_UINT128 y = to_BID_UINT128(rhs);
+
+    BID_UINT128 res;
+    bid128_sub(&res, &x, &y, &flags);
     memcpy(this, &res, sizeof(Decimal128));
     return *this;
 }
