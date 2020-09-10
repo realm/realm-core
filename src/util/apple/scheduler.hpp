@@ -153,13 +153,15 @@ static const void* c_queue_key = &c_queue_key;
 DispatchQueueScheduler::DispatchQueueScheduler(dispatch_queue_t queue)
 : m_queue(queue)
 {
-    static auto class_dispatch_queue_serial = objc_getClass("OS_dispatch_queue_serial");
-    static auto class_dispatch_queue_main = objc_getClass("OS_dispatch_queue_main");
-    auto cls = object_getClass(reinterpret_cast<id>(queue));
-    if (cls != class_dispatch_queue_serial && cls != class_dispatch_queue_main) {
-        auto msg = util::format("Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
-                                dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
-        throw std::logic_error(msg);
+    if (__builtin_available(iOS 12.0, macOS 10.14, tvOS 12.0, watchOS 5.0, *)) {
+        static auto class_dispatch_queue_serial = objc_getClass("OS_dispatch_queue_serial");
+        static auto class_dispatch_queue_main = objc_getClass("OS_dispatch_queue_main");
+        auto cls = object_getClass(reinterpret_cast<id>(queue));
+        if (cls != class_dispatch_queue_serial && cls != class_dispatch_queue_main) {
+            auto msg = util::format("Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
+                                    dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
+            throw std::logic_error(msg);
+        }
     }
     dispatch_retain(m_queue);
     if (dispatch_queue_get_specific(m_queue, c_queue_key) == nullptr) {
