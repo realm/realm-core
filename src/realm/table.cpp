@@ -296,14 +296,24 @@ const char* get_data_type_name(DataType type) noexcept
             return "timestamp";
         case type_ObjectId:
             return "ObjectId";
+        case type_Decimal:
+            return "decimal128";
+        case type_UUID:
+            return "uuid";
+        case type_Mixed:
+            return "mixed";
         case type_Link:
             return "link";
         case type_LinkList:
             return "linklist";
-        default:
-            return "unknown";
+        case type_OldTable:
+            return "oldTable";
+        case type_OldDateTime:
+            return "oldDateTime";
+        case type_TypedLink:
+            return "typedLink";
     }
-    return "";
+    return "unknown";
 }
 } // namespace realm
 
@@ -3602,6 +3612,9 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Decimal:
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
+            case type_UUID:
+                change_nullability_list<UUID, UUID>(from, to, throw_on_null);
+                break;
             case type_Link:
             case type_TypedLink:
             case type_LinkList:
@@ -3652,6 +3665,9 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_Decimal:
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
+                break;
+            case type_UUID:
+                change_nullability<UUID, UUID>(from, to, throw_on_null);
                 break;
             case type_TypedLink:
             case type_Link:

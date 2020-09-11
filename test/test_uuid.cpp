@@ -123,16 +123,14 @@ TEST(UUID_toAndFromString)
     CHECK(UUID::is_valid_string(uuid1));
     CHECK_EQUAL(uuid1, s1);
 
-    //    // UUID -> string -> UUID
-    //    auto uuid2 = UUID::gen();
-    //    auto s2 = uuid2.toString();
-    //    ASSERT(UUID::isUUIDString(s2));
+    // UUID -> string -> UUID
+    auto uuid2 = generate_random_uuid();
+    auto s2 = uuid2.to_string();
+    CHECK(UUID::is_valid_string(s2));
 
-    //    auto uuid2FromStringRes = UUID::parse(s2);
-    //    ASSERT_OK(uuid2FromStringRes);
-    //    auto uuid2FromString = uuid2FromStringRes.getValue();
-    //    ASSERT_EQUALS(uuid2FromString, uuid2);
-    //    ASSERT_EQUALS(uuid2FromString.toString(), s2);
+    UUID uuid2FromString(s2);
+    CHECK_EQUAL(uuid2FromString, uuid2);
+    CHECK_EQUAL(uuid2FromString.to_string(), s2);
 
     // Two UUIDs constructed from the same string are equal
     auto s3 = "01234567-9abc-4def-9012-3456789abcde";
@@ -352,6 +350,59 @@ TEST(UUID_Commit)
         CHECK_EQUAL(table->begin()->get<UUID>(col), id);
     }
 }
+
+
+TEST(UUID_GrowAndShrink)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(path);
+    ColKey col;
+    {
+        auto wt = db->start_write();
+        auto table = wt->add_table("Foo");
+        col = table->add_column(type_UUID, "id");
+        wt->commit();
+    }
+    constexpr size_t num_insertions = 10000;
+    std::vector<UUID> copy;
+    copy.reserve(num_insertions);
+    {
+        auto wt = db->start_write();
+        auto table = wt->get_table("Foo");
+        col = table->get_column_key("id");
+        for (size_t i = 0; i < num_insertions; ++i) {
+            UUID id = generate_random_uuid();
+            copy.push_back(id);
+            table->create_object().set(col, id);
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        CHECK_EQUAL(table->size(), num_insertions);
+        CHECK_EQUAL(copy.size(), table->size());
+        for (auto id : copy) {
+            auto result = table->find_first(col, id);
+            CHECK(result);
+        }
+    }
+    {
+        auto wt = db->start_write();
+        auto table = wt->get_table("Foo");
+        col = table->get_column_key("id");
+        for (size_t i = 0; i < num_insertions; ++i) {
+            table->remove_object(table->begin());
+        }
+        wt->commit();
+    }
+    {
+        auto rt = db->start_read();
+        auto table = rt->get_table("Foo");
+        CHECK_EQUAL(table->size(), 0);
+    }
+}
+
 
 TEST(UUID_Query)
 {

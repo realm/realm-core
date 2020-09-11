@@ -405,7 +405,23 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
             case type_LinkList: {
                 return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
             }
-            default: {
+            case type_ObjectId: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<ObjectId, Cond>(value, column_key)};
+            }
+            case type_Mixed: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Mixed, Cond>(value, column_key)};
+            }
+            case type_Decimal: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Decimal128, Cond>(value, column_key)};
+            }
+            case type_UUID: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<UUID, Cond>(value, column_key)};
+            }
+            case type_TypedLink:
+                [[fallthrough]];
+            case type_Link:
+                [[fallthrough]];
+            case type_OldTable: {
                 throw_type_mismatch_error();
             }
         }

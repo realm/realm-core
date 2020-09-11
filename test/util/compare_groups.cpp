@@ -362,6 +362,15 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                     }
                     continue;
                 }
+                case type_UUID: {
+                    auto a = obj_1.get_list<UUID>(col.key_1);
+                    auto b = obj_2.get_list<UUID>(col.key_2);
+                    if (!compare_arrays(a, b)) {
+                        logger.error("List mismatch in column '%1'", col.name);
+                        equal = false;
+                    }
+                    continue;
+                }
                 case type_TypedLink:
                     // FIXME: Implement
                     continue;
@@ -550,6 +559,15 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
             case type_Mixed: {
                 auto a = obj_1.get<Mixed>(col.key_1);
                 auto b = obj_2.get<Mixed>(col.key_2);
+                if (a != b) {
+                    logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name, a, b);
+                    equal = false;
+                }
+                continue;
+            }
+            case type_UUID: {
+                auto a = obj_1.get<UUID>(col.key_1);
+                auto b = obj_2.get<UUID>(col.key_2);
                 if (a != b) {
                     logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name, a, b);
                     equal = false;

@@ -5043,6 +5043,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
     test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, type_UUID);
     // lists...:
     test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
     test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
@@ -5054,6 +5055,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
     test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, type_UUID);
 }
 
 /*
