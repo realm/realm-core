@@ -54,7 +54,7 @@ namespace std {
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
-#if REALM_IOS
+#if REALM_IOS_DEVICE
 #define REALM_FILELOCK_EMULATION
 #endif
 

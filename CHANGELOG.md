@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix deadlocks when opening a Realm file in both the iOS simulator and Realm Studio (since 6.0.21).
  
 ### Breaking changes
 * None.
