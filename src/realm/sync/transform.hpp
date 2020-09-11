@@ -92,7 +92,7 @@ public:
     /// to point to it with BinaryData. entry.changeset.size() always gives the
     /// size of the changeset.
     ///
-    /// \param begin_version, end_version The range of versions to consider. If
+    /// \param begin_version  end_version The range of versions to consider. If
     /// `begin_version` is equal to `end_version`, it is the empty range. If
     /// `begin_version` is zero, it means that everything preceeding
     /// `end_version` is to be considered, which is again the empty range if
@@ -164,10 +164,6 @@ public:
     /// changesets where HistoryEntry::origin_file_ident is zero, i.e., when the
     /// changeset is of local origin. The specified identifier must never be
     /// zero.
-    ///
-    /// \return The size of the transformed version of the specified
-    /// changesets. Upon return, the transformed changesets are concatenated
-    /// and placed in \a output_buffer.
     ///
     /// \throw TransformError Thrown if operational transformation fails due to
     /// a problem with the specified changeset.

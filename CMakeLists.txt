@@ -82,7 +82,7 @@ else()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation")
     endif()
 
     # This warning is too agressive. It warns about moves that are not redundant on older
@@ -245,11 +245,11 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE OR REALM_FORCE_OPENSSL)
     set(REALM_HAVE_OPENSSL "1")
 endif()
 
-if(APPLE)
+if(APPLE AND NOT REALM_FORCE_OPENSSL)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 

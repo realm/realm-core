@@ -501,6 +501,115 @@ TEST(Shared_CompactingOnTheFly)
 }
 
 
+TEST(Shared_ReadAfterCompact)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->create_object().set_all(1);
+        wt.commit();
+    }
+    sg->compact();
+    auto rt = sg->start_read();
+    auto table = rt->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+
+    CHECK_EQUAL(table->size(), 1);
+    CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
+}
+
+TEST(Shared_ReadOverRead)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->create_object().set_all(1);
+        wt.commit();
+    }
+    DBRef sg2 = DB::create(path);
+    auto rt2 = sg2->start_read();
+    auto table2 = rt2->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg2);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table2->size(), 1);
+    CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
+}
+
+TEST(Shared_ReadOverReadAfterCompact)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef sg = DB::create(path);
+    {
+        WriteTransaction wt(sg);
+        auto table = wt.add_table("table");
+        table->add_column(type_Int, "col");
+        table->create_object().set_all(1);
+        wt.commit();
+    }
+    sg->compact();
+    DBRef sg2 = DB::create(path);
+    auto rt = sg->start_read();
+    auto rt2 = sg2->start_read();
+    auto table = rt->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table->size(), 1);
+    CHECK_EQUAL(table->get_object(0).get<int64_t>("col"), 1);
+
+    auto table2 = rt2->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg2);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table2->size(), 1);
+    CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
+}
+
+
+TEST(Shared_ReadOverRead2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        DBRef sg = DB::create(path);
+        {
+            WriteTransaction wt(sg);
+            auto table = wt.add_table("table");
+            table->add_column(type_Int, "col");
+            table->create_object().set_all(1);
+            wt.commit();
+        }
+    }
+    DBRef sg3 = DB::create(path);
+    DBRef sg2 = DB::create(path);
+    auto rt2 = sg2->start_read();
+    auto table2 = rt2->get_table("table");
+    for (int i = 2; i < 4; ++i) {
+        WriteTransaction wt(sg2);
+        wt.get_table("table")->create_object().set_all(i);
+        wt.commit();
+    }
+    CHECK_EQUAL(table2->size(), 1);
+    CHECK_EQUAL(table2->get_object(0).get<int64_t>("col"), 1);
+}
+
+
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
@@ -3395,6 +3504,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
     Thread t;
     auto do_async = [&]() {
         File f(path.get_lock_path(), File::mode_Write);
+        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3459,6 +3569,7 @@ TEST(Shared_LockFileOfWrongVersionThrows)
 
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
+        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
 
         f.lock_shared();
         File::UnlockGuard ug(f);
@@ -3511,6 +3622,7 @@ TEST(Shared_LockFileOfWrongMutexSizeThrows)
     auto do_async = [&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
+        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3564,6 +3676,7 @@ TEST(Shared_LockFileOfWrongCondvarSizeThrows)
     auto do_async = [&]() {
         File f;
         f.open(path.get_lock_path(), File::access_ReadWrite, File::create_Auto, 0); // Throws
+        f.set_fifo_path(std::string(path) + ".management/lock.fifo");
         f.lock_shared();
         File::UnlockGuard ug(f);
 
@@ -3646,6 +3759,23 @@ TEST(Shared_ConstObjectIterator)
     CHECK_EQUAL(i3->get<int64_t>(col), 7);
     ++i3;
     CHECK_EQUAL(i3->get<int64_t>(col), 8);
+    reader.reset();
+    // Verify that we can copy a ConstIterator - even an invalid one
+    TransactionRef writer = sg->start_write();
+    TableRef t4 = writer->get_table("Foo");
+    auto i4 = t4->begin();
+    t4->clear();
+    auto i5(i4);
+    // dereferencing an invalid iterator will throw
+    CHECK_THROW(*i5, std::runtime_error);
+    CHECK_THROW(i5[0], std::runtime_error);
+    // but moving it will not, it just stays invalid
+    ++i5;
+    i5 += 3;
+    // so, should still throw
+    CHECK_THROW(*i5, std::runtime_error);
+    CHECK_THROW(i5[0], std::runtime_error);
+    CHECK(i5 == t4->end());
 }
 
 TEST(Shared_ConstList)

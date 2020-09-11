@@ -386,13 +386,13 @@ ColKey Table::add_column_link(DataType type, StringData name, Table& target)
     }
 }
 
-ColKey Table::add_column_dictionary(DataType type, StringData name, DataType value_type)
+ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key_type)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
-    return do_insert_column(col_key, type, name, invalid_link, value_type); // Throws
+    return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -565,10 +565,9 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table,
-                               DataType value_type)
+ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table, DataType key_type)
 {
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, value_type); // Throws
+    col_key = do_insert_root_column(col_key, ColumnType(type), name, key_type); // Throws
 
     // When the inserted column is a link-type column, we must also add a
     // backlink column to the target table.
@@ -838,7 +837,7 @@ void Table::erase_root_column(ColKey col_key)
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, DataType value_type)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, DataType key_type)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
@@ -852,7 +851,7 @@ ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData 
 
     m_spec.insert_column(spec_ndx, col_key, type, name, col_key.get_attrs().m_value); // Throws
     if (col_key.is_dictionary()) {
-        m_spec.set_value_type(spec_ndx, value_type);
+        m_spec.set_dictionary_key_type(spec_ndx, key_type);
     }
     auto col_ndx = col_key.get_index().val;
     build_column_mapping();
@@ -1019,7 +1018,7 @@ bool Table::has_search_index(ColKey col_key) const noexcept
     return m_index_accessors[col_key.get_index().val] != nullptr;
 }
 
-void Table::migrate_column_info(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_column_info()
 {
     bool changes = false;
     TableKey tk = (get_name() == "pk") ? TableKey(0) : get_key();
@@ -1028,17 +1027,53 @@ void Table::migrate_column_info(util::FunctionRef<void()> commit_and_continue)
 
     if (changes) {
         build_column_mapping();
-        commit_and_continue();
     }
+}
+
+bool Table::verify_column_keys()
+{
+    size_t nb_public_columns = m_spec.get_public_column_count();
+    size_t nb_columns = m_spec.get_column_count();
+    bool modified = false;
+
+    auto check = [&]() {
+        for (size_t spec_ndx = nb_public_columns; spec_ndx < nb_columns; spec_ndx++) {
+            if (m_spec.get_column_type(spec_ndx) == col_type_BackLink) {
+                auto col_key = m_spec.get_key(spec_ndx);
+                // This function checks for a specific error in the m_keys array where the
+                // backlink column keys are wrong. It can be detected by trying to find the
+                // corresponding origin table. If the error exists some of the results will
+                // give null TableKeys back.
+                if (!get_opposite_table_key(col_key))
+                    return false;
+                auto t = get_opposite_table(col_key);
+                auto c = get_opposite_column(col_key);
+                if (!t->valid_column(c))
+                    return false;
+                if (t->get_opposite_column(c) != col_key) {
+                    t->set_opposite_column(c, get_key(), col_key);
+                }
+            }
+        }
+        return true;
+    };
+
+    if (!check()) {
+        m_spec.fix_column_keys(get_key());
+        build_column_mapping();
+        refresh_index_accessors();
+        REALM_ASSERT_RELEASE(check());
+        modified = true;
+    }
+    return modified;
 }
 
 // Delete the indexes stored in the columns array and create corresponding
 // entries in m_index_accessors array. This also has the effect that the columns
 // array after this step does not have extra entries for certain columns
-void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_indexes(ColKey pk_col_key)
 {
     if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
-        bool changes = false;
         Array col_refs(m_alloc);
         col_refs.set_parent(&m_top, top_position_for_columns);
         col_refs.init_from_ref(top_ref);
@@ -1057,7 +1092,6 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
                     // reports on freeing a null ref, so just to be sure ...
                     Array::destroy_deep(old_index_ref, m_alloc);
                 }
-                changes = true;
 
                 // Primary key columns does not need an index
                 if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
@@ -1071,9 +1105,6 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
             }
             col_ndx++;
         };
-        if (changes) {
-            commit_and_continue();
-        }
     }
 }
 
@@ -1082,68 +1113,74 @@ void Table::migrate_indexes(ColKey pk_col_key, util::FunctionRef<void()> commit_
 // This information is now held in "opposite" arrays directly in Table structure
 // At the same time the backlink columns are destroyed
 // If there is no subspec, this stage is done
-void Table::migrate_subspec(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_subspec()
 {
     if (!m_spec.has_subspec())
         return;
 
-    if (ref_type top_ref = m_top.get_as_ref(top_position_for_columns)) {
-        Array col_refs(m_alloc);
-        col_refs.set_parent(&m_top, top_position_for_columns);
-        col_refs.init_from_ref(top_ref);
-        Group* group = get_parent_group();
+    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
+    Array col_refs(m_alloc);
+    col_refs.set_parent(&m_top, top_position_for_columns);
+    col_refs.init_from_ref(top_ref);
+    Group* group = get_parent_group();
 
-        for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
-            ColumnType col_type = m_spec.get_column_type(col_ndx);
+    for (size_t col_ndx = 0; col_ndx < m_spec.get_column_count(); col_ndx++) {
+        ColumnType col_type = m_spec.get_column_type(col_ndx);
 
-            if (is_link_type(col_type)) {
-                auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
-                auto target_table = group->get_table(target_key);
-                Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
-                // The target table spec may already be migrated.
-                // If it has, the new functions should be used.
-                ColKey backlink_col_key = target_spec.has_subspec()
-                                              ? target_spec.find_backlink_column(m_key, col_ndx)
-                                              : target_table->find_opposite_column(m_spec.get_key(col_ndx));
-                REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
-                if (m_opposite_table.get(col_ndx) != target_key.value) {
-                    m_opposite_table.set(col_ndx, target_key.value);
-                }
-                if (m_opposite_column.get(col_ndx) != backlink_col_key.value) {
-                    m_opposite_column.set(col_ndx, backlink_col_key.value);
-                }
+        if (is_link_type(col_type)) {
+            auto target_key = m_spec.get_opposite_link_table_key(col_ndx);
+            auto target_table = group->get_table(target_key);
+            Spec& target_spec = _impl::TableFriend::get_spec(*target_table);
+            // The target table spec may already be migrated.
+            // If it has, the new functions should be used.
+            ColKey backlink_col_key = target_spec.has_subspec()
+                                          ? target_spec.find_backlink_column(m_key, col_ndx)
+                                          : target_table->find_opposite_column(m_spec.get_key(col_ndx));
+            REALM_ASSERT(backlink_col_key.get_type() == col_type_BackLink);
+            if (m_opposite_table.get(col_ndx) != target_key.value) {
+                m_opposite_table.set(col_ndx, target_key.value);
             }
-            else if (col_type == col_type_BackLink) {
-                auto origin_key = m_spec.get_opposite_link_table_key(col_ndx);
-                size_t origin_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
-                auto origin_table = group->get_table(origin_key);
-                Spec& origin_spec = _impl::TableFriend::get_spec(*origin_table);
-                ColKey origin_col_key = origin_spec.get_key(origin_col_ndx);
-                REALM_ASSERT(is_link_type(origin_col_key.get_type()));
-                if (m_opposite_table.get(col_ndx) != origin_key.value) {
-                    m_opposite_table.set(col_ndx, origin_key.value);
-                }
-                if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
-                    m_opposite_column.set(col_ndx, origin_col_key.value);
-                }
-                if (auto ref = to_ref(col_refs.get(col_ndx))) {
-                    Array::destroy_deep(ref, m_alloc);
-                    col_refs.set(col_ndx, 0);
-                }
+            if (m_opposite_column.get(col_ndx) != backlink_col_key.value) {
+                m_opposite_column.set(col_ndx, backlink_col_key.value);
             }
-        };
-    }
+        }
+        else if (col_type == col_type_BackLink) {
+            auto origin_key = m_spec.get_opposite_link_table_key(col_ndx);
+            size_t origin_col_ndx = m_spec.get_origin_column_ndx(col_ndx);
+            auto origin_table = group->get_table(origin_key);
+            Spec& origin_spec = _impl::TableFriend::get_spec(*origin_table);
+            ColKey origin_col_key = origin_spec.get_key(origin_col_ndx);
+            REALM_ASSERT(is_link_type(origin_col_key.get_type()));
+            if (m_opposite_table.get(col_ndx) != origin_key.value) {
+                m_opposite_table.set(col_ndx, origin_key.value);
+            }
+            if (m_opposite_column.get(col_ndx) != origin_col_key.value) {
+                m_opposite_column.set(col_ndx, origin_col_key.value);
+            }
+        }
+    };
     m_spec.destroy_subspec();
-    commit_and_continue();
 }
 
 namespace {
 
 class LegacyStringColumn : public BPlusTree<StringData> {
 public:
-    LegacyStringColumn(Allocator& alloc)
+    LegacyStringColumn(Allocator& alloc, Spec* spec, size_t col_ndx, bool nullable)
         : BPlusTree(alloc)
+        , m_spec(spec)
+        , m_col_ndx(col_ndx)
+        , m_nullable(nullable)
     {
+    }
+
+    std::unique_ptr<BPlusTreeLeaf> init_leaf_node(ref_type ref) override
+    {
+        auto leaf = std::make_unique<LeafNode>(this);
+        leaf->ArrayString::set_spec(m_spec, m_col_ndx);
+        leaf->set_nullability(m_nullable);
+        leaf->init_from_ref(ref);
+        return leaf;
     }
 
     StringData get_legacy(size_t n) const
@@ -1164,6 +1201,11 @@ public:
             return value;
         }
     }
+
+private:
+    Spec* m_spec;
+    size_t m_col_ndx;
+    bool m_nullable;
 };
 
 // We need an accessor that can read old Timestamp columns.
@@ -1283,9 +1325,10 @@ void copy_list<String>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& 
 {
     if (sub_table_ref) {
         // Actual list is in the columns array position 0
+        bool nullable = col.get_attrs().test(col_attr_Nullable);
         Array cols(alloc);
         cols.init_from_ref(sub_table_ref);
-        LegacyStringColumn from_list(alloc);
+        LegacyStringColumn from_list(alloc, nullptr, 0, nullable); // List of strings cannot be enumerated
         from_list.set_parent(&cols, 0);
         from_list.init_from_parent();
         size_t list_size = from_list.size();
@@ -1316,7 +1359,7 @@ void copy_list<Timestamp>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocato
 
 } // namespace
 
-void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
+void Table::create_columns()
 {
     size_t cnt;
     auto get_column_cnt = [&cnt](const Cluster* cluster) {
@@ -1330,18 +1373,23 @@ void Table::create_columns(util::FunctionRef<void()> commit_and_continue)
         for (size_t col_ndx = 0; col_ndx < column_count; col_ndx++) {
             m_clusters.insert_column(m_spec.get_key(col_ndx));
         }
-        commit_and_continue();
     }
 }
 
-void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_and_continue)
+bool Table::migrate_objects(ColKey pk_col_key)
 {
-    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
-    if (!top_ref) {
-        // All objects migrated
-        return;
+    size_t nb_public_columns = m_spec.get_public_column_count();
+    size_t nb_columns = m_spec.get_column_count();
+    if (!nb_columns) {
+        // No columns - this means no objects
+        return true;
     }
 
+    ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
+    if (!top_ref) {
+        // Has already been done
+        return true;
+    }
     Array col_refs(m_alloc);
     col_refs.set_parent(&m_top, top_position_for_columns);
     col_refs.init_from_ref(top_ref);
@@ -1353,7 +1401,6 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
     std::map<ColKey, std::unique_ptr<BPlusTree<int64_t>>> list_accessors;
     std::vector<size_t> cols_to_destroy;
     bool has_link_columns = false;
-    size_t nb_columns = m_spec.get_public_column_count();
 
     // helper function to determine the number of objects in the table
     size_t number_of_objects = (nb_columns == 0) ? 0 : size_t(-1);
@@ -1367,12 +1414,22 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
     };
 
     for (size_t col_ndx = 0; col_ndx < nb_columns; col_ndx++) {
+        if (col_ndx < nb_public_columns && m_spec.get_column_name(col_ndx) == "!ROW_INDEX") {
+            // If this column has been added, we can break here
+            break;
+        }
+
         ColKey col_key = m_spec.get_key(col_ndx);
         ColumnAttrMask attr = m_spec.get_column_attr(col_ndx);
         ColumnType col_type = m_spec.get_column_type(col_ndx);
+        bool nullable = attr.test(col_attr_Nullable);
         std::unique_ptr<BPlusTreeBase> acc;
         std::unique_ptr<LegacyTS> ts_acc;
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
+
+        if (!(col_ndx < col_refs.size())) {
+            throw std::runtime_error("File corrupted by previous upgrade attempt");
+        }
 
         if (!col_refs.get(col_ndx)) {
             // This column has been migrated
@@ -1386,7 +1443,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
             switch (col_type) {
                 case col_type_Int:
                 case col_type_Bool:
-                    if (attr.test(col_attr_Nullable)) {
+                    if (nullable) {
                         acc = std::make_unique<BPlusTree<util::Optional<Int>>>(m_alloc);
                     }
                     else {
@@ -1400,7 +1457,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
                     acc = std::make_unique<BPlusTree<double>>(m_alloc);
                     break;
                 case col_type_String:
-                    acc = std::make_unique<LegacyStringColumn>(m_alloc);
+                    acc = std::make_unique<LegacyStringColumn>(m_alloc, &m_spec, col_ndx, nullable);
                     break;
                 case col_type_Binary:
                     acc = std::make_unique<BPlusTree<Binary>>(m_alloc);
@@ -1416,6 +1473,14 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
                     arr.init_from_parent();
                     update_size(arr.size());
                     has_link_columns = true;
+                    break;
+                }
+                case col_type_BackLink: {
+                    BPlusTree<int64_t> arr(m_alloc);
+                    arr.set_parent(&col_refs, col_ndx);
+                    arr.init_from_parent();
+                    update_size(arr.size());
+                    cols_to_destroy.push_back(col_ndx);
                     break;
                 }
                 default:
@@ -1450,7 +1515,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
 
     if (m_clusters.size() == number_of_objects) {
         // We have migrated all objects
-        return;
+        return !has_link_columns;
     }
 
     /******************** Optionally create !OID accessor ********************/
@@ -1458,7 +1523,7 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
     ColKey oid_col;
     BPlusTree<Int>* oid_column = nullptr;
     std::unique_ptr<BPlusTreeBase> oid_column_store;
-    if (m_spec.get_column_name(0) == "!OID") {
+    if (nb_public_columns > 0 && m_spec.get_column_name(0) == "!OID") {
         // The !OID column should not be migrated, but we need an accessor
         // to the old column
         oid_col = m_spec.get_key(0);
@@ -1564,16 +1629,11 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         }
     }
 
-    if (!has_link_columns) {
-        // No link columns to update - mark that we are done with this table
-        finalize_migration();
-    }
-    else {
-        // Destroy values in the old columns that has been copied
-        for (auto col_ndx : cols_to_destroy) {
-            Array::destroy_deep(to_ref(col_refs.get(col_ndx)), m_alloc);
-            col_refs.set(col_ndx, 0);
-        }
+    // Destroy values in the old columns that has been copied.
+    // This frees up space in the file
+    for (auto ndx : cols_to_destroy) {
+        Array::destroy_deep(to_ref(col_refs.get(ndx)), m_alloc);
+        col_refs.set(ndx, 0);
     }
 
     // We need to be sure that the stored 'next sequence number' is bigger than
@@ -1585,15 +1645,15 @@ void Table::migrate_objects(ColKey pk_col_key, util::FunctionRef<void()> commit_
         m_top.set(top_position_for_sequence_number, rot);
     }
 
-    commit_and_continue();
 #if 0
     if (fastrand(100) < 20) {
         throw util::runtime_error("Upgrade interrupted");
     }
 #endif
+    return !has_link_columns;
 }
 
-void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
+void Table::migrate_links()
 {
     ref_type top_ref = m_top.get_as_ref(top_position_for_columns);
     if (!top_ref) {
@@ -1663,18 +1723,24 @@ void Table::migrate_links(util::FunctionRef<void()> commit_and_continue)
             }
         }
     }
-
-    finalize_migration();
-    commit_and_continue();
 }
 
-void Table::finalize_migration()
+void Table::finalize_migration(ColKey pk_col_key)
 {
-    ref_type ref = m_top.get_as_ref(top_position_for_columns);
-    if (ref) {
+    if (ref_type ref = m_top.get_as_ref(top_position_for_columns)) {
         Array::destroy_deep(ref, m_alloc);
         m_top.set(top_position_for_columns, 0);
     }
+
+    if (auto orig_row_ndx_col = get_column_key("!ROW_INDEX")) {
+        remove_column(orig_row_ndx_col);
+    }
+
+    if (auto oid_col = get_column_key("!OID")) {
+        remove_column(oid_col);
+    }
+
+    do_set_primary_key_column(pk_col_key);
 }
 
 StringData Table::get_name() const noexcept
@@ -2611,6 +2677,13 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
     if (key == null_key) {
         GlobalKey object_id = allocate_object_id_squeezed();
         key = object_id.get_local_key(get_sync_file_id());
+        // Check if this key collides with an already existing object
+        // This could happen if objects were at some point created with primary keys,
+        // but later primary key property was removed from the schema.
+        while (m_clusters.is_valid(key)) {
+            object_id = allocate_object_id_squeezed();
+            key = object_id.get_local_key(get_sync_file_id());
+        }
         if (auto repl = get_repl())
             repl->create_object(this, object_id);
     }

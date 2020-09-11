@@ -85,9 +85,10 @@ public:
     virtual BinaryData binary_for_argument(size_t argument_index) = 0;
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual ObjKey object_index_for_argument(size_t argument_index) = 0;
-    virtual ObjectId objectid_for_argument(size_t i) = 0;
-    virtual Decimal128 decimal128_for_argument(size_t i) = 0;
+    virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
+    virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
+
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
     std::vector<util::StringBuffer> buffer_space;
@@ -121,7 +122,10 @@ public:
     {
         return get<ObjKey>(i);
     }
-    bool is_argument_null(size_t i) override { return m_ctx.is_null(at(i)); }
+    bool is_argument_null(size_t i) override
+    {
+        return m_ctx.is_null(at(i));
+    }
 
 private:
     ContextType& m_ctx;

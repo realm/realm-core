@@ -348,19 +348,20 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
             instr.collection_type = CollectionType::List;
         }
         else if (col_key.is_dictionary()) {
-            REALM_ASSERT(type == type_String);
             instr.collection_type = CollectionType::Dictionary;
-            auto value_type = table->get_dictionary_value_type(col_key);
-            instr.value_type = get_payload_type(value_type);
+            auto key_type = table->get_dictionary_key_type(col_key);
+            REALM_ASSERT(key_type == type_String);
+            instr.key_type = get_payload_type(key_type);
         }
         else {
             REALM_ASSERT(!col_key.is_collection());
             instr.collection_type = CollectionType::Single;
-            instr.value_type = Instruction::Payload::Type::Null;
+            instr.key_type = Instruction::Payload::Type::Null;
         }
 
         // Mixed columns are always nullable.
-        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable);
+        REALM_ASSERT(instr.type != Instruction::Payload::Type::Null || instr.nullable ||
+                     instr.collection_type == CollectionType::Dictionary);
 
         if (instr.type == Instruction::Payload::Type::Link && target_table) {
             instr.link_target_table = emit_class_name(*target_table);
@@ -400,9 +401,14 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 {
     TrivialReplication::list_set(list, ndx, value);
 
-    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+    if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        return;
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
     }
 
     if (select_collection(list)) {
@@ -418,6 +424,16 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value)
 {
     TrivialReplication::list_insert(list, ndx, value);
+
+    if (!value.is_null()) {
+        // If link is unresolved, it should not be communicated.
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
+    }
 
     if (select_collection(list)) {
         auto sz = uint32_t(list.size());
@@ -452,11 +468,14 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         return;
     }
 
-    REALM_ASSERT(!key.is_unresolved());
-
-    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+    if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        return;
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
     }
 
     if (select_table(*table)) {
@@ -526,9 +545,19 @@ void SyncReplication::list_clear(const CollectionBase& view)
 }
 
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
+void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_insert(dict, key, val);
+    TrivialReplication::dictionary_insert(dict, key, value);
+
+    if (!value.is_null()) {
+        // If link is unresolved, it should not be communicated.
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
+    }
 
     if (select_collection(dict)) {
         Instruction::Update instr;
@@ -536,7 +565,7 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
         populate_path_instr(instr, dict);
         StringData key_value = key.get_string();
         instr.path.push_back(m_encoder.intern_string(key_value));
-        instr.value = as_payload(dict, val);
+        instr.value = as_payload(dict, value);
         instr.is_default = false;
         emit(instr);
     }
@@ -616,6 +645,10 @@ bool SyncReplication::select_table(const Table& table)
 
 bool SyncReplication::select_collection(const CollectionBase& view)
 {
+    if (view.get_key().is_unresolved()) {
+        return false;
+    }
+
     return select_table(*view.get_table());
 }
 

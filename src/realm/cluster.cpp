@@ -942,7 +942,8 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     // FIXME: Move this validation into callers.
     // Currently, the query subsystem may call with an unvalidated key.
     // once fixed, reintroduce the noexcept declaration :-D
-    m_tree_top.get_owning_table()->report_invalid_key(col_key);
+    if (auto t = m_tree_top.get_owning_table())
+        t->report_invalid_key(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
     if (leaf->need_spec()) {
         m_tree_top.set_spec(*leaf, col_ndx);
@@ -1068,7 +1069,8 @@ void Cluster::verify() const
             }
             for (size_t n = 0; n < sz; n++) {
                 if (arr.get(n)) {
-                    DictionaryClusterTree cluster(&arr, col_type, get_alloc(), n);
+                    auto key_type = get_owning_table()->get_dictionary_key_type(col_key);
+                    DictionaryClusterTree cluster(&arr, key_type, get_alloc(), n);
                     cluster.init_from_parent();
                     cluster.verify();
                 }

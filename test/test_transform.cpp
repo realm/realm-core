@@ -1888,7 +1888,7 @@ TEST(Transform_Dictionary)
         client_1->transaction([&](Peer& c) {
             auto& tr = *c.group;
             auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
-            table->add_column_dictionary(type_String, "dict", type_String);
+            table->add_column_dictionary(type_Mixed, "dict");
             table->create_object_with_primary_key(0);
             table->create_object_with_primary_key(1);
         });

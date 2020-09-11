@@ -301,6 +301,7 @@ public:
     /// ref->ptr translation changes, and is used by Group to enforce re-translation.
     void update_reader_view(size_t file_size);
     void purge_old_mappings(uint64_t oldest_live_version, uint64_t youngest_live_version);
+    void init_mapping_management(uint64_t currently_live_version);
 
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be

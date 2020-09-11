@@ -80,7 +80,7 @@ TEST(Dictionary_Basics)
     };
 
     auto foo = g.add_table("foo");
-    auto col_dict = foo->add_column_dictionary(type_String, "dictionaries", type_Mixed);
+    auto col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
 
     Obj obj1 = foo->create_object();
     Obj obj2 = foo->create_object();
@@ -134,7 +134,7 @@ TEST(Dictionary_Links)
 
     auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
     auto persons = g.add_table_with_primary_key("person", type_String, "name");
-    auto col_dict = persons->add_column_dictionary(type_String, "dictionaries", type_TypedLink);
+    auto col_dict = persons->add_column_dictionary(type_TypedLink, "dictionaries");
 
     Obj adam = persons->create_object_with_primary_key("adam");
     Obj pluto = dogs->create_object_with_primary_key("pluto");
@@ -181,7 +181,7 @@ TEST(Dictionary_Transaction)
     {
         WriteTransaction wt(db);
         auto foo = wt.add_table("foo");
-        col_dict = foo->add_column_dictionary(type_String, "dictionaries", type_Mixed);
+        col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
 
         Obj obj1 = foo->create_object();
         Obj obj2 = foo->create_object();
@@ -302,4 +302,27 @@ TEST(Dictionary_Performance)
     std::cout << nb_reps << " values in dictionary" << std::endl;
     std::cout << "    insertion: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/val" << std::endl;
     std::cout << "    lookup: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/val" << std::endl;
+}
+
+TEST(Dictionary_Tombstones)
+{
+    Group g;
+    auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+    auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+    ColKey col_dict = foos->add_column_dictionary(type_String, "dict", type_Mixed);
+
+    auto foo = foos->create_object_with_primary_key(123);
+    auto a = bars->create_object_with_primary_key("a");
+    auto b = bars->create_object_with_primary_key("b");
+
+    auto dict = foo.get_dictionary(col_dict);
+    dict.insert("a", a);
+    dict.insert("b", b);
+
+    a.invalidate();
+
+    CHECK_EQUAL(dict.size(), 2);
+    CHECK((*dict.find("a")).second.is_unresolved_link());
+
+    CHECK(dict.find("b") != dict.end());
 }

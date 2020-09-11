@@ -858,6 +858,14 @@ ClusterNode::State ClusterTree::get(ObjKey k) const
     return state;
 }
 
+ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
+{
+    ClusterNode::State state;
+    if (!m_root->try_get(k, state))
+        state.index = realm::npos;
+    return state;
+}
+
 ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {
@@ -993,11 +1001,6 @@ ClusterTree::Iterator::Iterator(const Iterator& other)
     , m_leaf_invalid(other.m_leaf_invalid)
     , m_position(other.m_position)
 {
-    if (m_key) {
-        auto k = load_leaf(m_key);
-        if (k != m_key)
-            throw std::runtime_error("ConstIterator copy failed");
-    }
     m_leaf_start_pos = m_position - m_state.m_current_index;
 }
 
@@ -1030,7 +1033,7 @@ ObjKey ClusterTree::Iterator::load_leaf(ObjKey key) const
 
 ObjKey ClusterTree::Iterator::go(size_t n)
 {
-    if (m_storage_version != m_tree.get_storage_version(m_instance_version)) {
+    if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         // reload
         m_position = get_position(); // Will throw if base object is deleted
         load_leaf(m_key);
@@ -1063,7 +1066,7 @@ bool ClusterTree::Iterator::update() const
 {
     if (m_leaf_invalid || m_storage_version != m_tree.get_storage_version(m_instance_version)) {
         ObjKey k = load_leaf(m_key);
-        m_leaf_invalid = (k != m_key);
+        m_leaf_invalid = !k || (k != m_key);
         if (m_leaf_invalid) {
             throw std::runtime_error("Outdated iterator");
         }

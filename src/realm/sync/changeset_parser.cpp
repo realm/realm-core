@@ -364,10 +364,10 @@ void ChangesetParser::State::parse_one()
                 instr.link_target_table = read_intern_string();
             }
             if (instr.collection_type == Instruction::AddColumn::CollectionType::Dictionary) {
-                instr.value_type = read_payload_type();
+                instr.key_type = read_payload_type();
             }
             else {
-                instr.value_type = Instruction::Payload::Type::Null;
+                instr.key_type = Instruction::Payload::Type::Null;
             }
             m_handler(instr);
             return;

@@ -194,6 +194,9 @@ TEST(Utils_File_resolve)
 #ifndef _WIN32 // An open file cannot be deleted on Windows
 TEST(Utils_File_remove_open)
 {
+    if (test_util::test_dir_is_exfat())
+        return;
+
     std::string file_name = File::resolve("FooBar", test_util::get_test_path_prefix());
     File f(file_name, File::mode_Write);
 

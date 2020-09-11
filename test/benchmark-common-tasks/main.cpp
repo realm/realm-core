@@ -1108,7 +1108,7 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
         ConstTableRef table = m_table;
         Query query = table->where();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(m_col, values_to_query[i]);
+            query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,

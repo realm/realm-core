@@ -154,7 +154,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
 
-#define REALM_OLDQUERY_FALLBACK
+#define REALM_OLDQUERY_FALLBACK 1
 
 namespace realm {
 
@@ -164,7 +164,7 @@ T minimum(T a, T b)
     return a < b ? a : b;
 }
 
-#ifdef REALM_OLDQUERY_FALLBACK
+#if REALM_OLDQUERY_FALLBACK
 // Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
 namespace _impl {
 
@@ -189,6 +189,28 @@ inline int only_numeric(const StringData&)
 
 template <class T>
 inline int only_numeric(const BinaryData&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+
+template <class T>
+inline int only_numeric(const realm::null&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template <class T>
+inline std::enable_if_t<std::is_same_v<T, Timestamp>, int> only_numeric(const ObjectId&)
+{
+    REALM_ASSERT(false);
+    return 0;
+}
+
+template <class T>
+inline std::enable_if_t<std::is_same_v<T, ObjectId>, int> only_numeric(const Timestamp&)
 {
     REALM_ASSERT(false);
     return 0;
@@ -331,6 +353,7 @@ struct ValueBase {
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void export_StringData(ValueBase& destination) const = 0;
     virtual void export_BinaryData(ValueBase& destination) const = 0;
+    virtual void export_Mixed(ValueBase& destination) const = 0;
     virtual void export_null(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
 
@@ -431,6 +454,11 @@ public:
         REALM_ASSERT(false); // Unimplemented
     }
 
+    virtual Mixed get_mixed()
+    {
+        return {};
+    }
+
     virtual ExpressionComparisonType get_comparison_type() const
     {
         return ExpressionComparisonType::Any;
@@ -456,7 +484,7 @@ template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
 template <class oper, class TLeft = Subexpr>
 class SizeOperator;
-template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr>
+template <class TCond, class T>
 class Compare;
 template <bool has_links>
 class UnaryLinkCompare;
@@ -467,79 +495,74 @@ class ColumnAccessorBase;
 template <class Cond, class L, class R>
 Query create(L left, const Subexpr2<R>& right)
 {
-// Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
-// query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
-// query_expression.hpp node.
-//
-// This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
+    // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
+    // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
+    // query_expression.hpp node.
+    //
+    // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere.
 
-#ifdef REALM_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
-    const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-    // TODO: recognize size operator expressions
-    // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
+    if constexpr (REALM_OLDQUERY_FALLBACK &&
+                  ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
+                   (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
+                   (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
+                   (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
+                   (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
+                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>))) {
+        const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+        // TODO: recognize size operator expressions
+        // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
-    if (column &&
-        ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
-         (std::is_same_v<L, double> && std::is_same_v<R, double>) ||
-         (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
-         (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
-         (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-         (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>)) &&
-        !column->links_exist()) {
-        ConstTableRef t = column->get_base_table();
-        Query q = Query(t);
+        if (column && !column->links_exist()) {
+            ConstTableRef t = column->get_base_table();
+            Query q = Query(t);
 
-        if (std::is_same_v<Cond, Less>)
-            q.greater(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same_v<Cond, Greater>)
-            q.less(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same_v<Cond, Equal>)
-            q.equal(column->column_key(), left);
-        else if (std::is_same_v<Cond, NotEqual>)
-            q.not_equal(column->column_key(), left);
-        else if (std::is_same_v<Cond, LessEqual>)
-            q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same_v<Cond, GreaterEqual>)
-            q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
-        else if (std::is_same_v<Cond, EqualIns>)
-            q.equal(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same_v<Cond, NotEqualIns>)
-            q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same_v<Cond, BeginsWith>)
-            q.begins_with(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same_v<Cond, BeginsWithIns>)
-            q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same_v<Cond, EndsWith>)
-            q.ends_with(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same_v<Cond, EndsWithIns>)
-            q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same_v<Cond, Contains>)
-            q.contains(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same_v<Cond, ContainsIns>)
-            q.contains(column->column_key(), _impl::only_string_op_types(left), false);
-        else if (std::is_same_v<Cond, Like>)
-            q.like(column->column_key(), _impl::only_string_op_types(left));
-        else if (std::is_same_v<Cond, LikeIns>)
-            q.like(column->column_key(), _impl::only_string_op_types(left), false);
-        else {
-            // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
-            // fallback to using use 'return new Compare<>' instead.
-            REALM_ASSERT(false);
+            if (std::is_same_v<Cond, Less>)
+                q.greater(column->column_key(), _impl::only_numeric<R>(left));
+            else if (std::is_same_v<Cond, Greater>)
+                q.less(column->column_key(), _impl::only_numeric<R>(left));
+            else if (std::is_same_v<Cond, Equal>)
+                q.equal(column->column_key(), left);
+            else if (std::is_same_v<Cond, NotEqual>)
+                q.not_equal(column->column_key(), left);
+            else if (std::is_same_v<Cond, LessEqual>)
+                q.greater_equal(column->column_key(), _impl::only_numeric<R>(left));
+            else if (std::is_same_v<Cond, GreaterEqual>)
+                q.less_equal(column->column_key(), _impl::only_numeric<R>(left));
+            else if (std::is_same_v<Cond, EqualIns>)
+                q.equal(column->column_key(), _impl::only_string_op_types(left), false);
+            else if (std::is_same_v<Cond, NotEqualIns>)
+                q.not_equal(column->column_key(), _impl::only_string_op_types(left), false);
+            else if (std::is_same_v<Cond, BeginsWith>)
+                q.begins_with(column->column_key(), _impl::only_string_op_types(left));
+            else if (std::is_same_v<Cond, BeginsWithIns>)
+                q.begins_with(column->column_key(), _impl::only_string_op_types(left), false);
+            else if (std::is_same_v<Cond, EndsWith>)
+                q.ends_with(column->column_key(), _impl::only_string_op_types(left));
+            else if (std::is_same_v<Cond, EndsWithIns>)
+                q.ends_with(column->column_key(), _impl::only_string_op_types(left), false);
+            else if (std::is_same_v<Cond, Contains>)
+                q.contains(column->column_key(), _impl::only_string_op_types(left));
+            else if (std::is_same_v<Cond, ContainsIns>)
+                q.contains(column->column_key(), _impl::only_string_op_types(left), false);
+            else if (std::is_same_v<Cond, Like>)
+                q.like(column->column_key(), _impl::only_string_op_types(left));
+            else if (std::is_same_v<Cond, LikeIns>)
+                q.like(column->column_key(), _impl::only_string_op_types(left), false);
+            else {
+                // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp
+                // or fallback to using use 'return new Compare<>' instead.
+                REALM_ASSERT(false);
+            }
+            // Return query_engine.hpp node
+            return q;
         }
-        // Return query_engine.hpp node
-        return q;
     }
-    else
-#endif
-    {
-        // Return query_expression.hpp node
-        using CommonType = typename Common<L, R>::type;
-        using ValueType =
-            typename std::conditional<std::is_same_v<L, StringData>, ConstantStringValue, Value<L>>::type;
-        return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
-    }
-}
 
+    // Return query_expression.hpp node
+    using CommonType = typename Common<L, R>::type;
+    using ValueType = typename std::conditional<std::is_same_v<L, StringData>, ConstantStringValue, Value<L>>::type;
+    return make_expression<Compare<Cond, CommonType>>(make_subexpr<ValueType>(left), right.clone());
+}
 
 // All overloads where left-hand-side is Subexpr2<L>:
 //
@@ -909,7 +932,7 @@ struct NullableVector {
 
     template <typename Type = T>
     typename std::enable_if<realm::is_any<Type, float, double, BinaryData, StringData, ObjKey, Timestamp, ObjectId,
-                                          Decimal128, ref_type, SizeOfList, null>::value,
+                                          Decimal128, Mixed, ref_type, SizeOfList, null>::value,
                             void>::type
     set(size_t index, T value)
     {
@@ -1123,6 +1146,20 @@ template <>
 inline void NullableVector<Decimal128>::set_null(size_t index)
 {
     m_first[index] = Decimal128{realm::null()};
+}
+
+// Mixed
+
+template <>
+inline bool NullableVector<Mixed>::is_null(size_t index) const
+{
+    return m_first[index].is_null();
+}
+
+template <>
+inline void NullableVector<Mixed>::set_null(size_t index)
+{
+    m_first[index] = Mixed{};
 }
 
 // ref_type
@@ -1364,8 +1401,7 @@ public:
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
     template <class D>
-    typename std::enable_if<std::is_convertible<T, D>::value>::type REALM_FORCEINLINE
-    export2(ValueBase& destination) const
+    REALM_FORCEINLINE std::enable_if_t<std::is_convertible<T, D>::value> export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
         d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
@@ -1378,12 +1414,96 @@ public:
         }
     }
 
+    template <class X, class Y>
+    static constexpr bool IsNullToObjectId = std::is_same<X, realm::null>::value&& std::is_same<Y, ObjectId>::value;
+
+    template <class X, class Y>
+    static constexpr bool IsObjectIdToTimestamp =
+        std::is_same<X, ObjectId>::value&& std::is_same<Y, Timestamp>::value;
+
+    // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
-    typename std::enable_if<!std::is_convertible<T, D>::value>::type REALM_FORCEINLINE export2(ValueBase&) const
+    REALM_FORCEINLINE std::enable_if_t<IsNullToObjectId<T, D>> export2(ValueBase& destination) const
+    {
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            d.m_storage.set_null(t);
+        }
+    }
+
+    // we specialize here because the conversion from ObjectId to Timestamp has been made explicit in order to catch
+    // wrong auto conversions
+    template <class D>
+    REALM_FORCEINLINE std::enable_if_t<IsObjectIdToTimestamp<T, D>> export2(ValueBase& destination) const
+    {
+        Value<D>& d = static_cast<Value<D>&>(destination);
+        d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
+        for (size_t t = 0; t < ValueBase::m_values; t++) {
+            if (m_storage.is_null(t)) {
+                d.m_storage.set_null(t);
+            }
+            else {
+                d.m_storage.set(t, m_storage[t].get_timestamp());
+            }
+        }
+    }
+
+    template <class D>
+    REALM_FORCEINLINE
+        std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D> && !IsObjectIdToTimestamp<T, D>>
+        export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
         // performed at runtime but would result in a compiler error if we did not provide this implementation.
         REALM_ASSERT_DEBUG(false);
+    }
+
+    void export2_Mixed(ValueBase& destination) const
+    {
+        if constexpr (std::is_same_v<T, Mixed>) {
+            Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
+            d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
+            for (size_t t = 0; t < ValueBase::m_values; t++) {
+                d.m_storage.set(t, m_storage[t]);
+            }
+        }
+        else if constexpr (std::is_same_v<T, null>) {
+            Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
+            d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
+        }
+        else if constexpr (realm::is_any_v<T, int, int64_t, bool, float, double, StringData, BinaryData, Timestamp,
+                                           Decimal128, ObjectId>) {
+            Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
+            d.init(ValueBase::m_from_link_list, ValueBase::m_values, Mixed());
+            for (size_t t = 0; t < ValueBase::m_values; t++) {
+                if (m_storage.is_null(t))
+                    d.m_storage.set_null(t);
+                else {
+                    d.m_storage.set(t, Mixed(m_storage[t]));
+                }
+            }
+        }
+        else {
+            REALM_ASSERT_DEBUG(false);
+        }
+    }
+
+    Mixed get_mixed() override
+    {
+        if constexpr (!std::is_same_v<T, realm::null>) {
+            if constexpr (std::is_same_v<T, Mixed>) {
+                return m_storage[0];
+            }
+            else if constexpr (realm::is_any_v<T, int, int64_t, bool, float, double, StringData, BinaryData,
+                                               Timestamp, Decimal128, ObjectId>) {
+                return Mixed(m_storage[0]);
+            }
+            else {
+                REALM_ASSERT_DEBUG(false);
+            }
+        }
+        return {};
     }
 
     REALM_FORCEINLINE void export_Timestamp(ValueBase& destination) const override
@@ -1433,6 +1553,10 @@ public:
     {
         export2<BinaryData>(destination);
     }
+    REALM_FORCEINLINE void export_Mixed(ValueBase& destination) const override
+    {
+        export2_Mixed(destination);
+    }
     REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         Value<null>& d = static_cast<Value<null>&>(destination);
@@ -1461,6 +1585,8 @@ public:
             source.export_StringData(*this);
         else if (std::is_same_v<T, BinaryData>)
             source.export_BinaryData(*this);
+        else if (std::is_same_v<T, Mixed>)
+            source.export_Mixed(*this);
         else if (std::is_same_v<T, null>)
             source.export_null(*this);
         else
@@ -1483,26 +1609,26 @@ public:
                     return m;
             }
         }
-        else if (comparison == ExpressionComparisonType::None) {
+        else {
             for (size_t m = 0; m < sz; m++) {
-                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                    return not_found;
+                bool match = c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m));
+                if (match) {
+                    if (comparison == ExpressionComparisonType::Any) {
+                        return 0;
+                    }
+                    if (comparison == ExpressionComparisonType::None) {
+                        return not_found; // one matched
+                    }
+                }
+                else {
+                    if (comparison == ExpressionComparisonType::All) {
+                        return not_found;
+                    }
+                }
             }
-            return 0; // no values matched, return match
-        }
-        else if (comparison == ExpressionComparisonType::All) {
-            for (size_t m = 0; m < sz; m++) {
-                if (!c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                    return not_found; // one did not match
+            if (comparison == ExpressionComparisonType::None || comparison == ExpressionComparisonType::All) {
+                return 0; // either none or all
             }
-            return 0; // all values matched (or there this is an empty list), return match
-        }
-        else { // ANY from list
-            for (size_t m = 0; m < sz; m++) {
-                if (c(left->m_storage[0], right->m_storage[m], left_is_null, right->m_storage.is_null(m)))
-                    return 0;
-            }
-            return not_found; // no match
         }
         return not_found;
     }
@@ -1521,7 +1647,6 @@ public:
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left->ValueBase::m_values, right->ValueBase::m_values);
             for (size_t m = 0; m < min; m++) {
-
                 if (c(left->m_storage[m], right->m_storage[m], left->m_storage.is_null(m),
                       right->m_storage.is_null(m)))
                     return m;
@@ -1540,56 +1665,52 @@ public:
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left->m_values > 0);
             const size_t num_right_values = right->m_values;
-            if (right_cmp_type == ExpressionComparisonType::Any) {
-                for (size_t r = 0; r < num_right_values; r++) {
-                    if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                          right->m_storage.is_null(r)))
+            T left_val = left->m_storage[0];
+            bool left_is_null = left->m_storage.is_null(0);
+            for (size_t r = 0; r < num_right_values; r++) {
+                bool match = c(left_val, right->m_storage[r], left_is_null, right->m_storage.is_null(r));
+                if (match) {
+                    if (right_cmp_type == ExpressionComparisonType::Any) {
                         return 0;
+                    }
+                    if (right_cmp_type == ExpressionComparisonType::None) {
+                        return not_found; // one matched
+                    }
+                }
+                else {
+                    if (right_cmp_type == ExpressionComparisonType::All) {
+                        return not_found;
+                    }
                 }
             }
-            else if (right_cmp_type == ExpressionComparisonType::All) {
-                for (size_t r = 0; r < num_right_values; r++) {
-                    if (!c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                           right->m_storage.is_null(r)))
-                        return not_found; // one didn't match
-                }
-                return 0; // all matched
-            }
-            else if (right_cmp_type == ExpressionComparisonType::None) {
-                for (size_t r = 0; r < num_right_values; r++) {
-                    if (c(left->m_storage[0], right->m_storage[r], left->m_storage.is_null(0),
-                          right->m_storage.is_null(r)))
-                        return not_found; // one matched, none not satisfied
-                }
-                return 0; // none matched
+            if (right_cmp_type == ExpressionComparisonType::None || right_cmp_type == ExpressionComparisonType::All) {
+                return 0; // either none or all
             }
         }
         else if (left->m_from_link_list && !right->m_from_link_list) {
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right->m_values > 0);
             const size_t num_left_values = left->m_values;
-            if (left_cmp_type == ExpressionComparisonType::Any) {
-                for (size_t l = 0; l < num_left_values; l++) {
-                    if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
-                          right->m_storage.is_null(0)))
+            T right_val = right->m_storage[0];
+            bool right_is_null = right->m_storage.is_null(0);
+            for (size_t l = 0; l < num_left_values; l++) {
+                bool match = c(left->m_storage[l], right_val, left->m_storage.is_null(l), right_is_null);
+                if (match) {
+                    if (left_cmp_type == ExpressionComparisonType::Any) {
                         return 0;
+                    }
+                    if (left_cmp_type == ExpressionComparisonType::None) {
+                        return not_found; // one matched
+                    }
+                }
+                else {
+                    if (left_cmp_type == ExpressionComparisonType::All) {
+                        return not_found;
+                    }
                 }
             }
-            else if (left_cmp_type == ExpressionComparisonType::All) {
-                for (size_t l = 0; l < num_left_values; l++) {
-                    if (!c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
-                           right->m_storage.is_null(0)))
-                        return not_found; // one did not match, All not satisfied
-                }
-                return 0; // all matched
-            }
-            else if (left_cmp_type == ExpressionComparisonType::None) {
-                for (size_t l = 0; l < num_left_values; l++) {
-                    if (c(left->m_storage[l], right->m_storage[0], left->m_storage.is_null(l),
-                          right->m_storage.is_null(0)))
-                        return not_found; // one matched, none not satisfied
-                }
-                return 0; // none matched
+            if (left_cmp_type == ExpressionComparisonType::None || left_cmp_type == ExpressionComparisonType::All) {
+                return 0; // either none or all
             }
         }
 
@@ -2206,19 +2327,11 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
     return value;
 }
 
-
-// If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
-// `template <> class Columns<T> : public SimpleQuerySupport<T>` and you're done. Any operators of the set
-// { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
-// automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
-// To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
-// node for it (super fast).
-
+// This class can be used as base for expressions that handle object properties
 template <class T>
-class SimpleQuerySupport : public Subexpr2<T> {
+class ObjPropertyExpr : public Subexpr2<T> {
 public:
-    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-                       ExpressionComparisonType type = ExpressionComparisonType::Any)
+    ObjPropertyExpr(ColKey column, ConstTableRef table, std::vector<ColKey> links, ExpressionComparisonType type)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_comparison_type(type)
@@ -2239,21 +2352,6 @@ public:
     {
         if (table != get_base_table()) {
             m_link_map.set_base_table(table);
-        }
-    }
-
-    void set_cluster(const Cluster* cluster) override
-    {
-        m_array_ptr = nullptr;
-        m_leaf_ptr = nullptr;
-        if (links_exist()) {
-            m_link_map.set_cluster(cluster);
-        }
-        else {
-            // Create new Leaf
-            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
-            cluster->init_leaf(m_column_key, m_array_ptr.get());
-            m_leaf_ptr = m_array_ptr.get();
         }
     }
 
@@ -2288,73 +2386,6 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<T>& d = static_cast<Value<T>&>(destination);
-
-        if (links_exist()) {
-            REALM_ASSERT(m_leaf_ptr == nullptr);
-
-            if (m_link_map.only_unary_links()) {
-                d.init(false, 1);
-                d.m_storage.set_null(0);
-                auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
-                if (link_translation_key) {
-                    const Obj obj = m_link_map.get_target_table()->get_object(link_translation_key);
-                    if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
-                        if (opt_val) {
-                            d.m_storage.set(0, *opt_val);
-                        }
-                        else {
-                            d.m_storage.set_null(0);
-                        }
-                    }
-                    else {
-                        d.m_storage.set(0, obj.get<T>(m_column_key));
-                    }
-                }
-            }
-            else {
-                std::vector<ObjKey> links = m_link_map.get_links(index);
-                Value<T> v = make_value_for_link<T>(false /*only_unary_links*/, links.size());
-                for (size_t t = 0; t < links.size(); t++) {
-                    const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-                    if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
-                        if (opt_val) {
-                            v.m_storage.set(t, *opt_val);
-                        }
-                        else {
-                            v.m_storage.set_null(t);
-                        }
-                    }
-                    else {
-                        v.m_storage.set(t, obj.get<T>(m_column_key));
-                    }
-                }
-                destination.import(v);
-            }
-        }
-        else {
-            REALM_ASSERT(m_leaf_ptr != nullptr);
-            // Not a link column
-            for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
-                if (m_leaf_ptr->is_null(index + t)) {
-                    d.m_storage.set_null(t);
-                }
-                else {
-                    d.m_storage.set(t, m_leaf_ptr->get(index + t));
-                }
-            }
-        }
-    }
-
-    void evaluate(ObjKey key, ValueBase& destination) override
-    {
-        Value<T>& d = static_cast<Value<T>&>(destination);
-        d.m_storage.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_key));
-    }
 
     bool links_exist() const
     {
@@ -2381,12 +2412,7 @@ public:
         return m_comparison_type;
     }
 
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
-    }
-
-    SimpleQuerySupport(SimpleQuerySupport const& other)
+    ObjPropertyExpr(ObjPropertyExpr const& other)
         : Subexpr2<T>(other)
         , m_link_map(other.m_link_map)
         , m_column_key(other.m_column_key)
@@ -2399,17 +2425,135 @@ public:
         return m_column_key;
     }
 
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<T>>(static_cast<const Columns<T>&>(*this));
+    }
+
+protected:
+    LinkMap m_link_map;
+    // Column key of payload column of m_table
+    mutable ColKey m_column_key;
+    ExpressionComparisonType m_comparison_type; // Any, All, None
+};
+
+// If we add a new Realm type T and quickly want Query support for it, then simply inherit from it like
+// `template <> class Columns<T> : public SimpleQuerySupport<T>` and you're done. Any operators of the set
+// { ==, >=, <=, !=, >, < } that are supported by T will be supported by the "query expression syntax"
+// automatically. NOTE: This method of Query support will be slow because it goes through Table::get<T>.
+// To get faster Query support, either add SequentialGetter support (faster) or create a query_engine.hpp
+// node for it (super fast).
+
+template <class T>
+class SimpleQuerySupport : public ObjPropertyExpr<T> {
+public:
+    using ObjPropertyExpr<T>::links_exist;
+    using ObjPropertyExpr<T>::m_link_map;
+    using ObjPropertyExpr<T>::m_column_key;
+
+    SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+                       ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ObjPropertyExpr<T>(column, table, std::move(links), type)
+    {
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_array_ptr = nullptr;
+        m_leaf_ptr = nullptr;
+        if (links_exist()) {
+            m_link_map.set_cluster(cluster);
+        }
+        else {
+            // Create new Leaf
+            m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_link_map.get_base_table()->get_alloc()));
+            cluster->init_leaf(m_column_key, m_array_ptr.get());
+            m_leaf_ptr = m_array_ptr.get();
+        }
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        if (links_exist()) {
+            REALM_ASSERT(m_leaf_ptr == nullptr);
+
+            if (m_link_map.only_unary_links()) {
+                Value<T> d;
+                d.init(false, 1);
+                d.m_storage.set_null(0);
+                auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
+                if (link_translation_key) {
+                    const Obj obj = m_link_map.get_target_table()->get_object(link_translation_key);
+                    if constexpr (std::is_same_v<T, ObjectId>) {
+                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                        if (opt_val) {
+                            d.m_storage.set(0, *opt_val);
+                        }
+                        else {
+                            d.m_storage.set_null(0);
+                        }
+                    }
+                    else {
+                        d.m_storage.set(0, obj.get<T>(m_column_key));
+                    }
+                }
+                destination.import(d);
+            }
+            else {
+                std::vector<ObjKey> links = m_link_map.get_links(index);
+                Value<T> d;
+                d.init(true, links.size());
+                for (size_t t = 0; t < links.size(); t++) {
+                    const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
+                    if constexpr (std::is_same_v<T, ObjectId>) {
+                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                        if (opt_val) {
+                            d.m_storage.set(t, *opt_val);
+                        }
+                        else {
+                            d.m_storage.set_null(t);
+                        }
+                    }
+                    else {
+                        d.m_storage.set(t, obj.get<T>(m_column_key));
+                    }
+                }
+                destination.import(d);
+            }
+        }
+        else {
+            REALM_ASSERT(m_leaf_ptr != nullptr);
+            Value<T> d(false /*not from link list*/, destination.m_values);
+            // Not a link column
+            for (size_t t = 0; t < destination.m_values && index + t < m_leaf_ptr->size(); t++) {
+                if (m_leaf_ptr->is_null(index + t)) {
+                    d.m_storage.set_null(t);
+                }
+                else {
+                    d.m_storage.set(t, T(m_leaf_ptr->get(index + t)));
+                }
+            }
+            destination.import(d);
+        }
+    }
+
+    void evaluate(ObjKey key, ValueBase& destination) override
+    {
+        Value<T>& d = static_cast<Value<T>&>(destination);
+        d.m_storage.set(0, m_link_map.get_target_table()->get_object(key).template get<T>(m_column_key));
+    }
+
+    SimpleQuerySupport(const SimpleQuerySupport& other)
+        : ObjPropertyExpr<T>(other)
+    {
+    }
+
     SizeOperator<T> size()
     {
         return SizeOperator<T>(this->clone());
     }
 
 private:
-    LinkMap m_link_map;
-
-    // Column key of payload column of m_table
-    mutable ColKey m_column_key;
-
     // Leaf cache
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
@@ -2417,9 +2561,7 @@ private:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     LeafType* m_leaf_ptr = nullptr;
-    ExpressionComparisonType m_comparison_type;
 };
-
 
 template <>
 class Columns<Timestamp> : public SimpleQuerySupport<Timestamp> {
@@ -2440,6 +2582,56 @@ template <>
 class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
+
+template <>
+class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<Dictionary> : public ObjPropertyExpr<Mixed> {
+public:
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ObjPropertyExpr<Mixed>(column, table, std::move(links), type)
+    {
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+    }
+
+    Columns& key(const Mixed& key_value);
+    void set_cluster(const Cluster* cluster) override;
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns>(static_cast<const Columns&>(*this));
+    }
+
+    Columns(Columns const& other)
+        : ObjPropertyExpr<Mixed>(other)
+        , m_key(other.m_key)
+        , m_objkey(other.m_objkey)
+        , m_key_type(other.m_key_type)
+    {
+    }
+
+private:
+    Mixed m_key;
+    ObjKey m_objkey;
+    DataType m_key_type;
+    // Leaf cache
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
+    LeafCacheStorage m_leaf_cache_storage;
+    LeafPtr m_array_ptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
+};
+
+// Columns<Mixed> == String
+inline Query operator==(Columns<Mixed>&& left, const char* right)
+{
+    return left == StringData(right);
+}
 
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
@@ -4311,10 +4503,10 @@ inline Mixed get_mixed(const Value<int>& val)
 }
 } // namespace
 
-template <class TCond, class T, class TLeft, class TRight>
+template <class TCond, class T>
 class Compare : public Expression {
 public:
-    Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right)
+    Compare(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
@@ -4437,10 +4629,7 @@ public:
                 if (match != not_found && match + start < end)
                     return start + match;
 
-                size_t rows = (m_left_value.m_from_link_list || right.m_from_link_list)
-                                  ? 1
-                                  : minimum(right.m_values, m_left_value.m_values);
-                start += rows;
+                start += 1;
             }
         }
         else {
@@ -4491,8 +4680,8 @@ private:
         }
     }
 
-    std::unique_ptr<TLeft> m_left;
-    std::unique_ptr<TRight> m_right;
+    std::unique_ptr<Subexpr> m_left;
+    std::unique_ptr<Subexpr> m_right;
     const Cluster* m_cluster;
     bool m_left_is_const;
     Value<T> m_left_value;

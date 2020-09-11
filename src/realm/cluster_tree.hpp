@@ -123,6 +123,8 @@ public:
     bool is_valid(ObjKey k) const;
     // Lookup and return object
     ClusterNode::State get(ObjKey k) const;
+    // Lookup and return object
+    ClusterNode::State try_get(ObjKey k) const noexcept;
     // Lookup by index
     ClusterNode::State get(size_t ndx, ObjKey& k) const;
     // Get logical index of object identified by k

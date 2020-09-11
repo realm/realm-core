@@ -309,7 +309,9 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
 
     // Retrieve or create the row for this object.
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    Query query = table->where().equal(schema.idx_identity, identity).equal(schema.idx_provider_type, provider_type);
+    Query query = table->where()
+                      .equal(schema.idx_identity, StringData(identity))
+                      .equal(schema.idx_provider_type, StringData(provider_type));
     Results results(realm, std::move(query));
     REALM_ASSERT_DEBUG(results.size() < 2);
     auto row = results.first();
