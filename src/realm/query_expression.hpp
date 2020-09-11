@@ -1890,6 +1890,12 @@ Query operator==(bool left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
 }
+template <class R>
+Query operator==(UUID left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+
 
 template <class R>
 Query operator>=(double left, const Subexpr2<R>& right)
@@ -2000,6 +2006,11 @@ Query operator!=(Decimal128 left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(bool left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(UUID left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }

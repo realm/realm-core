@@ -34,6 +34,7 @@ template <>
 inline UUID convert_for_test<UUID>(int64_t v)
 {
     UUID id;
+    ++v; // add one so we don't try to add a null to a non-nullable column
     memcpy(&id, &v, sizeof(v));
     return id;
 }

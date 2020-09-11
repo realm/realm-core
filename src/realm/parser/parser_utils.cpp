@@ -82,6 +82,12 @@ const char* type_to_str<Decimal128>()
     return "Decimal128";
 }
 
+template <>
+const char* type_to_str<UUID>()
+{
+    return "UUID";
+}
+
 const char* data_type_to_str(DataType type)
 {
     switch (type) {

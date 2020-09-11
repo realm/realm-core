@@ -255,5 +255,26 @@ ObjectId ValueExpression::value_of_type_for_query<ObjectId>()
     throw std::logic_error("ObjectId properties must be compared against an ObjectId or Timestamp argument.");
 }
 
+template <>
+UUID ValueExpression::value_of_type_for_query<UUID>()
+{
+    if (value->type == parser::Expression::Type::Argument) {
+        return arguments->uuid_for_argument(string_to<int>(value->s));
+    }
+    else if (value->type == parser::Expression::Type::Null) {
+        return UUID();
+    }
+    else if (value->type == parser::Expression::Type::UUID) {
+        // expect uuid(...) from the parser, and pass in the contents
+        if (value->s.size() > 6 && value->s.substr(0, 5) == "uuid(" && value->s[value->s.size() - 1] == ')') {
+            return UUID(value->s.substr(5, value->s.size() - 6).c_str());
+        }
+        // otherwise let the UUID constructor try to parse all the contents (may throw)
+        return UUID(value->s.c_str());
+    }
+    throw std::logic_error("UUID properties must be compared against an UUID argument.");
+}
+
+
 } // namespace parser
 } // namespace realm
