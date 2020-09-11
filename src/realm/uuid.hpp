@@ -23,13 +23,32 @@
 
 namespace realm {
 
+struct InvalidUUIDString : std::logic_error {
+    InvalidUUIDString(std::string msg)
+        : std::logic_error(msg)
+    {
+    }
+};
+
+/// A UUID is a sequence of 16 bytes (128 bits) as specified by https://tools.ietf.org/html/rfc4122
+/// Notably this type is considered null if all bits are 0.
 class UUID {
 public:
+    using UUIDBytes = std::array<uint8_t, 16>;
+
+    /// A string is considered valid if it contains only hex [a-f, 0-9]
+    /// and hyphens in the correct sequence, case insensitive. For
+    /// example: "01234567-9abc-4def-9012-3456789abcde" is valid.
+    /// Other than the above, this function does not check the validity
+    /// of the bits according to the rfc spec in order to allow for any
+    /// user defined bit pattern and future compatibility.
     static bool is_valid_string(StringData) noexcept;
 
     /// Constructs an ObjectId from 36 hex characters.
-    UUID(const char* init) noexcept;
-    UUID(const StringData& init) noexcept;
+    /// This constructor may throw InvalidUUIDString if the format
+    /// of the parameter is invalid according to `is_valid_string`
+    explicit UUID(const char*);
+    explicit UUID(const StringData&);
 
     /// Constructs a null UUID
     UUID() noexcept;
@@ -38,37 +57,45 @@ public:
         : UUID()
     {
     }
+    explicit UUID(const UUIDBytes& raw) noexcept
+        : m_bytes(raw)
+    {
+    }
 
     bool operator==(const UUID& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) == 0;
+        return m_bytes == other.m_bytes;
     }
     bool operator!=(const UUID& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) != 0;
+        return m_bytes != other.m_bytes;
     }
     bool operator>(const UUID& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) > 0;
+        return m_bytes > other.m_bytes;
     }
     bool operator<(const UUID& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) < 0;
+        return m_bytes < other.m_bytes;
     }
     bool operator>=(const UUID& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) >= 0;
+        return m_bytes >= other.m_bytes;
     }
     bool operator<=(const UUID& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) <= 0;
+        return m_bytes <= other.m_bytes;
     }
     bool is_null() const;
     std::string to_string() const;
+    UUIDBytes to_bytes() const
+    {
+        return m_bytes;
+    }
     size_t hash() const noexcept;
 
 private:
-    uint8_t m_bytes[16] = {};
+    UUIDBytes m_bytes = {};
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const UUID& id)
@@ -82,9 +109,9 @@ inline std::ostream& operator<<(std::ostream& ostr, const UUID& id)
 namespace std {
 template <>
 struct hash<realm::UUID> {
-    size_t operator()(const realm::UUID& oid) const noexcept
+    size_t operator()(const realm::UUID& uuid) const noexcept
     {
-        return oid.hash();
+        return uuid.hash();
     }
 };
 } // namespace std

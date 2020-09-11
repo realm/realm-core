@@ -45,14 +45,35 @@ TEST(UUID_Basics)
     std::string init_str0("3b241101-e2bb-4255-8caf-4136c566a962");
     UUID id0(init_str0.c_str());
     CHECK_EQUAL(id0.to_string(), init_str0);
+    CHECK_NOT(id0.is_null());
 
     std::string init_str1("3b241101-e2bb-4255-8caf-4136c566a962");
     UUID id1(init_str1.c_str());
     CHECK_EQUAL(id1.to_string(), init_str1);
+    CHECK_NOT(id1.is_null());
 
     UUID id_zeros;
     CHECK(id_zeros == UUID("00000000-0000-0000-0000-000000000000"));
     CHECK(id_zeros.is_null());
+
+    std::string init_str_max("ffffffff-ffff-ffff-ffff-ffffffffffff");
+    UUID id_max(init_str_max);
+    CHECK(id_max.to_string() == init_str_max);
+    CHECK_NOT(id_max.is_null());
+
+    std::string exception_message;
+    try {
+        UUID should_fail("hello world");
+    }
+    catch (const InvalidUUIDString& e) {
+        exception_message = e.what();
+    }
+    CHECK_EQUAL(exception_message, "Invalid string format encountered when constructing a UUID: 'hello world'.");
+
+    UUID::UUIDBytes raw_null = {};
+    CHECK(UUID(raw_null).is_null());
+    UUID::UUIDBytes raw_one = {255, 124, 32, 16, 8, 4, 2, 1, 15};
+    CHECK_EQUAL(UUID(raw_one).to_string(), "ff7c2010-0804-0201-0f00-000000000000");
 }
 
 // with credit to https://github.com/mongodb/mongo/blob/master/src/mongo/base/uuid_test.cpp
@@ -153,11 +174,11 @@ TEST(UUID_Array)
     arr.create();
 
     CHECK_EQUAL(arr.size(), 0);
-    arr.add({str0});
+    arr.add(UUID{str0});
     CHECK_EQUAL(arr.size(), 1);
     CHECK_EQUAL(arr.get(0), UUID(str0));
-    arr.add({str1});
-    arr.insert(1, {str2});
+    arr.add(UUID{str1});
+    arr.insert(1, UUID{str2});
     CHECK_EQUAL(arr.size(), 3);
 
     UUID id2(str2);
@@ -192,9 +213,9 @@ TEST(UUID_ArrayNull)
     ArrayUUID arr(Allocator::get_default());
     arr.create();
 
-    arr.add({str0});
-    arr.add({str1});
-    arr.insert(1, {str2});
+    arr.add(UUID{str0});
+    arr.add(UUID{str1});
+    arr.insert(1, UUID{str2});
     UUID id2(str2);
     CHECK(!arr.is_null(0));
     CHECK_EQUAL(arr.get(0), UUID(str0));
@@ -206,13 +227,13 @@ TEST(UUID_ArrayNull)
     CHECK_EQUAL(arr.find_first(UUID()), npos);
 
     arr.add(UUID());
-    CHECK_EQUAL(arr.find_first(null(), 0), 3);
-    CHECK_EQUAL(arr.find_first(null(), 1), 3);
-    CHECK_EQUAL(arr.find_first(null(), 2), 3);
-    CHECK_EQUAL(arr.find_first(null(), 3), 3);
-    CHECK_EQUAL(arr.find_first(null(), 0, 3), npos);
-    CHECK_EQUAL(arr.find_first(null(), 3, 3), npos);
-    CHECK_EQUAL(arr.find_first(null(), 4), npos);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 0), 3);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 1), 3);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 2), 3);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 3), 3);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 0, 3), npos);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 3, 3), npos);
+    CHECK_EQUAL(arr.find_first(UUID{null()}, 4), npos);
 
     arr.erase(1);
     CHECK_EQUAL(arr.get(1), UUID(str1));
@@ -225,7 +246,7 @@ TEST(UUID_ArrayNull)
     CHECK_EQUAL(arr1.get(0), UUID(str1));
     CHECK(!arr1.is_null(0));
     CHECK(arr1.is_null(1));
-    CHECK_EQUAL(arr1.find_first(null(), 0), 1);
+    CHECK_EQUAL(arr1.find_first(UUID{null()}, 0), 1);
 
     arr.destroy();
     arr1.destroy();
