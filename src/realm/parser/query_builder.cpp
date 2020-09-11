@@ -188,8 +188,8 @@ Query make_bool_constraint_query(Predicate::Operator operatorType, A lhs, B rhs)
             return lhs != rhs;
         default:
             throw_logic_error(util::format(
-            "Unsupported operator '%1' in query. Only equal (==) and not equal (!=) are supported for this type.",
-            operator_description(operatorType)));
+                "Unsupported operator '%1' in query. Only equal (==) and not equal (!=) are supported for this type.",
+                operator_description(operatorType)));
     }
 }
 
