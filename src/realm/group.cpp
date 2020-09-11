@@ -316,10 +316,11 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 10)
-        return 10;
+    if (requested_history_type == Replication::hist_None 
+        && (current_file_format_version == 10 || current_file_format_version == 11))
+        return 12; // without embedded object support
 
-    return 11;
+    return 13; // with embedded object support
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -443,14 +444,14 @@ void Transaction::upgrade_file_format(int target_file_format_version)
 
             if (pk_table) {
                 pk_table->migrate_column_info();
-                pk_table->migrate_indexes(ColKey());
+                pk_table->migrate_indexes();
                 pk_table->create_columns();
                 pk_table->migrate_objects(ColKey());
                 pk_cols = get_primary_key_columns_from_pk_table(pk_table);
             }
 
             for (auto k : table_accessors) {
-                k->migrate_indexes(pk_cols[k]);
+                k->migrate_indexes();
             }
             for (auto k : table_accessors) {
                 k->migrate_subspec();
@@ -509,7 +510,31 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     }
     // If we come from a file format version lower than 10, all objects with primary keys
     // will be upgraded correctly by the above process
-    if (current_file_format_version == 10 && target_file_format_version >= 11) {
+
+    if (current_file_format_version == 10 && target_file_format_version == 12) {
+        // we must ensure search indexes on string primary key columns
+        // corresponds to upgrade 10->11 on Core6
+
+        // a target format of 12 implies use in a non-sync setting.
+        // in this setting format 10 and 11 as produced by core6 are identical
+        // ==> we do nothing
+    }
+    if (current_file_format_version == 11 && target_file_format_version == 12) {
+        // a trivial upgrade of a core6 file format 11
+        // this CANNOT be a version 11 previously upgraded by v10, because
+        // that would have given us a TARGET version of 11, not 12.
+        // (assuming that the criteria for whether embedded objects are supported
+        // or not, are fixed by the history setting for the realm file (sync or not))
+
+        // a target format of 12 implies use in a non-sync setting.
+        // in this setting format 10 and 11 as produced by core6 are identical
+        // ==> we do nothing
+    }
+    if (current_file_format_version == 10 && target_file_format_version == 13) {
+        // target format 13 implies use of Sync:
+        REALM_ASSERT(get_replication()->get_history_type() == Replication::HistoryType::hist_SyncClient);
+        // we must ensure a) search indexes on string primary key columns,
+        // and b) embedded object support, neither of which are present in format 10
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);
@@ -519,10 +544,33 @@ void Transaction::upgrade_file_format(int target_file_format_version)
                     t->remove_search_index(col);
                     t->rebuild_table_with_pk_column();
                 }
+                else if (col.get_type() == col_type_String) {
+                    t->add_search_index(col);
+                }
             }
         }
     }
-    // NOTE: Additional future upgrade steps go here.
+    if (current_file_format_version == 11 && target_file_format_version == 13) {
+        // As above, but we do not know if this is a v11 produced by a previous
+        // upgrade with v10 code, or a v11 produced by core6.
+        // We need to apply both update steps in an idempotent way
+        REALM_ASSERT(get_replication()->get_history_type() == Replication::HistoryType::hist_SyncClient);
+        auto table_keys = get_table_keys();
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                if (col.get_type() == col_type_Int && t->has_search_index(col)) {
+                    // Tables with integer primary keys have to be rebuilt
+                    t->remove_search_index(col);
+                    t->rebuild_table_with_pk_column();
+                }
+                else if (col.get_type() == col_type_String) {
+                    if (!t->has_search_index(col))
+                        t->add_search_index(col);
+                }
+            }
+        }
+    }
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -544,6 +592,8 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
         case 10:
         case 11:
+        case 12:
+        case 13:
             file_format_ok = true;
             break;
     }

@@ -1356,6 +1356,14 @@ TEST(Upgrade_Database_9_10_with_oid)
     auto ll = obj2.get_linklist(t_origin->get_column_key("array"));
     CHECK_EQUAL(ll.get_object(0).get<String>("name"), "Tom");
     CHECK_EQUAL(ll.get_object(1).get<String>("name"), "Jerry");
+
+    // Check that the objects can be found by primary key
+    pk_col = t_bar->get_primary_key_column();
+    for (auto&& obj : *t_bar) {
+        StringData id = obj.get<String>(pk_col);
+        auto tv = (t_bar->column<String>(pk_col) == id).find_all();
+        CHECK_EQUAL(tv.size(), 1);
+    }
 }
 
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1770,6 +1778,7 @@ TEST(Upgrade_FixColumnKeys)
 /*
 TEST(Upgrade_bug)
 {
+    // ReplSyncClient repl_sync_client("/home/joergen/default.realm", 10, 16);
     auto hist = make_in_realm_history("/home/joergen/default.realm");
     DB::create(*hist)->start_read()->verify();
 }
