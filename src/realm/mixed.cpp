@@ -24,7 +24,7 @@ namespace realm {
 
 namespace _impl {
 
-static const int sorting_rank[18] = {
+static const int sorting_rank[19] = {
     0, // null
     0, // type_Int = 0,
     0, // type_Bool = 1,
@@ -43,6 +43,7 @@ static const int sorting_rank[18] = {
     -1,
     5, // type_ObjectId = 15,
     6, // type_TypedLink = 16
+    7, // type_UUID = 17
 };
 
 inline int compare_string(StringData a, StringData b)
