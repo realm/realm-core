@@ -40,7 +40,7 @@ namespace app {
 } // namespace app
 
 class SyncSession;
-
+class SyncManager;
 // A superclass that bindings can inherit from in order to store information
 // upon a `SyncUser` object.
 class SyncUserContext {
@@ -139,7 +139,8 @@ public:
              const std::string provider_type,
              std::string access_token,
              SyncUser::State state,
-             const std::string device_id);
+             const std::string device_id,
+             std::shared_ptr<SyncManager> sync_manager);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -225,6 +226,10 @@ public:
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
+    std::shared_ptr<SyncManager> sync_manager() const
+    {
+        return m_sync_manager;
+    }
 private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
@@ -266,6 +271,8 @@ private:
     SyncUserProfile m_user_profile;
 
     const std::string m_device_id;
+
+    std::shared_ptr<SyncManager> m_sync_manager;
 };
 
 }

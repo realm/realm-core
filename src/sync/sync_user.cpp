@@ -107,13 +107,15 @@ SyncUser::SyncUser(std::string refresh_token,
                    const std::string provider_type,
                    std::string access_token,
                    SyncUser::State state,
-                   const std::string device_id)
+                   const std::string device_id,
+                   std::shared_ptr<SyncManager> sync_manager)
 : m_state(state)
 , m_provider_type(provider_type)
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
 , m_access_token(RealmJWT(std::move(access_token)))
 , m_device_id(device_id)
+, m_sync_manager(sync_manager)
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -122,7 +124,7 @@ SyncUser::SyncUser(std::string refresh_token,
         }
     }
 
-    bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    bool updated = m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_refresh_token(m_refresh_token.token);
         metadata->set_access_token(m_access_token.token);
@@ -196,7 +198,7 @@ void SyncUser::update_refresh_token(std::string&& token)
             }
         }
 
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_refresh_token(m_refresh_token.token);
         });
@@ -235,7 +237,7 @@ void SyncUser::update_access_token(std::string&& token)
             }
         }
 
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_access_token(m_access_token.token);
         });
@@ -262,7 +264,7 @@ void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
 
     m_user_identities = identities;
 
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_identities(identities);
     });
@@ -276,7 +278,7 @@ void SyncUser::log_out()
             return;
         }
         m_state = State::LoggedOut;
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_state(State::LoggedOut);
         });
@@ -291,14 +293,14 @@ void SyncUser::log_out()
         m_sessions.clear();
     }
 
-    SyncManager::shared().log_out_user(m_identity);
+    m_sync_manager->log_out_user(m_identity);
     m_access_token.token = "";
 
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {
         invalidate();
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type, false);
             if (metadata)
                 metadata->remove();
@@ -351,7 +353,7 @@ void SyncUser::set_state(SyncUser::State state)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_state = state;
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_state(state);
     });
@@ -375,7 +377,7 @@ void SyncUser::update_user_profile(const SyncUserProfile& profile)
 
     m_user_profile = profile;
 
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_user_profile(profile);
     });
@@ -408,9 +410,12 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
-    SyncManager::shared().app()->refresh_custom_data(shared_from_this(), [completion_block](util::Optional<app::AppError> error){
-        completion_block(error);
-    });
+    if (auto app = m_sync_manager->app().lock()) {
+        app->refresh_custom_data(shared_from_this(), completion_block);
+    } else {
+        completion_block(app::AppError(app::make_client_error_code(app::ClientErrorCode::app_deallocated),
+                                       "App has been deallocated"));
+    }
 }
 } // namespace realm
 

@@ -37,7 +37,8 @@ namespace app {
 
 enum class ClientErrorCode {
     user_not_found = 1,
-    user_not_logged_in = 2
+    user_not_logged_in = 2,
+    app_deallocated = 3
 };
 
 enum class JSONErrorCode {

@@ -56,17 +56,18 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
 } // anonymous namespace
 
 TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
-    TestSyncManager init_sync_manager("");
+    TestSyncManager init_sync_manager;
+    auto app = init_sync_manager.app();
 
     SECTION("should work for log level") {
-        SyncManager::shared().set_log_level(util::Logger::Level::info);
-        REQUIRE(SyncManager::shared().log_level() == util::Logger::Level::info);
-        SyncManager::shared().set_log_level(util::Logger::Level::error);
-        REQUIRE(SyncManager::shared().log_level() == util::Logger::Level::error);
+        app->sync_manager()->set_log_level(util::Logger::Level::info);
+        REQUIRE(app->sync_manager()->log_level() == util::Logger::Level::info);
+        app->sync_manager()->set_log_level(util::Logger::Level::error);
+        REQUIRE(app->sync_manager()->log_level() == util::Logger::Level::error);
     }
 
     SECTION("should not crash on 'reconnect()'") {
-        SyncManager::shared().reconnect();
+        app->sync_manager()->reconnect();
     }
 }
 
@@ -75,46 +76,54 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
     // Get a sync user
+    TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "foobarbaz";
-    auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
+    auto user = sync_manager->get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
     auto server_identity = user->identity();
     REQUIRE(server_identity == identity);
 
     SECTION("should work properly without metadata") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
+        auto user = init_sync_manager.app()->sync_manager()->get_user(identity,
+                                                                      ENCODE_FAKE_JWT("dummy_token"),
+                                                                      ENCODE_FAKE_JWT("not_a_real_token"),
+                                                                      auth_server_url,
+                                                                      dummy_device_id);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
     SECTION("should work properly with metadata") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
         const auto expected = base_path + "mongodb-realm/app_id/" + server_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(*user, raw_url) == expected);
+
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/" + server_identity + "/");
     }
 
     SECTION("should produce the expected path for a string partition") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const bson::Bson partition("string-partition-value&^#");
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/s_string-partition-value%26%5E%23.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
     SECTION("should produce a hashed path for string partitions which exceed file system path length limits") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const std::string name_too_long(500, 'b');
         REQUIRE(name_too_long.length() == 500);
         const bson::Bson partition(name_too_long);
         SyncConfig config(user, partition);
         const std::string expected_prefix = base_path + "mongodb-realm/";
         const std::string expected_suffix = ".realm";
-        std::string actual = SyncManager::shared().path_for_realm(config);
+        std::string actual = init_sync_manager.app()->sync_manager()->path_for_realm(config);
         size_t expected_length = expected_prefix.length() + 64 + expected_suffix.length();
         REQUIRE(actual.length() == expected_length);
         REQUIRE(actual.find(expected_prefix) == 0);
@@ -122,49 +131,50 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     }
 
     SECTION("should produce the expected path for a int32 partition") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const bson::Bson partition(int32_t(-25));
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/i_-25.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
     SECTION("should produce the expected path for a int64 partition") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const bson::Bson partition(int64_t(1.15e18)); // > 32 bits
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/l_1150000000000000000.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
     SECTION("should produce the expected path for a ObjectId partition") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const bson::Bson partition(ObjectId("0123456789abcdefffffffff"));
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/o_0123456789abcdefffffffff.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
     SECTION("should produce the expected path for a Null partition") {
-        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
         const bson::Bson partition;
         REQUIRE(partition.type() == bson::Bson::Type::Null);
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/null.realm";
-        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 }
 
 TEST_CASE("sync_manager: user state management", "[sync]") {
-    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
 
     const std::string url_1 = "https://realm.example.org/1/";
     const std::string url_2 = "https://realm.example.org/2/";
@@ -183,20 +193,20 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     const std::string identity_3 = "user-baz";
 
     SECTION("should get all users that are created during run time") {
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
-        auto users = SyncManager::shared().all_users();
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        sync_manager->get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
+        auto users = sync_manager->all_users();
         REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
         CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
     }
 
     SECTION("should be able to distinguish users based solely on URL") {
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_2, dummy_device_id);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_3, dummy_device_id);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id); // existing
-        auto users = SyncManager::shared().all_users();
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_2, dummy_device_id);
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_3, dummy_device_id);
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id); // existing
+        auto users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
         CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1, dummy_device_id));
@@ -204,11 +214,11 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should be able to distinguish users based solely on user ID") {
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        SyncManager::shared().get_user(identity_2, r_token_1, a_token_1, url_1, dummy_device_id);
-        SyncManager::shared().get_user(identity_3, r_token_1, a_token_1, url_1, dummy_device_id);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1,dummy_device_id); // existing
-        auto users = SyncManager::shared().all_users();
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        sync_manager->get_user(identity_2, r_token_1, a_token_1, url_1, dummy_device_id);
+        sync_manager->get_user(identity_3, r_token_1, a_token_1, url_1, dummy_device_id);
+        sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1,dummy_device_id); // existing
+        auto users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
         CHECK(validate_user_in_vector(users, identity_2, url_1, r_token_1, a_token_1, dummy_device_id));
@@ -219,10 +229,10 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         auto r_token_3a = ENCODE_FAKE_JWT("qwerty");
         auto a_token_3a = ENCODE_FAKE_JWT("ytrewq");
 
-        auto u1 = SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
-        auto u3 = SyncManager::shared().get_user(identity_3, r_token_3, a_token_3, url_3, dummy_device_id);
-        auto users = SyncManager::shared().all_users();
+        auto u1 = sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        auto u2 = sync_manager->get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
+        auto u3 = sync_manager->get_user(identity_3, r_token_3, a_token_3, url_3, dummy_device_id);
+        auto users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
         CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
@@ -230,39 +240,39 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         // Log out users 1 and 3
         u1->log_out();
         u3->log_out();
-        users = SyncManager::shared().all_users();
+        users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
         // Log user 3 back in
-        u3 = SyncManager::shared().get_user(identity_3, r_token_3a, a_token_3a, url_3, dummy_device_id);
-        users = SyncManager::shared().all_users();
+        u3 = sync_manager->get_user(identity_3, r_token_3a, a_token_3a, url_3, dummy_device_id);
+        users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
         CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a, dummy_device_id));
         // Log user 2 out
         u2->log_out();
-        users = SyncManager::shared().all_users();
+        users = sync_manager->all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a, dummy_device_id));
     }
 
     SECTION("should return current user that was created during run time") {
-        auto u_null = SyncManager::shared().get_current_user();
+        auto u_null = sync_manager->get_current_user();
         REQUIRE(u_null == nullptr);
 
-        auto u1 = SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
-        auto u_current = SyncManager::shared().get_current_user();
+        auto u1 = sync_manager->get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        auto u_current = sync_manager->get_current_user();
         REQUIRE(u_current == u1);
 
-        auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
+        auto u2 = sync_manager->get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
         // The current user has switched to return the most recently used: "u2"
-        u_current = SyncManager::shared().get_current_user();
+        u_current = sync_manager->get_current_user();
         REQUIRE(u_current == u2);
     }
 }
 
 TEST_CASE("sync_manager: persistent user state management", "[sync]") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+
     reset_test_directory(base_path);
     auto file_manager = SyncFileManager(base_path, "app_id");
     // Open the metadata separately, so we can investigate it ourselves.
@@ -300,8 +310,8 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
-            auto users = SyncManager::shared().all_users();
+            TestSyncManager tsm({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
+            auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 3);
             REQUIRE(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
             REQUIRE(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
@@ -309,8 +319,8 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         }
 
         SECTION("they should not be added to the active users list when metadata is disabled") {
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoMetadata);
-            auto users = SyncManager::shared().all_users();
+            TestSyncManager tsm({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+            auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 0);
         }
     }
@@ -343,8 +353,8 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         create_dummy_realm(user_dir_3 + "baz");
 
         SECTION("they should be cleaned up if metadata is enabled") {
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
-            auto users = SyncManager::shared().all_users();
+            TestSyncManager tsm({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
+            auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 1);
             REQUIRE(validate_user_in_vector(users, identity_3, auth_url, r_token_3, a_token_3, dummy_device_id));
             REQUIRE_DIR_DOES_NOT_EXIST(user_dir_1);
@@ -352,8 +362,8 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
             REQUIRE_DIR_EXISTS(user_dir_3);
         }
         SECTION("they should be left alone if metadata is disabled") {
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoMetadata);
-            auto users = SyncManager::shared().all_users();
+            TestSyncManager tsm({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+            auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE_DIR_EXISTS(user_dir_1);
             REQUIRE_DIR_EXISTS(user_dir_2);
             REQUIRE_DIR_EXISTS(user_dir_3);
@@ -363,7 +373,6 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
 TEST_CASE("sync_manager: file actions", "[sync]") {
     using Action = SyncFileActionMetadata::Action;
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
 
     auto file_manager = SyncFileManager(base_path, "bar_app_id");
@@ -398,7 +407,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = { .app_id = "bar_app_id" }, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
             // File actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
@@ -413,7 +422,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = {.app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
         }
@@ -423,7 +432,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoMetadata);
+            TestSyncManager tsm({.app_config = {.app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
             // All file actions should still be present.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 3);
@@ -449,7 +458,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = {.app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
             // File actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
@@ -477,7 +486,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE(pending_actions.size() == 4);
 
             // Simulate client launch.
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = { .app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
 
             CHECK(pending_actions.size() == 0);
             CHECK(File::exists(recovery_path));
@@ -489,7 +498,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = { .app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
             // File actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
@@ -504,7 +513,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             // Create a Realm file
             create_dummy_realm(realm_path_4);
             // Configure the system
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = {.app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
             REQUIRE(manager.all_pending_actions().size() == 0);
             // Add a file action after the system is configured.
             REQUIRE_REALM_EXISTS(realm_path_4);
@@ -512,7 +521,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
             REQUIRE(manager.all_pending_actions().size() == 1);
             // Force the recovery. (In a real application, the user would have closed the files by now.)
-            REQUIRE(SyncManager::shared().immediately_run_file_actions(realm_path_4));
+            REQUIRE(tsm.app()->sync_manager()->immediately_run_file_actions(realm_path_4));
             // There should be recovery files.
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_4);
             CHECK(File::exists(recovery_1));
@@ -525,7 +534,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
             create_dummy_realm(recovery_1);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoEncryption);
+            TestSyncManager tsm({.app_config = {.app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption});
             // Most file actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 1);
@@ -543,7 +552,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm("", base_path, SyncManager::MetadataMode::NoMetadata);
+            TestSyncManager tsm({.app_config = {.app_id = "bar_app_id"}, .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
             // All file actions should still be present.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 3);
@@ -560,7 +569,10 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 }
 
 TEST_CASE("sync_manager: metadata") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    TestSyncManager init_sync_manager({.base_path = base_path});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { sync_manager->reset_for_testing(); });
     reset_test_directory(base_path);
 
     app::App::Config app_config;
@@ -576,23 +588,23 @@ TEST_CASE("sync_manager: metadata") {
         config.base_file_path = base_path;
         config.metadata_mode = SyncManager::MetadataMode::Encryption;
         config.custom_encryption_key = make_test_encryption_key();
-        SyncManager::shared().configure(config, app_config);
 
-        SyncManager::shared().reset_for_testing();
+        sync_manager->reset_for_testing();
 
         config.custom_encryption_key = make_test_encryption_key(1);
         config.reset_metadata_on_error = true;
-        SyncManager::shared().configure(config, app_config);
     }
 }
 
 TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
     reset_test_directory(base_path);
-    SyncServer server(false);
-    TestSyncManager init_sync_manager(server, base_path, SyncManager::MetadataMode::NoMetadata);
+
+    TestSyncManager init_sync_manager({.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoEncryption},
+                                      {false});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
 
     SECTION("no active sessions") {
-        REQUIRE(!SyncManager::shared().has_existing_sessions());
+        REQUIRE(!sync_manager->has_existing_sessions());
     }
 
     auto schema = Schema{
@@ -603,7 +615,7 @@ TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
 
     std::atomic<bool> error_handler_invoked(false);
     Realm::Config config;
-    auto user = SyncManager::shared().get_user("user-name", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
+    auto user = sync_manager->get_user("user-name", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
         std::shared_ptr<SyncSession> session = sync_session(user, "/test-dying-state",
                                     [&](auto, auto) { error_handler_invoked = true; },
@@ -615,10 +627,10 @@ TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
     SECTION("active sessions") {
         {
             auto session = create_session(SyncSessionStopPolicy::Immediately);
-            REQUIRE(SyncManager::shared().has_existing_sessions());
+            REQUIRE(sync_manager->has_existing_sessions());
             session->close();
         }
-        EventLoop::main().run_until([&] { return !SyncManager::shared().has_existing_sessions(); });
-        REQUIRE(!SyncManager::shared().has_existing_sessions());
+        EventLoop::main().run_until([&] { return !sync_manager->has_existing_sessions(); });
+        REQUIRE(!sync_manager->has_existing_sessions());
     }
 }
