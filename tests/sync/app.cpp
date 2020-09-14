@@ -420,6 +420,30 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
                 });
         CHECK(processed);
     }
+    
+    SECTION("retry custom confirmation") {
+        app->provider_client<App::UsernamePasswordProviderClient>()
+            .retry_custom_confirmation(email,
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == "already confirmed");
+                    processed = true;
+                });
+        CHECK(processed);
+    }
+
+    SECTION("retry custom confirmation for invalid user fails") {
+        app->provider_client<App::UsernamePasswordProviderClient>()
+            .retry_custom_confirmation(util::format("%1@%2.com", random_string(5), random_string(5)),
+                [&](Optional<app::AppError> error) {
+                    REQUIRE(error);
+                    CHECK(error->message == "user not found");
+                    CHECK(error->is_service_error());
+                    CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::user_not_found);
+                    processed = true;
+                });
+        CHECK(processed);
+    }
 }
 
 // MARK: - UserAPIKeyProviderClient Tests

@@ -266,6 +266,29 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
     }, handler);
 }
 
+void App::UsernamePasswordProviderClient::retry_custom_confirmation(const std::string& email,
+                                                                    std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/confirm/call", m_parent->m_auth_route, username_password_provider_key);
+
+    auto handler = [completion_block](const Response& response) {
+        handle_default_response(response, completion_block);
+    };
+
+    nlohmann::json body {
+        { "email", email }
+    };
+
+    m_parent->do_request(Request {
+        HttpMethod::post,
+        route,
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
+        body.dump()
+    }, handler);
+}
+
 void App::UsernamePasswordProviderClient::send_reset_password_email(const std::string& email,
                                                                     std::function<void(Optional<AppError>)> completion_block)
 {
