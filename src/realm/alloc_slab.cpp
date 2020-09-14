@@ -640,8 +640,8 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
 #if REALM_ENABLE_ENCRYPTION
     if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
         char* addr = ref_translation_ptr[0].mapping_addr;
-        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, ref_translation_ptr[0].encrypted_mapping,
-                                             NodeHeader::get_byte_size_from_header);
+        REALM_ASSERT_DEBUG(addr == m_data);
+        realm::util::encryption_read_barrier(addr, sizeof(Header), ref_translation_ptr[0].encrypted_mapping);;
     }
 #endif
 
