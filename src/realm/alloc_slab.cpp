@@ -641,7 +641,7 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
     if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
         char* addr = ref_translation_ptr[0].mapping_addr;
         REALM_ASSERT_DEBUG(addr == m_data);
-        realm::util::encryption_read_barrier(addr, sizeof(Header), ref_translation_ptr[0].encrypted_mapping);;
+        realm::util::encryption_read_barrier(addr, sizeof(Header), ref_translation_ptr[0].encrypted_mapping);
     }
 #endif
 
