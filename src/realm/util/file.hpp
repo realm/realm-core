@@ -54,7 +54,7 @@ namespace std {
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
-#if REALM_IOS
+#if REALM_IOS_DEVICE
 #define REALM_FILELOCK_EMULATION
 #endif
 
@@ -608,14 +608,13 @@ public:
 
 private:
 #ifdef _WIN32
-    void* m_fd;
-    bool m_have_lock; // Only valid when m_fd is not null
+    void* m_fd = nullptr;
+    bool m_have_lock = false; // Only valid when m_fd is not null
 #else
-    int m_fd;
+    int m_fd = -1;
 #ifdef REALM_FILELOCK_EMULATION
-    int m_pipe_fd; // -1 if no pipe has been allocated for emulation
+    int m_pipe_fd = -1; // -1 if no pipe has been allocated for emulation
     bool m_has_exclusive_lock = false;
-    bool m_has_shared_lock = false;
     std::string m_fifo_path;
 #endif
 #endif
@@ -624,6 +623,13 @@ private:
 
     bool lock(bool exclusive, bool non_blocking);
     void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
+
+#ifdef REALM_FILELOCK_EMULATION
+    bool has_shared_lock() const noexcept
+    {
+        return m_pipe_fd != -1;
+    }
+#endif
 
     struct MapBase {
         void* m_addr = nullptr;
@@ -988,29 +994,10 @@ private:
 
 inline File::File(const std::string& path, Mode m)
 {
-#ifdef _WIN32
-    m_fd = nullptr;
-#else
-    m_fd = -1;
-#ifdef REALM_FILELOCK_EMULATION
-    m_pipe_fd = -1;
-#endif
-#endif
-
     open(path, m);
 }
 
-inline File::File() noexcept
-{
-#ifdef _WIN32
-    m_fd = nullptr;
-#else
-    m_fd = -1;
-#ifdef REALM_FILELOCK_EMULATION
-    m_pipe_fd = -1;
-#endif
-#endif
-}
+inline File::File() noexcept = default;
 
 inline File::~File() noexcept
 {
@@ -1037,9 +1024,7 @@ inline File::File(File&& f) noexcept
 #ifdef REALM_FILELOCK_EMULATION
     m_pipe_fd = f.m_pipe_fd;
     m_has_exclusive_lock = f.m_has_exclusive_lock;
-    m_has_shared_lock = f.m_has_shared_lock;
     f.m_has_exclusive_lock = false;
-    f.m_has_shared_lock = false;
     f.m_pipe_fd = -1;
 #endif
     f.m_fd = -1;
@@ -1061,9 +1046,7 @@ inline File& File::operator=(File&& f) noexcept
     m_pipe_fd = f.m_pipe_fd;
     f.m_pipe_fd = -1;
     m_has_exclusive_lock = f.m_has_exclusive_lock;
-    m_has_shared_lock = f.m_has_shared_lock;
     f.m_has_exclusive_lock = false;
-    f.m_has_shared_lock = false;
 #endif
 #endif
     m_encryption_key = std::move(f.m_encryption_key);
