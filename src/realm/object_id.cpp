@@ -46,8 +46,9 @@ struct GeneratorState {
 
 
 static const char hex_digits[] = "0123456789abcdef";
-
 namespace realm {
+
+static_assert(sizeof(ObjectId) == 12, "changing the size of an ObjectId is a file format breaking change");
 
 bool ObjectId::is_valid_str(StringData str) noexcept
 {
@@ -57,17 +58,20 @@ bool ObjectId::is_valid_str(StringData str) noexcept
 
 ObjectId::ObjectId(const char* init) noexcept
 {
-    char buf[3];
+    char buf[3] = "";
     REALM_ASSERT(is_valid_str(init));
 
-    buf[2] = '\0';
-
     size_t j = 0;
-    for (size_t i = 0; i < sizeof(m_bytes); i++) {
+    for (size_t i = 0; i < m_bytes.size(); i++) {
         buf[0] = init[j++];
         buf[1] = init[j++];
         m_bytes[i] = char(strtol(buf, nullptr, 16));
     }
+}
+
+ObjectId::ObjectId(const ObjectIdBytes& init) noexcept
+    : m_bytes(init)
+{
 }
 
 ObjectId::ObjectId(Timestamp d, int machine_id, int process_id) noexcept
@@ -79,8 +83,8 @@ ObjectId::ObjectId(Timestamp d, int machine_id, int process_id) noexcept
     m_bytes[2] = (sec >> 8) & 0xff;
     m_bytes[3] = sec & 0xff;
 
-    memcpy(m_bytes + 4, &machine_id, 3);
-    memcpy(m_bytes + 7, &process_id, 2);
+    std::memcpy(m_bytes.data() + 4, &machine_id, 3);
+    std::memcpy(m_bytes.data() + 7, &process_id, 2);
 
     auto r = g_gen_state.seq.fetch_add(1, std::memory_order_relaxed);
 
@@ -108,16 +112,21 @@ Timestamp ObjectId::get_timestamp() const
 std::string ObjectId::to_string() const
 {
     std::string ret;
-    for (size_t i = 0; i < sizeof(m_bytes); i++) {
+    for (size_t i = 0; i < m_bytes.size(); i++) {
         ret += hex_digits[m_bytes[i] >> 4];
         ret += hex_digits[m_bytes[i] & 0xf];
     }
     return ret;
 }
 
+ObjectId::ObjectIdBytes ObjectId::to_bytes() const
+{
+    return m_bytes;
+}
+
 size_t ObjectId::hash() const noexcept
 {
-    return murmur2_or_cityhash(m_bytes, sizeof(m_bytes));
+    return murmur2_or_cityhash(m_bytes.data(), m_bytes.size());
 }
 
 
