@@ -18,6 +18,13 @@
 
 ----------------------------------------------
 
+# 10.0.0-beta.6 Release notes
+
+### Fixed
+* Issues fixed by releases v6.0.22 to v6.0.23
+ 
+----------------------------------------------
+
 # 10.0.0-beta.5 Release notes
 
 ### Fixed
