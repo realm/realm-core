@@ -1,20 +1,14 @@
-# NEXT RELEASE
+# 10.0.0-beta.6 Release notes
 
 ### Enhancements
 * Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
 * Add Decimal128 subtraction and multiplication arithmetic operators.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Issues fixed by releases v6.0.22 to v6.0.25
+
 ### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* File format bumped to 12. Automatic upgrade from earlier versions.
 
 ----------------------------------------------
 
