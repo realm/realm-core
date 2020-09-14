@@ -4205,4 +4205,36 @@ TEST_IF(Shared_LargeFile, TEST_DURATION > 0 && !REALM_ANDROID)
     }
 }
 
+TEST(Shared_EncryptionBug)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.encryption_key = crypt_key(true);
+    {
+        DBRef db = DB::create(path, false, options);
+        {
+            WriteTransaction wt(db);
+            auto foo = wt.add_table("foo");
+            auto col_str = foo->add_column(type_String, "str");
+            std::string string_1M(1024 * 1024, 'A');
+            for (int i = 0; i < 64; i++) {
+                foo->create_object().set(col_str, string_1M);
+            }
+            wt.commit();
+        }
+        for (int i = 0; i < 2; i++) {
+            WriteTransaction wt(db);
+            auto foo = wt.get_table("foo");
+            auto col_str = foo->get_column_key("str");
+            foo->create_object().set(col_str, "boobar");
+            wt.commit();
+        }
+    }
+
+    {
+        DBRef db = DB::create(path, false, options);
+        db->start_read()->verify();
+    }
+}
+
 #endif // TEST_SHARED
