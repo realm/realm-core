@@ -73,6 +73,8 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
         flags |= PropertyType::Nullable;
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
+    else if (attr.test(col_attr_Set))
+        flags |= PropertyType::Set;
     switch (col.get_type()) {
         case col_type_Int:
             return PropertyType::Int | flags;
@@ -94,8 +96,14 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
             return PropertyType::ObjectId | flags;
         case col_type_Decimal:
             return PropertyType::Decimal | flags;
-        case col_type_Link:
-            return PropertyType::Object | PropertyType::Nullable;
+        case col_type_Link: {
+            if (attr.test(col_attr_Set)) {
+                return PropertyType::Object | flags;
+            }
+            else {
+                return PropertyType::Object | PropertyType::Nullable;
+            }
+        }
         case col_type_LinkList:
             return PropertyType::Object | PropertyType::Array;
         default:

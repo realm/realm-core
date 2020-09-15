@@ -31,7 +31,7 @@ namespace realm {
 class Group;
 class Schema;
 class Table;
-enum class PropertyType : unsigned char;
+enum class PropertyType : unsigned short;
 struct ObjectSchemaValidationException;
 struct Property;
 
