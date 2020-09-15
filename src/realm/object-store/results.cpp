@@ -1215,11 +1215,13 @@ Results::IncorrectTableException::IncorrectTableException(StringData e, StringDa
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
-    const char* column_type = string_for_property_type(type & ~PropertyType::Array);
-    if (!is_array(type))
+    const char* column_type = string_for_property_type(type & PropertyType::Collection);
+    if (is_array(type))
+        return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
+    if (is_set(type))
+        return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
                             table.get_column_name(column), column_type);
-    return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
 }
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
@@ -1227,7 +1229,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
     : std::logic_error(unsupported_operation_msg(column, table, operation))
     , column_key(column)
     , column_name(table.get_column_name(column))
-    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Array)
+    , property_type(ObjectSchema::from_core_type(column) & PropertyType::Collection)
 {
 }
 
