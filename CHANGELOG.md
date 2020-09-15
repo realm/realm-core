@@ -11,7 +11,7 @@
   * Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 6.0.7)
 
 ### Breaking changes
-* File format bumped to 20. Automatic upgrade from earlier versions.
+* File format bumped to 20. Automatic upgrade of non syncked realms. Syncked realms produced by pre v10 application cannot be upgraded.
 
 ----------------------------------------------
 

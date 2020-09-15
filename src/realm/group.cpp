@@ -514,7 +514,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // will be upgraded correctly by the above process. In file format 20 we don't have
     // search index on primary key columns. We need to rebuild the tables to ensure that
     // the ObjKeys matches the primary key value.
-    if (current_file_format_version > 9 && target_file_format_version >= 20) {
+    if (current_file_format_version > 9 && current_file_format_version < 20 && target_file_format_version >= 20) {
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);

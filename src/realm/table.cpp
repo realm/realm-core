@@ -1381,30 +1381,17 @@ bool Table::migrate_objects(ColKey pk_col_key)
         return !has_link_columns;
     }
 
-    /******************** Optionally create !OID accessor ********************/
-
-    ColKey oid_col;
-    BPlusTree<Int>* oid_column = nullptr;
-    std::unique_ptr<BPlusTreeBase> oid_column_store;
-    if (nb_public_columns > 0 && m_spec.get_column_name(0) == "!OID") {
-        // The !OID column should not be migrated, but we need an accessor
-        // to the old column
-        oid_col = m_spec.get_key(0);
-        oid_column_store = std::move(column_accessors[oid_col]);
-
-        column_accessors.erase(oid_col);
-        oid_column = dynamic_cast<BPlusTree<Int>*>(oid_column_store.get());
-        REALM_ASSERT(oid_column);
-    }
+    // !OID column must not be present. Such columns are only present in syncked
+    // realms, which we cannot upgrade.
+    REALM_ASSERT(nb_public_columns == 0 || m_spec.get_column_name(0) != "!OID");
 
     /*************************** Create objects ******************************/
 
-    bool use_row_ndx_as_key = !(oid_column || pk_col_key);
     int64_t max_key_value = -1;
     // Store old row ndx in a temporary column. Use this in next steps to find
     // the right target for links
     ColKey orig_row_ndx_col;
-    if (!use_row_ndx_as_key) {
+    if (pk_col_key) {
         orig_row_ndx_col = add_column(type_Int, "!ROW_INDEX");
         add_search_index(orig_row_ndx_col);
     }
@@ -1428,19 +1415,14 @@ bool Table::migrate_objects(ColKey pk_col_key)
         }
 
         ObjKey obj_key;
-        if (use_row_ndx_as_key) {
-            obj_key = ObjKey(row_ndx);
+        if (pk_col_key) {
+            init_values.emplace_back(orig_row_ndx_col, Mixed(int64_t(row_ndx)));
+            // Generate key from pk value
+            GlobalKey object_id{pk_val};
+            obj_key = global_to_local_object_id_hashed(object_id);
         }
         else {
-            init_values.emplace_back(orig_row_ndx_col, Mixed(int64_t(row_ndx)));
-            if (oid_column) {
-                obj_key = oid_column->get(row_ndx);
-            }
-            else {
-                // Generate key from pk value
-                GlobalKey object_id{pk_val};
-                obj_key = global_to_local_object_id_hashed(object_id);
-            }
+            obj_key = ObjKey(row_ndx);
         }
 
         if (obj_key.value > max_key_value) {
