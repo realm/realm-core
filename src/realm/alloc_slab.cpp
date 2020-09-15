@@ -637,12 +637,14 @@ char* SlabAlloc::do_translate(ref_type) const noexcept
 
 int SlabAlloc::get_committed_file_format_version() const noexcept
 {
-    if (m_mappings.size()) {
-        // if we have mapped a file, m_mappings will have at least one mapping and
-        // the first will be to the start of the file. Don't come here, if we're
-        // just attaching a buffer. They don't have mappings.
-        realm::util::encryption_read_barrier(m_mappings[0], 0, sizeof(Header));
+#if REALM_ENABLE_ENCRYPTION
+    if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
+        char* addr = ref_translation_ptr[0].mapping_addr;
+        REALM_ASSERT_DEBUG(addr == m_data);
+        realm::util::encryption_read_barrier(addr, sizeof(Header), ref_translation_ptr[0].encrypted_mapping);
     }
+#endif
+
     const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
     int file_format_version = int(header.m_file_format[slot_selector]);
