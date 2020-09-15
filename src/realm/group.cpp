@@ -321,7 +321,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
         return 11;
     }
 
-    return 12;
+    return 20;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -379,7 +379,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 12, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 20, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -511,10 +511,10 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     }
 
     // If we come from a file format version lower than 10, all objects with primary keys
-    // will be upgraded correctly by the above process. In file format 12 we don't have
+    // will be upgraded correctly by the above process. In file format 20 we don't have
     // search index on primary key columns. We need to rebuild the tables to ensure that
     // the ObjKeys matches the primary key value.
-    if (current_file_format_version < 12 && target_file_format_version >= 12) {
+    if (current_file_format_version > 9 && target_file_format_version >= 20) {
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);
@@ -546,7 +546,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             file_format_ok = (top_ref == 0);
             break;
         case 11:
-        case 12:
+        case 20:
             file_format_ok = true;
             break;
     }
