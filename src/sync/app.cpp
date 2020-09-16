@@ -740,8 +740,6 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
     }
-    std::string bearer = util::format("Bearer %1", user->refresh_token());
-    user->log_out();
 
     auto handler = [completion_block, user](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -750,6 +748,9 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
         return completion_block(util::none);
     };
 
+    auto refresh_token = user->refresh_token();
+    user->log_out();
+
     std::string route = util::format("%1/auth/session", m_base_route);
 
     Request req;
@@ -757,8 +758,19 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = true;
+    req.headers = get_request_headers();
+    req.headers.insert({ "Authorization",
+        util::format("Bearer %1", refresh_token)
+    });
 
-    do_authenticated_request(req, user, handler);
+    do_request(req, [completion_block, req](Response response) {
+        if (auto error = check_for_errors(response)) {
+            // We do not care about handling auth errors on log out
+            completion_block(error);
+        } else {
+            completion_block(util::none);
+        }
+    });
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) {
@@ -966,20 +978,19 @@ void App::handle_auth_failure(const AppError& error,
     };
 
     // Only handle auth failures
-    if (error.is_http_error() && error.error_code.value() != 401) {
-        completion_block(response);
-        return;
-    }
-
-    if (request.uses_refresh_token) {
-        if (sync_user && sync_user->is_logged_in()) {
-            sync_user->log_out();
+    if (error.is_http_error() && error.error_code.value() == 401) {
+        if (request.uses_refresh_token) {
+            if (sync_user && sync_user->is_logged_in()) {
+                sync_user->log_out();
+            }
+            completion_block(response);
+            return;
         }
-        completion_block(response);
-        return;
-    }
 
-    App::refresh_access_token(sync_user, access_token_handler);
+        App::refresh_access_token(sync_user, access_token_handler);
+    } else {
+        completion_block(response);
+    }
 }
 
 /// MARK: - refresh access token

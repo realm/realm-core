@@ -170,6 +170,30 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(metadata->identities() == identities);
     }
 
+    SECTION("properly removes a user's access/refresh token upon log out") {
+        const std::string identity = "test_identity_1";
+        const std::string refresh_token = ENCODE_FAKE_JWT("r-token-1");
+        const std::string access_token = ENCODE_FAKE_JWT("a-token-1");
+        const std::string server_url = "https://realm.example.org/1/";
+        const std::vector<SyncUserIdentity> identities {
+            { "12345", "test_case_provider" }
+        };
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        user->update_identities(identities);
+        user->log_out();
+        // Now try to pull the user out of the shadow manager directly.
+        auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
+        REQUIRE((bool)metadata);
+        REQUIRE(metadata->is_valid());
+        REQUIRE(metadata->provider_type() == server_url);
+        REQUIRE(metadata->access_token() == "");
+        REQUIRE(metadata->refresh_token() == "");
+        REQUIRE(metadata->device_id() == dummy_device_id);
+        REQUIRE(metadata->identities() == identities);
+        REQUIRE(metadata->state() == SyncUser::State::LoggedOut);
+        REQUIRE(user->is_logged_in() == false);
+    }
+
     SECTION("properly persists a user's information when the user is updated") {
         const std::string identity = "test_identity_2";
         const std::string refresh_token = ENCODE_FAKE_JWT("r_token-2a");

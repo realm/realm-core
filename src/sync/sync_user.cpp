@@ -278,9 +278,14 @@ void SyncUser::log_out()
             return;
         }
         m_state = State::LoggedOut;
+        m_access_token.token = "";
+        m_refresh_token.token = "";
+
         m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_state(State::LoggedOut);
+            metadata->set_access_token("");
+            metadata->set_refresh_token("");
         });
         // Move all active sessions into the waiting sessions pool. If the user is
         // logged back in, they will automatically be reactivated.
@@ -294,7 +299,6 @@ void SyncUser::log_out()
     }
 
     m_sync_manager->log_out_user(m_identity);
-    m_access_token.token = "";
 
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
@@ -311,7 +315,7 @@ void SyncUser::log_out()
 bool SyncUser::is_logged_in() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return !m_access_token.token.empty() && !m_refresh_token.token.empty();
+    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && m_state == State::LoggedIn;
 }
 
 void SyncUser::invalidate()
