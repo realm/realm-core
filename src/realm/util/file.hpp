@@ -159,8 +159,7 @@ public:
 
     /// Create an instance that is not initially attached to an open
     /// file.
-    File() noexcept;
-
+    File() = default;
     ~File() noexcept;
 
     File(File&&) noexcept;
@@ -996,8 +995,6 @@ inline File::File(const std::string& path, Mode m)
 {
     open(path, m);
 }
-
-inline File::File() noexcept = default;
 
 inline File::~File() noexcept
 {
