@@ -134,7 +134,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/table.hpp>
@@ -868,10 +868,11 @@ struct NullableVector {
         using type = TypeMapper<Query, Rest...>; // Keep looking
     };
 
-    using t_storage = TypeMapper<T,                        //
-                                 std::pair<bool, int64_t>, //
-                                 std::pair<int, int64_t>,  //
-                                 std::pair<ObjectId, util::Optional<ObjectId>>>;
+    using t_storage = TypeMapper<T,                                             //
+                                 std::pair<bool, int64_t>,                      //
+                                 std::pair<int, int64_t>,                       //
+                                 std::pair<ObjectId, util::Optional<ObjectId>>, //
+                                 std::pair<UUID, util::Optional<UUID>>>;
 
     NullableVector()
     {
@@ -1205,12 +1206,19 @@ inline void NullableVector<ObjKey>::set_null(size_t index)
 template <>
 inline bool NullableVector<UUID>::is_null(size_t index) const
 {
-    return m_first[index].is_null();
+    return !m_first[index];
 }
 template <>
 inline void NullableVector<UUID>::set_null(size_t index)
 {
-    m_first[index] = UUID();
+    m_first[index].reset();
+}
+template <>
+inline UUID NullableVector<UUID>::operator[](size_t index) const
+{
+    REALM_ASSERT_3(index, <, m_size);
+    const auto& opt = m_first[index];
+    return opt ? *opt : UUID();
 }
 
 template <typename Operator>
@@ -1430,7 +1438,8 @@ public:
     }
 
     template <class X, class Y>
-    static constexpr bool IsNullToObjectId = std::is_same<X, realm::null>::value&& std::is_same<Y, ObjectId>::value;
+    static constexpr bool IsNullToFixedBytesType =
+        std::is_same<X, realm::null>::value&& realm::is_any_v<Y, ObjectId, UUID>;
 
     template <class X, class Y>
     static constexpr bool IsObjectIdToTimestamp =
@@ -1438,7 +1447,7 @@ public:
 
     // we specialize here to convert between null and ObjectId without having a constructor from null
     template <class D>
-    REALM_FORCEINLINE std::enable_if_t<IsNullToObjectId<T, D>> export2(ValueBase& destination) const
+    REALM_FORCEINLINE std::enable_if_t<IsNullToFixedBytesType<T, D>> export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
         d.init(ValueBase::m_from_link_list, ValueBase::m_values, D());
@@ -1465,9 +1474,9 @@ public:
     }
 
     template <class D>
-    REALM_FORCEINLINE
-        std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToObjectId<T, D> && !IsObjectIdToTimestamp<T, D>>
-        export2(ValueBase&) const
+    REALM_FORCEINLINE std::enable_if_t<!std::is_convertible<T, D>::value && !IsNullToFixedBytesType<T, D> &&
+                                       !IsObjectIdToTimestamp<T, D>>
+    export2(ValueBase&) const
     {
         // export2 is instantiated for impossible conversions like T=StringData, D=int64_t. These are never
         // performed at runtime but would result in a compiler error if we did not provide this implementation.
@@ -1511,7 +1520,7 @@ public:
                 return m_storage[0];
             }
             else if constexpr (realm::is_any_v<T, int, int64_t, bool, float, double, StringData, BinaryData,
-                                               Timestamp, Decimal128, ObjectId>) {
+                                               Timestamp, Decimal128, ObjectId, UUID>) {
                 return Mixed(m_storage[0]);
             }
             else {
@@ -2516,8 +2525,8 @@ public:
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
                 if (link_translation_key) {
                     const Obj obj = m_link_map.get_target_table()->get_object(link_translation_key);
-                    if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                    if constexpr (realm::is_any_v<T, ObjectId, UUID>) {
+                        auto opt_val = obj.get<util::Optional<T>>(m_column_key);
                         if (opt_val) {
                             d.m_storage.set(0, *opt_val);
                         }
@@ -2537,8 +2546,8 @@ public:
                 d.init(true, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-                    if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                    if constexpr (realm::is_any_v<T, ObjectId, UUID>) {
+                        auto opt_val = obj.get<util::Optional<T>>(m_column_key);
                         if (opt_val) {
                             d.m_storage.set(t, *opt_val);
                         }
@@ -3320,7 +3329,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
             if (m_is_nullable_storage) {
                 evaluate<util::Optional<T>>(index, destination);
                 return;
@@ -3413,7 +3422,7 @@ public:
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
             if (this->m_is_nullable_storage) {
                 evaluate<util::Optional<T>>(index, destination);
                 return;
@@ -3575,7 +3584,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
             if (m_list.m_is_nullable_storage) {
                 evaluate<util::Optional<T>>(index, destination);
                 return;

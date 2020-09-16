@@ -19,7 +19,7 @@
 #include <realm.hpp>
 #include <realm/uuid.hpp>
 #include <chrono>
-#include <realm/array_uuid.hpp>
+#include <realm/array_fixed_bytes.hpp>
 
 #include "test.hpp"
 
@@ -45,21 +45,17 @@ TEST(UUID_Basics)
     std::string init_str0("3b241101-e2bb-4255-8caf-4136c566a962");
     UUID id0(init_str0.c_str());
     CHECK_EQUAL(id0.to_string(), init_str0);
-    CHECK_NOT(id0.is_null());
 
     std::string init_str1("3b241101-e2bb-4255-8caf-4136c566a962");
     UUID id1(init_str1.c_str());
     CHECK_EQUAL(id1.to_string(), init_str1);
-    CHECK_NOT(id1.is_null());
 
     UUID id_zeros;
     CHECK(id_zeros == UUID("00000000-0000-0000-0000-000000000000"));
-    CHECK(id_zeros.is_null());
 
     std::string init_str_max("ffffffff-ffff-ffff-ffff-ffffffffffff");
     UUID id_max(init_str_max);
     CHECK(id_max.to_string() == init_str_max);
-    CHECK_NOT(id_max.is_null());
 
     std::string exception_message;
     try {
@@ -70,8 +66,8 @@ TEST(UUID_Basics)
     }
     CHECK_EQUAL(exception_message, "Invalid string format encountered when constructing a UUID: 'hello world'.");
 
-    UUID::UUIDBytes raw_null = {};
-    CHECK(UUID(raw_null).is_null());
+    UUID::UUIDBytes raw_zeros = {};
+    CHECK_EQUAL(UUID(raw_zeros).to_string(), "00000000-0000-0000-0000-000000000000");
     UUID::UUIDBytes raw_one = {255, 124, 32, 16, 8, 4, 2, 1, 15};
     CHECK_EQUAL(UUID(raw_one).to_string(), "ff7c2010-0804-0201-0f00-000000000000");
 }
@@ -208,7 +204,7 @@ TEST(UUID_ArrayNull)
     const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
     const char str2[] = "3b241101-e2bb-4255-8caf-4136c566a962";
 
-    ArrayUUID arr(Allocator::get_default());
+    ArrayUUIDNull arr(Allocator::get_default());
     arr.create();
 
     arr.add(UUID{str0});
@@ -222,20 +218,20 @@ TEST(UUID_ArrayNull)
     CHECK(!arr.is_null(2));
     CHECK_EQUAL(arr.get(2), UUID(str1));
     CHECK_EQUAL(arr.find_first(id2), 1);
-    CHECK_EQUAL(arr.find_first(UUID()), npos);
+    CHECK_EQUAL(arr.find_first_null(), npos);
 
-    arr.add(UUID());
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 0), 3);
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 1), 3);
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 2), 3);
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 3), 3);
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 0, 3), npos);
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 3, 3), npos);
-    CHECK_EQUAL(arr.find_first(UUID{null()}, 4), npos);
+    arr.add(util::none);
+    CHECK_EQUAL(arr.find_first_null(0), 3);
+    CHECK_EQUAL(arr.find_first_null(1), 3);
+    CHECK_EQUAL(arr.find_first_null(2), 3);
+    CHECK_EQUAL(arr.find_first_null(3), 3);
+    CHECK_EQUAL(arr.find_first_null(0, 3), npos);
+    CHECK_EQUAL(arr.find_first_null(3, 3), npos);
+    CHECK_EQUAL(arr.find_first_null(4), npos);
 
     arr.erase(1);
     CHECK_EQUAL(arr.get(1), UUID(str1));
-    ArrayUUID arr1(Allocator::get_default());
+    ArrayUUIDNull arr1(Allocator::get_default());
     arr1.create();
     arr.move(arr1, 1);
 
@@ -244,7 +240,7 @@ TEST(UUID_ArrayNull)
     CHECK_EQUAL(arr1.get(0), UUID(str1));
     CHECK(!arr1.is_null(0));
     CHECK(arr1.is_null(1));
-    CHECK_EQUAL(arr1.find_first(UUID{null()}, 0), 1);
+    CHECK_EQUAL(arr1.find_first_null(0), 1);
 
     arr.destroy();
     arr1.destroy();
@@ -266,10 +262,10 @@ TEST(UUID_Table)
     CHECK_EQUAL(obj1.get<UUID>(col_id), UUID(str1));
     CHECK_NOT(obj2.is_null(col_id));
     CHECK(obj2.is_null(col_id_null));
-    auto id = obj1.get<UUID>(col_id_null);
-    CHECK(!id.is_null());
-    id = obj2.get<UUID>(col_id_null);
-    CHECK(id.is_null());
+    auto id = obj1.get<util::Optional<UUID>>(col_id_null);
+    CHECK(id);
+    id = obj2.get<util::Optional<UUID>>(col_id_null);
+    CHECK(!id);
     auto key = t.find_first(col_id, UUID(str1));
     CHECK_EQUAL(key, obj1.get_key());
     t.add_search_index(col_id);
@@ -306,19 +302,22 @@ TEST(UUID_PrimaryKeyNullable)
     UUID id{"3b241101-e2bb-4255-8caf-4136c566a960"};
     ObjKey key0;
     ObjKey key1;
+    ObjKey key2;
     {
         auto wt = db->start_write();
         auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id", true);
         key0 = table->create_object_with_primary_key(UUID()).get_key();
         key1 = table->create_object_with_primary_key(id).get_key();
+        key2 = table->create_object_with_primary_key(util::Optional<UUID>{}).get_key();
         wt->commit();
     }
     {
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
-        CHECK_EQUAL(table->size(), 2);
+        CHECK_EQUAL(table->size(), 3);
         CHECK_EQUAL(table->find_first_uuid(table->get_primary_key_column(), UUID()), key0);
         CHECK_EQUAL(table->find_first_uuid(table->get_primary_key_column(), id), key1);
+        CHECK_EQUAL(table->find_first_null(table->get_primary_key_column()), key2);
     }
 }
 
@@ -403,6 +402,43 @@ TEST(UUID_GrowAndShrink)
     }
 }
 
+// This should exhaustively test all cases of ArrayUUIDNull::find_first_null.
+TEST(UUID_ArrayNull_FindFirstNull_StressTest)
+{
+    // Test is O(2^N * N^2) in terms of this, so don't go too high...
+    // 17 should be enough to cover all cases, including a middle block that is neither first nor last.
+    const auto MaxSize = 17;
+
+    for (int size = 0; size <= MaxSize; size++) {
+        ArrayUUIDNull arr(Allocator::get_default());
+        arr.create();
+        for (int i = 0; i < size; i++) {
+            arr.add(util::none);
+        }
+
+        for (unsigned mask = 0; mask < (1u << size); mask++) {
+            // Set nulls to match mask.
+            for (int i = 0; i < size; i++) {
+                if (mask & (1 << i)) {
+                    arr.set(i, util::none);
+                }
+                else {
+                    arr.set(i, UUID());
+                }
+            }
+
+            for (int begin = 0; begin <= size; begin++) {
+                for (int end = begin; end <= size; end++) {
+                    auto adjusted_mask = (mask & ~(unsigned(-1) << end)) >> begin;
+                    const size_t expected = adjusted_mask ? begin + ctz(adjusted_mask) : npos;
+                    CHECK_EQUAL(arr.find_first_null(begin, end), expected);
+                }
+            }
+        }
+
+        arr.destroy();
+    }
+}
 
 TEST(UUID_Query)
 {
@@ -463,7 +499,7 @@ TEST(UUID_Query)
         q = table->column<UUID>(col) == UUID();
         CHECK_EQUAL(q.count(), 0);
         q = table->column<UUID>(col) > UUID();
-        CHECK_EQUAL(q.count(), 0);
+        CHECK_EQUAL(q.count(), 1000);
         q = table->column<UUID>(col) < UUID();
         CHECK_EQUAL(q.count(), 0);
         q = table->column<UUID>(col) >= uuid1;

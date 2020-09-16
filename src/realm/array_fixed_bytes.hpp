@@ -16,17 +16,20 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_OBJECT_ID_HPP
-#define REALM_ARRAY_OBJECT_ID_HPP
+#ifndef REALM_ARRAY_FIXED_BYTES_HPP
+#define REALM_ARRAY_FIXED_BYTES_HPP
 
 #include <realm/array.hpp>
 #include <realm/object_id.hpp>
+#include <realm/uuid.hpp>
 
 namespace realm {
 
-class ArrayObjectId : public ArrayPayload, protected Array {
+template <class ObjectType, int ElementSize>
+class ArrayFixedBytes : public ArrayPayload, protected Array {
 public:
-    using value_type = ObjectId;
+    using value_type = ObjectType;
+    using self_type = ArrayFixedBytes<ObjectType, ElementSize>;
 
     using Array::Array;
     using Array::destroy;
@@ -36,10 +39,10 @@ public:
     using Array::update_parent;
     using Array::verify;
 
-    static ObjectId default_value(bool nullable)
+    static ObjectType default_value(bool nullable)
     {
         REALM_ASSERT(!nullable);
-        return ObjectId();
+        return ObjectType();
     }
 
     void create()
@@ -69,22 +72,22 @@ public:
         return this->get_width() == 0 || get_pos(ndx).is_null(this);
     }
 
-    ObjectId get(size_t ndx) const
+    ObjectType get(size_t ndx) const
     {
         REALM_ASSERT(is_valid_ndx(ndx));
         REALM_ASSERT(!is_null(ndx));
         return get_pos(ndx).get_value(this);
     }
 
-    void add(const ObjectId& value)
+    void add(const ObjectType& value)
     {
         insert(size(), value);
     }
 
-    void set(size_t ndx, const ObjectId& value);
-    void insert(size_t ndx, const ObjectId& value);
+    void set(size_t ndx, const ObjectType& value);
+    void insert(size_t ndx, const ObjectType& value);
     void erase(size_t ndx);
-    void move(ArrayObjectId& dst, size_t ndx);
+    void move(ArrayFixedBytes<ObjectType, ElementSize>& dst, size_t ndx);
     void clear()
     {
         truncate(0);
@@ -94,11 +97,10 @@ public:
         Array::truncate(calc_required_bytes(ndx));
     }
 
-    size_t find_first(const ObjectId& value, size_t begin = 0, size_t end = npos) const noexcept;
+    size_t find_first(const ObjectType& value, size_t begin = 0, size_t end = npos) const noexcept;
 
 protected:
-    static constexpr size_t s_width = sizeof(ObjectId); // Size of each element
-    static_assert(s_width == 12, "Size of ObjectId must be 12");
+    static constexpr size_t s_width = ElementSize; // Size of each element
 
     // A block is a byte bitvector indicating null entries and 8 ObjectIds.
     static constexpr size_t s_block_size = s_width * 8 + 1; // 97
@@ -114,16 +116,16 @@ protected:
         size_t base_byte;
         size_t offset;
 
-        void set_value(ArrayObjectId* arr, const ObjectId& val) const
+        void set_value(self_type* arr, const ObjectType& val) const
         {
-            reinterpret_cast<ObjectId*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset] = val;
+            reinterpret_cast<ObjectType*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset] = val;
         }
-        const ObjectId& get_value(const ArrayObjectId* arr) const
+        const ObjectType& get_value(const self_type* arr) const
         {
-            return reinterpret_cast<const ObjectId*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset];
+            return reinterpret_cast<const ObjectType*>(arr->m_data + base_byte + 1 /*null bit byte*/)[offset];
         }
 
-        void set_null(ArrayObjectId* arr, bool new_is_null) const
+        void set_null(self_type* arr, bool new_is_null) const
         {
             auto& bitvec = arr->m_data[base_byte];
             if (new_is_null) {
@@ -133,7 +135,7 @@ protected:
                 bitvec &= ~(1 << offset);
             }
         }
-        bool is_null(const ArrayObjectId* arr) const
+        bool is_null(const self_type* arr) const
         {
             return arr->m_data[base_byte] & (1 << offset);
         }
@@ -164,58 +166,45 @@ protected:
 
 // The nullable ObjectId array uses the same layout and is compatible with the non-nullable one. It adds support for
 // operations on null. Because the base class maintains null markers, we are able to defer to it for many operations.
-class ArrayObjectIdNull : public ArrayObjectId {
+template <class ObjectType, int ElementSize>
+class ArrayFixedBytesNull : public ArrayFixedBytes<ObjectType, ElementSize> {
 public:
-    using ArrayObjectId::ArrayObjectId;
-    static util::Optional<ObjectId> default_value(bool nullable)
+    using Parent = ArrayFixedBytes<ObjectType, ElementSize>;
+    using ArrayFixedBytes<ObjectType, ElementSize>::ArrayFixedBytes;
+    static util::Optional<ObjectType> default_value(bool nullable)
     {
         if (nullable)
             return util::none;
-        return ObjectId();
+        return ObjectType();
     }
 
-    void set(size_t ndx, const util::Optional<ObjectId>& value)
+    void set(size_t ndx, const util::Optional<ObjectType>& value)
     {
         if (value) {
-            ArrayObjectId::set(ndx, *value);
+            Parent::set(ndx, *value);
         }
         else {
             set_null(ndx);
         }
     }
-    void add(const util::Optional<ObjectId>& value)
+    void add(const util::Optional<ObjectType>& value)
     {
-        insert(size(), value);
+        insert(this->size(), value);
     }
-    void insert(size_t ndx, const util::Optional<ObjectId>& value)
+    void insert(size_t ndx, const util::Optional<ObjectType>& value);
+    void set_null(size_t ndx);
+    util::Optional<ObjectType> get(size_t ndx) const noexcept
     {
-        if (value) {
-            ArrayObjectId::insert(ndx, *value);
-        }
-        else {
-            ArrayObjectId::insert(ndx, null_oid);
-            set_null(ndx);
-        }
-    }
-    void set_null(size_t ndx)
-    {
-        copy_on_write();
-        auto pos = get_pos(ndx);
-        pos.set_value(this, null_oid);
-        pos.set_null(this, true);
-    }
-    util::Optional<ObjectId> get(size_t ndx) const noexcept
-    {
-        auto pos = get_pos(ndx);
+        auto pos = this->get_pos(ndx);
         if (pos.is_null(this)) {
             return util::none;
         }
         return pos.get_value(this);
     }
-    size_t find_first(const util::Optional<ObjectId>& value, size_t begin = 0, size_t end = npos) const
+    size_t find_first(const util::Optional<ObjectType>& value, size_t begin = 0, size_t end = npos) const
     {
         if (value) {
-            return ArrayObjectId::find_first(*value, begin, end);
+            return Parent::find_first(*value, begin, end);
         }
         else {
             return find_first_null(begin, end);
@@ -224,10 +213,15 @@ public:
     size_t find_first_null(size_t begin = 0, size_t end = npos) const;
 
 private:
-    static const ObjectId null_oid;
+    static const ObjectType null_oid;
 };
 
+using ArrayObjectId = ArrayFixedBytes<ObjectId, sizeof(ObjectId)>;
+using ArrayObjectIdNull = ArrayFixedBytesNull<ObjectId, sizeof(ObjectId)>;
+
+using ArrayUUID = ArrayFixedBytes<UUID, sizeof(UUID::UUIDBytes)>;
+using ArrayUUIDNull = ArrayFixedBytesNull<UUID, sizeof(UUID::UUIDBytes)>;
 
 } // namespace realm
 
-#endif /* REALM_ARRAY_OBJECT_ID_HPP */
+#endif /* REALM_ARRAY_FIXED_BYTES_HPP */

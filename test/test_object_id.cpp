@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <realm.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <chrono>
 
 #include "test.hpp"

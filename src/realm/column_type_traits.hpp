@@ -48,10 +48,15 @@ class ArrayBoolNull;
 class ArrayKey;
 class ArrayKeyNonNullable;
 class ArrayDecimal128;
-class ArrayObjectId;
-class ArrayObjectIdNull;
+template <typename, int>
+class ArrayFixedBytes;
+template <typename, int>
+class ArrayFixedBytesNull;
+using ArrayObjectId = ArrayFixedBytes<ObjectId, sizeof(ObjectId)>;
+using ArrayObjectIdNull = ArrayFixedBytesNull<ObjectId, sizeof(ObjectId)>;
 class ArrayTypedLink;
-class ArrayUUID;
+using ArrayUUID = ArrayFixedBytes<UUID, sizeof(UUID)>;
+using ArrayUUIDNull = ArrayFixedBytesNull<UUID, sizeof(UUID)>;
 template <class>
 class BasicArray;
 template <class>
@@ -248,6 +253,14 @@ struct ColumnTypeTraits<UUID> {
     static const ColumnType column_id = col_type_UUID;
 };
 
+template <>
+struct ColumnTypeTraits<util::Optional<UUID>> {
+    using cluster_leaf_type = ArrayUUIDNull;
+    static const DataType id = type_UUID;
+    static const ColumnType column_id = col_type_UUID;
+};
+
+
 template <typename T>
 using ColumnClusterLeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 template <typename T>
@@ -312,6 +325,10 @@ inline bool value_is_null(const bool&)
     return false;
 }
 inline bool value_is_null(const ObjectId&)
+{
+    return false;
+}
+inline bool value_is_null(const UUID&)
 {
     return false;
 }

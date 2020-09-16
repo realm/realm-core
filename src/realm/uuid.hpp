@@ -44,19 +44,14 @@ public:
     /// user defined bit pattern and future compatibility.
     static bool is_valid_string(StringData) noexcept;
 
-    /// Constructs an ObjectId from 36 hex characters.
     /// This constructor may throw InvalidUUIDString if the format
     /// of the parameter is invalid according to `is_valid_string`
     explicit UUID(const char*);
     explicit UUID(const StringData&);
 
-    /// Constructs a null UUID
+    /// Constructs a  UUID with all zero bytes
     UUID() noexcept;
-    UUID(const null&)
-    noexcept
-        : UUID()
-    {
-    }
+
     explicit UUID(const UUIDBytes& raw) noexcept
         : m_bytes(raw)
     {
@@ -86,7 +81,6 @@ public:
     {
         return m_bytes <= other.m_bytes;
     }
-    bool is_null() const;
     std::string to_string() const;
     UUIDBytes to_bytes() const
     {

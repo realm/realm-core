@@ -11,12 +11,11 @@ set(REALM_SOURCES
     array_blobs_small.cpp
     array_blobs_big.cpp
     array_decimal128.cpp
+    array_fixed_bytes.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
-    array_object_id.cpp
     array_unsigned.cpp
-    array_uuid.cpp
     array_string.cpp
     array_string_short.cpp
     array_timestamp.cpp
@@ -115,17 +114,16 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_bool.hpp
     array_decimal128.hpp
     array_direct.hpp
+    array_fixed_bytes.hpp
     array_integer.hpp
     array_mixed.hpp
     array_key.hpp
     array_list.hpp
-    array_object_id.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp
     array_unsigned.hpp
-    array_uuid.hpp
     binary_data.hpp
     bplustree.hpp
     chunked_binary.hpp

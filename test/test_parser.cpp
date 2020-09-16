@@ -4269,7 +4269,6 @@ TEST(Parser_UUID)
     UUID u1("3b241101-e2bb-4255-8caf-4136c566a961");
     UUID u2("3b241101-e2bb-4255-8caf-294299afdce2");
     UUID u3("3b241101-e2bb-4255-8caf-000000000003");
-    UUID null_uuid;
     std::vector<UUID> ids = {u1, u2, u3};
 
     for (auto id : ids) {
@@ -4279,9 +4278,8 @@ TEST(Parser_UUID)
     // add one object with default values, it should be null for the nullable column
     auto obj_generated = table->create_object_with_primary_key(UUID("3b241101-0000-0000-0000-4136c566a964"));
     UUID generated_pk = obj_generated.get<UUID>(pk_col_key);
-    auto generated_nullable = obj_generated.get<UUID>(nullable_id_col_key);
-    CHECK_NOT(generated_pk.is_null());
-    CHECK(generated_nullable.is_null());
+    auto generated_nullable = obj_generated.get<util::Optional<UUID>>(nullable_id_col_key);
+    CHECK_NOT(generated_nullable);
     size_t num_rows = table->size();
     verify_query(test_context, table, "id == uuid(" + generated_pk.to_string() + ")", 1);
     verify_query(test_context, table, "nid == uuid(" + generated_pk.to_string() + ")", 0);
@@ -4291,12 +4289,6 @@ TEST(Parser_UUID)
     verify_query(test_context, table, "nid == NULL", 1);
     verify_query(test_context, table, "id != NULL", num_rows);
     verify_query(test_context, table, "nid != NULL", num_rows - 1);
-    // checks for the null uuid (aka all zeros)
-    CHECK(null_uuid.is_null());
-    verify_query(test_context, table, util::format("id == uuid(%1)", null_uuid.to_string()), 0);
-    verify_query(test_context, table, util::format("nid == uuid(%1)", null_uuid.to_string()), 1);
-    verify_query(test_context, table, util::format("id != uuid(%1)", null_uuid.to_string()), num_rows);
-    verify_query(test_context, table, util::format("nid != uuid(%1)", null_uuid.to_string()), num_rows - 1);
 
     for (auto id : ids) {
         verify_query(test_context, table, "id == uuid(" + id.to_string() + ")", 1);
@@ -4314,18 +4306,16 @@ TEST(Parser_UUID)
     }
 
     // argument substitution checks
-    util::Any args[] = {u1, u2, u3, realm::null(), null_uuid};
-    size_t num_args = 5;
+    util::Any args[] = {u1, u2, u3, realm::null()};
+    size_t num_args = 4;
     verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
     verify_query_sub(test_context, table, "id == $3", args, num_args, 0);
-    verify_query_sub(test_context, table, "id == $4", args, num_args, 0);
     verify_query_sub(test_context, table, "nid == $0", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $1", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $2", args, num_args, 1);
     verify_query_sub(test_context, table, "nid == $3", args, num_args, 1);
-    verify_query_sub(test_context, table, "nid == $4", args, num_args, 1);
 }
 
 

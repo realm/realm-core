@@ -26,7 +26,6 @@ namespace realm {
 
 constexpr char hex_digits[] = "0123456789abcdef";
 constexpr size_t size_of_uuid_string = 36;
-constexpr UUID::UUIDBytes null_uuid = {};
 constexpr char null_uuid_string[] = "00000000-0000-0000-0000-000000000000";
 static_assert(sizeof(UUID) == 16, "A change to the size of UUID is a file format breaking change");
 static_assert(sizeof(null_uuid_string) - 1 == (sizeof(UUID) * 2) + 4,
@@ -87,11 +86,6 @@ UUID::UUID(const StringData& init)
 UUID::UUID() noexcept
     : m_bytes{}
 {
-}
-
-bool UUID::is_null() const
-{
-    return m_bytes == null_uuid;
 }
 
 std::string UUID::to_string() const

@@ -27,10 +27,9 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
 #include "realm/array_key.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 #include "realm/array_backlink.hpp"
 #include "realm/array_typed_link.hpp"
-#include "realm/array_uuid.hpp"
 #include "realm/column_type_traits.hpp"
 #include "realm/index_string.hpp"
 #include "realm/cluster_tree.hpp"
@@ -149,7 +148,10 @@ int Obj::cmp(const Obj& other, ColKey col_key) const
             else
                 return cmp<ObjectId>(other, col_ndx);
         case type_UUID:
-            return cmp<UUID>(other, col_ndx);
+            if (attr.test(col_attr_Nullable))
+                return cmp<util::Optional<UUID>>(other, col_ndx);
+            else
+                return cmp<UUID>(other, col_ndx);
         case type_Link:
             return cmp<ObjKey>(other, col_ndx);
         case type_TypedLink:
@@ -445,7 +447,7 @@ Mixed Obj::get_any(ColKey col_key) const
         case col_type_ObjectId:
             return Mixed{_get<util::Optional<ObjectId>>(col_ndx)};
         case col_type_UUID:
-            return Mixed{_get<UUID>(col_ndx)};
+            return Mixed{_get<util::Optional<UUID>>(col_ndx)};
         case col_type_Link:
             return Mixed{_get<ObjKey>(col_ndx)};
         default:
@@ -539,7 +541,7 @@ bool Obj::is_null(ColKey col_key) const
             case col_type_Decimal:
                 return do_is_null<ArrayDecimal128>(col_ndx);
             case col_type_UUID:
-                return do_is_null<ArrayUUID>(col_ndx);
+                return do_is_null<ArrayUUIDNull>(col_ndx);
             default:
                 REALM_UNREACHABLE();
         }
@@ -1732,6 +1734,7 @@ template Decimal128 Obj::get<Decimal128>(ColKey col_key) const;
 template ObjLink Obj::get<ObjLink>(ColKey col_key) const;
 template Mixed Obj::get<Mixed>(realm::ColKey) const;
 template UUID Obj::get<UUID>(realm::ColKey) const;
+template util::Optional<UUID> Obj::get<util::Optional<UUID>>(ColKey col_key) const;
 
 template <class T>
 inline void Obj::do_set_null(ColKey col_key)
@@ -1817,7 +1820,7 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
                 do_set_null<ArrayMixed>(col_key);
                 break;
             case col_type_UUID:
-                do_set_null<ArrayUUID>(col_key);
+                do_set_null<ArrayUUIDNull>(col_key);
                 break;
             default:
                 REALM_UNREACHABLE();

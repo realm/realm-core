@@ -39,8 +39,7 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_object_id.hpp>
-#include <realm/array_uuid.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -3489,6 +3488,11 @@ ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
     return val.value();
 }
+template <>
+UUID remove_optional<Optional<UUID>>(Optional<UUID> val)
+{
+    return val.value();
+}
 } // namespace
 
 template <class F, class T>
@@ -3613,7 +3617,12 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
             case type_UUID:
-                change_nullability_list<UUID, UUID>(from, to, throw_on_null);
+                if (is_nullable(from)) {
+                    change_nullability_list<Optional<UUID>, UUID>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability_list<UUID, Optional<UUID>>(from, to, throw_on_null);
+                }
                 break;
             case type_Link:
             case type_TypedLink:
@@ -3667,7 +3676,12 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
             case type_UUID:
-                change_nullability<UUID, UUID>(from, to, throw_on_null);
+                if (is_nullable(from)) {
+                    change_nullability<Optional<UUID>, UUID>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability<UUID, Optional<UUID>>(from, to, throw_on_null);
+                }
                 break;
             case type_TypedLink:
             case type_Link:

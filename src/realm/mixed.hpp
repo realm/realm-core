@@ -140,6 +140,7 @@ public:
     Mixed(ObjKey) noexcept;
     Mixed(ObjLink) noexcept;
     Mixed(UUID) noexcept;
+    Mixed(util::Optional<UUID>) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -310,6 +311,17 @@ inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
     }
 }
 
+inline Mixed::Mixed(util::Optional<UUID> v) noexcept
+{
+    if (v) {
+        m_type = type_UUID + 1;
+        uuid_val = *v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
@@ -362,13 +374,8 @@ inline Mixed::Mixed(ObjectId v) noexcept
 
 inline Mixed::Mixed(UUID v) noexcept
 {
-    if (!v.is_null()) {
-        m_type = type_UUID + 1;
-        uuid_val = v;
-    }
-    else {
-        m_type = 0;
-    }
+    m_type = type_UUID + 1;
+    uuid_val = v;
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
