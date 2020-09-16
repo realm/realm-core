@@ -309,7 +309,7 @@ TEST(Dictionary_Tombstones)
     Group g;
     auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
     auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
-    ColKey col_dict = foos->add_column_dictionary(type_String, "dict", type_Mixed);
+    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
 
     auto foo = foos->create_object_with_primary_key(123);
     auto a = bars->create_object_with_primary_key("a");
