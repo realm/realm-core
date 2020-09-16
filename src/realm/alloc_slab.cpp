@@ -643,6 +643,7 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
         // just attaching a buffer. They don't have mappings.
         realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
     }
+
     const Header& header = *reinterpret_cast<const Header*>(m_data);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
     int file_format_version = int(header.m_file_format[slot_selector]);

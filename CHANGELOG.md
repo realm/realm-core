@@ -306,7 +306,19 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+
+----------------------------------------------
  
+# 6.0.26 Release notes
+
+### Enhancements
+* Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
+
+### Fixed
+* Fix deadlocks when opening a Realm file in both the iOS simulator and Realm Studio ([Cocoa #6743](https://github.com/realm/realm-cocoa/issues/6743), since 6.0.21).
+* Fix Springboard deadlocking when an app is unsuspended while it has an open Realm file which is stored in an app group ([Cocoa #6749](https://github.com/realm/realm-cocoa/issues/6749), since 6.0.21).
+* If you use encryption your application cound crash with a message like "Opening Realm files of format version 0 is not supported by this version of Realm". ([#6889](https://github.com/realm/realm-java/issues/6889) among others, since v6.0.0)
+
 ----------------------------------------------
 
 # 6.0.25 Release notes
