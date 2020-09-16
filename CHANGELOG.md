@@ -1,20 +1,17 @@
-# NEXT RELEASE
+# 10.0.0-beta.7 Release notes
 
 ### Enhancements
 * Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
 * Add Decimal128 subtraction and multiplication arithmetic operators.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Issues fixed by releases v6.0.24 to v6.0.25:
+  * If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "Key not found" exception when updating an object. If asserts are enabled at the binding level, you may get an "assert(m_has_refs)" instead. ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
+  * In cases where you have more than 32 columns in a table, you may get a currrupted file resulting in various crashes ([#7057](https://github.com/realm/realm-java/issues/7057), since v6.0.0)
+  * Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 6.0.7)
+
 ### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* File format bumped to 20. Automatic upgrade of non syncked realms. Syncked realms produced by pre v10 application cannot be upgraded.
 
 ----------------------------------------------
 
