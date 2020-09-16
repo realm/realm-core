@@ -247,7 +247,7 @@ TEST(UUID_ArrayNull)
 }
 
 
-TEST(UUID_Table)
+TEST_TYPES(UUID_Table, std::true_type, std::false_type)
 {
     const char str0[] = "3b241101-e2bb-4255-8caf-4136c566a960";
     const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
@@ -255,22 +255,35 @@ TEST(UUID_Table)
     Table t;
     auto col_id = t.add_column(type_UUID, "id");
     auto col_id_null = t.add_column(type_UUID, "id_null", true);
-    auto obj0 = t.create_object().set(col_id, UUID(str0));
+    auto obj0 = t.create_object().set(col_id, UUID(str0)).set(col_id_null, UUID(str0));
     auto obj1 = t.create_object().set(col_id, UUID(str1)).set(col_id_null, UUID(str1));
     auto obj2 = t.create_object();
+
+    if constexpr (TEST_TYPE::value) {
+        t.add_search_index(col_id);
+        t.add_search_index(col_id_null);
+    }
+
     CHECK_EQUAL(obj0.get<UUID>(col_id), UUID(str0));
     CHECK_EQUAL(obj1.get<UUID>(col_id), UUID(str1));
     CHECK_NOT(obj2.is_null(col_id));
+    CHECK_EQUAL(obj0.get<util::Optional<UUID>>(col_id_null), UUID(str0));
+    CHECK_EQUAL(obj1.get<util::Optional<UUID>>(col_id_null), UUID(str1));
     CHECK(obj2.is_null(col_id_null));
-    auto id = obj1.get<util::Optional<UUID>>(col_id_null);
-    CHECK(id);
-    id = obj2.get<util::Optional<UUID>>(col_id_null);
-    CHECK(!id);
-    auto key = t.find_first(col_id, UUID(str1));
-    CHECK_EQUAL(key, obj1.get_key());
-    t.add_search_index(col_id);
+    CHECK_NOT(obj2.get<util::Optional<UUID>>(col_id_null));
+
+    auto key = t.find_first(col_id, UUID(str0));
+    CHECK_EQUAL(key, obj0.get_key());
     key = t.find_first(col_id, UUID(str1));
     CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first_null(col_id);
+    CHECK_NOT(key);
+    key = t.find_first(col_id_null, UUID(str0));
+    CHECK_EQUAL(key, obj0.get_key());
+    key = t.find_first(col_id_null, UUID(str1));
+    CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first_null(col_id_null);
+    CHECK_EQUAL(key, obj2.get_key());
 }
 
 

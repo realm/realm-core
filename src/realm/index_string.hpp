@@ -107,9 +107,11 @@ private:
     void index_string_all_ins(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 };
 
-// 12 is the biggest element size of any non-string/binary Realm type
-constexpr size_t string_conversion_buffer_size = 12;
+// 16 is the biggest element size of any non-string/binary Realm type (UUID)
+constexpr size_t string_conversion_buffer_size = 16;
 using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
+static_assert(sizeof(UUID::UUIDBytes) == 16,
+              "if you change the size of a UUID then also change the string index buffer space");
 
 // The purpose of this class is to get easy access to fields in a specific column in the
 // cluster. When you have an object like this, you can get a string version of the relevant
