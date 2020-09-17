@@ -110,7 +110,7 @@ tasks:
       working_dir: realm-core
       script: |-
         set -o errexit
-        cpack=$(realpath ${cmake_bindir}/cpack)
+        cpack=$(pwd)/${cmake_bindir}/cpack
 
         cd build
         $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts"
@@ -151,7 +151,7 @@ tasks:
       working_dir: realm-core
       script: |-
         set -o errexit
-        ctest=$(realpath ${cmake_bindir}/ctest)
+        ctest=$(pwd)/${cmake_bindir}/ctest
 
         cd build
         $ctest -V
@@ -216,7 +216,7 @@ buildvariants:
   run_on: ubuntu2004-arm64-small
   expansions:
     cmake_url: "https://s3.amazonaws.com/boxes.10gen.com/build/cmake/cmake-3.18.2-Linux-aarch64.tar.gz"
-    cmake_bindir: "./cmake_binaries"
+    cmake_bindir: "./cmake_binaries/bin"
   tasks:
   - name: compile_test_and_package
     distros:
