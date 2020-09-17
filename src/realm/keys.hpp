@@ -96,7 +96,7 @@ struct ColKey {
     };
 
     constexpr ColKey() noexcept
-        : value(null_value) // free top bit
+        : value(null_value)
     {
     }
     constexpr explicit ColKey(int64_t val) noexcept
