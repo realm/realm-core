@@ -3189,6 +3189,8 @@ void Table::set_primary_key_column(ColKey col_key)
         }
     }
 
+    REALM_ASSERT_RELEASE(col_key.value >= 0); // Just to be sure. We have an issue where value seems to be -1
+
     if (col_key) {
         check_column(col_key);
         validate_column_is_unique(col_key);
