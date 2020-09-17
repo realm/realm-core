@@ -170,7 +170,10 @@ template <class ObjectType, int ElementSize>
 class ArrayFixedBytesNull : public ArrayFixedBytes<ObjectType, ElementSize> {
 public:
     using Parent = ArrayFixedBytes<ObjectType, ElementSize>;
-    using ArrayFixedBytes<ObjectType, ElementSize>::ArrayFixedBytes;
+    ArrayFixedBytesNull(Allocator& alloc) noexcept
+        : ArrayFixedBytes<ObjectType, ElementSize>(alloc)
+    {
+    }
     static util::Optional<ObjectType> default_value(bool nullable)
     {
         if (nullable)
