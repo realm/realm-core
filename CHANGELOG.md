@@ -1,19 +1,13 @@
-# NEXT RELEASE
+# 10.0.0-beta.8 Release notes
 
 ### Enhancements
-* None.
+* Features added by release v6.0.26:
+  * Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* Issues fixed by release v6.0.26:
+  * Fix deadlocks when opening a Realm file in both the iOS simulator and Realm Studio ([Cocoa #6743](https://github.com/realm/realm-cocoa/issues/6743), since 6.0.21).
+  * Fix Springboard deadlocking when an app is unsuspended while it has an open Realm file which is stored in an app group ([Cocoa #6749](https://github.com/realm/realm-cocoa/issues/6749), since 6.0.21).
 
 ----------------------------------------------
 
