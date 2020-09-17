@@ -1,19 +1,13 @@
-# NEXT RELEASE
+# 10.0.0-beta.8 Release notes
 
 ### Enhancements
-* None.
+* Features added by release v6.0.26:
+  * Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* Issues fixed by release v6.0.26:
+  * Fix deadlocks when opening a Realm file in both the iOS simulator and Realm Studio ([Cocoa #6743](https://github.com/realm/realm-cocoa/issues/6743), since 10.0.0-beta.5).
+  * Fix Springboard deadlocking when an app is unsuspended while it has an open Realm file which is stored in an app group ([Cocoa #6749](https://github.com/realm/realm-cocoa/issues/6749), since 10.0.0-beta.5).
 
 ----------------------------------------------
 
@@ -27,7 +21,7 @@
 * Issues fixed by releases v6.0.24 to v6.0.25:
   * If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "Key not found" exception when updating an object. If asserts are enabled at the binding level, you may get an "assert(m_has_refs)" instead. ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
   * In cases where you have more than 32 columns in a table, you may get a currrupted file resulting in various crashes ([#7057](https://github.com/realm/realm-java/issues/7057), since v6.0.0)
-  * Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 6.0.7)
+  * Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 10.0.0-beta.2)
 
 ### Breaking changes
 * File format bumped to 20. Automatic upgrade of non syncked realms. Syncked realms produced by pre v10 application cannot be upgraded.
