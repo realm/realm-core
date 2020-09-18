@@ -46,11 +46,18 @@ function build_macos {
     (
         cd "${folder_name}" || exit 1
         rm -f realm-core-*-devel.tar.gz
+
+        ##
+        #  ONLY_ACTIVE_ARCH without ARCHITECTURES will be defaulted to YES
+        ##
+
         cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/$platform.toolchain.cmake" \
               -D CMAKE_BUILD_TYPE="${bt}" \
               -D REALM_VERSION="${VERSION}" \
               -D REALM_SKIP_SHARED_LIB=ON \
               -D REALM_BUILD_LIB_ONLY=ON \
+              -D CMAKE_OSX_ARCHITECTURES="x86_64; arm64" \
+              -D CMAKE_XCODE_ONLY_ACTIVE_ARCH='NO' \
               ${CMAKE_FLAGS} \
               -G Ninja ..
         cmake --build . --config "${bt}" --target package
