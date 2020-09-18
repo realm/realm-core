@@ -1565,6 +1565,7 @@ void Table::finalize_migration(ColKey pk_col_key)
         remove_column(oid_col);
     }
 
+    REALM_ASSERT_RELEASE(!pk_col_key || valid_column(pk_col_key));
     do_set_primary_key_column(pk_col_key);
 }
 
@@ -3165,10 +3166,13 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     if (is_nullable(col_key) == nullable)
         return col_key;
 
+    check_column(col_key);
+
     bool si = has_search_index(col_key);
     std::string column_name(get_column_name(col_key));
     auto type = get_real_column_type(col_key);
-    auto list = is_list(col_key);
+    bool list = is_list(col_key);
+    bool is_pk_col = (col_key == m_primary_key_col);
 
     ColKey new_col = do_insert_root_column(ColKey(), type, "__temporary", nullable, list);
 
@@ -3189,6 +3193,13 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 
     if (si)
         add_search_index(new_col);
+
+    if (is_pk_col) {
+        // If we go from non nullable to nullable, no values change,
+        // so it is safe to preserve the pk column. Otherwise it is not
+        // safe as a null entry might have been converted to default value.
+        do_set_primary_key_column(nullable ? new_col : ColKey{});
+    }
 
     return new_col;
 }
