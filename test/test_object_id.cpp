@@ -209,7 +209,7 @@ TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
 TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
 {
     const char str0[] = "0000012300000000009218a4";
-    const char str1[] = "000004560000000000170232";
+    const char str1[] = "deaddeaddeaddeaddeaddead";
 
     Table t;
     auto col_id = t.add_column(type_ObjectId, "id");
@@ -237,11 +237,13 @@ TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
     CHECK_EQUAL(key, obj0.get_key());
     key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
-    key = t.find_first(col_id_null, ObjectId(str0));
+    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str0}));
     CHECK_EQUAL(key, obj0.get_key());
-    key = t.find_first(col_id_null, ObjectId(str1));
+    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str1}));
     CHECK_EQUAL(key, obj1.get_key());
     key = t.find_first_null(col_id_null);
+    CHECK_EQUAL(key, obj2.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>{});
     CHECK_EQUAL(key, obj2.get_key());
 }
 
