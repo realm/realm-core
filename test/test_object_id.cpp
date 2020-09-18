@@ -210,7 +210,7 @@ TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
     }
 }
 
-TEST(ObjectId_Table)
+TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
 {
     const char str0[] = "0000012300000000009218a4";
     const char str1[] = "000004560000000000170232";
@@ -218,22 +218,35 @@ TEST(ObjectId_Table)
     Table t;
     auto col_id = t.add_column(type_ObjectId, "id");
     auto col_id_null = t.add_column(type_ObjectId, "id_null", true);
-    auto obj0 = t.create_object().set(col_id, ObjectId(str0));
+    auto obj0 = t.create_object().set(col_id, ObjectId(str0)).set(col_id_null, ObjectId(str0));
     auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
     auto obj2 = t.create_object();
+
+    if constexpr (TEST_TYPE::value) {
+        t.add_search_index(col_id);
+        t.add_search_index(col_id_null);
+    }
+
     CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
     CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
     CHECK_NOT(obj2.is_null(col_id));
+    CHECK_EQUAL(obj0.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str0));
+    CHECK_EQUAL(obj1.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str1));
     CHECK(obj2.is_null(col_id_null));
     auto id = obj1.get<util::Optional<ObjectId>>(col_id_null);
     CHECK(id);
     id = obj2.get<util::Optional<ObjectId>>(col_id_null);
     CHECK_NOT(id);
-    auto key = t.find_first(col_id, ObjectId(str1));
-    CHECK_EQUAL(key, obj1.get_key());
-    t.add_search_index(col_id);
+    auto key = t.find_first(col_id, ObjectId(str0));
+    CHECK_EQUAL(key, obj0.get_key());
     key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first(col_id_null, ObjectId(str0));
+    CHECK_EQUAL(key, obj0.get_key());
+    key = t.find_first(col_id_null, ObjectId(str1));
+    CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first_null(col_id_null);
+    CHECK_EQUAL(key, obj2.get_key());
 }
 
 TEST(ObjectId_PrimaryKey)

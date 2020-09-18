@@ -589,8 +589,14 @@ void Table::populate_search_index(ColKey col_key)
             index->insert(key, value); // Throws
         }
         else if (type == type_ObjectId) {
-            ObjectId value = o.get<ObjectId>(col_key);
-            index->insert(key, value); // Throws
+            if (is_nullable(col_key)) {
+                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
+                index->insert(key, value); // Throws
+            }
+            else {
+                ObjectId value = o.get<ObjectId>(col_key);
+                index->insert(key, value); // Throws
+            }
         }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");

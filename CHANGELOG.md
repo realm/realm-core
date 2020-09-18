@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed a ObjectId sometimes changing from null to ObjectId("deaddeaddeaddeaddeaddead") after erasing rows which triggers a BPNode merge, this can happen when there are > 1000 objects. (Since v10).
+* Fixed an assertion failure when adding an index to a nullable ObjectId property that contains nulls. (since v10).
 
 ### Breaking changes
 * None.
