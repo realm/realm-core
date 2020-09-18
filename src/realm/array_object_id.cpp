@@ -99,13 +99,24 @@ void ArrayObjectId::move(ArrayObjectId& dst_arr, size_t ndx)
 
     const auto n_to_move = old_src_size - ndx;
 
+    dst_arr.copy_on_write();
+    dst_arr.ensure_minimum_width(this->m_ubound);
     // Allocate room for the new value
     const auto new_dest_byte_size = calc_required_bytes(old_dst_size + n_to_move);
     dst_arr.alloc(new_dest_byte_size, 1); // Throws
 
-    // Initialize last null byte.
+    // Initialize last null byte if we are expanding beyond dst_arr's current
+    // block of 8. If all the moved elements fit in the current block, then
+    // the null block has already been initialised so do nothing. No need to
+    // initialize intermediary null blocks (if n_to_move > 8) because we set
+    // nulls explicitly for each element below. Therefore only the last new
+    // null byte needs to be set for the extra capacity beyond the
+    // explicitly set elements.
     const auto last_in_dst = get_pos(old_dst_size + n_to_move - 1);
-    dst_arr.m_data[last_in_dst.base_byte] = 0;
+    const auto first_in_dst = get_pos(old_dst_size - 1);
+    if (last_in_dst.base_byte != first_in_dst.base_byte) {
+        dst_arr.m_data[last_in_dst.base_byte] = 0;
+    }
 
     for (size_t i = 0; i < n_to_move; i++) {
         // Possible optimization: Use memmove + shifting the bitvector to operate in chunks. This can be especially

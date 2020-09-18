@@ -128,6 +128,50 @@ TEST(ObjectId_ArrayNull)
     arr1.destroy();
 }
 
+TEST(ObjectId_ArrayNullMove)
+{
+    const char str0[] = "0000012300000000009218a4";
+    const char str1[] = "0000078900000000002999f3";
+
+    ArrayObjectIdNull arr(Allocator::get_default());
+    arr.create();
+
+    auto get_value_for_ndx = [&](size_t ndx) -> util::Optional<ObjectId> {
+        if (ndx % 3 == 0) {
+            return {str0};
+        }
+        else if (ndx % 3 == 1) {
+            return {str1};
+        }
+        else {
+            return util::none;
+        }
+    };
+
+    for (size_t i = 0; i < 3; ++i) {
+        arr.add(get_value_for_ndx(i));
+    }
+
+    ArrayObjectIdNull arr1(Allocator::get_default());
+    arr1.create();
+    arr1.add({str0});
+    arr1.add({str1});
+    arr1.add(util::none);
+    arr.move(arr1, 0);
+
+    CHECK_EQUAL(arr1.size(), 6);
+
+    for (size_t i = 0; i < arr1.size(); ++i) {
+        auto expected = get_value_for_ndx(i);
+        auto actual = arr1.get(i);
+        CHECK_EQUAL(actual, expected);
+    }
+
+    arr.destroy();
+    arr1.destroy();
+}
+
+
 // This should exhaustively test all cases of ArrayObjectIdNull::find_first_null.
 TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
 {
