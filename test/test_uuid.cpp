@@ -286,11 +286,13 @@ TEST_TYPES(UUID_Table, std::true_type, std::false_type)
     CHECK_EQUAL(key, obj1.get_key());
     key = t.find_first_null(col_id);
     CHECK_NOT(key);
-    key = t.find_first(col_id_null, UUID(str0));
+    key = t.find_first(col_id_null, util::Optional<UUID>(UUID(str0)));
     CHECK_EQUAL(key, obj0.get_key());
-    key = t.find_first(col_id_null, UUID(str1));
+    key = t.find_first(col_id_null, util::Optional<UUID>(UUID(str1)));
     CHECK_EQUAL(key, obj1.get_key());
     key = t.find_first_null(col_id_null);
+    CHECK_EQUAL(key, obj2.get_key());
+    key = t.find_first(col_id_null, util::Optional<UUID>());
     CHECK_EQUAL(key, obj2.get_key());
 }
 

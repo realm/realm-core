@@ -2296,6 +2296,7 @@ template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 template ObjKey Table::find_first(ColKey col_key, Mixed) const;
 template ObjKey Table::find_first(ColKey col_key, UUID) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<UUID>) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
