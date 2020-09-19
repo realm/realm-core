@@ -302,6 +302,17 @@ public:
         return s;
     }
 
+    bool consume_condition(ParentNode& other)
+    {
+        if (m_condition_column_key != other.m_condition_column_key)
+            return false;
+        if (m_child || other.m_child)
+            return false;
+        if (typeid(*this) != typeid(other))
+            return false;
+        return do_consume_condition(other);
+    }
+
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
     std::string m_condition_column_name;
@@ -334,6 +345,10 @@ private:
     virtual void cluster_changed()
     {
         // TODO: Should eventually be pure
+    }
+    virtual bool do_consume_condition(ParentNode&)
+    {
+        return false;
     }
 };
 
@@ -677,6 +692,28 @@ public:
     }
 };
 
+template <size_t linear_search_threshold, class LeafType, class NeedleContainer>
+static size_t find_first_haystack(LeafType& leaf, NeedleContainer& needles, size_t start, size_t end)
+{
+    // for a small number of conditions, it is faster to do a linear search than to compute the hash
+    // the exact thresholds were found experimentally
+    if (needles.size() < linear_search_threshold) {
+        for (size_t i = start; i < end; ++i) {
+            auto element = leaf.get(i);
+            if (std::find(needles.begin(), needles.end(), element) != needles.end())
+                return i;
+        }
+    }
+    else {
+        for (size_t i = start; i < end; ++i) {
+            auto element = leaf.get(i);
+            if (needles.count(element))
+                return i;
+        }
+    }
+    return realm::npos;
+}
+
 template <class LeafType>
 class IntegerNode<LeafType, Equal> : public IntegerNodeBase<LeafType> {
 public:
@@ -708,14 +745,18 @@ public:
         }
     }
 
-    void consume_condition(IntegerNode<LeafType, Equal>* other)
+    bool do_consume_condition(ParentNode& node) override
     {
-        REALM_ASSERT(this->m_condition_column_key == other->m_condition_column_key);
-        REALM_ASSERT(other->m_needles.empty());
+        if (has_search_index())
+            return false;
+        auto& other = static_cast<ThisType&>(node);
+        REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
+        REALM_ASSERT(other.m_needles.empty());
         if (m_needles.empty()) {
             m_needles.insert(this->m_value);
         }
-        m_needles.insert(other->m_value);
+        m_needles.insert(other.m_value);
+        return true;
     }
 
     bool has_search_index() const override
@@ -787,7 +828,7 @@ public:
             }
 
             if (m_nb_needles) {
-                s = find_first_haystack(start, end);
+                s = find_first_haystack<22>(*this->m_leaf_ptr, m_needles, start, end);
             }
             else if (end - start == 1) {
                 if (this->m_leaf_ptr->get(start) == this->m_value) {
@@ -842,32 +883,6 @@ private:
         : BaseType(from)
         , m_needles(from.m_needles)
     {
-    }
-    size_t find_first_haystack(size_t start, size_t end)
-    {
-        const auto not_in_set = m_needles.end();
-        // for a small number of conditions, it is faster to do a linear search than to compute the hash
-        // the decision threshold was determined experimentally to be 22 conditions
-        bool search = m_nb_needles < 22;
-        auto cmp_fn = [this, search, not_in_set](const auto& v) {
-            if (search) {
-                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                    if (*it == v)
-                        return true;
-                }
-                return false;
-            }
-            else {
-                return (m_needles.find(v) != not_in_set);
-            }
-        };
-        for (size_t i = start; i < end; ++i) {
-            auto val = this->m_leaf_ptr->get(i);
-            if (cmp_fn(val)) {
-                return i;
-            }
-        }
-        return realm::npos;
     }
 };
 
@@ -1670,7 +1685,7 @@ public:
 
     void _search_index_init() override;
 
-    void consume_condition(StringNode<Equal>* other);
+    bool do_consume_condition(ParentNode& other) override;
 
     std::unique_ptr<ParentNode> clone() const override
     {
@@ -1682,14 +1697,14 @@ public:
     StringNode<Equal>(const StringNode& from)
         : StringNodeEqualBase(from)
     {
-        for (auto it = from.m_needles.begin(); it != from.m_needles.end(); ++it) {
-            if (it->data() == nullptr && it->size() == 0) {
-                m_needles.insert(StringData()); // nulls
+        for (auto& needle : from.m_needles) {
+            if (needle.is_null()) {
+                m_needles.emplace();
             }
             else {
-                m_needle_storage.emplace_back(StringBuffer());
-                m_needle_storage.back().append(it->data(), it->size());
-                m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+                m_needle_storage.push_back(std::make_unique<char[]>(needle.size()));
+                std::copy(needle.data(), needle.data() + needle.size(), m_needle_storage.back().get());
+                m_needles.insert(StringData(m_needle_storage.back().get(), needle.size()));
             }
         }
     }
@@ -1729,7 +1744,7 @@ private:
 
     size_t _find_first_local(size_t start, size_t end) override;
     std::unordered_set<StringData> m_needles;
-    std::vector<StringBuffer> m_needle_storage;
+    std::vector<std::unique_ptr<char[]>> m_needle_storage;
 };
 
 
@@ -1883,12 +1898,7 @@ public:
 
         m_dD = 10.0;
 
-        std::sort(m_conditions.begin(), m_conditions.end(),
-                  [](auto& a, auto& b) { return a->m_condition_column_key < b->m_condition_column_key; });
-
-        combine_conditions<StringNode<Equal>>();
-        combine_conditions<IntegerNode<ArrayInteger, Equal>>();
-        combine_conditions<IntegerNode<ArrayIntNull, Equal>>();
+        combine_conditions();
 
         m_start.clear();
         m_start.resize(m_conditions.size(), 0);
@@ -1971,34 +1981,18 @@ public:
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
 
 private:
-    template<class QueryNodeType>
     void combine_conditions() {
-        QueryNodeType* first_match = nullptr;
-        QueryNodeType* advance = nullptr;
-        auto it = m_conditions.begin();
-        while (it != m_conditions.end()) {
-            // Only try to optimize on QueryNodeType conditions without search index
-            auto node = it->get();
-            if ((first_match = dynamic_cast<QueryNodeType*>(node)) && first_match->m_child == nullptr &&
-                !first_match->has_search_index()) {
-                auto col_key = first_match->m_condition_column_key;
-                auto next = it + 1;
-                while (next != m_conditions.end() && (*next)->m_condition_column_key == col_key) {
-                    auto next_node = next->get();
-                    if ((advance = dynamic_cast<QueryNodeType*>(next_node)) && next_node->m_child == nullptr) {
-                        first_match->consume_condition(advance);
-                        next = m_conditions.erase(next);
-                    }
-                    else {
-                        ++next;
-                    }
-                }
-                it = next;
-            }
-            else {
-                ++it;
-            }
-        }
+        std::sort(m_conditions.begin(), m_conditions.end(),
+                  [](auto& a, auto& b) { return a->m_condition_column_key < b->m_condition_column_key; });
+
+        auto prev = m_conditions.begin()->get();
+        auto cond = [&](auto& node) {
+            if (prev->consume_condition(*node))
+                return true;
+            prev = &*node;
+            return false;
+        };
+        m_conditions.erase(std::remove_if(m_conditions.begin() + 1, m_conditions.end(), cond), m_conditions.end());
     }
 
     // start index of the last find for each cond

@@ -306,7 +306,7 @@ void StringNode<Equal>::_search_index_init()
     m_results_ndx = m_results_start;
 }
 
-void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
+bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 {
     // If a search index is present, don't try to combine conditions since index search is most likely faster.
     // Assuming N elements to search and M conditions to check:
@@ -314,19 +314,24 @@ void StringNode<Equal>::consume_condition(StringNode<Equal>* other)
     // 2) no search index, combine conditions:      O(N)
     // 3) no search index, conditions not combined: O(N*M)
     // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible choose 2.
-    REALM_ASSERT(m_condition_column_key == other->m_condition_column_key);
-    REALM_ASSERT(other->m_needles.empty());
+    if (has_search_index())
+        return false;
+
+    auto& other = static_cast<StringNode<Equal>&>(node);
+    REALM_ASSERT(m_condition_column_key == other.m_condition_column_key);
+    REALM_ASSERT(other.m_needles.empty());
     if (m_needles.empty()) {
-        m_needles.insert(bool(m_value) ? StringData(*m_value) : StringData());
+        m_needles.insert(m_value ? StringData(*m_value) : StringData());
     }
-    if (bool(other->m_value)) {
-        m_needle_storage.push_back(StringBuffer());
-        m_needle_storage.back().append(*other->m_value);
-        m_needles.insert(StringData(m_needle_storage.back().data(), m_needle_storage.back().size()));
+    if (auto& str = other.m_value) {
+        m_needle_storage.push_back(std::make_unique<char[]>(str->size()));
+        std::copy(str->data(), str->data() + str->size(), m_needle_storage.back().get());
+        m_needles.insert(StringData(m_needle_storage.back().get(), str->size()));
     }
     else {
-        m_needles.insert(StringData());
+        m_needles.emplace();
     }
+    return true;
 }
 
 size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
@@ -335,38 +340,11 @@ size_t StringNode<Equal>::_find_first_local(size_t start, size_t end)
         return m_leaf_ptr->find_first(m_value, start, end);
     }
     else {
-        size_t n = m_leaf_ptr->size();
         if (end == npos)
-            end = n;
-        REALM_ASSERT_7(start, <=, n, &&, end, <=, n);
+            end = m_leaf_ptr->size();
         REALM_ASSERT_3(start, <=, end);
-
-        const auto not_in_set = m_needles.end();
-        // For a small number of conditions it is faster to cycle through
-        // and check them individually. The threshold depends on how fast
-        // our hashing of StringData is (see `StringData.hash()`). The
-        // number 20 was found empirically when testing small strings
-        // with N==100k
-        if (m_needles.size() < 20) {
-            for (size_t i = start; i < end; ++i) {
-                auto element = m_leaf_ptr->get(i);
-                StringData value_2{element.data(), element.size()};
-                for (auto it = m_needles.begin(); it != not_in_set; ++it) {
-                    if (*it == value_2)
-                        return i;
-                }
-            }
-        }
-        else {
-            for (size_t i = start; i < end; ++i) {
-                auto element = m_leaf_ptr->get(i);
-                StringData value_2{element.data(), element.size()};
-                if (m_needles.find(value_2) != not_in_set)
-                    return i;
-            }
-        }
+        return find_first_haystack<20>(*m_leaf_ptr, m_needles, start, end);
     }
-    return not_found;
 }
 
 std::string StringNode<Equal>::describe(util::serializer::SerialisationState& state) const
