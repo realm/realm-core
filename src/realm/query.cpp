@@ -829,6 +829,16 @@ Query& Query::less(ColKey column_key, ObjectId value)
     return add_condition<Less>(column_key, value);
 }
 
+// ------------- UUID
+Query& Query::equal(ColKey column_key, UUID value)
+{
+    return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, UUID value)
+{
+    return add_condition<NotEqual>(column_key, value);
+}
+
 // ------------- Decimal128
 Query& Query::greater(ColKey column_key, Decimal128 value)
 {

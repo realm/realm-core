@@ -423,6 +423,12 @@ inline Obj& Obj::set(ColKey col_key, util::Optional<ObjectId> value, bool is_def
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
+template <>
+inline Obj& Obj::set(ColKey col_key, util::Optional<UUID> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
 template <typename U>
 Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 {

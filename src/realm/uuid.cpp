@@ -104,9 +104,4 @@ std::string UUID::to_string() const
     return ret;
 }
 
-size_t UUID::hash() const noexcept
-{
-    return murmur2_or_cityhash(m_bytes.data(), sizeof(m_bytes));
-}
-
 } // namespace realm

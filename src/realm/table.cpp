@@ -743,7 +743,12 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
                     index->insert(key, init_value);
                     break;
                 case col_type_UUID:
-                    index->insert(key, init_value.get<UUID>());
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayUUIDNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<UUID>());
+                    }
                     break;
                 default:
                     REALM_UNREACHABLE();

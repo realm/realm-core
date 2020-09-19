@@ -86,7 +86,11 @@ public:
     {
         return m_bytes;
     }
-    size_t hash() const noexcept;
+
+    inline size_t hash() const noexcept
+    {
+        return murmur2_or_cityhash(m_bytes.data(), sizeof(m_bytes));
+    }
 
 private:
     UUIDBytes m_bytes = {};

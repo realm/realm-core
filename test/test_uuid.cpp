@@ -40,6 +40,14 @@ UUID generate_random_uuid()
     return UUID(str.c_str());
 }
 
+util::Optional<UUID> generate_random_nullable_uuid()
+{
+    if (test_util::random_int<size_t>(0, 1) == 0) {
+        return util::none;
+    }
+    return util::Optional<UUID>(generate_random_uuid());
+}
+
 TEST(UUID_Basics)
 {
     std::string init_str0("3b241101-e2bb-4255-8caf-4136c566a962");
@@ -363,29 +371,48 @@ TEST(UUID_Commit)
     }
 }
 
-
-TEST(UUID_GrowAndShrink)
+// This test has a higher chance of finding node merge issues
+// when using REALM_MAX_BPNODE_SIZE = 4
+TEST_TYPES(UUID_GrowAndShrink, UUID, util::Optional<UUID>)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
     ColKey col;
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        col = table->add_column(type_UUID, "id");
+        col = table->add_column(type_UUID, "id", is_optional);
         wt->commit();
     }
-    constexpr size_t num_insertions = 10000;
-    std::vector<UUID> copy;
+    constexpr size_t num_insertions = 2000;
+    using KV = std::pair<ObjKey, TEST_TYPE>;
+    std::vector<KV> copy;
+    auto verify_values = [&](TableRef table) {
+        CHECK_EQUAL(copy.size(), table->size());
+        for (auto it : copy) {
+            auto actual = table->get_object(it.first).template get<TEST_TYPE>(col);
+            auto expected = it.second;
+            CHECK_EQUAL(actual, expected);
+        }
+    };
     copy.reserve(num_insertions);
     {
         auto wt = db->start_write();
         auto table = wt->get_table("Foo");
         col = table->get_column_key("id");
         for (size_t i = 0; i < num_insertions; ++i) {
-            UUID id = generate_random_uuid();
-            copy.push_back(id);
-            table->create_object().set(col, id);
+            TEST_TYPE id;
+            if constexpr (is_optional) {
+                id = generate_random_nullable_uuid();
+            }
+            else {
+                id = generate_random_uuid();
+            }
+            auto obj = table->create_object();
+            obj.set(col, id);
+            copy.push_back({obj.get_key(), id});
         }
         wt->commit();
     }
@@ -393,18 +420,20 @@ TEST(UUID_GrowAndShrink)
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
         CHECK_EQUAL(table->size(), num_insertions);
-        CHECK_EQUAL(copy.size(), table->size());
-        for (auto id : copy) {
-            auto result = table->find_first(col, id);
-            CHECK(result);
-        }
+        verify_values(table);
     }
     {
         auto wt = db->start_write();
         auto table = wt->get_table("Foo");
         col = table->get_column_key("id");
         for (size_t i = 0; i < num_insertions; ++i) {
-            table->remove_object(table->begin());
+            auto ndx_to_remove = test_util::random_int<size_t>(0, table->size() - 1);
+            auto key_to_erase = copy[ndx_to_remove].first;
+            copy.erase(copy.begin() + ndx_to_remove);
+            table->remove_object(key_to_erase);
+            if (i % 8 == 0) {
+                verify_values(table);
+            }
         }
         wt->commit();
     }
@@ -412,6 +441,7 @@ TEST(UUID_GrowAndShrink)
         auto rt = db->start_read();
         auto table = rt->get_table("Foo");
         CHECK_EQUAL(table->size(), 0);
+        CHECK_EQUAL(copy.size(), 0);
     }
 }
 

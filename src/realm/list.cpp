@@ -88,7 +88,10 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
                 return std::make_unique<Lst<ObjectId>>(*this, col_key);
         }
         case type_UUID: {
-            return std::make_unique<Lst<UUID>>(*this, col_key);
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<UUID>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<UUID>>(*this, col_key);
         }
         case type_TypedLink: {
             return std::make_unique<Lst<ObjLink>>(*this, col_key);

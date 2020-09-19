@@ -4703,7 +4703,7 @@ TEST(List_Ops)
     test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
     test_lists<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
-    test_lists<UUID>(test_context, sg, type_UUID, true);
+    test_lists<Optional<UUID>>(test_context, sg, type_UUID, true);
 }
 
 template <typename T, typename U = T>

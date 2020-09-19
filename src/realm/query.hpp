@@ -180,6 +180,10 @@ public:
     Query& less_equal(ColKey column_key, ObjectId value);
     Query& less(ColKey column_key, ObjectId value);
 
+    // Conditions: UUID
+    Query& equal(ColKey column_key, UUID value);
+    Query& not_equal(ColKey column_key, UUID value);
+
     // Conditions: Decimal128
     Query& equal(ColKey column_key, Decimal128 value);
     Query& not_equal(ColKey column_key, Decimal128 value);
