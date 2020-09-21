@@ -204,10 +204,10 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     }
 }
 
-void StringNodeEqualBase::init()
+void StringNodeEqualBase::init(bool will_query_ranges)
 {
     m_dD = 10.0;
-    StringNodeBase::init();
+    StringNodeBase::init(will_query_ranges);
 
     if (m_is_string_enum) {
         m_dT = 1.0;
@@ -308,14 +308,9 @@ void StringNode<Equal>::_search_index_init()
 
 bool StringNode<Equal>::do_consume_condition(ParentNode& node)
 {
-    // If a search index is present, don't try to combine conditions since index search is most likely faster.
-    // Assuming N elements to search and M conditions to check:
-    // 1) search index present:                     O(log(N)*M)
-    // 2) no search index, combine conditions:      O(N)
-    // 3) no search index, conditions not combined: O(N*M)
-    // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible choose 2.
-    if (has_search_index())
-        return false;
+    // Don't use the search index if present since we're in a scenario where
+    // it'd be slower
+    m_has_search_index = false;
 
     auto& other = static_cast<StringNode<Equal>&>(node);
     REALM_ASSERT(m_condition_column_key == other.m_condition_column_key);
@@ -546,9 +541,9 @@ void ExpressionNode::cluster_changed()
     m_expression->set_cluster(m_cluster);
 }
 
-void ExpressionNode::init()
+void ExpressionNode::init(bool will_query_ranges)
 {
-    ParentNode::init();
+    ParentNode::init(will_query_ranges);
     m_dT = m_expression->init();
 }
 

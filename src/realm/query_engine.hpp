@@ -174,10 +174,10 @@ public:
 
     bool match(ConstObj& obj);
 
-    virtual void init()
+    virtual void init(bool will_query_ranges)
     {
         if (m_child)
-            m_child->init();
+            m_child->init(will_query_ranges);
 
         m_column_action_specializer = nullptr;
     }
@@ -302,13 +302,27 @@ public:
         return s;
     }
 
-    bool consume_condition(ParentNode& other)
+    bool consume_condition(ParentNode& other, bool ignore_indexes)
     {
+        // We can only combine conditions if they're the same operator on the
+        // same column and there's no additional conditions ANDed on
         if (m_condition_column_key != other.m_condition_column_key)
             return false;
         if (m_child || other.m_child)
             return false;
         if (typeid(*this) != typeid(other))
+            return false;
+
+        // If a search index is present, don't try to combine conditions since index search is most likely faster.
+        // Assuming N elements to search and M conditions to check:
+        // 1) search index present:                     O(log(N)*M)
+        // 2) no search index, combine conditions:      O(N)
+        // 3) no search index, conditions not combined: O(N*M)
+        // In practice N is much larger than M, so if we have a search index, choose 1, otherwise if possible
+        // choose 2. The exception is if we're inside a Not group or if the query is restricted to a view, as in those
+        // cases end will always be start+1 and we'll have O(N*M) runtime even with a search index, so we want to
+        // combine even with an index.
+        if (has_search_index() && !ignore_indexes)
             return false;
         return do_consume_condition(other);
     }
@@ -536,9 +550,9 @@ protected:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ColumnNodeBase::init();
+        ColumnNodeBase::init(will_query_ranges);
 
         m_dT = _impl::CostHeuristic<LeafType>::dT();
         m_dD = _impl::CostHeuristic<LeafType>::dD();
@@ -729,9 +743,9 @@ public:
     {
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        BaseType::init();
+        BaseType::init(will_query_ranges);
         m_nb_needles = m_needles.size();
 
         if (has_search_index()) {
@@ -747,8 +761,6 @@ public:
 
     bool do_consume_condition(ParentNode& node) override
     {
-        if (has_search_index())
-            return false;
         auto& other = static_cast<ThisType&>(node);
         REALM_ASSERT(this->m_condition_column_key == other.m_condition_column_key);
         REALM_ASSERT(other.m_needles.empty());
@@ -795,7 +807,10 @@ public:
         size_t s = realm::npos;
 
         if (start < end) {
-            if (has_search_index()) {
+            if (m_nb_needles) {
+                s = find_first_haystack<22>(*this->m_leaf_ptr, m_needles, start, end);
+            }
+            else if (has_search_index()) {
                 ObjKey first_key = BaseType::m_cluster->get_real_key(start);
                 if (first_key < m_last_start_key) {
                     // We are not advancing through the clusters. We basically don't know where we are,
@@ -825,10 +840,6 @@ public:
                         ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
                 }
                 return not_found;
-            }
-
-            if (m_nb_needles) {
-                s = find_first_haystack<22>(*this->m_leaf_ptr, m_needles, start, end);
             }
             else if (end - start == 1) {
                 if (this->m_leaf_ptr->get(start) == this->m_value) {
@@ -920,9 +931,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
         m_dD = 100.0;
     }
 
@@ -1001,9 +1012,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
         m_dD = 10.0;
     }
 
@@ -1065,9 +1076,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
         m_dD = 50.0;
     }
 
@@ -1136,9 +1147,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dD = 100.0;
     }
@@ -1206,9 +1217,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dD = 100.0;
     }
@@ -1269,9 +1280,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dD = 100.0;
     }
@@ -1343,9 +1354,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dT = 10.0;
         m_probes = 0;
@@ -1417,13 +1428,13 @@ public:
         }
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
         clear_leaf_state();
 
         m_dD = 100.0;
 
-        StringNodeBase::init();
+        StringNodeBase::init(will_query_ranges);
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1484,13 +1495,13 @@ public:
         }
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
         clear_leaf_state();
 
         m_dD = 100.0;
 
-        StringNodeBase::init();
+        StringNodeBase::init(will_query_ranges);
     }
 
 
@@ -1563,13 +1574,13 @@ public:
         }
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
         clear_leaf_state();
 
         m_dD = 100.0;
 
-        StringNodeBase::init();
+        StringNodeBase::init(will_query_ranges);
     }
 
 
@@ -1626,7 +1637,7 @@ public:
     {
     }
 
-    void init() override;
+    void init(bool) override;
 
     bool has_search_index() const override
     {
@@ -1892,13 +1903,13 @@ public:
         }
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dD = 10.0;
 
-        combine_conditions();
+        combine_conditions(!will_query_ranges);
 
         m_start.clear();
         m_start.resize(m_conditions.size(), 0);
@@ -1911,7 +1922,7 @@ public:
 
         std::vector<ParentNode*> v;
         for (auto& condition : m_conditions) {
-            condition->init();
+            condition->init(will_query_ranges);
             v.clear();
             condition->gather_children(v);
         }
@@ -1981,13 +1992,14 @@ public:
     std::vector<std::unique_ptr<ParentNode>> m_conditions;
 
 private:
-    void combine_conditions() {
+    void combine_conditions(bool ignore_indexes)
+    {
         std::sort(m_conditions.begin(), m_conditions.end(),
                   [](auto& a, auto& b) { return a->m_condition_column_key < b->m_condition_column_key; });
 
         auto prev = m_conditions.begin()->get();
         auto cond = [&](auto& node) {
-            if (prev->consume_condition(*node))
+            if (prev->consume_condition(*node, ignore_indexes))
                 return true;
             prev = &*node;
             return false;
@@ -2026,15 +2038,15 @@ public:
         m_first_in_known_range = not_found;
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dD = 10.0;
 
         std::vector<ParentNode*> v;
 
-        m_condition->init();
+        m_condition->init(false);
         v.clear();
         m_condition->gather_children(v);
     }
@@ -2149,9 +2161,9 @@ public:
         return TConditionFunction::description();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
         m_dD = 100.0;
     }
 
@@ -2232,7 +2244,7 @@ class ExpressionNode : public ParentNode {
 public:
     ExpressionNode(std::unique_ptr<Expression>);
 
-    void init() override;
+    void init(bool) override;
     size_t find_first_local(size_t start, size_t end) override;
 
     void table_changed() override;
