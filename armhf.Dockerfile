@@ -10,7 +10,7 @@ RUN apt-get install -y \
         libssl-dev:armhf \
         libz-dev:armhf \
         libcurl4-openssl-dev:armhf \
-        libuv-dev:armhf \
+        libuv1-dev:armhf \
         ninja-build \
         qemu-user
 
