@@ -67,7 +67,7 @@ endfunction()
 
 # Set global warnings settings
 if(MSVC)
-    add_compile_options(/W3)
+    add_compile_options(/W3 /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS)
 else()
     add_compile_options(-Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wunused-parameter -Wno-missing-field-initializers)
     # TODO: Remove this when fixed
