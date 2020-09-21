@@ -99,8 +99,6 @@ void ArrayObjectId::move(ArrayObjectId& dst_arr, size_t ndx)
 
     const auto n_to_move = old_src_size - ndx;
 
-    dst_arr.copy_on_write();
-    dst_arr.ensure_minimum_width(this->m_ubound);
     // Allocate room for the new value
     const auto new_dest_byte_size = calc_required_bytes(old_dst_size + n_to_move);
     dst_arr.alloc(new_dest_byte_size, 1); // Throws
