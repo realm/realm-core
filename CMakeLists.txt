@@ -189,8 +189,6 @@ option(REALM_METRICS "Enable various metric tracking" ON)
 option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" REALM_INCLUDE_CERTS_DEFAULT)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
-check_include_files(malloc.h HAVE_MALLOC_H)
-
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
