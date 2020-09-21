@@ -155,7 +155,7 @@ class DistinctDescriptor : public ColumnsDescriptor {
 public:
     DistinctDescriptor() = default;
     DistinctDescriptor(std::vector<std::vector<ColKey>> column_keys)
-        : ColumnsDescriptor(column_keys)
+        : ColumnsDescriptor(std::move(column_keys))
     {
     }
 
