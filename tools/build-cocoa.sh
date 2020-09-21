@@ -56,8 +56,6 @@ function build_macos {
               -D REALM_VERSION="${VERSION}" \
               -D REALM_SKIP_SHARED_LIB=ON \
               -D REALM_BUILD_LIB_ONLY=ON \
-              -D CMAKE_OSX_ARCHITECTURES="x86_64; arm64" \
-              -D CMAKE_XCODE_ONLY_ACTIVE_ARCH='NO' \
               ${CMAKE_FLAGS} \
               -G Ninja ..
         cmake --build . --config "${bt}" --target package
