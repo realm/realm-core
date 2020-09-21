@@ -128,7 +128,7 @@ set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
 	find_package(ProcPS REQUIRED)
-	target_link_libraries(CoreTests PRIVATE rt PROCPS::PROCPS)
+	target_link_libraries(CoreTests rt PROCPS::PROCPS)
 endif()
 
 # Resources required for running the tests copied to the target directory
