@@ -22,7 +22,7 @@ find_path(
 # Library finding process
 find_library(
     PROCPS_LIBRARY
-    NAMES  proc
+    NAMES  proc procps
     PATHS  /lib64 /lib /usr/lib64 /usr/lib /usr/local/lib64 /usr/local/lib
     DOC    "ProcPS library location"
 )
