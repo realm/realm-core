@@ -105,7 +105,7 @@ bool TransactLogEncoder::dictionary_insert(Mixed key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed)
+void TransactLogConvenientEncoder::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed)
 {
     select_collection(dict);
     m_encoder.dictionary_insert(key);
@@ -118,7 +118,7 @@ bool TransactLogEncoder::dictionary_erase(Mixed key)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase& dict, Mixed key)
+void TransactLogConvenientEncoder::dictionary_erase(const CollectionBase& dict, Mixed key)
 {
     select_collection(dict);
     m_encoder.dictionary_insert(key);
