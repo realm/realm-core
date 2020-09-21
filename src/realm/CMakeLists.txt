@@ -311,7 +311,7 @@ if(UNIX AND NOT APPLE)
         find_package(OpenSSL REQUIRED)
     else()
         # Use our OpenSSL
-        if(NOT OpenSSL_DIR)
+        if(NOT OPENSSL_ROOT_DIR)
             if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
                 if(ANDROID)
                     set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
@@ -334,9 +334,12 @@ if(UNIX AND NOT APPLE)
                 )
             endif()
 
-            set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+            set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl")
         endif()
-        find_package(OpenSSL REQUIRED CONFIG)
+        find_package(OpenSSL REQUIRED)
+
+        # FIXME our OpenSSL doesn't define the dependency between SSL and Crypto
+        #target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
     endif()
 
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
