@@ -144,6 +144,10 @@ public:
     template<typename T, typename Context>
     void set(Context&, size_t row_ndx, T&& value, CreatePolicy=CreatePolicy::SetLink);
 
+    Obj add_embedded();
+    Obj set_embedded(size_t list_ndx);
+    Obj insert_embedded(size_t list_ndx);
+
     // Replace the values in this list with the values from an enumerable object
     template<typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy=CreatePolicy::SetLink);

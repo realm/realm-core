@@ -285,6 +285,39 @@ void List::set(size_t row_ndx, Obj o)
     as<Obj>().set(row_ndx, o.get_key());
 }
 
+Obj List::add_embedded()
+{
+    verify_in_transaction();
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_insert_linked_object(size());
+}
+
+Obj List::set_embedded(size_t list_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(list_ndx);
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_set_linked_object(list_ndx);
+}
+
+Obj List::insert_embedded(size_t list_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(list_ndx, true);
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_insert_linked_object(list_ndx);
+}
+
+
 void List::swap(size_t ndx1, size_t ndx2)
 {
     verify_in_transaction();
