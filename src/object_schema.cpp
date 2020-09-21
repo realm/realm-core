@@ -87,6 +87,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     table_key = table->get_key();
 
     size_t count = table->get_column_count();
+    ColKey pk_col = table->get_primary_key_column();
     persisted_properties.reserve(count);
 
     for (auto col_key : table->get_column_keys()) {
@@ -102,7 +103,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         Property property;
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(*table, col_key);
-        property.is_indexed = table->has_search_index(col_key) || table->get_primary_key_column() == col_key;
+        property.is_indexed = table->has_search_index(col_key) || pk_col == col_key;
         property.column_key = col_key;
 
         if (property.type == PropertyType::Object) {
@@ -113,7 +114,8 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         persisted_properties.push_back(std::move(property));
     }
 
-    primary_key = ObjectStore::get_primary_key_for_object(group, name);
+    if (pk_col)
+        primary_key = table->get_column_name(pk_col);
     set_primary_key_property();
 }
 
