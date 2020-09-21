@@ -25,17 +25,13 @@
 #include <stdexcept>
 #include <vector>
 
-#if (REALM_HAVE_UV && !REALM_PLATFORM_APPLE) || REALM_PLATFORM_NODE
-#define REALM_USE_UV 1
-#else
-#define REALM_USE_UV 0
-#endif
-
 #if REALM_USE_UV
 #include <uv.h>
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
+#else
+#error "No EventLoop implementation selected, tests will fail"
 #endif
 
 using namespace realm::util;

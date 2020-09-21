@@ -72,16 +72,6 @@ set(HEADERS
     util/tagged_bool.hpp
     util/uuid.hpp)
 
-if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
-elseif(REALM_HAVE_EPOLL)
-    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
-elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
-else()
-    list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
-endif()
-
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/app.hpp
@@ -137,6 +127,19 @@ add_library(Realm::ObjectStore ALIAS ObjectStore)
 set_target_properties(ObjectStore PROPERTIES
     OUTPUT_NAME realm-object-store
 )
+
+check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
+
+if(APPLE)
+    target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+elseif(REALM_HAVE_EPOLL)
+    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
+    target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
+elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    target_sources(ObjectStore PRIVATE impl/windows/external_commit_helper.cpp)
+else()
+    target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
+endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
     # needed to disable assertions in external/json

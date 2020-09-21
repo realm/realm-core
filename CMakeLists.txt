@@ -15,7 +15,6 @@ include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
-include(CheckSymbolExists)
 
 include(CodeCoverage)
 
@@ -174,8 +173,6 @@ endif()
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-
-check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
 if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
     set(REALM_INCLUDE_CERTS_DEFAULT ON)
