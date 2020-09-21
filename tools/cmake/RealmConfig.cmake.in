@@ -34,6 +34,7 @@ if(REALM_NEEDS_OPENSSL)
         endif()
     endif()
 
+    set(OPENSSL_USE_STATIC_LIBS ON)
     find_dependency(OpenSSL VERSION @OPENSSL_VERSION_MAJOR_MINOR@)
 endif()
 
