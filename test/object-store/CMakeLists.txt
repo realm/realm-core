@@ -3,6 +3,7 @@ set(HEADERS
     util/index_helpers.hpp
     util/test_file.hpp
     util/test_utils.hpp
+    collection_fixtures.hpp
 )
 
 set(SOURCES
@@ -14,8 +15,10 @@ set(SOURCES
     migrations.cpp
     object.cpp
     object_store.cpp
+    primitive_list.cpp
     realm.cpp
     results.cpp
+    set.cpp
     schema.cpp
     thread_safe_reference.cpp
     transaction_log_parsing.cpp

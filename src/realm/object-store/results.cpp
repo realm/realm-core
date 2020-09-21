@@ -731,26 +731,34 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
 util::Optional<Mixed> Results::max(ColKey column)
 {
     ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "max", [&](auto&& helper) { return helper.max(column, return_ndx); });
+    auto results = aggregate(column, "max", [&](auto&& helper) {
+        return helper.max(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::min(ColKey column)
 {
     ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "min", [&](auto&& helper) { return helper.min(column, return_ndx); });
+    auto results = aggregate(column, "min", [&](auto&& helper) {
+        return helper.min(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::sum(ColKey column)
 {
-    return aggregate(column, "sum", [&](auto&& helper) { return helper.sum(column); });
+    return aggregate(column, "sum", [&](auto&& helper) {
+        return helper.sum(column);
+    });
 }
 
 util::Optional<Mixed> Results::average(ColKey column)
 {
     size_t value_count = 0;
-    auto results = aggregate(column, "avg", [&](auto&& helper) { return helper.avg(column, &value_count); });
+    auto results = aggregate(column, "avg", [&](auto&& helper) {
+        return helper.avg(column, &value_count);
+    });
     return value_count == 0 ? none : results;
 }
 
@@ -1220,8 +1228,8 @@ static std::string unsupported_operation_msg(ColKey column, Table const& table, 
         return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
     if (is_set(type))
         return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
-        return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
-                            table.get_column_name(column), column_type);
+    return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
+                        table.get_column_name(column), column_type);
 }
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
