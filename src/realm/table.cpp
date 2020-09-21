@@ -401,6 +401,9 @@ void Table::remove_column(ColKey col_key)
     if (col_key == m_primary_key_col) {
         do_set_primary_key_column(ColKey());
     }
+    else {
+        REALM_ASSERT_RELEASE(m_primary_key_col.get_index().val != col_key.get_index().val);
+    }
     bump_content_version();
     bump_storage_version();
     erase_root_column(col_key); // Throws
