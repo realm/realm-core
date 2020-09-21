@@ -31,7 +31,6 @@ foreach(DEPENDENCY IN LISTS DEPENDENCIES)
     set(${COMPONENT} ${VERSION})
 endforeach()
 
-
 if(APPLE)
     find_library(FOUNDATION_FRAMEWORK Foundation)
     find_library(SECURITY_FRAMEWORK Security)
@@ -48,15 +47,15 @@ else()
         if(REALM_PLATFORM STREQUAL "Android")
             set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${ANDROID_ABI}/openssl.tgz")
         endif()
-    
+
         message(STATUS "Downloading OpenSSL...")
         file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
-    
+
         list(GET download_status 0 status_code)
         if (NOT "${status_code}" STREQUAL "0")
             message(FATAL_ERROR "Downloading ${OPENSSL_URL}... Failed. Status: ${download_status}")
         endif()
-    
+
         message(STATUS "Uncompressing OpenSSL...")
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
@@ -225,7 +224,7 @@ macro(build_realm_core)
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND cmake -B build.debug -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja
                        && cmake -B build.release -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja
-                       
+
         BUILD_COMMAND cmake --build build.debug --target Storage --target QueryParser
                    && cmake --build build.release --target Storage --target QueryParser
 
@@ -293,6 +292,8 @@ function(build_existing_realm_core core_directory)
 endfunction()
 
 macro(build_realm_sync)
+    find_package(ZLIB REQUIRED)
+
     set(sync_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync")
 
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
@@ -333,7 +334,7 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
 
-    set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
+    set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${ZLIB_LIBRARIES})
 
     # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
     # configure time, when they'd otherwise not be created until we download and build sync.

@@ -134,8 +134,6 @@ if(REALM_ENABLE_SYNC)
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)
     endif()
-    find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
@@ -150,5 +148,5 @@ target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+    target_link_libraries(realm-object-store PUBLIC realm-sync)
 endif()
