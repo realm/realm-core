@@ -16,15 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "sync/session/session_util.hpp"
 
-#include "feature_checks.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"

@@ -19,7 +19,7 @@
 #ifndef REALM_OS_SYSTEM_CONFIGURATION_HPP
 #define REALM_OS_SYSTEM_CONFIGURATION_HPP
 
-#include "sync/impl/network_reachability.hpp"
+#include <realm/object-store/sync/impl/network_reachability.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
 

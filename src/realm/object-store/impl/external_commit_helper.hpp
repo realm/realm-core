@@ -29,13 +29,13 @@
 #endif
 
 #if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
+#include <realm/object-store/impl/apple/external_commit_helper.hpp>
 #elif REALM_USE_EPOLL
-#include "impl/epoll/external_commit_helper.hpp"
+#include <realm/object-store/impl/epoll/external_commit_helper.hpp>
 #elif defined(_WIN32)
-#include "impl/windows/external_commit_helper.hpp"
+#include <realm/object-store/impl/windows/external_commit_helper.hpp>
 #else
-#include "impl/generic/external_commit_helper.hpp"
+#include <realm/object-store/impl/generic/external_commit_helper.hpp>
 #endif
 
 #endif // REALM_EXTERNAL_COMMIT_HELPER_HPP

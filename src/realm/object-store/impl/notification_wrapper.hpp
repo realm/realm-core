@@ -19,7 +19,7 @@
 #ifndef REALM_OS_NOTIFICATION_WRAPPER_HPP
 #define REALM_OS_NOTIFICATION_WRAPPER_HPP
 
-#include "collection_notifications.hpp"
+#include <realm/object-store/collection_notifications.hpp>
 
 namespace realm {
 namespace _impl {

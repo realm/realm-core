@@ -19,9 +19,9 @@
 #ifndef REALM_COORDINATOR_HPP
 #define REALM_COORDINATOR_HPP
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
-#include "util/checked_mutex.hpp"
+#include <realm/object-store/util/checked_mutex.hpp>
 
 #include <realm/version_id.hpp>
 

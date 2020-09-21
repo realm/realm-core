@@ -19,8 +19,8 @@
 #ifndef REALM_OS_SYNC_SESSION_HPP
 #define REALM_OS_SYNC_SESSION_HPP
 
-#include "feature_checks.hpp"
-#include "sync/sync_config.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/sync/sync_config.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>

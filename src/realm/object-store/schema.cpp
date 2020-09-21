@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "schema.hpp"
+#include <realm/object-store/schema.hpp>
 
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
 
 #include <algorithm>
 

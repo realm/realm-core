@@ -16,16 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/scheduler.hpp"
+#include <realm/object-store/util/scheduler.hpp>
 
 #if REALM_USE_UV
-#include "util/uv/scheduler.hpp"
+#include <realm/object-store/util/uv/scheduler.hpp>
 #elif REALM_USE_CF
-#include "util/apple/scheduler.hpp"
+#include <realm/object-store/util/apple/scheduler.hpp>
 #elif REALM_USE_ALOOPER
-#include "util/android/scheduler.hpp"
+#include <realm/object-store/util/android/scheduler.hpp>
 #else
-#include "util/generic/scheduler.hpp"
+#include <realm/object-store/util/generic/scheduler.hpp>
 #endif
 
 namespace {

@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#include <util/event_loop.hpp>
-#include <util/event_loop_dispatcher.hpp>
+#include "util/event_loop.hpp"
+#include <realm/object-store/util/event_loop_dispatcher.hpp>
 
 #include <realm/util/features.h>
 

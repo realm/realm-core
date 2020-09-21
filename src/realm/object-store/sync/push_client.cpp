@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/push_client.hpp"
-#include "sync/app_utils.hpp"
+#include <realm/object-store/sync/push_client.hpp>
+#include <realm/object-store/sync/app_utils.hpp>
 
 namespace realm {
 namespace app {

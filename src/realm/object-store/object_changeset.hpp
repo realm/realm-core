@@ -19,7 +19,7 @@
 #ifndef REALM_OBJECT_CHANGESET_HPP
 #define REALM_OBJECT_CHANGESET_HPP
 
-#include "collection_notifications.hpp"
+#include <realm/object-store/collection_notifications.hpp>
 
 #include <realm/keys.hpp>
 #include <realm/util/optional.hpp>

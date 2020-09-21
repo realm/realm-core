@@ -16,14 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/sync_manager.hpp"
+#include <realm/object-store/sync/sync_manager.hpp>
 
-#include "sync/impl/sync_client.hpp"
-#include "sync/impl/sync_file.hpp"
-#include "sync/impl/sync_metadata.hpp"
-#include "sync/sync_session.hpp"
-#include "sync/sync_user.hpp"
-#include "sync/app.hpp"
+#include <realm/object-store/sync/impl/sync_client.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/app.hpp>
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>

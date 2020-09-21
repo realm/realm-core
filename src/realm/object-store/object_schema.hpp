@@ -19,7 +19,7 @@
 #ifndef REALM_OBJECT_SCHEMA_HPP
 #define REALM_OBJECT_SCHEMA_HPP
 
-#include "util/tagged_bool.hpp"
+#include <realm/object-store/util/tagged_bool.hpp>
 
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>

@@ -21,7 +21,7 @@
 
 #include <string>
 
-#include "sync/sync_user.hpp"
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include <realm/util/optional.hpp>
 

@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/impl/apple/network_reachability_observer.hpp"
+#include <realm/object-store/sync/impl/apple/network_reachability_observer.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
 

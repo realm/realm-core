@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/collection_change_builder.hpp"
+#include <realm/object-store/impl/collection_change_builder.hpp>
 
 #include <realm/util/assert.hpp>
 

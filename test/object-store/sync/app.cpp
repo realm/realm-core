@@ -16,15 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
-#include "impl/object_accessor_impl.hpp"
-#include "property.hpp"
-#include "sync/app.hpp"
-#include "sync/app_credentials.hpp"
-#include "sync/async_open_task.hpp"
-#include "sync/remote_mongo_client.hpp"
-#include "sync/remote_mongo_database.hpp"
-#include "sync/sync_session.hpp"
+#include <catch2/catch.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/remote_mongo_client.hpp>
+#include <realm/object-store/sync/remote_mongo_database.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
