@@ -30,4 +30,12 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-include("${CMAKE_CURRENT_LIST_DIR}/RealmCoreTargets.cmake")
+# Find dependencies
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/RealmTargets.cmake")
+
+if(TARGET Realm::Sync)
+    find_package(ZLIB REQUIRED)
+endif()

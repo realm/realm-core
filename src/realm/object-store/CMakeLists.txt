@@ -82,10 +82,6 @@ else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
 
-set(INCLUDE_DIRS
-    ${UV_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR})
-
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/app.hpp
@@ -133,25 +129,27 @@ if(REALM_ENABLE_SYNC)
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)
     endif()
-    find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
+
+add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
+add_library(Realm::ObjectStore ALIAS ObjectStore)
+
+set_target_properties(ObjectStore PROPERTIES
+    OUTPUT_NAME realm-object-store
+)
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
-    list(APPEND INCLUDE_DIRS ../external/json)
+    # needed to disable assertions in external/json
+    target_compile_definitions(ObjectStore PUBLIC
+        $<$<CONFIG:Release>:NDEBUG>
+        $<$<CONFIG:RelWithDebInfo>:NDEBUG>
+    )
+    target_include_directories(ObjectStore PRIVATE ${JSON_INCLUDE_DIR})
 endif()
 
-add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
-set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
-target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
-target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
-
-if (APPLE)
-    target_link_libraries(realm-object-store PUBLIC ${Foundation} ${Security})
-endif()
+target_link_libraries(ObjectStore INTERFACE Storage)
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(realm-object-store PUBLIC Sync ${ZLIB_LIBRARIES})
+    target_link_libraries(ObjectStore INTERFACE Sync)
 endif()

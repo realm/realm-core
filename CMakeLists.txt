@@ -1,8 +1,4 @@
-if(WIN32)
-    cmake_minimum_required(VERSION 3.12)
-else()
-    cmake_minimum_required(VERSION 3.15)
-endif()
+cmake_minimum_required(VERSION 3.15)
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(RealmCore)
@@ -49,7 +45,7 @@ function(add_cxx_flag_if_supported flag)
 
     check_cxx_compiler_flag(${check_flag} HAVE${check_flag})
     if(HAVE${check_flag})
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flag}" PARENT_SCOPE)
+        add_compile_options(${flag})
     endif()
 endfunction()
 
@@ -64,9 +60,7 @@ function(use_faster_linker)
         set(CMAKE_REQUIRED_LINK_OPTIONS "-fuse-ld=${LINKER}")
         check_cxx_source_compiles("int main() {}" HAVE_LINKER_${LINKER})
         if(HAVE_LINKER_${LINKER})
-            foreach(KIND EXE SHARED MODULE)
-                set(CMAKE_${KIND}_LINKER_FLAGS "${CMAKE_${KIND}_LINKER_FLAGS} -fuse-ld=${LINKER}" PARENT_SCOPE)
-            endforeach()
+            add_link_options("-fuse-ld=${LINKER}")
             return()
         endif()
     endforeach()
@@ -74,15 +68,15 @@ endfunction()
 
 # Set global warnings settings
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS")
+    add_compile_options(/W3)
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wunused-parameter -Wno-missing-field-initializers")
+    add_compile_options(-Wall -Wextra -Wempty-body -Wparentheses -Wunknown-pragmas -Wunreachable-code -Wunused-parameter -Wno-missing-field-initializers)
     # TODO: Remove this when fixed
     if(ANDROID)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-uninitialized")
+        add_compile_options(-Wno-uninitialized)
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES ".*[Cc]lang")
         # FIXME: Re-introduce -Wold-style-cast 
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation")
+        add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation)
     endif()
 
     # This warning is too agressive. It warns about moves that are not redundant on older
@@ -106,24 +100,21 @@ if(ANDROID)
     # - `-fomit-frame-pointer` is inherited from NDK r10e.
     #
     # On some architectures char is unsigned by default. Make it signed
-    set(CMAKE_CXX_FLAGS_RELEASE "-Oz -DNDEBUG")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes")
+    add_compile_options($<$<CONFIG:Release>:-Oz>)
+    add_compile_options(-fdata-sections -ffunction-sections -fomit-frame-pointer -fsigned-char -fstrict-aliasing -funwind-tables -no-canonical-prefixes)
 endif()
 
-set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
-    $<$<CONFIG:MinSizeDebug>:-g>
-)
+add_compile_options($<$<CONFIG:MinSizeDebug>:-g>)
 
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 
-set(CMAKE_POSITION_INDEPENDENT_CODE true)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_definitions(
-        /D_SCL_SECURE_NO_WARNINGS
         /DWIN32_LEAN_AND_MEAN
         /DUNICODE
         /D_UNICODE
@@ -133,9 +124,6 @@ endif()
 if(MSVC)
     add_compile_options(
         /MP # Enable multi-processor compilation
-    )
-    add_definitions(
-        /D_DISABLE_EXTENDED_ALIGNED_STORAGE #https://developercommunity.visualstudio.com/comments/279328/view.html
     )
     if(WINDOWS_STORE)
         # Removing LNK4075 warnings for debug UWP builds
@@ -153,41 +141,24 @@ if(MSVC)
         set(CMAKE_EXE_LINKER_FLAGS_DEBUG     "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
         set(CMAKE_SHARED_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /INCREMENTAL:NO /OPT:NOREF /OPT:NOICF")
     else()
-        # Statically link the run-time library
-        # TODO: replace with CMAKE_MSVC_RUNTIME_LIBRARY once we switch to CMake 3.15 as the minimum
-        # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
-        # https://cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
-        foreach(flag_var
-            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
-            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-            if(${flag_var} MATCHES "/MD")
-                string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-            endif()
-
-            # Disable runtime stack bound checks, because these slow down unit tests
-            # disproportionately.
-            if(${flag_var} MATCHES "/RTC")
-                string(REGEX REPLACE "/RTC(su|[1su])" "" ${flag_var} "${${flag_var}}")
-            endif()
-        endforeach()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     endif()
 
     # Let the compiler optimize debug builds ever so slightly.
     # /Ob1: This allows the compiler to inline functions marked __inline.
     # /Oi:  This enables (faster) intrinsic functions.
     string(REPLACE "/Ob0" "/Ob1" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-    string(CONCAT CMAKE_CXX_FLAGS_DEBUG "/Oi " "${CMAKE_CXX_FLAGS_DEBUG}")
+    add_compile_options($<$<CONFIG:Debug>:/Oi>)
 
     # Prevent warnings abount non-existing .pdb files
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG  "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /ignore:4099")
+    add_link_options($<$<CONFIG:Debug>:/ignore:4099>)
 endif()
 
 # Platform-specific build configuration
 if(APPLE)
-    find_library(Foundation Foundation)
-    find_library(Security Security)
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+    find_library(SECURITY_FRAMEWORK Security)
 elseif(ANDROID)
     list(APPEND PLATFORM_LIBRARIES log android)
 endif()
@@ -203,24 +174,6 @@ endif()
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-list(APPEND PLATFORM_LIBRARIES Threads::Threads)
-
-if(NOT REALM_PLATFORM OR REALM_PLATFORM STREQUAL "Node")
-    find_library(UV_LIBRARY NAMES uv libuv)
-    if(UV_LIBRARY)
-        find_path(UV_INCLUDE_DIR uv.h)
-
-        list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
-        set(REALM_HAVE_UV "1")
-    endif()
-endif()
-
-if(REALM_PLATFORM STREQUAL "Node")
-    set(PLATFORM_DEFINES "REALM_PLATFORM_NODE=1")
-    if(NOT UV_LIBRARY)
-        message(FATAL_ERROR "Platform set to Node but libuv was not found!")
-    endif()
-endif()
 
 check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
 
@@ -301,25 +254,33 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Make the project importable from the build directory
-export(TARGETS Storage QueryParser NAMESPACE RealmCore:: FILE RealmCoreTargets.cmake)
-configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmCoreConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake @ONLY)
+set(REALM_EXPORTED_TARGETS
+    Storage
+    QueryParser
+    ObjectStore
+)
+if(${REALM_ENABLE_SYNC})
+    list(APPEND REALM_EXPORTED_TARGETS Sync)
+endif()
+export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/tools/cmake/RealmConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake @ONLY)
 
 # Make the project importable from the install directory
 install(EXPORT realm
-        NAMESPACE RealmCore::
-        FILE RealmCoreTargets.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore
+        NAMESPACE Realm::
+        FILE RealmTargets.cmake
+        DESTINATION lib/cmake/Realm
         COMPONENT devel
 )
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmCoreConfig.cmake 
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/RealmCore 
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake 
+        DESTINATION lib/cmake/Realm
         COMPONENT devel
 )
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
+set(CPACK_PACKAGE_NAME "realm-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)

@@ -29,29 +29,13 @@ endif()
 
 add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
 add_library(realm-parser ALIAS QueryParser)
+add_library(Realm::QueryParser ALIAS QueryParser)
 target_link_libraries(QueryParser PUBLIC Storage)
 target_include_directories(QueryParser PRIVATE ${PEGTL_INCLUDE_DIR})
 set_target_properties(QueryParser PROPERTIES OUTPUT_NAME "realm-parser")
 install(FILES ${REALM_PARSER_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/parser
+        DESTINATION include/realm/parser
         COMPONENT devel)
 install(TARGETS QueryParser EXPORT realm
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
-if(NOT REALM_SKIP_SHARED_LIB)
-    add_library(QueryParserShared SHARED ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS})
-    add_dependencies(QueryParserShared StorageShared)
-    target_link_libraries(QueryParserShared PRIVATE StorageShared)
-    target_include_directories(QueryParserShared PRIVATE ${PEGTL_INCLUDE_DIR})
-    target_include_directories(QueryParserShared
-        INTERFACE
-            $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
-            $<BUILD_INTERFACE:${RealmCore_BINARY_DIR}/src>
-            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-    set_target_properties(QueryParserShared PROPERTIES
-                          OUTPUT_NAME "realm-parser"
-    )
-    install(TARGETS QueryParserShared
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-endif()
-
+        ARCHIVE DESTINATION lib
+        COMPONENT devel)
