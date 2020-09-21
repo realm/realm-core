@@ -1,12 +1,19 @@
+include("${CMAKE_CURRENT_LIST_DIR}/RealmTargets.cmake")
+
+# Find dependencies
 include(CMakeFindDependencyMacro)
 
+set(REALM_NEEDS_OPENSSL OFF)
 if(UNIX AND NOT APPLE)
-    if(REALM_USE_SYSTEM_OPENSSL)
-        # Use system OpenSSL
-        find_package(OpenSSL REQUIRED)
-    else()
-        if(NOT OpenSSL_DIR)
-            if(NOT EXISTS ${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+    set(REALM_NEEDS_OPENSSL ON)
+elseif(TARGET Realm::Sync AND CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    set(REALM_NEEDS_OPENSSL ON)
+endif()
+
+if(REALM_NEEDS_OPENSSL)
+    if(NOT REALM_USE_SYSTEM_OPENSSL)
+        if(NOT OPENSSL_ROOT_DIR)
+            if(NOT OPENSSL_ROOT_DIR STREQUAL "${CMAKE_BINARY_DIR}/openssl")
                 set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Linux/x86_64/openssl.tgz")
                 if(ANDROID)
                     set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
@@ -23,19 +30,16 @@ if(UNIX AND NOT APPLE)
                     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/openssl"
                 )
             endif()
-            message(STATUS "Importing OpenSSL...")
-            set(OpenSSL_DIR "${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+            set(OPENSSL_ROOT_DIR "${CMAKE_BINARY_DIR}/openssl")
         endif()
-        find_dependency(OpenSSL REQUIRED CONFIG)
     endif()
+
+    find_dependency(OpenSSL VERSION @OPENSSL_VERSION_MAJOR_MINOR@)
 endif()
 
-# Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-
-include("${CMAKE_CURRENT_LIST_DIR}/RealmTargets.cmake")
+find_dependency(Threads)
 
 if(TARGET Realm::Sync)
-    find_package(ZLIB REQUIRED)
+    find_dependency(ZLIB)
 endif()

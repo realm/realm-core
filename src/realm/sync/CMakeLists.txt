@@ -120,7 +120,6 @@ set_target_properties(Sync PROPERTIES
     OUTPUT_NAME "realm-sync"
 )
 
-find_package(ZLIB REQUIRED)
 target_link_libraries(Sync PUBLIC Storage ZLIB::ZLIB)
 
 add_library(SyncServer STATIC EXCLUDE_FROM_ALL ${SERVER_SOURCES} ${SYNC_SERVER_HEADERS})
@@ -140,9 +139,6 @@ if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")
 else()
     target_sources(SyncServer PRIVATE crypto_server_openssl.cpp)
-    if(APPLE)
-        find_package(OpenSSL REQUIRED)
-    endif()
     target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 

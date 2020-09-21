@@ -174,6 +174,48 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
+if(UNIX AND NOT APPLE)
+    set(REALM_NEEDS_OPENSSL ON)
+elseif(REALM_ENABLE_SYNC AND CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    set(REALM_NEEDS_OPENSSL ON)
+endif()
+if(REALM_NEEDS_OPENSSL)
+    if(NOT REALM_USE_SYSTEM_OPENSSL)
+        # Use our OpenSSL
+        if(NOT OPENSSL_ROOT_DIR STREQUAL "${CMAKE_CURRENT_BINARY_DIR}/openssl")
+            if(ANDROID)
+                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+            else()
+                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+            endif()
+
+            message(STATUS "Getting ${OPENSSL_URL}...")
+            file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+
+            list(GET download_status 0 status_code)
+            if (NOT "${status_code}" STREQUAL "0")
+                message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+            endif()
+
+            message(STATUS "Uncompressing OpenSSL...")
+            execute_process(
+                COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+            )
+            set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl")
+        endif()
+    endif()
+
+    find_package(OpenSSL REQUIRED)
+    set(REALM_HAVE_OPENSSL ON)
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
+endif()
+
+if(REALM_ENABLE_SYNC)
+    find_package(ZLIB REQUIRED)
+endif()
+
 if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
     set(REALM_INCLUDE_CERTS_DEFAULT ON)
 else()
@@ -195,20 +237,8 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 
-if(UNIX AND NOT APPLE OR REALM_FORCE_OPENSSL)
-    set(REALM_HAVE_OPENSSL "1")
-endif()
-
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
-endif()
-
-if(REALM_ENABLE_SYNC)
-    find_package(ZLIB REQUIRED)
-    if (WIN32)
-        find_package(OpenSSL REQUIRED)
-        set(REALM_HAVE_OPENSSL "1")
-    endif()
 endif()
 
 # Store configuration in header file

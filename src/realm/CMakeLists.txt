@@ -306,42 +306,6 @@ endif()
 target_link_libraries(Storage INTERFACE Threads::Threads)
 
 if(UNIX AND NOT APPLE)
-    if(REALM_USE_SYSTEM_OPENSSL)
-        # Use system OpenSSL
-        find_package(OpenSSL REQUIRED)
-    else()
-        # Use our OpenSSL
-        if(NOT OPENSSL_ROOT_DIR)
-            if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
-                if(ANDROID)
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
-                else()
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
-                endif()
-
-                message(STATUS "Getting ${OPENSSL_URL}...")
-                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
-
-                list(GET download_status 0 status_code)
-                if (NOT "${status_code}" STREQUAL "0")
-                    message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
-                endif()
-
-                message(STATUS "Uncompressing OpenSSL...")
-                execute_process(
-                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
-                    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
-                )
-            endif()
-
-            set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl")
-        endif()
-        find_package(OpenSSL REQUIRED)
-
-        # FIXME our OpenSSL doesn't define the dependency between SSL and Crypto
-        #target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
-    endif()
-
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
 endif()
 
