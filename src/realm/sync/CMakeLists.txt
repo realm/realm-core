@@ -121,7 +121,7 @@ set_target_properties(Sync PROPERTIES
 )
 
 find_package(ZLIB REQUIRED)
-target_link_libraries(Sync INTERFACE Storage ZLIB::ZLIB)
+target_link_libraries(Sync PUBLIC Storage ZLIB::ZLIB)
 
 add_library(SyncServer STATIC EXCLUDE_FROM_ALL ${SERVER_SOURCES} ${SYNC_SERVER_HEADERS})
 add_library(Realm::SyncServer ALIAS SyncServer)
@@ -129,10 +129,10 @@ add_library(Realm::SyncServer ALIAS SyncServer)
 set_target_properties(SyncServer PROPERTIES
     OUTPUT_NAME "realm-server"
 )
-target_link_libraries(SyncServer INTERFACE Sync QueryParser)
+target_link_libraries(SyncServer PUBLIC Sync QueryParser)
 if (REALM_BUILD_DOGLESS)
     message(STATUS "Building Sync Server with Dogless (statsd) support.")
-    target_link_libraries(SyncServer INTERFACE Dogless)
+    target_link_libraries(SyncServer PUBLIC Dogless)
 endif()
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
@@ -143,7 +143,7 @@ else()
     if(APPLE)
         find_package(OpenSSL REQUIRED)
     endif()
-    target_link_libraries(Sync INTERFACE OpenSSL::SSL)
+    target_link_libraries(Sync PUBLIC OpenSSL::SSL)
 endif()
 
 if(WIN32 AND NOT WINDOWS_STORE)

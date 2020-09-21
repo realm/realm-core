@@ -147,9 +147,9 @@ if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
     target_include_directories(ObjectStore PRIVATE ${JSON_INCLUDE_DIR})
 endif()
 
-target_link_libraries(ObjectStore INTERFACE Storage)
+target_link_libraries(ObjectStore PUBLIC Storage)
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(ObjectStore INTERFACE Sync)
+    target_link_libraries(ObjectStore PUBLIC Sync)
 endif()
