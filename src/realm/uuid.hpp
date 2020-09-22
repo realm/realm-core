@@ -24,17 +24,14 @@
 namespace realm {
 
 struct InvalidUUIDString : std::logic_error {
-    InvalidUUIDString(std::string msg)
-        : std::logic_error(msg)
-    {
-    }
+    using std::logic_error::logic_error;
 };
 
-/// A UUID is a sequence of 16 bytes (128 bits) as specified by https://tools.ietf.org/html/rfc4122
-/// Notably this type is considered null if all bits are 0.
+/// A UUID is a sequence of 16 bytes (128 bits)
 class UUID {
 public:
-    using UUIDBytes = std::array<uint8_t, 16>;
+    static constexpr size_t num_bytes = 16;
+    using UUIDBytes = std::array<uint8_t, num_bytes>;
 
     /// A string is considered valid if it contains only hex [a-f, 0-9]
     /// and hyphens in the correct sequence, case insensitive. For
@@ -46,11 +43,14 @@ public:
 
     /// This constructor may throw InvalidUUIDString if the format
     /// of the parameter is invalid according to `is_valid_string`
-    explicit UUID(const char*);
-    explicit UUID(const StringData&);
+    explicit UUID(StringData);
 
     /// Constructs a  UUID with all zero bytes
-    UUID() noexcept;
+    UUID()
+    noexcept
+        : m_bytes{}
+    {
+    }
 
     explicit UUID(const UUIDBytes& raw) noexcept
         : m_bytes(raw)

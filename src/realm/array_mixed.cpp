@@ -155,9 +155,9 @@ Mixed ArrayMixed::get(size_t ndx) const
                 ensure_string_array();
                 REALM_ASSERT(size_t(int_val) < m_strings.size());
                 auto s = m_strings.get(payload_ndx);
-                UUID id;
-                memcpy(&id, s.data(), sizeof(UUID));
-                return Mixed(id);
+                UUID::UUIDBytes bytes{};
+                std::copy_n(s.data(), bytes.size(), bytes.begin());
+                return Mixed(UUID(bytes));
             }
             default:
                 break;
@@ -424,9 +424,8 @@ int64_t ArrayMixed::store(const Mixed& value)
             ensure_string_array();
             size_t ndx = m_strings.size();
             auto id = value.get<UUID>();
-            char buffer[sizeof(UUID)];
-            memcpy(buffer, &id, sizeof(UUID));
-            m_strings.add(StringData(buffer, sizeof(UUID)));
+            const auto uuid_bytes = id.to_bytes();
+            m_strings.add(StringData(reinterpret_cast<const char*>(uuid_bytes.data()), uuid_bytes.size()));
             val = int64_t(ndx << s_data_shift) | (payload_idx_str << s_payload_idx_shift);
             break;
         }

@@ -27,6 +27,7 @@ namespace realm {
 
 class ObjectId {
 public:
+    static constexpr size_t num_bytes = 12;
     /**
      * Constructs an ObjectId with all bytes 0x00.
      */
@@ -86,7 +87,7 @@ public:
     size_t hash() const noexcept;
 
 private:
-    uint8_t m_bytes[12] = {};
+    uint8_t m_bytes[num_bytes] = {};
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)

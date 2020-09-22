@@ -421,8 +421,9 @@ template <>
 struct GetIndexData<UUID> {
     static StringData get_index_data(UUID value, StringConversionBuffer& buffer)
     {
-        memcpy(&buffer, &value, sizeof(UUID));
-        return StringData{buffer.data(), sizeof(UUID)};
+        const auto bytes = value.to_bytes();
+        std::copy_n(bytes.data(), bytes.size(), buffer.begin());
+        return StringData{buffer.data(), bytes.size()};
     }
 };
 

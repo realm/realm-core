@@ -199,14 +199,14 @@ const ObjectId ArrayObjectIdNull::null_oid = ObjectId("DEADDEAD"
                                                       "DEADDEAD"
                                                       "DEADDEAD");
 
-template class ArrayFixedBytes<ObjectId, sizeof(ObjectId)>;
-template class ArrayFixedBytesNull<ObjectId, sizeof(ObjectId)>;
+template class ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
+template class ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
 
 template <>
 const UUID ArrayUUIDNull::null_oid = UUID("DEADBEEF-DEAD-BEEF-DEAD-BEEFDEADBEEF");
 
-template class ArrayFixedBytes<UUID, sizeof(UUID)>;
-template class ArrayFixedBytesNull<UUID, sizeof(UUID)>;
+template class ArrayFixedBytes<UUID, UUID::num_bytes>;
+template class ArrayFixedBytesNull<UUID, UUID::num_bytes>;
 
 
 } // namespace realm
