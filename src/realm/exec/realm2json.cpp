@@ -3,12 +3,12 @@
 #include <realm/history.hpp>
 
 const char* legend = "Simple tool to output the JSON representation of a Realm:\n"
-                     "  realm2json [-link-depth=N] [-output-mode=N] <.realm file>\n"
+                     "  realm2json [-link-depth=N] [-xjson] <.realm file>\n"
                      "\n"
                      "Options:\n"
                      " -link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
                      "for more details. Defaults to 0.\n"
-                     " -output-mode:Can specify MongoDB XJSON output format by passing in 1. Defaults to 0. \n"
+                     " -xjson: Output should be formatted as MongoDB XJSON \n"
                      "\n";
 
 void abort2(bool b, const char* fmt, ...)
@@ -37,10 +37,8 @@ int main(int argc, char const* argv[])
 
         if (strncmp(argv[a], "-link-depth=", 12) == 0)
             link_depth = atoi(&argv[a][12]);
-        else if (strncmp(argv[a], "-output-mode=", 13) == 0) {
-            auto output_mode_int = atoi(&argv[a][13]);
-            if (output_mode_int == 1)
-                output_mode = realm::output_mode_xjson;
+        else if (strncmp(argv[a], "-xjson", 6) == 0) {
+            output_mode = realm::output_mode_xjson;
         }
         else {
             abort2(true, "Received unknown option '%s' - please see description below\n\n%s", argv[a], legend);
