@@ -1,0 +1,52 @@
+{
+    "database": "test_data",
+    "collection": "Person",
+    "relationships": {
+        "dogs": {
+            "ref": "#/stitch/BackingDB/test_data/Dog",
+            "source_key": "dogs",
+            "foreign_key": "_id",
+            "is_list": true
+        }
+    },
+    "roles": [
+        {
+            "name": "default",
+            "apply_when": {},
+            "insert": true,
+            "delete": true,
+            "additional_fields": {}
+        }
+    ],
+    "schema": {
+        "title": "Person",
+        "properties": {
+            "_id": {
+                "bsonType": "objectId"
+            },
+            "firstName": {
+                "bsonType": "string"
+            },
+            "lastName": {
+                "bsonType": "string"
+            },
+            "age": {
+                "bsonType": "int"
+            },
+            "realm_id": {
+                "bsonType": "string"
+            },
+            "dogs": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "objectId"
+                }
+            }
+        },
+        "required": [
+            "firstName",
+            "lastName",
+            "age"
+        ]
+    }
+}

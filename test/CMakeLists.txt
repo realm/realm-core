@@ -290,7 +290,7 @@ if(REALM_ENABLE_SYNC)
 	set(TEST_CLIENT_HEADERS
 	    client/metrics.hpp
 	    client/peer.hpp
-	    client/row_observer.hpp
+	    client/object_observer.hpp
 	    client/statistics.hpp
 	)
 
