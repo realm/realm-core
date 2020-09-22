@@ -128,6 +128,50 @@ TEST(ObjectId_ArrayNull)
     arr1.destroy();
 }
 
+TEST(ObjectId_ArrayNullMove)
+{
+    const char str0[] = "0000012300000000009218a4";
+    const char str1[] = "0000078900000000002999f3";
+
+    ArrayObjectIdNull arr(Allocator::get_default());
+    arr.create();
+
+    auto get_value_for_ndx = [&](size_t ndx) -> util::Optional<ObjectId> {
+        if (ndx % 3 == 0) {
+            return {str0};
+        }
+        else if (ndx % 3 == 1) {
+            return {str1};
+        }
+        else {
+            return util::none;
+        }
+    };
+
+    for (size_t i = 0; i < 3; ++i) {
+        arr.add(get_value_for_ndx(i));
+    }
+
+    ArrayObjectIdNull arr1(Allocator::get_default());
+    arr1.create();
+    arr1.add({str0});
+    arr1.add({str1});
+    arr1.add(util::none);
+    arr.move(arr1, 0);
+
+    CHECK_EQUAL(arr1.size(), 6);
+
+    for (size_t i = 0; i < arr1.size(); ++i) {
+        auto expected = get_value_for_ndx(i);
+        auto actual = arr1.get(i);
+        CHECK_EQUAL(actual, expected);
+    }
+
+    arr.destroy();
+    arr1.destroy();
+}
+
+
 // This should exhaustively test all cases of ArrayObjectIdNull::find_first_null.
 TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
 {
@@ -166,30 +210,45 @@ TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
     }
 }
 
-TEST(ObjectId_Table)
+TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
 {
     const char str0[] = "0000012300000000009218a4";
-    const char str1[] = "000004560000000000170232";
+    const char str1[] = "deaddeaddeaddeaddeaddead";
 
     Table t;
     auto col_id = t.add_column(type_ObjectId, "id");
     auto col_id_null = t.add_column(type_ObjectId, "id_null", true);
-    auto obj0 = t.create_object().set(col_id, ObjectId(str0));
+    auto obj0 = t.create_object().set(col_id, ObjectId(str0)).set(col_id_null, ObjectId(str0));
     auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
     auto obj2 = t.create_object();
+
+    if constexpr (TEST_TYPE::value) {
+        t.add_search_index(col_id);
+        t.add_search_index(col_id_null);
+    }
+
     CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
     CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
     CHECK_NOT(obj2.is_null(col_id));
+    CHECK_EQUAL(obj0.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str0));
+    CHECK_EQUAL(obj1.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str1));
     CHECK(obj2.is_null(col_id_null));
     auto id = obj1.get<util::Optional<ObjectId>>(col_id_null);
     CHECK(id);
     id = obj2.get<util::Optional<ObjectId>>(col_id_null);
     CHECK_NOT(id);
-    auto key = t.find_first(col_id, ObjectId(str1));
-    CHECK_EQUAL(key, obj1.get_key());
-    t.add_search_index(col_id);
+    auto key = t.find_first(col_id, ObjectId(str0));
+    CHECK_EQUAL(key, obj0.get_key());
     key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str0}));
+    CHECK_EQUAL(key, obj0.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str1}));
+    CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first_null(col_id_null);
+    CHECK_EQUAL(key, obj2.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>{});
+    CHECK_EQUAL(key, obj2.get_key());
 }
 
 TEST(ObjectId_PrimaryKey)

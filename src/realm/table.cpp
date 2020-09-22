@@ -589,8 +589,14 @@ void Table::populate_search_index(ColKey col_key)
             index->insert(key, value); // Throws
         }
         else if (type == type_ObjectId) {
-            ObjectId value = o.get<ObjectId>(col_key);
-            index->insert(key, value); // Throws
+            if (is_nullable(col_key)) {
+                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
+                index->insert(key, value); // Throws
+            }
+            else {
+                ObjectId value = o.get<ObjectId>(col_key);
+                index->insert(key, value); // Throws
+            }
         }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
@@ -2103,6 +2109,7 @@ template ObjKey Table::find_first(ColKey col_key, ObjKey) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
