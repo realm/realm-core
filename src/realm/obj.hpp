@@ -55,6 +55,11 @@ class ConstLnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 using ConstLnkLstPtr = std::unique_ptr<const LnkLst>;
 
+enum JSONOutputMode {
+    output_mode_json,  // default / existing implementation for outputting realm to json
+    output_mode_xjson, // extended json as described in the spec
+};
+
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class ConstObj {
 public:
@@ -159,15 +164,15 @@ public:
     }
 
     void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-                 std::vector<ColKey>& followed) const;
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const
+                 std::vector<ColKey>& followed, JSONOutputMode output_mode) const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+                 JSONOutputMode output_mode = output_mode_json) const
     {
         std::map<std::string, std::string> renames2;
         renames = renames ? renames : &renames2;
 
         std::vector<ColKey> followed;
-        to_json(out, link_depth, *renames, followed);
+        to_json(out, link_depth, *renames, followed, output_mode);
     }
 
     std::string to_string() const;

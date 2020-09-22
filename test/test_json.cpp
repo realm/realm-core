@@ -202,7 +202,18 @@ TEST(Json_NoLinks)
     std::stringstream ss;
     table.to_json(ss);
     CHECK(json_test(ss.str(), "expect_json", generate_all));
+    return;
+}
 
+TEST(Xjson_NoLinks)
+{
+    Table table;
+    setup_multi_table(table, 15);
+
+    std::stringstream ss;
+    table.to_json(ss, 0, nullptr, output_mode_xjson);
+
+    CHECK(json_test(ss.str(), "expect_xjson", generate_all));
     return;
 }
 
@@ -423,6 +434,92 @@ TEST(Json_LinkCycles)
     ss.str("");
     tv.to_json(ss, 2);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
+}
+
+TEST(Xjson_LinkList1)
+{
+    // Basic non-cyclic LinkList test that also tests column and table renaming
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+
+    // add some more columns to table1 and table2
+    ColKey table1Coll = table1->add_column(type_Int, "int1");
+    ColKey table2Coll = table2->add_column(type_Int, "int2");
+
+    // add some rows
+    auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
+    auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
+    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+
+
+    table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
+    auto k21 = table2->create_object_with_primary_key("t2o2").set(table2Coll, 500).get_key();
+    auto k22 = table2->create_object_with_primary_key("t2o3").set(table2Coll, 600).get_key();
+
+    ColKey col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
+
+    // set some links
+    auto ll0 = obj0.get_linklist(col_link2); // Links to table 2
+    ll0.add(k21);
+
+    auto ll1 = obj1.get_linklist(col_link2); // Links to table 2
+    ll1.add(k21);
+    ll1.add(k22);
+
+    std::stringstream ss;
+
+    // Now try different link_depth arguments
+    table1->to_json(ss, 0, nullptr, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_linklist1", generate_all));
+
+    // Column and table renaming
+    std::map<std::string, std::string> m;
+    m["str1"] = "STR1";
+    m["linkA"] = "LINKA";
+    m["table1"] = "TABLE1";
+    ss.str("");
+    table1->to_json(ss, 2, &m, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_linklist2", generate_all));
+}
+
+TEST(Xjson_LinkCycles)
+{
+    // Cycle in Link
+    Group group;
+
+    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+
+    ColKey table1Coll = table1->add_column(type_String, "str1");
+    ColKey table2Coll = table2->add_column(type_String, "str2");
+
+    // add some rows
+    auto t10 = table1->create_object_with_primary_key("t1o1").set(table1Coll, "hello");
+    table1->create_object_with_primary_key("t1o2").set(table1Coll, "world");
+
+    auto t20 = table2->create_object_with_primary_key("t2o1").set(table2Coll, "foo");
+
+    ColKey col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
+    ColKey col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
+
+    // set some links
+    table1->begin()->set(col_link1, t20.get_key());
+    table2->begin()->set(col_link2, t10.get_key());
+
+    std::stringstream ss;
+
+    // Now try different link_depth arguments
+    table1->to_json(ss, 0, nullptr, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_link", generate_all));
+
+    // Redo but from a TableView instead of the Table.
+    auto tv = table1->where().find_all();
+    // Now try different link_depth arguments
+    ss.str("");
+    tv.to_json(ss, 0, nullptr, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_link", generate_all));
 }
 
 TEST(Json_Nulls)

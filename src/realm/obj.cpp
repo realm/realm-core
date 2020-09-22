@@ -691,7 +691,8 @@ inline void out_floats(std::ostream& out, T value)
     out.precision(old);
 }
 
-void out_mixed(std::ostream& out, const Mixed& val)
+
+void out_mixed_json(std::ostream& out, const Mixed& val)
 {
     if (val.is_null()) {
         out << "null";
@@ -761,10 +762,102 @@ void out_mixed(std::ostream& out, const Mixed& val)
     }
 }
 
+void out_mixed_xjson(std::ostream& out, const Mixed& val)
+{
+    if (val.is_null()) {
+        out << "null";
+        return;
+    }
+    switch (val.get_type()) {
+        case type_Int:
+            out << "{\"$numberLong\": \"";
+            out << val.get<Int>();
+            out << "\"}";
+            break;
+        case type_Bool:
+            out << (val.get<bool>() ? "true" : "false");
+            break;
+        case type_Float:
+            out << "{\"$numberDouble\": \"";
+            out_floats<float>(out, val.get<float>());
+            out << "\"}";
+            break;
+        case type_Double:
+            out << "{\"$numberDouble\": \"";
+            out_floats<double>(out, val.get<double>());
+            out << "\"}";
+            break;
+        case type_String: {
+            out << "\"";
+            std::string str = val.get<String>();
+            size_t p = str.find_first_of(to_be_escaped);
+            while (p != std::string::npos) {
+                char c = str[p];
+                auto found = strchr(to_be_escaped, c);
+                REALM_ASSERT(found);
+                out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+                str = str.substr(p + 1);
+                p = str.find_first_of(to_be_escaped);
+            }
+            out << str << "\"";
+            break;
+        }
+        case type_Binary: {
+            out << "{\"$binary\": {\"base64\": \"";
+            auto bin = val.get<Binary>();
+            const char* start = bin.data();
+            const size_t len = bin.size();
+            util::StringBuffer encode_buffer;
+            encode_buffer.resize(util::base64_encoded_size(len));
+            util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+            out << encode_buffer.str();
+            out << "\", \"subType\": \"00\"}}";
+            break;
+        }
+        case type_Timestamp: {
+            out << "{\"$date\": {\"$numberLong\": \"";
+            auto ts = val.get<Timestamp>();
+            int64_t timeMillis = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
+            out << timeMillis;
+            out << "\"}}";
+            break;
+        }
+        case type_Decimal:
+            out << "{\"$numberDecimal\": \"";
+            out << val.get<Decimal128>();
+            out << "\"}";
+            break;
+        case type_ObjectId:
+            out << "{\"$oid\": \"";
+            out << val.get<ObjectId>();
+            out << "\"}";
+            break;
+        case type_Link:
+        case type_LinkList:
+        case type_OldDateTime:
+        case type_OldMixed:
+        case type_OldTable:
+            break;
+    }
+}
+
+void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
+{
+    switch (output_mode) {
+        case output_mode_xjson: {
+            out_mixed_xjson(out, val);
+            return;
+        }
+        case output_mode_json: {
+            out_mixed_json(out, val);
+        }
+    }
+}
+
 } // anonymous namespace
 
 void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-                       std::vector<ColKey>& followed) const
+                       std::vector<ColKey>& followed, JSONOutputMode output_mode) const
 {
     StringData name = "_key";
     if (renames[name] != "")
@@ -783,12 +876,22 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
         if (ck.get_attrs().test(col_attr_List)) {
             if (type == type_LinkList) {
                 TableRef target_table = get_target_table(ck);
+                auto primary_key_coll = target_table->get_primary_key_column();
                 auto ll = get_linklist(ck);
                 auto sz = ll.size();
 
-                if (!target_table->is_embedded() &&
-                    ((link_depth == 0) || (link_depth == not_found &&
-                                           std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
+                if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
+                    out << "[";
+                    for (size_t i = 0; i < sz; i++) {
+                        if (i > 0)
+                            out << ",";
+                        out_mixed_xjson(out, ll.get_object(i).get_any(primary_key_coll));
+                    }
+                    out << "]";
+                }
+                else if (!target_table->is_embedded() &&
+                         ((link_depth == 0) || (link_depth == not_found &&
+                                                std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
                     out << "{\"table\": \"" << target_table->get_name() << "\", \"keys\": [";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
@@ -804,7 +907,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                             out << ",";
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        ll.get_object(i).to_json(out, new_depth, renames, followed);
+                        ll.get_object(i).to_json(out, new_depth, renames, followed, output_mode);
                     }
                     out << "]";
                 }
@@ -818,7 +921,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     if (i > 0)
                         out << ",";
 
-                    out_mixed(out, list->get_any(i));
+                    out_mixed(out, list->get_any(i), output_mode);
                 }
                 out << "]";
             }
@@ -829,16 +932,22 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                 auto k = get<ObjKey>(ck);
                 if (k) {
                     auto obj = get_linked_object(ck);
-                    if (!target_table->is_embedded() &&
-                        ((link_depth == 0) || (link_depth == not_found &&
-                                               std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
+                    auto primary_key_coll = target_table->get_primary_key_column();
+
+                    if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
+                        out_mixed_xjson(out, obj.get_any(primary_key_coll));
+                    }
+                    else if (!target_table->is_embedded() &&
+                             ((link_depth == 0) ||
+                              (link_depth == not_found &&
+                               std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
                         out << "{\"table\": \"" << get_target_table(ck)->get_name()
                             << "\", \"key\": " << obj.get_key().value << "}";
                     }
                     else {
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        obj.to_json(out, new_depth, renames, followed);
+                        obj.to_json(out, new_depth, renames, followed, output_mode);
                     }
                 }
                 else {
@@ -846,7 +955,7 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                 }
             }
             else {
-                out_mixed(out, get_any(ck));
+                out_mixed(out, get_any(ck), output_mode);
             }
         }
     }

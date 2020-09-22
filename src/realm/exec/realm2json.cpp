@@ -8,14 +8,21 @@ int main(int argc, char const* argv[])
         std::string path = argv[1];
         std::map<std::string, std::string> renames;
         size_t link_depth = 0;
+        realm::JSONOutputMode output_mode = realm::output_mode_json;
         if (argc > 2) {
             link_depth = strtol(argv[2], nullptr, 0);
+
+            if (argc > 3) {
+                auto output_mode_int = strtol(argv[3], nullptr, 0);
+                if (output_mode_int == 1)
+                    output_mode = realm::output_mode_xjson;
+            }
         }
         try {
             // First we try to open in read_only mode. In this way we can also open
             // realms with a client history
             realm::Group g(path);
-            g.to_json(std::cout, link_depth, &renames);
+            g.to_json(std::cout, link_depth, &renames, output_mode);
         }
         catch (const realm::FileFormatUpgradeRequired& e) {
             // In realm history
@@ -29,7 +36,7 @@ int main(int argc, char const* argv[])
             std::cerr << "File upgraded to latest version: " << path << std::endl;
 
             auto tr = db->start_read();
-            tr->to_json(std::cout, link_depth, &renames);
+            tr->to_json(std::cout, link_depth, &renames, output_mode);
         }
     }
     return 0;

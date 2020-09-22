@@ -1,0 +1,1 @@
+[{"_key":212099125390893509,"primaryKey":"t1o1","int1":{"$numberLong": "100"},"LINKA":["t2o2"]},{"_key":1561838586635386223,"primaryKey":"t1o3","int1":{"$numberLong": "300"},"LINKA":[]},{"_key":4468606095014817046,"primaryKey":"t1o2","int1":{"$numberLong": "200"},"LINKA":["t2o2","t2o3"]}]
