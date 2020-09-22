@@ -91,6 +91,7 @@ tasks:
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+        set_cmake_var realm_vars REALM_BUILD_TEST_CLIENT BOOL On
 
         cat cmake_vars/*.txt | tee cmake_vars.txt
         

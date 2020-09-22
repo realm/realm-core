@@ -1,0 +1,9 @@
+config:
+  numTransacts: "10000000"
+  transactPeriod: "180000" # 3 minutes
+  numBlobs: "250"
+  maxBlobLevel: "10000"
+  sendPropagationTimeRequests: true
+  downloadFirst: true
+  startDelay: "360000" # 6 minutes
+  metricsPrefix: "realm.fan_out_send" # See ../grafana-dashboards/fanout.json

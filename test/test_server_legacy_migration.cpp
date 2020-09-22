@@ -66,39 +66,9 @@ TEST(ServerLegacyMigration_ClientFileToCore6)
     SHARED_GROUP_TEST_PATH(copy_path);
     util::File::copy(path, copy_path);
 
-    {
-        std::unique_ptr<Replication> history = make_client_replication(copy_path);
-        DBRef db = DB::create(*history);
-
-        auto tr = db->start_read();
-        auto foo = tr->get_table("class_foo");
-        auto bar = tr->get_table("class_bar");
-        auto col_i = bar->get_column_key("i");
-        CHECK_EQUAL(col_i, bar->get_primary_key_column());
-        auto col_int = foo->get_column_key("int");
-        auto col_link = foo->get_column_key("link");
-        CHECK_NOT(foo->get_primary_key_column());
-        CHECK_EQUAL(foo->size(), 5);
-        CHECK_EQUAL(bar->size(), 6);
-        for (auto o : *foo) {
-            int64_t val = o.get<Int>(col_int);
-            Obj linked_obj = o.get_linked_object(col_link);
-            int64_t i_val = linked_obj.get<Int>(col_i);
-            CHECK_EQUAL(val, 5 - i_val);
-        }
-        tr->promote_to_write();
-        // Check that we can create new tables and objects
-        TableRef foobar = sync::create_table(*tr, "class_foobar");
-        CHECK(foobar);
-        foo->create_object().set(col_int, 100);
-        tr->commit();
-    }
-    {
-        std::unique_ptr<Replication> history = make_client_replication(copy_path);
-        DBRef db = DB::create(*history);
-        auto tr = db->start_read();
-        CHECK_EQUAL(tr->size(), 8);
-    }
+    std::unique_ptr<Replication> history = make_client_replication(copy_path);
+    // Upgrade not possible
+    CHECK_THROW_ANY(DB::create(*history));
 }
 
 } // unnamed namespace

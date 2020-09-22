@@ -1,0 +1,61 @@
+# Default values for sync-perf-test-server.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  pullPolicy: Always
+
+resources:
+  limits:
+    cpu: 1
+    memory: 1Gi
+  requests:
+    cpu: 1
+    memory: 1Gi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+config:
+  debug: false
+  realmPath: "/client/realms/test-@N.realm"
+  realmName: "\"\"" # Must be a serialized MongoDB Extended JSON document
+  logLevel: "info"
+  syncLogLevel: "error"
+  abortOnError: "never"
+  authMethod: "anon"
+  username: "unique_user@@domain.com" # `@` needs escaping from parameter substitution
+  password: "password"
+  numTransacts: "0"
+  transactPeriod: "1000" # 1 second
+  maxTransactPeriod: "0"
+  numBlobs: "1"
+  blobSize: "0"
+  blobLabel: ""
+  blobKind: "0"
+  blobLevel: "0"
+  maxBlobLevel: "0"
+  replaceBlobs: false
+  ensureBlobClass: false
+  sendPropagationTimeRequests: false
+  receivePropagationTimeRequests: false
+  propagationTimeRequestThreshold: "reconnect"
+  ensurePropagationTimeClass: false
+  downloadFirst: false
+  numPeers: "1"
+  numGrowths: "1"
+  timeBetweenGrowths: "1000" # 1 second
+  startDelay: "10000" # 10 seconds
+  maxStartDelay: "0"
+  connectionPerSession: true
+  timeBetweenPings: "60000" # 1 minutes
+  pongTimeout: "120000" # 2 minutes
+  connectTimeout: "120000" # 2 minutes
+  connectionLingerTime: "0"
+  tcpNoDelay: false
+  reportRoundtripTimes: false

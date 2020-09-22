@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "sync-perf-test-client.fullname" . }}
+  labels:
+    app: {{ template "sync-perf-test-client.name" . }}
+    chart: {{ template "sync-perf-test-client.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9102
+      targetPort: 9102
+      protocol: TCP
+      name: metrics
+  selector:
+    app: {{ template "sync-perf-test-client.name" . }}
+    release: {{ .Release.Name }}

@@ -6,7 +6,7 @@
 // clang-format off
 #define REALM_SYNC_VER_MAJOR 10
 #define REALM_SYNC_VER_MINOR 0
-#define REALM_SYNC_VER_PATCH 0-beta.9
+#define REALM_SYNC_VER_PATCH 0-beta.11
 #define REALM_SYNC_PRODUCT_NAME "realm-sync"
 // clang-format on
 

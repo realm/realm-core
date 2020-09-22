@@ -1,0 +1,166 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "sync-perf-test-client.fullname" . }}
+  labels:
+    app: {{ template "sync-perf-test-client.name" . }}
+    chart: {{ template "sync-perf-test-client.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "sync-perf-test-client.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "sync-perf-test-client.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: main
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            {{- if .Values.config.debug }}
+            - realm-test-client-dbg
+            {{- else }}
+            - realm-test-client
+            {{- end }}
+            - "{{ .Values.config.realmPath }}"
+            - "{{ .Values.config.serverUrl }}"
+            - --app-id
+            - "{{ .Values.config.applicationIdentifier }}"
+            - --realm-name
+            - '{{ .Values.config.realmName }}'
+            - --log-level
+            - "{{ .Values.config.logLevel }}"
+            - --sync-log-level
+            - "{{ .Values.config.syncLogLevel }}"
+            - --abort-on-error
+            - "{{ .Values.config.abortOnError }}"
+            - --auth-method
+            - "{{ .Values.config.authMethod }}"
+            - --username
+            - "{{ .Values.config.username}}"
+            - --password
+            - "{{ .Values.config.password}}"
+            - --num-transacts
+            - "{{ .Values.config.numTransacts }}"
+            - --transact-period
+            - "{{ .Values.config.transactPeriod }}"
+            - --max-transact-period
+            - "{{ .Values.config.maxTransactPeriod }}"
+            - --num-blobs
+            - "{{ .Values.config.numBlobs }}"
+            - --blob-size
+            - "{{ .Values.config.blobSize }}"
+            - --blob-label
+            - "{{ .Values.config.blobLabel }}"
+            - --blob-kind
+            - "{{ .Values.config.blobKind }}"
+            - --blob-level
+            - "{{ .Values.config.blobLevel }}"
+            - --max-blob-level
+            - "{{ .Values.config.maxBlobLevel }}"
+            {{- if .Values.config.replaceBlobs }}
+            - --replace-blobs
+            {{- end }}
+            {{- if .Values.config.ensureBlobClass }}
+            - --ensure-blob-class
+            {{- end }}
+            {{- if .Values.config.sendPropagationTimeRequests }}
+            - --send-ptime-requests
+            {{- end }}
+            {{- if .Values.config.receivePropagationTimeRequests }}
+            - --receive-ptime-requests
+            {{- end }}
+            - --ptime-request-threshold
+            - "{{ .Values.config.propagationTimeRequestThreshold }}"
+            {{- if .Values.config.ensurePropagationTimeClass }}
+            - --ensure-ptime-class
+            {{- end }}
+            {{- if .Values.config.downloadFirst }}
+            - --download-first
+            {{- end }}
+            - --follow
+            - --num-peers
+            - "{{ .Values.config.numPeers }}"
+            - --num-growths
+            - "{{ .Values.config.numGrowths }}"
+            - --time-between-growths
+            - "{{ .Values.config.timeBetweenGrowths }}"
+            {{- if .Values.config.addQuery1 }}
+            - --query-class
+            - "{{ .Values.config.queryClass1 }}"
+            - --add-query
+            - "{{ .Values.config.addQuery1 }}"
+            {{- end }}
+            {{- if .Values.config.addQuery2 }}
+            - --query-class
+            - "{{ .Values.config.queryClass2 }}"
+            - --add-query
+            - "{{ .Values.config.addQuery2 }}"
+            {{- end }}
+            {{- if .Values.config.addQuery3 }}
+            - --query-class
+            - "{{ .Values.config.queryClass3 }}"
+            - --add-query
+            - "{{ .Values.config.addQuery3 }}"
+            {{- end }}
+            {{- if .Values.config.addQuery4 }}
+            - --query-class
+            - "{{ .Values.config.queryClass4 }}"
+            - --add-query
+            - "{{ .Values.config.addQuery4 }}"
+            {{- end }}
+            - --start-delay
+            - "{{ .Values.config.startDelay }}"
+            - --max-start-delay
+            - "{{ .Values.config.maxStartDelay }}"
+            {{- if .Values.config.connectionPerSession }}
+            - --connection-per-session
+            {{- end }}
+            - --disable-sync-to-disk
+            - --time-between-pings
+            - "{{ .Values.config.timeBetweenPings }}"
+            - --pong-timeout
+            - "{{ .Values.config.pongTimeout }}"
+            - --connect-timeout
+            - "{{ .Values.config.connectTimeout }}"
+            - --connection-linger-time
+            - "{{ .Values.config.connectionLingerTime }}"
+            {{- if .Values.config.tcpNoDelay }}
+            - --tcp-no-delay
+            {{- end }}
+            - --metrics-prefix
+            - "{{ .Values.config.metricsPrefix }}"
+            {{- if .Values.config.reportRoundtripTimes }}
+            - --report-roundtrip-times
+            {{- end }}
+            - --halt-on-crash
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+        - name: statsd-exporter
+          image: "prom/statsd-exporter"
+          imagePullPolicy: IfNotPresent
+          args:
+            - --statsd.listen-udp
+            - :8125
+          ports:
+            - containerPort: 9102
+              name: metrics
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

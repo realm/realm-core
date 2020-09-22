@@ -305,9 +305,9 @@ int main(int argc, char* argv[])
     bool connection_per_session = false;
     bool disable_sync_to_disk = false;
     bool dry_run = false;
-    milliseconds_type time_between_pings = 600000;    // 10 minutes
-    milliseconds_type pong_timeout = 600000;          // 10 minutes
-    milliseconds_type connect_timeout = 600000;       // 10 minutes
+    milliseconds_type time_between_pings = 60000;     //  1 minute
+    milliseconds_type pong_timeout = 120000;          //  2 minutes
+    milliseconds_type connect_timeout = 120000;       //  2 minutes
     milliseconds_type connection_linger_time = 30000; // 30 seconds
     bool tcp_no_delay = false;
     bool verify_ssl_cert = false;
@@ -966,15 +966,15 @@ int main(int argc, char* argv[])
                          "                       zero. Cannot be combined with\n"
                          "                       `--receive-ptime-requests`.\n"
                          "  -I, --time-between-pings  Time in milliseconds beteeen PING messages\n"
-                         "                       (heartbeat). The default value is 600'000 (10 minutes).\n"
+                         "                       (heartbeat). The default value is 60'000 (10 minutes).\n"
                          "  -O, --pong-timeout   Maximum time in milliseconds to allow for a PONG message\n"
                          "                       to be received after the corresponding PING message was\n"
-                         "                       sent. The default value is 600'000 (10 minutes).\n"
+                         "                       sent. The default value is 120'000 (2 minutes).\n"
                          "  -U, --connect-timeout  Maximum time in milliseconds to allow for a connection\n"
                          "                       to become fully established. This includes the time to\n"
                          "                       resolve the network address, the TCP connect operation,\n"
                          "                       the SSL handshake, and the WebSocket handshake. The\n"
-                         "                       default is 600'000 (10 minutes).\n"
+                         "                       default is 120'000 (2 minutes).\n"
                          "  -L, --connection-linger-time  Time in milliseconds to keep a connection\n"
                          "                       open after all sessions have been abandoned or\n"
                          "                       suspended by errors. The default is 30'000 (30 seconds).\n"
