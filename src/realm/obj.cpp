@@ -691,6 +691,29 @@ inline void out_floats(std::ostream& out, T value)
     out.precision(old);
 }
 
+void out_string(std::ostream& out, std::string str)
+{
+    size_t p = str.find_first_of(to_be_escaped);
+    while (p != std::string::npos) {
+        char c = str[p];
+        auto found = strchr(to_be_escaped, c);
+        REALM_ASSERT(found);
+        out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
+        str = str.substr(p + 1);
+        p = str.find_first_of(to_be_escaped);
+    }
+    out << str;
+}
+
+void out_binary(std::ostream& out, BinaryData bin)
+{
+    const char* start = bin.data();
+    const size_t len = bin.size();
+    util::StringBuffer encode_buffer;
+    encode_buffer.resize(util::base64_encoded_size(len));
+    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
+    out << encode_buffer.str();
+}
 
 void out_mixed_json(std::ostream& out, const Mixed& val)
 {
@@ -713,28 +736,13 @@ void out_mixed_json(std::ostream& out, const Mixed& val)
             break;
         case type_String: {
             out << "\"";
-            std::string str = val.get<String>();
-            size_t p = str.find_first_of(to_be_escaped);
-            while (p != std::string::npos) {
-                char c = str[p];
-                auto found = strchr(to_be_escaped, c);
-                REALM_ASSERT(found);
-                out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
-                str = str.substr(p + 1);
-                p = str.find_first_of(to_be_escaped);
-            }
-            out << str << "\"";
+            out_string(out, val.get<String>());
+            out << "\"";
             break;
         }
         case type_Binary: {
             out << "\"";
-            auto bin = val.get<Binary>();
-            const char* start = bin.data();
-            const size_t len = bin.size();
-            util::StringBuffer encode_buffer;
-            encode_buffer.resize(util::base64_encoded_size(len));
-            util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-            out << encode_buffer.str();
+            out_binary(out, val.get<Binary>());
             out << "\"";
             break;
         }
@@ -789,28 +797,13 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
             break;
         case type_String: {
             out << "\"";
-            std::string str = val.get<String>();
-            size_t p = str.find_first_of(to_be_escaped);
-            while (p != std::string::npos) {
-                char c = str[p];
-                auto found = strchr(to_be_escaped, c);
-                REALM_ASSERT(found);
-                out << str.substr(0, p) << '\\' << encoding[found - to_be_escaped];
-                str = str.substr(p + 1);
-                p = str.find_first_of(to_be_escaped);
-            }
-            out << str << "\"";
+            out_string(out, val.get<String>());
+            out << "\"";
             break;
         }
         case type_Binary: {
             out << "{\"$binary\": {\"base64\": \"";
-            auto bin = val.get<Binary>();
-            const char* start = bin.data();
-            const size_t len = bin.size();
-            util::StringBuffer encode_buffer;
-            encode_buffer.resize(util::base64_encoded_size(len));
-            util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-            out << encode_buffer.str();
+            out_binary(out, val.get<Binary>());
             out << "\", \"subType\": \"00\"}}";
             break;
         }
