@@ -116,7 +116,6 @@ private:
     TransactionRef m_receive_group = nullptr;
     std::string m_refresh_token;
     util::Optional<util::network::DeadlineTimer> m_access_token_refresh_timer;
-    TableKey m_ptime_table_ndx = TableKey{};
     std::atomic<bool> m_receive_enabled{false}; // Release-Acquire ordering
     milliseconds_type m_start_time = 0;
     ConnectionState m_connection_state = ConnectionState::disconnected;
