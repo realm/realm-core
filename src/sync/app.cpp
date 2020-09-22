@@ -327,7 +327,7 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
     nlohmann::json body = {
         { "password", password },
         { "token", token },
-        { "token_id", token_id }
+        { "tokenId", token_id }
     };
 
     m_parent->do_request(Request {
