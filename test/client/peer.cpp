@@ -7,6 +7,7 @@
 #include <realm/util/network.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/websocket.hpp>
+#include <realm/list.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/changeset_cooker.hpp>
@@ -718,7 +719,7 @@ void Peer::receive(VersionID)
             ColKey col_timestamp = table->get_column_key("timestamp");
             const std::set<ObjKey>& objects = table_entry.second;
             for (ObjKey obj_key : objects) {
-                ConstObj obj = table->get_object(obj_key);
+                Obj obj = table->get_object(obj_key);
                 std::int_fast64_t originator_ident = obj.get<int64_t>(col_originator);
                 if (originator_ident != m_originator_ident)
                     continue;
