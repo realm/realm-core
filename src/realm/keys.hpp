@@ -26,7 +26,6 @@
 
 namespace realm {
 
-class ConstObj;
 class Obj;
 
 struct TableKey {
