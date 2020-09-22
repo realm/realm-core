@@ -96,7 +96,7 @@ let package = Package(
             dependencies: ["Storage"],
             path: "src",
             sources: ["realm/parser"],
-            //publicHeadersPath: "realm/parser",
+            publicHeadersPath: "realm/parser",
             cxxSettings: [
                 .headerSearchPath("external/pegtl/include/tao")
             ] + cxxSettings),
@@ -126,7 +126,7 @@ let package = Package(
                 "realm/util/http.cpp",
                 "realm/util/websocket.cpp"
             ],
-            //publicHeadersPath: "realm/sync",
+            publicHeadersPath: "realm/sync",
             cxxSettings: [
                 .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .define("REALM_HAVE_OPENSSL", to: "1", .when(platforms: [.linux]))
@@ -145,7 +145,7 @@ let package = Package(
                 "realm/object-store/impl/windows"
             ],
             sources: ["realm/object-store"],
-            //publicHeadersPath: "realm/object-store",
+            publicHeadersPath: "realm/object-store",
             cxxSettings: [
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .headerSearchPath("realm/object-store")
