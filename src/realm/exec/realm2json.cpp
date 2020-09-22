@@ -3,12 +3,12 @@
 #include <realm/history.hpp>
 
 const char* legend = "Simple tool to output the JSON representation of a Realm:\n"
-                     "  realm2json [-link_depth=N] [-output_mode=N] <.realm file>\n"
+                     "  realm2json [-link-depth=N] [-output-mode=N] <.realm file>\n"
                      "\n"
                      "Options:\n"
-                     " -link_depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
+                     " -link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
                      "for more details. Defaults to 0.\n"
-                     " -output_mode:Can specify MongoDB XJSON output format by passing in 1. Defaults to 0. \n"
+                     " -output-mode:Can specify MongoDB XJSON output format by passing in 1. Defaults to 0. \n"
                      "\n";
 
 void abort2(bool b, const char* fmt, ...)
@@ -35,9 +35,9 @@ int main(int argc, char const* argv[])
         abort2(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=',
                "Please remove space characters before and after '=' signs in command line flags");
 
-        if (strncmp(argv[a], "-link_depth=", 12) == 0)
+        if (strncmp(argv[a], "-link-depth=", 12) == 0)
             link_depth = atoi(&argv[a][12]);
-        else if (strncmp(argv[a], "-output_mode=", 13) == 0) {
+        else if (strncmp(argv[a], "-output-mode=", 13) == 0) {
             auto output_mode_int = atoi(&argv[a][13]);
             if (output_mode_int == 1)
                 output_mode = realm::output_mode_xjson;
