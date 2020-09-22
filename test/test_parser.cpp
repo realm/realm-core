@@ -2203,7 +2203,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 }
 
 TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
-           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID)
+           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
 {
     Group g;
     TableRef t = g.add_table("table");

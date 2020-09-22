@@ -128,6 +128,7 @@ TEST_CASE("ObjectSchema")
         table->add_column(type_Timestamp, "date");
         table->add_column(type_ObjectId, "object id");
         table->add_column(type_Decimal, "decimal");
+        table->add_column(type_UUID, "uuid");
 
         table->add_column(*target, "object");
         table->add_column_list(*target, "array");
@@ -141,6 +142,7 @@ TEST_CASE("ObjectSchema")
         table->add_column(type_Timestamp, "date?", true);
         table->add_column(type_ObjectId, "object id?", true);
         table->add_column(type_Decimal, "decimal?", true);
+        table->add_column(type_UUID, "uuid?", true);
 
         auto add_list = [](TableRef table, DataType type, StringData name, bool nullable) {
             table->add_column_list(type, name, nullable);
@@ -155,6 +157,7 @@ TEST_CASE("ObjectSchema")
         add_list(table, type_Timestamp, "date array", false);
         add_list(table, type_ObjectId, "object id array", false);
         add_list(table, type_Decimal, "decimal array", false);
+        add_list(table, type_UUID, "uuid array", false);
         add_list(table, type_Int, "int? array", true);
         add_list(table, type_Bool, "bool? array", true);
         add_list(table, type_Float, "float? array", true);
@@ -164,6 +167,7 @@ TEST_CASE("ObjectSchema")
         add_list(table, type_Timestamp, "date? array", true);
         add_list(table, type_ObjectId, "object id? array", true);
         add_list(table, type_Decimal, "decimal? array", true);
+        add_list(table, type_UUID, "uuid? array", true);
 
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
@@ -171,12 +175,14 @@ TEST_CASE("ObjectSchema")
         indexed_cols.push_back(table->add_column(type_String, "indexed string"));
         indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date"));
         indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id"));
+        indexed_cols.push_back(table->add_column(type_UUID, "indexed uuid"));
 
         indexed_cols.push_back(table->add_column(type_Int, "indexed int?", true));
         indexed_cols.push_back(table->add_column(type_Bool, "indexed bool?", true));
         indexed_cols.push_back(table->add_column(type_String, "indexed string?", true));
         indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date?", true));
         indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id?", true));
+        indexed_cols.push_back(table->add_column(type_UUID, "indexed uuid?", true));
 
         for (auto col : indexed_cols)
             table->add_search_index(col);
@@ -211,6 +217,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date", Date);
         REQUIRE_PROPERTY("object id", ObjectId);
         REQUIRE_PROPERTY("decimal", Decimal);
+        REQUIRE_PROPERTY("uuid", UUID);
 
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
@@ -224,6 +231,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date?", Date | PropertyType::Nullable);
         REQUIRE_PROPERTY("object id?", ObjectId | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal?", Decimal | PropertyType::Nullable);
+        REQUIRE_PROPERTY("uuid?", UUID | PropertyType::Nullable);
 
         REQUIRE_PROPERTY("int array", Int | PropertyType::Array);
         REQUIRE_PROPERTY("bool array", Bool | PropertyType::Array);
@@ -234,6 +242,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date array", Date | PropertyType::Array);
         REQUIRE_PROPERTY("object id array", ObjectId | PropertyType::Array);
         REQUIRE_PROPERTY("decimal array", Decimal | PropertyType::Array);
+        REQUIRE_PROPERTY("uuid array", UUID | PropertyType::Array);
         REQUIRE_PROPERTY("int? array", Int | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool? array", Bool | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("float? array", Float | PropertyType::Array | PropertyType::Nullable);
@@ -243,12 +252,14 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date? array", Date | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("object id? array", ObjectId | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal? array", Decimal | PropertyType::Array | PropertyType::Nullable);
+        REQUIRE_PROPERTY("uuid? array", UUID | PropertyType::Array | PropertyType::Nullable);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string", String, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed date", Date, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed object id", ObjectId, Property::IsPrimary{false}, Property::IsIndexed{true});
+        REQUIRE_PROPERTY("indexed uuid", UUID, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed int?", Int | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool?", Bool | PropertyType::Nullable, Property::IsPrimary{false},
@@ -258,6 +269,8 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("indexed date?", Date | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed object id?", ObjectId | PropertyType::Nullable, Property::IsPrimary{false},
+                         Property::IsIndexed{true});
+        REQUIRE_PROPERTY("indexed uuid?", UUID | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
     }
 }
@@ -435,6 +448,7 @@ TEST_CASE("Schema")
                                   {"date", PropertyType::Date},
                                   {"object id", PropertyType::ObjectId},
                                   {"decimal", PropertyType::Decimal},
+                                  {"uuid", PropertyType::UUID},
                                   {"object", PropertyType::Object | PropertyType::Nullable, "object"},
                                   {"array", PropertyType::Object | PropertyType::Array, "object"},
                               }}};
@@ -563,6 +577,10 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
             schema.begin()->primary_key_property()->type = PropertyType::ObjectId | PropertyType::Nullable;
             REQUIRE_NOTHROW(schema.validate());
+            schema.begin()->primary_key_property()->type = PropertyType::UUID;
+            REQUIRE_NOTHROW(schema.validate());
+            schema.begin()->primary_key_property()->type = PropertyType::UUID | PropertyType::Nullable;
+            REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("rejects nonexistent primary key")
@@ -605,7 +623,8 @@ TEST_CASE("Schema")
                      {"bool", PropertyType::Bool, Property::IsPrimary{false}, Property::IsIndexed{true}},
                      {"string", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{true}},
                      {"date", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{true}},
-                     {"object id", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                     {"object id", PropertyType::ObjectId, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                     {"uuid", PropertyType::UUID, Property::IsPrimary{false}, Property::IsIndexed{true}},
                  }}};
             REQUIRE_NOTHROW(schema.validate());
         }

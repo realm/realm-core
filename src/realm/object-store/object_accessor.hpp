@@ -185,6 +185,9 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::Decimal:
             return ctx.box(m_obj.get<Decimal>(column));
             //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
+        case PropertyType::UUID:
+            return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
+                                              : ctx.box(m_obj.get<UUID>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             return ctx.box(Object(m_realm, *linkObjectSchema, const_cast<Obj&>(m_obj).get_linked_object(column)));
@@ -254,6 +257,9 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
                 }
                 else if (primary_prop->type == PropertyType::ObjectId) {
                     primary_key = ctx.template unbox<ObjectId>(*primary_value);
+                }
+                else if (primary_prop->type == PropertyType::UUID) {
+                    primary_key = ctx.template unbox<UUID>(*primary_value);
                 }
                 else {
                     REALM_TERMINATE("Unsupported primary key type.");
@@ -348,6 +354,9 @@ ObjKey Object::get_for_primary_key_impl(ContextType& ctx, Table const& table, co
     }
     else if (primary_prop.type == PropertyType::ObjectId) {
         return table.find_primary_key(ctx.template unbox<ObjectId>(primary_value));
+    }
+    else if (primary_prop.type == PropertyType::UUID) {
+        return table.find_primary_key(ctx.template unbox<UUID>(primary_value));
     }
     return {};
 }

@@ -3201,6 +3201,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
                                 {"date", PropertyType::Date},
                                 {"object id", PropertyType::ObjectId},
                                 {"decimal", PropertyType::Decimal},
+                                {"uuid", PropertyType::UUID},
                                 {"object", PropertyType::Object | PropertyType::Nullable, "AllTypes"},
                                 {"list", PropertyType::Array | PropertyType::Object, "AllTypes"},
 
@@ -3213,6 +3214,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
                                 {"date array", PropertyType::Array | PropertyType::Date},
                                 {"object id array", PropertyType::Array | PropertyType::ObjectId},
                                 {"decimal array", PropertyType::Array | PropertyType::Decimal},
+                                {"uuid array", PropertyType::Array | PropertyType::UUID},
                                 {"object array", PropertyType::Array | PropertyType::Object, "AllTypes"},
                             },
                             {
@@ -3313,6 +3315,12 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
             CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
         }
 
+        util::Any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
+        r.set_property_value(ctx, "uuid", uuid);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get<UUID>("uuid") == any_cast<UUID>(uuid));
+        }
+
         ObjKey object_key = table->create_object_with_primary_key(3).get_key();
         Object linked_obj(realm, "AllTypes", object_key);
         r.set_property_value(ctx, "object", util::Any(linked_obj));
@@ -3378,6 +3386,12 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
         r.set_property_value(ctx, "decimal array",
                              util::Any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
         check_array(table->get_column_key("decimal array"), Decimal128("123.45e67"), Decimal128("876.54e32"));
+
+        r.set_property_value(ctx, "uuid array",
+                             util::Any(AnyVec{UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                                              UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")}));
+        check_array(table->get_column_key("uuid array"), UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
     }
 }
 

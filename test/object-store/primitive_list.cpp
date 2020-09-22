@@ -235,6 +235,14 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
     }
 };
 
+struct UUID : Base<PropertyType::UUID, realm::UUID> {
+    static std::vector<realm::UUID> values()
+    {
+        return {realm::UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                realm::UUID("3b241101-a2b3-4255-8caf-4136c566a999")};
+    }
+};
+
 struct Decimal : Base<PropertyType::Decimal, Decimal128> {
     using AvgType = Decimal128;
     static std::vector<Decimal128> values()
@@ -480,9 +488,9 @@ auto greater::operator()<Timestamp&, Timestamp&>(Timestamp& a, Timestamp& b) con
 }
 
 TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::Double, ::String, ::Binary, ::Date,
-                   ::OID, ::Decimal, BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>,
-                   BoxedOptional<::Double>, UnboxedOptional<::String>, UnboxedOptional<::Binary>,
-                   UnboxedOptional<::Date>)
+                   ::OID, ::Decimal, ::UUID, BoxedOptional<::Int>, BoxedOptional<::Bool>, BoxedOptional<::Float>,
+                   BoxedOptional<::Double>, BoxedOptional<::OID>, BoxedOptional<::UUID>, UnboxedOptional<::String>,
+                   UnboxedOptional<::Binary>, UnboxedOptional<::Date>)
 {
     auto values = TestType::values();
     using T = typename TestType::Type;

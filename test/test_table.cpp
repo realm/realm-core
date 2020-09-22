@@ -3226,7 +3226,7 @@ TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, Objec
 }
 
 TEST_TYPES(Table_ListOfPrimitivesDistinct, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
-           Optional<float>, Optional<double>, Optional<ObjectId>, UUID)
+           Optional<float>, Optional<double>, Optional<ObjectId>, UUID, Optional<UUID>)
 {
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
