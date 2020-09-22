@@ -56,20 +56,16 @@ let package = Package(
     name: "RealmDatabase",
     products: [
         .library(
-            name: "Storage",
-            type: .static,
+            name: "RealmStorage",
             targets: ["Storage"]),
         .library(
-            name: "QueryParser",
-            type: .static,
+            name: "RealmQueryParser",
             targets: ["QueryParser"]),
         .library(
-            name: "SyncClient",
-            type: .static,
+            name: "RealmSyncClient",
             targets: ["SyncClient"]),
         .library(
-            name: "ObjectStore",
-            type: .static,
+            name: "RealmObjectStore",
             targets: ["ObjectStore"]),
     ],
     targets: [
@@ -89,7 +85,8 @@ let package = Package(
                 "bid_decimal_globals.c",
                 "bid_from_int.c",
                 "bid_round.c"
-            ]
+            ],
+            publicHeadersPath: "."
         ),
         .target(
             name: "Storage",
@@ -153,6 +150,7 @@ let package = Package(
                 "realm/sync/crypto_server_openssl.cpp",
             ] + syncCommandSources,
             sources: syncServerSources,
+            publicHeadersPath: "realm/sync/impl", // hack
             cxxSettings: cxxSettings,
             linkerSettings: [
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
