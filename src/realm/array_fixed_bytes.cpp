@@ -20,6 +20,27 @@
 
 namespace realm {
 
+// Intuitively the null T value could be a static member variable of the ArrayFixedBytesNull<T>
+// class, but there is a MSVC bug which we would have to make an ugly workaround for, so
+// instead of that, we keep it self contained in this cpp file as an implementation detail.
+template <class T>
+struct Sentinel {
+    const static T null_value;
+};
+
+// The null value is only for debugging. We use the null bit vector for checking if an index is null.
+// This value should be easy to spot in hex dumps, and should also be unlikely to be a "real" ObjectId. For one thing,
+// if using the normal generation algorithm, it can only be generated at precisely 2088-05-21T00:11:25. Of course
+// users could also be using this as a sentinel so we must support storing this value in a non-null OID.
+template <>
+const ObjectId Sentinel<ObjectId>::null_value = ObjectId("DEADDEAD"
+                                                         "DEADDEAD"
+                                                         "DEADDEAD");
+
+template <>
+const UUID Sentinel<UUID>::null_value = UUID("DEADBEEF-DEAD-BEEF-DEAD-BEEFDEADBEEF");
+
+
 template <class ObjectType, int ElementSize>
 void ArrayFixedBytes<ObjectType, ElementSize>::set(size_t ndx, const ObjectType& value)
 {
@@ -148,7 +169,7 @@ void ArrayFixedBytesNull<ObjectType, ElementSize>::insert(size_t ndx, const util
         Parent::insert(ndx, *value);
     }
     else {
-        Parent::insert(ndx, null_oid);
+        Parent::insert(ndx, Sentinel<ObjectType>::null_value);
         set_null(ndx);
     }
 }
@@ -158,7 +179,7 @@ void ArrayFixedBytesNull<ObjectType, ElementSize>::set_null(size_t ndx)
 {
     this->copy_on_write();
     auto pos = this->get_pos(ndx);
-    pos.set_value(this, null_oid);
+    pos.set_value(this, Sentinel<ObjectType>::null_value);
     pos.set_null(this, true);
 }
 
@@ -190,23 +211,10 @@ size_t ArrayFixedBytesNull<ObjectType, ElementSize>::find_first_null(size_t star
     return realm::npos;
 }
 
-// This is only for debugging. We use the null bit vector for checking if an index is null.
-// This value should be easy to spot in hex dumps, and should also be unlikely to be a "real" ObjectId. For one thing,
-// if using the normal generation algorithm, it can only be generated at precisely 2088-05-21T00:11:25. Of course
-// users could also be using this as a sentinel so we must support storing this value in a non-null OID.
-template <>
-const ObjectId ArrayObjectIdNull::null_oid = ObjectId("DEADDEAD"
-                                                      "DEADDEAD"
-                                                      "DEADDEAD");
-
+// actual definitions forced here
 template class ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
 template class ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
-
-template <>
-const UUID ArrayUUIDNull::null_oid = UUID("DEADBEEF-DEAD-BEEF-DEAD-BEEFDEADBEEF");
-
 template class ArrayFixedBytes<UUID, UUID::num_bytes>;
 template class ArrayFixedBytesNull<UUID, UUID::num_bytes>;
-
 
 } // namespace realm

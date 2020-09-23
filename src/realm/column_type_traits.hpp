@@ -53,10 +53,6 @@ class ArrayFixedBytes;
 template <typename, int>
 class ArrayFixedBytesNull;
 class ArrayTypedLink;
-typedef ArrayFixedBytes<ObjectId, ObjectId::num_bytes> ArrayObjectId;
-typedef ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes> ArrayObjectIdNull;
-typedef ArrayFixedBytes<UUID, UUID::num_bytes> ArrayUUID;
-typedef ArrayFixedBytesNull<UUID, UUID::num_bytes> ArrayUUIDNull;
 template <class>
 class BasicArray;
 template <class>
@@ -208,14 +204,14 @@ struct ColumnTypeTraits<Timestamp> {
 
 template <>
 struct ColumnTypeTraits<ObjectId> {
-    using cluster_leaf_type = ArrayObjectId;
+    using cluster_leaf_type = ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
     static const DataType id = type_ObjectId;
     static const ColumnType column_id = col_type_ObjectId;
 };
 
 template <>
 struct ColumnTypeTraits<util::Optional<ObjectId>> {
-    using cluster_leaf_type = ArrayObjectIdNull;
+    using cluster_leaf_type = ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
     static const DataType id = type_ObjectId;
     static const ColumnType column_id = col_type_ObjectId;
 };
@@ -248,14 +244,14 @@ struct ColumnTypeTraits<Decimal128> {
 
 template <>
 struct ColumnTypeTraits<UUID> {
-    using cluster_leaf_type = ArrayUUID;
+    using cluster_leaf_type = ArrayFixedBytes<UUID, UUID::num_bytes>;
     static const DataType id = type_UUID;
     static const ColumnType column_id = col_type_UUID;
 };
 
 template <>
 struct ColumnTypeTraits<util::Optional<UUID>> {
-    using cluster_leaf_type = ArrayUUIDNull;
+    using cluster_leaf_type = ArrayFixedBytesNull<UUID, UUID::num_bytes>;
     static const DataType id = type_UUID;
     static const ColumnType column_id = col_type_UUID;
 };

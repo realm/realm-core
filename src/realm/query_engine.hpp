@@ -1487,8 +1487,6 @@ protected:
     }
 };
 
-template class FixedBytesNodeBase<ObjectId, ArrayObjectIdNull>;
-template class FixedBytesNodeBase<UUID, ArrayUUIDNull>;
 template <typename T>
 using ObjectIdNode = FixedBytesNode<T, ObjectId, ArrayObjectIdNull>;
 template <typename T>

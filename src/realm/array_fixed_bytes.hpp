@@ -214,16 +214,17 @@ public:
         }
     }
     size_t find_first_null(size_t begin = 0, size_t end = npos) const;
-
-private:
-    static const ObjectType null_oid;
 };
 
 typedef ArrayFixedBytes<ObjectId, ObjectId::num_bytes> ArrayObjectId;
 typedef ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes> ArrayObjectIdNull;
-
 typedef ArrayFixedBytes<UUID, UUID::num_bytes> ArrayUUID;
 typedef ArrayFixedBytesNull<UUID, UUID::num_bytes> ArrayUUIDNull;
+
+extern template class ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
+extern template class ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
+extern template class ArrayFixedBytes<UUID, UUID::num_bytes>;
+extern template class ArrayFixedBytesNull<UUID, UUID::num_bytes>;
 
 } // namespace realm
 
