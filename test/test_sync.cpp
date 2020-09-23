@@ -7653,8 +7653,58 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     CHECK(failed_twice);
 }
 
-TEST(Sync_NonLinkObjectId)
+template <typename T>
+T sequence_next()
 {
+    REALM_UNREACHABLE();
+}
+
+template <>
+ObjectId sequence_next()
+{
+    return ObjectId::gen();
+}
+
+template <>
+UUID sequence_next()
+{
+    union {
+        struct {
+            uint64_t upper;
+            uint64_t lower;
+        } ints;
+        UUID::UUIDBytes bytes;
+    } u;
+    static uint64_t counter = test_util::random_int(0, 1000);
+    u.ints.upper = ++counter;
+    u.ints.lower = ++counter;
+    return UUID{u.bytes};
+}
+
+template <>
+Int sequence_next()
+{
+    static Int count = test_util::random_int(-1000, 1000);
+    return ++count;
+}
+
+
+template <>
+String sequence_next()
+{
+    static std::string str;
+    static Int sequence = test_util::random_int(-1000, 1000);
+    str = util::format("string sequence %1", ++sequence);
+    return String(str);
+}
+
+TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int>, util::Optional<ObjectId>,
+           util::Optional<UUID>)
+{
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same_v<underlying_type, TEST_TYPE>;
+    DataType type = ColumnTypeTraits<TEST_TYPE>::id;
+
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
@@ -7673,20 +7723,29 @@ TEST(Sync_NonLinkObjectId)
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
-    ObjectId obj_2_id;
+    TEST_TYPE obj_1_id;
+    TEST_TYPE obj_2_id;
 
     {
         WriteTransaction tr{sg_1};
-        auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type_ObjectId, "id");
-        auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type_ObjectId, "id");
-        table_1->add_column_list(type_ObjectId, "oids");
+        auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type, "id", is_optional);
+        auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type, "id", is_optional);
+        table_1->add_column_list(type, "oids", is_optional);
 
-        auto obj_1 = table_1->create_object_with_primary_key(ObjectId::gen());
-        auto obj_2 = table_2->create_object_with_primary_key(ObjectId::gen());
+        auto obj_1 = table_1->create_object_with_primary_key(sequence_next<underlying_type>());
+        auto obj_2 = table_2->create_object_with_primary_key(sequence_next<underlying_type>());
+        if constexpr (is_optional) {
+            auto obj_3 = table_2->create_object_with_primary_key(TEST_TYPE(realm::null()));
+        }
 
-        auto list = obj_1.get_list<ObjectId>("oids");
-        obj_2_id = obj_2.get<ObjectId>("id");
+        auto list = obj_1.template get_list<TEST_TYPE>("oids");
+        obj_1_id = obj_1.template get<TEST_TYPE>("id");
+        obj_2_id = obj_2.template get<TEST_TYPE>("id");
         list.insert(0, obj_2_id);
+        if constexpr (is_optional) {
+            list.insert(1, TEST_TYPE(realm::null()));
+            list.add(TEST_TYPE(realm::null()));
+        }
         session_1.nonsync_transact_notify(tr.commit());
     }
 
@@ -7696,10 +7755,20 @@ TEST(Sync_NonLinkObjectId)
     {
         ReadTransaction tr{sg_2};
         auto table_1 = tr.get_table("class_Table1");
+        auto table_2 = tr.get_table("class_Table2");
         auto obj_1 = *table_1->begin();
-        auto list = obj_1.get_list<ObjectId>("oids");
-        CHECK_EQUAL(list.size(), 1);
+        auto obj_2 = table_2->find_first(table_2->get_column_key("id"), obj_2_id);
+        CHECK(obj_2);
+        auto list = obj_1.get_list<TEST_TYPE>("oids");
+        CHECK_EQUAL(obj_1.template get<TEST_TYPE>("id"), obj_1_id);
+        CHECK_EQUAL(list.size(), is_optional ? 3 : 1);
         CHECK_EQUAL(list.get(0), obj_2_id);
+        if constexpr (is_optional) {
+            auto obj_3 = table_2->find_first_null(table_2->get_column_key("id"));
+            CHECK(obj_3);
+            CHECK_EQUAL(list.get(1), TEST_TYPE(realm::null()));
+            CHECK_EQUAL(list.get(2), TEST_TYPE(realm::null()));
+        }
     }
 }
 

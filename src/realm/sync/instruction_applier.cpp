@@ -142,6 +142,17 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
                 table->create_object_with_primary_key(id);
             },
+            [&](const UUID& id) {
+                if (!pk_col) {
+                    bad_transaction_log("CreateObject(UUID) on table without a primary key");
+                }
+                if (table->get_column_type(pk_col) != type_UUID) {
+                    bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
+                                        table->get_column_type(pk_col));
+                }
+                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
+                table->create_object_with_primary_key(id);
+            },
             [&](GlobalKey key) {
                 if (pk_col) {
                     bad_transaction_log("CreateObject(GlobalKey) on table with a primary key");
@@ -219,6 +230,8 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
         }
         case Type::ObjectId:
             return visitor(data.object_id);
+        case Type::UUID:
+            return visitor(data.uuid);
     }
 }
 
@@ -573,7 +586,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                 [&](Mixed value) {
                     if (value.is_null()) {
                         if (col.is_nullable()) {
-                            list.set_null(index);
+                            list.insert_null(index);
                         }
                         else {
                             bad_transaction_log("ArrayInsert: NULL in non-nullable list '%2.%1'", field_name,
@@ -989,6 +1002,20 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                     bad_transaction_log(
                         "%1 instruction with ObjectId primary key (%2), but '%3.%4' has primary keys of type '%5'",
                         name, pk, table_name, pk_name, pk_type);
+                }
+                ObjKey key = table.get_objkey_from_primary_key(pk);
+                return key;
+            },
+            [&](UUID pk) {
+                if (!pk_col) {
+                    bad_transaction_log("%1 instruction with UUID primary key (\"%2\"), but table '%3' does not "
+                                        "have a primary key column",
+                                        name, pk, table_name);
+                }
+                if (pk_type != type_UUID) {
+                    bad_transaction_log(
+                        "%1 instruction with UUID primary key (%2), but '%3.%4' has primary keys of type '%5'", name,
+                        pk, table_name, pk_name, pk_type);
                 }
                 ObjKey key = table.get_objkey_from_primary_key(pk);
                 return key;

@@ -66,6 +66,7 @@ private:
     void append_value(Timestamp);
     void append_value(ObjectId);
     void append_value(Decimal128);
+    void append_value(UUID);
 
     Buffer m_buffer;
     util::metered::map<std::string, uint32_t> m_intern_strings_rev;

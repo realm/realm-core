@@ -44,7 +44,7 @@ namespace sync {
 
 // Any unambiguous object identifier. Monostate represents NULL (can't use realm::None or std::nullptr_t because they
 // do not implement operator<).
-using PrimaryKey = mpark::variant<mpark::monostate, int64_t, StringData, GlobalKey, ObjectId>;
+using PrimaryKey = mpark::variant<mpark::monostate, int64_t, StringData, GlobalKey, ObjectId, UUID>;
 
 /// FIXME: Since PrimaryKey is a typedef to an `std` type, ADL for operator<<
 /// doesn't work properly. This struct exists solely for passing PrimaryKey

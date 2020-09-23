@@ -76,6 +76,9 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         case type_ObjectId: {
             return Instruction::Payload{value.get<ObjectId>()};
         }
+        case type_UUID: {
+            return Instruction::Payload{value.get<UUID>()};
+        }
         case type_TypedLink:
             [[fallthrough]];
         case type_Link: {
@@ -177,6 +180,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::Link;
         case type_ObjectId:
             return Type::ObjectId;
+        case type_UUID:
+            return Type::UUID;
         case type_Mixed:
             return Type::Null;
         case type_OldTable:
@@ -265,6 +270,9 @@ Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
     }
     else if (value.get_type() == type_ObjectId) {
         return value.get<ObjectId>();
+    }
+    else if (value.get_type() == type_UUID) {
+        return value.get<UUID>();
     }
     else {
         // Unsupported primary key type.
@@ -676,6 +684,11 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 
         if (pk_type == type_ObjectId) {
             ObjectId id = obj.get<ObjectId>(pk_col);
+            return id;
+        }
+
+        if (pk_type == type_UUID) {
+            UUID id = obj.get<UUID>(pk_col);
             return id;
         }
 
