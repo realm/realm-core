@@ -219,11 +219,11 @@ private:
     static const ObjectType null_oid;
 };
 
-using ArrayObjectId = ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
-using ArrayObjectIdNull = ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
+typedef ArrayFixedBytes<ObjectId, ObjectId::num_bytes> ArrayObjectId;
+typedef ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes> ArrayObjectIdNull;
 
-using ArrayUUID = ArrayFixedBytes<UUID, UUID::num_bytes>;
-using ArrayUUIDNull = ArrayFixedBytesNull<UUID, UUID::num_bytes>;
+typedef ArrayFixedBytes<UUID, UUID::num_bytes> ArrayUUID;
+typedef ArrayFixedBytesNull<UUID, UUID::num_bytes> ArrayUUIDNull;
 
 } // namespace realm
 

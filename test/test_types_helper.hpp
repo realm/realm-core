@@ -33,9 +33,16 @@ inline T convert_for_test(int64_t v)
 template <>
 inline UUID convert_for_test<UUID>(int64_t v)
 {
-    UUID id;
-    memcpy(&id, &v, sizeof(v));
-    return id;
+    union {
+        struct {
+            int64_t upper;
+            int64_t lower;
+        } ints;
+        UUID::UUIDBytes bytes;
+    } u;
+    u.ints.upper = v;
+    u.ints.lower = 0;
+    return UUID{u.bytes};
 }
 
 template <>

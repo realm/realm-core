@@ -7688,7 +7688,6 @@ Int sequence_next()
     return ++count;
 }
 
-
 template <>
 String sequence_next()
 {
@@ -7726,6 +7725,14 @@ TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int
     TEST_TYPE obj_1_id;
     TEST_TYPE obj_2_id;
 
+    TEST_TYPE default_or_null{};
+    if constexpr (std::is_same_v<TEST_TYPE, String>) {
+        default_or_null = "";
+    }
+    if constexpr (is_optional) {
+        CHECK(!default_or_null);
+    }
+
     {
         WriteTransaction tr{sg_1};
         auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type, "id", is_optional);
@@ -7735,17 +7742,15 @@ TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int
         auto obj_1 = table_1->create_object_with_primary_key(sequence_next<underlying_type>());
         auto obj_2 = table_2->create_object_with_primary_key(sequence_next<underlying_type>());
         if constexpr (is_optional) {
-            auto obj_3 = table_2->create_object_with_primary_key(TEST_TYPE(realm::null()));
+            auto obj_3 = table_2->create_object_with_primary_key(default_or_null);
         }
 
         auto list = obj_1.template get_list<TEST_TYPE>("oids");
         obj_1_id = obj_1.template get<TEST_TYPE>("id");
         obj_2_id = obj_2.template get<TEST_TYPE>("id");
         list.insert(0, obj_2_id);
-        if constexpr (is_optional) {
-            list.insert(1, TEST_TYPE(realm::null()));
-            list.add(TEST_TYPE(realm::null()));
-        }
+        list.insert(1, default_or_null);
+        list.add(default_or_null);
         session_1.nonsync_transact_notify(tr.commit());
     }
 
@@ -7761,13 +7766,16 @@ TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int
         CHECK(obj_2);
         auto list = obj_1.get_list<TEST_TYPE>("oids");
         CHECK_EQUAL(obj_1.template get<TEST_TYPE>("id"), obj_1_id);
-        CHECK_EQUAL(list.size(), is_optional ? 3 : 1);
+        CHECK_EQUAL(list.size(), 3);
+        CHECK_NOT(list.is_null(0));
         CHECK_EQUAL(list.get(0), obj_2_id);
+        CHECK_EQUAL(list.get(1), default_or_null);
+        CHECK_EQUAL(list.get(2), default_or_null);
         if constexpr (is_optional) {
             auto obj_3 = table_2->find_first_null(table_2->get_column_key("id"));
             CHECK(obj_3);
-            CHECK_EQUAL(list.get(1), TEST_TYPE(realm::null()));
-            CHECK_EQUAL(list.get(2), TEST_TYPE(realm::null()));
+            CHECK(list.is_null(1));
+            CHECK(list.is_null(2));
         }
     }
 }
