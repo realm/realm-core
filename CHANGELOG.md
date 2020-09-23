@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([#7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
  
 ### Breaking changes
 * None.
