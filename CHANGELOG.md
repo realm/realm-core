@@ -1,19 +1,11 @@
-# NEXT RELEASE
+# 6.1.0 Release notes
 
 ### Enhancements
 * Greatly improve performance of NOT IN queries on indexed string or int columns.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([#7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
- 
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([Java #7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
+* Possibly fix issues related to changing the primary key property from nullable to required. ([PR #3917](https://github.com/realm/realm-core/pull/3918)).
 
 ----------------------------------------------
 
