@@ -691,7 +691,7 @@ def doBuildMacOs(Map options = [:]) {
                     runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-clang-${buildType}")
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
                 runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build', name: "osx-clang-xcrun-swift-${buildType}")
                 sh 'xcrun swift run ObjectStoreTests'
             }
