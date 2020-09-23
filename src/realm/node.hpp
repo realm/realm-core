@@ -256,6 +256,7 @@ public:
     {
         m_parent = parent;
         m_ndx_in_parent = ndx_in_parent;
+        m_missing_parent_update = false;
     }
     void set_ndx_in_parent(size_t ndx) noexcept
     {

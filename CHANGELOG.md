@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix an assertion failure on "!has_missing_parent_update()", seemingly related to table accessor recycling (since 6.1.0).
  
 ### Breaking changes
 * None.
