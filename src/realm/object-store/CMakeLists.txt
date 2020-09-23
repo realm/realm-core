@@ -155,4 +155,5 @@ target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
     target_link_libraries(ObjectStore PUBLIC Sync)
+    target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
 endif()

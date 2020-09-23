@@ -193,6 +193,60 @@ if(APPLE AND NOT REALM_FORCE_OPENSSL)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
+# Find dependencies
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
+if(UNIX AND NOT APPLE)
+    set(REALM_NEEDS_OPENSSL ON)
+elseif(REALM_ENABLE_SYNC AND CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    set(REALM_NEEDS_OPENSSL ON)
+    set(REALM_USE_SYSTEM_OPENSSL ON)
+endif()
+if(REALM_NEEDS_OPENSSL)
+    if(REALM_USE_SYSTEM_OPENSSL)
+        # Use system OpenSSL
+        find_package(OpenSSL REQUIRED)
+    else()
+        # Use our OpenSSL
+        if(NOT OpenSSL_DIR)
+            if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+                if(ANDROID)
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+                else()
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+                endif()
+
+                message(STATUS "Getting ${OPENSSL_URL}...")
+                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+
+                list(GET download_status 0 status_code)
+                if (NOT "${status_code}" STREQUAL "0")
+                    message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+                endif()
+
+                message(STATUS "Uncompressing OpenSSL...")
+                execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+                    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+                )
+            endif()
+
+            set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+        endif()
+        find_package(OpenSSL REQUIRED CONFIG)
+        target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
+    endif()
+
+    set(REALM_HAVE_OPENSSL ON)
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
+endif()
+
+if(REALM_ENABLE_SYNC)
+    find_package(ZLIB REQUIRED)
+endif()
+
 # Store configuration in header file
 configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 
@@ -212,58 +266,11 @@ set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
-# Find dependencies
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-
-set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
-if(UNIX AND NOT APPLE)
-    set(REALM_NEEDS_OPENSSL ON)
-elseif(REALM_ENABLE_SYNC AND CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    set(REALM_NEEDS_OPENSSL ON)
-endif()
-if(REALM_NEEDS_OPENSSL)
-    if(NOT REALM_USE_SYSTEM_OPENSSL)
-        # Use our OpenSSL
-        if(NOT OPENSSL_ROOT_DIR STREQUAL "${CMAKE_CURRENT_BINARY_DIR}/openssl")
-            if(ANDROID)
-                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
-            else()
-                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
-            endif()
-
-            message(STATUS "Getting ${OPENSSL_URL}...")
-            file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
-
-            list(GET download_status 0 status_code)
-            if (NOT "${status_code}" STREQUAL "0")
-                message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
-            endif()
-
-            message(STATUS "Uncompressing OpenSSL...")
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
-                WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
-            )
-            set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl")
-        endif()
-    endif()
-
-    set(OPENSSL_USE_STATIC_LIBS ON)
-    find_package(OpenSSL REQUIRED)
-    set(REALM_HAVE_OPENSSL ON)
-    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
-endif()
-
-if(REALM_ENABLE_SYNC)
-    find_package(ZLIB REQUIRED)
-endif()
-
 # Include additional CMakeLists
 add_subdirectory(src)
 
 if (REALM_BUILD_DOGLESS)
-    set(REALM_HAVE_DOGLESS "1")
+    set(REALM_HAVE_DOGLESS ON)
     add_subdirectory(src/dogless)
 endif()
 
