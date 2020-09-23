@@ -93,8 +93,10 @@ void setup_multi_table(Table& table, size_t rows)
     ColKey col_string_big = table.add_column(type_String, "string_big_blobs"); //  7
     ColKey col_string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
     ColKey col_binary = table.add_column(type_Binary, "binary");               //  9
-    ColKey col_int_list = table.add_column_list(type_Int, "integers");
-    ColKey col_string_list = table.add_column_list(type_String, "strings");
+    ColKey col_oid = table.add_column(type_ObjectId, "oid");                   //  10
+    ColKey col_decimal = table.add_column(type_Decimal, "decimal");            //  11
+    ColKey col_int_list = table.add_column_list(type_Int, "integers");         //  12
+    ColKey col_string_list = table.add_column_list(type_String, "strings");    //  13
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -132,6 +134,8 @@ void setup_multi_table(Table& table, size_t rows)
                 break;
         }
         obj.set(col_binary, BinaryData("binary", 7));
+        obj.set(col_oid, ObjectId());
+        obj.set(col_decimal, Decimal128("1.2345"));
         auto int_list = obj.get_list<Int>(col_int_list);
         auto str_list = obj.get_list<String>(col_string_list);
         for (size_t n = 0; n < i % 5; n++) {
