@@ -278,10 +278,10 @@ public:
     /// @returns A shared pointer to the new current user
     std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
 
-    /// Logs out and removes the provided user
-    /// this is a local operation and does not invoke any server side function
+    /// Logs out and removes the provided user.
+    /// This invokes logout on the server.
     /// @param user the user to remove
-    /// @param completion_block Will return an error if the user is not found
+    /// @param completion_block Will return an error if the user is not found or the http request failed.
     void remove_user(std::shared_ptr<SyncUser> user,
                      std::function<void(util::Optional<AppError>)> completion_block);
 
