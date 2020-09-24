@@ -40,20 +40,25 @@ class FunctionRef;
 template <typename Return, typename... Args>
 class FunctionRef<Return(Args...)> {
 public:
+    using ThisType = FunctionRef<Return(Args...)>;
     // A FunctionRef is never empty, and so cannot be default-constructed.
     constexpr FunctionRef() noexcept = delete;
 
     // FunctionRef is copyable and moveable.
 #if defined(__GNUC__) && __GNUC__ == 4 && __GNUC_MINOR__ <= 9 && !defined(__clang__)
-    FunctionRef(FunctionRef<Return(Args...)> const&) noexcept = default;
-    FunctionRef<Return(Args...)>& operator=(const FunctionRef<Return(Args...)>&) noexcept = default;
-    FunctionRef(FunctionRef<Return(Args...)>&&) noexcept = default;
-    FunctionRef<Return(Args...)>& operator=(FunctionRef<Return(Args...)>&&) noexcept = default;
+    FunctionRef(ThisType&) noexcept = default;
+    FunctionRef(ThisType const&) noexcept = default;
+    ThisType& operator=(ThisType&) noexcept = default;
+    ThisType& operator=(const ThisType&) noexcept = default;
+    FunctionRef(ThisType&&) noexcept = default;
+    ThisType& operator=(ThisType&&) noexcept = default;
 #else
-    constexpr FunctionRef(FunctionRef<Return(Args...)> const&) noexcept = default;
-    constexpr FunctionRef<Return(Args...)>& operator=(const FunctionRef<Return(Args...)>&) noexcept = default;
-    constexpr FunctionRef(FunctionRef<Return(Args...)>&&) noexcept = default;
-    constexpr FunctionRef<Return(Args...)>& operator=(FunctionRef<Return(Args...)>&&) noexcept = default;
+    constexpr FunctionRef(ThisType&) noexcept = default;
+    constexpr FunctionRef(ThisType const&) noexcept = default;
+    constexpr ThisType& operator=(ThisType&) noexcept = default;
+    constexpr ThisType& operator=(const ThisType&) noexcept = default;
+    constexpr FunctionRef(ThisType&&) noexcept = default;
+    constexpr ThisType& operator=(ThisType&&) noexcept = default;
 #endif
 
     // Construct a FunctionRef which wraps the given callable.
@@ -66,7 +71,7 @@ public:
     {
     }
 
-    constexpr void swap(FunctionRef<Return(Args...)>& rhs) noexcept
+    constexpr void swap(ThisType& rhs) noexcept
     {
         std::swap(m_obj, rhs.m_obj);
         std::swap(m_callback, rhs.m_callback);
