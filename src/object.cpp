@@ -73,6 +73,7 @@ Object::Object(SharedRealm r, Obj const& o)
 , m_object_schema(&*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name())))
 , m_obj(o)
 {
+  REALM_ASSERT(!m_obj.get_table() || (m_realm->get_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
