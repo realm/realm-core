@@ -5,8 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Rerunning a query on an indexed string column which previously had more than one match and now has one match would sometimes throw a "key not found" exception ([Cocoa #6536](https://github.com/realm/realm-cocoa/issues/6536), since 5.0.0),
+
 ### Breaking changes
 * None.
 

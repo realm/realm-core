@@ -285,6 +285,7 @@ void StringNode<Equal>::_search_index_init()
         auto index = ParentNode::m_table.unchecked_ptr()->get_search_index(ParentNode::m_condition_column_key);
         fr = index->find_all_no_copy(StringData(StringNodeBase::m_value), res);
 
+        m_index_matches.reset();
         switch (fr) {
             case FindRes_single:
                 m_actual_key = ObjKey(res.payload);
@@ -298,7 +299,6 @@ void StringNode<Equal>::_search_index_init()
                 m_actual_key = ObjKey(m_index_matches->get(m_results_start));
                 break;
             case FindRes_not_found:
-                m_index_matches.reset();
                 m_results_end = 0;
                 break;
         }
