@@ -853,10 +853,15 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                        std::vector<ColKey>& followed, JSONOutputMode output_mode) const
 {
     StringData name = "_key";
+    bool prefixComma = false;
     if (renames[name] != "")
         name = renames[name];
     out << "{";
-    out << "\"" << name << "\":" << this->m_key.value;
+    if (output_mode != output_mode_xjson) {
+        prefixComma = true;
+        out << "\"" << name << "\":" << this->m_key.value;
+    }
+
     auto col_keys = m_table->get_column_keys();
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
@@ -864,7 +869,10 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
         if (renames[name] != "")
             name = renames[name];
 
-        out << ",\"" << name << "\":";
+        if (prefixComma)
+            out << ",";
+        out << "\"" << name << "\":";
+        prefixComma = true;
 
         if (ck.get_attrs().test(col_attr_List)) {
             if (type == type_LinkList) {
@@ -874,13 +882,14 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                 auto sz = ll.size();
 
                 if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
-                    out << "[";
+                    out << "{ \"$linkList\": { \"table\": \"" << get_target_table(ck)->get_name()
+                        << "\", \"keys\": [";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
                             out << ",";
                         out_mixed_xjson(out, ll.get_object(i).get_any(primary_key_coll));
                     }
-                    out << "]";
+                    out << "]}}";
                 }
                 else if (!target_table->is_embedded() &&
                          ((link_depth == 0) || (link_depth == not_found &&
@@ -894,6 +903,12 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     out << "]}";
                 }
                 else {
+
+                    if (output_mode == output_mode_xjson) {
+                        out << "{ \"$embeddedList\": { \"table\": \"" << get_target_table(ck)->get_name()
+                            << "\", \"values\": ";
+                    }
+
                     out << "[";
                     for (size_t i = 0; i < sz; i++) {
                         if (i > 0)
@@ -903,6 +918,10 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                         ll.get_object(i).to_json(out, new_depth, renames, followed, output_mode);
                     }
                     out << "]";
+
+                    if (output_mode == output_mode_xjson) {
+                        out << "}}";
+                    }
                 }
             }
             else {
@@ -928,7 +947,9 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     auto primary_key_coll = target_table->get_primary_key_column();
 
                     if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
+                        out << "{ \"$link\": { \"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": ";
                         out_mixed_xjson(out, obj.get_any(primary_key_coll));
+                        out << "}}";
                     }
                     else if (!target_table->is_embedded() &&
                              ((link_depth == 0) ||
@@ -940,7 +961,17 @@ void ConstObj::to_json(std::ostream& out, size_t link_depth, std::map<std::strin
                     else {
                         followed.push_back(ck);
                         size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+
+                        if (output_mode == output_mode_xjson) {
+                            out << "{ \"$embeddedObj\": { \"table\": \"" << get_target_table(ck)->get_name()
+                                << "\", \"value\": ";
+                        }
+
                         obj.to_json(out, new_depth, renames, followed, output_mode);
+
+                        if (output_mode == output_mode_xjson) {
+                            out << "}}";
+                        }
                     }
                 }
                 else {
