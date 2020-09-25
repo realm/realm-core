@@ -25,6 +25,15 @@
 namespace realm {
 namespace util {
 
+#ifdef _WIN32
+// VC++ warns about multiple copy constructors, but we want both const and
+// non-const version to ensure they're a better match than the wrapping
+// constructor. We could instead use enable_if to make the wrapping constructor
+// ineligible, but that tends to do bad things to compile times.
+#pragma warning(push)
+#pragma warning(disable : 4521 4522)
+#endif
+
 /// A lightweight non-owning reference to a callable.
 ///
 /// This type is similar to std::function, but unlike std::function holds a reference to the callable rather than
@@ -53,10 +62,36 @@ public:
     FunctionRef(ThisType&&) noexcept = default;
     ThisType& operator=(ThisType&&) noexcept = default;
 #else
+#ifdef _WIN32
+    // VC++ incorrectly rejects multiple versions of a defaulted special member function
+    constexpr FunctionRef(ThisType& o) noexcept
+        : m_obj(o.m_obj)
+        , m_callback(o.m_callback)
+    {
+    }
+    constexpr ThisType& operator=(ThisType& o) noexcept
+    {
+        m_obj = o.m_obj;
+        m_callback = o.m_callback;
+        return *this;
+    }
+    constexpr FunctionRef(ThisType const& o) noexcept
+        : m_obj(o.m_obj)
+        , m_callback(o.m_callback)
+    {
+    }
+    constexpr ThisType& operator=(ThisType const& o) noexcept
+    {
+        m_obj = o.m_obj;
+        m_callback = o.m_callback;
+        return *this;
+    }
+#else
     constexpr FunctionRef(ThisType&) noexcept = default;
-    constexpr FunctionRef(ThisType const&) noexcept = default;
     constexpr ThisType& operator=(ThisType&) noexcept = default;
+    constexpr FunctionRef(ThisType const&) noexcept = default;
     constexpr ThisType& operator=(const ThisType&) noexcept = default;
+#endif
     constexpr FunctionRef(ThisType&&) noexcept = default;
     constexpr ThisType& operator=(ThisType&&) noexcept = default;
 #endif
@@ -95,5 +130,9 @@ constexpr void swap(FunctionRef<R(Args...)>& lhs, FunctionRef<R(Args...)>& rhs) 
 
 } // namespace util
 } // namespace realm
+
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
 
 #endif
