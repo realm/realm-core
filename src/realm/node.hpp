@@ -262,6 +262,11 @@ public:
         m_ndx_in_parent = ndx;
     }
 
+    void clear_missing_parent_update()
+    {
+        m_missing_parent_update = false;
+    }
+
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
     /// parent pointer is set to null, this function has no effect.

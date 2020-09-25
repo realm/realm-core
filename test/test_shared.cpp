@@ -4274,10 +4274,12 @@ TEST(Shared_ManyColumns)
         first->set(col, 500);
     }
 
-    tr->commit();
+    tr->commit_and_continue_as_read();
+    tr->verify();
 
-    auto rt = db->start_read();
-    rt->verify();
+    tr->promote_to_write();
+    foo->clear();
+    foo->create_object().set("Prop0", 500);
 }
 
 #endif // TEST_SHARED

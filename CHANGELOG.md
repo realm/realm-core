@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix assertion failure related to Table::clear found by Cocoa SDK in V6.1.0. That release is not expected to be used in SDK releases, so no customers are affected.
 
 ----------------------------------------------
 
