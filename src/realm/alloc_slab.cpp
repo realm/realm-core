@@ -1078,6 +1078,7 @@ void SlabAlloc::reset_free_space_tracking()
         auto& last_slab = m_slabs.back();
         auto& last_translation = m_ref_translation_ptr[m_translation_table_size - 1];
         REALM_ASSERT(last_translation.mapping_addr == last_slab.addr);
+        last_translation.mapping_addr = reinterpret_cast<char*>(0xdead0000);
         --m_translation_table_size;
         m_slabs.pop_back();
     }
@@ -1343,16 +1344,15 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
     }
 
     for (size_t i = 0; i < m_old_translations.size();) {
-        if (m_old_translations[i].replaced_at_version < oldest_live_version) {
-            // This translation is too old - purge by move last over:
-            auto oldie = std::move(m_old_translations[i]);
-            m_old_translations[i] = std::move(m_old_translations.back());
-            m_old_translations.pop_back();
-            delete[] oldie.translations;
-        }
-        else {
+        if (m_old_translations[i].replaced_at_version >= oldest_live_version) {
             ++i;
+            continue;
         }
+        // This translation is too old - purge by move last over:
+        auto oldie = std::move(m_old_translations[i]);
+        m_old_translations[i] = std::move(m_old_translations.back());
+        m_old_translations.pop_back();
+        delete[] oldie.translations;
     }
     m_youngest_live_version = youngest_live_version;
 }
