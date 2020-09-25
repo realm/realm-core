@@ -1,15 +1,10 @@
-# NEXT RELEASE
+# 6.1.1 Release notes
 
 ### Enhancements
-* None.
+* Allocating one extra entry in ref translation tables. May help finding memory mapping problems.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
- 
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
