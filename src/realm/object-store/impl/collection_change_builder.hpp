@@ -19,7 +19,7 @@
 #ifndef REALM_COLLECTION_CHANGE_BUILDER_HPP
 #define REALM_COLLECTION_CHANGE_BUILDER_HPP
 
-#include "collection_notifications.hpp"
+#include <realm/object-store/collection_notifications.hpp>
 
 #include <realm/keys.hpp>
 

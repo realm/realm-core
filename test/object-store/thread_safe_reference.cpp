@@ -16,21 +16,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
-#include "util/scheduler.hpp"
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
-#include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/db.hpp>
 #include <realm/history.hpp>

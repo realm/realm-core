@@ -19,7 +19,7 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 #include <realm/util/file.hpp>
 
 #include <functional>

@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/weak_realm_notifier.hpp"
+#include <realm/object-store/impl/weak_realm_notifier.hpp>
 
-#include "shared_realm.hpp"
-#include "util/scheduler.hpp"
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

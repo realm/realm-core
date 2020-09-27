@@ -19,11 +19,11 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
-#include "sync/auth_request_client.hpp"
-#include "sync/app_service_client.hpp"
-#include "sync/app_credentials.hpp"
-#include "sync/push_client.hpp"
-#include "sync/generic_network_transport.hpp"
+#include <realm/object-store/sync/auth_request_client.hpp>
+#include <realm/object-store/sync/app_service_client.hpp>
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/push_client.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include <realm/object_id.hpp>
 #include <realm/util/optional.hpp>

@@ -105,12 +105,6 @@ set(FUZZY_TEST_SOURCES fuzz_group.cpp)
 
 set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
-    include(Findprocps)
-    set(EXTRA_TEST_LIBS ${PROCPS_LIBRARY} rt)
-    set(EXTRA_TEST_CFLAGS ${PROCPS_INCLUDE_DIR})
-endif()
-
 # FIXME: Benchmarks
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
@@ -132,6 +126,11 @@ file(GLOB REQUIRED_TEST_FILES
 add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
+	find_package(ProcPS REQUIRED)
+	target_link_libraries(CoreTests rt PROCPS::PROCPS)
+endif()
+
 # Resources required for running the tests copied to the target directory
 if(CMAKE_GENERATOR STREQUAL Xcode)
     # a simple copy doesn't work for an Xcode build because Xcode also needs to sign them
@@ -147,7 +146,7 @@ else()
 endif()
 
 target_link_libraries(CoreTests
-                      TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+                      TestUtil QueryParser
 )
 
 if(WINDOWS_STORE)
@@ -176,7 +175,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(CoreTests "-rdynamic")
 endif()
 
-target_include_directories(CoreTests PRIVATE ${EXTRA_TEST_CFLAGS} .)
+target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_test(NAME StorageTests COMMAND realm-tests)
 
@@ -296,12 +295,11 @@ if(REALM_ENABLE_SYNC)
 	)
 
 	add_library(TestUtils STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
-	target_link_libraries(TestUtils Storage)
+	target_link_libraries(TestUtils PUBLIC Storage)
 
-	if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
-	    include(Findprocps)
-	    target_link_libraries(TestUtils rt ${PROCPS_LIBRARY})
-	    target_include_directories(TestUtils PRIVATE ${PROCPS_INCLUDE_DIR})
+	if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
+	    find_package(ProcPS REQUIRED)
+	    target_link_libraries(TestUtils PUBLIC rt PROCPS::PROCPS)
 	endif()
 
 	if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")

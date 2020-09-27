@@ -21,7 +21,7 @@
 #if REALM_PLATFORM_APPLE
 #define CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS
 #endif
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include <limits.h>
 

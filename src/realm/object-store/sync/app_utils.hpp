@@ -20,8 +20,8 @@
 #ifndef APP_UTILS_HPP
 #define APP_UTILS_HPP
 
-#include "sync/generic_network_transport.hpp"
-#include "sync/auth_request_client.hpp"
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/sync/auth_request_client.hpp>
 #include <realm/util/optional.hpp>
 #include <string>
 

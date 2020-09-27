@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/impl/apple/system_configuration.hpp"
+#include <realm/object-store/sync/impl/apple/system_configuration.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
 
 #include <asl.h>
-#include "dlfcn.h"
+#include <dlfcn.h>
 
 using namespace realm;
 using namespace realm::_impl;

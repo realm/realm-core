@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/remote_mongo_collection.hpp"
-#include "realm/util/uri.hpp"
+#include <realm/object-store/sync/remote_mongo_collection.hpp>
+#include <realm/util/uri.hpp>
 
 namespace realm {
 namespace app {

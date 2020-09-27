@@ -18,11 +18,11 @@
 
 #include "sync_test_utils.hpp"
 
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
-#include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 #include "util/test_utils.hpp"
 
 #include <realm/util/file.hpp>

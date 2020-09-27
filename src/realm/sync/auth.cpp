@@ -615,7 +615,7 @@ void Client::Request::initiate_ssl_handshake()
             else {
                 // The included certificates are used if neither the trust
                 // certificate nor the callback function is set.
-#ifdef REALM_INCLUDE_CERTS
+#if REALM_INCLUDE_CERTS
                 m_ssl_stream->use_included_certificates(); // Throws
 #endif
             }
