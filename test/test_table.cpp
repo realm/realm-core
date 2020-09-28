@@ -4299,6 +4299,44 @@ TEST(Table_SearchIndexFindAll)
     CHECK_EQUAL(tv.size(), 6);
 }
 
+TEST(Table_QueryNullOnNonNullSearchIndex)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey col0 = t->add_column(type_Int, "value", false);
+    ColKey col_link = t->add_column_link(type_Link, "link", *t);
+    t->add_search_index(col0);
+
+    std::vector<Int> values = {0, 9, 4, 2, 7};
+
+    for (Int v : values) {
+        auto obj = t->create_object();
+        obj.set(col0, v);
+        obj.set(col_link, obj.get_key());
+    }
+
+    for (Int v : values) {
+        Query q0 = t->column<Int>(col0) == v;
+        CHECK_EQUAL(q0.count(), 1);
+        Query q1 = t->link(col_link).column<Int>(col0) == v;
+        CHECK_EQUAL(q1.count(), 1);
+        Query q2 = t->link(col_link).link(col_link).column<Int>(col0) == v;
+        CHECK_EQUAL(q2.count(), 1);
+        Query q3 = t->where().equal(col0, v);
+        CHECK_EQUAL(q3.count(), 1);
+    }
+
+    {
+        Query q0 = t->column<Int>(col0) == realm::null();
+        CHECK_EQUAL(q0.count(), 0);
+        Query q1 = t->link(col_link).column<Int>(col0) == realm::null();
+        CHECK_EQUAL(q1.count(), 0);
+        Query q2 = t->link(col_link).link(col_link).column<Int>(col0) == realm::null();
+        CHECK_EQUAL(q2.count(), 0);
+    }
+}
+
+
 namespace {
 
 template <class T, bool nullable>
