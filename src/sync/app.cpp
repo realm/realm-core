@@ -80,7 +80,7 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
     return headers;
 }
 
-const static std::string default_base_url = "https://stitch.mongodb.com";
+const static std::string default_base_url = "https://realm.mongodb.com";
 const static std::string base_path = "/api/client/v2.0";
 const static std::string app_path = "/app";
 const static std::string auth_path = "/auth";
@@ -1127,9 +1127,9 @@ Request App::make_streaming_request(std::shared_ptr<SyncUser> user,
     auto args_base64 = std::string(util::base64_encoded_size(args_json.size()), '\0');
     util::base64_encode(args_json.data(), args_json.size(), args_base64.data(), args_base64.size());
 
-    auto url = function_call_url_path() + "?stitch_request=" + util::uri_percent_encode(args_base64);
+    auto url = function_call_url_path() + "?baas_request=" + util::uri_percent_encode(args_base64);
     if (user) {
-        url += "&stitch_at=";
+        url += "&baas_at=";
         url += user->access_token(); // doesn't need url encoding
     }
 

@@ -3459,7 +3459,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app]") {
 
     using Headers = decltype(Request().headers);
 
-    const auto url_prefix = "field/api/client/v2.0/app/django/functions/call?stitch_request="sv;
+    const auto url_prefix = "field/api/client/v2.0/app/django/functions/call?baas_request="sv;
     const auto get_request_args = [&] (const Request& req) {
         REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
         auto args = req.url.substr(url_prefix.size());
@@ -3535,6 +3535,6 @@ TEST_CASE("app: make_streaming_request", "[sync][app]") {
         auto amp = req.url.find('&');
         REQUIRE(amp != std::string::npos);
         auto tail = req.url.substr(amp);
-        REQUIRE(tail == ("&stitch_at=" + user->access_token()));
+        REQUIRE(tail == ("&baas_at=" + user->access_token()));
     }
 }
