@@ -2545,6 +2545,73 @@ TEST(Query_StrIndex)
     }
 }
 
+TEST(Query_StrIndexUpdating)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_write();
+
+    auto t = group->add_table("table");
+    auto col = t->add_column(type_String, "value");
+    t->add_search_index(col);
+    TableView tv = t->where().equal(col, "").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    group->commit_and_continue_as_read();
+
+    // Queries on indexes have different codepaths for 0, 1, and multiple results,
+    // so check each of the 6 possible transitions. The write transactions are
+    // required here because otherwise the Query will be using the StringIndex
+    // being mutated and will happen to give correct results even if it fails
+    // to update all of its internal state.
+
+    // 0 -> 1 result
+    group->promote_to_write();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+
+    // 1 -> multiple results
+    group->promote_to_write();
+    t->create_object();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+
+    // multiple -> 1
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    t->remove_object(tv.get_key(1));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+
+    // 1 -> 0
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+
+    // 0 -> multiple
+    group->promote_to_write();
+    t->create_object();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 2);
+
+    // multiple -> 0
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    t->remove_object(tv.get_key(1));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+}
+
 TEST(Query_GA_Crash)
 {
     GROUP_TEST_PATH(path);
