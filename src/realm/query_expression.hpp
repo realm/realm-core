@@ -2094,6 +2094,12 @@ public:
     }
 
     Columns& key(const Mixed& key_value);
+    Columns& property(const std::string& prop)
+    {
+        REALM_ASSERT(!m_key.is_null());
+        m_prop_list.push_back(prop);
+        return *this;
+    }
     void set_cluster(const Cluster* cluster) override;
     void evaluate(size_t index, ValueBase& destination) override;
 
@@ -2105,6 +2111,7 @@ public:
     Columns(Columns const& other)
         : ObjPropertyExpr<Mixed>(other)
         , m_key(other.m_key)
+        , m_prop_list(other.m_prop_list)
         , m_objkey(other.m_objkey)
         , m_key_type(other.m_key_type)
     {
@@ -2112,6 +2119,7 @@ public:
 
 private:
     Mixed m_key;
+    std::vector<std::string> m_prop_list;
     ObjKey m_objkey;
     DataType m_key_type;
     // Leaf cache

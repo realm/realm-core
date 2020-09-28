@@ -259,11 +259,20 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
             for (size_t t = 0; t < sz; t++) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
                 auto dict = obj.get_dictionary(m_column_key);
-                auto opt_val = dict.try_get(m_key);
-                if (opt_val)
-                    destination.set(t, *opt_val);
-                else
-                    destination.set_null(t);
+                Mixed val;
+                if (auto opt_val = dict.try_get(m_key)) {
+                    val = *opt_val;
+                    if (m_prop_list.size()) {
+                        if (val.get_type() == type_TypedLink) {
+                            auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
+                            val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
+                        }
+                        else {
+                            val = {};
+                        }
+                    }
+                }
+                destination.set(t, val);
             }
         }
         else {
@@ -300,6 +309,15 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
                     ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
                     values.init_from_ref(ref);
                     val = values.get(state.index);
+                    if (m_prop_list.size()) {
+                        if (val.get_type() == type_TypedLink) {
+                            auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
+                            val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
+                        }
+                        else {
+                            val = {};
+                        }
+                    }
                 }
                 destination.set(0, val);
             }
