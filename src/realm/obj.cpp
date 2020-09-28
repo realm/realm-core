@@ -450,6 +450,30 @@ Mixed Obj::get_any(ColKey col_key) const
     return {};
 }
 
+Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const
+{
+    if (auto col = get_table()->get_column_key(*path_start)) {
+        auto val = get_any(col);
+        ++path_start;
+        if (path_start == path_end)
+            return val;
+        if (!val.is_null()) {
+            if (val.get_type() == type_Link || val.get_type() == type_TypedLink) {
+                Obj obj;
+                if (val.get_type() == type_Link) {
+                    obj = get_target_table(col)->get_object(val.get<ObjKey>());
+                }
+                else {
+                    auto obj_link = val.get<ObjLink>();
+                    obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
+                }
+                return obj.get_any(path_start, path_end);
+            }
+        }
+    }
+    return {};
+}
+
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
@@ -877,7 +901,25 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
                 first = false;
                 out_mixed(out, it.first);
                 out << ":";
-                out_mixed(out, it.second);
+                if (it.second.is_null()) {
+                    out << "null";
+                }
+                else if (it.second.get_type() == type_TypedLink) {
+                    auto obj_link = it.second.get<ObjLink>();
+                    auto target_table = m_table->get_parent_group()->get_table(obj_link.get_table_key());
+                    if (link_depth == 0 || link_depth == not_found) {
+                        out << "{\"table\": \"" << target_table->get_name()
+                            << "\", \"key\": " << obj_link.get_obj_key().value << "}";
+                    }
+                    else {
+                        auto obj = target_table->get_object(obj_link.get_obj_key());
+                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                        obj.to_json(out, new_depth, renames, followed);
+                    }
+                }
+                else {
+                    out_mixed(out, it.second);
+                }
             }
             out << "}";
         }

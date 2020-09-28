@@ -5545,4 +5545,43 @@ TEST(Query_Dictionary)
     CHECK_EQUAL(tv.size(), 7);
 }
 
+TEST(Query_DictionaryTypedLinks)
+{
+    Group g;
+    auto dog = g.add_table("dog");
+    auto cat = g.add_table("cat");
+    auto person = g.add_table("person");
+    auto col_data = person->add_column_dictionary(type_Mixed, "data");
+    auto col_dog_name = dog->add_column(type_String, "Name");
+    auto col_dog_parent = dog->add_column(*dog, "Parent");
+    auto col_cat_name = cat->add_column(type_String, "Name");
+
+    auto fido = dog->create_object().set(col_dog_name, "Fido");
+    auto pluto = dog->create_object().set(col_dog_name, "Pluto");
+    pluto.set(col_dog_parent, fido.get_key());
+    auto vaks = dog->create_object().set(col_dog_name, "Vaks");
+    auto marie = cat->create_object().set(col_cat_name, "Marie");
+    auto berlioz = cat->create_object().set(col_cat_name, "Berlioz");
+    auto toulouse = cat->create_object().set(col_cat_name, "Toulouse");
+
+    auto john = person->create_object().get_dictionary(col_data);
+    auto paul = person->create_object().get_dictionary(col_data);
+
+    john.insert("Name", "John");
+    john.insert("Pet", pluto);
+
+    paul.insert("Name", "Paul");
+    paul.insert("Pet", marie);
+
+    // g.to_json(std::cout, 5);
+
+    auto cnt = (person->column<Dictionary>(col_data).key("Pet").property("Name") == StringData("Pluto")).count();
+    CHECK_EQUAL(cnt, 1);
+    cnt = (person->column<Dictionary>(col_data).key("Pet").property("Name") == StringData("Marie")).count();
+    CHECK_EQUAL(cnt, 1);
+    cnt = (person->column<Dictionary>(col_data).key("Pet").property("Parent").property("Name") == StringData("Fido"))
+              .count();
+    CHECK_EQUAL(cnt, 1);
+}
+
 #endif // TEST_QUERY
