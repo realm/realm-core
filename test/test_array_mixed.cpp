@@ -210,7 +210,7 @@ TEST(Mixed_Compare)
     CHECK(Mixed(nan("123")) < 5);
 
     CHECK(Mixed("Hello") == Mixed(BinaryData("Hello")));
-    CHECK(Mixed::types_are_comparable(Mixed(), Mixed()));
+    CHECK_NOT(Mixed::types_are_comparable(Mixed(), Mixed()));
     CHECK(Mixed() == Mixed());
     CHECK(Mixed(0.f) < Mixed(1));
     CHECK(Mixed(1) < Mixed("a"));
@@ -220,6 +220,8 @@ TEST(Mixed_Compare)
     CHECK(Mixed(BinaryData("b")) < Mixed("c"));
     CHECK(Mixed("a") < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Decimal128("25")) < Mixed(Timestamp(1, 2)));
+    CHECK(Mixed(ObjectId(Timestamp(1, 2), 0, 0)) < Mixed(Timestamp(2, 3)));
+    CHECK(Mixed(Timestamp(1, 2)) < Mixed(ObjectId(Timestamp(2, 3), 0, 0)));
 }
 
 #endif // TEST_ARRAY_VARIANT
