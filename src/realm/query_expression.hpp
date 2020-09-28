@@ -3603,6 +3603,10 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
+        if (value.is_null() && !m_nullable) {
+            return ret;
+        }
+
         if (m_nullable && std::is_same_v<T, int64_t>) {
             util::Optional<int64_t> val;
             if (!value.is_null()) {
@@ -3780,7 +3784,7 @@ private:
     mutable ColKey m_column_key;
 
     // set to false by default for stand-alone Columns declaration that are not yet associated with any table
-    // or oclumn. Call init() to update it or use a constructor that takes table + column index as argument.
+    // or column. Call init() to update it or use a constructor that takes table + column index as argument.
     bool m_nullable = false;
     ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
