@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 10.0.0-beta.9 Release notes
 
 ### Enhancements
 * Features added by release v6.1.0 to 6.1.2:
