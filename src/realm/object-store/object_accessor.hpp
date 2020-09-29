@@ -32,10 +32,6 @@
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/sync/object.hpp>
-#endif // REALM_ENABLE_SYNC
-
 #include <string>
 
 namespace realm {

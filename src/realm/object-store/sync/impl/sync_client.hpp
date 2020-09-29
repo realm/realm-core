@@ -36,8 +36,6 @@
 namespace realm {
 namespace _impl {
 
-using ReconnectMode = sync::Client::ReconnectMode;
-
 struct SyncClient {
     SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config)
         : m_client([&] {
