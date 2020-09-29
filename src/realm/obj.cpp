@@ -976,6 +976,8 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
         values.set(m_row_ndx, value);
     }
 
+    REALM_ASSERT(!fields.has_missing_parent_update());
+
     if (Replication* repl = get_replication()) {
         repl->set_int(m_table.unchecked_ptr(), col_key, m_key, value,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -1031,6 +1033,8 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         }
         values.set(m_row_ndx, new_val);
     }
+
+    REALM_ASSERT(!fields.has_missing_parent_update());
 
     if (Replication* repl = get_replication()) {
         repl->add_int(m_table.unchecked_ptr(), col_key, m_key, value); // Throws
@@ -1122,6 +1126,8 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 
         values.set(m_row_ndx, target_key);
 
+        REALM_ASSERT(!fields.has_missing_parent_update());
+
         if (Replication* repl = get_replication()) {
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -1199,6 +1205,8 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
+    REALM_ASSERT(!fields.has_missing_parent_update());
+
     if (Replication* repl = get_replication())
         repl->set<T>(m_table.unchecked_ptr(), col_key, m_key, value,
                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -1221,6 +1229,8 @@ void Obj::set_int(ColKey col_key, int64_t value)
     values.set_parent(&fields, col_ndx.val + 1);
     values.init_from_parent();
     values.set(m_row_ndx, value);
+
+    REALM_ASSERT(!fields.has_missing_parent_update());
 }
 
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
@@ -1238,6 +1248,8 @@ void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
     backlinks.init_from_parent();
 
     backlinks.add(m_row_ndx, origin_key);
+
+    REALM_ASSERT(!fields.has_missing_parent_update());
 }
 
 bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
@@ -1301,7 +1313,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjKey target_key)
     alloc.bump_content_version();
 }
 
-void Obj::set_backlink(ColKey col_key, ObjKey new_key)
+void Obj::set_backlink(ColKey col_key, ObjKey new_key) const
 {
     if (new_key != realm::null_key) {
         REALM_ASSERT(m_table->valid_column(col_key));
@@ -1314,7 +1326,7 @@ void Obj::set_backlink(ColKey col_key, ObjKey new_key)
     }
 }
 
-bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state)
+bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, CascadeState& state) const
 {
     bool recurse = remove_backlink(col_key, old_key, state);
     set_backlink(col_key, new_key);
@@ -1322,7 +1334,7 @@ bool Obj::replace_backlink(ColKey col_key, ObjKey old_key, ObjKey new_key, Casca
     return recurse;
 }
 
-bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state)
+bool Obj::remove_backlink(ColKey col_key, ObjKey old_key, CascadeState& state) const
 {
     const Table& origin_table = *m_table;
 

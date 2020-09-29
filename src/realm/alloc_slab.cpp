@@ -1232,7 +1232,7 @@ size_t SlabAlloc::get_allocated_size() const noexcept
 void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 {
     ++m_translation_table_size;
-    auto new_fast_mapping = new RefTranslation[m_translation_table_size];
+    auto new_fast_mapping = new RefTranslation[m_translation_table_size + 1]();
     for (size_t i = 0; i < m_translation_table_size - 1; ++i) {
         new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
@@ -1258,7 +1258,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         if (m_translation_table_size)
             m_old_translations.emplace_back(m_youngest_live_version, m_ref_translation_ptr.load());
         m_translation_table_size = num_mappings + free_space_size;
-        new_translation_table = new RefTranslation[m_translation_table_size];
+        new_translation_table = new RefTranslation[m_translation_table_size + 1]();
         old_num_sections = 0;
     }
     for (size_t i = old_num_sections; i < num_mappings; ++i) {

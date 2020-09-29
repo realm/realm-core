@@ -1064,43 +1064,70 @@ struct BenchmarkQuery : BenchmarkWithStrings {
     }
 };
 
-struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTable {
-    const size_t num_queried_matches = 1000;
+struct BenchmarkWithStringsTableForIn : BenchmarkWithStringsTable {
+    const size_t num_queried_matches = 200;
     const size_t num_rows = BASE_SIZE;
     std::vector<std::string> values_to_query;
-    const char* name() const
-    {
-        return "QueryChainedOrStrings";
-    }
 
-    void before_all(DBRef group)
+    void create_table(DBRef group, bool index)
     {
         BenchmarkWithStringsTable::before_all(group);
         WrtTrans tr(group);
         TableRef t = tr.get_table(name());
         REALM_ASSERT(num_rows > num_queried_matches);
         for (size_t i = 0; i < num_rows; ++i) {
-            std::stringstream ss;
-            ss << i;
-            auto s = ss.str();
-#ifdef REALM_CLUSTER_IF
-            t->create_object().set(m_col, s);
-#else
-            t->add_empty_row();
-            t->set_string(0, i, s);
-#endif
+            t->create_object().set(m_col, util::to_string(i));
         }
-        // t->add_search_index(0);
+        if (index)
+            t->add_search_index(m_col);
         for (size_t i = 0; i < num_queried_matches; ++i) {
             size_t ndx_to_match = (num_rows / num_queried_matches) * i;
-#ifdef REALM_CLUSTER_IF
             auto obj = t->get_object(ndx_to_match);
             values_to_query.push_back(obj.get<String>(m_col));
-#else
-            values_to_query.push_back(t->get_string(0, ndx_to_match));
-#endif
         }
         tr.commit();
+    }
+};
+
+template <bool index>
+struct BenchmarkQueryNotChainedOrStrings : BenchmarkWithStringsTableForIn {
+    const char* name() const
+    {
+        return index ? "QueryNotChainedOrStringsIndexed" : "QueryNotChainedOrStrings";
+    }
+
+    void before_all(DBRef group)
+    {
+        create_table(group, index);
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        Query query = table->where();
+        query.Not();
+        query.group();
+        for (size_t i = 0; i < values_to_query.size(); ++i) {
+            query.Or().equal(m_col, values_to_query[i]);
+        }
+        query.end_group();
+        TableView results = query.find_all();
+        REALM_ASSERT_EX(results.size() == num_rows - num_queried_matches, results.size(),
+                        num_rows - num_queried_matches, values_to_query.size());
+        static_cast<void>(results);
+    }
+};
+
+template <bool index>
+struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTableForIn {
+    const char* name() const
+    {
+        return index ? "QueryChainedOrStringsIndexed" : "QueryChainedOrStrings";
+    }
+
+    void before_all(DBRef group)
+    {
+        create_table(group, index);
     }
 
     void operator()(DBRef)
@@ -1884,7 +1911,10 @@ int benchmark_common_tasks_main()
 
     BENCH(BenchmarkQueryInsensitiveString);
     BENCH(BenchmarkQueryInsensitiveStringIndexed);
-    BENCH(BenchmarkQueryChainedOrStrings);
+    BENCH(BenchmarkQueryChainedOrStrings<false>);
+    BENCH(BenchmarkQueryChainedOrStrings<true>);
+    BENCH(BenchmarkQueryNotChainedOrStrings<false>);
+    BENCH(BenchmarkQueryNotChainedOrStrings<true>);
     BENCH(BenchmarkQueryChainedOrInts);
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryIntEquality);

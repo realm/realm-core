@@ -2545,6 +2545,73 @@ TEST(Query_StrIndex)
     }
 }
 
+TEST(Query_StrIndexUpdating)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_write();
+
+    auto t = group->add_table("table");
+    auto col = t->add_column(type_String, "value");
+    t->add_search_index(col);
+    TableView tv = t->where().equal(col, "").find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    group->commit_and_continue_as_read();
+
+    // Queries on indexes have different codepaths for 0, 1, and multiple results,
+    // so check each of the 6 possible transitions. The write transactions are
+    // required here because otherwise the Query will be using the StringIndex
+    // being mutated and will happen to give correct results even if it fails
+    // to update all of its internal state.
+
+    // 0 -> 1 result
+    group->promote_to_write();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+
+    // 1 -> multiple results
+    group->promote_to_write();
+    t->create_object();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+
+    // multiple -> 1
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    t->remove_object(tv.get_key(1));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+
+    // 1 -> 0
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+
+    // 0 -> multiple
+    group->promote_to_write();
+    t->create_object();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 2);
+
+    // multiple -> 0
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    t->remove_object(tv.get_key(1));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+}
+
 TEST(Query_GA_Crash)
 {
     GROUP_TEST_PATH(path);
@@ -5186,6 +5253,45 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
             foreignindex = foreignindex2;
         }
     }
+}
+
+TEST(Query_AllocatorBug)
+{
+    // At some point this test failed when cluster node size was 4.
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column(type_Double, "doubles");
+    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_link = bar->add_column_link(type_Link, "links", *foo);
+    auto col_linklist = bar->add_column_link(type_LinkList, "linklists", *foo);
+
+    for (int i = 0; i < 10000; i++) {
+        auto obj = foo->create_object();
+        obj.set(col_double, double(i % 19));
+        obj.set(col_int, 30 - (i % 19));
+    }
+
+    // At this point the WrappedAllocator in "foo" points to a translation table with 6 elements
+
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        // During this a new slab is needed, so the translation table in "bar" contains 7 elements.
+        // Some clusters if "bar" will use this last element for translation
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // When traversion clusters in "bar" wee should use the "bar" wrapped allocator and not the
+    // one in "foo" (that was the error)
+    auto cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
 }
 
 #endif // TEST_QUERY

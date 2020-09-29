@@ -781,7 +781,15 @@ void Cluster::create(size_t nb_leaf_columns)
 {
     // Create array with the required size
     Array::create(type_HasRefs, false, nb_leaf_columns + s_first_col_index);
-    Array::set(0, RefOrTagged::make_tagged(0));
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    ensure_size(m_size * 8);
+    // "ensure_size" may COW, but as array is just created, it has no parents, so
+    // failing to update parent is not an error.
+    clear_missing_parent_update();
+
+    Array::set(0, RefOrTagged::make_tagged(0)); // Size = 0
+
     auto table = m_tree_top.get_owner();
     auto column_initialize = [this](ColKey col_key) {
         auto col_ndx = col_key.get_index();
@@ -849,10 +857,6 @@ void Cluster::create(size_t nb_leaf_columns)
         return false;
     };
     table->for_each_and_every_column(column_initialize);
-
-    // By specifying the minimum size, we ensure that the array has a capacity
-    // to hold m_size 64 bit refs.
-    ensure_size(m_size * 8);
 }
 
 void Cluster::init(MemRef mem)

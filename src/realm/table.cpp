@@ -405,6 +405,10 @@ void Table::remove_column(ColKey col_key)
     if (col_key == m_primary_key_col) {
         do_set_primary_key_column(ColKey());
     }
+    else {
+        REALM_ASSERT_RELEASE(m_primary_key_col.get_index().val != col_key.get_index().val);
+    }
+
     erase_root_column(col_key); // Throws
     m_has_any_embedded_objects.reset();
 }
@@ -1591,6 +1595,7 @@ void Table::finalize_migration(ColKey pk_col_key)
         remove_column(oid_col);
     }
 
+    REALM_ASSERT_RELEASE(!pk_col_key || valid_column(pk_col_key));
     do_set_primary_key_column(pk_col_key);
 }
 
@@ -3520,10 +3525,13 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     if (col_key.is_nullable() == nullable)
         return col_key;
 
+    check_column(col_key);
+
     bool si = has_search_index(col_key);
     std::string column_name(get_column_name(col_key));
     auto type = col_key.get_type();
     auto attr = col_key.get_attrs();
+    bool is_pk_col = (col_key == m_primary_key_col);
     if (nullable) {
         attr.set(col_attr_Nullable);
     }
@@ -3548,6 +3556,13 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 
     if (si)
         add_search_index(new_col);
+
+    if (is_pk_col) {
+        // If we go from non nullable to nullable, no values change,
+        // so it is safe to preserve the pk column. Otherwise it is not
+        // safe as a null entry might have been converted to default value.
+        do_set_primary_key_column(nullable ? new_col : ColKey{});
+    }
 
     return new_col;
 }

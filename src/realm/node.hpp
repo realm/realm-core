@@ -182,6 +182,11 @@ public:
     {
         return m_ndx_in_parent;
     }
+    bool has_missing_parent_update() const noexcept
+    {
+        return m_missing_parent_update;
+    }
+
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
@@ -243,13 +248,22 @@ public:
         m_ndx_in_parent = ndx;
     }
 
+    void clear_missing_parent_update()
+    {
+        m_missing_parent_update = false;
+    }
+
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
     /// parent pointer is set to null, this function has no effect.
     void update_parent()
     {
-        if (m_parent)
+        if (m_parent) {
             m_parent->update_child_ref(m_ndx_in_parent, m_ref);
+        }
+        else {
+            m_missing_parent_update = true;
+        }
     }
 
 protected:
@@ -323,6 +337,7 @@ protected:
 private:
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
+    bool m_missing_parent_update = false;
 
     void do_copy_on_write(size_t minimum_size = 0);
 };

@@ -1,20 +1,19 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Features added by release v6.1.0 to 6.1.2:
+  * Slightly improve performance of most operations which read data from the Realm file.
+  * Allocating one extra entry in ref translation tables. May help finding memory mapping problems.
+  * Greatly improve performance of NOT IN queries on indexed string or int columns.
 
 ### Fixed
 * Fixed a ObjectId sometimes changing from null to ObjectId("deaddeaddeaddeaddeaddead") after erasing rows which triggers a BPNode merge, this can happen when there are > 1000 objects. (Since v10).
 * Fixed an assertion failure when adding an index to a nullable ObjectId property that contains nulls. (since v10).
 * Added missing `Table::find_first(ColKey, util::Optional<ObjectId>)`. ([#3919](https://github.com/realm/realm-core/issues/3919), since v10).
-
-### Breaking changes
-* None.
-
------------
-
-### Internals
-* None.
+* Issues fixed by releases v6.1.0 to v6.1.2:
+  * Rerunning an equals query on an indexed string column which previously had more than one match and now has one match would sometimes throw a "key not found" exception ([Cocoa #6536](https://github.com/realm/realm-cocoa/issues/6536), since 6.1.0-alpha.4),
+  * When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([Java #7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
+  * Possibly fix issues related to changing the primary key property from nullable to required. ([PR #3917](https://github.com/realm/realm-core/pull/3918)).
 
 ----------------------------------------------
 
@@ -323,6 +322,41 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
  
+# 6.1.2 Release notes
+
+### Enhancements
+* Slightly improve performance of most operations which read data from the Realm file.
+
+### Fixed
+* Rerunning an equals query on an indexed string column which previously had more than one match and now has one match would sometimes throw a "key not found" exception ([Cocoa #6536](https://github.com/realm/realm-cocoa/issues/6536), since 6.0.2),
+
+----------------------------------------------
+
+# 6.1.1 Release notes
+
+### Enhancements
+* Allocating one extra entry in ref translation tables. May help finding memory mapping problems.
+
+### Fixed
+* None.
+-----------
+
+### Internals
+* Fix assertion failure related to Table::clear found by Cocoa SDK in V6.1.0. That release is not expected to be used in SDK releases, so no customers are affected.
+
+----------------------------------------------
+
+# 6.1.0 Release notes
+
+### Enhancements
+* Greatly improve performance of NOT IN queries on indexed string or int columns.
+
+### Fixed
+* When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([Java #7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
+* Possibly fix issues related to changing the primary key property from nullable to required. ([PR #3917](https://github.com/realm/realm-core/pull/3918)).
+
+----------------------------------------------
+
 # 6.0.26 Release notes
 
 ### Enhancements

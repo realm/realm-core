@@ -2134,7 +2134,7 @@ public:
 
     void set_cluster(const Cluster* cluster)
     {
-        Allocator& alloc = m_tables.back()->get_alloc();
+        Allocator& alloc = get_base_table()->get_alloc();
         m_array_ptr = nullptr;
         switch (m_link_types[0]) {
             case col_type_Link:

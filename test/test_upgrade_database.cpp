@@ -1712,7 +1712,17 @@ TEST(Upgrade_bug)
 {
     // ReplSyncClient repl_sync_client("/home/joergen/default.realm", 10, 16);
     auto hist = make_in_realm_history("/home/joergen/default.realm");
-    DB::create(*hist)->start_read()->verify();
+    auto db = DB::create(*hist);
+    auto rt = db->start_read();
+    rt->verify();
+    for (TableKey&& k : rt->get_table_keys()) {
+        auto table = rt->get_table(k);
+        std::cout << table->get_name() << std::endl;
+        if (auto col = table->get_primary_key_column()) {
+            StringData column_name = table->get_column_name(col);
+            std::cout << "   pk: " << column_name << std::endl;
+        }
+    }
 }
 */
 
