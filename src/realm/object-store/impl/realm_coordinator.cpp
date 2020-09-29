@@ -33,15 +33,16 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
-#include <realm/object-store/sync/sync_config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/sync/history.hpp>
 #endif
 
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/sync/config.hpp>
 
 #include <algorithm>
 #include <unordered_map>

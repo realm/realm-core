@@ -23,7 +23,6 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/sync_config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/schema.hpp>

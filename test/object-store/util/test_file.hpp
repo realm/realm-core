@@ -28,7 +28,8 @@
 #include <thread>
 
 #if REALM_ENABLE_SYNC
-#include <realm/object-store/sync/sync_config.hpp>
+#include <realm/sync/config.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include "test_utils.hpp"
 

@@ -40,9 +40,9 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
-#include <realm/object-store/sync/sync_config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 
+#include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/version.hpp>
 #endif

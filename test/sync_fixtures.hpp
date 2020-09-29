@@ -543,7 +543,7 @@ public:
             config_2.user_agent_application_info = "TestFixture/" REALM_SYNC_VER_STRING;
             config_2.max_open_files = config.client_max_open_files;
             config_2.logger = &*m_client_loggers[i];
-            config_2.reconnect_mode = Client::ReconnectMode::testing;
+            config_2.reconnect_mode = ReconnectMode::testing;
             config_2.ping_keepalive_period = config.client_ping_period;
             config_2.pong_keepalive_timeout = config.client_pong_timeout;
             config_2.disable_upload_compaction = config.disable_upload_compaction;

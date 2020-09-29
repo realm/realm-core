@@ -26,10 +26,6 @@
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/sync/client.hpp>
-#endif
-
 #include <memory>
 
 namespace realm {

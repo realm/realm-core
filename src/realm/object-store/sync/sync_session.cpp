@@ -301,8 +301,8 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
             if (session->m_config.error_handler) {
-                session->m_config.error_handler(
-                    session, SyncError(SyncError::ProtocolError::bad_authentication, "expired refresh token", true));
+                session->m_config.error_handler(session, SyncError(realm::sync::ProtocolError::bad_authentication,
+                                                                   "expired refresh token", true));
             }
         }
         else if (error) {
@@ -842,6 +842,8 @@ SyncSession::PublicState SyncSession::get_public_state() const
     }
     REALM_UNREACHABLE();
 }
+
+SyncSession::~SyncSession() {}
 
 SyncSession::PublicState SyncSession::state() const
 {

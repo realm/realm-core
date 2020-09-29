@@ -59,7 +59,6 @@ TEST(Sync_CookedHistory_Basics)
     SHARED_GROUP_TEST_PATH(client_path_2);
     SHARED_GROUP_TEST_PATH(client_path_3);
 
-    using ChangesetCooker = ClientReplication::ChangesetCooker;
     std::shared_ptr<ChangesetCooker> cooker = std::make_shared<TrivialChangesetCooker>();
 
     // Produce a changeset
@@ -310,8 +309,7 @@ TEST(Sync_CookedHistory_2)
     ClientServerFixture fixture{server_dir, test_context};
     fixture.start();
 
-    using ChangesetCooker = ClientReplication::ChangesetCooker;
-    std::shared_ptr<ChangesetCooker> cooker = std::make_shared<TrivialChangesetCooker>();
+    auto cooker = std::make_shared<TrivialChangesetCooker>();
 
     {
         std::unique_ptr<ClientReplication> history = sync::make_client_replication(client_path_1);
@@ -378,8 +376,7 @@ TEST(Sync_CookedHistory_LargeChangeset)
     ClientServerFixture fixture{server_dir, test_context};
     fixture.start();
 
-    using ChangesetCooker = ClientReplication::ChangesetCooker;
-    std::shared_ptr<ChangesetCooker> cooker = std::make_shared<TrivialChangesetCooker>();
+    auto cooker = std::make_shared<TrivialChangesetCooker>();
 
     // Create enough data that our changeset cannot be stored contiguously by BinaryColumn (> 16MB).
     constexpr size_t data_size = 8 * 1024 * 1024;
@@ -473,8 +470,7 @@ TEST(Sync_CookedHistory_RestrictsServerSideHistoryCompaction)
     fixture_config.disable_upload_compaction = true;
     fixture_config.history_compaction_clock = &compaction_clock;
 
-    using ChangesetCooker = ClientReplication::ChangesetCooker;
-    std::shared_ptr<ChangesetCooker> cooker = std::make_shared<TrivialChangesetCooker>();
+    auto cooker = std::make_shared<TrivialChangesetCooker>();
 
     auto transact = [](DBRef sg) {
         WriteTransaction wt{sg};

@@ -31,6 +31,15 @@
 using namespace realm;
 using namespace realm::_impl;
 
+SyncClientTimeouts::SyncClientTimeouts()
+    : connect_timeout(sync::Client::default_connect_timeout)
+    , connection_linger_time(sync::Client::default_connection_linger_time)
+    , ping_keepalive_period(sync::Client::default_ping_keepalive_period)
+    , pong_keepalive_timeout(sync::Client::default_pong_keepalive_timeout)
+    , fast_reconnect_limit(sync::Client::default_fast_reconnect_limit)
+{
+}
+
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after

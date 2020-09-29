@@ -21,7 +21,7 @@
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 
-#include <realm/object-store/sync/sync_config.hpp>
+#include <realm/sync/config.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
