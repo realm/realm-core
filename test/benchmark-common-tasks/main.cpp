@@ -1036,6 +1036,23 @@ struct BenchmarkQueryIntEquality : BenchmarkQueryChainedOrInts {
     }
 };
 
+struct BenchmarkQueryIntSum : BenchmarkQueryChainedOrInts {
+    const char* name() const
+    {
+        return "QueryIntSum";
+    }
+
+    void operator()(DBRef)
+    {
+        ConstTableRef table = m_table;
+        for (int k = 0; k < 1000; k++) {
+            Query query = table->where().equal(m_col, k);
+            auto sum = query.sum_int(m_col);
+            static_cast<void>(sum);
+        }
+    }
+};
+
 struct BenchmarkQueryIntEqualityIndexed : BenchmarkQueryIntEquality {
     const char* name() const
     {
@@ -1889,6 +1906,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryChainedOrIntsIndexed);
     BENCH(BenchmarkQueryIntEquality);
     BENCH(BenchmarkQueryIntEqualityIndexed);
+    BENCH(BenchmarkQueryIntSum);
     BENCH(BenchmarkIntVsDoubleColumns);
     BENCH(BenchmarkQueryStringOverLinks);
     BENCH(BenchmarkQueryTimestampGreaterOverLinks);
