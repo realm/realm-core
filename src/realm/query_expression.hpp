@@ -2317,7 +2317,8 @@ public:
 
     bool has_search_index() const override
     {
-        return m_link_map.get_target_table()->has_search_index(m_column_key);
+        auto target_table = m_link_map.get_target_table();
+        return target_table->get_primary_key_column() == m_column_key || target_table->has_search_index(m_column_key);
     }
 
     std::vector<ObjKey> find_all(Mixed value) const override
@@ -2325,13 +2326,22 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        T val{};
-        if (!value.is_null()) {
-            val = value.get<T>();
+        if (m_link_map.get_target_table()->get_primary_key_column() == m_column_key) {
+            // Only one object with a given key would be possible
+            if (auto k = m_link_map.get_target_table()->find_primary_key(value))
+                result.push_back(k);
         }
+        else {
+            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            T val{};
 
-        StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-        index->find_all(result, val);
+            if (!value.is_null()) {
+                val = value.get<T>();
+            }
+
+            REALM_ASSERT(index);
+            index->find_all(result, val);
+        }
 
         for (ObjKey k : result) {
             auto ndxs = m_link_map.get_origin_ndxs(k);
@@ -3603,21 +3613,28 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        if (m_nullable && std::is_same_v<T, int64_t>) {
-            util::Optional<int64_t> val;
-            if (!value.is_null()) {
-                val = value.get_int();
-            }
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-            index->find_all(result, val);
+        if (m_link_map.get_target_table()->get_primary_key_column() == m_column_key) {
+            // Only one object with a given key would be possible
+            if (auto k = m_link_map.get_target_table()->find_primary_key(value))
+                result.push_back(k);
         }
         else {
-            T val{};
-            if (!value.is_null()) {
-                val = value.get<T>();
+            if (m_nullable && std::is_same_v<T, int64_t>) {
+                util::Optional<int64_t> val;
+                if (!value.is_null()) {
+                    val = value.get_int();
+                }
+                StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+                index->find_all(result, val);
             }
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-            index->find_all(result, val);
+            else {
+                T val{};
+                if (!value.is_null()) {
+                    val = value.get<T>();
+                }
+                StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+                index->find_all(result, val);
+            }
         }
 
         for (auto k : result) {
