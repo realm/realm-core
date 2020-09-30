@@ -95,6 +95,7 @@ public:
 
     template <typename T = Obj>
     T get(size_t row_ndx) const;
+    Mixed get_any(size_t ndx) const;
     template <typename T>
     size_t find(T const& value) const;
 
@@ -107,6 +108,10 @@ public:
     void insert(size_t list_ndx, T value);
     template <typename T>
     void set(size_t row_ndx, T value);
+
+    void add_any(Mixed value);
+    void insert_any(size_t index, Mixed value);
+    void set_any(size_t index, Mixed value);
 
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
@@ -226,7 +231,9 @@ auto List::dispatch(Fn&& fn) const
 template <typename Context>
 auto List::get(Context& ctx, size_t row_ndx) const
 {
-    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) {
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+    });
 }
 
 template <typename T, typename Context>
@@ -253,7 +260,9 @@ void List::add(Context& ctx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) { this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
+    dispatch([&](auto t) {
+        this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
 }
 
 template <typename T, typename Context>
@@ -265,7 +274,9 @@ void List::insert(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) { this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
+    dispatch([&](auto t) {
+        this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
 }
 
 template <typename T, typename Context>
@@ -279,7 +290,9 @@ void List::set(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) { this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
+    dispatch([&](auto t) {
+        this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
 }
 
 template <typename T, typename Context>
