@@ -21,7 +21,11 @@ set(SOURCES
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
     util/scheduler.cpp
-    util/uuid.cpp)
+    util/uuid.cpp
+    
+    c_api.cpp
+    c_api/realm.c
+)
 
 set(HEADERS
     binding_callback_thread_observer.hpp
@@ -70,7 +74,10 @@ set(HEADERS
     util/event_loop_dispatcher.hpp
     util/scheduler.hpp
     util/tagged_bool.hpp
-    util/uuid.hpp)
+    util/uuid.hpp
+    
+    c_api/conversion.hpp
+)
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)

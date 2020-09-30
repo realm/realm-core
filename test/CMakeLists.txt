@@ -131,6 +131,7 @@ file(GLOB REQUIRED_TEST_FILES
 
 add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
+target_compile_options(CoreTests PRIVATE "-Wno-unused")
 
 # Resources required for running the tests copied to the target directory
 if(CMAKE_GENERATOR STREQUAL Xcode)
@@ -297,6 +298,7 @@ if(REALM_ENABLE_SYNC)
 
 	add_library(TestUtils STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
 	target_link_libraries(TestUtils Storage)
+	target_compile_options(TestUtils PRIVATE "-Wno-unused")
 
 	if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
 	    include(Findprocps)
@@ -312,6 +314,7 @@ if(REALM_ENABLE_SYNC)
 	add_executable(SyncTests ${SYNC_TESTS} ${TEST_MAIN_SOURCES} ${TEST_HEADERS})
 	set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
 	target_link_libraries(SyncTests Sync SyncServer TestUtils)
+	target_compile_options(SyncTests PRIVATE "-Wno-unused")
 	add_test(NAME SyncTests COMMAND realm-sync-tests)
 
 	if(UNIX AND NOT APPLE)

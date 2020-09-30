@@ -20,6 +20,7 @@ set(SOURCES
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
     uuid.cpp
+    c_api.cpp
 
     util/event_loop.cpp
     util/test_file.cpp
@@ -72,6 +73,7 @@ endif()
 
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(tests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} .)
+target_compile_options(tests PRIVATE "-Wno-unused")
 
 if(VSCODE_TEST_RUNNER)
     # Increase the Catch2 virtual console width so that the Visual Studio Code
