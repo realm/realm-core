@@ -1001,16 +1001,16 @@ RLM_API bool realm_list_clear(realm_list_t* list)
 RLM_API realm_query_t* realm_query_new(const realm_t* realm, realm_table_key_t key)
 {
     return wrap_err([&]() {
-        auto& shared_realm = **realm;
-        auto table = shared_realm.read_group().get_table(from_capi(key));
-        return new realm_query_t{table->where()};
+        auto& shared_realm = *realm;
+        auto table = shared_realm->read_group().get_table(from_capi(key));
+        return new realm_query_t{table->where(), shared_realm};
     });
 }
 
 RLM_API realm_query_t* realm_query_new_with_results(realm_results_t* results)
 {
     return wrap_err([&]() {
-        return new realm_query_t{results->get_query()};
+        return new realm_query_t{results->get_query(), results->get_realm()};
     });
 }
 
@@ -1062,7 +1062,7 @@ RLM_API bool realm_query_count(const realm_query_t* query, size_t* out_count)
     });
 }
 
-RLM_API bool realm_query_find_first(const realm_query_t* query, realm_obj_key_t* out_key, bool* out_found)
+RLM_API bool realm_query_find_first(realm_query_t* query, realm_obj_key_t* out_key, bool* out_found)
 {
     return wrap_err([&]() {
         auto key = query->ptr->find();
@@ -1074,7 +1074,7 @@ RLM_API bool realm_query_find_first(const realm_query_t* query, realm_obj_key_t*
     });
 }
 
-RLM_API realm_results_t* realm_query_find_all(const realm_query_t* query)
+RLM_API realm_results_t* realm_query_find_all(realm_query_t* query)
 {
     return wrap_err([&]() {
         auto shared_realm = query->weak_realm.lock();
