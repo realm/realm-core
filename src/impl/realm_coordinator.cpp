@@ -1001,6 +1001,12 @@ void RealmCoordinator::run_async_notifiers()
         // skipped
         // FIXME: this is comically slow
         version = m_db->start_read()->get_version_of_current_transaction();
+        if (version == m_notifier_sg->get_version_of_current_transaction()) {
+            // We were spuriously woken up and there isn't actually anything to do
+            REALM_ASSERT(!m_notifier_skip_version.version);
+            m_notifier_cv.notify_all();
+            return;
+        }
     }
 
     auto skip_version = m_notifier_skip_version;
@@ -1008,7 +1014,18 @@ void RealmCoordinator::run_async_notifiers()
 
     // Make a copy of the notifiers vector and then release the lock to avoid
     // blocking other threads trying to register or unregister notifiers while we run them
-    auto notifiers = m_notifiers;
+    decltype(m_notifiers) notifiers;
+    if (version != m_notifier_sg->get_version_of_current_transaction()) {
+        // We only want to rerun the existing notifiers if the version has changed.
+        // This is both a minor optimization and required for notification
+        // skipping to work. The skip logic assumes that the notifier can't be
+        // running when suppress_next() is called because it can only be called
+        // from within a write transaction, and starting the write transaction
+        // would have blocked until the notifier is done running. However,
+        // on_change() can be triggered by things other than writes, so we may
+        // be here even if the notifiers don't need to rerun.
+        notifiers = m_notifiers;
+    }
     m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
     lock.unlock();
 

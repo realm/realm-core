@@ -974,6 +974,27 @@ TEST_CASE("notifications: skip") {
         advance_and_notify(*r);
         REQUIRE(calls1 == 2);
     }
+
+    SECTION("skipping every write in a loop with spurious background runs works") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        std::atomic<bool> exit{false};
+        JoiningThread t([&] {
+            while (!exit)
+                on_change_but_no_notify(*r);
+        });
+
+        for (int i = 0; i < 10; ++i) {
+            r->begin_transaction();
+            table->create_object();
+            token1.suppress_next();
+            r->commit_transaction();
+        }
+
+        exit = true;
+        REQUIRE(calls1 == 1);
+    }
 }
 
 TEST_CASE("notifications: TableView delivery") {
