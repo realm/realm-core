@@ -231,6 +231,12 @@ struct ColumnTypeTraits<Decimal128> {
 };
 
 template <typename T>
+struct ObjectTypeTraits {
+    constexpr static bool self_contained_null =
+        realm::is_any_v<T, StringData, BinaryData, Decimal128, Timestamp, Mixed>;
+};
+
+template <typename T>
 using ColumnClusterLeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
 template <typename T>
 using ColumnSumType = typename ColumnTypeTraits<T>::sum_type;

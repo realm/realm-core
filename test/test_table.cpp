@@ -3168,22 +3168,25 @@ TEST(Table_ListOfPrimitives)
     CHECK_NOT(timestamp_list.is_attached());
 }
 
-TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
-           Optional<float>, Optional<double>, Optional<ObjectId>)
+TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
+           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
 {
-    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
-    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+    using type = typename TEST_TYPE::type;
+    using underlying_type = typename TEST_TYPE::underlying_type;
 
+    TestValueGenerator gen;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+    ColKey col = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     auto obj = t->create_object();
-    auto list = obj.get_list<TEST_TYPE>(col);
+    auto list = obj.get_list<type>(col);
 
-    std::vector<TEST_TYPE> values =
-        values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<type> values = gen.values_from_int<type>({9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     std::vector<size_t> indices;
+    type default_or_null = TEST_TYPE::default_value();
+    values.push_back(default_or_null);
     obj.set_list_values(col, values);
 
     CHECK(list.has_changed());
@@ -3203,9 +3206,9 @@ TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, Objec
     cmp();
     CHECK_NOT(list.has_changed());
 
-    TEST_TYPE new_value = convert_for_test<underlying_type>(6);
+    underlying_type new_value = gen.convert_for_test<underlying_type>(6);
     values.push_back(new_value);
-    list.add(new_value);
+    list.add(type(new_value));
     CHECK(list.has_changed());
     std::sort(values.begin(), values.end(), ::less());
     list.sort(indices);
@@ -3218,20 +3221,24 @@ TEST_TYPES(Table_ListOfPrimitivesSort, int64_t, float, double, Decimal128, Objec
     cmp();
 }
 
-TEST_TYPES(Table_ListOfPrimitivesDistinct, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>,
-           Optional<float>, Optional<double>, Optional<ObjectId>)
+TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
+           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
 {
-    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
-    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+    using type = typename TEST_TYPE::type;
+    TestValueGenerator gen;
     Group g;
     TableRef t = g.add_table("table");
-    ColKey col = t->add_column_list(ColumnTypeTraits<underlying_type>::id, "values", is_optional);
+    ColKey col = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     auto obj = t->create_object();
-    auto list = obj.get_list<TEST_TYPE>(col);
+    auto list = obj.get_list<type>(col);
 
-    std::vector<TEST_TYPE> values = values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5});
-    std::vector<TEST_TYPE> distinct_values = values_from_int<TEST_TYPE, underlying_type>({9, 4, 2, 7, 8, 11, 5});
+    std::vector<type> values = gen.values_from_int<type>({9, 4, 2, 7, 4, 9, 8, 11, 2, 4, 5});
+    std::vector<type> distinct_values = gen.values_from_int<type>({9, 4, 2, 7, 8, 11, 5});
+    type default_or_null = TEST_TYPE::default_value();
+    values.push_back(default_or_null);
+    distinct_values.push_back(default_or_null);
     std::vector<size_t> indices;
     obj.set_list_values(col, values);
 
@@ -3245,10 +3252,10 @@ TEST_TYPES(Table_ListOfPrimitivesDistinct, int64_t, float, double, Decimal128, O
     list.distinct(indices);
     cmp();
     list.distinct(indices, true);
-    std::sort(distinct_values.begin(), distinct_values.end(), std::less<TEST_TYPE>());
+    std::sort(distinct_values.begin(), distinct_values.end(), std::less<type>());
     cmp();
     list.distinct(indices, false);
-    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<TEST_TYPE>());
+    std::sort(distinct_values.begin(), distinct_values.end(), std::greater<type>());
     cmp();
 }
 
@@ -4269,6 +4276,78 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
     }
 }
 
+TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Prop<ObjectId>, Prop<Timestamp>,
+           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Nullable<Int>, Nullable<double>, Nullable<float>,
+           Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>, Nullable<Decimal128>,
+           Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>, Indexed<StringData>, NullableIndexed<Int>,
+           NullableIndexed<ObjectId>, NullableIndexed<Timestamp>, NullableIndexed<StringData>)
+{
+    using type = typename TEST_TYPE::type;
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    TestValueGenerator gen;
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey col0 = t->add_column(TEST_TYPE::data_type, "value", TEST_TYPE::is_nullable);
+    ColKey col1 = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    ColKey col_link = t->add_column_link(type_Link, "link", *t);
+
+    if constexpr (TEST_TYPE::is_indexed) {
+        t->add_search_index(col0);
+    }
+
+    std::vector<underlying_type> values = gen.values_from_int<underlying_type>({9, 4, 2, 7});
+    underlying_type default_non_null_value = TEST_TYPE::default_non_nullable_value();
+    values.push_back(default_non_null_value);
+    std::vector<size_t> indices;
+
+    for (underlying_type v : values) {
+        auto obj = t->create_object();
+        obj.set(col0, v);
+        obj.set(col_link, obj.get_key());
+    }
+
+    constexpr size_t num_defaults_added = 3;
+    for (size_t i = 0; i < num_defaults_added; ++i) {
+        auto obj = t->create_object();
+        obj.set(col_link, obj.get_key());
+    }
+    auto list = t->begin()->get_list<type>(col1);
+    for (underlying_type v : values) {
+        list.add(v);
+    }
+
+    constexpr size_t num_nulls = TEST_TYPE::is_nullable ? num_defaults_added : 0;
+    constexpr size_t num_default_non_nullables = TEST_TYPE::is_nullable ? 1 : num_defaults_added + 1;
+
+    for (underlying_type v : values) {
+        const size_t num_expected = (v == default_non_null_value ? num_default_non_nullables : 1);
+        Query q0 = t->column<underlying_type>(col0) == v;
+        CHECK_EQUAL(q0.count(), num_expected);
+        Query q1 = t->link(col_link).column<underlying_type>(col0) == v;
+        CHECK_EQUAL(q1.count(), num_expected);
+        Query q2 = t->link(col_link).link(col_link).column<underlying_type>(col0) == v;
+        CHECK_EQUAL(q2.count(), num_expected);
+        Query q3 = t->where().equal(col0, v);
+        CHECK_EQUAL(q3.count(), num_expected);
+        Query q4 = t->column<Lst<underlying_type>>(col1) == v;
+        CHECK_EQUAL(q4.count(), 1);
+    }
+
+    {
+        Query q0 = t->column<underlying_type>(col0) == realm::null();
+        CHECK_EQUAL(q0.count(), num_nulls);
+        Query q1 = t->link(col_link).column<underlying_type>(col0) == realm::null();
+        CHECK_EQUAL(q1.count(), num_nulls);
+        Query q2 = t->link(col_link).link(col_link).column<underlying_type>(col0) == realm::null();
+        CHECK_EQUAL(q2.count(), num_nulls);
+        Query q3 = t->column<underlying_type>(col0) == default_non_null_value;
+        CHECK_EQUAL(q3.count(), num_default_non_nullables);
+        Query q4 = t->link(col_link).column<underlying_type>(col0) == default_non_null_value;
+        CHECK_EQUAL(q4.count(), num_default_non_nullables);
+        Query q5 = t->link(col_link).link(col_link).column<underlying_type>(col0) == default_non_null_value;
+        CHECK_EQUAL(q5.count(), num_default_non_nullables);
+    }
+}
 
 namespace {
 
