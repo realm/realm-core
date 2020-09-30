@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/apple/keychain_helper.hpp"
+#include <realm/object-store/impl/apple/keychain_helper.hpp>
 
 
 #include <realm/util/cf_ptr.hpp>

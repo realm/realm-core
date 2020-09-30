@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/results_notifier.hpp"
+#include <realm/object-store/impl/results_notifier.hpp>
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
 #include <numeric>
 

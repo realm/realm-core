@@ -9,30 +9,6 @@
 
 namespace realm {
 
-// To be used in query for size. Adds nullability to size so that
-// it can be put in a NullableVector
-struct SizeOfList {
-    static constexpr size_t null_value = size_t(-1);
-
-    SizeOfList(size_t s = null_value)
-        : sz(s)
-    {
-    }
-    bool is_null()
-    {
-        return sz == null_value;
-    }
-    void set_null()
-    {
-        sz = null_value;
-    }
-    size_t size() const
-    {
-        return sz;
-    }
-    size_t sz = null_value;
-};
-
 template <class T>
 inline void check_column_type(ColKey col)
 {
@@ -142,17 +118,6 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
         return Mixed(bptree_average<T>(tree, return_cnt));
     }
 };
-
-inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
-{
-    if (size_of_list.is_null()) {
-        ostr << "null";
-    }
-    else {
-        ostr << size_of_list.sz;
-    }
-    return ostr;
-}
 
 class CollectionBase : public ArrayParent {
 public:

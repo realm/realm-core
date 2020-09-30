@@ -79,20 +79,6 @@ set(HEADERS
     c_api/conversion.hpp
 )
 
-if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
-elseif(REALM_HAVE_EPOLL)
-    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
-elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
-else()
-    list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
-endif()
-
-set(INCLUDE_DIRS
-    ${UV_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR})
-
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/app.hpp
@@ -140,25 +126,41 @@ if(REALM_ENABLE_SYNC)
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)
     endif()
-    find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+endif()
+
+add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
+add_library(Realm::ObjectStore ALIAS ObjectStore)
+
+set_target_properties(ObjectStore PROPERTIES
+    OUTPUT_NAME realm-object-store
+)
+
+check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
+
+if(APPLE)
+    target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+elseif(REALM_HAVE_EPOLL)
+    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
+    target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
+elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    target_sources(ObjectStore PRIVATE impl/windows/external_commit_helper.cpp)
+else()
+    target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
-    list(APPEND INCLUDE_DIRS ../external/json)
+    # needed to disable assertions in external/json
+    target_compile_definitions(ObjectStore PUBLIC
+        $<$<CONFIG:Release>:NDEBUG>
+        $<$<CONFIG:RelWithDebInfo>:NDEBUG>
+    )
+    target_include_directories(ObjectStore PRIVATE ${JSON_INCLUDE_DIR})
 endif()
 
-add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
-set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
-target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
-target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
-
-if (APPLE)
-    target_link_libraries(realm-object-store PUBLIC ${Foundation} ${Security})
-endif()
+target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(realm-object-store PUBLIC Sync ${ZLIB_LIBRARIES})
+    target_link_libraries(ObjectStore PUBLIC Sync)
+    target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
 endif()

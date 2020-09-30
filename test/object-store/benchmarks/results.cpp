@@ -21,11 +21,11 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
-#include "binding_context.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <realm/db.hpp>
 #include <realm/query_engine.hpp>

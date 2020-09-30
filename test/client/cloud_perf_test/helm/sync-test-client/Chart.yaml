@@ -1,4 +1,0 @@
-apiVersion: v1
-description: Deployment of sync test client for performance testing
-name: sync-test-client
-version: 0.1.0

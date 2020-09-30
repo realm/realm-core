@@ -1654,7 +1654,7 @@ bool DirScanner::next(std::string& name)
 
 // Use readdir64 if it is available. This is necessary to support filesystems that return dirent fields that don't fit
 // in 32-bits.
-#ifdef REALM_HAVE_READDIR64
+#if REALM_HAVE_READDIR64
 #define REALM_READDIR(...) readdir64(__VA_ARGS__)
 #else
 #define REALM_READDIR(...) readdir(__VA_ARGS__)

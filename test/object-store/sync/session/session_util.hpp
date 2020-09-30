@@ -21,10 +21,10 @@
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 
-#include "sync/sync_config.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
-#include "sync/sync_user.hpp"
+#include <realm/object-store/sync/sync_config.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 using namespace realm;
 using namespace realm::util;

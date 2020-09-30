@@ -298,7 +298,7 @@ public:
     /// independent verification.
     void use_verify_callback(const std::function<SSLVerifyCallback>& callback);
 
-#ifdef REALM_INCLUDE_CERTS
+#if REALM_INCLUDE_CERTS
     /// use_included_certificates() loads a set of certificates that are
     /// included in the header file src/realm/noinst/root_certs.hpp. By using
     /// the included certificates, the client can verify a server in the case
@@ -784,7 +784,7 @@ inline void Stream::use_verify_callback(const std::function<SSLVerifyCallback>& 
         throw std::system_error(ec);
 }
 
-#ifdef REALM_INCLUDE_CERTS
+#if REALM_INCLUDE_CERTS
 inline void Stream::use_included_certificates()
 {
     std::error_code ec;

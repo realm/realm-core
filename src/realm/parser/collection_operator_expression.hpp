@@ -235,10 +235,10 @@ template <typename RetType>
 struct CollectionOperatorGetter<
     RetType, parser::Expression::KeyPathOp::Count, PrimitiveListExpression,
     typename std::enable_if_t<realm::is_any<RetType, Int, Float, Double, Decimal128>::value>> {
-    static SizeOperator<SizeOfList>
+    static SizeOperator<int64_t>
     convert(const CollectionOperatorExpression<parser::Expression::KeyPathOp::Count, PrimitiveListExpression>& expr)
     {
-        return expr.pe.size_of_list<SizeOperator<SizeOfList>>();
+        return expr.pe.size_of_list<SizeOperator<int64_t>>();
     }
 };
 

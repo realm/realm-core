@@ -19,9 +19,9 @@
 #ifndef REALM_OS_SYNC_METADATA_HPP
 #define REALM_OS_SYNC_METADATA_HPP
 
-#include "results.hpp"
-#include "shared_realm.hpp"
-#include "sync/sync_user.hpp"
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include <realm/obj.hpp>
 #include <realm/table.hpp>

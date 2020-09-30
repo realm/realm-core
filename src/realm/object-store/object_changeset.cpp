@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object_changeset.hpp"
+#include <realm/object-store/object_changeset.hpp>
 
 using namespace realm;
 

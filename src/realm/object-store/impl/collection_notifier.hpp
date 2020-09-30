@@ -19,9 +19,9 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
-#include "object_changeset.hpp"
-#include "impl/collection_change_builder.hpp"
-#include "util/checked_mutex.hpp"
+#include <realm/object-store/object_changeset.hpp>
+#include <realm/object-store/impl/collection_change_builder.hpp>
+#include <realm/object-store/util/checked_mutex.hpp>
 
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>

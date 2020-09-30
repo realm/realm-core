@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/async_open_task.hpp"
+#include <realm/object-store/sync/async_open_task.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
-#include "thread_safe_reference.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 namespace realm {
 

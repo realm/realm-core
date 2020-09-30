@@ -19,15 +19,15 @@
 #ifndef REALM_RESULTS_HPP
 #define REALM_RESULTS_HPP
 
-#include "collection_notifications.hpp"
-#include "impl/collection_notifier.hpp"
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "shared_realm.hpp"
-#include "util/checked_mutex.hpp"
-#include "util/copyable_atomic.hpp"
+#include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/util/checked_mutex.hpp>
+#include <realm/object-store/util/copyable_atomic.hpp>
 
 #include <realm/table_view.hpp>
 #include <realm/util/optional.hpp>

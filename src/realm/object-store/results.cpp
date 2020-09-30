@@ -16,14 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "results.hpp"
+#include <realm/object-store/results.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "impl/results_notifier.hpp"
-#include "audit.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "schema.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/results_notifier.hpp>
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <stdexcept>
 

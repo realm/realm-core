@@ -19,8 +19,8 @@
 #ifndef REALM_COLLECTION_NOTIFICATIONS_HPP
 #define REALM_COLLECTION_NOTIFICATIONS_HPP
 
-#include "index_set.hpp"
-#include "util/atomic_shared_ptr.hpp"
+#include <realm/object-store/index_set.hpp>
+#include <realm/object-store/util/atomic_shared_ptr.hpp>
 
 #include <exception>
 #include <memory>

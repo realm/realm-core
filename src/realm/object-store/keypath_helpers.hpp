@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/parser/keypath_mapping.hpp>
 

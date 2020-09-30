@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "collection_notifications.hpp"
+#include <realm/object-store/collection_notifications.hpp>
 
-#include "impl/collection_notifier.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

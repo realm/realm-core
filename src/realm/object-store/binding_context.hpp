@@ -19,7 +19,7 @@
 #ifndef BINDING_CONTEXT_HPP
 #define BINDING_CONTEXT_HPP
 
-#include "index_set.hpp"
+#include <realm/object-store/index_set.hpp>
 
 #include <realm/keys.hpp>
 

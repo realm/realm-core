@@ -19,10 +19,10 @@
 #ifndef REALM_OS_SYNC_MANAGER_HPP
 #define REALM_OS_SYNC_MANAGER_HPP
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
-#include "app.hpp"
-#include "sync_user.hpp"
+#include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
