@@ -1192,7 +1192,7 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
     }
 }
 
-bool Results::is_frozen()
+bool Results::is_frozen() const
 {
     return !m_realm || m_realm->is_frozen();
 }

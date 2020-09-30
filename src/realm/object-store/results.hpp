@@ -152,7 +152,7 @@ public:
     Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
-    bool is_frozen() REQUIRES(!m_mutex);
+    bool is_frozen() const REQUIRES(!m_mutex);
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
