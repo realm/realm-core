@@ -4017,6 +4017,23 @@ TEST(Table_CreateObjectWithPrimaryKeyDidCreate)
     CHECK_NOT(did_create);
 }
 
+TEST(Table_PrimaryKeyIndexBug)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    TableRef origin = g.add_table("origin");
+    auto col_id = table->add_column(type_String, "id");
+    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    table->add_search_index(col_id);
+    // Create an object where bit 62 is set in the ObkKey
+    auto obj = table->create_object(ObjKey(0x40083f0f9b0fb598)).set(col_id, "hallo");
+    origin->create_object().set(col_link, obj.get_key());
+
+    auto q = origin->link(col_link).column<String>(col_id) == "hallo";
+    auto cnt = q.count();
+    CHECK_EQUAL(cnt, 1);
+}
+
 TEST(Table_PrimaryKeyString)
 {
 #ifdef REALM_DEBUG

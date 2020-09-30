@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Making a query in an indexed property may give a "Key not found" exception. ([#2025](https://github.com/realm/realm-dotnet/issues/2025), since v6.0.0)
  
 ### Breaking changes
 * None.

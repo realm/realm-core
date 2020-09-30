@@ -208,6 +208,7 @@ protected:
     std::vector<ObjKey> get_all_backlinks(ColKey backlink_col) const;
 };
 
+std::ostream& operator<<(std::ostream&, const ConstObj& obj);
 
 class Obj : public ConstObj {
 public:
@@ -314,7 +315,6 @@ private:
     template <class T>
     inline void set_spec(T&, ColKey);
 };
-
 
 inline Obj Obj::get_linked_object(ColKey link_col_key)
 {
