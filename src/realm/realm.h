@@ -48,6 +48,7 @@ typedef struct realm_object_notifier realm_object_notifier_t;
 /* Query types */
 typedef struct realm_query realm_query_t;
 typedef struct realm_parsed_query realm_parsed_query_t;
+typedef struct realm_parsed_query_arguments realm_parsed_query_arguments_t;
 typedef struct realm_descriptor_ordering realm_descriptor_ordering_t;
 typedef struct realm_sort_descriptor realm_sort_descriptor_t;
 typedef struct realm_distinct_descriptor realm_distinct_descriptor_t;
@@ -322,6 +323,14 @@ RLM_API void realm_release(const void* ptr);
  *         cloning failed.
  */
 RLM_API void* realm_clone(const void*);
+
+/**
+ * True if a Realm C Wrapper object is "frozen" (immutable).
+ *
+ * Objects, collections, and results can be frozen. For all other types, this
+ * function always returns false.
+ */
+RLM_API bool realm_is_frozen(const void*);
 
 RLM_API realm_config_t* realm_config_new();
 RLM_API bool realm_config_set_path(realm_config_t*, realm_string_t);
@@ -689,6 +698,13 @@ RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
 RLM_API void* _realm_object_get_native_ptr(realm_object_t*);
 
 /**
+ * True if this object still exists in the realm.
+ *
+ * This function cannot fail.
+ */
+RLM_API bool realm_object_is_valid(const realm_object_t*);
+
+/**
  * Get the key for this object.
  *
  * This function cannot fail.
@@ -802,19 +818,22 @@ RLM_API bool realm_descriptor_ordering_append_include(realm_descriptor_ordering_
 
 
 RLM_API realm_parsed_query_t* realm_query_parse(realm_string_t);
-RLM_API bool realm_query_apply_parsed_predicate(realm_query_t*, const realm_parsed_query_t*);
-RLM_API bool realm_query_apply_parsed_descriptor_ordering(realm_descriptor_ordering_t*, const realm_parsed_query_t*,
-                                                          const realm_key_path_mapping_t*);
+RLM_API bool realm_apply_parsed_predicate(realm_query_t*, const realm_parsed_query_t*,
+                                          const realm_parsed_query_arguments_t*, const realm_key_path_mapping_t*);
+RLM_API bool realm_apply_parsed_descriptor_ordering(realm_descriptor_ordering_t*, const realm_t*,
+                                                    realm_table_key_t target, const realm_parsed_query_t*,
+                                                    const realm_key_path_mapping_t*);
 
 RLM_API bool realm_query_count(const realm_query_t*, size_t* out_count);
-RLM_API bool realm_query_find_first(const realm_query_t*, realm_obj_key_t* out_key);
-RLM_API realm_results_t* realm_query_find_all(const realm_query_t*);
+RLM_API bool realm_query_find_first(realm_query_t*, realm_obj_key_t* out_key, bool* out_found);
+RLM_API realm_results_t* realm_query_find_all(realm_query_t*);
+RLM_API realm_results_t* realm_query_find_all_with_ordering(realm_query_t*, const realm_descriptor_ordering_t*);
 RLM_API bool realm_query_delete_all(const realm_query_t*);
 
-RLM_API bool realm_query_min(const realm_query_t*, realm_col_key_t, realm_value_t* out_min);
-RLM_API bool realm_query_max(const realm_query_t*, realm_col_key_t, realm_value_t* out_max);
-RLM_API bool realm_query_sum(const realm_query_t*, realm_col_key_t, realm_value_t* out_sum);
-RLM_API bool realm_query_average(const realm_query_t*, realm_col_key_t, realm_value_t* out_average);
+RLM_API bool realm_query_min(realm_query_t*, realm_col_key_t, realm_value_t* out_min);
+RLM_API bool realm_query_max(realm_query_t*, realm_col_key_t, realm_value_t* out_max);
+RLM_API bool realm_query_sum(realm_query_t*, realm_col_key_t, realm_value_t* out_sum);
+RLM_API bool realm_query_average(realm_query_t*, realm_col_key_t, realm_value_t* out_average);
 
 typedef enum realm_query_op {
     RLM_QUERY_AND,
@@ -851,8 +870,8 @@ RLM_API bool realm_query_push_cond_properties(realm_query_t*, realm_col_key_t lh
 RLM_API bool realm_query_push_query(realm_query_t*, realm_query_t*);
 RLM_API bool realm_query_negate(realm_query_t*);
 
-RLM_API size_t realm_results_count(const realm_results_t*);
-RLM_API realm_object_t* realm_results_get(const realm_results_t*, size_t index);
+RLM_API size_t realm_results_count(realm_results_t*);
+RLM_API realm_value_t realm_results_get(realm_results_t*, size_t index);
 RLM_API bool realm_results_delete_all(realm_results_t*);
 RLM_API bool realm_results_filter(realm_results_t*, const realm_query_t*);
 RLM_API bool realm_results_sort(realm_results_t*, const realm_sort_descriptor_t*);

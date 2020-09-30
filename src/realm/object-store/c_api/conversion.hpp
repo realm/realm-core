@@ -6,6 +6,7 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
@@ -212,6 +213,31 @@ static inline realm_value_t to_capi(Mixed value)
     }
 
     return val;
+}
+
+static inline SchemaMode from_capi(realm_schema_mode_e mode)
+{
+    switch (mode) {
+        case RLM_SCHEMA_MODE_AUTOMATIC: {
+            return SchemaMode::Automatic;
+        }
+        case RLM_SCHEMA_MODE_IMMUTABLE: {
+            return SchemaMode::Immutable;
+        }
+        case RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE: {
+            return SchemaMode::ReadOnlyAlternative;
+        }
+        case RLM_SCHEMA_MODE_RESET_FILE: {
+            return SchemaMode::ResetFile;
+        }
+        case RLM_SCHEMA_MODE_ADDITIVE: {
+            return SchemaMode::Additive;
+        }
+        case RLM_SCHEMA_MODE_MANUAL: {
+            return SchemaMode::Manual;
+        }
+    }
+    REALM_TERMINATE("Invalid schema mode.");
 }
 
 static inline realm_property_type_e to_capi(PropertyType type) noexcept

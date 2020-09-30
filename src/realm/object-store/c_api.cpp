@@ -7,7 +7,9 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_accessor.hpp>
+
 #include <realm/parser/parser.hpp>
+#include <realm/parser/query_builder.hpp>
 
 using namespace realm;
 
@@ -33,6 +35,11 @@ struct WrapC {
     virtual WrapC* clone() const
     {
         throw NotClonableException();
+    }
+
+    virtual bool is_frozen() const
+    {
+        return false;
     }
 };
 
@@ -127,6 +134,11 @@ struct realm_object : WrapC, Object {
     {
         return new realm_object{*this};
     }
+
+    bool is_frozen() const override
+    {
+        return Object::is_frozen();
+    }
 };
 
 struct realm_list : WrapC, List {
@@ -135,9 +147,14 @@ struct realm_list : WrapC, List {
     {
     }
 
-    realm_list* clone() const noexcept
+    realm_list* clone() const override
     {
         return new realm_list{*this};
+    }
+
+    bool is_frozen() const override
+    {
+        return List::is_frozen();
     }
 };
 
@@ -147,7 +164,7 @@ struct realm_parsed_query : WrapC, parser::ParserResult {
     {
     }
 
-    realm_parsed_query* clone() const noexcept
+    realm_parsed_query* clone() const override
     {
         return new realm_parsed_query{*this};
     }
@@ -155,15 +172,48 @@ struct realm_parsed_query : WrapC, parser::ParserResult {
 
 struct realm_query : WrapC {
     std::unique_ptr<Query> ptr;
+    std::weak_ptr<Realm> weak_realm;
 
-    explicit realm_query(Query query)
+    explicit realm_query(Query query, std::weak_ptr<Realm> realm)
         : ptr(std::make_unique<Query>(std::move(query)))
+        , weak_realm(realm)
     {
     }
 
-    realm_query* clone() const noexcept
+    realm_query* clone() const override
     {
-        return new realm_query{*ptr};
+        return new realm_query{*ptr, weak_realm};
+    }
+};
+
+struct realm_results : WrapC, Results {
+    explicit realm_results(Results results)
+        : Results(std::move(results))
+    {
+    }
+
+    realm_results* clone() const override
+    {
+        return new realm_results{static_cast<const Results&>(*this)};
+    }
+
+    bool is_frozen() const override
+    {
+        return Results::is_frozen();
+    }
+};
+
+struct realm_descriptor_ordering : WrapC, DescriptorOrdering {
+    realm_descriptor_ordering() = default;
+
+    explicit realm_descriptor_ordering(DescriptorOrdering o)
+        : DescriptorOrdering(std::move(o))
+    {
+    }
+
+    realm_descriptor_ordering* clone() const override
+    {
+        return new realm_descriptor_ordering{static_cast<const DescriptorOrdering&>(*this)};
     }
 };
 
@@ -244,6 +294,11 @@ RLM_API void* realm_clone(const void* ptr)
     return cast_ptr<WrapC>(ptr)->clone();
 }
 
+RLM_API bool realm_is_frozen(const void* ptr)
+{
+    return cast_ptr<WrapC>(ptr)->is_frozen();
+}
+
 RLM_API realm_config_t* realm_config_new()
 {
     return new realm_config_t{};
@@ -271,31 +326,6 @@ RLM_API bool realm_config_set_schema_version(realm_config_t* config, uint64_t ve
         config->schema_version = version;
         return true;
     });
-}
-
-static inline SchemaMode from_capi(realm_schema_mode_e mode)
-{
-    switch (mode) {
-        case RLM_SCHEMA_MODE_AUTOMATIC: {
-            return SchemaMode::Automatic;
-        }
-        case RLM_SCHEMA_MODE_IMMUTABLE: {
-            return SchemaMode::Immutable;
-        }
-        case RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE: {
-            return SchemaMode::ReadOnlyAlternative;
-        }
-        case RLM_SCHEMA_MODE_RESET_FILE: {
-            return SchemaMode::ResetFile;
-        }
-        case RLM_SCHEMA_MODE_ADDITIVE: {
-            return SchemaMode::Additive;
-        }
-        case RLM_SCHEMA_MODE_MANUAL: {
-            return SchemaMode::Manual;
-        }
-    }
-    REALM_TERMINATE("Invalid schema mode.");
 }
 
 RLM_API bool realm_config_set_schema_mode(realm_config_t* config, realm_schema_mode_e mode)
@@ -820,6 +850,11 @@ RLM_API void* _realm_object_get_native_ptr(realm_object_t* obj)
     return static_cast<Object*>(obj);
 }
 
+RLM_API bool realm_object_is_valid(const realm_object_t* obj)
+{
+    return obj->is_valid();
+}
+
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
 {
     auto obj = object->obj();
@@ -963,10 +998,126 @@ RLM_API bool realm_list_clear(realm_list_t* list)
     });
 }
 
+RLM_API realm_query_t* realm_query_new(const realm_t* realm, realm_table_key_t key)
+{
+    return wrap_err([&]() {
+        auto& shared_realm = **realm;
+        auto table = shared_realm.read_group().get_table(from_capi(key));
+        return new realm_query_t{table->where()};
+    });
+}
+
+RLM_API realm_query_t* realm_query_new_with_results(realm_results_t* results)
+{
+    return wrap_err([&]() {
+        return new realm_query_t{results->get_query()};
+    });
+}
+
+RLM_API realm_descriptor_ordering_t* realm_new_descriptor_ordering()
+{
+    return wrap_err([&]() {
+        return new realm_descriptor_ordering_t{};
+    });
+}
+
 RLM_API realm_parsed_query_t* realm_query_parse(realm_string_t str)
 {
     return wrap_err([&]() {
         auto input = from_capi(str);
         return new realm_parsed_query_t{parser::parse(input)};
+    });
+}
+
+RLM_API bool realm_apply_parsed_predicate(realm_query_t* query, const realm_parsed_query_t* parsed,
+                                          const realm_parsed_query_arguments_t*, const realm_key_path_mapping_t*)
+{
+    return wrap_err([&]() {
+        // FIXME: arguments, key-path mapping
+        auto args = query_builder::NoArguments{};
+        auto key_path_mapping = parser::KeyPathMapping{};
+        query_builder::apply_predicate(*query->ptr, parsed->predicate, args, key_path_mapping);
+        return true;
+    });
+}
+
+RLM_API bool realm_apply_parsed_descriptor_ordering(realm_descriptor_ordering_t* ordering, const realm_t*,
+                                                    realm_table_key_t, const realm_parsed_query_t* parsed,
+                                                    const realm_key_path_mapping_t* key_path_mapping)
+{
+    return wrap_err([&]() {
+        static_cast<void>(ordering);
+        static_cast<void>(parsed);
+        static_cast<void>(key_path_mapping);
+        REALM_TERMINATE("Not implemented yet.");
+        return true;
+    });
+}
+
+RLM_API bool realm_query_count(const realm_query_t* query, size_t* out_count)
+{
+    return wrap_err([&]() {
+        *out_count = query->ptr->count();
+        return true;
+    });
+}
+
+RLM_API bool realm_query_find_first(const realm_query_t* query, realm_obj_key_t* out_key, bool* out_found)
+{
+    return wrap_err([&]() {
+        auto key = query->ptr->find();
+        if (out_found)
+            *out_found = bool(key);
+        if (key && out_key)
+            *out_key = to_capi(key);
+        return true;
+    });
+}
+
+RLM_API realm_results_t* realm_query_find_all(const realm_query_t* query)
+{
+    return wrap_err([&]() {
+        auto shared_realm = query->weak_realm.lock();
+        REALM_ASSERT_RELEASE(shared_realm);
+        return new realm_results{Results{shared_realm, *query->ptr}};
+    });
+}
+
+RLM_API size_t realm_results_count(realm_results_t* results)
+{
+    return results->size();
+}
+
+RLM_API realm_value_t realm_results_get(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        // FIXME: Support non-object results.
+        auto obj = results->get<Obj>(index);
+        auto table_key = obj.get_table()->get_key();
+        auto obj_key = obj.get_key();
+        realm_value_t val;
+        val.type = RLM_TYPE_LINK;
+        val.link.target_table = to_capi(table_key);
+        val.link.target = to_capi(obj_key);
+        return val;
+    });
+}
+
+RLM_API realm_object_t* realm_results_get_object(realm_results_t* results, size_t index)
+{
+    return wrap_err([&]() {
+        auto shared_realm = results->get_realm();
+        auto obj = results->get<Obj>(index);
+        return new realm_object_t{Object{shared_realm, std::move(obj)}};
+    });
+}
+
+RLM_API bool realm_results_delete_all(realm_results_t* results)
+{
+    return wrap_err([&]() {
+        // Note: This method is very confusingly named. It actually does erase
+        // all the objects.
+        results->clear();
+        return true;
     });
 }
