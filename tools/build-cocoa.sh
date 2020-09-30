@@ -46,11 +46,6 @@ function build_macos {
     (
         cd "${folder_name}" || exit 1
         rm -f realm-core-*-devel.tar.gz
-
-        ##
-        #  ONLY_ACTIVE_ARCH without ARCHITECTURES will be defaulted to YES
-        ##
-
         cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/$platform.toolchain.cmake" \
               -D CMAKE_BUILD_TYPE="${bt}" \
               -D REALM_VERSION="${VERSION}" \
