@@ -6,6 +6,7 @@
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+* Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
  
 ### Breaking changes
 * None.

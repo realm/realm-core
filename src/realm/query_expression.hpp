@@ -2325,13 +2325,18 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        T val{};
-        if (!value.is_null()) {
-            val = value.get<T>();
+        if (value.is_null()) {
+            if (!m_column_key.is_nullable()) {
+                return ret;
+            }
+            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            index->find_all(result, realm::null{});
         }
-
-        StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-        index->find_all(result, val);
+        else {
+            T val = value.get<T>();
+            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            index->find_all(result, val);
+        }
 
         for (ObjKey k : result) {
             auto ndxs = m_link_map.get_origin_ndxs(k);
@@ -2620,6 +2625,26 @@ inline Query operator!=(const Columns<BinaryData>& left, BinaryData right)
 inline Query operator!=(BinaryData left, const Columns<BinaryData>& right)
 {
     return create<NotEqual>(left, right);
+}
+
+inline Query operator==(const Columns<BinaryData>& left, realm::null)
+{
+    return create<Equal>(BinaryData(), left);
+}
+
+inline Query operator==(realm::null, const Columns<BinaryData>& right)
+{
+    return create<Equal>(BinaryData(), right);
+}
+
+inline Query operator!=(const Columns<BinaryData>& left, realm::null)
+{
+    return create<NotEqual>(BinaryData(), left);
+}
+
+inline Query operator!=(realm::null, const Columns<BinaryData>& right)
+{
+    return create<NotEqual>(BinaryData(), right);
 }
 
 
@@ -3603,23 +3628,15 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        if (value.is_null() && !m_nullable) {
-            return ret;
-        }
-
-        if (m_nullable && std::is_same_v<T, int64_t>) {
-            util::Optional<int64_t> val;
-            if (!value.is_null()) {
-                val = value.get_int();
+        if (value.is_null()) {
+            if (!m_nullable) {
+                return ret;
             }
             StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-            index->find_all(result, val);
+            index->find_all(result, realm::null{});
         }
         else {
-            T val{};
-            if (!value.is_null()) {
-                val = value.get<T>();
-            }
+            T val = value.get<T>();
             StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
             index->find_all(result, val);
         }
