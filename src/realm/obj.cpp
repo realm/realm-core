@@ -860,6 +860,12 @@ std::string ConstObj::to_string() const
     return ostr.str();
 }
 
+std::ostream& operator<<(std::ostream& ostr, const ConstObj& obj)
+{
+    obj.to_json(ostr, -1, nullptr);
+    return ostr;
+}
+
 /*********************************** Obj *************************************/
 
 bool Obj::ensure_writeable()
