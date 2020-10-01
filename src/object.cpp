@@ -73,6 +73,7 @@ Object::Object(SharedRealm r, Obj const& o)
 , m_object_schema(&*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name())))
 , m_obj(o)
 {
+    REALM_ASSERT(!m_obj.get_table() || (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object(SharedRealm r, StringData object_type, ObjKey key)
@@ -80,6 +81,7 @@ Object::Object(SharedRealm r, StringData object_type, ObjKey key)
 , m_object_schema(&*m_realm->schema().find(object_type))
 , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(key))
 {
+    REALM_ASSERT(!m_obj.get_table() || (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object(SharedRealm r, StringData object_type, size_t index)
@@ -87,6 +89,7 @@ Object::Object(SharedRealm r, StringData object_type, size_t index)
 , m_object_schema(&*m_realm->schema().find(object_type))
 , m_obj(ObjectStore::table_for_object_type(m_realm->read_group(), object_type)->get_object(index))
 {
+    REALM_ASSERT(!m_obj.get_table() || (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
 Object::Object() = default;
