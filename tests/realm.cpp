@@ -418,7 +418,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
 // Our test scheduler uses a simple integer identifier to allow cross thread scheduling
-class SimpleScheduler : public util::Scheduler {
+    class SimpleScheduler : public util::Scheduler {
 public:
     SimpleScheduler(size_t id)
     : Scheduler()
