@@ -144,11 +144,14 @@ typedef enum realm_logic_error_kind {
     // ...
 } realm_logic_error_kind_e;
 
-typedef struct realm_err_info {
+typedef struct realm_error {
     realm_errno_e error;
     realm_string_t message;
-    realm_logic_error_kind_e logic_error_kind;
-} realm_err_info_t;
+    union {
+        int code;
+        realm_logic_error_kind_e logic_error_kind;
+    } kind;
+} realm_error_t;
 
 typedef enum realm_column_attr {
     // Values matching `realm::ColumnAttr`.
@@ -270,12 +273,12 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  *
  * This function does not allocate any memory.
  *
- * @param err A pointer to a `realm_err_info_t` struct that will be populated
+ * @param err A pointer to a `realm_error_t` struct that will be populated
  *            with information about the last error, if there is one. May be
  *            NULL.
  * @return True if an error occurred.
  */
-RLM_API bool realm_get_last_error(realm_err_info_t* err);
+RLM_API bool realm_get_last_error(realm_error_t* err);
 
 /**
  * Rethrow the last exception.

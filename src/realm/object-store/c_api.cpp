@@ -230,10 +230,10 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
     *out_extra = REALM_VERSION_EXTRA;
 }
 
-RLM_API bool realm_get_last_error(realm_err_info_t* err)
+RLM_API bool realm_get_last_error(realm_error_t* err)
 {
     if (g_last_exception) {
-        err->logic_error_kind = RLM_LOGIC_ERR_NONE;
+        err->kind.code = 0;
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
             err->error = error_number;
