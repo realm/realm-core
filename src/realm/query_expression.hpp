@@ -3629,7 +3629,7 @@ public:
         std::vector<ObjKey> result;
 
         if (value.is_null()) {
-            if (!m_nullable) {
+            if (!m_column_key.is_nullable()) {
                 return ret;
             }
             StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);

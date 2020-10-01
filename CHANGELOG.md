@@ -342,6 +342,13 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
  
+# 6.1.3 Release notes
+
+### Fixed
+* Making a query in an indexed property may give a "Key not found" exception. ([#2025](https://github.com/realm/realm-dotnet/issues/2025), since v6.0.0)
+* Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+----------------------------------------------
+
 # 6.1.2 Release notes
 
 ### Enhancements

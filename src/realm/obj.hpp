@@ -246,6 +246,7 @@ protected:
     ObjKey get_unfiltered_link(ColKey col_key) const;
 };
 
+std::ostream& operator<<(std::ostream&, const ConstObj& obj);
 
 class Obj : public ConstObj {
 public:
