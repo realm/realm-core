@@ -183,6 +183,10 @@ public:
     // Conditions: UUID
     Query& equal(ColKey column_key, UUID value);
     Query& not_equal(ColKey column_key, UUID value);
+    Query& greater(ColKey column_key, UUID value);
+    Query& greater_equal(ColKey column_key, UUID value);
+    Query& less_equal(ColKey column_key, UUID value);
+    Query& less(ColKey column_key, UUID value);
 
     // Conditions: Decimal128
     Query& equal(ColKey column_key, Decimal128 value);

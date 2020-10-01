@@ -4239,6 +4239,56 @@ TEST(Table_SearchIndexFindAll)
     CHECK_EQUAL(tv.size(), 6);
 }
 
+TEST_TYPES(Table_QuerySearchIndexTypes, int64_t, ObjectId, Timestamp, UUID, Optional<int64_t>, Optional<ObjectId>,
+           Optional<UUID>)
+{
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same_v<underlying_type, TEST_TYPE>;
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey col0 = t->add_column(ColumnTypeTraits<underlying_type>::id, "value", is_optional);
+    ColKey col_link = t->add_column(*t, "link");
+
+    std::vector<underlying_type> values = values_from_int<underlying_type, underlying_type>({9, 4, 2, 7});
+    std::vector<size_t> indices;
+
+    for (TEST_TYPE v : values) {
+        auto obj = t->create_object();
+        obj.set(col0, v);
+        obj.set(col_link, obj.get_key());
+    }
+
+    auto obj = t->create_object();
+
+    auto check_queries = [&]() {
+        for (underlying_type v : values) {
+            Query q0 = t->column<underlying_type>(col0) == v;
+            CHECK_EQUAL(q0.count(), 1);
+            Query q1 = t->link(col_link).column<underlying_type>(col0) == v;
+            CHECK_EQUAL(q1.count(), 1);
+            Query q2 = t->link(col_link).link(col_link).column<underlying_type>(col0) == v;
+            CHECK_EQUAL(q2.count(), 1);
+            Query q3 = t->where().equal(col0, v);
+            CHECK_EQUAL(q3.count(), 1);
+        }
+
+        {
+            constexpr size_t num_nulls = is_optional ? 1 : 0;
+            Query q0 = t->column<underlying_type>(col0) == realm::null();
+            CHECK_EQUAL(q0.count(), num_nulls);
+            Query q1 = t->link(col_link).column<underlying_type>(col0) == realm::null();
+            CHECK_EQUAL(q1.count(), num_nulls);
+            Query q2 = t->link(col_link).link(col_link).column<underlying_type>(col0) == realm::null();
+            CHECK_EQUAL(q2.count(), num_nulls);
+        }
+    };
+
+    check_queries();
+    t->add_search_index(col0);
+    check_queries();
+}
+
+
 namespace {
 
 template <class T, bool nullable>

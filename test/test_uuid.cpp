@@ -25,6 +25,14 @@
 
 using namespace realm;
 
+struct WithIndex {
+    constexpr static bool do_add_index = true;
+};
+
+struct WithoutIndex {
+    constexpr static bool do_add_index = false;
+};
+
 UUID generate_random_uuid()
 {
     std::string str;
@@ -254,8 +262,7 @@ TEST(UUID_ArrayNull)
     arr1.destroy();
 }
 
-
-TEST_TYPES(UUID_Table, std::true_type, std::false_type)
+TEST_TYPES(UUID_Table, WithIndex, WithoutIndex)
 {
     const char str0[] = "3b241101-e2bb-4255-8caf-4136c566a960";
     const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
@@ -267,7 +274,7 @@ TEST_TYPES(UUID_Table, std::true_type, std::false_type)
     auto obj1 = t.create_object().set(col_id, UUID(str1)).set(col_id_null, UUID(str1));
     auto obj2 = t.create_object();
 
-    if constexpr (TEST_TYPE::value) {
+    if constexpr (TEST_TYPE::do_add_index) {
         t.add_search_index(col_id);
         t.add_search_index(col_id_null);
     }
@@ -485,7 +492,7 @@ TEST(UUID_ArrayNull_FindFirstNull_StressTest)
     }
 }
 
-TEST(UUID_Query)
+TEST_TYPES(UUID_Query, WithIndex, WithoutIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
@@ -508,6 +515,10 @@ TEST(UUID_Query)
         col_int = table->add_column(type_Int, "int");
         col_has = table->add_column(*target, "Has");
         col_owns = origin->add_column(*table, "Owns");
+
+        if constexpr (TEST_TYPE::do_add_index) {
+            table->add_search_index(col_id);
+        }
 
         ObjKeys target_keys;
         target->create_objects(16, target_keys);
@@ -532,6 +543,7 @@ TEST(UUID_Query)
         auto origin = rt->get_table("Origin");
         auto target = rt->get_table("Target");
         auto col = table->get_primary_key_column();
+        constexpr size_t num_expected_nulls = 1000 - 34;
 
         Query q = table->column<UUID>(col) != uuid1;
         CHECK_EQUAL(q.count(), 999);
@@ -557,7 +569,7 @@ TEST(UUID_Query)
         q = table->column<UUID>(col_id) <= uuid3;
         CHECK_EQUAL(q.count(), 34);
         q = table->column<UUID>(col_id) != uuid3;
-        CHECK_EQUAL(q.count(), 1000 - 34);
+        CHECK_EQUAL(q.count(), num_expected_nulls);
         q = table->column<UUID>(col_id) == uuid3;
         CHECK_EQUAL(q.count(), 34);
 
@@ -572,13 +584,15 @@ TEST(UUID_Query)
         Query q2 = table->column<UUID>(col_id) == uuid3;
         CHECK_EQUAL(q2.count(), 34);
         q2 = table->column<UUID>(col_id) == realm::null();
-        CHECK_EQUAL(q2.count(), 1000 - 34);
+        CHECK_EQUAL(q2.count(), num_expected_nulls);
         q2 = table->where().equal(col_id, realm::null());
-        CHECK_EQUAL(q2.count(), 1000 - 34);
+        CHECK_EQUAL(q2.count(), num_expected_nulls);
 
         // Test query over links
         Query q3 = origin->link(col_owns).column<UUID>(col_id) == uuid3;
         CHECK_EQUAL(q3.count(), 34);
+        q3 = origin->link(col_owns).column<UUID>(col_id) == realm::null();
+        CHECK_EQUAL(q3.count(), num_expected_nulls);
 
         // Test query over backlink (link list)
         Query q4 = target->backlink(*table, col_has).column<UUID>(col_id) == uuid3;

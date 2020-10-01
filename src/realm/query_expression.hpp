@@ -508,7 +508,9 @@ Query create(L left, const Subexpr2<R>& right)
                    (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
                    (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
                    (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>))) {
+                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
+                   (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
+                   (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>))) {
         const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
         // TODO: recognize size operator expressions
         // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);

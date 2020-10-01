@@ -1487,6 +1487,123 @@ protected:
     }
 };
 
+template <class ObjectType, class ArrayType>
+class FixedBytesNode<Equal, ObjectType, ArrayType> : public FixedBytesNodeBase<ObjectType, ArrayType> {
+public:
+    using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
+    using BaseType = FixedBytesNodeBase<ObjectType, ArrayType>;
+
+    void init() override
+    {
+        BaseType::init();
+
+        if (!this->m_value_is_null) {
+            m_optional_value = this->m_value;
+        }
+
+        if (has_search_index()) {
+            // _search_index_init();
+            m_result.clear();
+            auto index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
+            index->find_all(m_result, m_optional_value);
+            m_result_get = 0;
+            m_last_start_key = ObjKey();
+            this->m_dT = 0;
+        }
+    }
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
+            auto obj = this->m_table->get_object(m_result[t]);
+            if (evaluator(obj)) {
+                --limit;
+            }
+        }
+    }
+
+    bool has_search_index() const override
+    {
+        return this->m_table->has_search_index(BaseType::m_condition_column_key);
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(this->m_table);
+        size_t s = realm::npos;
+
+        if (start < end) {
+            if (has_search_index()) {
+                ObjKey first_key = BaseType::m_cluster->get_real_key(start);
+                if (first_key < m_last_start_key) {
+                    // We are not advancing through the clusters. We basically don't know where we are,
+                    // so just start over from the beginning.
+                    auto it = std::lower_bound(m_result.begin(), m_result.end(), first_key);
+                    m_result_get = (it == m_result.end()) ? realm::npos : (it - m_result.begin());
+                }
+                m_last_start_key = first_key;
+
+                if (m_result_get < m_result.size()) {
+                    auto actual_key = m_result[m_result_get];
+                    // skip through keys which are in "earlier" leafs than the one selected by start..end:
+                    while (first_key > actual_key) {
+                        m_result_get++;
+                        if (m_result_get == m_result.size())
+                            return not_found;
+                        actual_key = m_result[m_result_get];
+                    }
+
+                    // if actual key is bigger than last key, it is not in this leaf
+                    ObjKey last_key = BaseType::m_cluster->get_real_key(end - 1);
+                    if (actual_key > last_key)
+                        return not_found;
+
+                    // key is known to be in this leaf, so find key whithin leaf keys
+                    return BaseType::m_cluster->lower_bound_key(
+                        ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
+                }
+                return not_found;
+            }
+
+            if (end - start == 1) {
+                if (this->m_leaf_ptr->get(start) == m_optional_value) {
+                    s = start;
+                }
+            }
+            else {
+                s = this->m_leaf_ptr->find_first(m_optional_value, start, end);
+            }
+        }
+
+        return s;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(this->m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, this->m_condition_column_key) + " " + Equal::description() +
+               " " +
+               (this->m_value_is_null ? util::serializer::print_value(realm::null())
+                                      : util::serializer::print_value(this->m_value));
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new FixedBytesNode(*this));
+    }
+
+protected:
+    FixedBytesNode(const FixedBytesNode& from, Transaction* tr)
+        : FixedBytesNode(from, tr)
+    {
+    }
+    util::Optional<ObjectType> m_optional_value;
+    std::vector<ObjKey> m_result;
+    size_t m_result_get = 0;
+    ObjKey m_last_start_key;
+};
+
+
 template <typename T>
 using ObjectIdNode = FixedBytesNode<T, ObjectId, ArrayObjectIdNull>;
 template <typename T>
