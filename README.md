@@ -17,7 +17,7 @@ Please report bugs against the Realm product that you're using:
 * [Realm Objective-C](https://github.com/realm/realm-cocoa)
 * [Realm React Native](https://github.com/realm/realm-js)
 * [Realm Swift](https://github.com/realm/realm-cocoa)
-* [Realm Xamarin](https://github.com/realm/realm-dotnet)
+* [Realm .NET](https://github.com/realm/realm-dotnet)
 
 ## Supported Platforms
 
@@ -185,5 +185,3 @@ Realm Object Store is published under the Apache 2.0 license. The [underlying co
 **This product is not being made available to any person located in Cuba, Iran,
 North Korea, Sudan, Syria or the Crimea region, or to any other person that is
 not eligible to receive the product under U.S. law.**
-
-![analytics](https://ga-beacon.appspot.com/UA-50247013-2/realm-object-store/README?pixel)

@@ -749,7 +749,6 @@ void ObjectStore::set_schema_keys(Group const& group, Schema& schema)
 void ObjectStore::delete_data_for_object(Group& group, StringData object_type)
 {
     if (TableRef table = table_for_object_type(group, object_type)) {
-        ObjectStore::set_primary_key_for_object(group, object_type, "");
         group.remove_table(table->get_key());
     }
 }
