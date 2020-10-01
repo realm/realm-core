@@ -19,8 +19,9 @@
 #ifndef REALM_OS_SYNC_SESSION_HPP
 #define REALM_OS_SYNC_SESSION_HPP
 
-#include "feature_checks.hpp"
-#include "sync/sync_config.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/sync/config.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
@@ -124,6 +125,7 @@ public:
     using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
     using ConnectionStateCallback = void(ConnectionState old_state, ConnectionState new_state);
 
+    ~SyncSession();
     PublicState state() const;
     ConnectionState connection_state() const;
 
@@ -333,7 +335,7 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
-    static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
+    // static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();

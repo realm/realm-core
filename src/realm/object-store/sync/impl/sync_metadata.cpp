@@ -16,17 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/impl/sync_metadata.hpp"
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "util/uuid.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/util/uuid.hpp>
 #if REALM_PLATFORM_APPLE
-#include "impl/apple/keychain_helper.hpp"
+#include <realm/object-store/impl/apple/keychain_helper.hpp>
 #endif
 
 #include <realm/db.hpp>

@@ -234,8 +234,8 @@ void Connection::cancel_reconnect_delay()
 Connection::Connection(ClientImplBase& client, std::string logger_prefix, ProtocolEnvelope protocol,
                        std::string address, port_type port, bool verify_servers_ssl_certificate,
                        Optional<std::string> ssl_trust_certificate_path,
-                       std::function<SSLVerifyCallback> ssl_verify_callback, Optional<ProxyConfig> proxy_config,
-                       ReconnectInfo reconnect_info)
+                       std::function<SSLVerifyCallback> ssl_verify_callback,
+                       Optional<SyncConfig::ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
     : logger{std::move(logger_prefix), client.logger} // Throws
     , m_client{client}
     , m_read_ahead_buffer{} // Throws
@@ -721,7 +721,7 @@ void Connection::initiate_resolve()
     const port_type& port = m_proxy_config ? m_proxy_config->port : m_port;
 
     if (m_proxy_config) {
-        logger.detail("Using %1 proxy", m_proxy_config->type); // Throws
+        // logger.detail("Using %1 proxy", m_proxy_config->type); // Throws
     }
 
     logger.detail("Resolving '%1:%2'", address, port); // Throws
@@ -894,7 +894,7 @@ void Connection::initiate_ssl_handshake()
             else {
                 // The included certificates are used if neither the trust
                 // certificate nor the callback function is set.
-#ifdef REALM_INCLUDE_CERTS
+#if REALM_INCLUDE_CERTS
                 m_ssl_stream->use_included_certificates(); // Throws
 #endif
             }

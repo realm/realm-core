@@ -1,4 +1,5 @@
 set(SYNC_SOURCES
+    config.cpp
     encrypt/fingerprint.cpp
     noinst/changeset_index.cpp
     noinst/client_file_access_cache.cpp
@@ -72,6 +73,7 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
+    config.hpp
     encrypt/fingerprint.hpp
     changeset_cooker.hpp
     changeset_encoder.hpp
@@ -113,89 +115,65 @@ set(SYNC_HEADERS ${IMPL_INSTALL_HEADESR}
     ${NOINST_HEADERS})
 set(SYNC_SERVER_HEADERS ${SERVER_INSTALL_HEADERS} ${SERVER_NOINST_HEADERS})
 
-if(APPLE AND NOT REALM_FORCE_OPENSSL)
-    list(APPEND SERVER_SOURCES
-        crypto_server_apple.mm
-    )
-    set(PLATFORM_LIBRARIES ${Foundation} ${Security})
-else()
-    if (APPLE)
-        find_package(OpenSSL REQUIRED)
-    endif()
-    list(APPEND SYNC_SOURCES
-        crypto_server_openssl.cpp
-        )
-    set(PLATFORM_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
-endif()
-
-list(APPEND PLATFORM_LIBRARIES ZLIB::ZLIB)
-if(WIN32 AND NOT WINDOWS_STORE)
-    list(APPEND PLATFORM_LIBRARIES Mincore.lib)
-endif()
-
-if(MSVC)
-    add_compile_options(/Z7) # embed debug info in static library
-endif()
-
 add_library(Sync STATIC ${SYNC_SOURCES} ${SYNC_HEADERS})
+add_library(Realm::Sync ALIAS Sync)
+
 set_target_properties(Sync PROPERTIES
     OUTPUT_NAME "realm-sync"
-    POSITION_INDEPENDENT_CODE ON)
+)
 
-if (APPLE)
-    set_target_properties(Sync PROPERTIES VISIBILITY_INLINES_HIDDEN ON)
-endif()
-
-target_compile_definitions(Sync PUBLIC
-    # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
-    # FIXME: This should be exported by Core's realm-config.cmake instead.
-    $<$<CONFIG:Debug>:REALM_DEBUG=1>
-    $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>)
-target_include_directories(Sync PUBLIC
-                           $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-
-target_link_libraries(Sync PUBLIC Storage ${PLATFORM_LIBRARIES} )
-
-list(APPEND targets_to_install Sync)
+target_link_libraries(Sync PUBLIC Storage ZLIB::ZLIB)
 
 add_library(SyncServer STATIC EXCLUDE_FROM_ALL ${SERVER_SOURCES} ${SYNC_SERVER_HEADERS})
+add_library(Realm::SyncServer ALIAS SyncServer)
+
 set_target_properties(SyncServer PROPERTIES
     OUTPUT_NAME "realm-server"
-    POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(SyncServer PUBLIC Sync QueryParser Storage)
+)
+target_link_libraries(SyncServer PUBLIC Sync QueryParser)
 if (REALM_BUILD_DOGLESS)
     message(STATUS "Building Sync Server with Dogless (statsd) support.")
     target_link_libraries(SyncServer PUBLIC Dogless)
 endif()
 
-install(TARGETS ${targets_to_install} EXPORT Sync
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+if(APPLE AND NOT REALM_FORCE_OPENSSL)
+    target_sources(SyncServer PRIVATE crypto_server_apple.mm)
+    target_link_options(Sync INTERFACE "SHELL:-framework Security")
+else()
+    target_sources(SyncServer PRIVATE crypto_server_openssl.cpp)
+    target_link_libraries(Sync PUBLIC OpenSSL::SSL)
+endif()
+
+if(WIN32 AND NOT WINDOWS_STORE)
+    target_link_libraries(Sync INTERFACE Mincore.lib)
+endif()
+
+install(TARGETS Sync EXPORT realm
+    ARCHIVE COMPONENT devel
+    PUBLIC_HEADER COMPONENT devel)
 
 install(FILES ${SYNC_INSTALL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/sync
+        DESTINATION include/realm/sync
         COMPONENT devel)
 
 install(FILES ${IMPL_INSTALL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/impl
+        DESTINATION include/realm/impl
         COMPONENT devel)
 
 install(FILES ${SYNC_INSTALL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/sync
+        DESTINATION include/realm/sync
         COMPONENT devel)
 
 install(FILES ${UTIL_INSTALL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        DESTINATION include/realm/util
         COMPONENT devel)
 
 install(FILES ${UTIL_METERED_INSTALL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util/metered
+        DESTINATION include/realm/util/metered
         COMPONENT devel)
 
 install(FILES ../../external/mpark/variant.hpp
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/external/mpark
+        DESTINATION include/external/mpark
         COMPONENT devel)
 
 if(REALM_BUILD_COMMANDLINE_TOOLS)
@@ -260,17 +238,15 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     target_link_libraries(PrintChangesetCommand Sync Storage)
 
-    install(
-        TARGETS
-            SyncWorker
-            VacuumCommand
-            EncryptionTransformer
-            DumpCommand
-            StatCommand
-            # HistCommand
-            VerifyServerFileCommand
-            ServerIndexCommand
-        DESTINATION
-            ${CMAKE_INSTALL_BINDIR}
+    install(TARGETS
+        SyncWorker
+        VacuumCommand
+        EncryptionTransformer
+        DumpCommand
+        StatCommand
+        # HistCommand
+        VerifyServerFileCommand
+        ServerIndexCommand
+        COMPONENT runtime
     )
 endif()

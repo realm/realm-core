@@ -19,8 +19,8 @@
 #ifndef PUSH_CLIENT_HPP
 #define PUSH_CLIENT_HPP
 
-#include "sync/auth_request_client.hpp"
-#include "sync/app_service_client.hpp"
+#include <realm/object-store/sync/auth_request_client.hpp>
+#include <realm/object-store/sync/app_service_client.hpp>
 #include <realm/util/optional.hpp>
 #include <string>
 #include <map>

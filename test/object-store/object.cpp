@@ -16,20 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
-#include "feature_checks.hpp"
-#include "collection_notifications.hpp"
-#include "object_accessor.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/object_accessor.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/group.hpp>
 #include <realm/util/any.hpp>

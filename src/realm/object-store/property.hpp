@@ -19,7 +19,7 @@
 #ifndef REALM_PROPERTY_HPP
 #define REALM_PROPERTY_HPP
 
-#include "util/tagged_bool.hpp"
+#include <realm/object-store/util/tagged_bool.hpp>
 
 #include <realm/util/features.h>
 // FIXME: keys.hpp is currently pretty heavyweight

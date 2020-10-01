@@ -19,7 +19,7 @@
 #ifndef REALM_OBJECT_STORE_HPP
 #define REALM_OBJECT_STORE_HPP
 
-#include "property.hpp"
+#include <realm/object-store/property.hpp>
 
 #include <realm/table_ref.hpp>
 #include <realm/util/optional.hpp>

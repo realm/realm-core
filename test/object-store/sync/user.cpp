@@ -18,9 +18,9 @@
 
 #include "sync_test_utils.hpp"
 
-#include "sync/app_credentials.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_user.hpp"
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"

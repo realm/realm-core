@@ -16,13 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/sync_user.hpp"
+#include <realm/object-store/sync/sync_user.hpp>
 
-#include "sync/app_credentials.hpp"
-#include "sync/generic_network_transport.hpp"
-#include "sync/impl/sync_metadata.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/util/base64.hpp>
 

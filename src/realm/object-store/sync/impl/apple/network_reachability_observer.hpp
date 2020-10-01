@@ -25,11 +25,11 @@
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/optional.hpp>
 
-#include "sync/impl/network_reachability.hpp"
+#include <realm/object-store/sync/impl/network_reachability.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
 
-#include "sync/impl/apple/system_configuration.hpp"
+#include <realm/object-store/sync/impl/apple/system_configuration.hpp>
 
 namespace realm {
 namespace _impl {

@@ -16,14 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
 
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <realm/string_data.hpp>
 #include <realm/table.hpp>

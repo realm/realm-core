@@ -16,33 +16,33 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
-#include "impl/collection_notifier.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "impl/transact_log_handler.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/transact_log_handler.hpp>
 
-#include "audit.hpp"
-#include "binding_context.hpp"
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
-#include "util/scheduler.hpp"
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/fifo_helper.hpp>
 
 #if REALM_ENABLE_SYNC
-#include "sync/impl/sync_file.hpp"
-#include "sync/sync_config.hpp"
-#include "sync/sync_manager.hpp"
+#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 
+#include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/version.hpp>
 #endif

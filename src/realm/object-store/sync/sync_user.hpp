@@ -19,9 +19,9 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include "object_schema.hpp"
-#include "util/atomic_shared_ptr.hpp"
-#include "util/bson/bson.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/util/atomic_shared_ptr.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
 
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>

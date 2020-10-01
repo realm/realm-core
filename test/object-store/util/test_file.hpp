@@ -19,8 +19,8 @@
 #ifndef REALM_TEST_UTIL_TEST_FILE_HPP
 #define REALM_TEST_UTIL_TEST_FILE_HPP
 
-#include "shared_realm.hpp"
-#include "util/tagged_bool.hpp"
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/util/tagged_bool.hpp>
 
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
@@ -28,8 +28,9 @@
 #include <thread>
 
 #if REALM_ENABLE_SYNC
-#include "sync/sync_config.hpp"
-#include "sync/app.hpp"
+#include <realm/sync/config.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/app.hpp>
 #include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>

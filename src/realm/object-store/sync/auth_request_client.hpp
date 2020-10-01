@@ -18,8 +18,8 @@
 #ifndef AUTH_REQUEST_CLIENT_HPP
 #define AUTH_REQUEST_CLIENT_HPP
 
-#include "sync/generic_network_transport.hpp"
-#include "sync_user.hpp"
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 namespace realm {
 namespace app {

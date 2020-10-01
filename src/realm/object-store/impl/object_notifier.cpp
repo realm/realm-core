@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/object_notifier.hpp"
+#include <realm/object-store/impl/object_notifier.hpp>
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
 using namespace realm;
 using namespace realm::_impl;

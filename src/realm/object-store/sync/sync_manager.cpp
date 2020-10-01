@@ -16,20 +16,29 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/sync_manager.hpp"
+#include <realm/object-store/sync/sync_manager.hpp>
 
-#include "sync/impl/sync_client.hpp"
-#include "sync/impl/sync_file.hpp"
-#include "sync/impl/sync_metadata.hpp"
-#include "sync/sync_session.hpp"
-#include "sync/sync_user.hpp"
-#include "sync/app.hpp"
+#include <realm/object-store/sync/impl/sync_client.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/app.hpp>
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
+
+SyncClientTimeouts::SyncClientTimeouts()
+    : connect_timeout(sync::Client::default_connect_timeout)
+    , connection_linger_time(sync::Client::default_connection_linger_time)
+    , ping_keepalive_period(sync::Client::default_ping_keepalive_period)
+    , pong_keepalive_timeout(sync::Client::default_pong_keepalive_timeout)
+    , fast_reconnect_limit(sync::Client::default_fast_reconnect_limit)
+{
+}
 
 SyncManager& SyncManager::shared()
 {

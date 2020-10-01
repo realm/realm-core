@@ -4,8 +4,6 @@
 
 #include <csignal>
 
-#include <realm/util/config.h>
-
 
 namespace realm {
 namespace util {

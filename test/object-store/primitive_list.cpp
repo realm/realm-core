@@ -16,23 +16,23 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
-#include "binding_context.hpp"
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/db.hpp>
 #include <realm/query_expression.hpp>

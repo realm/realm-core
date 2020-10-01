@@ -16,13 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "thread_safe_reference.hpp"
+#include <realm/object-store/thread_safe_reference.hpp>
 
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "results.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/db.hpp>
 #include <realm/keys.hpp>

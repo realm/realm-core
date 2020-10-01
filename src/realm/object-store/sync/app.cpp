@@ -16,16 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/app.hpp"
+#include <realm/object-store/sync/app.hpp>
 
-#include "realm/util/base64.hpp"
-#include "realm/util/uri.hpp"
-#include "sync/app_credentials.hpp"
-#include "sync/generic_network_transport.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/remote_mongo_client.hpp"
-#include "sync/app_utils.hpp"
-#include "sync/impl/sync_metadata.hpp"
+#include <realm/util/base64.hpp>
+#include <realm/util/uri.hpp>
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/remote_mongo_client.hpp>
+#include <realm/object-store/sync/app_utils.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
 
 #include <external/json/json.hpp>
 #include <string>

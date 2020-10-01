@@ -141,6 +141,7 @@ public:
     Mixed(ObjLink) noexcept;
     Mixed(UUID) noexcept;
     Mixed(util::Optional<UUID>) noexcept;
+    Mixed(const Obj&) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -171,6 +172,9 @@ public:
 
     template <class T>
     T get() const noexcept;
+
+    template <class T>
+    T export_to_type() const noexcept;
 
     // These functions are kept to be backwards compatible
     int64_t get_int() const;
@@ -401,10 +405,24 @@ inline Mixed::Mixed(ObjLink v) noexcept
 }
 
 template <>
+inline null Mixed::get<null>() const noexcept
+{
+    REALM_ASSERT(m_type == 0);
+    return {};
+}
+
+template <>
 inline int64_t Mixed::get<int64_t>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Int);
     return int_val;
+}
+
+template <>
+inline int Mixed::get<int>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Int);
+    return int(int_val);
 }
 
 inline int64_t Mixed::get_int() const

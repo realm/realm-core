@@ -16,20 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/sync_session.hpp"
+#include <realm/object-store/sync/sync_session.hpp>
 
-#include "sync/impl/sync_client.hpp"
-#include "sync/impl/sync_file.hpp"
-#include "sync/impl/sync_metadata.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_user.hpp"
-#include "sync/app.hpp"
+#include <realm/object-store/sync/impl/sync_client.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/app.hpp>
 
 #include <realm/sync/client.hpp>
 #include <realm/db_options.hpp>
 #include <realm/sync/protocol.hpp>
 
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -301,8 +301,8 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
             if (session->m_config.error_handler) {
-                session->m_config.error_handler(
-                    session, SyncError(SyncError::ProtocolError::bad_authentication, "expired refresh token", true));
+                session->m_config.error_handler(session, SyncError(realm::sync::ProtocolError::bad_authentication,
+                                                                   "expired refresh token", true));
             }
         }
         else if (error) {
@@ -842,6 +842,8 @@ SyncSession::PublicState SyncSession::get_public_state() const
     }
     REALM_UNREACHABLE();
 }
+
+SyncSession::~SyncSession() {}
 
 SyncSession::PublicState SyncSession::state() const
 {

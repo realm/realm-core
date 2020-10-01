@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object_store.hpp"
+#include <realm/object-store/object_store.hpp>
 
-#include "feature_checks.hpp"
-#include "object_schema.hpp"
-#include "schema.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>

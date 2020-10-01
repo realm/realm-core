@@ -18,9 +18,9 @@
 
 #include "sync_test_utils.hpp"
 
-#include "sync/sync_config.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_user.hpp"
+#include <realm/sync/config.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include "sync/session/session_util.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"

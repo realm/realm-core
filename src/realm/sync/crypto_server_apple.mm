@@ -67,8 +67,7 @@ PKey PKey::load_public(const std::string &pemfile) {
   }
 
   PKey pkey;
-  pkey.m_impl->public_key =
-      load_public_from_data(static_cast<CFDataRef>(pem_data));
+  pkey.m_impl->public_key = load_public_from_data((__bridge CFDataRef)pem_data);
   return pkey;
 }
 
@@ -110,7 +109,7 @@ bool PKey::verify(BinaryData message, BinaryData signature) const {
   auto translateError = [](CFErrorRef error) -> CryptoError {
     auto errorCF = adoptCF(error);
     return CryptoError(std::string("Error verifying message: ") +
-                       [static_cast<id>(error) description].UTF8String);
+                       [(__bridge NSError *)error description].UTF8String);
   };
 
   CFErrorRef error = nullptr;
@@ -124,8 +123,8 @@ bool PKey::verify(BinaryData message, BinaryData signature) const {
                                 messageCF.get(), &error) ||
       !SecTransformSetAttribute(verifier.get(), kSecDigestTypeAttribute,
                                 kSecDigestSHA2, &error) ||
-      !SecTransformSetAttribute(verifier.get(), kSecDigestLengthAttribute, @256,
-                                &error)) {
+      !SecTransformSetAttribute(verifier.get(), kSecDigestLengthAttribute,
+                                (__bridge CFTypeRef) @256, &error)) {
     throw translateError(error);
   }
 

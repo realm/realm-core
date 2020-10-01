@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/collection_notifier.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/db.hpp>
 #include <realm/list.hpp>

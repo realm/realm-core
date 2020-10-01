@@ -19,14 +19,14 @@
 #ifndef REALM_OS_SYNC_MANAGER_HPP
 #define REALM_OS_SYNC_MANAGER_HPP
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
-#include "app.hpp"
-#include "sync_user.hpp"
+#include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
-#include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/config.hpp>
 
 #include <memory>
 #include <mutex>
@@ -48,28 +48,22 @@ namespace _impl {
 struct SyncClient;
 }
 
-enum class SyncSessionStopPolicy {
-    Immediately,          // Immediately stop the session as soon as all Realms/Sessions go out of scope.
-    LiveIndefinitely,     // Never stop the session.
-    AfterChangesUploaded, // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
-};
-
 class SyncLoggerFactory {
 public:
     virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
 };
 
 struct SyncClientTimeouts {
+    SyncClientTimeouts();
     // See sync::Client::Config for the meaning of these fields.
-    uint64_t connect_timeout = sync::Client::default_connect_timeout;
-    uint64_t connection_linger_time = sync::Client::default_connection_linger_time;
-    uint64_t ping_keepalive_period = sync::Client::default_ping_keepalive_period;
-    uint64_t pong_keepalive_timeout = sync::Client::default_pong_keepalive_timeout;
-    uint64_t fast_reconnect_limit = sync::Client::default_fast_reconnect_limit;
+    uint64_t connect_timeout;
+    uint64_t connection_linger_time;
+    uint64_t ping_keepalive_period;
+    uint64_t pong_keepalive_timeout;
+    uint64_t fast_reconnect_limit;
 };
 
 struct SyncClientConfig {
-    using ReconnectMode = sync::Client::ReconnectMode;
     enum class MetadataMode {
         NoEncryption, // Enable metadata, but disable encryption.
         Encryption,   // Enable metadata, and use encryption (automatic if possible).
@@ -214,8 +208,6 @@ public:
     }
 
 private:
-    using ReconnectMode = sync::Client::ReconnectMode;
-
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.

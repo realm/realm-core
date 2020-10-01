@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
-#include "impl/collection_notifier.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
 
 #include "util/index_helpers.hpp"
 

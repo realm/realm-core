@@ -22,6 +22,9 @@
 #include <cstdlib> // itoa()
 #include <limits>
 #include <vector>
+#include <chrono>
+
+using namespace std::chrono;
 
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
@@ -37,6 +40,17 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
+
+// valgrind --tool=callgrind --instr-atstart=no realm-tests
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -1437,18 +1451,15 @@ TEST(Query_Expressions0)
     match = (power(second) < 9.001 && power(second) > 8.999).find();
     CHECK_EQUAL(key0, match);
 
-    // For `float < int_column` we had a bug where the float truncated to int, and the int_column remained int
-    // (correct behaviour would be that the float remained float and int_column converted to float). This test
-    // exposes such a bug because 1000000001 should convert to the nearest float value which is `1000000000.`
-    // (gap between floats is bigger than 1 and cannot represent 1000000001).
+    // For `float < int_column` we had a bug where int was promoted to float instead of double.
     table.clear();
-    table.create_object().set(col_int, 1000000001);
+    auto k = table.create_object().set(col_int, 1000000001).get_key();
 
     match = (1000000000.f < first).find();
-    CHECK_EQUAL(match, null_key);
+    CHECK_EQUAL(match, k);
 
     match = (first > 1000000000.f).find();
-    CHECK_EQUAL(match, null_key);
+    CHECK_EQUAL(match, k);
 }
 
 TEST(Query_StrIndexCrash)
@@ -5169,6 +5180,70 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
             foreignindex = foreignindex2;
         }
     }
+}
+
+TEST(Query_Performance)
+{
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column(type_Double, "doubles");
+    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
+
+    for (int i = 0; i < 10000; i++) {
+        auto obj = foo->create_object();
+        obj.set(col_double, double(i % 19));
+        obj.set(col_int, 30 - (i % 19));
+    }
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    auto t1 = steady_clock::now();
+
+    size_t cnt = (foo->column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 4208);
+
+    auto t2 = steady_clock::now();
+    CHECK(t2 > t1);
+
+    cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
+
+    auto t3 = steady_clock::now();
+    CHECK(t3 > t2);
+    CALLGRIND_START_INSTRUMENTATION;
+
+    cnt = (bar->link(col_linklist).column<double>(col_double) > 15).count();
+    CHECK_EQUAL(cnt, 630);
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto t4 = steady_clock::now();
+    CHECK(t4 > t3);
+
+    cnt = (foo->column<double>(col_double) > foo->column<Int>(col_int)).count();
+    CHECK_EQUAL(cnt, 1578);
+
+    auto t5 = steady_clock::now();
+    CHECK(t5 > t4);
+
+    /*
+    std::cout << "Row against constant: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    std::cout << "Linked row against constant: " << duration_cast<microseconds>(t3 - t2).count() << " us"
+              << std::endl;
+    std::cout << "List row against constant: " << duration_cast<microseconds>(t4 - t3).count() << " us" << std::endl;
+    std::cout << "Row against row: " << duration_cast<microseconds>(t5 - t4).count() << " us" << std::endl;
+    */
 }
 
 #endif // TEST_QUERY

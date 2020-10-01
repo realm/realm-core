@@ -19,22 +19,18 @@
 #ifndef REALM_OS_OBJECT_ACCESSOR_HPP
 #define REALM_OS_OBJECT_ACCESSOR_HPP
 
-#include "object.hpp"
+#include <realm/object-store/object.hpp>
 
-#include "feature_checks.hpp"
-#include "list.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
-
-#if REALM_ENABLE_SYNC
-#include <realm/sync/object.hpp>
-#endif // REALM_ENABLE_SYNC
 
 #include <string>
 

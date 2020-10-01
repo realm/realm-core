@@ -6,6 +6,7 @@
 
 #include <realm/util/string_view.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
+#include <realm/sync/config.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/transform.hpp>
@@ -236,7 +237,6 @@ protected:
 
 class ClientReplication : public ClientReplicationBase {
 public:
-    class ChangesetCooker;
     class Config;
 
     /// Get the persisted upload/download progress in bytes.
@@ -384,39 +384,6 @@ public:
 
 protected:
     ClientReplication(const std::string& realm_path);
-};
-
-
-/// \brief Abstract interface for changeset cookers.
-///
-/// Note, it is completely up to the application to decide what a cooked
-/// changeset is. History objects (instances of ClientHistory) are required to
-/// treat cooked changesets as opaque entities. For an example of a concrete
-/// changeset cooker, see TrivialChangesetCooker which defines the cooked
-/// changesets to be identical copies of the raw changesets.
-class ClientReplication::ChangesetCooker {
-public:
-    virtual ~ChangesetCooker() {}
-
-    /// \brief An opportunity to produce a cooked changeset.
-    ///
-    /// When the implementation chooses to produce a cooked changeset, it must
-    /// write the cooked changeset to the specified buffer, and return
-    /// true. When the implementation chooses not to produce a cooked changeset,
-    /// it must return false. The implementation is allowed to write to the
-    /// buffer, and return false, and in that case, the written data will be
-    /// ignored.
-    ///
-    /// \param prior_state The state of the local Realm on which the specified
-    /// raw changeset is based.
-    ///
-    /// \param changeset changeset_size The raw changeset.
-    ///
-    /// \param buffer The buffer to which the cooked changeset must be written.
-    ///
-    /// \return True if a cooked changeset was produced. Otherwise false.
-    virtual bool cook_changeset(const Group& prior_state, const char* changeset, std::size_t changeset_size,
-                                util::AppendBuffer<char>& buffer) = 0;
 };
 
 

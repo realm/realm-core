@@ -16,32 +16,33 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
-#include "impl/collection_notifier.hpp"
-#include "impl/external_commit_helper.hpp"
-#include "impl/transact_log_handler.hpp"
-#include "impl/weak_realm_notifier.hpp"
-#include "binding_context.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
-#include "util/scheduler.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/impl/external_commit_helper.hpp>
+#include <realm/object-store/impl/transact_log_handler.hpp>
+#include <realm/object-store/impl/weak_realm_notifier.hpp>
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #if REALM_ENABLE_SYNC
-#include "sync/impl/sync_file.hpp"
-#include "sync/async_open_task.hpp"
-#include "sync/sync_config.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
+#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
+#include <realm/sync/history.hpp>
 #endif
 
 #include <realm/db.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/fifo_helper.hpp>
+#include <realm/sync/config.hpp>
 
 #include <algorithm>
 #include <unordered_map>

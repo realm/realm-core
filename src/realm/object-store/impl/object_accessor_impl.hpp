@@ -19,7 +19,7 @@
 #ifndef REALM_OS_OBJECT_ACCESSOR_IMPL_HPP
 #define REALM_OS_OBJECT_ACCESSOR_IMPL_HPP
 
-#include "object_accessor.hpp"
+#include <realm/object-store/object_accessor.hpp>
 
 #include <realm/util/any.hpp>
 

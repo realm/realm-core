@@ -19,16 +19,12 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
-#include "schema.hpp"
+#include <realm/object-store/schema.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
-
-#if REALM_ENABLE_SYNC
-#include <realm/sync/client.hpp>
-#endif
 
 #include <memory>
 

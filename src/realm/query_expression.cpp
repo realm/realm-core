@@ -249,31 +249,30 @@ void Columns<Dictionary>::set_cluster(const Cluster* cluster)
 
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 {
-    Value<Mixed>& d = static_cast<Value<Mixed>&>(destination);
-
     if (links_exist()) {
         REALM_ASSERT(m_leaf_ptr == nullptr);
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (!m_key.is_null()) {
-            if (m_link_map.only_unary_links()) {
-                // If unary links, we can at most have one link
-                REALM_ASSERT(sz <= 1);
-                d.init(false, 1);
-                d.m_storage.set_null(0);
-            }
-            else {
-                d.init(true, sz);
-            }
+            destination.init_for_links(m_link_map.only_unary_links(), sz);
             for (size_t t = 0; t < sz; t++) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
                 auto dict = obj.get_dictionary(m_column_key);
-                auto opt_val = dict.try_get(m_key);
-                if (opt_val)
-                    d.m_storage.set(t, *opt_val);
-                else
-                    d.m_storage.set_null(t);
+                Mixed val;
+                if (auto opt_val = dict.try_get(m_key)) {
+                    val = *opt_val;
+                    if (m_prop_list.size()) {
+                        if (val.get_type() == type_TypedLink) {
+                            auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
+                            val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
+                        }
+                        else {
+                            val = {};
+                        }
+                    }
+                }
+                destination.set(t, val);
             }
         }
         else {
@@ -289,7 +288,8 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
             }
 
             // Copy values over
-            d.init(true, values);
+            destination.init(true, values.size());
+            destination.set(values.begin(), values.end());
         }
     }
     else {
@@ -309,25 +309,33 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
                     ref_type ref = to_ref(Array::get(state.mem.get_addr(), 2));
                     values.init_from_ref(ref);
                     val = values.get(state.index);
+                    if (m_prop_list.size()) {
+                        if (val.get_type() == type_TypedLink) {
+                            auto obj = get_base_table()->get_parent_group()->get_object(val.get<ObjLink>());
+                            val = obj.get_any(m_prop_list.begin(), m_prop_list.end());
+                        }
+                        else {
+                            val = {};
+                        }
+                    }
                 }
-                d.m_storage.set(0, val);
+                destination.set(0, val);
             }
             else {
-                d.init(true, dict_cluster.size());
+                destination.init(true, dict_cluster.size());
                 ArrayMixed leaf(alloc);
                 size_t n = 0;
                 // Iterate through cluster and insert all values
-                auto f = [&leaf, &d, &n](const Cluster* cluster) {
+                dict_cluster.traverse([&leaf, &destination, &n](const Cluster* cluster) {
                     size_t e = cluster->node_size();
                     cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
                     for (size_t i = 0; i < e; i++) {
-                        d.m_storage.set(n, leaf.get(i));
+                        destination.set(n, leaf.get(i));
                         n++;
                     }
                     // Continue
                     return false;
-                };
-                dict_cluster.traverse(f);
+                });
             }
         }
     }
@@ -338,8 +346,6 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
 {
     // Destination must be of Key type. It only makes sense to
     // compare keys with keys
-    REALM_ASSERT_DEBUG(dynamic_cast<Value<ObjKey>*>(&destination));
-    auto d = static_cast<Value<ObjKey>*>(&destination);
     std::vector<ObjKey> links = m_link_map.get_links(index);
 
     if (m_link_map.only_unary_links()) {
@@ -347,10 +353,12 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
         if (!links.empty()) {
             key = links[0];
         }
-        d->init(false, 1, key);
+        destination.init(false, 1);
+        destination.set(0, key);
     }
     else {
-        d->init(true, links);
+        destination.init(true, links.size());
+        destination.set(links.begin(), links.end());
     }
 }
 
@@ -369,26 +377,27 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     }
 }
 
-void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_t nb_elements)
+void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination, size_t nb_elements)
 {
     if (m_link_map.has_links()) {
         std::vector<ObjKey> links = m_link_map.get_links(index);
         auto sz = links.size();
 
         if (m_link_map.only_unary_links()) {
-            ref_type val = 0;
+            int64_t val = 0;
             if (sz == 1) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[0]);
-                val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
+                val = obj._get<int64_t>(m_column_key.get_index());
             }
-            destination.init(false, 1, val);
+            destination.init(false, 1);
+            destination.set(0, val);
         }
         else {
             destination.init(true, sz);
             for (size_t t = 0; t < sz; t++) {
                 const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-                ref_type val = to_ref(obj._get<int64_t>(m_column_key.get_index()));
-                destination.m_storage.set(t, val);
+                int64_t val = obj._get<int64_t>(m_column_key.get_index());
+                destination.set(t, val);
             }
         }
     }
@@ -398,7 +407,7 @@ void ColumnListBase::get_lists(size_t index, Value<ref_type>& destination, size_
         destination.init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            destination.m_storage.set(t, to_ref(m_leaf_ptr->get(index + t)));
+            destination.set(t, from_ref(m_leaf_ptr->get(index + t)));
         }
     }
 }
