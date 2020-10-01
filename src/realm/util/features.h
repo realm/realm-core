@@ -237,7 +237,7 @@
 /* Apple OSX and iOS (Darwin). */
 #include <Availability.h>
 #include <TargetConditionals.h>
-#if TARGET_OS_IPHONE == 1
+#if TARGET_OS_IPHONE == 1 && TARGET_OS_IOS == 1
 /* Device (iPhone or iPad) or simulator. */
 #define REALM_IOS 1
 #define REALM_IOS_DEVICE !TARGET_OS_SIMULATOR
