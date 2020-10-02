@@ -196,7 +196,11 @@ static inline realm_value_t to_capi(Mixed value)
                 break;
             }
             case type_TypedLink: {
-                REALM_TERMINATE("Not implemented yet");
+                val.type = RLM_TYPE_LINK;
+                auto link = value.get<ObjLink>();
+                val.link.target_table = to_capi(link.get_table_key());
+                val.link.target = to_capi(link.get_obj_key());
+                break;
             }
 
             case type_LinkList:
