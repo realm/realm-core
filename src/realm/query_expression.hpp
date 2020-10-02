@@ -446,6 +446,8 @@ public:
         return {};
     }
 
+    virtual DataType get_type() const = 0;
+
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
     // This function supports SubColumnAggregate
     virtual void evaluate(ObjKey, ValueBase&)
@@ -757,6 +759,11 @@ public:
     {
     }
 
+    DataType get_type() const final
+    {
+        return ColumnTypeTraits<T>::id;
+    }
+
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
 #define RLM_U(o)                                                                                                     \
     RLM_U2(int, o)                                                                                                   \
@@ -775,6 +782,11 @@ public:
 // Subexpr2<Link> only provides equality comparisons. Their implementations can be found later in this file.
 template <>
 class Subexpr2<Link> : public Subexpr {
+public:
+    DataType get_type() const final
+    {
+        return type_Link;
+    }
 };
 
 template <>
@@ -792,6 +804,10 @@ public:
     Query contains(const Subexpr2<StringData>& col, bool case_sensitive = true);
     Query like(StringData sd, bool case_sensitive = true);
     Query like(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    DataType get_type() const final
+    {
+        return type_String;
+    }
 };
 
 template <>
@@ -809,6 +825,10 @@ public:
     Query contains(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
     Query like(BinaryData sd, bool case_sensitive = true);
     Query like(const Subexpr2<BinaryData>& col, bool case_sensitive = true);
+    DataType get_type() const final
+    {
+        return type_Binary;
+    }
 };
 
 
@@ -2317,7 +2337,8 @@ public:
 
     bool has_search_index() const override
     {
-        return m_link_map.get_target_table()->has_search_index(m_column_key);
+        auto target_table = m_link_map.get_target_table();
+        return target_table->get_primary_key_column() == m_column_key || target_table->has_search_index(m_column_key);
     }
 
     std::vector<ObjKey> find_all(Mixed value) const override
@@ -2325,13 +2346,26 @@ public:
         std::vector<ObjKey> ret;
         std::vector<ObjKey> result;
 
-        T val{};
-        if (!value.is_null()) {
-            val = value.get<T>();
+        if (value.is_null() && !m_column_key.get_attrs().test(col_attr_Nullable)) {
+            return ret;
         }
 
-        StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-        index->find_all(result, val);
+        if (m_link_map.get_target_table()->get_primary_key_column() == m_column_key) {
+            // Only one object with a given key would be possible
+            if (auto k = m_link_map.get_target_table()->find_primary_key(value))
+                result.push_back(k);
+        }
+        else {
+            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+            T val{};
+
+            if (!value.is_null()) {
+                val = value.get<T>();
+            }
+
+            REALM_ASSERT(index);
+            index->find_all(result, val);
+        }
 
         for (ObjKey k : result) {
             auto ndxs = m_link_map.get_origin_ndxs(k);
@@ -3607,21 +3641,28 @@ public:
             return ret;
         }
 
-        if (m_nullable && std::is_same_v<T, int64_t>) {
-            util::Optional<int64_t> val;
-            if (!value.is_null()) {
-                val = value.get_int();
-            }
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-            index->find_all(result, val);
+        if (m_link_map.get_target_table()->get_primary_key_column() == m_column_key) {
+            // Only one object with a given key would be possible
+            if (auto k = m_link_map.get_target_table()->find_primary_key(value))
+                result.push_back(k);
         }
         else {
-            T val{};
-            if (!value.is_null()) {
-                val = value.get<T>();
+            if (m_nullable && std::is_same_v<T, int64_t>) {
+                util::Optional<int64_t> val;
+                if (!value.is_null()) {
+                    val = value.get_int();
+                }
+                StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+                index->find_all(result, val);
             }
-            StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
-            index->find_all(result, val);
+            else {
+                T val{};
+                if (!value.is_null()) {
+                    val = value.get<T>();
+                }
+                StringIndex* index = m_link_map.get_target_table()->get_search_index(m_column_key);
+                index->find_all(result, val);
+            }
         }
 
         for (auto k : result) {
@@ -3799,6 +3840,11 @@ public:
         : m_column(std::move(column))
         , m_link_map(link_map)
     {
+    }
+
+    DataType get_type() const final
+    {
+        return ColumnTypeTraits<T>::id;
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -4415,7 +4461,13 @@ public:
                 m_matches = m_right->find_all(Mixed());
             }
             else {
-                m_matches = m_right->find_all(get_mixed(m_left_value));
+                Mixed m = get_mixed(m_left_value);
+                if (m_right->get_type() != m.get_type()) {
+                    // If the type we are looking for is not the same type as the target
+                    // column, we cannot use the index
+                    return dT;
+                }
+                m_matches = m_right->find_all(m);
             }
             // Sort
             std::sort(m_matches.begin(), m_matches.end());
