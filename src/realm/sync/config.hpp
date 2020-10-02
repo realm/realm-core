@@ -22,6 +22,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/network.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
 
 #include <functional>
 #include <memory>
@@ -172,9 +173,19 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string partition_value)
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, const bson::Bson& partition)
         : user(std::move(user))
-        , partition_value(std::move(partition_value))
+        , partition_value(partition.to_string())
+    {
+    }
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition)
+        : user(std::move(user))
+        , partition_value(std::move(partition))
+    {
+    }
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
+        : user(std::move(user))
+        , partition_value(partition)
     {
     }
 };

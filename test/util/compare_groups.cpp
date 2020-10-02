@@ -665,7 +665,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
     // Compare row sets
     using Objects = std::set<sync::PrimaryKey>;
     auto make_inventory = [](const Table& table, Objects& objects) {
-        for (const Obj obj : table) {
+        for (const Obj& obj : table) {
             auto oid = sync::primary_key_for_row(obj);
             objects.insert(oid);
         }

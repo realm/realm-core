@@ -52,11 +52,11 @@ TEST_CASE("sync: Connection state changes", "[sync]")
     if (!EventLoop::has_implementation())
         return;
 
-    SyncServer server;
-    TestSyncManager init_sync_manager(server, base_path);
+    TestSyncManager init_sync_manager({.base_path = base_path});
+    auto app = init_sync_manager.app();
     auto user =
-        SyncManager::shared().get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
-                                       ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_auth_url, dummy_device_id);
+        app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
+                                      ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_auth_url, dummy_device_id);
 
     SECTION("register connection change listener")
     {
@@ -67,8 +67,9 @@ TEST_CASE("sync: Connection state changes", "[sync]")
         EventLoop::main().run_until([&] { return sessions_are_connected(*session); });
 
         std::atomic<bool> listener_called(false);
-        session->register_connection_change_callback(
-            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) { listener_called = true; });
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+            listener_called = true;
+        });
 
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_disconnected(*session); });
@@ -86,10 +87,13 @@ TEST_CASE("sync: Connection state changes", "[sync]")
         std::atomic<bool> listener1_called(false);
         std::atomic<bool> listener2_called(false);
         auto token1 = session->register_connection_change_callback(
-            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) { listener1_called = true; });
+            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+                listener1_called = true;
+            });
         session->unregister_connection_change_callback(token1);
-        session->register_connection_change_callback(
-            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) { listener2_called = true; });
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+            listener2_called = true;
+        });
 
         user->log_out();
         REQUIRE(sessions_are_disconnected(*session));

@@ -190,6 +190,13 @@ Bson::Type Bson::type() const noexcept
     return m_type;
 }
 
+std::string Bson::to_string() const
+{
+    std::stringstream ss;
+    ss << *this;
+    return ss.str();
+}
+
 bool Bson::operator==(const Bson& other) const
 {
     if (m_type != other.m_type) {
@@ -600,7 +607,7 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
                  base64.emplace(str.begin(), str.end());
              }
              else if (k == "subType") {
-                 subType = uint8_t(std::stoul(v.get<std::string>(), nullptr, 16));
+                 subType = std::stoul(v.get<std::string>(), nullptr, 16);
              }
          }
          if (!base64 || !subType)

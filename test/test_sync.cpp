@@ -3350,7 +3350,7 @@ TEST(Sync_MultipleServers)
                 ConstTableRef table = rt_0.get_table("class_table");
                 if (CHECK(table)) {
                     std::set<std::tuple<int, int, int>> rows;
-                    for (const Obj obj : *table) {
+                    for (const Obj& obj : *table) {
                         int server_index = int(obj.get<int64_t>("server_index"));
                         int realm_index = int(obj.get<int64_t>("realm_index"));
                         int file_index = int(obj.get<int64_t>("file_index"));

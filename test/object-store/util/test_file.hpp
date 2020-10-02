@@ -112,7 +112,11 @@ using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
-    SyncServer(StartImmediately start_immediately = true, std::string local_dir = "");
+    struct Config {
+        bool start_immediately = true;
+        std::string local_dir;
+    };
+
     ~SyncServer();
 
     void start();
@@ -135,6 +139,8 @@ public:
     }
 
 private:
+    friend struct TestSyncManager;
+    SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::unique_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
@@ -164,22 +170,26 @@ struct SyncTestFile : TestFile {
 };
 
 struct TestSyncManager {
-    TestSyncManager(const realm::app::App::Config& config, bool should_teardown_test_directory = true,
-                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-    TestSyncManager(const std::string& base_url, std::string const& base_path = "",
-                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption,
-                    bool should_teardown_test_directory = true);
-    TestSyncManager(const SyncServer& server, std::string const& base_path = "",
-                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption,
-                    bool should_teardown_test_directory = true)
-        : TestSyncManager(server.base_url(), base_path, metadataMode, should_teardown_test_directory)
-    {
-    }
+    struct Config {
+        realm::app::App::Config app_config;
+        std::string base_path;
+        std::string base_url;
+        realm::SyncManager::MetadataMode metadata_mode;
+        bool should_teardown_test_directory = true;
+    };
+
+    TestSyncManager(const Config& = {.should_teardown_test_directory = true}, const SyncServer::Config& = {});
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const;
+    SyncServer& sync_server()
+    {
+        return m_sync_server;
+    }
 
 private:
+    std::shared_ptr<realm::app::App> m_app;
+    SyncServer m_sync_server;
     std::string m_base_file_path;
     bool m_should_teardown_test_directory = true;
 };

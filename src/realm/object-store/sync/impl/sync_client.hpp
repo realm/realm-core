@@ -37,7 +37,8 @@ namespace realm {
 namespace _impl {
 
 struct SyncClient {
-    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config)
+    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config,
+               std::shared_ptr<const SyncManager> sync_manager)
         : m_client([&] {
             sync::Client::Config c;
             c.logger = logger.get();
@@ -78,9 +79,12 @@ struct SyncClient {
             }
         }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
-        , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
-            if (status != NotReachable)
-                SyncManager::shared().reconnect();
+        , m_reachability_observer(none, [weak_sync_manager = std::weak_ptr<const SyncManager>(sync_manager)](
+                                            const NetworkReachabilityStatus status) {
+            if (status != NotReachable) {
+                if (auto sync_manager = weak_sync_manager.lock())
+                    sync_manager->reconnect();
+            }
         })
     {
         if (!m_reachability_observer.start_observing())
@@ -88,6 +92,7 @@ struct SyncClient {
     }
 #else
     {
+        static_cast<void>(sync_manager);
     }
 #endif
 

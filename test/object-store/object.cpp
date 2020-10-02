@@ -88,6 +88,7 @@ TEST_CASE("object")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"table",
@@ -212,8 +213,9 @@ TEST_CASE("object")
         };
 
         auto require_change = [&] {
-            auto token =
-                object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
             return token;
         };
@@ -305,7 +307,9 @@ TEST_CASE("object")
             auto token = require_change();
 
             // would not produce a notification even if it wasn't skipped because no changes were made
-            write([&] { token.suppress_next(); });
+            write([&] {
+                token.suppress_next();
+            });
             REQUIRE(change.empty());
 
             // should now produce a notification
@@ -316,8 +320,9 @@ TEST_CASE("object")
         SECTION("add notification callback, remove it, then add another notification callback")
         {
             {
-                auto token = object.add_notification_callback(
-                    [&](CollectionChangeSet, std::exception_ptr) { FAIL("This should never happen"); });
+                auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    FAIL("This should never happen");
+                });
             }
             auto token = require_change();
             write([&] { obj.remove(); });
@@ -326,7 +331,9 @@ TEST_CASE("object")
 
         SECTION("observing deleted object throws")
         {
-            write([&] { obj.remove(); });
+            write([&] {
+                obj.remove();
+            });
             REQUIRE_THROWS(require_change());
         }
     }
@@ -707,12 +714,15 @@ TEST_CASE("object")
         bool callback_called;
         bool results_callback_called;
         bool sub_callback_called;
-        auto token1 =
-            obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { callback_called = true; });
-        auto token2 = result.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { results_callback_called = true; });
-        auto token3 = sub_obj.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { sub_callback_called = true; });
+        auto token1 = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            callback_called = true;
+        });
+        auto token2 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            results_callback_called = true;
+        });
+        auto token3 = sub_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            sub_callback_called = true;
+        });
         advance_and_notify(*r);
 
         auto table = r->read_group().get_table("class_link target");
@@ -785,8 +795,9 @@ TEST_CASE("object")
 
         auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
-        auto token1 = result.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { callback_called = true; });
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            callback_called = true;
+        });
         advance_and_notify(*r);
 
         create(dict, CreatePolicy::UpdateModified);
@@ -1130,16 +1141,15 @@ TEST_CASE("object")
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
-
-    SyncServer server(false);
-    TestSyncManager init_sync_manager(server);
-    SyncTestFile config1(init_sync_manager.app(), "shared");
-    config1.schema = config.schema;
-    SyncTestFile config2(init_sync_manager.app(), "shared");
-    config2.schema = config.schema;
-
     SECTION("defaults do not override values explicitly passed to create()")
     {
+        TestSyncManager init_sync_manager({}, {.start_immediately = false});
+        auto& server = init_sync_manager.sync_server();
+        SyncTestFile config1(init_sync_manager.app(), "shared");
+        config1.schema = config.schema;
+        SyncTestFile config2(init_sync_manager.app(), "shared");
+        config2.schema = config.schema;
+
         AnyDict v1{
             {"pk", INT64_C(7)},
             {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
@@ -1169,8 +1179,9 @@ TEST_CASE("object")
         r1->commit_transaction();
 
         server.start();
-        util::EventLoop::main().run_until(
-            [&] { return r1->read_group().get_table("class_array target")->size() == 4; });
+        util::EventLoop::main().run_until([&] {
+            return r1->read_group().get_table("class_array target")->size() == 4;
+        });
 
         Obj obj = object1.obj();
         REQUIRE(obj.get<Int>("pk") == 7); // pk
@@ -1372,11 +1383,13 @@ TEST_CASE("Embedded Object")
         Results result(realm, array_table);
 
         bool obj_callback_called = false;
-        auto token = obj.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { obj_callback_called = true; });
+        auto token = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            obj_callback_called = true;
+        });
         bool list_callback_called = false;
-        auto token1 = result.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { list_callback_called = true; });
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            list_callback_called = true;
+        });
         advance_and_notify(*realm);
 
         // Update with identical value

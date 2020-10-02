@@ -35,6 +35,7 @@ public:
     void set_notify_callback(std::function<void()>) override;
 
     bool is_on_thread() const noexcept override;
+    bool is_same_as(const Scheduler* other) const noexcept override;
     bool can_deliver_notifications() const noexcept override;
 
 private:
@@ -108,6 +109,12 @@ bool RunLoopScheduler::is_on_thread() const noexcept
     return CFRunLoopGetCurrent() == m_runloop;
 }
 
+bool RunLoopScheduler::is_same_as(const Scheduler* other) const noexcept
+{
+    auto o = dynamic_cast<const RunLoopScheduler*>(other);
+    return (o && (o->m_runloop == m_runloop));
+}
+
 bool RunLoopScheduler::can_deliver_notifications() const noexcept
 {
     // The main thread may not be in a run loop yet if we're called from
@@ -134,6 +141,7 @@ public:
     void set_notify_callback(std::function<void()>) override;
 
     bool is_on_thread() const noexcept override;
+    bool is_same_as(const Scheduler* other) const noexcept override;
     bool can_deliver_notifications() const noexcept override
     {
         return true;
@@ -149,14 +157,16 @@ static const void* c_queue_key = &c_queue_key;
 DispatchQueueScheduler::DispatchQueueScheduler(dispatch_queue_t queue)
     : m_queue(queue)
 {
-    static auto class_dispatch_queue_serial = objc_getClass("OS_dispatch_queue_serial");
-    static auto class_dispatch_queue_main = objc_getClass("OS_dispatch_queue_main");
-    auto cls = object_getClass(reinterpret_cast<id>(queue));
-    if (cls != class_dispatch_queue_serial && cls != class_dispatch_queue_main) {
-        auto msg =
-            util::format("Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
-                         dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
-        throw std::logic_error(msg);
+    if (__builtin_available(iOS 12.0, macOS 10.14, tvOS 12.0, watchOS 5.0, *)) {
+        static auto class_dispatch_queue_serial = objc_getClass("OS_dispatch_queue_serial");
+        static auto class_dispatch_queue_main = objc_getClass("OS_dispatch_queue_main");
+        auto cls = object_getClass(reinterpret_cast<id>(queue));
+        if (cls != class_dispatch_queue_serial && cls != class_dispatch_queue_main) {
+            auto msg = util::format(
+                "Invalid queue '%1' (%2): Realms can only be confined to serial queues or the main queue.",
+                dispatch_queue_get_label(queue) ?: "<nil>", class_getName(cls));
+            throw std::logic_error(msg);
+        }
     }
     dispatch_retain(m_queue);
     if (dispatch_queue_get_specific(m_queue, c_queue_key) == nullptr) {
@@ -187,6 +197,13 @@ bool DispatchQueueScheduler::is_on_thread() const noexcept
 {
     return dispatch_get_specific(c_queue_key) == m_queue;
 }
+
+bool DispatchQueueScheduler::is_same_as(const Scheduler* other) const noexcept
+{
+    auto o = dynamic_cast<const DispatchQueueScheduler*>(other);
+    return (o && (o->m_queue == m_queue));
+}
+
 } // anonymous namespace
 
 namespace realm {

@@ -309,9 +309,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
 
     // Retrieve or create the row for this object.
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-    Query query = table->where()
-                      .equal(schema.idx_identity, StringData(identity))
-                      .equal(schema.idx_provider_type, StringData(provider_type));
+    Query query = table->where().equal(schema.idx_identity, identity).equal(schema.idx_provider_type, provider_type);
     Results results(realm, std::move(query));
     REALM_ASSERT_DEBUG(results.size() < 2);
     auto row = results.first();
@@ -384,8 +382,9 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     return SyncUserMetadata(schema, std::move(realm), std::move(*row));
 }
 
-void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData url, StringData local_uuid,
-                                                    SyncFileActionMetadata::Action action, StringData new_name) const
+void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData partition_key_value,
+                                                    StringData local_uuid, SyncFileActionMetadata::Action action,
+                                                    StringData new_name) const
 {
     // This function can't use get_shared_realm() because it's called on a
     // background thread and that's currently not supported by the libuv
@@ -405,7 +404,7 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name, St
 
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
-    obj.set(schema.idx_url, url);
+    obj.set(schema.idx_url, partition_key_value);
     obj.set(schema.idx_user_identity, local_uuid);
     transaction.commit();
 }

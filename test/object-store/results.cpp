@@ -137,7 +137,7 @@ TEST_CASE("notifications: async delivery")
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -351,8 +351,9 @@ TEST_CASE("notifications: async delivery")
         bool called = false;
         token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             token2 = {};
-            token3 =
-                results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { called = true; });
+            token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                called = true;
+            });
         });
 
         advance_and_notify(*r);
@@ -371,8 +372,9 @@ TEST_CASE("notifications: async delivery")
         auto check = [&](Results& outer, Results& inner) {
             token2 = outer.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 token2 = {};
-                token3 =
-                    inner.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { called = true; });
+                token3 = inner.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    called = true;
+                });
             });
 
             advance_and_notify(*r);
@@ -395,14 +397,16 @@ TEST_CASE("notifications: async delivery")
         {
             SECTION("notifier before active")
             {
-                token3 =
-                    results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { token3 = {}; });
+                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    token3 = {};
+                });
                 check(results3, results2);
             }
             SECTION("notifier after active")
             {
-                token3 =
-                    results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { token3 = {}; });
+                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    token3 = {};
+                });
                 check(results, results2);
             }
         }
@@ -446,8 +450,12 @@ TEST_CASE("notifications: async delivery")
     SECTION("notifications are not delivered when a callback is removed from within a callback")
     {
         NotificationToken token2, token3;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { token3 = {}; });
-        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { REQUIRE(false); });
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token3 = {};
+        });
+        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            REQUIRE(false);
+        });
 
         advance_and_notify(*r);
     }
@@ -456,8 +464,12 @@ TEST_CASE("notifications: async delivery")
     {
         NotificationToken token2, token3;
         bool called = false;
-        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { token2 = {}; });
-        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { called = true; });
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
+        });
+        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            called = true;
+        });
 
         advance_and_notify(*r);
 
@@ -467,8 +479,9 @@ TEST_CASE("notifications: async delivery")
     SECTION("the first call of a notification can include changes if it previously ran for a different callback")
     {
         r->begin_transaction();
-        auto token2 = results.add_notification_callback(
-            [&](CollectionChangeSet c, std::exception_ptr) { REQUIRE(!c.empty()); });
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            REQUIRE(!c.empty());
+        });
 
         table->create_object().set(col, 5);
         r->commit_transaction();
@@ -834,6 +847,7 @@ TEST_CASE("notifications: skip")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -868,7 +882,7 @@ TEST_CASE("notifications: skip")
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -979,7 +993,9 @@ TEST_CASE("notifications: skip")
     {
         advance_and_notify(*r);
         r->begin_transaction();
-        std::thread([&] { REQUIRE_THROWS(token1.suppress_next()); }).join();
+        std::thread([&] {
+            REQUIRE_THROWS(token1.suppress_next());
+        }).join();
         r->cancel_transaction();
     }
 
@@ -1065,6 +1081,28 @@ TEST_CASE("notifications: skip")
         advance_and_notify(*r);
         REQUIRE(calls1 == 2);
     }
+
+    SECTION("skipping every write in a loop with spurious background runs works")
+    {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        std::atomic<bool> exit{false};
+        JoiningThread t([&] {
+            while (!exit)
+                on_change_but_no_notify(*r);
+        });
+
+        for (int i = 0; i < 10; ++i) {
+            r->begin_transaction();
+            table->create_object();
+            token1.suppress_next();
+            r->commit_transaction();
+        }
+
+        exit = true;
+        REQUIRE(calls1 == 1);
+    }
 }
 
 TEST_CASE("notifications: TableView delivery")
@@ -1073,6 +1111,7 @@ TEST_CASE("notifications: TableView delivery")
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.max_number_of_active_versions = 5;
 
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
@@ -1111,7 +1150,7 @@ TEST_CASE("notifications: TableView delivery")
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1183,13 +1222,57 @@ TEST_CASE("notifications: TableView delivery")
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("TV can be delivered in a write transaction")
+    SECTION("TV can't be delivered in a write transaction")
     {
-        make_remote_change();
-        advance_and_notify(*r);
-        r->begin_transaction();
-        REQUIRE(results.size() == 11);
-        r->cancel_transaction();
+        SECTION("no changes")
+        {
+            make_remote_change();
+            advance_and_notify(*r);
+            r->begin_transaction();
+            REQUIRE(results.size() == 0);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates disabled")
+        {
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 10);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates enabled")
+        {
+            // Use a new Results because AsyncOnly leaves the Results in a
+            // weird state and switching back to Auto doesn't work.
+            Results results(r, table->where());
+            results.evaluate_query_if_needed();
+            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 12);
+            r->cancel_transaction();
+        }
+    }
+
+    SECTION("unused background TVs do not pin old versions forever")
+    {
+        // This will exceed the maximum active version count (5) if any
+        // transactions are being pinned, resulting in make_remote_change() throwing
+        for (int i = 0; i < 10; ++i) {
+            REQUIRE_NOTHROW(make_remote_change());
+            advance_and_notify(*r);
+        }
     }
 }
 
@@ -1200,6 +1283,7 @@ TEST_CASE("notifications: async error handling")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1422,9 +1506,11 @@ TEST_CASE("notifications: sync")
 {
     _impl::RealmCoordinator::assert_no_open_realms();
 
-    SyncServer server(false);
-    TestSyncManager init_sync_manager(server);
-    SyncTestFile config(init_sync_manager.app());
+    TestSyncManager init_sync_manager({}, {false});
+    auto& server = init_sync_manager.sync_server();
+
+    SyncTestFile config(init_sync_manager.app(), "test");
+    config.cache = false;
     config.schema = Schema{
         {"object",
          {
@@ -1471,6 +1557,7 @@ TEST_CASE("notifications: results")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1522,25 +1609,33 @@ TEST_CASE("notifications: results")
 
         SECTION("modifications to unrelated tables do not send notifications")
         {
-            write([&] { r->read_group().get_table("class_other object")->create_object(); });
+            write([&] {
+                r->read_group().get_table("class_other object")->create_object();
+            });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("irrelevant modifications to linked tables do not send notifications")
         {
-            write([&] { r->read_group().get_table("class_linked to object")->create_object(); });
+            write([&] {
+                r->read_group().get_table("class_linked to object")->create_object();
+            });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("irrelevant modifications to linking tables do not send notifications")
         {
-            write([&] { r->read_group().get_table("class_linking object")->create_object(); });
+            write([&] {
+                r->read_group().get_table("class_linking object")->create_object();
+            });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("modifications that leave a non-matching row non-matching do not send notifications")
         {
-            write([&] { table->get_object(object_keys[6]).set(col_value, 13); });
+            write([&] {
+                table->get_object(object_keys[6]).set(col_value, 13);
+            });
             REQUIRE(notification_calls == 1);
         }
 
@@ -1555,7 +1650,9 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row and leaving it matching marks that row as modified")
         {
-            write([&] { table->get_object(object_keys[1]).set(col_value, 3); });
+            write([&] {
+                table->get_object(object_keys[1]).set(col_value, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE_INDICES(change.modifications_new, 0);
@@ -1563,14 +1660,18 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row to no longer match marks that row as deleted")
         {
-            write([&] { table->get_object(object_keys[2]).set(col_value, 0); });
+            write([&] {
+                table->get_object(object_keys[2]).set(col_value, 0);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 1);
         }
 
         SECTION("modifying a non-matching row to match marks that row as inserted, but not modified")
         {
-            write([&] { table->get_object(object_keys[7]).set(col_value, 3); });
+            write([&] {
+                table->get_object(object_keys[7]).set(col_value, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 4);
             REQUIRE(change.modifications.empty());
@@ -1579,7 +1680,9 @@ TEST_CASE("notifications: results")
 
         SECTION("deleting a matching row marks that row as deleted")
         {
-            write([&] { table->remove_object(object_keys[3]); });
+            write([&] {
+                table->remove_object(object_keys[3]);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 2);
         }
@@ -1656,13 +1759,17 @@ TEST_CASE("notifications: results")
 
         SECTION("inserting a non-matching row at the beginning does not produce a notification")
         {
-            write([&] { table->create_object(ObjKey(1)); });
+            write([&] {
+                table->create_object(ObjKey(1));
+            });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("inserting a matching row at the beginning marks just it as inserted")
         {
-            write([&] { table->create_object(ObjKey(0)).set(col_value, 5); });
+            write([&] {
+                table->create_object(ObjKey(0)).set(col_value, 5);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 0);
         }
@@ -1726,7 +1833,9 @@ TEST_CASE("notifications: results")
 
         SECTION("both are called after a write")
         {
-            write([&](auto&& t) { t.create_object(ObjKey(53)).set(col_value, 5); });
+            write([&](auto&& t) {
+                t.create_object(ObjKey(53)).set(col_value, 5);
+            });
             REQUIRE(callback.before_calls == 1);
             REQUIRE(callback.after_calls == 2);
             REQUIRE_INDICES(callback.before_change.insertions, 4);
@@ -1741,7 +1850,9 @@ TEST_CASE("notifications: results")
                 REQUIRE(results.get(0).is_valid());
                 REQUIRE(results.get(0).get<int64_t>(col_value) == 2);
             };
-            write([&](auto&& t) { t.remove_object(results.get(0).get_key()); });
+            write([&](auto&& t) {
+                t.remove_object(results.get(0).get_key());
+            });
             REQUIRE(callback.before_calls == 1);
             REQUIRE(callback.after_calls == 2);
         }
@@ -1753,7 +1864,9 @@ TEST_CASE("notifications: results")
                 REQUIRE_INDICES(callback.after_change.insertions, 4);
                 REQUIRE(results.last()->get<int64_t>(col_value) == 5);
             };
-            write([&](auto&& t) { t.create_object(ObjKey(53)).set(col_value, 5); });
+            write([&](auto&& t) {
+                t.create_object(ObjKey(53)).set(col_value, 5);
+            });
             REQUIRE(callback.before_calls == 1);
             REQUIRE(callback.after_calls == 2);
         }
@@ -1783,7 +1896,9 @@ TEST_CASE("notifications: results")
 
         SECTION("modifications that leave a non-matching row non-matching do not send notifications")
         {
-            write([&] { table->get_object(object_keys[6]).set(col_value, 13); });
+            write([&] {
+                table->get_object(object_keys[6]).set(col_value, 13);
+            });
             REQUIRE(notification_calls == 1);
         }
 
@@ -1798,7 +1913,9 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row and leaving it matching marks that row as modified")
         {
-            write([&] { table->get_object(object_keys[1]).set(col_value, 3); });
+            write([&] {
+                table->get_object(object_keys[1]).set(col_value, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 3);
             REQUIRE_INDICES(change.modifications_new, 3);
@@ -1806,21 +1923,27 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row to no longer match marks that row as deleted")
         {
-            write([&] { table->get_object(object_keys[2]).set(col_value, 0); });
+            write([&] {
+                table->get_object(object_keys[2]).set(col_value, 0);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 2);
         }
 
         SECTION("modifying a non-matching row to match marks that row as inserted")
         {
-            write([&] { table->get_object(object_keys[7]).set(col_value, 3); });
+            write([&] {
+                table->get_object(object_keys[7]).set(col_value, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 3);
         }
 
         SECTION("deleting a matching row marks that row as deleted")
         {
-            write([&] { table->remove_object(object_keys[3]); });
+            write([&] {
+                table->remove_object(object_keys[3]);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 1);
         }
@@ -1828,7 +1951,9 @@ TEST_CASE("notifications: results")
         SECTION("clearing the table marks all rows as deleted")
         {
             size_t num_expected_deletes = results.size();
-            write([&] { table->clear(); });
+            write([&] {
+                table->clear();
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE(change.deletions.count() == num_expected_deletes);
         }
@@ -1836,7 +1961,9 @@ TEST_CASE("notifications: results")
         SECTION("clear insert clear marks the correct rows as deleted")
         {
             size_t num_expected_deletes = results.size();
-            write([&] { table->clear(); });
+            write([&] {
+                table->clear();
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE(change.deletions.count() == num_expected_deletes);
             write([&] {
@@ -1847,7 +1974,9 @@ TEST_CASE("notifications: results")
             REQUIRE(notification_calls == 3);
             REQUIRE_INDICES(change.insertions, 0, 1, 2);
             REQUIRE(change.deletions.empty());
-            write([&] { table->clear(); });
+            write([&] {
+                table->clear();
+            });
             REQUIRE(notification_calls == 4);
             REQUIRE_INDICES(change.deletions, 0, 1, 2);
             REQUIRE(change.insertions.empty());
@@ -1870,7 +1999,9 @@ TEST_CASE("notifications: results")
             REQUIRE(notification_calls == 3);
             REQUIRE_INDICES(change.insertions, 0, 1, 2);
             REQUIRE(change.deletions.empty());
-            write([&] { table->clear(); });
+            write([&] {
+                table->clear();
+            });
             REQUIRE(notification_calls == 4);
             REQUIRE_INDICES(change.deletions, 0, 1, 2);
             REQUIRE(change.insertions.empty());
@@ -1879,7 +2010,9 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row to change its position sends insert+delete")
         {
-            write([&] { table->get_object(object_keys[2]).set(col_value, 9); });
+            write([&] {
+                table->get_object(object_keys[2]).set(col_value, 9);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 2);
             REQUIRE_INDICES(change.insertions, 0);
@@ -1943,7 +2076,9 @@ TEST_CASE("notifications: results")
 
         SECTION("modifications that leave a non-matching row non-matching do not send notifications")
         {
-            write([&] { table->get_object(object_keys[6]).set(col_value, 13); });
+            write([&] {
+                table->get_object(object_keys[6]).set(col_value, 13);
+            });
             REQUIRE(notification_calls == 1);
         }
 
@@ -1958,7 +2093,9 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row and leaving it matching marks that row as modified")
         {
-            write([&] { table->get_object(object_keys[1]).set(col_value, 3); });
+            write([&] {
+                table->get_object(object_keys[1]).set(col_value, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE_INDICES(change.modifications_new, 0);
@@ -1967,14 +2104,18 @@ TEST_CASE("notifications: results")
         SECTION("modifying a non-matching row which is after the distinct results in the table to be a same value \
                 in the distinct results doesn't send notification.")
         {
-            write([&] { table->get_object(object_keys[6]).set(col_value, 2); });
+            write([&] {
+                table->get_object(object_keys[6]).set(col_value, 2);
+            });
             REQUIRE(notification_calls == 1);
         }
 
         SECTION("modifying a non-matching row which is before the distinct results in the table to be a same value \
                 in the distinct results send insert + delete.")
         {
-            write([&] { table->get_object(object_keys[0]).set(col_value, 2); });
+            write([&] {
+                table->get_object(object_keys[0]).set(col_value, 2);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 0);
             REQUIRE_INDICES(change.insertions, 0);
@@ -1982,14 +2123,18 @@ TEST_CASE("notifications: results")
 
         SECTION("modifying a matching row to duplicated value in distinct results marks that row as deleted")
         {
-            write([&] { table->get_object(object_keys[2]).set(col_value, 2); });
+            write([&] {
+                table->get_object(object_keys[2]).set(col_value, 2);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 1);
         }
 
         SECTION("modifying a non-matching row to match and different value marks that row as inserted")
         {
-            write([&] { table->get_object(object_keys[0]).set(col_value, 1); });
+            write([&] {
+                table->get_object(object_keys[0]).set(col_value, 1);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 0);
         }
@@ -2082,7 +2227,9 @@ TEST_CASE("results: notifications after move")
         Results r(std::move(*results));
         results.reset();
 
-        write([&] { table->create_object().set_all(1); });
+        write([&] {
+            table->create_object().set_all(1);
+        });
         REQUIRE(notification_calls == 2);
     }
 
@@ -2092,7 +2239,9 @@ TEST_CASE("results: notifications after move")
         r = std::move(*results);
         results.reset();
 
-        write([&] { table->create_object().set_all(1); });
+        write([&] {
+            table->create_object().set_all(1);
+        });
         REQUIRE(notification_calls == 2);
     }
 }
@@ -2102,6 +2251,7 @@ TEST_CASE("results: notifier with no callbacks")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -2124,7 +2274,7 @@ TEST_CASE("results: notifier with no callbacks")
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2211,6 +2361,7 @@ TEST_CASE("results: error messages")
 TEST_CASE("results: snapshots")
 {
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -2243,7 +2394,9 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
-            write([=] { table->create_object(); });
+            write([=] {
+                table->create_object();
+            });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
         }
@@ -2254,14 +2407,18 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
-            write([=] { table->begin()->remove(); });
+            write([=] {
+                table->begin()->remove();
+            });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a row at the same index that was formerly present in the snapshot shouldn't
             // affect the state of the snapshot.
-            write([=] { table->create_object(); });
+            write([=] {
+                table->create_object();
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
         }
@@ -2273,7 +2430,9 @@ TEST_CASE("results: snapshots")
         auto col_link = object->get_column_key("array");
         auto linked_to = r->read_group().get_table("class_linked to object");
 
-        write([=] { object->create_object(); });
+        write([=] {
+            object->create_object();
+        });
 
         std::shared_ptr<LnkLst> lv = object->begin()->get_linklist_ptr(col_link);
         Results results(r, lv);
@@ -2283,7 +2442,9 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
-            write([&] { lv->add(linked_to->create_object().get_key()); });
+            write([&] {
+                lv->add(linked_to->create_object().get_key());
+            });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
         }
@@ -2293,19 +2454,25 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
-            write([&] { lv->remove(0); });
+            write([&] {
+                lv->remove(0);
+            });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
             REQUIRE(snapshot.get(0).is_valid());
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
-            write([&] { linked_to->begin()->remove(); });
+            write([&] {
+                linked_to->begin()->remove();
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new row to the link list shouldn't affect the state of the snapshot.
-            write([&] { lv->add(linked_to->create_object().get_key()); });
+            write([&] {
+                lv->add(linked_to->create_object().get_key());
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
         }
@@ -2323,7 +2490,9 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
-            write([=] { table->create_object().set(col_value, 1); });
+            write([=] {
+                table->create_object().set(col_value, 1);
+            });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
         }
@@ -2333,19 +2502,25 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
-            write([=] { table->begin()->set(col_value, 0); });
+            write([=] {
+                table->begin()->set(col_value, 0);
+            });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
             REQUIRE(snapshot.get(0).is_valid());
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
-            write([=] { table->begin()->remove(); });
+            write([=] {
+                table->begin()->remove();
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new row that matches the query criteria shouldn't affect the state of the snapshot.
-            write([=] { table->create_object().set(col_value, 1); });
+            write([=] {
+                table->create_object().set(col_value, 1);
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
         }
@@ -2363,7 +2538,9 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
-            write([=] { table->create_object().set(col_value, 1); });
+            write([=] {
+                table->create_object().set(col_value, 1);
+            });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
         }
@@ -2373,19 +2550,25 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 1);
-            write([=] { table->begin()->set(col_value, 0); });
+            write([=] {
+                table->begin()->set(col_value, 0);
+            });
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 1);
             REQUIRE(snapshot.get(0).is_valid());
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
-            write([=] { table->begin()->remove(); });
+            write([=] {
+                table->begin()->remove();
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new row that matches the query criteria shouldn't affect the state of the snapshot.
-            write([=] { table->create_object().set(col_value, 1); });
+            write([=] {
+                table->create_object().set(col_value, 1);
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
         }
@@ -2413,7 +2596,9 @@ TEST_CASE("results: snapshots")
             auto snapshot = results.snapshot();
             REQUIRE(results.size() == 0);
             REQUIRE(snapshot.size() == 0);
-            write([&] { lv->add(linked_to_obj.get_key()); });
+            write([&] {
+                lv->add(linked_to_obj.get_key());
+            });
             REQUIRE(results.size() == 1);
             REQUIRE(snapshot.size() == 0);
         }
@@ -2433,12 +2618,16 @@ TEST_CASE("results: snapshots")
 
             // Removing a row present in the snapshot from its table should result in the snapshot
             // returning a detached row accessor.
-            write([=] { object->begin()->remove(); });
+            write([=] {
+                object->begin()->remove();
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
 
             // Adding a new link shouldn't affect the state of the snapshot.
-            write([=] { object->create_object().get_linklist(col_link).add(linked_to_obj.get_key()); });
+            write([=] {
+                object->create_object().get_linklist(col_link).add(linked_to_obj.get_key());
+            });
             REQUIRE(snapshot.size() == 1);
             REQUIRE(!snapshot.get(0).is_valid());
         }
@@ -2451,21 +2640,26 @@ TEST_CASE("results: snapshots")
         Query q = table->column<Int>(col_value) > 0;
         Results results(r, q.find_all());
 
-        auto token = results.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr err) { REQUIRE_FALSE(err); });
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+        });
         advance_and_notify(*r);
 
         SECTION("snapshot of lvalue")
         {
             auto snapshot = results.snapshot();
-            write([=] { table->create_object().set(col_value, 1); });
+            write([=] {
+                table->create_object().set(col_value, 1);
+            });
             REQUIRE(snapshot.size() == 0);
         }
 
         SECTION("snapshot of rvalue")
         {
             auto snapshot = std::move(results).snapshot();
-            write([=] { table->create_object().set(col_value, 1); });
+            write([=] {
+                table->create_object().set(col_value, 1);
+            });
             REQUIRE(snapshot.size() == 0);
         }
     }
@@ -2483,7 +2677,9 @@ TEST_CASE("results: snapshots")
     SECTION("accessors should return none for detached row")
     {
         auto table = r->read_group().get_table("class_object");
-        write([=] { table->create_object(); });
+        write([=] {
+            table->create_object();
+        });
         Results results(r, table);
         auto snapshot = results.snapshot();
         write([=] {
@@ -2501,6 +2697,7 @@ TEST_CASE("results: distinct")
 {
     const int N = 10;
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2723,6 +2920,7 @@ TEST_CASE("results: distinct")
 TEST_CASE("results: sort")
 {
     InMemoryTestFile config;
+    config.cache = false;
     config.schema = Schema{
         {"object",
          {
