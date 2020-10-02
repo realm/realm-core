@@ -20,8 +20,8 @@
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
 
-#include "shared_realm.hpp"
-#include "sync/sync_manager.hpp"
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 

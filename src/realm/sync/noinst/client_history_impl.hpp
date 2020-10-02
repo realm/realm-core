@@ -38,9 +38,12 @@ namespace _impl {
 //
 //  10   Stable IDs supported by core.
 //
+//  11   Path-based instruction format for MongoDB Realm Sync (v10)
+//
+
 constexpr int get_client_history_schema_version() noexcept
 {
-    return 10;
+    return 11;
 }
 
 class ClientHistoryImpl : public sync::ClientReplication, private History, public sync::TransformHistory {
@@ -326,11 +329,8 @@ private:
     void save_cooked_changeset(BinaryData changeset, version_type server_version);
     void update_cooked_progress(CookedProgress progress);
     void fix_up_client_file_ident_in_stored_changesets(Transaction&, file_ident_type);
-    void migrate_from_history_schema_version_1_to_2(int orig_schema_version);
-    void migrate_from_history_schema_version_2_to_10();
     void record_current_schema_version();
     static void record_current_schema_version(Array& schema_versions, version_type snapshot_version);
-    bool was_migrated_from_schema_version_earlier_than(int schema_version) const noexcept;
 
     // Overriding member functions in realm::_impl::History
     void set_group(Group* group, bool updated = false) override final;

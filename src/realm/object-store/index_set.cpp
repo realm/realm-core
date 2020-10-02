@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "index_set.hpp"
+#include <realm/object-store/index_set.hpp>
 
 #include <realm/util/assert.hpp>
 

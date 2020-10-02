@@ -16,19 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
-#include "impl/collection_notifier.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "impl/transact_log_handler.hpp"
-#include "binding_context.hpp"
-#include "property.hpp"
-#include "object_schema.hpp"
-#include "schema.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/transact_log_handler.hpp>
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <realm.hpp>
 #include <realm/history.hpp>

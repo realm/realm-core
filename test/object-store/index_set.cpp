@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
-#include "index_set.hpp"
+#include <realm/object-store/index_set.hpp>
 
 #include "util/index_helpers.hpp"
 

@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/list_notifier.hpp"
+#include <realm/object-store/impl/list_notifier.hpp>
 
-#include "list.hpp"
+#include <realm/object-store/list.hpp>
 
 #include <realm/db.hpp>
 #include <realm/group.hpp>

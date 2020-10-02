@@ -1,6 +1,3 @@
-include_directories(../../external/catch/single_include .)
-include_directories(../util .)
-
 set(HEADERS
     ../util/event_loop.hpp
     ../util/index_helpers.hpp
@@ -30,15 +27,17 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 add_executable(benchmarks ${SOURCES} ${HEADERS})
-target_compile_definitions(benchmarks PRIVATE ${PLATFORM_DEFINES})
+
+target_include_directories(benchmarks PRIVATE 
+    ${CATCH_INCLUDE_DIR}
+    ../util
+)
 
 if(REALM_ENABLE_SYNC)
-    # It's necessary to explicitly link to realm-sync here to control the order in which libraries are
-    # linked to avoid link errors when using GNU ld.
-    target_link_libraries(benchmarks realm-sync realm-sync-server realm-parser)
+    target_link_libraries(benchmarks SyncServer)
 endif()
 
-target_link_libraries(benchmarks realm-object-store ${PLATFORM_LIBRARIES})
+target_link_libraries(benchmarks ObjectStore)
 set_target_properties(benchmarks PROPERTIES
       EXCLUDE_FROM_ALL 1
       EXCLUDE_FROM_DEFAULT_BUILD 1)

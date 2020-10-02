@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/impl/sync_file.hpp"
+#include <realm/object-store/sync/impl/sync_file.hpp>
 
 #include <realm/util/file.hpp>
 #include <realm/util/time.hpp>

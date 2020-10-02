@@ -19,18 +19,18 @@
 #ifndef REALM_OS_SYNC_CLIENT_HPP
 #define REALM_OS_SYNC_CLIENT_HPP
 
-#include "binding_callback_thread_observer.hpp"
+#include <realm/object-store/binding_callback_thread_observer.hpp>
 
 #include <realm/sync/client.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <thread>
 
-#include "sync/sync_manager.hpp"
-#include "sync/impl/network_reachability.hpp"
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/impl/network_reachability.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
-#include "sync/impl/apple/network_reachability_observer.hpp"
+#include <realm/object-store/sync/impl/apple/network_reachability_observer.hpp>
 #endif
 
 namespace realm {

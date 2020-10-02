@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include "test_utils.hpp"
 
 #include <realm/util/base64.hpp>

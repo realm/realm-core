@@ -26,7 +26,6 @@
 
 namespace realm {
 
-class ConstObj;
 class Obj;
 
 struct TableKey {
@@ -270,11 +269,15 @@ public:
     }
     explicit operator bool() const
     {
-        return m_table_key.operator bool();
+        return bool(m_table_key) && bool(m_obj_key);
     }
     bool is_null() const
     {
-        return !m_table_key.operator bool();
+        return !bool(*this);
+    }
+    bool is_unresolved() const
+    {
+        return m_obj_key.is_unresolved();
     }
     bool operator==(const ObjLink& other) const
     {

@@ -169,6 +169,9 @@ public:
     template <class T>
     T get() const noexcept;
 
+    template <class T>
+    T export_to_type() const noexcept;
+
     // These functions are kept to be backwards compatible
     int64_t get_int() const;
     bool get_bool() const;
@@ -180,6 +183,7 @@ public:
     ObjLink get_link() const;
 
     bool is_null() const;
+    bool is_unresolved_link() const;
     int compare(const Mixed& b) const;
     bool operator==(const Mixed& other) const
     {
@@ -379,10 +383,24 @@ inline Mixed::Mixed(ObjLink v) noexcept
 }
 
 template <>
+inline null Mixed::get<null>() const noexcept
+{
+    REALM_ASSERT(m_type == 0);
+    return {};
+}
+
+template <>
 inline int64_t Mixed::get<int64_t>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Int);
     return int_val;
+}
+
+template <>
+inline int Mixed::get<int>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Int);
+    return int(int_val);
 }
 
 inline int64_t Mixed::get_int() const
@@ -511,6 +529,20 @@ inline ObjLink Mixed::get_link() const
 inline bool Mixed::is_null() const
 {
     return (m_type == 0);
+}
+
+inline bool Mixed::is_unresolved_link() const
+{
+    if (is_null()) {
+        return false;
+    }
+    else if (get_type() == type_TypedLink) {
+        return get<ObjLink>().is_unresolved();
+    }
+    else if (get_type() == type_Link) {
+        return get<ObjKey>().is_unresolved();
+    }
+    return false;
 }
 
 std::ostream& operator<<(std::ostream& out, const Mixed& m);

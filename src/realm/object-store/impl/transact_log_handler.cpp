@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/transact_log_handler.hpp"
+#include <realm/object-store/impl/transact_log_handler.hpp>
 
-#include "binding_context.hpp"
-#include "impl/collection_notifier.hpp"
-#include "index_set.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/index_set.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/db.hpp>
 

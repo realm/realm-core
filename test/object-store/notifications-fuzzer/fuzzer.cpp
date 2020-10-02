@@ -18,12 +18,12 @@
 
 #include "command_file.hpp"
 
-#include "list.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/commit_log.hpp>
 #include <realm/disable_sync_to_disk.hpp>

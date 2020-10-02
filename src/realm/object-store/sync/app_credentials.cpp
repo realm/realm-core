@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/app_credentials.hpp"
-#include "util/bson/bson.hpp"
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
 
 #include <external/json/json.hpp>
 #include <sstream>

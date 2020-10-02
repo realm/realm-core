@@ -16,26 +16,26 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
-#include "binding_context.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
-#include "util/scheduler.hpp"
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
 
 #if REALM_ENABLE_SYNC
-#include "sync/async_open_task.hpp"
+#include <realm/object-store/sync/async_open_task.hpp>
 #endif
 
 #include <realm/util/fifo_helper.hpp>

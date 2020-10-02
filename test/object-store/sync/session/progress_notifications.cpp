@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
-#include "sync/sync_session.hpp"
+#include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/util/scope_exit.hpp>
 

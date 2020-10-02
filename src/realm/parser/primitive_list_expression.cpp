@@ -40,7 +40,7 @@ LinkChain PrimitiveListExpression::link_chain_getter() const
 }
 
 template <>
-SizeOperator<SizeOfList> PrimitiveListExpression::size_of_list() const
+SizeOperator<int64_t> PrimitiveListExpression::size_of_list() const
 {
     ColKey col = get_dest_col_key();
     ColumnType type = col.get_type();

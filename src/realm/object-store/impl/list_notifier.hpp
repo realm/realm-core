@@ -19,9 +19,9 @@
 #ifndef REALM_LIST_NOTIFIER_HPP
 #define REALM_LIST_NOTIFIER_HPP
 
-#include "impl/collection_notifier.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
 
-#include "property.hpp"
+#include <realm/object-store/property.hpp>
 
 #include <realm/list.hpp>
 

@@ -19,7 +19,7 @@
 #ifndef REALM_OS_OBJECT_NOTIFIER_HPP
 #define REALM_OS_OBJECT_NOTIFIER_HPP
 
-#include "impl/collection_notifier.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
 
 #include <realm/keys.hpp>
 

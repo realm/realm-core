@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object.hpp"
+#include <realm/object-store/object.hpp>
 
-#include "impl/object_notifier.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
+#include <realm/object-store/impl/object_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
 
 #include <realm/table.hpp>
 

@@ -7967,6 +7967,120 @@ TEST(Sync_Dictionary)
     }
 }
 
+TEST(Sync_Dictionary_Links)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    // Test that we can transmit links.
+
+    ColKey col_dict;
+
+    {
+        WriteTransaction tr{db_1};
+        auto& g = tr.get_group();
+        auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+        auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+        col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+
+        auto foo = foos->create_object_with_primary_key(123);
+        auto a = bars->create_object_with_primary_key("a");
+        auto b = bars->create_object_with_primary_key("b");
+
+        auto dict = foo.get_dictionary(col_dict);
+        dict.insert("a", a);
+        dict.insert("b", b);
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+
+        auto foos = tr.get_table("class_Foo");
+        auto bars = tr.get_table("class_Bar");
+
+        CHECK_EQUAL(foos->size(), 1);
+        CHECK_EQUAL(bars->size(), 2);
+
+        auto foo = foos->get_object_with_primary_key(123);
+        auto a = bars->get_object_with_primary_key("a");
+        auto b = bars->get_object_with_primary_key("b");
+
+        auto dict = foo.get_dictionary(foos->get_column_key("dict"));
+        CHECK_EQUAL(dict.size(), 2);
+
+        auto dict_a = dict.get("a");
+        auto dict_b = dict.get("b");
+        CHECK(dict_a == Mixed{a.get_link()});
+        CHECK(dict_b == Mixed{b.get_link()});
+    }
+
+    // Test that we can create tombstones for objects in dictionaries.
+
+    {
+        WriteTransaction tr{db_1};
+        auto& g = tr.get_group();
+
+        auto bars = g.get_table("class_Bar");
+        auto a = bars->get_object_with_primary_key("a");
+        a.invalidate();
+
+        auto foos = g.get_table("class_Foo");
+        auto foo = foos->get_object_with_primary_key(123);
+        auto dict = foo.get_dictionary(col_dict);
+
+        CHECK_EQUAL(dict.size(), 2);
+        CHECK((*dict.find("a")).second.is_unresolved_link());
+
+        CHECK(dict.find("b") != dict.end());
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+
+        auto foos = tr.get_table("class_Foo");
+        auto bars = tr.get_table("class_Bar");
+
+        CHECK_EQUAL(foos->size(), 1);
+        CHECK_EQUAL(bars->size(), 1);
+
+        auto b = bars->get_object_with_primary_key("b");
+
+        auto foo = foos->get_object_with_primary_key(123);
+        auto dict = foo.get_dictionary(col_dict);
+
+        CHECK_EQUAL(dict.size(), 2);
+        CHECK((*dict.find("a")).second.is_unresolved_link());
+
+        CHECK(dict.find("b") != dict.end());
+        CHECK((*dict.find("b")).second == Mixed{b.get_link()});
+    }
+}
+
 TEST(Sync_Set)
 {
     // Test replication and synchronization of Set values.

@@ -16,23 +16,23 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
-#include "binding_context.hpp"
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/db.hpp>
 #include <realm/query_expression.hpp>
@@ -41,6 +41,7 @@
 #include <numeric>
 
 using namespace realm;
+using namespace realm::util;
 
 
 template <PropertyType prop_type, typename T>
@@ -963,10 +964,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         CollectionChangeSet change, rchange;
         SECTION("add value to list")
         {
-            auto token =
-                list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
-            auto rtoken =
-                results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { rchange = c; });
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                rchange = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -981,10 +984,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         SECTION("clear list")
         {
-            auto token =
-                list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
-            auto rtoken =
-                results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { rchange = c; });
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                rchange = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -1015,7 +1020,6 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             obj.remove();
             r->commit_transaction();
             advance_and_notify(*r);
-            calls++; // FIXME: remove when working
             REQUIRE(calls == 4);
             REQUIRE(change.deletions.count() == values.size());
 #if 0
@@ -1031,8 +1035,9 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         SECTION("deleting containing row before first run of notifier")
         {
-            auto token =
-                list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             r2->begin_transaction();
             table2->begin()->remove();
             r2->commit_transaction();
@@ -1071,7 +1076,9 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             auto r = Realm::get_shared_realm(sync_config);
             auto table = r->read_group().get_table("class_object");
 
-            util::EventLoop::main().run_until([&] { return table->size() == 1; });
+            util::EventLoop::main().run_until([&] {
+                return table->size() == 1;
+            });
 
             CppContext ctx(r);
             Object obj(r, "object", 0);

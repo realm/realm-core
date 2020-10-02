@@ -19,8 +19,8 @@
 #ifndef REALM_OS_SYNC_CONFIG_HPP
 #define REALM_OS_SYNC_CONFIG_HPP
 
-#include "sync_user.hpp"
-#include "sync_manager.hpp"
+#include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 
 #include <realm/util/assert.hpp>
 #include <realm/sync/client.hpp>

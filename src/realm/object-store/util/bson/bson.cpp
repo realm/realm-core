@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include "util/bson/bson.hpp"
+#include <realm/object-store/util/bson/bson.hpp>
 #include <external/json/json.hpp>
 #include <stack>
 #include <algorithm>
