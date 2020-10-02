@@ -80,8 +80,6 @@ public:
     }
 
     ObjKey index_string_find_first(StringData value, const ClusterColumn& column) const;
-    void index_string_find_all(IntegerColumn& result, StringData value, const ClusterColumn& column,
-                               bool case_insensitive = false) const;
     void index_string_find_all(std::vector<ObjKey>& result, StringData value, const ClusterColumn& column,
                                bool case_insensitive = false) const;
     FindRes index_string_find_all_no_copy(StringData value, const ClusterColumn& column,
