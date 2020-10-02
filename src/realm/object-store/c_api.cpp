@@ -1,5 +1,3 @@
-#define Realm_EXPORTS
-
 #include <realm/realm.h>
 #include <realm/object-store/c_api/conversion.hpp>
 

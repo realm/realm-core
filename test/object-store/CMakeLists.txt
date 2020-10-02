@@ -56,7 +56,7 @@ set_target_properties(ObjectStoreTests PROPERTIES
     OUTPUT_NAME realm-object-store-tests
 )
 
-target_link_libraries(ObjectStoreTests ObjectStore)
+target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
 create_coverage_target(generate-coverage ObjectStoreTests)
 

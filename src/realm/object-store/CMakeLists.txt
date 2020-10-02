@@ -22,9 +22,6 @@ set(SOURCES
     impl/weak_realm_notifier.cpp
     util/scheduler.cpp
     util/uuid.cpp
-    
-    c_api.cpp
-    c_api/realm.c
 )
 
 set(HEADERS

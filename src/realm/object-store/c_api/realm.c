@@ -1,4 +1,2 @@
-#define Realm_EXPORTS
-
 /* Verify that realm.h compiles when included into a C object. */
 #include <realm/realm.h>
