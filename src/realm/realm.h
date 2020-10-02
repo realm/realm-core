@@ -789,13 +789,68 @@ RLM_API realm_list_t* _realm_list_from_native_copy(const void* plist, size_t n);
  * @return A non-null pointer if no exception occurred.
  */
 RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
+
+/**
+ * Get the size of a list, in number of elements.
+ *
+ * This function cannot fail.
+ */
 RLM_API size_t realm_list_size(const realm_list_t*);
+
+/**
+ * Get the property that this list came from.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_get_property(const realm_list_t*, realm_property_info_t* out_property_info);
+
+/**
+ * Get the value at @a index.
+ *
+ * @param out_value The resulting value, if no error occurred. May be NULL,
+ *                  though nonsensical.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_get(const realm_list_t*, size_t index, realm_value_t* out_value);
+
+/**
+ * Set the value at @a index.
+ *
+ * @param value The value to set.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
+
+/**
+ * Insert @a value at @a index.
+ *
+ * @param value The value to insert.
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
+
+/**
+ * Erase the element at @a index.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_erase(realm_list_t*, size_t index);
+
+/**
+ * Clear a list.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_clear(realm_list_t*);
+
+/**
+ * Replace the contents of a list with values.
+ *
+ * This is equivalent to calling `realm_list_clear()`, and then
+ * `realm_list_insert()` repeatedly.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_t num_values);
 
 RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
@@ -824,8 +879,31 @@ RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
 typedef realm_value_t realm_key_value_pair_t[2];
 RLM_API bool realm_dictionary_assign(realm_dictionary_t*, const realm_key_value_pair_t* pairs, size_t num_pairs);
 
-RLM_API realm_query_t* realm_query_new(const realm_t*, realm_table_key_t);
+/**
+ * Construct a new, empty query targeting @a table.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_query_t* realm_query_new(const realm_t*, realm_table_key_t table);
+
+/**
+ * Construct a new query targeting the results of a previous query.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_query_t* realm_query_new_with_results(realm_results_t*);
+
+/**
+ * Parse a query string.
+ *
+ * If the query failed to parse, the parser error is available from
+ * `realm_get_last_error()`.
+ *
+ * @return A non-null pointer if the query was successfully parsed, and no
+ *         exception occurred.
+ */
+RLM_API realm_parsed_query_t* realm_query_parse(realm_string_t);
+
 RLM_API realm_descriptor_ordering_t* realm_new_descriptor_ordering();
 RLM_API bool realm_descriptor_ordering_append_sort(realm_descriptor_ordering_t*, void*);
 RLM_API bool realm_descriptor_ordering_append_distinct(realm_descriptor_ordering_t*,
@@ -834,8 +912,6 @@ RLM_API bool realm_descriptor_ordering_append_limit(realm_descriptor_ordering_t*
 RLM_API bool realm_descriptor_ordering_append_include(realm_descriptor_ordering_t*,
                                                       const realm_include_descriptor_t*);
 
-
-RLM_API realm_parsed_query_t* realm_query_parse(realm_string_t);
 RLM_API bool realm_apply_parsed_predicate(realm_query_t*, const realm_parsed_query_t*,
                                           const realm_parsed_query_arguments_t*, const realm_key_path_mapping_t*);
 RLM_API bool realm_apply_parsed_descriptor_ordering(realm_descriptor_ordering_t*, const realm_t*,
