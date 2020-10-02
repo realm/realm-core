@@ -2556,7 +2556,9 @@ TEST(Query_StrIndexUpdating)
     auto col = t->add_column(type_String, "value");
     t->add_search_index(col);
     TableView tv = t->where().equal(col, "").find_all();
+    TableView tv_ins = t->where().equal(col, "", false).find_all();
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv_ins.size(), 0);
     group->commit_and_continue_as_read();
 
     // Queries on indexes have different codepaths for 0, 1, and multiple results,
@@ -2570,7 +2572,9 @@ TEST(Query_StrIndexUpdating)
     t->create_object();
     group->commit_and_continue_as_read();
     tv.sync_if_needed();
+    tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv_ins.size(), 1);
 
     // 1 -> multiple results
     group->promote_to_write();
@@ -2578,7 +2582,9 @@ TEST(Query_StrIndexUpdating)
     t->create_object();
     group->commit_and_continue_as_read();
     tv.sync_if_needed();
+    tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv_ins.size(), 3);
 
     // multiple -> 1
     group->promote_to_write();
@@ -2586,14 +2592,18 @@ TEST(Query_StrIndexUpdating)
     t->remove_object(tv.get_key(1));
     group->commit_and_continue_as_read();
     tv.sync_if_needed();
+    tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv_ins.size(), 1);
 
     // 1 -> 0
     group->promote_to_write();
     t->remove_object(tv.get_key(0));
     group->commit_and_continue_as_read();
     tv.sync_if_needed();
+    tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv_ins.size(), 0);
 
     // 0 -> multiple
     group->promote_to_write();
@@ -2601,7 +2611,9 @@ TEST(Query_StrIndexUpdating)
     t->create_object();
     group->commit_and_continue_as_read();
     tv.sync_if_needed();
+    tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv_ins.size(), 2);
 
     // multiple -> 0
     group->promote_to_write();
@@ -2609,7 +2621,9 @@ TEST(Query_StrIndexUpdating)
     t->remove_object(tv.get_key(1));
     group->commit_and_continue_as_read();
     tv.sync_if_needed();
+    tv_ins.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv_ins.size(), 0);
 }
 
 TEST(Query_GA_Crash)

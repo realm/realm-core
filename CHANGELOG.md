@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* If you make a case insignificant query on an indexed string column, it may fail in a way that results in a "No such key" exception. ([#6830](https://github.com/realm/realm-cocoa/issues/6830), since v6.0.0)
  
 ### Breaking changes
 * None.
