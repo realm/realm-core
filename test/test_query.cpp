@@ -1490,17 +1490,24 @@ TEST(Query_IntIndex)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     Group group;
     TableRef table = group.add_table("test");
-    auto col = table->add_column(type_Int, "first");
+    auto col = table->add_column(type_Int, "first", true);
     table->add_search_index(col);
 
     size_t eights = 0;
+    size_t nulls = 0;
 
     for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
         int v = random.draw_int_mod(10);
         if (v == 8) {
             eights++;
         }
-        table->create_object().set(col, v);
+        auto obj = table->create_object();
+        if (v == 5) {
+            nulls++;
+        }
+        else {
+            obj.set(col, v);
+        }
     }
 
     // This will use IntegerNode
@@ -1522,6 +1529,42 @@ TEST(Query_IntIndex)
     q = origin->link(col_link).column<Int>(col) == 8;
     cnt = q.count();
     CHECK_EQUAL(cnt, eights);
+
+    q = origin->link(col_link).column<Int>(col) == realm::null();
+    cnt = q.count();
+    CHECK_EQUAL(cnt, nulls);
+}
+
+TEST(Query_StringIndexNull)
+{
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    Group group;
+    TableRef table = group.add_table("test");
+    auto col = table->add_column(type_String, "first", true);
+    table->add_search_index(col);
+
+    size_t nulls = 0;
+
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
+        int v = random.draw_int_mod(10);
+        auto obj = table->create_object();
+        if (v == 8) {
+            nulls++;
+        }
+        else {
+            obj.set(col, util::to_string(v));
+        }
+    }
+
+    TableRef origin = group.add_table("origin");
+    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    for (auto&& o : *table) {
+        origin->create_object().set(col_link, o.get_key());
+    }
+
+    auto q = origin->link(col_link).column<String>(col) == realm::null();
+    auto cnt = q.count();
+    CHECK_EQUAL(cnt, nulls);
 }
 
 TEST(Query_Links)

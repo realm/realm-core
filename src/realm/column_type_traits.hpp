@@ -243,7 +243,7 @@ struct ColumnTypeTraits<int> {
 
 template <>
 struct ColumnTypeTraits<null> {
-    static const DataType id = type_Int;
+    static const DataType id = DataType(-1);
 };
 
 template <typename T>
