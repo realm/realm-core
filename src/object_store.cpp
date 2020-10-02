@@ -169,6 +169,16 @@ void make_property_required(Group& group, Table& table, Property property)
     property.column_key = add_column(group, table, property).value;
 }
 
+void add_search_index(Table& table, Property property)
+{
+    table.add_search_index(table.get_column_key(property.name));
+}
+
+void remove_search_index(Table& table, Property property)
+{
+    table.remove_search_index(table.get_column_key(property.name));
+}
+
 } // anonymous namespace
 
 void ObjectStore::set_schema_version(Group& group, uint64_t version) {
@@ -470,8 +480,8 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
+        void operator()(AddIndex op) { add_search_index(table(op.object), *op.property); }
+        void operator()(RemoveIndex op) { remove_search_index(table(op.object), *op.property); }
 
         void operator()(ChangePropertyType op)
         {
@@ -531,8 +541,8 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { table(op.object).set_primary_key_column(ColKey{}); }
-        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
-        void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
+        void operator()(AddIndex op) { add_search_index(table(op.object), *op.property); }
+        void operator()(RemoveIndex op) { remove_search_index(table(op.object), *op.property); }
     } applier{group};
 
     for (auto& change : changes) {

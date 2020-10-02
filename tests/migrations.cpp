@@ -692,6 +692,49 @@ TEST_CASE("migration: Automatic") {
         }
     }
 
+    SECTION("change nullability and primary key") {
+        using namespace std::string_literals;
+        Schema schema{
+            {"EmpDetails", {
+                {"UId", PropertyType::String, Property::IsPrimary{true}},
+                {"EmployeeId", PropertyType::String|PropertyType::Nullable},
+                {"Name", PropertyType::String},
+            }}
+        };
+        Schema schema2{
+            {"EmpDetails", {
+                {"UId", PropertyType::String},
+                {"EmployeeId", PropertyType::String, Property::IsPrimary{true}},
+                {"Name", PropertyType::String},
+            }}
+        };
+        InMemoryTestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext ctx(realm);
+        util::Any values = AnyDict{
+            {"UId", "ID_001"s},
+            {"EmployeeId", "XHGR"s},
+            {"Name", "John Doe"s},
+        };
+        realm->begin_transaction();
+        Object::create(ctx, realm, *realm->schema().find("EmpDetails"), values);
+        realm->commit_transaction();
+
+        realm->update_schema(schema2, 2, [](auto old_realm, auto new_realm, auto&) {
+            // ObjectStore::delete_data_for_object(realm->read_group(), "DetailStudentStatus");
+            Object old_obj(old_realm, "EmpDetails", 0);
+            Object new_obj(new_realm, "EmpDetails", 0);
+
+            CppContext ctx1(old_realm);
+            CppContext ctx2(new_realm);
+            auto val = old_obj.get_property_value<util::Any>(ctx1, "EmployeeId");
+            new_obj.set_property_value(ctx2, "EmployeeId", val);
+        });
+    }
+
     SECTION("object accessors inside migrations") {
         using namespace std::string_literals;
 
