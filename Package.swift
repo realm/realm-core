@@ -124,9 +124,9 @@ let package = Package(
             name: "SyncClient",
             dependencies: ["Storage"],
             path: "src",
-            exclude: [
+            exclude: ([
                 "realm/sync/crypto_server_openssl.cpp",
-            ] + syncCommandSources + syncServerSources,
+            ] + syncCommandSources + syncServerSources) as [String],
             sources: [
                 "realm/sync",
                 "realm/util/network.cpp",
@@ -146,9 +146,9 @@ let package = Package(
             name: "SyncServer",
             dependencies: ["SyncClient"],
             path: "src",
-            exclude: [
+            exclude: ([
                 "realm/sync/crypto_server_openssl.cpp",
-            ] + syncCommandSources,
+            ] + syncCommandSources) as [String],
             sources: syncServerSources,
             publicHeadersPath: "realm/sync/impl", // hack
             cxxSettings: cxxSettings,
@@ -166,11 +166,11 @@ let package = Package(
             ],
             sources: ["realm/object-store"],
             publicHeadersPath: "realm/object-store",
-            cxxSettings: [
+            cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("realm/object-store")
-            ] + cxxSettings),
+            ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
             dependencies: ["ObjectStore", "SyncServer"],
@@ -179,12 +179,12 @@ let package = Package(
                 "benchmarks",
                 "notifications-fuzzer"
             ],
-            cxxSettings: [
+            cxxSettings: ([
                 .define("REALM_ENABLE_SYNC", to: "1"),
                 .define("REALM_PLATFORM_APPLE", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .headerSearchPath("."),
                 .headerSearchPath("../../external/catch/single_include")
-            ] + cxxSettings)
+            ] + cxxSettings) as [CXXSetting])
     ],
     cxxLanguageStandard: .cxx1z
 )
