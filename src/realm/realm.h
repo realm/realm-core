@@ -16,8 +16,13 @@
 // Exporting Win32 symbols
 #define RLM_EXPORT __declspec(dllexport)
 #else
-// Not exporting Win32 symbols
+// Importing Win32 symbols. Note: Clients linking statically should define
+// RLM_NO_DLLIMPORT.
+#if !define(RLM_NO_DLLIMPORT)
 #define RLM_EXPORT __declspec(dllimport)
+#else
+#define RLM_EXPORT
+#endif // RLM_NO_DLLIMPORT
 #endif // Realm_EXPORTS
 
 #else

@@ -1,5 +1,7 @@
 #include "catch2/catch.hpp"
 
+// FIXME: Support linking the test suite dynamically.
+#define RLM_NO_DLLIMPORT
 #include <realm/realm.h>
 
 #include <realm/util/file.hpp>
