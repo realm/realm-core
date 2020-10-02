@@ -57,9 +57,9 @@ static util::Optional<AppError> check_for_errors(const Response& response)
                 !error_code->get<std::string>().empty())
             {
                 return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
-                                message != body.end() ? message->get<std::string>() : "no error message", parsed_link);
+                                message != body.end() ? message->get<std::string>() : "no error message", std::move(parsed_link));
             } else if (message != body.end()) {
-                return AppError(make_error_code(ServiceErrorCode::unknown), message->get<std::string>(), parsed_link);
+                return AppError(make_error_code(ServiceErrorCode::unknown), message->get<std::string>(), std::move(parsed_link));
             }
         }
     } catch (const std::exception&) {
