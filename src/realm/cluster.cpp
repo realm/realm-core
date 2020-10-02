@@ -220,7 +220,7 @@ void ClusterNode::IteratorState::init(const ConstObj& obj)
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw InvalidKey("Key not found");
+        throw InvalidKey("No such object");
     }
 }
 
@@ -280,7 +280,7 @@ T ClusterNodeInner::recurse(ObjKey key, F func)
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw InvalidKey("Key not found");
+        throw InvalidKey("Child not found in recurse");
     }
     return recurse<T>(child_info, func);
 }
@@ -410,7 +410,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw InvalidKey("Key not found");
+        throw InvalidKey("Child not found in get_ndx");
     }
 
     // First figure out how many objects there are in nodes before actual one
@@ -1339,13 +1339,13 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw InvalidKey("Key not found");
+            throw InvalidKey("Key not found in get_ndx");
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw InvalidKey("Key not found");
+            throw InvalidKey("Key not found in get_ndx");
         }
     }
     return index + ndx;
