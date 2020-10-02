@@ -11,6 +11,8 @@
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 
+#include <realm/util/overloaded.hpp>
+
 using namespace realm;
 
 namespace {
@@ -118,6 +120,7 @@ struct shared_realm : WrapC, SharedRealm {
         : SharedRealm{std::move(rlm)}
     {
     }
+
     shared_realm* clone() const override
     {
         return new shared_realm{*this};
@@ -247,6 +250,12 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
         }
         catch (const NotClonableException& ex) {
             populate_error(ex, RLM_ERR_NOT_CLONABLE);
+        }
+        catch (const List::OutOfBoundsIndexException& ex) {
+            populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+        }
+        catch (const std::invalid_argument& ex) {
+            populate_error(ex, RLM_ERR_INVALID_ARGUMENT);
         }
         catch (const std::bad_alloc& ex) {
             populate_error(ex, RLM_ERR_OUT_OF_MEMORY);
@@ -855,6 +864,11 @@ RLM_API bool realm_object_is_valid(const realm_object_t* obj)
     return obj->is_valid();
 }
 
+RLM_API realm_obj_key_t realm_object_get_key(const realm_object_t* obj)
+{
+    return to_capi(obj->obj().get_key());
+}
+
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
 {
     auto obj = object->obj();
@@ -962,12 +976,112 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
     });
 }
 
+template <class F>
+auto value_or_object(const std::shared_ptr<Realm>& realm, PropertyType val_type, Mixed val, F&& f)
+{
+    // FIXME: Object Store has poor support for heterogeneous lists, and in
+    // particular it relies on Core to check that the input types to
+    // `List::insert()` etc. match the list property type. Once that is fixed /
+    // made safer, this logic should move into Object Store.
+
+    if (val.is_null()) {
+        if (!is_nullable(val_type)) {
+            // FIXME: Defer this exception to Object Store, which can produce
+            // nicer message.
+            throw std::invalid_argument("NULL in non-nullable field/list.");
+        }
+
+        // Produce a util::none matching the property type.
+        return switch_on_type(val_type, [&](auto ptr) {
+            using T = std::remove_cv_t<std::remove_pointer_t<decltype(ptr)>>;
+            T nothing{};
+            return f(nothing);
+        });
+    }
+
+    PropertyType base_type = (val_type & ~PropertyType::Flags);
+
+    // Note: The following checks PropertyType::Any on the assumption that it
+    // will become un-deprecated when Mixed is exposed in Object Store.
+
+    switch (val.get_type()) {
+        case type_Int: {
+            if (base_type != PropertyType::Int && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<int64_t>());
+        }
+        case type_Bool: {
+            if (base_type != PropertyType::Bool && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<bool>());
+        }
+        case type_String: {
+            if (base_type != PropertyType::String && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<StringData>());
+        }
+        case type_Binary: {
+            if (base_type != PropertyType::Data && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<BinaryData>());
+        }
+        case type_Timestamp: {
+            if (base_type != PropertyType::Date && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<Timestamp>());
+        }
+        case type_Float: {
+            if (base_type != PropertyType::Float && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<float>());
+        }
+        case type_Double: {
+            if (base_type != PropertyType::Double && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<double>());
+        }
+        case type_Decimal: {
+            if (base_type != PropertyType::Decimal && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<Decimal128>());
+        }
+        case type_ObjectId: {
+            if (base_type != PropertyType::ObjectId && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<ObjectId>());
+        }
+        case type_TypedLink: {
+            if (base_type != PropertyType::Object && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            // Object Store performs link validation already. Just create an Obj
+            // for the link, and pass it on.
+            auto link = val.get<ObjLink>();
+            auto target_table = realm->read_group().get_table(link.get_table_key());
+            auto obj = target_table->get_object(link.get_obj_key());
+            return f(std::move(obj));
+        }
+
+        case type_Link:
+            // Note: from_capi(realm_value_t) never produces an untyped link.
+            [[fallthrough]];
+        case type_OldTable:
+            [[fallthrough]];
+        case type_Mixed:
+            [[fallthrough]];
+        case type_OldDateTime:
+            [[fallthrough]];
+        case type_LinkList:
+            REALM_TERMINATE("Invalid value type.");
+    }
+}
+
 RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t value)
 {
     return wrap_err([&]() {
         auto val = from_capi(value);
-        val = typed_link_to_link(val);
-        list->insert_any(index, val);
+        value_or_object(list->get_realm(), list->get_type(), val, [&](auto val) {
+            list->insert(index, val);
+        });
         return true;
     });
 }
@@ -976,8 +1090,9 @@ RLM_API bool realm_list_set(realm_list_t* list, size_t index, realm_value_t valu
 {
     return wrap_err([&]() {
         auto val = from_capi(value);
-        val = typed_link_to_link(val);
-        list->set_any(index, val);
+        value_or_object(list->get_realm(), list->get_type(), val, [&](auto val) {
+            list->set(index, val);
+        });
         return true;
     });
 }
