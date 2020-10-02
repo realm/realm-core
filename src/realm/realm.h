@@ -18,7 +18,7 @@
 #else
 // Importing Win32 symbols. Note: Clients linking statically should define
 // RLM_NO_DLLIMPORT.
-#if !define(RLM_NO_DLLIMPORT)
+#if !defined(RLM_NO_DLLIMPORT)
 #define RLM_EXPORT __declspec(dllimport)
 #else
 #define RLM_EXPORT
