@@ -31,19 +31,17 @@
 #define RLM_API RLM_EXPORT
 #endif // __cplusplus
 
-typedef struct realm_coordinator realm_coordinator_t;
+
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
-typedef struct realm_scheduler realm_scheduler_t;
-typedef struct realm_sync_config realm_sync_config_t;
-typedef struct realm_config realm_config_t;
+typedef void (*realm_free_userdata_func_t)(void*);
+typedef void* (*realm_clone_userdata_func_t)(const void*);
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
 typedef struct realm_list realm_list_t;
 typedef struct realm_set realm_set_t;
 typedef struct realm_dictionary realm_dictionary_t;
-typedef struct realm_object_notifier realm_object_notifier_t;
 
 /* Query types */
 typedef struct realm_query realm_query_t;
@@ -57,7 +55,9 @@ typedef struct realm_include_descriptor realm_include_descriptor_t;
 typedef struct realm_key_path_mapping realm_key_path_mapping_t;
 typedef struct realm_results realm_results_t;
 
-/* Configuration types */
+/* Config types */
+typedef struct realm_config realm_config_t;
+typedef struct realm_sync_config realm_sync_config_t;
 typedef void (*realm_migration_func_t)(void* userdata, realm_t* old_realm, realm_t* new_realm,
                                        const realm_schema_t* schema);
 typedef void (*realm_data_initialization_func_t)(void* userdata, realm_t* realm);
@@ -71,7 +71,7 @@ typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_MANUAL,
 } realm_schema_mode_e;
 
-/* Non-opaque types */
+/* Key types */
 typedef struct realm_table_key {
     uint32_t table_key;
 } realm_table_key_t;
@@ -88,106 +88,8 @@ typedef struct realm_version {
     uint64_t version;
 } realm_version_t;
 
-typedef struct realm_string {
-    const char* data;
-    size_t size;
-} realm_string_t;
 
-typedef struct realm_binary {
-    const uint8_t* data;
-    size_t size;
-} realm_binary_t;
-
-typedef enum realm_transaction_stage {
-    RLM_TRANSACTION_STAGE_READY,
-    RLM_TRANSACTION_STAGE_READING,
-    RLM_TRANSACTION_STAGE_WRITING,
-    RLM_TRANSACTION_STAGE_FROZEN,
-} realm_transaction_stage_e;
-
-typedef struct realm_observer {
-    bool (*select_table)(void*, realm_table_key_t);
-    bool (*select_collection)(void*, realm_col_key_t, realm_obj_key_t);
-    // ...
-    void* userdata;
-} realm_observer_t;
-
-typedef enum realm_errno {
-    RLM_ERR_UNKNOWN,
-    RLM_ERR_OTHER_EXCEPTION,
-    RLM_ERR_OUT_OF_MEMORY,
-    RLM_ERR_NOT_CLONABLE,
-
-    RLM_ERR_LOGIC,
-    RLM_ERR_NO_SUCH_TABLE,
-    RLM_ERR_TABLE_NAME_IN_USE,
-    RLM_ERR_CROSS_TABLE_LINK_TARGET,
-    RLM_ERR_DESCRIPTOR_MISMATCH,
-    RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
-    RLM_ERR_MULTIPLE_SYNC_AGENTS,
-    RLM_ERR_ADDRESS_SPACE_EXHAUSTED,
-    RLM_ERR_MAXIMUM_FILE_SIZE_EXCEEDED,
-    RLM_ERR_OUT_OF_DISK_SPACE,
-    RLM_ERR_KEY_NOT_FOUND,
-    RLM_ERR_COLUMN_NOT_FOUND,
-    RLM_ERR_COLUMN_ALREADY_EXISTS,
-    RLM_ERR_KEY_ALREADY_USED,
-    RLM_ERR_SERIALIZATION_ERROR,
-    RLM_ERR_INVALID_PATH_ERROR,
-    RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE,
-    // ...
-} realm_errno_e;
-
-typedef enum realm_logic_error_kind {
-    RLM_LOGIC_ERR_NONE = 0,
-    RLM_LOGIC_ERR_STRING_TOO_BIG,
-    // ...
-} realm_logic_error_kind_e;
-
-typedef struct realm_error {
-    realm_errno_e error;
-    realm_string_t message;
-    union {
-        int code;
-        realm_logic_error_kind_e logic_error_kind;
-    } kind;
-} realm_error_t;
-
-typedef enum realm_column_attr {
-    // Values matching `realm::ColumnAttr`.
-    RLM_COLUMN_ATTR_NONE = 0,
-    RLM_COLUMN_ATTR_INDEXED = 1,
-    RLM_COLUMN_ATTR_UNIQUE = 2,
-    RLM_COLUMN_ATTR_RESERVED = 4,
-    RLM_COLUMN_ATTR_STRONG_LINKS = 8,
-    RLM_COLUMN_ATTR_NULLABLE = 16,
-    RLM_COLUMN_ATTR_LIST = 32,
-    RLM_COLUMN_ATTR_DICTIONARY = 64,
-    RLM_COLUMN_ATTR_COLLECTION = 64 + 32,
-} realm_column_attr_e;
-
-typedef enum realm_property_type {
-    // Values matching `realm::ColumnType`.
-    RLM_PROPERTY_TYPE_INT = 0,
-    RLM_PROPERTY_TYPE_BOOL = 1,
-    RLM_PROPERTY_TYPE_STRING = 2,
-    RLM_PROPERTY_TYPE_BINARY = 4,
-    RLM_PROPERTY_TYPE_ANY = 6,
-    RLM_PROPERTY_TYPE_TIMESTAMP = 8,
-    RLM_PROPERTY_TYPE_FLOAT = 9,
-    RLM_PROPERTY_TYPE_DOUBLE = 10,
-    RLM_PROPERTY_TYPE_DECIMAL128 = 11,
-    RLM_PROPERTY_TYPE_OBJECT = 12,
-    RLM_PROPERTY_TYPE_LINKING_OBJECTS = 14,
-    RLM_PROPERTY_TYPE_OBJECT_ID = 15,
-} realm_property_type_e;
-
-typedef enum realm_collection_type {
-    RLM_COLLECTION_TYPE_NONE = 0,
-    RLM_COLLECTION_TYPE_LIST = 1,
-    RLM_COLLECTION_TYPE_SET = 2,
-    RLM_COLLECTION_TYPE_DICTIONARY = 4,
-} realm_collection_type_e;
+/* Value types */
 
 typedef enum realm_value_type {
     RLM_TYPE_NULL,
@@ -202,6 +104,16 @@ typedef enum realm_value_type {
     RLM_TYPE_OBJECT_ID,
     RLM_TYPE_LINK,
 } realm_value_type_e;
+
+typedef struct realm_string {
+    const char* data;
+    size_t size;
+} realm_string_t;
+
+typedef struct realm_binary {
+    const uint8_t* data;
+    size_t size;
+} realm_binary_t;
 
 typedef struct realm_timestamp {
     int64_t seconds;
@@ -239,6 +151,142 @@ typedef struct realm_value {
     };
     realm_value_type_e type;
 } realm_value_t;
+
+
+/* Error types */
+typedef struct realm_async_error realm_async_error_t;
+typedef enum realm_errno {
+    RLM_ERR_NONE = 0,
+    RLM_ERR_UNKNOWN,
+    RLM_ERR_OTHER_EXCEPTION,
+    RLM_ERR_OUT_OF_MEMORY,
+    RLM_ERR_NOT_CLONABLE,
+
+    RLM_ERR_INVALID_ARGUMENT,
+
+    RLM_ERR_LOGIC,
+    RLM_ERR_NO_SUCH_TABLE,
+    RLM_ERR_TABLE_NAME_IN_USE,
+    RLM_ERR_CROSS_TABLE_LINK_TARGET,
+    RLM_ERR_DESCRIPTOR_MISMATCH,
+    RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
+    RLM_ERR_MULTIPLE_SYNC_AGENTS,
+    RLM_ERR_ADDRESS_SPACE_EXHAUSTED,
+    RLM_ERR_MAXIMUM_FILE_SIZE_EXCEEDED,
+    RLM_ERR_OUT_OF_DISK_SPACE,
+    RLM_ERR_KEY_NOT_FOUND,
+    RLM_ERR_COLUMN_NOT_FOUND,
+    RLM_ERR_COLUMN_ALREADY_EXISTS,
+    RLM_ERR_KEY_ALREADY_USED,
+    RLM_ERR_SERIALIZATION_ERROR,
+    RLM_ERR_INVALID_PATH_ERROR,
+    RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE,
+
+    RLM_ERR_INDEX_OUT_OF_BOUNDS,
+    // ...
+} realm_errno_e;
+
+typedef enum realm_logic_error_kind {
+    RLM_LOGIC_ERR_NONE = 0,
+    RLM_LOGIC_ERR_STRING_TOO_BIG,
+    // ...
+} realm_logic_error_kind_e;
+
+typedef struct realm_error {
+    realm_errno_e error;
+    realm_string_t message;
+    union {
+        int code;
+        realm_logic_error_kind_e logic_error_kind;
+    } kind;
+} realm_error_t;
+
+/* Schema types */
+
+typedef enum realm_column_attr {
+    // Values matching `realm::ColumnAttr`.
+    RLM_COLUMN_ATTR_NONE = 0,
+    RLM_COLUMN_ATTR_INDEXED = 1,
+    RLM_COLUMN_ATTR_UNIQUE = 2,
+    RLM_COLUMN_ATTR_RESERVED = 4,
+    RLM_COLUMN_ATTR_STRONG_LINKS = 8,
+    RLM_COLUMN_ATTR_NULLABLE = 16,
+    RLM_COLUMN_ATTR_LIST = 32,
+    RLM_COLUMN_ATTR_DICTIONARY = 64,
+    RLM_COLUMN_ATTR_COLLECTION = 64 + 32,
+} realm_column_attr_e;
+
+typedef enum realm_property_type {
+    // Values matching `realm::ColumnType`.
+    RLM_PROPERTY_TYPE_INT = 0,
+    RLM_PROPERTY_TYPE_BOOL = 1,
+    RLM_PROPERTY_TYPE_STRING = 2,
+    RLM_PROPERTY_TYPE_BINARY = 4,
+    RLM_PROPERTY_TYPE_ANY = 6,
+    RLM_PROPERTY_TYPE_TIMESTAMP = 8,
+    RLM_PROPERTY_TYPE_FLOAT = 9,
+    RLM_PROPERTY_TYPE_DOUBLE = 10,
+    RLM_PROPERTY_TYPE_DECIMAL128 = 11,
+    RLM_PROPERTY_TYPE_OBJECT = 12,
+    RLM_PROPERTY_TYPE_LINKING_OBJECTS = 14,
+    RLM_PROPERTY_TYPE_OBJECT_ID = 15,
+} realm_property_type_e;
+
+typedef enum realm_collection_type {
+    RLM_COLLECTION_TYPE_NONE = 0,
+    RLM_COLLECTION_TYPE_LIST = 1,
+    RLM_COLLECTION_TYPE_SET = 2,
+    RLM_COLLECTION_TYPE_DICTIONARY = 4,
+} realm_collection_type_e;
+
+typedef struct realm_property_info {
+    realm_string_t name;
+    realm_string_t public_name;
+    realm_property_type_e type;
+    realm_collection_type_e collection_type;
+
+    realm_string_t link_target;
+    realm_string_t link_origin_property_name;
+    realm_col_key_t key;
+    int flags;
+} realm_property_info_t;
+
+typedef struct realm_class_info {
+    realm_string_t name;
+    realm_string_t primary_key;
+    size_t num_properties;
+    size_t num_computed_properties;
+    realm_table_key_t key;
+    int flags;
+} realm_class_info_t;
+
+typedef enum realm_class_flags {
+    RLM_CLASS_NORMAL = 0,
+    RLM_CLASS_EMBEDDED = 1,
+} realm_class_flags_e;
+
+typedef enum realm_property_flags {
+    RLM_PROPERTY_NORMAL = 0,
+    RLM_PROPERTY_NULLABLE = 1,
+    RLM_PROPERTY_PRIMARY_KEY = 2,
+    RLM_PROPERTY_INDEXED = 4,
+} realm_property_flags_e;
+
+
+/* Notification types */
+typedef struct realm_notication_token realm_notification_token_t;
+typedef struct realm_collection_changes realm_collection_changes_t;
+typedef void (*realm_before_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
+typedef void (*realm_after_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
+typedef void (*realm_collection_change_error_func_t)(void* userdata, realm_async_error_t*);
+
+
+/* Sync types */
+typedef void (*realm_sync_upload_completion_func_t)(void* userdata, realm_async_error_t*);
+typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_async_error_t*);
+typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, int, int);
+typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, int, int);
+typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, size_t total);
 
 /**
  * Get a string representing the version number of the Realm library.
@@ -407,11 +455,11 @@ RLM_API bool realm_is_closed(realm_t*);
 RLM_API bool realm_begin_write(realm_t*);
 
 /**
- * Get the current transaction state of a realm file.
+ * Return true if the realm is in a write transaction.
  *
  * This function cannot fail.
  */
-RLM_API realm_transaction_stage_e realm_get_transaction_stage(const realm_t*);
+RLM_API bool realm_is_writable(const realm_t*);
 
 /**
  * Commit a write transaction.
@@ -453,39 +501,6 @@ RLM_API realm_t* realm_freeze(realm_t*);
  * @return True if compaction was successful and no exceptions were thrown.
  */
 RLM_API bool realm_compact(realm_t*, bool* did_compact);
-
-typedef struct realm_property_info {
-    realm_string_t name;
-    realm_string_t public_name;
-    realm_property_type_e type;
-    realm_collection_type_e collection_type;
-
-    realm_string_t link_target;
-    realm_string_t link_origin_property_name;
-    realm_col_key_t key;
-    int flags;
-} realm_property_info_t;
-
-typedef struct realm_class_info {
-    realm_string_t name;
-    realm_string_t primary_key;
-    size_t num_properties;
-    size_t num_computed_properties;
-    realm_table_key_t key;
-    int flags;
-} realm_class_info_t;
-
-typedef enum realm_class_flags {
-    RLM_CLASS_NORMAL = 0,
-    RLM_CLASS_EMBEDDED = 1,
-} realm_class_flags_e;
-
-typedef enum realm_property_flags {
-    RLM_PROPERTY_NORMAL = 0,
-    RLM_PROPERTY_NULLABLE = 1,
-    RLM_PROPERTY_PRIMARY_KEY = 2,
-    RLM_PROPERTY_INDEXED = 4,
-} realm_property_flags_e;
 
 /**
  * Create a new schema from classes and their properties.
