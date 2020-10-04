@@ -144,7 +144,7 @@ void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_
             // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
             // launches again, which might not be how some apps want to treat their data.)
             try {
-                m_file_manager->remove_user_directory(user.local_uuid());
+                m_file_manager->remove_user_directory(user.identity());
                 dead_users.emplace_back(std::move(user));
             }
             catch (util::File::AccessError const&) {
@@ -503,7 +503,7 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->realm_file_path(user.local_identity(), realm_file_name);
+    return m_file_manager->realm_file_path(user.identity(), user.local_identity(), realm_file_name);
 }
 
 std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name) const
@@ -517,8 +517,8 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
     std::array<unsigned char, 32> hash;
     util::sha256(config.partition_value.data(), config.partition_value.size(), hash.data());
     std::string legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
-    std::string legacy_file_path =
-        m_file_manager->realm_file_path(config.user->local_identity(), legacy_hashed_file_name);
+    std::string legacy_file_path = m_file_manager->realm_file_path(
+        config.user->identity(), config.user->local_identity(), legacy_hashed_file_name);
     if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
         return legacy_file_path;
     }
@@ -527,7 +527,7 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
     // locating files in the filesystem.
     std::string file_name =
         (custom_file_name) ? custom_file_name.value() : string_from_partition(config.partition_value);
-    return m_file_manager->realm_file_path(config.user->local_identity(), file_name);
+    return m_file_manager->realm_file_path(config.user->identity(), config.user->local_identity(), file_name);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const
