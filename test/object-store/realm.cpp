@@ -434,7 +434,9 @@ TEST_CASE("SharedRealm: get_shared_realm()")
     public:
         SimpleScheduler(size_t id)
             : Scheduler()
-            , m_id(id){};
+            , m_id(id)
+        {
+        }
 
         bool is_on_thread() const noexcept override
         {

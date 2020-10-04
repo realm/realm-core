@@ -205,7 +205,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]")
             SECTION("that was already deleted succeeds")
             {
                 manager.remove_user_directory(identity);
-                REQUIRE(opendir(expected.c_str()) == NULL);
+                // REQUIRE(opendir(expected.c_str()) == NULL); // FIXME: Does not work on Windows
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
             }
         }
