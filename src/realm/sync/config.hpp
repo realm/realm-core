@@ -37,6 +37,10 @@ class Group;
 class SyncUser;
 class SyncSession;
 
+namespace bson {
+class Bson;
+}
+
 struct SyncError {
 
     std::error_code error_code;
@@ -172,11 +176,9 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string partition_value)
-        : user(std::move(user))
-        , partition_value(std::move(partition_value))
-    {
-    }
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);
 };
 
 } // namespace realm

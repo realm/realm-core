@@ -1073,6 +1073,7 @@ TEST_CASE("notifications: TableView delivery")
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.max_number_of_active_versions = 5;
 
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
@@ -1190,6 +1191,16 @@ TEST_CASE("notifications: TableView delivery")
         r->begin_transaction();
         REQUIRE(results.size() == 11);
         r->cancel_transaction();
+    }
+
+    SECTION("unused background TVs do not pin old versions forever")
+    {
+        // This will exceed the maximum active version count (5) if any
+        // transactions are being pinned, resulting in make_remote_change() throwing
+        for (int i = 0; i < 10; ++i) {
+            REQUIRE_NOTHROW(make_remote_change());
+            advance_and_notify(*r);
+        }
     }
 }
 
@@ -1424,7 +1435,7 @@ TEST_CASE("notifications: sync")
 
     SyncServer server(false);
     TestSyncManager init_sync_manager(server);
-    SyncTestFile config(init_sync_manager.app());
+    SyncTestFile config(init_sync_manager.app(), "test");
     config.schema = Schema{
         {"object",
          {

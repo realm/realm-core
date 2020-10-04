@@ -1632,7 +1632,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
     };
     auto setup_and_get_config = [&base_path](std::shared_ptr<App> app) -> realm::Realm::Config {
         realm::Realm::Config config;
-        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), "\"foo\"");
+        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
             std::cout << error.message << std::endl;
@@ -1769,6 +1769,25 @@ TEST_CASE("app: sync integration", "[sync][app]")
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
             REQUIRE(dogs.get(0).get<String>("realm_id") == "foo");
         }
+    }
+
+    SECTION("invalid partition error handling")
+    {
+        auto app = get_app_and_login();
+        auto config = setup_and_get_config(app);
+        config.sync_config->partition_value = "not a bson serialized string";
+        std::atomic<bool> error_did_occur = false;
+        config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
+            REQUIRE(error.message ==
+                    "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+            error_did_occur.store(true);
+        };
+        auto r = realm::Realm::get_shared_realm(config);
+        auto session = app->current_user()->session_for_on_disk_path(r->config().path);
+        util::EventLoop::main().run_until([&] {
+            return error_did_occur.load();
+        });
+        REQUIRE(error_did_occur.load());
     }
 }
 
@@ -2966,7 +2985,7 @@ TEST_CASE("app: auth providers", "[sync][app]")
         auto credentials = realm::app::AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
         CHECK(credentials.provider_as_string() == IdentityProviderFacebook);
-        CHECK(credentials.serialize_as_json() == "{\"access_token\":\"a_token\",\"provider\":\"oauth2-facebook\"}");
+        CHECK(credentials.serialize_as_json() == "{\"accessToken\":\"a_token\",\"provider\":\"oauth2-facebook\"}");
     }
 
     SECTION("auth providers anonymous")
@@ -3036,21 +3055,33 @@ TEST_CASE("app: auth providers", "[sync][app]")
     }
 }
 
+template <typename Factory>
+static App::Config get_config(Factory factory)
+{
+    return {app_name,
+            factory,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"};
+}
+
 TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 {
+    auto setup_user = []() {
+        if (SyncManager::shared().get_current_user()) {
+            return;
+        }
+
+        SyncManager::shared().get_user("a_user_id", good_access_token, good_access_token, "anon-user",
+                                       dummy_device_id);
+    };
 
     SECTION("refresh custom data happy path")
     {
-
-        auto setup_user = []() {
-            if (realm::SyncManager::shared().get_current_user()) {
-                return;
-            }
-
-            realm::SyncManager::shared().get_user("a_user_id", good_access_token, good_access_token, "anon-user",
-                                                  dummy_device_id);
-        };
-
         static bool session_route_hit = false;
 
         std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
@@ -3076,16 +3107,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
 
-        auto config = App::Config{app_name,
-                                  generic_factory,
-                                  util::none,
-                                  util::none,
-                                  Optional<std::string>("A Local App Version"),
-                                  util::none,
-                                  "Object Store Platform Tests",
-                                  "Object Store Platform Version Blah",
-                                  "An sdk version"};
-
+        auto config = get_config(generic_factory);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3104,16 +3126,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 
     SECTION("refresh custom data sad path")
     {
-
-        auto setup_user = []() {
-            if (realm::SyncManager::shared().get_current_user()) {
-                return;
-            }
-
-            realm::SyncManager::shared().get_user("a_user_id", good_access_token, good_access_token, "anon-user",
-                                                  dummy_device_id);
-        };
-
         static bool session_route_hit = false;
 
         std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
@@ -3139,16 +3151,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
 
-        auto config = App::Config{app_name,
-                                  generic_factory,
-                                  util::none,
-                                  util::none,
-                                  Optional<std::string>("A Local App Version"),
-                                  util::none,
-                                  "Object Store Platform Tests",
-                                  "Object Store Platform Version Blah",
-                                  "An sdk version"};
-
+        auto config = get_config(generic_factory);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3168,16 +3171,6 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 
     SECTION("refresh token ensure flow is correct")
     {
-
-        auto setup_user = []() {
-            if (realm::SyncManager::shared().get_current_user()) {
-                return;
-            }
-
-            realm::SyncManager::shared().get_user("a_user_id", good_access_token, good_access_token, "anon-user",
-                                                  dummy_device_id);
-        };
-
         /*
          Expected flow:
          Login - this gets access and refresh tokens
@@ -3247,16 +3240,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
 
-        auto config = App::Config{app_name,
-                                  factory,
-                                  util::none,
-                                  util::none,
-                                  Optional<std::string>("A Local App Version"),
-                                  util::none,
-                                  "Object Store Platform Tests",
-                                  "Object Store Platform Version Blah",
-                                  "An sdk version"};
-
+        auto config = get_config(factory);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3308,17 +3292,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]")
         return std::unique_ptr<GenericNetworkTransport>(new transport);
     };
 
-    auto config = App::Config{app_name,
-                              generic_factory,
-                              util::none,
-                              util::none,
-                              Optional<std::string>("A Local App Version"),
-                              util::none,
-                              "Object Store Platform Tests",
-                              "Object Store Platform Version Blah",
-                              "An sdk version"};
-
-    TestSyncManager sync_manager(config);
+    auto config = get_config(generic_factory);
+    TestSyncManager sync_manager(get_config(generic_factory), true, SyncManager::MetadataMode::NoEncryption);
     {
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
@@ -3344,18 +3319,10 @@ TEST_CASE("app: make_streaming_request", "[sync][app]")
     UnitTestTransport::access_token = good_access_token;
 
     constexpr auto timeout_ms = 60000;
-    auto config = App::Config{app_name,
-                              [] {
-                                  return std::make_unique<UnitTestTransport>();
-                              },
-                              util::none,
-                              util::none,
-                              util::Optional<std::string>("A Local App Version"),
-                              timeout_ms,
-                              "Object Store Platform Tests",
-                              "Object Store Platform Version Blah",
-                              "An sdk version"};
-
+    auto config = get_config([] {
+        return std::make_unique<UnitTestTransport>();
+    });
+    config.default_request_timeout_ms = timeout_ms;
     TestSyncManager tsm(config);
     auto app = tsm.app();
 

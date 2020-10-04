@@ -576,11 +576,11 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 linking_user->update_access_token(value_from_json<std::string>(json, "access_token"));
             }
             else {
-                sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
-                                                                  value_from_json<std::string>(json, "refresh_token"),
-                                                                  value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string(),
-                                                                  value_from_json<std::string>(json, "device_id"));
+                sync_user = SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
+                                                           value_from_json<std::string>(json, "refresh_token"),
+                                                           value_from_json<std::string>(json, "access_token"),
+                                                           credentials.provider_as_string(),
+                                                           value_from_json<std::string>(json, "device_id"));
             }
         }
         catch (const AppError& err) {
@@ -749,18 +749,17 @@ void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::O
         }
 
         try {
-            SyncManager::shared().perform_metadata_update([json](const SyncMetadataManager& manager) {
+            auto hostname = value_from_json<std::string>(json, "hostname");
+            auto ws_hostname = value_from_json<std::string>(json, "ws_hostname");
+            SyncManager::shared().perform_metadata_update([&](const SyncMetadataManager& manager) {
                 manager.set_app_metadata(value_from_json<std::string>(json, "deployment_model"),
-                                         value_from_json<std::string>(json, "location"),
-                                         value_from_json<std::string>(json, "hostname"),
-                                         value_from_json<std::string>(json, "ws_hostname"));
+                                         value_from_json<std::string>(json, "location"), hostname, ws_hostname);
             });
-            auto metadata = SyncManager::shared().app_metadata();
-            m_base_route = metadata->hostname + base_path;
+            m_base_route = hostname + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
             m_auth_route = m_app_route + auth_path;
-            m_sync_route = metadata->ws_hostname + base_path + this_app_path + sync_path;
+            m_sync_route = ws_hostname + base_path + this_app_path + sync_path;
         }
         catch (const AppError& err) {
             return completion_block(err, response);
@@ -785,9 +784,10 @@ void App::do_request(Request request, std::function<void(Response)> completion_b
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
-            if (SyncManager::shared().app_metadata()->deployment_model != "GLOBAL" &&
+            auto app_metadata = SyncManager::shared().app_metadata();
+            if (app_metadata && app_metadata->deployment_model != "GLOBAL" &&
                 request.url.rfind(m_base_url, 0) != std::string::npos) {
-                request.url.replace(0, m_base_url.size(), SyncManager::shared().app_metadata()->hostname);
+                request.url.replace(0, m_base_url.size(), app_metadata->hostname);
             }
 
             m_config.transport_generator()->send_request_to_server(request, completion_block);

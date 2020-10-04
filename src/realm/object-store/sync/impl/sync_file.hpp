@@ -22,6 +22,7 @@
 #include <string>
 
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/app.hpp>
 
 #include <realm/util/optional.hpp>
 
@@ -55,10 +56,12 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
 
 } // namespace util
 
+// This class manages how Synced Realms are stored on the filesystem.
 class SyncFileManager {
 public:
-    SyncFileManager(std::string base_path)
+    SyncFileManager(std::string base_path, std::string app_id)
         : m_base_path(std::move(base_path))
+        , m_app_id(std::move(app_id))
     {
     }
 
@@ -73,11 +76,15 @@ public:
     /// exists at `old_name`.
     bool try_rename_user_directory(const std::string& old_name, const std::string& new_name) const;
 
+    /// A non throw version of File::exists(),  returning false if any exceptions are thrown when attempting to access
+    /// this file.
+    static bool try_file_exists(const std::string& path) noexcept;
+
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string path(const std::string&, const std::string&) const;
+    std::string realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& local_identity, const std::string& raw_realm_path) const;
+    bool remove_realm(const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -104,12 +111,17 @@ public:
 
 private:
     const std::string m_base_path;
+    const std::string m_app_id;
 
-    static constexpr const char c_sync_directory[] = "realm-object-server";
-    static constexpr const char c_utility_directory[] = "io.realm.object-server-utility";
-    static constexpr const char c_recovery_directory[] = "io.realm.object-server-recovered-realms";
+    static constexpr const char c_sync_directory[] = "mongodb-realm";
+    static constexpr const char c_utility_directory[] = "server-utility";
+    static constexpr const char c_recovery_directory[] = "recovered-realms";
     static constexpr const char c_metadata_directory[] = "metadata";
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";
+    static constexpr const char c_realm_file_suffix[] = ".realm";
+    static constexpr const char c_realm_file_test_suffix[] =
+        ".rtest"; // Must have same length as c_realm_file_suffix.
+    static constexpr const char c_legacy_sync_directory[] = "realm-object-server";
 
     std::string get_special_directory(std::string directory_name) const;
 
@@ -119,6 +131,12 @@ private:
     }
 
     std::string get_base_sync_directory() const;
+
+    // Construct the absolute path to the users directory
+    std::string get_user_directory_path(const std::string& local_user_identity) const;
+    std::string legacy_realm_file_path(const std::string& local_user_identity,
+                                       const std::string& realm_file_name) const;
+    std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };
 
 } // namespace realm

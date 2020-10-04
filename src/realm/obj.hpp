@@ -60,14 +60,9 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table()
+    TableRef get_table() const
     {
         return m_table.cast_away_const();
-    }
-
-    ConstTableRef get_table() const
-    {
-        return m_table;
     }
 
     Allocator& get_alloc() const;
