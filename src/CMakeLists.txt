@@ -30,6 +30,10 @@ if (${REALM_ENABLE_SYNC})
   target_link_libraries(RealmFFIStatic PRIVATE Sync)
 endif()
 
+if (ANDROID)
+  target_link_libraries(RealmFFI PUBLIC android)
+endif()
+
 set_target_properties(RealmFFI PROPERTIES
   OUTPUT_NAME "realm-ffi"
   CXX_VISIBILITY_PRESET hidden
