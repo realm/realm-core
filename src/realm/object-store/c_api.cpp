@@ -13,8 +13,6 @@
 
 using namespace realm;
 
-#define RLM_NO_THREAD_LOCAL
-
 #if REALM_PLATFORM_APPLE && !defined(RLM_NO_THREAD_LOCAL)
 #define RLM_NO_THREAD_LOCAL
 #endif
