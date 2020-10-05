@@ -22,7 +22,7 @@ target_link_libraries(RealmFFI PRIVATE Storage Sync ObjectStore QueryParser)
 target_link_libraries(RealmFFI PRIVATE Storage Sync ObjectStore QueryParser)
 
 target_compile_definitions(RealmFFI PRIVATE -DRealm_EXPORTS)
-target_compile_definitions(RealmFFIStatic INTERFACE -DRLM_NO_DLLIMPORT)
+target_compile_definitions(RealmFFIStatic PUBLIC -DRLM_NO_DLLIMPORT)
 
 set_target_properties(RealmFFI PROPERTIES
   OUTPUT_NAME "realm-ffi"
