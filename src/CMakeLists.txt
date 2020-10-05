@@ -18,11 +18,17 @@ set(REALM_FFI_SOURCES
 
 add_library(RealmFFI SHARED ${REALM_FFI_SOURCES})
 add_library(RealmFFIStatic STATIC ${REALM_FFI_SOURCES})
-target_link_libraries(RealmFFI PRIVATE Storage Sync ObjectStore QueryParser)
-target_link_libraries(RealmFFI PRIVATE Storage Sync ObjectStore QueryParser)
 
 target_compile_definitions(RealmFFI PRIVATE -DRealm_EXPORTS)
 target_compile_definitions(RealmFFIStatic PUBLIC -DRLM_NO_DLLIMPORT)
+
+target_link_libraries(RealmFFI PRIVATE Storage ObjectStore QueryParser)
+target_link_libraries(RealmFFIStatic PRIVATE Storage ObjectStore QueryParser)
+
+if (${REALM_ENABLE_SYNC})
+  target_link_libraries(RealmFFI PRIVATE Sync)
+  target_link_libraries(RealmFFIState PRIVATE Sync)
+endif()
 
 set_target_properties(RealmFFI PROPERTIES
   OUTPUT_NAME "realm-ffi"
