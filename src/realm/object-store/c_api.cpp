@@ -1035,10 +1035,30 @@ static inline Mixed typed_link_to_link(Mixed value)
 RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_t* out_value)
 {
     return wrap_err([&]() {
-        auto val = list->get_any(index);
-        val = link_to_typed_link(val, *list);
+        list->verify_attached();
+        realm_value_t result;
+
+        auto getter = util::overloaded{
+            [&](Obj*) {
+                Obj o = list->get<Obj>(index);
+                result.type = RLM_TYPE_LINK;
+                result.link.target_table = to_capi(o.get_table()->get_key());
+                result.link.target = to_capi(o.get_key());
+            },
+            [&](util::Optional<Obj>*) {
+                REALM_TERMINATE("Nullable link lists not supported");
+            },
+            [&](auto p) {
+                using T = std::remove_cv_t<std::remove_pointer_t<decltype(p)>>;
+                Mixed mixed{list->get<T>(index)};
+                result = to_capi(mixed);
+            },
+        };
+
+        switch_on_type(list->get_type(), getter);
+
         if (out_value)
-            *out_value = to_capi(val);
+            *out_value = result;
         return true;
     });
 }

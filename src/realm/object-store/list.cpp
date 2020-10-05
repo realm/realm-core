@@ -176,12 +176,6 @@ Obj List::get(size_t row_ndx) const
     return list.get_target_table()->get_object(list.get(row_ndx));
 }
 
-Mixed List::get_any(size_t row_ndx) const
-{
-    verify_valid_row(row_ndx);
-    return m_list_base->get_any(row_ndx);
-}
-
 template <typename T>
 size_t List::find(T const& value) const
 {
@@ -246,16 +240,6 @@ void List::insert(size_t row_ndx, Obj o)
     as<Obj>().insert(row_ndx, o.get_key());
 }
 
-void List::insert_any(size_t row_ndx, Mixed value)
-{
-    verify_in_transaction();
-    verify_valid_row(row_ndx, true);
-    // validate(value);
-    if (m_is_embedded)
-        throw InvalidEmbeddedOperationException();
-    m_list_base->insert_any(row_ndx, value);
-}
-
 void List::move(size_t source_ndx, size_t dest_ndx)
 {
     verify_in_transaction();
@@ -298,16 +282,6 @@ void List::set(size_t row_ndx, Obj o)
     if (m_is_embedded)
         throw InvalidEmbeddedOperationException();
     as<Obj>().set(row_ndx, o.get_key());
-}
-
-void List::set_any(size_t row_ndx, Mixed value)
-{
-    verify_in_transaction();
-    verify_valid_row(row_ndx);
-    // validate(value);
-    if (m_is_embedded)
-        throw InvalidEmbeddedOperationException();
-    m_list_base->set_any(row_ndx, value);
 }
 
 void List::swap(size_t ndx1, size_t ndx2)
