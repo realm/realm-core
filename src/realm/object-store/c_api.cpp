@@ -11,6 +11,9 @@
 
 #include <realm/util/overloaded.hpp>
 
+// FIXME: Query parser throws raw pegtl exceptions.
+#include <pegtl.hpp>
+
 using namespace realm;
 
 #if REALM_PLATFORM_APPLE && !defined(RLM_NO_THREAD_LOCAL)
@@ -312,6 +315,9 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
         }
         catch (const List::OutOfBoundsIndexException& ex) {
             populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+        }
+        catch (const tao::pegtl::parse_error& ex) {
+            populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
         }
         catch (const std::invalid_argument& ex) {
             populate_error(ex, RLM_ERR_INVALID_ARGUMENT);

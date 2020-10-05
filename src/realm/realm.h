@@ -188,6 +188,8 @@ typedef enum realm_errno {
     RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE,
 
     RLM_ERR_INDEX_OUT_OF_BOUNDS,
+
+    RLM_ERR_INVALID_QUERY_STRING,
     // ...
 } realm_errno_e;
 
