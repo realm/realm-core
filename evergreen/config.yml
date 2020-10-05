@@ -113,7 +113,7 @@ tasks:
         cpack=$(pwd)/${cmake_bindir}/cpack
 
         cd build
-        $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts"
+        $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
@@ -154,7 +154,7 @@ tasks:
         ctest=$(pwd)/${cmake_bindir}/ctest
 
         cd build
-        $ctest -V
+        $ctest -V ${test_flags|}
 
 - name: lint
   commands:
@@ -202,8 +202,8 @@ buildvariants:
   display_name: "RHEL 7"
   run_on: rhel70-small
   expansions:
-    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
-    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
+    c_compiler: /opt/mongodbtoolchain/v3/bin/clang
+    cxx_compiler: /opt/mongodbtoolchain/v3/bin/clang++
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
   tasks:
@@ -242,6 +242,8 @@ buildvariants:
     cmake_bindir: "./cmake-3.18.2-win64-x64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
+    test_flags: "-C Debug"
+    package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
   tasks:
   - name: compile_test_and_package

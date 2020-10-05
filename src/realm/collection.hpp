@@ -234,7 +234,8 @@ public:
 
     T get(size_t ndx) const
     {
-        if (ndx >= Collection::size()) {
+        const auto current_size = Collection::size();
+        if (ndx >= current_size) {
             throw std::out_of_range("Index out of range");
         }
         return m_tree->get(ndx);
