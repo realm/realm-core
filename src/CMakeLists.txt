@@ -27,7 +27,7 @@ target_link_libraries(RealmFFIStatic PRIVATE Storage ObjectStore QueryParser)
 
 if (${REALM_ENABLE_SYNC})
   target_link_libraries(RealmFFI PRIVATE Sync)
-  target_link_libraries(RealmFFIState PRIVATE Sync)
+  target_link_libraries(RealmFFIStatic PRIVATE Sync)
 endif()
 
 set_target_properties(RealmFFI PROPERTIES
