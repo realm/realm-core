@@ -13,6 +13,16 @@
 
 using namespace realm;
 
+#define RLM_NO_THREAD_LOCAL
+
+#if REALM_PLATFORM_APPLE && !defined(RLM_NO_THREAD_LOCAL)
+#define RLM_NO_THREAD_LOCAL
+#endif
+
+#if defined(RLM_NO_THREAD_LOCAL)
+#include <pthread.h>
+#endif
+
 namespace {
 
 struct NotClonableException : std::exception {
@@ -43,7 +53,59 @@ struct WrapC {
     }
 };
 
+#if !defined(RLM_NO_THREAD_LOCAL)
+
 thread_local std::exception_ptr g_last_exception;
+
+static void set_last_exception(std::exception_ptr eptr)
+{
+    g_last_exception = eptr;
+}
+
+static std::exception_ptr* get_last_exception()
+{
+    return &g_last_exception;
+}
+
+#else // RLM_NO_THREAD_LOCAL
+
+static pthread_key_t g_last_exception_key;
+static pthread_once_t g_last_exception_key_init_once = PTHREAD_ONCE_INIT;
+
+static void destroy_last_exception(void* ptr)
+{
+    auto p = static_cast<std::exception_ptr*>(ptr);
+    delete p;
+}
+
+static void init_last_exception_key()
+{
+    pthread_key_create(&g_last_exception_key, destroy_last_exception);
+}
+
+static void set_last_exception(std::exception_ptr eptr)
+{
+    pthread_once(&g_last_exception_key_init_once, init_last_exception_key);
+    void* ptr = pthread_getspecific(g_last_exception_key);
+    std::exception_ptr* p;
+    if (!ptr) {
+        p = new std::exception_ptr;
+        pthread_setspecific(g_last_exception_key, p);
+    }
+    else {
+        p = static_cast<std::exception_ptr*>(ptr);
+    }
+    *p = eptr;
+}
+
+static std::exception_ptr* get_last_exception()
+{
+    pthread_once(&g_last_exception_key_init_once, init_last_exception_key);
+    void* ptr = pthread_getspecific(g_last_exception_key);
+    return static_cast<std::exception_ptr*>(ptr);
+}
+
+#endif // RLM_NO_THREAD_LOCAL
 
 template <class F>
 auto wrap_err(F&& f) -> decltype(std::declval<F>()())
@@ -52,7 +114,7 @@ auto wrap_err(F&& f) -> decltype(std::declval<F>()())
         return f();
     }
     catch (...) {
-        g_last_exception = std::current_exception();
+        set_last_exception(std::current_exception());
         return decltype(std::declval<F>()()){};
     }
 }
@@ -233,18 +295,19 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
 
 RLM_API bool realm_get_last_error(realm_error_t* err)
 {
-    if (g_last_exception) {
+    std::exception_ptr* ptr = get_last_exception();
+    if (ptr && *ptr) {
         err->kind.code = 0;
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
             err->error = error_number;
             err->message.data = ex.what();
             err->message.size = std::strlen(err->message.data);
-            g_last_exception = std::current_exception();
+            set_last_exception(std::current_exception());
         };
 
         try {
-            std::rethrow_exception(g_last_exception);
+            std::rethrow_exception(*ptr);
         }
         catch (const NotClonableException& ex) {
             populate_error(ex, RLM_ERR_NOT_CLONABLE);
@@ -266,7 +329,7 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
             err->error = RLM_ERR_UNKNOWN;
             err->message.data = "Unknown error";
             err->message.size = std::strlen(err->message.data);
-            g_last_exception = std::current_exception();
+            set_last_exception(std::current_exception());
         }
         return true;
     }
@@ -275,15 +338,17 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
 
 RLM_EXPORT void realm_rethrow_last_error()
 {
-    if (g_last_exception) {
-        std::rethrow_exception(g_last_exception);
+    std::exception_ptr* ptr = get_last_exception();
+    if (ptr && *ptr) {
+        std::rethrow_exception(*ptr);
     }
 }
 
 RLM_API bool realm_clear_last_error()
 {
-    if (g_last_exception) {
-        g_last_exception = nullptr;
+    std::exception_ptr* ptr = get_last_exception();
+    if (ptr && *ptr) {
+        *ptr = std::exception_ptr{};
         return true;
     }
     return false;
