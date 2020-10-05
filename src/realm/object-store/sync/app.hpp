@@ -193,6 +193,12 @@ public:
         void send_reset_password_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
+        /// Retries the custom confirmation function on a user for a given email.
+        /// @param email The email address of the user to retry the custom confirmation for.
+        /// @param completion_block A callback to be invoked once the retry is complete.
+        void retry_custom_confirmation(const std::string& email,
+                                       std::function<void(util::Optional<AppError>)> completion_block);
+
         /// Resets the password of an email identity using the
         /// password reset token emailed to a user.
         /// @param password The desired new password.
@@ -268,10 +274,10 @@ public:
     /// @returns A shared pointer to the new current user
     std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
 
-    /// Logs out and removes the provided user
-    /// this is a local operation and does not invoke any server side function
+    /// Logs out and removes the provided user.
+    /// This invokes logout on the server.
     /// @param user the user to remove
-    /// @param completion_block Will return an error if the user is not found
+    /// @param completion_block Will return an error if the user is not found or the http request failed.
     void remove_user(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
 
     // Get a provider client for the given class type.

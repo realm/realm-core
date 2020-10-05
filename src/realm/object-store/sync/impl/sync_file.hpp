@@ -58,11 +58,7 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
 // This class manages how Synced Realms are stored on the filesystem.
 class SyncFileManager {
 public:
-    SyncFileManager(std::string base_path, std::string app_id)
-        : m_base_path(std::move(base_path))
-        , m_app_id(std::move(app_id))
-    {
-    }
+    SyncFileManager(const std::string& base_path, const std::string& app_id);
 
     /// Return the user directory for a given user, creating it if it does not already exist.
     std::string user_directory(const std::string& identity) const;
@@ -104,14 +100,23 @@ public:
         return m_base_path;
     }
 
+    const std::string& app_path() const
+    {
+        return m_app_path;
+    }
+
     std::string recovery_directory_path(util::Optional<std::string> const& directory = none) const
     {
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
 
 private:
+    // Denotes the base path for the mongodb-realm app associated with this sync manager.
+    // Expected to be `base_path` + "mongodb-realm/" + `app_id` + "/".
     const std::string m_base_path;
-    const std::string m_app_id;
+    // Denotes the root path for any mongodb-realm app for the passed in `base_path`.
+    // Expected to be `base_path` + "mongodb-realm/".
+    const std::string m_app_path;
 
     static constexpr const char c_sync_directory[] = "mongodb-realm";
     static constexpr const char c_utility_directory[] = "server-utility";
@@ -129,8 +134,6 @@ private:
     {
         return get_special_directory(c_utility_directory);
     }
-
-    std::string get_base_sync_directory() const;
 
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& user_identity) const;

@@ -73,7 +73,7 @@ get_request_headers(std::shared_ptr<SyncUser> with_user_authorization = nullptr,
     return headers;
 }
 
-const static std::string default_base_url = "https://stitch.mongodb.com";
+const static std::string default_base_url = "https://realm.mongodb.com";
 const static std::string base_path = "/api/client/v2.0";
 const static std::string app_path = "/app";
 const static std::string auth_path = "/auth";
@@ -241,6 +241,24 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(
         handler);
 }
 
+void App::UsernamePasswordProviderClient::retry_custom_confirmation(
+    const std::string& email, std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(m_parent);
+    std::string route =
+        util::format("%1/providers/%2/confirm/call", m_parent->m_auth_route, username_password_provider_key);
+
+    auto handler = [completion_block](const Response& response) {
+        handle_default_response(response, completion_block);
+    };
+
+    nlohmann::json body{{"email", email}};
+
+    m_parent->do_request(
+        Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
+        handler);
+}
+
 void App::UsernamePasswordProviderClient::send_reset_password_email(
     const std::string& email, std::function<void(Optional<AppError>)> completion_block)
 {
@@ -270,7 +288,7 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
         handle_default_response(response, completion_block);
     };
 
-    nlohmann::json body = {{"password", password}, {"token", token}, {"token_id", token_id}};
+    nlohmann::json body = {{"password", password}, {"token", token}, {"tokenId", token_id}};
 
     m_parent->do_request(
         Request{HttpMethod::post, route, m_parent->m_request_timeout_ms, get_request_headers(), body.dump()},
@@ -662,8 +680,6 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
     }
-    std::string bearer = util::format("Bearer %1", user->refresh_token());
-    user->log_out();
 
     auto handler = [completion_block, user](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -672,6 +688,9 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
         return completion_block(util::none);
     };
 
+    auto refresh_token = user->refresh_token();
+    user->log_out();
+
     std::string route = util::format("%1/auth/session", m_base_route);
 
     Request req;
@@ -679,8 +698,18 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = true;
+    req.headers = get_request_headers();
+    req.headers.insert({"Authorization", util::format("Bearer %1", refresh_token)});
 
-    do_authenticated_request(req, user, handler);
+    do_request(req, [completion_block, req](Response response) {
+        if (auto error = check_for_errors(response)) {
+            // We do not care about handling auth errors on log out
+            completion_block(error);
+        }
+        else {
+            completion_block(util::none);
+        }
+    });
 }
 
 void App::log_out(std::function<void(Optional<AppError>)> completion_block)
@@ -875,20 +904,20 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
     };
 
     // Only handle auth failures
-    if (error.is_http_error() && error.error_code.value() != 401) {
-        completion_block(response);
-        return;
-    }
-
-    if (request.uses_refresh_token) {
-        if (sync_user && sync_user->is_logged_in()) {
-            sync_user->log_out();
+    if (error.is_http_error() && error.error_code.value() == 401) {
+        if (request.uses_refresh_token) {
+            if (sync_user && sync_user->is_logged_in()) {
+                sync_user->log_out();
+            }
+            completion_block(response);
+            return;
         }
-        completion_block(response);
-        return;
-    }
 
-    App::refresh_access_token(sync_user, access_token_handler);
+        App::refresh_access_token(sync_user, access_token_handler);
+    }
+    else {
+        completion_block(response);
+    }
 }
 
 /// MARK: - refresh access token
@@ -992,9 +1021,9 @@ Request App::make_streaming_request(std::shared_ptr<SyncUser> user, const std::s
     auto args_base64 = std::string(util::base64_encoded_size(args_json.size()), '\0');
     util::base64_encode(args_json.data(), args_json.size(), args_base64.data(), args_base64.size());
 
-    auto url = function_call_url_path() + "?stitch_request=" + util::uri_percent_encode(args_base64);
+    auto url = function_call_url_path() + "?baas_request=" + util::uri_percent_encode(args_base64);
     if (user) {
-        url += "&stitch_at=";
+        url += "&baas_at=";
         url += user->access_token(); // doesn't need url encoding
     }
 
