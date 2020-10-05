@@ -31,7 +31,7 @@ if (${REALM_ENABLE_SYNC})
 endif()
 
 if (ANDROID)
-  target_link_libraries(RealmFFI PUBLIC android)
+  target_link_libraries(RealmFFI PUBLIC android log)
 endif()
 
 set_target_properties(RealmFFI PROPERTIES
