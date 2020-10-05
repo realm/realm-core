@@ -352,13 +352,13 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    m_config.user->sync_manager()->perform_metadata_update([this, action, original_path = std::move(original_path),
-                                                            recovery_path =
-                                                                std::move(recovery_path)](const auto& manager) {
-        std::string partition_value = m_config.partition_value;
-        manager.make_file_action_metadata(original_path, partition_value, m_config.user->identity(), action,
-                                          recovery_path);
-    });
+    m_config.user->sync_manager()->perform_metadata_update(
+        [this, action, original_path = std::move(original_path),
+         recovery_path = std::move(recovery_path)](const auto& manager) {
+            std::string partition_value = m_config.partition_value;
+            manager.make_file_action_metadata(original_path, partition_value, m_config.user->identity(), action,
+                                              recovery_path);
+        });
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
