@@ -26,6 +26,8 @@
 #include <realm/object-store/sync/remote_mongo_client.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/impl/sync_client.hpp>
+#include <realm/object-store/sync/impl/sync_file.hpp>
 
 #include <external/json/json.hpp>
 #include <string>
@@ -79,10 +81,34 @@ const static std::string sync_path = "/realm-sync";
 const static uint64_t default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
+static std::unordered_map<std::string, std::shared_ptr<App>> s_apps_cache;
+std::mutex s_apps_mutex;
 
-SharedApp App::get_shared_app(const Config& config)
+SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
-    return std::make_shared<App>(config);
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
+    auto& app = s_apps_cache[config.app_id];
+    if (!app) {
+        app = std::make_shared<App>(config);
+        app->configure(sync_client_config);
+    }
+    return app;
+}
+
+std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
+{
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
+    if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+void App::clear_cached_apps()
+{
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
+    s_apps_cache.clear();
 }
 
 App::App(const Config& config)
@@ -91,7 +117,6 @@ App::App(const Config& config)
     , m_base_route(m_base_url + base_path)
     , m_app_route(m_base_route + app_path + "/" + config.app_id)
     , m_auth_route(m_app_route + auth_path)
-    , m_sync_route(m_app_route + sync_path)
     , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
     REALM_ASSERT(m_config.transport_generator);
@@ -109,16 +134,29 @@ App::App(const Config& config)
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
-    size_t uri_scheme_start = m_sync_route.find("http");
+    auto sync_route = m_app_route + sync_path;
+    size_t uri_scheme_start = sync_route.find("http");
     if (uri_scheme_start == 0)
-        m_sync_route.replace(uri_scheme_start, 4, "ws");
+        sync_route.replace(uri_scheme_start, 4, "ws");
 
-    if (auto metadata = SyncManager::shared().app_metadata()) {
+    m_sync_manager = std::make_shared<SyncManager>();
+}
+
+void App::configure(const SyncClientConfig& sync_client_config)
+{
+    // change the scheme in the base url to ws from http to satisfy the sync client
+    auto sync_route = m_app_route + sync_path;
+    size_t uri_scheme_start = sync_route.find("http");
+    if (uri_scheme_start == 0)
+        sync_route.replace(uri_scheme_start, 4, "ws");
+
+    m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
+    if (auto metadata = m_sync_manager->app_metadata()) {
         m_base_route = metadata->hostname + base_path;
         std::string this_app_path = app_path + "/" + m_config.app_id;
         m_app_route = m_base_route + this_app_path;
         m_auth_route = m_app_route + auth_path;
-        m_sync_route = metadata->ws_hostname + base_path + this_app_path + sync_path;
+        m_sync_manager->set_sync_route(metadata->ws_hostname + base_path + this_app_path + sync_path);
     }
 }
 
@@ -465,18 +503,18 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
 
 std::shared_ptr<SyncUser> App::current_user() const
 {
-    return SyncManager::shared().get_current_user();
+    return m_sync_manager->get_current_user();
 }
 
 std::vector<std::shared_ptr<SyncUser>> App::all_users() const
 {
-    return SyncManager::shared().all_users();
+    return m_sync_manager->all_users();
 }
 
 void App::get_profile(std::shared_ptr<SyncUser> sync_user,
                       std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block)
 {
-    auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
+    auto profile_handler = [completion_block, this, sync_user](const Response& profile_response) {
         if (auto error = check_for_errors(profile_response)) {
             return completion_block(nullptr, error);
         }
@@ -514,7 +552,7 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
                                                            get_optional<std::string>(profile_data, "max_age")));
 
             sync_user->set_state(SyncUser::State::LoggedIn);
-            SyncManager::shared().set_current_user(sync_user->identity());
+            m_sync_manager->set_current_user(sync_user->identity());
         }
         catch (const AppError& err) {
             return completion_block(nullptr, err);
@@ -576,11 +614,11 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                 linking_user->update_access_token(value_from_json<std::string>(json, "access_token"));
             }
             else {
-                sync_user = SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
-                                                           value_from_json<std::string>(json, "refresh_token"),
-                                                           value_from_json<std::string>(json, "access_token"),
-                                                           credentials.provider_as_string(),
-                                                           value_from_json<std::string>(json, "device_id"));
+                sync_user = m_sync_manager->get_user(value_from_json<std::string>(json, "user_id"),
+                                                     value_from_json<std::string>(json, "refresh_token"),
+                                                     value_from_json<std::string>(json, "access_token"),
+                                                     credentials.provider_as_string(),
+                                                     value_from_json<std::string>(json, "device_id"));
             }
         }
         catch (const AppError& err) {
@@ -600,7 +638,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
     // if we try logging in with an anonymous user while there
     // is already an anonymous session active, reuse it
     if (credentials.provider() == AuthProvider::ANONYMOUS) {
-        for (auto user : realm::SyncManager::shared().all_users()) {
+        for (auto user : m_sync_manager->all_users()) {
             if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
                 completion_block(switch_user(user), util::none);
                 return;
@@ -657,14 +695,14 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
                        "User is no longer valid or is logged out");
     }
 
-    auto users = SyncManager::shared().all_users();
+    auto users = m_sync_manager->all_users();
     auto it = std::find(users.begin(), users.end(), user);
 
     if (it == users.end()) {
         throw AppError(make_client_error_code(ClientErrorCode::user_not_found), "User does not exist");
     }
 
-    SyncManager::shared().set_current_user(user->identity());
+    m_sync_manager->set_current_user(user->identity());
     return current_user();
 }
 
@@ -675,7 +713,8 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
             AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
     }
 
-    auto users = SyncManager::shared().all_users();
+    auto users = m_sync_manager->all_users();
+
     auto it = std::find(users.begin(), users.end(), user);
 
     if (it == users.end()) {
@@ -684,13 +723,13 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
     }
 
     if (user->is_logged_in()) {
-        log_out(user, [user, completion_block](const Optional<AppError>& error) {
-            SyncManager::shared().remove_user(user->identity());
+        log_out(user, [user, completion_block, this](const Optional<AppError>& error) {
+            m_sync_manager->remove_user(user->identity());
             return completion_block(error);
         });
     }
     else {
-        SyncManager::shared().remove_user(user->identity());
+        m_sync_manager->remove_user(user->identity());
         return completion_block({});
     }
 }
@@ -703,7 +742,8 @@ void App::link_user(std::shared_ptr<SyncUser> user, const AppCredentials& creden
                                                   "The specified user is not logged in"));
     }
 
-    auto users = SyncManager::shared().all_users();
+    auto users = m_sync_manager->all_users();
+
     auto it = std::find(users.begin(), users.end(), user);
 
     if (it == users.end()) {
@@ -728,7 +768,7 @@ std::string App::url_for_path(const std::string& path = "") const
 // FIXME: This passes back the response to bubble up any potential errors, making this somewhat leaky
 void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::Optional<Response>)> completion_block)
 {
-    if (SyncManager::shared().app_metadata()) {
+    if (m_sync_manager->app_metadata()) {
         return completion_block(util::none, util::none);
     }
 
@@ -751,15 +791,18 @@ void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::O
         try {
             auto hostname = value_from_json<std::string>(json, "hostname");
             auto ws_hostname = value_from_json<std::string>(json, "ws_hostname");
-            SyncManager::shared().perform_metadata_update([&](const SyncMetadataManager& manager) {
+            m_sync_manager->perform_metadata_update([&](const SyncMetadataManager& manager) {
                 manager.set_app_metadata(value_from_json<std::string>(json, "deployment_model"),
                                          value_from_json<std::string>(json, "location"), hostname, ws_hostname);
             });
+
+            auto metadata = m_sync_manager->app_metadata();
+
             m_base_route = hostname + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
             m_auth_route = m_app_route + auth_path;
-            m_sync_route = ws_hostname + base_path + this_app_path + sync_path;
+            m_sync_manager->set_sync_route(ws_hostname + base_path + this_app_path + sync_path);
         }
         catch (const AppError& err) {
             return completion_block(err, response);
@@ -774,7 +817,7 @@ void App::do_request(Request request, std::function<void(Response)> completion_b
     request.timeout_ms = default_timeout_ms;
 
     // if we do not have metadata yet, we need to initialize it
-    if (!SyncManager::shared().app_metadata()) {
+    if (!m_sync_manager->app_metadata()) {
         init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
                                                             const util::Optional<Response> response) mutable {
             if (error) {
@@ -784,7 +827,7 @@ void App::do_request(Request request, std::function<void(Response)> completion_b
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
-            auto app_metadata = SyncManager::shared().app_metadata();
+            auto app_metadata = m_sync_manager->app_metadata();
             if (app_metadata && app_metadata->deployment_model != "GLOBAL" &&
                 request.url.rfind(m_base_url, 0) != std::string::npos) {
                 request.url.replace(0, m_base_url.size(), app_metadata->hostname);
@@ -924,13 +967,13 @@ void App::call_function(const std::string& name, const bson::BsonArray& args_bso
                         const util::Optional<std::string>& service_name,
                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
-    call_function(SyncManager::shared().get_current_user(), name, args_bson, service_name, completion_block);
+    call_function(m_sync_manager->get_current_user(), name, args_bson, service_name, completion_block);
 }
 
 void App::call_function(const std::string& name, const bson::BsonArray& args_bson,
                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
-    call_function(SyncManager::shared().get_current_user(), name, args_bson, completion_block);
+    call_function(m_sync_manager->get_current_user(), name, args_bson, completion_block);
 }
 
 Request App::make_streaming_request(std::shared_ptr<SyncUser> user, const std::string& name,

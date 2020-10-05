@@ -237,7 +237,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({.app_config = config});
         auto app = sync_manager.app();
         bool processed = false;
 
@@ -287,7 +287,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({.app_config = config});
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -439,7 +439,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({.app_config = config});
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -770,7 +770,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({.app_config = config});
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -820,7 +820,7 @@ TEST_CASE("app: link_user integration", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({.app_config = config});
         auto app = sync_manager.app();
 
         bool processed = false;
@@ -881,7 +881,7 @@ TEST_CASE("app: call function", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager tsm(config);
+    TestSyncManager tsm({.app_config = config});
     auto app = tsm.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
@@ -904,7 +904,7 @@ TEST_CASE("app: call function", "[sync][app]")
                                     CHECK(*sum == 15);
                                 });
 
-    app->call_function<int64_t>(SyncManager::shared().get_current_user(), "sumFunc", {1, 2, 3, 4, 5},
+    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(), "sumFunc", {1, 2, 3, 4, 5},
                                 [&](Optional<app::AppError> error, Optional<int64_t> sum) {
                                     REQUIRE(!error);
                                     CHECK(*sum == 15);
@@ -933,7 +933,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({.app_config = config});
     auto app = sync_manager.app();
 
     auto remote_client = app->remote_mongo_client("BackingDB");
@@ -1492,8 +1492,8 @@ TEST_CASE("app: push notifications", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager init_sync_manager(config);
-    auto app = App::get_shared_app(config);
+    TestSyncManager init_sync_manager({.app_config = config});
+    auto app = init_sync_manager.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -1609,14 +1609,15 @@ TEST_CASE("app: sync integration", "[sync][app]")
                                   "An sdk version"};
 
     auto base_path = tmp_dir() + app_config.app_id;
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
     // Heap allocate to control lifecycle.
     // This is required so that we can reset the sync manager
     // through deallocation without worrying about it being popped
     // off the stack at the end of test case.
-    TestSyncManager& sync_manager = *new TestSyncManager(app_config);
 
-    auto get_app_and_login = +[]() -> std::shared_ptr<App> {
-        auto app = SyncManager::shared().app();
+
+    auto get_app_and_login = [&](SharedApp app) -> std::shared_ptr<App> {
         auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
         auto password = random_string(10);
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
@@ -1678,8 +1679,9 @@ TEST_CASE("app: sync integration", "[sync][app]")
     // MARK: Add Objects -
     SECTION("Add Objects")
     {
+        TestSyncManager& sync_manager = *new TestSyncManager({.app_config = app_config});
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1708,9 +1710,11 @@ TEST_CASE("app: sync integration", "[sync][app]")
 
         // reset sync manager, deleting local data
         delete &sync_manager;
-        TestSyncManager reinit(app_config);
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+        TestSyncManager reinit({.app_config = app_config});
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(reinit.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1725,8 +1729,9 @@ TEST_CASE("app: sync integration", "[sync][app]")
     // MARK: Expired Session Refresh -
     SECTION("Expired Session Refresh")
     {
+        TestSyncManager& sync_manager = *new TestSyncManager({.app_config = app_config});
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1754,9 +1759,11 @@ TEST_CASE("app: sync integration", "[sync][app]")
         }
 
         delete &sync_manager;
-        TestSyncManager reinit(app_config);
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+        TestSyncManager reinit({.app_config = app_config});
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
             app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
@@ -1773,13 +1780,14 @@ TEST_CASE("app: sync integration", "[sync][app]")
 
     SECTION("invalid partition error handling")
     {
-        auto app = get_app_and_login();
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         config.sync_config->partition_value = "not a bson serialized string";
         std::atomic<bool> error_did_occur = false;
         config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-            REQUIRE(error.message ==
-                    "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+            CHECK(error.message ==
+                  "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
             error_did_occur.store(true);
         };
         auto r = realm::Realm::get_shared_realm(config);
@@ -1829,7 +1837,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager tsm(config);
+        TestSyncManager tsm({.app_config = config});
         auto app = tsm.app();
         bool processed = false;
         app->log_in_with_credentials(AppCredentials::anonymous(),
@@ -2104,7 +2112,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager tsm(config);
+        TestSyncManager tsm({.app_config = config});
         auto app = tsm.app();
 
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
@@ -2171,7 +2179,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager tsm(config);
+        TestSyncManager tsm({.app_config = config});
         auto app = tsm.app();
 
         bool processed = false;
@@ -2208,10 +2216,10 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({.app_config = config});
     auto app = sync_manager.app();
 
-    std::shared_ptr<SyncUser> logged_in_user = realm::SyncManager::shared().get_user(
+    std::shared_ptr<SyncUser> logged_in_user = app->sync_manager()->get_user(
         UnitTestTransport::user_id, good_access_token, good_access_token, "anon-user", dummy_device_id);
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
@@ -2299,7 +2307,7 @@ TEST_CASE("app: user_semantics", "[app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager(config);
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user =
@@ -2446,7 +2454,7 @@ TEST_CASE("app: response error handling", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager(config);
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2573,7 +2581,7 @@ TEST_CASE("app: switch user", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager(config);
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2584,13 +2592,13 @@ TEST_CASE("app: switch user", "[sync][app]")
     SECTION("switch user expect success")
     {
 
-        CHECK(SyncManager::shared().all_users().size() == 0);
+        CHECK(app->sync_manager()->all_users().size() == 0);
 
         // Log in user 1
         app->log_in_with_credentials(realm::app::AppCredentials::username_password("test@10gen.com", "password"),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                          CHECK(!error);
-                                         CHECK(SyncManager::shared().get_current_user() == user);
+                                         CHECK(app->sync_manager()->get_current_user() == user);
                                          user_a = user;
                                      });
 
@@ -2598,28 +2606,28 @@ TEST_CASE("app: switch user", "[sync][app]")
         app->log_in_with_credentials(realm::app::AppCredentials::username_password("test2@10gen.com", "password"),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                          CHECK(!error);
-                                         CHECK(SyncManager::shared().get_current_user() == user);
+                                         CHECK(app->sync_manager()->get_current_user() == user);
                                          user_b = user;
                                      });
 
-        CHECK(SyncManager::shared().all_users().size() == 2);
+        CHECK(app->sync_manager()->all_users().size() == 2);
 
         auto user1 = app->switch_user(user_a);
         CHECK(user1 == user_a);
 
-        CHECK(SyncManager::shared().get_current_user() == user_a);
+        CHECK(app->sync_manager()->get_current_user() == user_a);
 
         auto user2 = app->switch_user(user_b);
         CHECK(user2 == user_b);
 
-        CHECK(SyncManager::shared().get_current_user() == user_b);
+        CHECK(app->sync_manager()->get_current_user() == user_b);
         processed = true;
         CHECK(processed);
     }
 
     SECTION("switch user expect fail")
     {
-        CHECK(SyncManager::shared().all_users().size() == 0);
+        CHECK(app->sync_manager()->all_users().size() == 0);
 
         // Log in user 1
         app->log_in_with_credentials(realm::app::AppCredentials::username_password("test@10gen.com", "password"),
@@ -2628,13 +2636,13 @@ TEST_CASE("app: switch user", "[sync][app]")
                                          CHECK(!error);
                                      });
 
-        CHECK(SyncManager::shared().get_current_user() == user_a);
+        CHECK(app->sync_manager()->get_current_user() == user_a);
 
         app->log_out([&](Optional<app::AppError> error) {
             CHECK(!error);
         });
 
-        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
         CHECK(user_a->state() == SyncUser::State::LoggedOut);
 
         // Log in user 2
@@ -2644,8 +2652,8 @@ TEST_CASE("app: switch user", "[sync][app]")
                                          CHECK(!error);
                                      });
 
-        CHECK(SyncManager::shared().get_current_user() == user_b);
-        CHECK(SyncManager::shared().all_users().size() == 2);
+        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(app->sync_manager()->all_users().size() == 2);
 
         try {
             auto user = app->switch_user(user_a);
@@ -2655,7 +2663,7 @@ TEST_CASE("app: switch user", "[sync][app]")
             CHECK(error.error_code.value() > 0);
         }
 
-        CHECK(SyncManager::shared().get_current_user() == user_b);
+        CHECK(app->sync_manager()->get_current_user() == user_b);
 
         processed = true;
         CHECK(processed);
@@ -2679,7 +2687,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager(config);
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2688,13 +2696,13 @@ TEST_CASE("app: remove anonymous user", "[sync][app]")
 
     SECTION("remove user expect success")
     {
-        CHECK(SyncManager::shared().all_users().size() == 0);
+        CHECK(app->sync_manager()->all_users().size() == 0);
 
         // Log in user 1
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                          CHECK(!error);
-                                         CHECK(SyncManager::shared().get_current_user() == user);
+                                         CHECK(app->sync_manager()->get_current_user() == user);
                                          user_a = user;
                                      });
 
@@ -2708,26 +2716,26 @@ TEST_CASE("app: remove anonymous user", "[sync][app]")
 
         app->remove_user(user_a, [&](Optional<app::AppError> error) {
             CHECK(error->message == "User has already been removed");
-            CHECK(SyncManager::shared().all_users().size() == 0);
+            CHECK(app->sync_manager()->all_users().size() == 0);
         });
 
         // Log in user 2
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                          CHECK(!error);
-                                         CHECK(SyncManager::shared().get_current_user() == user);
+                                         CHECK(app->sync_manager()->get_current_user() == user);
                                          user_b = user;
                                      });
 
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
-        CHECK(SyncManager::shared().all_users().size() == 1);
+        CHECK(app->sync_manager()->all_users().size() == 1);
 
         app->remove_user(user_b, [&](Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(SyncManager::shared().all_users().size() == 0);
+            CHECK(app->sync_manager()->all_users().size() == 0);
         });
 
-        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
@@ -2778,7 +2786,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager(config);
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     CHECK(!app->current_user());
@@ -2788,8 +2796,8 @@ TEST_CASE("app: remove user with credentials", "[sync][app]")
     SECTION("log in, log out and remove")
     {
 
-        CHECK(SyncManager::shared().all_users().size() == 0);
-        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         app->log_in_with_credentials(realm::app::AppCredentials::username_password("email", "pass"),
                                      [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -2807,12 +2815,12 @@ TEST_CASE("app: remove user with credentials", "[sync][app]")
 
         app->remove_user(test_user, [&](Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(SyncManager::shared().all_users().size() == 0);
+            CHECK(app->sync_manager()->all_users().size() == 0);
         });
 
         app->remove_user(test_user, [&](Optional<app::AppError> error) {
             CHECK(error->error_code.value() > 0);
-            CHECK(SyncManager::shared().all_users().size() == 0);
+            CHECK(app->sync_manager()->all_users().size() == 0);
             processed = true;
         });
 
@@ -2867,7 +2875,7 @@ TEST_CASE("app: link_user", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        auto tsm = TestSyncManager(config);
+        auto tsm = TestSyncManager({.app_config = config});
         auto app = tsm.app();
 
         bool processed = false;
@@ -2940,7 +2948,7 @@ TEST_CASE("app: link_user", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        auto tsm = TestSyncManager(config);
+        auto tsm = TestSyncManager({.app_config = config});
         auto app = tsm.app();
 
         bool processed = false;
@@ -3072,12 +3080,38 @@ static App::Config get_config(Factory factory)
 TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 {
     auto setup_user = []() {
-        if (SyncManager::shared().get_current_user()) {
+        std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void(const Response)> completion_block)
+                {
+                    if (request.url.find("/session") != std::string::npos) {
+                        nlohmann::json json{{"access_token", good_access_token}};
+                        completion_block({200, 0, {}, json.dump()});
+                    }
+                    else if (request.url.find("/location") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::get);
+                        completion_block({200,
+                                          0,
+                                          {},
+                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+
+        auto config = get_config(generic_factory);
+        TestSyncManager sync_manager(
+            {.app_config = config, .base_path = tmp_dir() + config.app_id, .should_teardown_test_directory = false});
+        auto app = sync_manager.app();
+        if (app->sync_manager()->get_current_user()) {
             return;
         }
 
-        SyncManager::shared().get_user("a_user_id", good_access_token, good_access_token, "anon-user",
-                                       dummy_device_id);
+        app->sync_manager()->get_user("a_user_id", good_access_token, good_access_token, "anon-user",
+                                      dummy_device_id);
     };
 
     SECTION("refresh custom data happy path")
@@ -3108,14 +3142,14 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({.app_config = config, .base_path = tmp_dir() + config.app_id});
         auto app = sync_manager.app();
 
         setup_user();
 
         bool processed = false;
 
-        app->refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
             CHECK(!error);
             CHECK(session_route_hit);
             processed = true;
@@ -3152,14 +3186,14 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({.app_config = config, .base_path = tmp_dir() + config.app_id});
         auto app = sync_manager.app();
 
         setup_user();
 
         bool processed = false;
 
-        app->refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
+        app->refresh_custom_data(app->sync_manager()->get_current_user(), [&](const Optional<AppError>& error) {
             CHECK(error->message == "jwt missing parts");
             CHECK(error->error_code.value() == 1);
             CHECK(session_route_hit);
@@ -3241,7 +3275,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(factory);
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({.app_config = config, .base_path = tmp_dir() + config.app_id});
         auto app = sync_manager.app();
 
         setup_user();
@@ -3293,7 +3327,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]")
     };
 
     auto config = get_config(generic_factory);
-    TestSyncManager sync_manager(get_config(generic_factory), true, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager sync_manager(
+        {.app_config = get_config(generic_factory), .metadata_mode = SyncManager::MetadataMode::NoEncryption});
     {
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
@@ -3301,12 +3336,9 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]")
         });
     }
     {
-        SyncManager::shared().configure({}, config);
-        REQUIRE(App::OnlyForTesting::sync_route(*SyncManager::shared().app()).rfind(test_ws_hostname, 0) !=
-                std::string::npos);
+        REQUIRE(sync_manager.app()->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
     }
     {
-        SyncManager::shared().configure({}, config);
         auto app = sync_manager.app();
         app->call_function("function", {}, [](auto error, auto) {
             REQUIRE(!error);
@@ -3323,7 +3355,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app]")
         return std::make_unique<UnitTestTransport>();
     });
     config.default_request_timeout_ms = timeout_ms;
-    TestSyncManager tsm(config);
+    TestSyncManager tsm({.app_config = config});
     auto app = tsm.app();
 
     std::shared_ptr<realm::SyncUser> user;

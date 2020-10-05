@@ -89,19 +89,11 @@ struct SyncClientConfig {
     SyncClientTimeouts timeouts;
 };
 
-class SyncManager {
+class SyncManager : public std::enable_shared_from_this<SyncManager> {
     friend class SyncSession;
     friend struct ::TestSyncManager;
-
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
-
-    static SyncManager& shared();
-
-    // Configure the metadata and file management subsystems and sync client
-    // options. This must be called before a SyncSession is first created, and
-    // will not reconfigure anything if the SyncClient already exists.
-    void configure(SyncClientConfig, app::App::Config);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -141,7 +133,7 @@ public:
     ///
     /// Refer to `SyncSession::handle_reconnect()` to see what sort of work is done
     /// on a per-session basis.
-    void reconnect();
+    void reconnect() const;
 
     util::Logger::Level log_level() const noexcept;
 
@@ -206,20 +198,34 @@ public:
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const;
 
-    std::shared_ptr<app::App> app() const
+    void set_sync_route(std::string sync_route)
+    {
+        m_sync_route = std::move(sync_route);
+    }
+
+    const std::string sync_route() const
+    {
+        return m_sync_route;
+    }
+
+    std::weak_ptr<app::App> app() const
     {
         return m_app;
     }
 
+    SyncManager() = default;
+    SyncManager(const SyncManager&) = delete;
+    SyncManager& operator=(const SyncManager&) = delete;
+
 private:
+    friend class app::App;
+
+    void configure(std::shared_ptr<app::App> app, const std::string& sync_route, const SyncClientConfig& config);
+
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
     void unregister_session(const std::string& path);
-
-    SyncManager() = default;
-    SyncManager(const SyncManager&) = delete;
-    SyncManager& operator=(const SyncManager&) = delete;
 
     _impl::SyncClient& get_sync_client() const;
     std::unique_ptr<_impl::SyncClient> create_sync_client() const;
@@ -264,7 +270,9 @@ private:
     // The unique identifier of this client.
     util::Optional<std::string> m_client_uuid;
 
-    std::shared_ptr<app::App> m_app;
+    std::string m_sync_route;
+
+    std::weak_ptr<app::App> m_app;
 };
 
 } // namespace realm

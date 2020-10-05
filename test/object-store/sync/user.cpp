@@ -37,7 +37,8 @@ static const std::string dummy_device_id = "123400000000000000000000";
 
 TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
 {
-    TestSyncManager init_sync_manager(base_path);
+    TestSyncManager init_sync_manager({.base_path = base_path});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -45,8 +46,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
 
     SECTION("properly creates a new normal user")
     {
-        auto user =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         REQUIRE(user);
         // The expected state for a newly created user:
         REQUIRE(user->identity() == identity);
@@ -61,14 +61,13 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
         const std::string second_refresh_token = ENCODE_FAKE_JWT("0987654321-fake-refresh-token");
         const std::string second_access_token = ENCODE_FAKE_JWT("0987654321-fake-access-token");
 
-        auto first =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         REQUIRE(first);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->refresh_token() == refresh_token);
         // Get the user again, but with a different token.
-        auto second = SyncManager::shared().get_user(identity, second_refresh_token, second_access_token, server_url,
-                                                     dummy_device_id);
+        auto second =
+            sync_manager->get_user(identity, second_refresh_token, second_access_token, server_url, dummy_device_id);
         REQUIRE(second == first);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->access_token() == second_access_token);
@@ -80,14 +79,13 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
         const std::string second_refresh_token = ENCODE_FAKE_JWT("0987654321-fake-refresh-token");
         const std::string second_access_token = ENCODE_FAKE_JWT("0987654321-fake-access-token");
 
-        auto first =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         REQUIRE(first->identity() == identity);
         first->log_out();
         REQUIRE(first->state() == SyncUser::State::LoggedOut);
         // Get the user again, with a new token.
-        auto second = SyncManager::shared().get_user(identity, second_refresh_token, second_access_token, server_url,
-                                                     dummy_device_id);
+        auto second =
+            sync_manager->get_user(identity, second_refresh_token, second_access_token, server_url, dummy_device_id);
         REQUIRE(second == first);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->refresh_token() == second_refresh_token);
@@ -97,7 +95,9 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]")
 {
-    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager(
+        {.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -105,39 +105,39 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
 
     SECTION("properly returns a null pointer when called for a non-existent user")
     {
-        std::shared_ptr<SyncUser> user = SyncManager::shared().get_existing_logged_in_user(identity);
+        std::shared_ptr<SyncUser> user = sync_manager->get_existing_logged_in_user(identity);
         REQUIRE(!user);
     }
 
     SECTION("properly returns an existing logged-in user")
     {
-        auto first =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->state() == SyncUser::State::LoggedIn);
         REQUIRE(first->device_id() == dummy_device_id);
         // Get that user using the 'existing user' API.
-        auto second = SyncManager::shared().get_existing_logged_in_user(identity);
+        auto second = sync_manager->get_existing_logged_in_user(identity);
         REQUIRE(second == first);
         REQUIRE(second->refresh_token() == refresh_token);
     }
 
     SECTION("properly returns a null pointer for a logged-out user")
     {
-        auto first =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         first->log_out();
         REQUIRE(first->identity() == identity);
         REQUIRE(first->state() == SyncUser::State::LoggedOut);
         // Get that user using the 'existing user' API.
-        auto second = SyncManager::shared().get_existing_logged_in_user(identity);
+        auto second = sync_manager->get_existing_logged_in_user(identity);
         REQUIRE(!second);
     }
 }
 
 TEST_CASE("sync_user: logout", "[sync]")
 {
-    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+    TestSyncManager init_sync_manager(
+        {.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
     const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
@@ -145,8 +145,7 @@ TEST_CASE("sync_user: logout", "[sync]")
 
     SECTION("properly changes the state of the user object")
     {
-        auto user =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         REQUIRE(user->state() == SyncUser::State::LoggedIn);
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
@@ -155,7 +154,10 @@ TEST_CASE("sync_user: logout", "[sync]")
 
 TEST_CASE("sync_user: user persistence", "[sync]")
 {
-    TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager init_sync_manager({.app_config = {.app_id = "baz_app_id"},
+                                       .base_path = base_path,
+                                       .metadata_mode = SyncManager::MetadataMode::NoEncryption});
+    auto sync_manager = init_sync_manager.app()->sync_manager();
     auto file_manager = SyncFileManager(base_path, "baz_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
@@ -167,11 +169,11 @@ TEST_CASE("sync_user: user persistence", "[sync]")
         const std::string access_token = ENCODE_FAKE_JWT("a-token-1");
         const std::string server_url = "https://realm.example.org/1/";
         const std::vector<SyncUserIdentity> identities{{"12345", "test_case_provider"}};
-        auto user =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         user->update_identities(identities);
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
+        REQUIRE((bool)metadata);
         REQUIRE(metadata->is_valid());
         REQUIRE(metadata->provider_type() == server_url);
         REQUIRE(metadata->access_token() == access_token);
@@ -187,14 +189,13 @@ TEST_CASE("sync_user: user persistence", "[sync]")
         const std::string access_token = ENCODE_FAKE_JWT("a_token-1a");
         const std::string server_url = "https://realm.example.org/2/";
         // Create the user and validate it.
-        auto first =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         auto first_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(first_metadata->is_valid());
         REQUIRE(first_metadata->access_token() == access_token);
         const std::string token_2 = ENCODE_FAKE_JWT("token-2b");
         // Update the user.
-        auto second = SyncManager::shared().get_user(identity, refresh_token, token_2, server_url, dummy_device_id);
+        auto second = sync_manager->get_user(identity, refresh_token, token_2, server_url, dummy_device_id);
         auto second_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(second_metadata->is_valid());
         REQUIRE(second_metadata->access_token() == token_2);
@@ -207,8 +208,7 @@ TEST_CASE("sync_user: user persistence", "[sync]")
         const std::string access_token = ENCODE_FAKE_JWT("a-token-3");
         const std::string provider_type = app::IdentityProviderGoogle;
         // Create the user and validate it.
-        auto user =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
         // Log out the user.
@@ -224,13 +224,12 @@ TEST_CASE("sync_user: user persistence", "[sync]")
         const std::string access_token = ENCODE_FAKE_JWT("a-token-3");
         const std::string provider_type = app::IdentityProviderAnonymous;
         // Create the user and validate it.
-        auto user =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
         // Log out the user.
         user->log_out();
-        REQUIRE(SyncManager::shared().all_users().size() == 0);
+        REQUIRE(sync_manager->all_users().size() == 0);
     }
 
     SECTION("properly revives a logged-out user when it's requested again")
@@ -240,16 +239,15 @@ TEST_CASE("sync_user: user persistence", "[sync]")
         const std::string access_token = ENCODE_FAKE_JWT("a-token-4a");
         const std::string provider_type = app::IdentityProviderApple;
         // Create the user and log it out.
-        auto first =
-            SyncManager::shared().get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
+        auto first = sync_manager->get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
         first->log_out();
-        REQUIRE(SyncManager::shared().all_users().size() == 1);
-        REQUIRE(SyncManager::shared().all_users()[0]->state() == SyncUser::State::LoggedOut);
+        REQUIRE(sync_manager->all_users().size() == 1);
+        REQUIRE(sync_manager->all_users()[0]->state() == SyncUser::State::LoggedOut);
         // Log the user back in.
         const std::string r_token_2 = ENCODE_FAKE_JWT("r-token-4b");
         const std::string a_token_2 = ENCODE_FAKE_JWT("atoken-4b");
-        auto second = SyncManager::shared().get_user(identity, r_token_2, a_token_2, provider_type, dummy_device_id);
-        REQUIRE(SyncManager::shared().all_users().size() == 1);
-        REQUIRE(SyncManager::shared().all_users()[0]->state() == SyncUser::State::LoggedIn);
+        auto second = sync_manager->get_user(identity, r_token_2, a_token_2, provider_type, dummy_device_id);
+        REQUIRE(sync_manager->all_users().size() == 1);
+        REQUIRE(sync_manager->all_users()[0]->state() == SyncUser::State::LoggedIn);
     }
 }
