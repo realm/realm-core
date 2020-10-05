@@ -237,7 +237,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager sync_manager({.app_config = config});
+        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
         auto app = sync_manager.app();
         bool processed = false;
 
@@ -287,7 +287,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager({.app_config = config});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -439,7 +439,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager({.app_config = config});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -770,7 +770,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager({.app_config = config});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -820,7 +820,7 @@ TEST_CASE("app: link_user integration", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager sync_manager({.app_config = config});
+        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
         auto app = sync_manager.app();
 
         bool processed = false;
@@ -881,7 +881,7 @@ TEST_CASE("app: call function", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager tsm({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
@@ -933,7 +933,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager({.app_config = config});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
     auto remote_client = app->remote_mongo_client("BackingDB");
@@ -1492,7 +1492,7 @@ TEST_CASE("app: push notifications", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager init_sync_manager({.app_config = config});
+    TestSyncManager init_sync_manager(TestSyncManager::Config(config), {});
     auto app = init_sync_manager.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
@@ -1679,7 +1679,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
     // MARK: Add Objects -
     SECTION("Add Objects")
     {
-        TestSyncManager& sync_manager = *new TestSyncManager({.app_config = app_config});
+        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         {
             auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
@@ -1712,7 +1712,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
         delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit({.app_config = app_config});
+        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
         {
             auto app = get_app_and_login(reinit.app());
             auto config = setup_and_get_config(app);
@@ -1729,7 +1729,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
     // MARK: Expired Session Refresh -
     SECTION("Expired Session Refresh")
     {
-        TestSyncManager& sync_manager = *new TestSyncManager({.app_config = app_config});
+        TestSyncManager& sync_manager = *new TestSyncManager(TestSyncManager::Config(app_config), {});
         {
             auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
@@ -1761,7 +1761,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
         delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit({.app_config = app_config});
+        TestSyncManager reinit(TestSyncManager::Config(app_config), {});
         {
             auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
@@ -1780,7 +1780,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
 
     SECTION("invalid partition error handling")
     {
-        TestSyncManager sync_manager({.app_config = app_config});
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
         auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         config.sync_config->partition_value = "not a bson serialized string";
@@ -1837,7 +1837,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager tsm({.app_config = config});
+        TestSyncManager tsm(TestSyncManager::Config(config), {});
         auto app = tsm.app();
         bool processed = false;
         app->log_in_with_credentials(AppCredentials::anonymous(),
@@ -2112,7 +2112,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager tsm({.app_config = config});
+        TestSyncManager tsm(TestSyncManager::Config(config), {});
         auto app = tsm.app();
 
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
@@ -2179,7 +2179,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        TestSyncManager tsm({.app_config = config});
+        TestSyncManager tsm(TestSyncManager::Config(config), {});
         auto app = tsm.app();
 
         bool processed = false;
@@ -2216,7 +2216,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager({.app_config = config});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
     std::shared_ptr<SyncUser> logged_in_user = app->sync_manager()->get_user(
@@ -2307,7 +2307,7 @@ TEST_CASE("app: user_semantics", "[app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user =
@@ -2454,7 +2454,7 @@ TEST_CASE("app: response error handling", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2581,7 +2581,7 @@ TEST_CASE("app: switch user", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2687,7 +2687,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2786,7 +2786,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    auto tsm = TestSyncManager({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     CHECK(!app->current_user());
@@ -2875,7 +2875,7 @@ TEST_CASE("app: link_user", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        auto tsm = TestSyncManager({.app_config = config});
+        TestSyncManager tsm(TestSyncManager::Config(config), {});
         auto app = tsm.app();
 
         bool processed = false;
@@ -2948,7 +2948,7 @@ TEST_CASE("app: link_user", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-        auto tsm = TestSyncManager({.app_config = config});
+        TestSyncManager tsm(TestSyncManager::Config(config), {});
         auto app = tsm.app();
 
         bool processed = false;
@@ -3103,8 +3103,10 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager(
-            {.app_config = config, .base_path = tmp_dir() + config.app_id, .should_teardown_test_directory = false});
+        TestSyncManager::Config cfg(config);
+        cfg.base_path = tmp_dir() + config.app_id;
+        cfg.should_teardown_test_directory = false;
+        TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
         if (app->sync_manager()->get_current_user()) {
             return;
@@ -3142,7 +3144,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager({.app_config = config, .base_path = tmp_dir() + config.app_id});
+        TestSyncManager::Config cfg(config);
+        cfg.base_path = tmp_dir() + config.app_id;
+        TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
 
         setup_user();
@@ -3186,7 +3190,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager({.app_config = config, .base_path = tmp_dir() + config.app_id});
+        TestSyncManager::Config cfg(config);
+        cfg.base_path = tmp_dir() + config.app_id;
+        TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
 
         setup_user();
@@ -3275,7 +3281,9 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
         };
 
         auto config = get_config(factory);
-        TestSyncManager sync_manager({.app_config = config, .base_path = tmp_dir() + config.app_id});
+        TestSyncManager::Config cfg(config);
+        cfg.base_path = tmp_dir() + config.app_id;
+        TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
 
         setup_user();
@@ -3327,8 +3335,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]")
     };
 
     auto config = get_config(generic_factory);
-    TestSyncManager sync_manager(
-        {.app_config = get_config(generic_factory), .metadata_mode = SyncManager::MetadataMode::NoEncryption});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     {
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
@@ -3355,7 +3362,7 @@ TEST_CASE("app: make_streaming_request", "[sync][app]")
         return std::make_unique<UnitTestTransport>();
     });
     config.default_request_timeout_ms = timeout_ms;
-    TestSyncManager tsm({.app_config = config});
+    TestSyncManager tsm(TestSyncManager::Config(config), {});
     auto app = tsm.app();
 
     std::shared_ptr<realm::SyncUser> user;

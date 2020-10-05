@@ -171,14 +171,19 @@ struct SyncTestFile : TestFile {
 
 struct TestSyncManager {
     struct Config {
+        Config();
+        Config(std::string, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+        Config(std::string, std::string,
+               realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+        Config(const realm::app::App::Config&);
         realm::app::App::Config app_config;
         std::string base_path;
         std::string base_url;
         realm::SyncManager::MetadataMode metadata_mode;
-        bool should_teardown_test_directory = true;
+        bool should_teardown_test_directory;
     };
 
-    TestSyncManager(const Config& = {.should_teardown_test_directory = true}, const SyncServer::Config& = {});
+    TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const;
@@ -193,6 +198,36 @@ private:
     std::string m_base_file_path;
     bool m_should_teardown_test_directory = true;
 };
+
+inline TestSyncManager::Config::Config()
+    : metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
+    , should_teardown_test_directory(true)
+{
+}
+
+inline TestSyncManager::Config::Config(std::string bp, realm::SyncManager::MetadataMode mdm)
+    : base_path(bp)
+    , metadata_mode(mdm)
+    , should_teardown_test_directory(true)
+{
+}
+
+inline TestSyncManager::Config::Config(std::string app_id, std::string bp, realm::SyncManager::MetadataMode mdm)
+    : base_path(bp)
+    , metadata_mode(mdm)
+    , should_teardown_test_directory(true)
+{
+    realm::app::App::Config app_cfg;
+    app_cfg.app_id = app_id;
+    app_config = app_cfg;
+}
+
+inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg)
+    : app_config(app_cfg)
+    , metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
+    , should_teardown_test_directory(true)
+{
+}
 
 std::error_code wait_for_upload(realm::Realm& realm);
 std::error_code wait_for_download(realm::Realm& realm);

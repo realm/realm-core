@@ -37,7 +37,7 @@ static const std::string dummy_device_id = "123400000000000000000000";
 
 TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
 {
-    TestSyncManager init_sync_manager({.base_path = base_path});
+    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path), {});
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
@@ -95,8 +95,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]")
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]")
 {
-    TestSyncManager init_sync_manager(
-        {.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path, SyncManager::MetadataMode::NoMetadata));
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
@@ -135,8 +134,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
 
 TEST_CASE("sync_user: logout", "[sync]")
 {
-    TestSyncManager init_sync_manager(
-        {.base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata});
+    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path, SyncManager::MetadataMode::NoMetadata));
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "sync_test_identity";
     const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
@@ -154,9 +152,8 @@ TEST_CASE("sync_user: logout", "[sync]")
 
 TEST_CASE("sync_user: user persistence", "[sync]")
 {
-    TestSyncManager init_sync_manager({.app_config = {.app_id = "baz_app_id"},
-                                       .base_path = base_path,
-                                       .metadata_mode = SyncManager::MetadataMode::NoEncryption});
+    TestSyncManager init_sync_manager(
+        TestSyncManager::Config("baz_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
     auto sync_manager = init_sync_manager.app()->sync_manager();
     auto file_manager = SyncFileManager(base_path, "baz_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
