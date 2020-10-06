@@ -960,7 +960,7 @@ std::string Obj::to_string() const
     return ostr.str();
 }
 
-std::ostream& operator<<(std::ostream& ostr, const ConstObj& obj)
+std::ostream& operator<<(std::ostream& ostr, const Obj& obj)
 {
     obj.to_json(ostr, -1, nullptr);
     return ostr;

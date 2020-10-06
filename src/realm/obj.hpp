@@ -328,6 +328,8 @@ private:
     inline void set_spec(T&, ColKey);
 };
 
+std::ostream& operator<<(std::ostream&, const Obj& obj);
+
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
     ColKey col_key; // Column holding link or link list which embeds...

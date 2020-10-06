@@ -1538,9 +1538,9 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        ParentNode::init();
+        ParentNode::init(will_query_ranges);
 
         m_dD = 100.0;
     }

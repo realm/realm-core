@@ -87,15 +87,7 @@ inline void Cluster::do_create(ColKey col)
 
 void Cluster::create()
 {
-    // Create array with the required size
-    Array::create(type_HasRefs, false, nb_leaf_columns + s_first_col_index);
-    // By specifying the minimum size, we ensure that the array has a capacity
-    // to hold m_size 64 bit refs.
-    ensure_size(m_size * 8);
-    // "ensure_size" may COW, but as array is just created, it has no parents, so
-    // failing to update parent is not an error.
-    clear_missing_parent_update();
-
+    Array::create(type_HasRefs, false, s_first_col_index);
     Array::set(0, RefOrTagged::make_tagged(0)); // Size = 0
 
     auto column_initialize = [this](ColKey col_key) {
@@ -168,6 +160,13 @@ void Cluster::create()
         return false;
     };
     m_tree_top.for_each_and_every_column(column_initialize);
+
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    ensure_size(m_size * 8);
+    // "ensure_size" may COW, but as array is just created, it has no parents, so
+    // failing to update parent is not an error.
+    clear_missing_parent_update();
 }
 
 void Cluster::init(MemRef mem)

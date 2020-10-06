@@ -3972,7 +3972,7 @@ TEST(Table_PrimaryKeyIndexBug)
     TableRef table = g.add_table("table");
     TableRef origin = g.add_table("origin");
     auto col_id = table->add_column(type_String, "id");
-    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    auto col_link = origin->add_column(*table, "link");
     table->add_search_index(col_id);
     // Create an object where bit 62 is set in the ObkKey
     auto obj = table->create_object(ObjKey(0x40083f0f9b0fb598)).set(col_id, "hallo");
@@ -4253,7 +4253,7 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
     Group g;
     TableRef t = g.add_table("table");
     ColKey col0 = t->add_column(type_Int, "value", false);
-    ColKey col_link = t->add_column_link(type_Link, "link", *t);
+    ColKey col_link = t->add_column(*t, "link");
     t->add_search_index(col0);
 
     std::vector<Int> values = {0, 9, 4, 2, 7};

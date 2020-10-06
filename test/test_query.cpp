@@ -1532,7 +1532,7 @@ TEST(Query_IntIndex)
     CHECK_EQUAL(cnt, eights);
 
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    auto col_link = origin->add_column(*table, "link");
     for (auto&& o : *table) {
         origin->create_object().set(col_link, o.get_key());
     }
@@ -1568,7 +1568,7 @@ TEST(Query_StringIndexNull)
     }
 
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    auto col_link = origin->add_column(*table, "link");
     for (auto&& o : *table) {
         origin->create_object().set(col_link, o.get_key());
     }
@@ -5421,8 +5421,8 @@ TEST(Query_AllocatorBug)
 
     auto col_double = foo->add_column(type_Double, "doubles");
     auto col_int = foo->add_column(type_Int, "ints");
-    auto col_link = bar->add_column_link(type_Link, "links", *foo);
-    auto col_linklist = bar->add_column_link(type_LinkList, "linklists", *foo);
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
 
     for (int i = 0; i < 10000; i++) {
         auto obj = foo->create_object();
