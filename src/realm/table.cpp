@@ -1794,12 +1794,6 @@ bool Table::is_list(ColKey col_key) const
     return col_key.get_attrs().test(col_attr_List);
 }
 
-bool Table::is_set(ColKey col_key) const
-{
-    REALM_ASSERT_DEBUG(valid_column(col_key));
-    return col_key.get_attrs().test(col_attr_Set);
-}
-
 
 ref_type Table::create_empty_table(Allocator& alloc, TableKey key)
 {
