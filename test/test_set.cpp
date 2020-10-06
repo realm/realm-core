@@ -50,8 +50,9 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find(5);
         CHECK_NOT_EQUAL(ndx, realm::npos);
-        auto erased = s.erase(5);
-        CHECK_EQUAL(ndx, erased);
+        auto [erased_ndx, erased] = s.erase(5);
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 0);
         CHECK_EQUAL(s.size(), 1);
     }
 
@@ -65,8 +66,9 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find("Hello");
         CHECK_NOT_EQUAL(ndx, realm::npos);
-        auto erased = s.erase("Hello");
-        CHECK_EQUAL(ndx, erased);
+        auto [erased_ndx, erased] = s.erase("Hello");
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 0);
         CHECK_EQUAL(s.size(), 1);
     }
     {
@@ -79,8 +81,9 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find(Mixed("Hello"));
         CHECK_NOT_EQUAL(ndx, realm::npos);
-        auto erased = s.erase(Mixed("Hello"));
-        CHECK_EQUAL(ndx, erased);
+        auto [erased_ndx, erased] = s.erase(Mixed("Hello"));
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 1);
         CHECK_EQUAL(s.size(), 1);
     }
 }
