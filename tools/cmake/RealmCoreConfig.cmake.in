@@ -7,19 +7,19 @@ if(UNIX AND NOT APPLE)
     else()
         if(NOT OpenSSL_DIR)
             if(NOT EXISTS ${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
-                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Linux/x86_64/openssl.tgz")
+                set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Linux/x86_64/openssl.tar.gz")
                 if(ANDROID)
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/@OPENSSL_VERSION@/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tar.gz")
                 endif()
                 message(STATUS "Getting ${OPENSSL_URL}...")
-                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tar.gz" STATUS download_status)
                 list(GET download_status 0 status_code)
                 if (NOT "${status_code}" STREQUAL "0")
                     message(FATAL_ERROR "Downloading ${OPENSSL_URL}... Failed. Status: ${download_status}")
                 endif()
                 message(STATUS "Uncompressing OpenSSL...")
                 execute_process(
-                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tar.gz"
                     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/openssl"
                 )
             endif()
