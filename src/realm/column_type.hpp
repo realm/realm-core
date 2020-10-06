@@ -73,7 +73,7 @@ enum ColumnAttr {
     /// Each element is a set of values
     col_attr_Set = 128,
 
-    // Either list or dictionary
+    /// Either list, dictionary, or set
     col_attr_Collection = 128 + 64 + 32
 };
 
