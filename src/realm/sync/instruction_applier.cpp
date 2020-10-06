@@ -794,37 +794,37 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
                         if (target_table->get_key() != link.get_table_key()) {
-                            bad_transaction_log("SetInsert: Target table mismatch (expected '%1', got '%2')",
+                            bad_transaction_log("SetErase: Target table mismatch (expected '%1', got '%2')",
                                                 target_table->get_name(), table_name);
                         }
                         link_set.erase(link.get_obj_key());
                     }
                     else {
-                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected link type, was %3)",
+                        bad_transaction_log("SetErase: Type mismatch in set at '%2.%1' (expected link type, was %3)",
                                             field_name, table_name, data_type);
                     }
                 },
                 [&](Mixed value) {
                     if (value.is_null() && !col.is_nullable()) {
-                        bad_transaction_log("SetInsert: NULL in non-nullable set '%2.%1'", field_name, table_name);
+                        bad_transaction_log("SetErase: NULL in non-nullable set '%2.%1'", field_name, table_name);
                     }
 
                     if (data_type == type_Mixed || value.get_type() == data_type) {
                         set.erase_any(value);
                     }
                     else {
-                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected %3, got %4)",
+                        bad_transaction_log("SetErase: Type mismatch in set at '%2.%1' (expected %3, got %4)",
                                             field_name, table_name, data_type, value.get_type());
                     }
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
-                    bad_transaction_log("SetInsert: Sets of embedded objects are not supported.");
+                    bad_transaction_log("SetErase: Sets of embedded objects are not supported.");
                 },
                 [&](const Instruction::Payload::Dictionary&) {
-                    bad_transaction_log("SetInsert: Sets of dictionaries are not supported.");
+                    bad_transaction_log("SetErase: Sets of dictionaries are not supported.");
                 },
                 [&](const Instruction::Payload::Erased&) {
-                    bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
+                    bad_transaction_log("SetErase: Dictionary erase payload in SetErase");
                 },
             };
 
