@@ -1026,6 +1026,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
 
     SECTION("object change information")
     {
+        config.cache = false;
         auto realm = Realm::get_shared_realm(config);
         realm->update_schema({
             {"origin",

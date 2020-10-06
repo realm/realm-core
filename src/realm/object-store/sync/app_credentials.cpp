@@ -100,7 +100,7 @@ AppCredentials AppCredentials::apple(AppCredentialsToken id_token)
 AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
 {
     return AppCredentials(AuthProvider::FACEBOOK, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderFacebook}, {"access_token", access_token}}).dump();
+        return nlohmann::json({{kAppProviderKey, IdentityProviderFacebook}, {"accessToken", access_token}}).dump();
     });
 }
 
@@ -136,6 +136,14 @@ AppCredentials AppCredentials::function(const bson::BsonDocument& payload)
         return output.str();
     });
 }
+
+AppCredentials AppCredentials::function(const std::string& serialized_payload)
+{
+    return AppCredentials(AuthProvider::FUNCTION, [=] {
+        return serialized_payload;
+    });
+}
+
 
 AppCredentials AppCredentials::user_api_key(std::string api_key)
 {

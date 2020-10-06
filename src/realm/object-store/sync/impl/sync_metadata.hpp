@@ -239,7 +239,7 @@ public:
     util::Optional<SyncFileActionMetadata> get_file_action_metadata(StringData path) const;
 
     // Create file action metadata.
-    void make_file_action_metadata(StringData original_name, StringData url, StringData local_uuid,
+    void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
                                    SyncFileActionMetadata::Action action, StringData new_name = {}) const;
 
     // Get the unique identifier of this client.

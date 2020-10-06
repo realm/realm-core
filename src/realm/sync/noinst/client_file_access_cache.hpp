@@ -64,7 +64,7 @@ public:
     /// The mere creation of the slot is guaranteed to not involve any access to
     /// the file system.
     Slot(ClientFileAccessCache&, std::string realm_path, util::Optional<std::array<char, 64>> encryption_key = none,
-         std::shared_ptr<sync::ClientReplication::ChangesetCooker> = nullptr) noexcept;
+         std::shared_ptr<ChangesetCooker> = nullptr) noexcept;
 
     /// Closes the file if it is open (as if by calling close()).
     ~Slot() noexcept;
@@ -102,7 +102,7 @@ private:
     DBRef m_shared_group;
     util::Optional<std::array<char, 64>> m_encryption_key;
 
-    std::shared_ptr<sync::ClientReplication::ChangesetCooker> m_changeset_cooker;
+    std::shared_ptr<ChangesetCooker> m_changeset_cooker;
 
     bool is_open() const noexcept;
     void open();
@@ -165,7 +165,7 @@ inline void ClientFileAccessCache::insert(Slot& slot) noexcept
 
 inline ClientFileAccessCache::Slot::Slot(ClientFileAccessCache& cache, std::string rp,
                                          util::Optional<std::array<char, 64>> ek,
-                                         std::shared_ptr<sync::ClientReplication::ChangesetCooker> cc) noexcept
+                                         std::shared_ptr<ChangesetCooker> cc) noexcept
     : realm_path{std::move(rp)}
     , m_cache{cache}
     , m_encryption_key{std::move(ek)}

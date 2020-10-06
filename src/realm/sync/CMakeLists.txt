@@ -1,4 +1,5 @@
 set(SYNC_SOURCES
+    config.cpp
     encrypt/fingerprint.cpp
     noinst/changeset_index.cpp
     noinst/client_file_access_cache.cpp
@@ -72,6 +73,7 @@ set(IMPL_INSTALL_HEADERS
 )
 
 set(SYNC_INSTALL_HEADERS
+    config.hpp
     encrypt/fingerprint.hpp
     changeset_cooker.hpp
     changeset_encoder.hpp

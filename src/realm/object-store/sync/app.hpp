@@ -33,6 +33,7 @@ namespace realm {
 class SyncUser;
 class SyncSession;
 class SyncManager;
+struct SyncClientConfig;
 
 namespace app {
 
@@ -85,6 +86,11 @@ public:
 
     /// Get all users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
+
+    std::shared_ptr<SyncManager> sync_manager() const
+    {
+        return m_sync_manager;
+    }
 
     /// A struct representing a user API key as returned by the App server.
     struct UserAPIKey {
@@ -187,6 +193,12 @@ public:
         void send_reset_password_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
+        /// Retries the custom confirmation function on a user for a given email.
+        /// @param email The email address of the user to retry the custom confirmation for.
+        /// @param completion_block A callback to be invoked once the retry is complete.
+        void retry_custom_confirmation(const std::string& email,
+                                       std::function<void(util::Optional<AppError>)> completion_block);
+
         /// Resets the password of an email identity using the
         /// password reset token emailed to a user.
         /// @param password The desired new password.
@@ -216,7 +228,8 @@ public:
         SharedApp m_parent;
     };
 
-    static SharedApp get_shared_app(const Config& config);
+    static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
+    static std::shared_ptr<App> get_cached_app(const std::string& app_id);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -261,10 +274,10 @@ public:
     /// @returns A shared pointer to the new current user
     std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
 
-    /// Logs out and removes the provided user
-    /// this is a local operation and does not invoke any server side function
+    /// Logs out and removes the provided user.
+    /// This invokes logout on the server.
     /// @param user the user to remove
-    /// @param completion_block Will return an error if the user is not found
+    /// @param completion_block Will return an error if the user is not found or the http request failed.
     void remove_user(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
 
     // Get a provider client for the given class type.
@@ -273,29 +286,6 @@ public:
     {
         return T(this);
     }
-
-    class Internal {
-        friend class realm::SyncSession;
-
-        static const std::string& sync_route(const App& app)
-        {
-            return app.m_sync_route;
-        }
-    };
-
-    // Expose some internal functionality to testing code.
-    class OnlyForTesting {
-    public:
-        static const std::string& sync_route(const App& app)
-        {
-            return app.m_sync_route;
-        }
-
-        static void set_sync_route(App& app, std::string sync_route)
-        {
-            app.m_sync_route = std::move(sync_route);
-        }
-    };
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
@@ -348,6 +338,8 @@ public:
     // MARK: Push notification client
     PushClient push_notification_client(const std::string& service_name);
 
+    static void clear_cached_apps();
+
 private:
     friend class Internal;
     friend class OnlyForTesting;
@@ -357,8 +349,8 @@ private:
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
-    std::string m_sync_route;
     uint64_t m_request_timeout_ms;
+    std::shared_ptr<SyncManager> m_sync_manager;
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
@@ -414,6 +406,8 @@ private:
     void attach_auth_options(bson::BsonDocument& body);
 
     std::string function_call_url_path() const;
+
+    void configure(const SyncClientConfig& sync_client_config);
 };
 
 // MARK: Provider client templates

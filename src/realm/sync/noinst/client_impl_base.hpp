@@ -35,7 +35,6 @@ public:
     class Session;
 
     // clang-format off
-    using ReconnectMode        = sync::Client::ReconnectMode;
     using RoundtripTimeHandler = sync::Client::RoundtripTimeHandler;
     using ProtocolEnvelope     = sync::ProtocolEnvelope;
     using ProtocolError        = sync::ProtocolError;
@@ -217,7 +216,7 @@ private:
 class ClientImplBase::Connection : public util::websocket::Config {
 public:
     using SSLVerifyCallback = sync::Session::SSLVerifyCallback;
-    using ProxyConfig = sync::Session::Config::ProxyConfig;
+    using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImplBase::ReconnectInfo;
     using port_type = ClientImplBase::port_type;
     using ReadCompletionHandler = util::websocket::ReadCompletionHandler;

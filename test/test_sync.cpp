@@ -4062,7 +4062,7 @@ TEST(Sync_MultiplexIdent)
 
     Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     client_config.tcp_no_delay = true;
     Client client(client_config);
@@ -4441,7 +4441,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     util::PrefixLogger client_logger("Client: ", logger);
     Client::Config config;
     config.logger = &client_logger;
-    config.reconnect_mode = Client::ReconnectMode::testing;
+    config.reconnect_mode = ReconnectMode::testing;
     config.tcp_no_delay = true;
     Client client(config);
 
@@ -4661,7 +4661,7 @@ TEST(Sync_UploadDownloadProgress_1)
         util::PrefixLogger client_logger("Client: ", logger);
         Client::Config config;
         config.logger = &client_logger;
-        config.reconnect_mode = Client::ReconnectMode::testing;
+        config.reconnect_mode = ReconnectMode::testing;
         config.tcp_no_delay = true;
         Client client(config);
 
@@ -4965,7 +4965,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.tcp_no_delay = true;
     Client client(client_config);
 
@@ -5277,7 +5277,7 @@ TEST(Sync_UploadDownloadProgress_6)
 
     Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     client_config.tcp_no_delay = true;
     Client client(client_config);
@@ -5338,7 +5338,7 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     SHARED_GROUP_TEST_PATH(path);
     Client::Config config;
     config.logger = &test_context.logger;
-    config.reconnect_mode = Client::ReconnectMode::testing;
+    config.reconnect_mode = ReconnectMode::testing;
     config.tcp_no_delay = true;
     Client client{config};
     Session session_1{client, path};
@@ -6309,7 +6309,7 @@ TEST(Sync_ServerHasMoved)
 
     sync::Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = sync::Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.tcp_no_delay = true;
     sync::Client client(client_config);
 
@@ -6810,7 +6810,7 @@ TEST_IF(Sync_SSL_Certificates, false)
     for (size_t i = 0; i < num_servers; ++i) {
         Client::Config client_config;
         client_config.logger = &client_logger;
-        client_config.reconnect_mode = Client::ReconnectMode::testing;
+        client_config.reconnect_mode = ReconnectMode::testing;
         Client client(client_config);
 
         ThreadWrapper client_thread;
