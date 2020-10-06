@@ -19,6 +19,7 @@
 #ifndef REALM_OBJECT_ID_HPP
 #define REALM_OBJECT_ID_HPP
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <realm/timestamp.hpp>
@@ -27,6 +28,8 @@ namespace realm {
 
 class ObjectId {
 public:
+    using ObjectIdBytes = std::array<uint8_t, 12>;
+
     /**
      * Constructs an ObjectId with all bytes 0x00.
      */
@@ -43,6 +46,11 @@ public:
     ObjectId(const char* init) noexcept;
 
     /**
+     * Constructs an ObjectID from an array of 12 unsigned bytes
+     */
+    ObjectId(const ObjectIdBytes& init) noexcept;
+
+    /**
      * Constructs an ObjectId with the specified inputs, and a random number
      */
     ObjectId(Timestamp d, int machine_id, int process_id) noexcept;
@@ -54,27 +62,27 @@ public:
 
     bool operator==(const ObjectId& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) == 0;
+        return m_bytes == other.m_bytes;
     }
     bool operator!=(const ObjectId& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) != 0;
+        return m_bytes != other.m_bytes;
     }
     bool operator>(const ObjectId& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) > 0;
+        return m_bytes > other.m_bytes;
     }
     bool operator<(const ObjectId& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) < 0;
+        return m_bytes < other.m_bytes;
     }
     bool operator>=(const ObjectId& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) >= 0;
+        return m_bytes >= other.m_bytes;
     }
     bool operator<=(const ObjectId& other) const
     {
-        return memcmp(m_bytes, other.m_bytes, sizeof(m_bytes)) <= 0;
+        return m_bytes <= other.m_bytes;
     }
     explicit operator Timestamp() const
     {
@@ -83,10 +91,11 @@ public:
 
     Timestamp get_timestamp() const;
     std::string to_string() const;
+    ObjectIdBytes to_bytes() const;
     size_t hash() const noexcept;
 
 private:
-    uint8_t m_bytes[12] = {};
+    ObjectIdBytes m_bytes = {};
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)

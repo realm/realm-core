@@ -30,6 +30,7 @@ class Obj;
 
 struct TableKey {
     static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
+
     constexpr TableKey() noexcept
         : value(null_value)
     {
@@ -95,12 +96,14 @@ public:
 };
 
 struct ColKey {
+    static constexpr int64_t null_value = int64_t(uint64_t(-1) >> 1); // free top bit
+
     struct Idx {
         unsigned val;
     };
 
     constexpr ColKey() noexcept
-        : value(uint64_t(-1) >> 1) // free top bit
+        : value(null_value)
     {
     }
     constexpr explicit ColKey(int64_t val) noexcept
@@ -151,7 +154,7 @@ struct ColKey {
     }
     explicit operator bool() const noexcept
     {
-        return value != ColKey().value;
+        return value != null_value;
     }
     Idx get_index() const noexcept
     {
@@ -171,6 +174,8 @@ struct ColKey {
     }
     int64_t value;
 };
+
+static_assert(ColKey::null_value == 0x7fffffffffffffff, "Fix this");
 
 inline std::ostream& operator<<(std::ostream& os, ColKey ck)
 {

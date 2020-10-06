@@ -87,8 +87,17 @@ inline void Cluster::do_create(ColKey col)
 
 void Cluster::create()
 {
-    Array::create(type_HasRefs, false, s_first_col_index);
-    Array::set(0, RefOrTagged::make_tagged(0));
+    // Create array with the required size
+    Array::create(type_HasRefs, false, nb_leaf_columns + s_first_col_index);
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    ensure_size(m_size * 8);
+    // "ensure_size" may COW, but as array is just created, it has no parents, so
+    // failing to update parent is not an error.
+    clear_missing_parent_update();
+
+    Array::set(0, RefOrTagged::make_tagged(0)); // Size = 0
+
     auto column_initialize = [this](ColKey col_key) {
         auto col_ndx = col_key.get_index();
         while (size() <= col_ndx.val + 1)
@@ -187,7 +196,10 @@ bool Cluster::update_from_parent(size_t old_baseline) noexcept
 
 MemRef Cluster::ensure_writeable(ObjKey)
 {
-    copy_on_write();
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    copy_on_write(8 * m_size);
+
     return get_mem();
 }
 
@@ -271,6 +283,9 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
 
 void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 {
+    // Ensure the cluster array is big enough to hold 64 bit values.
+    copy_on_write(m_size * 8);
+
     if (m_keys.is_attached()) {
         m_keys.insert(ndx, k.value);
     }

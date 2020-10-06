@@ -3963,7 +3963,7 @@ TEST(Parser_ObjectIdTimestamp)
     // add one object with default values, we assume time > now, and null
     auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
-    CHECK_EQUAL(generated_pk.get_timestamp().get_seconds(), ts_now.get_seconds());
+    CHECK(std::abs(generated_pk.get_timestamp().get_seconds() - ts_now.get_seconds()) <= 1);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);
