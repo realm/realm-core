@@ -39,6 +39,7 @@
 
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
+typedef struct realm_scheduler realm_scheduler_t;
 typedef void (*realm_free_userdata_func_t)(void*);
 typedef void* (*realm_clone_userdata_func_t)(const void*);
 
@@ -281,11 +282,14 @@ typedef enum realm_property_flags {
 
 
 /* Notification types */
-typedef struct realm_notication_token realm_notification_token_t;
+typedef struct realm_notification_token realm_notification_token_t;
+typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
+typedef void (*realm_before_object_change_func_t)(void* userdata, const realm_object_changes_t*);
+typedef void (*realm_after_object_change_func_t)(void* userdata, const realm_object_changes_t*);
 typedef void (*realm_before_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
 typedef void (*realm_after_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
-typedef void (*realm_collection_change_error_func_t)(void* userdata, realm_async_error_t*);
+typedef void (*realm_callback_error_func_t)(void* userdata, realm_async_error_t*);
 
 
 /* Sync types */
@@ -709,14 +713,23 @@ RLM_API realm_object_t* realm_find_object_with_primary_key(const realm_t*, realm
  *
  * @return A non-NULL pointer if the object was created successfully.
  */
-RLM_API realm_object_t* realm_create_object(realm_t*, realm_table_key_t);
+RLM_API realm_object_t* realm_object_create(realm_t*, realm_table_key_t);
 
 /**
  * Create an object in a class with a primary key.
  *
  * @return A non-NULL pointer if the object was created successfully.
  */
-RLM_API realm_object_t* realm_create_object_with_primary_key(realm_t*, realm_table_key_t, realm_value_t pk);
+RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_table_key_t, realm_value_t pk);
+
+/**
+ * Delete a realm object.
+ *
+ * Note: This does not call `realm_release()` on the `realm_object_t` instance.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_object_delete(realm_object_t*);
 
 RLM_API realm_object_t* _realm_object_from_native_copy(const void* pobj, size_t n);
 RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n);
@@ -749,6 +762,15 @@ RLM_API realm_table_key_t realm_object_get_table(const realm_object_t* object);
  * This function cannot fail.
  */
 RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
+
+/**
+ * Subscribe to notifications for this object.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_notification_token_t* realm_object_add_notification_callback(
+    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_object_change_func_t before,
+    realm_after_object_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
  * Get the value for a property.
@@ -860,6 +882,99 @@ RLM_API bool realm_list_clear(realm_list_t*);
  */
 RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_t num_values);
 
+/**
+ * Subscribe to notifications for this object.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_notification_token_t* realm_list_add_notification_callback(
+    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_collection_change_func_t before,
+    realm_after_collection_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
+
+/**
+ * True if an object notification indicates that the object was deleted.
+ *
+ * This function cannot fail.
+ */
+RLM_API bool realm_object_changes_is_deleted(const realm_object_changes_t*);
+
+/**
+ * Get the number of properties that were modified in an object notification.
+ *
+ * This function cannot fail.
+ */
+RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_object_changes_t*);
+
+/**
+ * Get the column keys for the properties that were modified in an object
+ * notification.
+ *
+ * This function cannot fail.
+ *
+ * @param out_modified Where the column keys should be written. May be NULL.
+ * @param max The maximum number of column keys to write.
+ * @return The number of column keys written to @a out_modified, or the number
+ *         of modified properties if @a out_modified is NULL.
+ */
+RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_changes_t*,
+                                                            realm_col_key_t* out_modified, size_t max);
+
+/**
+ * Get the number of various types of changes in a collection notification.
+ *
+ * @param out_num_deletions The number of deletions. May be NULL.
+ * @param out_num_insertions The number of insertions. May be NULL.
+ * @param out_num_modifications The number of modifications. May be NULL.
+ * @param out_num_moves The number of moved elements. May be NULL.
+ */
+RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t*, size_t* out_num_deletions,
+                                                      size_t* out_num_insertions, size_t* out_num_modifications,
+                                                      size_t* out_num_moves);
+
+typedef struct realm_collection_move {
+    size_t from;
+    size_t to;
+} realm_collection_move_t;
+
+/**
+ * Get the indices of changes in a collection notification.
+ *
+ * Note: For moves, every `from` index will also be present among deletions, and
+ *       every `to` index will also be present among insertions.
+ *
+ * This function cannot fail.
+ *
+ * @param out_deletion_indices Where to put the indices of deleted elements
+ *                             (*before* the deletion happened). May be NULL.
+ * @param max_deletion_indices The max number of indices to write to @a
+ *                             out_deletion_indices.
+ * @param out_insertion_indices Where the put the indices of inserted elements
+ *                              (*after* the insertion happened). May be NULL.
+ * @param max_insertion_indices The max number of indices to write to @a
+ *                              out_insertion_indices.
+ * @param out_modification_indices Where to put the indices of modified elements
+ *                                 (*before* any insertions or deletions of
+ *                                 other elements). May be NULL.
+ * @param max_modification_indices The max number of indices to write to @a
+ *                                 out_modification_indices.
+ * @param out_modification_indices_after Where to put the indices of modified
+ *                                       elements (*after* any insertions or
+ *                                       deletions of other elements). May be
+ *                                       NULL.
+ * @param max_modification_indices_after The max number of indices to write to
+ *                                       @a out_modification_indices_after.
+ * @param out_moves Where to put the pairs of indices of moved elements. May be
+ *                  NULL.
+ * @param max_moves The max number of pairs to write to @a out_moves.
+ */
+RLM_API void realm_collection_changes_get_changes(const realm_collection_changes_t*, size_t* out_deletion_indices,
+                                                  size_t max_deletion_indices, size_t* out_insertion_indices,
+                                                  size_t max_insertion_indices, size_t* out_modification_indices,
+                                                  size_t max_modification_indices,
+                                                  size_t* out_modification_indices_after,
+                                                  size_t max_modification_indices_after,
+                                                  realm_collection_move_t* out_moves, size_t max_moves);
+
 RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
 RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
 RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_col_key_t);
@@ -870,6 +985,10 @@ RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t out_inde
 RLM_API bool realm_set_erase(realm_set_t*, realm_value_t value, bool* out_erased);
 RLM_API bool realm_set_clear(realm_set_t*);
 RLM_API bool realm_set_assign(realm_set_t*, realm_value_t values, size_t num_values);
+RLM_API realm_notification_token_t* realm_set_add_notification_callback(
+    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_collection_change_func_t before,
+    realm_after_collection_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
+
 
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_copy(const void* pdict, size_t n);
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_move(void* pdict, size_t n);
@@ -885,6 +1004,9 @@ RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool
 RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
 typedef realm_value_t realm_key_value_pair_t[2];
 RLM_API bool realm_dictionary_assign(realm_dictionary_t*, const realm_key_value_pair_t* pairs, size_t num_pairs);
+RLM_API realm_notification_token_t* realm_dictionary_add_notification_callback(
+    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_collection_change_func_t before,
+    realm_after_collection_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
  * Construct a new, empty query targeting @a table.

@@ -150,6 +150,20 @@ inline const T& cast_ref(const void* ptr)
 
 } // namespace
 
+struct realm_async_error : WrapC {
+    std::exception_ptr ep;
+
+    explicit realm_async_error(std::exception_ptr ep)
+        : ep(std::move(ep))
+    {
+    }
+
+    realm_async_error* clone() const override
+    {
+        return new realm_async_error{ep};
+    }
+};
+
 struct realm_config : WrapC, Realm::Config {
     using Realm::Config::Config;
 };
@@ -219,6 +233,37 @@ struct realm_list : WrapC, List {
     bool is_frozen() const override
     {
         return List::is_frozen();
+    }
+};
+
+struct realm_object_changes : WrapC, CollectionChangeSet {
+    explicit realm_object_changes(CollectionChangeSet changes)
+        : CollectionChangeSet(std::move(changes))
+    {
+    }
+
+    realm_object_changes* clone() const override
+    {
+        return new realm_object_changes{static_cast<const CollectionChangeSet&>(*this)};
+    }
+};
+
+struct realm_collection_changes : WrapC, CollectionChangeSet {
+    explicit realm_collection_changes(CollectionChangeSet changes)
+        : CollectionChangeSet(std::move(changes))
+    {
+    }
+
+    realm_collection_changes* clone() const override
+    {
+        return new realm_collection_changes{static_cast<const CollectionChangeSet&>(*this)};
+    }
+};
+
+struct realm_notification_token : WrapC, NotificationToken {
+    explicit realm_notification_token(NotificationToken token)
+        : NotificationToken(std::move(token))
+    {
     }
 };
 
@@ -874,7 +919,7 @@ RLM_API realm_object_t* realm_find_object_with_primary_key(const realm_t* realm,
     });
 }
 
-RLM_API realm_object_t* realm_create_object(realm_t* realm, realm_table_key_t table_key)
+RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_table_key_t table_key)
 {
     return wrap_err([&]() {
         auto& shared_realm = *realm;
@@ -886,7 +931,7 @@ RLM_API realm_object_t* realm_create_object(realm_t* realm, realm_table_key_t ta
     });
 }
 
-RLM_API realm_object_t* realm_create_object_with_primary_key(realm_t* realm, realm_table_key_t table_key,
+RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, realm_table_key_t table_key,
                                                              realm_value_t pk)
 {
     return wrap_err([&]() {
@@ -898,6 +943,15 @@ RLM_API realm_object_t* realm_create_object_with_primary_key(realm_t* realm, rea
         auto obj = table->create_object_with_primary_key(pkval);
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
+    });
+}
+
+RLM_API bool realm_object_delete(realm_object_t* obj)
+{
+    return wrap_err([&]() {
+        auto o = obj->obj();
+        o.remove();
+        return true;
     });
 }
 
@@ -972,6 +1026,101 @@ RLM_API bool realm_set_value(realm_object_t* obj, realm_col_key_t col, realm_val
         o.set_any(col_key, from_capi(new_value), is_default);
         return true;
     });
+}
+
+namespace {
+struct ObjectNotificationsCallback {
+    void* m_userdata;
+    realm_free_userdata_func_t m_free = nullptr;
+    realm_before_object_change_func_t m_before = nullptr;
+    realm_after_object_change_func_t m_after = nullptr;
+    realm_callback_error_func_t m_on_error = nullptr;
+
+    ObjectNotificationsCallback() = default;
+
+    ObjectNotificationsCallback(ObjectNotificationsCallback&& other)
+        : m_userdata(std::exchange(other.m_userdata, nullptr))
+        , m_free(std::exchange(other.m_free, nullptr))
+        , m_before(std::exchange(other.m_before, nullptr))
+        , m_after(std::exchange(other.m_after, nullptr))
+        , m_on_error(std::exchange(other.m_on_error, nullptr))
+    {
+    }
+
+    ~ObjectNotificationsCallback()
+    {
+        if (m_free && m_userdata) {
+            (m_free)(m_userdata);
+        }
+    }
+
+    void before(const CollectionChangeSet& changes)
+    {
+        if (m_before) {
+            realm_object_changes_t c{changes};
+            m_before(m_userdata, &c);
+        }
+    }
+
+    void after(const CollectionChangeSet& changes)
+    {
+        if (m_after) {
+            realm_object_changes_t c{changes};
+            m_after(m_userdata, &c);
+        }
+    }
+
+    void error(std::exception_ptr e)
+    {
+        if (m_on_error) {
+            realm_async_error_t err{std::move(e)};
+            m_on_error(m_userdata, &err);
+        }
+    }
+};
+} // namespace
+
+RLM_API realm_notification_token_t* realm_object_add_notification_callback(
+    realm_object_t* obj, void* userdata, realm_free_userdata_func_t free, realm_before_object_change_func_t before,
+    realm_after_object_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*)
+{
+    return wrap_err([&]() {
+        ObjectNotificationsCallback cb;
+        cb.m_userdata = userdata;
+        cb.m_free = free;
+        cb.m_before = before;
+        cb.m_after = after;
+        cb.m_on_error = on_error;
+        auto token = obj->add_notification_callback(std::move(cb));
+        return new realm_notification_token_t{std::move(token)};
+    });
+}
+
+RLM_API bool realm_object_changes_is_deleted(const realm_object_changes_t* changes)
+{
+    return !changes->deletions.empty();
+}
+
+RLM_API size_t realm_object_changes_get_num_modified_properties(const realm_object_changes_t* changes)
+{
+    return changes->columns.size();
+}
+
+RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_changes_t* changes,
+                                                            realm_col_key_t* out_properties, size_t max)
+{
+    if (!out_properties)
+        return changes->columns.size();
+
+    size_t i = 0;
+    for (const auto& [col_key_val, index_set] : changes->columns) {
+        if (i >= max) {
+            break;
+        }
+        out_properties[i].col_key = col_key_val;
+        ++i;
+    }
+    return i;
 }
 
 RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_col_key_t key)

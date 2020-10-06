@@ -49,13 +49,34 @@ std::string rlm_stdstr(realm_value_t val)
     return std::string(val.string.data, 0, val.string.size);
 }
 
+struct RealmReleaseDeleter {
+    void operator()(void* ptr)
+    {
+        realm_release(ptr);
+    }
+};
+
 template <class T>
-using CPtr = std::unique_ptr<T, void (*)(const void*)>;
+using CPtr = std::unique_ptr<T, RealmReleaseDeleter>;
 
 template <class T>
 CPtr<T> make_cptr(T* ptr)
 {
-    return std::unique_ptr<T, void (*)(const void*)>{ptr, realm_release};
+    return CPtr<T>{ptr};
+}
+
+template <class T>
+CPtr<T> clone_cptr(const CPtr<T>& ptr)
+{
+    void* clone = realm_clone(ptr.get());
+    return CPtr<T>{static_cast<T*>(clone)};
+}
+
+template <class T>
+CPtr<T> clone_cptr(const T* ptr)
+{
+    void* clone = realm_clone(ptr);
+    return CPtr<T>{static_cast<T*>(clone)};
 }
 
 TEST_CASE("C API")
@@ -170,6 +191,13 @@ TEST_CASE("C API")
         realm_release(schema);
     }
 
+    auto write = [&](auto&& f) {
+        checked(realm_begin_write(realm));
+        f();
+        checked(realm_commit(realm));
+        checked(realm_refresh(realm));
+    };
+
     CHECK(realm_get_num_classes(realm) == 2);
     bool found = false;
 
@@ -195,11 +223,11 @@ TEST_CASE("C API")
 
     CHECK(checked(realm_begin_write(realm)));
 
-    auto obj1 = realm_create_object(realm, foo_info.key);
+    auto obj1 = realm_object_create(realm, foo_info.key);
     CHECK(checked(obj1));
     CHECK(checked(realm_set_value(obj1, foo_properties[0].key, rlm_int_val(123), false)));
     CHECK(checked(realm_set_value(obj1, foo_properties[1].key, rlm_str_val("Hello, World!"), false)));
-    auto obj2 = realm_create_object(realm, bar_info.key);
+    auto obj2 = realm_object_create(realm, bar_info.key);
     CHECK(checked(obj2));
 
     SECTION("lists")
@@ -266,7 +294,7 @@ TEST_CASE("C API")
 
             SECTION("set wrong type")
             {
-                auto foo2 = make_cptr(realm_create_object(realm, foo_info.key));
+                auto foo2 = make_cptr(realm_object_create(realm, foo_info.key));
                 CHECK(foo2);
                 realm_value_t foo2_link_val;
                 foo2_link_val.type = RLM_TYPE_LINK;
@@ -280,11 +308,78 @@ TEST_CASE("C API")
         }
 
         realm_release(bars);
+    } // lists
+
+    checked(realm_commit(realm));
+
+    SECTION("notifications")
+    {
+        struct State {
+            CPtr<realm_object_changes_t> changes_before;
+            CPtr<realm_object_changes_t> changes_after;
+            CPtr<realm_async_error_t> error;
+        };
+
+        State state;
+
+        auto before = [](void* userdata, const realm_object_changes_t* changes) {
+            auto state = static_cast<State*>(userdata);
+            state->changes_before = clone_cptr(changes);
+        };
+        auto after = [](void* userdata, const realm_object_changes_t* changes) {
+            auto state = static_cast<State*>(userdata);
+            state->changes_after = clone_cptr(changes);
+        };
+
+        auto on_error = [](void* userdata, realm_async_error_t* err) {
+            auto state = static_cast<State*>(userdata);
+            state->error = clone_cptr(err);
+        };
+
+        auto require_change = [&]() {
+            auto token = make_cptr(
+                realm_object_add_notification_callback(obj1, &state, nullptr, before, after, on_error, nullptr));
+            checked(realm_refresh(realm));
+            return token;
+        };
+
+        SECTION("deleting the object sends a change notification")
+        {
+            auto token = require_change();
+            write([&]() {
+                checked(realm_object_delete(obj1));
+            });
+            CHECK(!state.error);
+            CHECK(state.changes_before);
+            CHECK(state.changes_after);
+            bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
+            CHECK(deleted);
+        }
+
+        SECTION("modifying the object sends a change notification for the object, and for the changed column")
+        {
+            auto token = require_change();
+            write([&]() {
+                checked(realm_set_value(obj1, foo_properties[0].key, rlm_int_val(999), false));
+                checked(realm_set_value(obj1, foo_properties[1].key, rlm_str_val("aaa"), false));
+            });
+            CHECK(!state.error);
+            CHECK(state.changes_before);
+            CHECK(state.changes_after);
+            bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
+            CHECK(!deleted);
+            size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes_after.get());
+            CHECK(num_modified == 2);
+            realm_col_key_t modified_keys[2];
+            size_t n = realm_object_changes_get_modified_properties(state.changes_after.get(), modified_keys, 2);
+            CHECK(n == 2);
+            CHECK(modified_keys[0].col_key == foo_properties[0].key.col_key);
+            CHECK(modified_keys[1].col_key == foo_properties[1].key.col_key);
+        }
     }
 
     realm_release(obj1);
     realm_release(obj2);
-    CHECK(checked(realm_commit(realm)));
 
     size_t num_foos, num_bars;
     CHECK(checked(realm_get_num_objects(realm, foo_info.key, &num_foos)));
