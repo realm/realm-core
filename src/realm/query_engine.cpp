@@ -379,6 +379,7 @@ std::string StringNode<Equal>::describe(util::serializer::SerialisationState& st
 void StringNode<EqualIns>::_search_index_init()
 {
     auto index = ParentNode::m_table->get_search_index(ParentNode::m_condition_column_key);
+    m_index_matches.clear();
     index->find_all(m_index_matches, StringData(StringNodeBase::m_value), true);
     m_results_start = 0;
     m_results_ndx = 0;

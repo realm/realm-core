@@ -58,7 +58,7 @@ void ClusterNode::IteratorState::init(State& s, ObjKey key)
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw KeyNotFound("When getting");
+        throw KeyNotFound("No such object");
     }
 }
 
@@ -739,13 +739,13 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw KeyNotFound("Get index");
+            throw KeyNotFound("Key not found in get_ndx");
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw KeyNotFound("Get index");
+            throw KeyNotFound("Key not found in get_ndx (compact)");
         }
     }
     return index + ndx;
