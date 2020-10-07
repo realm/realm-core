@@ -49,8 +49,9 @@ using LnkLstPtr = std::unique_ptr<LnkLst>;
 class Dictionary;
 
 enum JSONOutputMode {
-    output_mode_json,  // default / existing implementation for outputting realm to json
-    output_mode_xjson, // extended json as described in the spec
+    output_mode_json,       // default / existing implementation for outputting realm to json
+    output_mode_xjson,      // extended json as described in the spec
+    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
 };
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore

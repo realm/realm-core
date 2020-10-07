@@ -225,6 +225,18 @@ TEST(Xjson_NoLinks)
     return;
 }
 
+TEST(Xjson_Plus_NoLinks)
+{
+    Table table;
+    setup_multi_table(table, 15);
+
+    std::stringstream ss;
+    table.to_json(ss, 0, nullptr, output_mode_xjson_plus);
+
+    CHECK(json_test(ss.str(), "expect_xjson_plus", generate_all));
+    return;
+}
+
 /*
 For tables with links, the link_depth argument in to_json() means following:
 
@@ -482,6 +494,10 @@ TEST(Xjson_LinkList1)
     table1->to_json(ss, 0, nullptr, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_linklist1", generate_all));
 
+    ss.str("");
+    table1->to_json(ss, 0, nullptr, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_linklist1", generate_all));
+
     // Column and table renaming
     std::map<std::string, std::string> m;
     m["str1"] = "STR1";
@@ -490,6 +506,10 @@ TEST(Xjson_LinkList1)
     ss.str("");
     table1->to_json(ss, 2, &m, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_linklist2", generate_all));
+
+    ss.str("");
+    table1->to_json(ss, 2, &m, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
 TEST(Xjson_LinkCycles)
@@ -522,12 +542,20 @@ TEST(Xjson_LinkCycles)
     table1->to_json(ss, 0, nullptr, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_link", generate_all));
 
+    ss.str("");
+    table1->to_json(ss, 0, nullptr, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_link", generate_all));
+
     // Redo but from a TableView instead of the Table.
     auto tv = table1->where().find_all();
     // Now try different link_depth arguments
     ss.str("");
     tv.to_json(ss, 0, nullptr, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_link", generate_all));
+
+    ss.str("");
+    tv.to_json(ss, 0, nullptr, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_link", generate_all));
 }
 
 TEST(Json_Nulls)
