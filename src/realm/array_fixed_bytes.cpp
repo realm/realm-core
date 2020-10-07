@@ -145,10 +145,9 @@ void ArrayFixedBytes<ObjectType, ElementSize>::move(ArrayFixedBytes<ObjectType, 
 }
 
 template <class ObjectType, int ElementSize>
-size_t ArrayFixedBytes<ObjectType, ElementSize>::find_first(const ObjectType& value, size_t start,
-                                                            size_t end) const noexcept
-{
-    auto sz = size();
+size_t ArrayFixedBytes<ObjectType, ElementSize>::find_first(const ObjectType& value, size_t start, size_t end) const
+    noexcept
+ {    auto sz = size();
     if (end == size_t(-1))
         end = sz;
     REALM_ASSERT(start <= sz && end <= sz && start <= end);
