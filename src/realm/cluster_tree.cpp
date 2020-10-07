@@ -235,7 +235,7 @@ T ClusterNodeInner::recurse(ObjKey key, F func)
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw KeyNotFound("Recurse");
+        throw KeyNotFound("Child not found in recurse");
     }
     return recurse<T>(child_info, func);
 }
@@ -368,7 +368,7 @@ size_t ClusterNodeInner::get_ndx(ObjKey key, size_t ndx) const
 {
     ChildInfo child_info;
     if (!find_child(key, child_info)) {
-        throw KeyNotFound("find_child");
+        throw KeyNotFound("Child not found in get_ndx");
     }
 
     // First figure out how many objects there are in nodes before actual one

@@ -113,6 +113,7 @@ for bt in "${BUILD_TYPES[@]}"; do
 
     mkdir -p out
     mv core/librealm-macosx* out
+    mv core/librealm-parser-macosx* out
     if [[ -z $MACOS_ONLY ]]; then
         mv core/librealm-maccatalyst* out
         combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
@@ -126,9 +127,10 @@ rmdir out
 
 function add_to_xcframework() {
     local xcf="$1"
-    local os="$2"
-    local platform="$3"
-    local build_type="$4"
+    local library="$2"
+    local os="$3"
+    local platform="$4"
+    local build_type="$5"
 
     local suffix
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
@@ -142,14 +144,16 @@ function add_to_xcframework() {
 
     # Extract the library from the source tar
     local source_tar="build-${platform}-${build_type}/realm-core-${build_type}-${VERSION}-${platform}-devel.tar.gz"
-    tar -C "$xcf" -zxvf "${source_tar}" "lib/librealm${suffix}.a"
+    tar -C "$xcf" -zxvf "${source_tar}" "lib/$library${suffix}.a"
 
     # Populate the actual directory structure
-    local archs="$(lipo -archs "$xcf/lib/librealm${suffix}.a")"
+    local archs="$(lipo -archs "$xcf/lib/$library${suffix}.a")"
     local dir="$os-$(echo "$archs" | tr ' ' '_')$variant"
     mkdir -p "$xcf/$dir/Headers"
-    mv "$xcf/lib/librealm${suffix}.a" "$xcf/$dir"
-    cp -R core/include/* "$xcf/$dir/Headers"
+    mv "$xcf/lib/$library${suffix}.a" "$xcf/$dir"
+    if [ "$library" = "librealm" ]; then
+        cp -R core/include/* "$xcf/$dir/Headers"
+    fi
 
     # Add this library to the Plist
     cat << EOF >> "$xcf/Info.plist"
@@ -159,7 +163,7 @@ function add_to_xcframework() {
 			<key>LibraryIdentifier</key>
 			<string>$dir</string>
 			<key>LibraryPath</key>
-			<string>librealm$suffix.a</string>
+			<string>$library$suffix.a</string>
 			<key>SupportedArchitectures</key>
 			<array>$(for arch in $archs; do echo "<string>$arch</string>"; done)</array>
 			<key>SupportedPlatform</key>
@@ -175,11 +179,13 @@ EOF
     echo >> "$xcf/Info.plist" '		</dict>'
 }
 
-# Produce xcframeworks
-if [[ -n $BUILD_XCFRAMEWORK ]]; then
+function create_xcframework {
+    local framework="$1"
+    local library="$2"
+
     for bt in "${BUILD_TYPES[@]}"; do
         [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
-        xcf="core/realm-core${suffix}.xcframework"
+        xcf="core/${framework}${suffix}.xcframework"
         rm -rf "$xcf"
         mkdir "$xcf"
 
@@ -191,16 +197,16 @@ if [[ -n $BUILD_XCFRAMEWORK ]]; then
 	<key>AvailableLibraries</key>
 	<array>
 EOF
-        add_to_xcframework "$xcf" "macos" "macosx" "$bt"
+        add_to_xcframework "$xcf" "$library" "macos" "macosx" "$bt"
 
         if [[ -z $MACOS_ONLY ]]; then
-            add_to_xcframework "$xcf" "ios" "iphoneos" "$bt"
-            add_to_xcframework "$xcf" "ios" "iphonesimulator" "$bt"
-            add_to_xcframework "$xcf" "ios" "maccatalyst" "$bt"
-            add_to_xcframework "$xcf" "watchos" "watchos" "$bt"
-            add_to_xcframework "$xcf" "watchos" "watchsimulator" "$bt"
-            add_to_xcframework "$xcf" "tvos" "appletvos" "$bt"
-            add_to_xcframework "$xcf" "tvos" "appletvsimulator" "$bt"
+            add_to_xcframework "$xcf" "$library" "ios" "iphoneos" "$bt"
+            add_to_xcframework "$xcf" "$library" "ios" "iphonesimulator" "$bt"
+            add_to_xcframework "$xcf" "$library" "ios" "maccatalyst" "$bt"
+            add_to_xcframework "$xcf" "$library" "watchos" "watchos" "$bt"
+            add_to_xcframework "$xcf" "$library" "watchos" "watchsimulator" "$bt"
+            add_to_xcframework "$xcf" "$library" "tvos" "appletvos" "$bt"
+            add_to_xcframework "$xcf" "$library" "tvos" "appletvsimulator" "$bt"
         fi
         rmdir "$xcf/lib"
 
@@ -214,6 +220,12 @@ EOF
 </plist>
 EOF
     done
+}
+
+# Produce xcframeworks
+if [[ -n $BUILD_XCFRAMEWORK ]]; then
+    create_xcframework realm-core librealm
+    create_xcframework realm-parser librealm-parser
 fi
 
 # Package artifacts
@@ -230,10 +242,12 @@ if [[ -n $COPY ]]; then
     fi
 else
     rm -f "realm-core-cocoa-${VERSION}.tar.xz"
+    rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
     # .tar.gz package is used by realm-js, which uses the parser
     tar -czvf "realm-core-cocoa-${VERSION}.tar.gz" core
     # .tar.xz package is used by cocoa, which doesn't use the parser
-    tar -cJvf "realm-core-cocoa-${VERSION}.tar.xz" --exclude 'librealm-parser*' core
+    tar -cJvf "realm-core-cocoa-${VERSION}.tar.xz" --exclude "realm-parser*.xcframework" core
+    tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
 
     if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
         rm -f "realm-sync-xcframework-${VERSION}.tar.xz"

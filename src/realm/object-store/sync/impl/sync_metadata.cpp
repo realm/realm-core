@@ -384,8 +384,9 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     return SyncUserMetadata(schema, std::move(realm), std::move(*row));
 }
 
-void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData url, StringData local_uuid,
-                                                    SyncFileActionMetadata::Action action, StringData new_name) const
+void SyncMetadataManager::make_file_action_metadata(StringData original_name, StringData partition_key_value,
+                                                    StringData local_uuid, SyncFileActionMetadata::Action action,
+                                                    StringData new_name) const
 {
     // This function can't use get_shared_realm() because it's called on a
     // background thread and that's currently not supported by the libuv
@@ -405,7 +406,7 @@ void SyncMetadataManager::make_file_action_metadata(StringData original_name, St
 
     obj.set(schema.idx_new_name, new_name);
     obj.set(schema.idx_action, static_cast<int64_t>(action));
-    obj.set(schema.idx_url, url);
+    obj.set(schema.idx_url, partition_key_value);
     obj.set(schema.idx_user_identity, local_uuid);
     transaction.commit();
 }

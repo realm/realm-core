@@ -35,7 +35,7 @@
 namespace realm {
 namespace app {
 
-enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2 };
+enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2, app_deallocated = 3 };
 
 enum class JSONErrorCode { bad_token = 1, malformed_json = 2, missing_json_key = 3, bad_bson_parse = 4 };
 

@@ -46,6 +46,10 @@ TEST(ObjectId_Basics)
     CHECK_GREATER(id2, id1);
     CHECK_LESS(id1, id2);
 
+    const auto id1_bytes = id1.to_bytes();
+    ObjectId id3(id1_bytes);
+    CHECK_EQUAL(id1, id3);
+
     ObjectId id_zeros;
     CHECK(id_zeros == ObjectId("000000000000000000000000"));
 }

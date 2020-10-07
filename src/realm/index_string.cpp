@@ -533,7 +533,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
 
         // Get entry under key
         const size_t pos_refs = pos + 1; // first entry in refs points to offsets
-        const int64_t ref = get_direct(data, width, pos_refs);
+        const uint64_t ref = get_direct(data, width, pos_refs);
 
         if (is_inner_node) {
             // Set vars for next iteration
@@ -549,7 +549,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
 
         // Literal row index (tagged)
         if (ref & 1) {
-            ObjKey k = ObjKey(ref >> 1);
+            ObjKey k(int64_t(ref >> 1));
 
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
@@ -561,12 +561,12 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
             continue;
         }
 
-        const char* const sub_header = m_alloc.translate(to_ref(ref));
+        const char* const sub_header = m_alloc.translate(ref_type(ref));
         const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
-            const IntegerColumn sub(m_alloc, to_ref(ref));
+            const IntegerColumn sub(m_alloc, ref_type(ref));
             from_list_all_ins(upper_value, result, sub, column);
             continue;
         }
@@ -607,11 +607,11 @@ void IndexArray::index_string_all(StringData value, std::vector<ObjKey>& result,
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
-        int64_t ref = get_direct(data, width, pos_refs);
+        uint64_t ref = get_direct(data, width, pos_refs);
 
         if (is_inner_node) {
             // Set vars for next iteration
-            header = m_alloc.translate(to_ref(ref));
+            header = m_alloc.translate(ref_type(ref));
             data = get_data_from_header(header);
             width = get_width_from_header(header);
             is_inner_node = get_is_inner_bptree_node_from_header(header);
@@ -625,7 +625,7 @@ void IndexArray::index_string_all(StringData value, std::vector<ObjKey>& result,
 
         // Literal row index (tagged)
         if (ref & 1) {
-            ObjKey k = ObjKey(ref >> 1);
+            ObjKey k(int64_t(ref >> 1));
 
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
@@ -637,12 +637,12 @@ void IndexArray::index_string_all(StringData value, std::vector<ObjKey>& result,
             return;
         }
 
-        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const char* sub_header = m_alloc.translate(ref_type(ref));
         const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
-            const IntegerColumn sub(m_alloc, to_ref(ref));
+            const IntegerColumn sub(m_alloc, ref_type(ref));
             return from_list_all(value, result, sub, column);
         }
 
@@ -1189,7 +1189,6 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
 
     return true;
 }
-
 
 StringData StringIndex::get(ObjKey key, StringConversionBuffer& buffer) const
 {

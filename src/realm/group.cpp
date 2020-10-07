@@ -316,10 +316,12 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 10)
-        return 10;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 11) {
+        // We are able to open file format 11 in RO mode
+        return 11;
+    }
 
-    return 11;
+    return 20;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -377,7 +379,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 11, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 20, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -385,7 +387,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // DB::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 11,
                     current_file_format_version);
 
 
@@ -507,21 +509,22 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         }
         remove_table(progress_info->get_key());
     }
+
     // If we come from a file format version lower than 10, all objects with primary keys
-    // will be upgraded correctly by the above process
-    if (current_file_format_version == 10 && target_file_format_version >= 11) {
+    // will be upgraded correctly by the above process. In file format 20 we don't have
+    // search index on primary key columns. We need to rebuild the tables to ensure that
+    // the ObjKeys matches the primary key value.
+    if (current_file_format_version > 9 && current_file_format_version < 20 && target_file_format_version >= 20) {
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);
             if (auto col = t->get_primary_key_column()) {
-                if (col.get_type() == col_type_Int) {
-                    // Tables with integer primary keys have to be rebuilt
-                    t->remove_search_index(col);
-                    t->rebuild_table_with_pk_column();
-                }
+                t->remove_search_index(col);
+                t->rebuild_table_with_pk_column();
             }
         }
     }
+
     // NOTE: Additional future upgrade steps go here.
 }
 
@@ -542,8 +545,8 @@ void Group::open(ref_type top_ref, const std::string& file_path)
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 10:
         case 11:
+        case 20:
             file_format_ok = true;
             break;
     }

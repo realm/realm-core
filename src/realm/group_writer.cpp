@@ -164,7 +164,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     , m_durability(dura)
 {
     m_map_windows.reserve(num_map_windows);
-#if REALM_IOS
+#if REALM_PLATFORM_APPLE && REALM_MOBILE
     m_window_alignment = 1 * 1024 * 1024; // 1M
 #else
     if (sizeof(int*) == 4) {                  // 32 bit address space

@@ -60,6 +60,7 @@ class BasicArrayNull;
 struct Link;
 template <class>
 class Lst;
+struct SizeOfList;
 
 template <class T>
 struct ColumnTypeTraits;
@@ -256,6 +257,26 @@ struct ColumnTypeTraits<util::Optional<UUID>> {
     static const ColumnType column_id = col_type_UUID;
 };
 
+template <>
+struct ColumnTypeTraits<SizeOfList> {
+    static const DataType id = type_Int;
+};
+
+template <>
+struct ColumnTypeTraits<int> {
+    static const DataType id = type_Int;
+};
+
+template <>
+struct ColumnTypeTraits<null> {
+    static const DataType id = DataType(-1);
+};
+
+template <typename T>
+struct ObjectTypeTraits {
+    constexpr static bool self_contained_null =
+        realm::is_any_v<T, StringData, BinaryData, Decimal128, Timestamp, Mixed>;
+};
 
 template <typename T>
 using ColumnClusterLeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;

@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
 
 namespace realm {
 
@@ -58,6 +59,22 @@ bool SyncError::is_client_reset_requested() const
             error_code == ProtocolError::bad_client_file_ident || error_code == ProtocolError::bad_server_version ||
             error_code == ProtocolError::diverging_histories || error_code == ProtocolError::client_file_expired ||
             error_code == ProtocolError::invalid_schema_change);
+}
+
+SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
+    : user(std::move(user))
+    , partition_value(partition.to_string())
+{
+}
+SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, std::string partition)
+    : user(std::move(user))
+    , partition_value(std::move(partition))
+{
+}
+SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
+    : user(std::move(user))
+    , partition_value(partition)
+{
 }
 
 } // namespace realm

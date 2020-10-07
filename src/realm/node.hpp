@@ -182,6 +182,11 @@ public:
     {
         return m_ndx_in_parent;
     }
+    bool has_missing_parent_update() const noexcept
+    {
+        return m_missing_parent_update;
+    }
+
     /// Get the ref of this array as known to the parent. The caller must ensure
     /// that the parent information ('pointer to parent' and 'index in parent')
     /// is correct before calling this function.
@@ -243,13 +248,22 @@ public:
         m_ndx_in_parent = ndx;
     }
 
+    void clear_missing_parent_update()
+    {
+        m_missing_parent_update = false;
+    }
+
     /// Update the parents reference to this child. This requires, of course,
     /// that the parent information stored in this child is up to date. If the
     /// parent pointer is set to null, this function has no effect.
     void update_parent()
     {
-        if (m_parent)
+        if (m_parent) {
             m_parent->update_child_ref(m_ndx_in_parent, m_ref);
+        }
+        else {
+            m_missing_parent_update = true;
+        }
     }
 
 protected:
@@ -283,6 +297,28 @@ protected:
             do_copy_on_write();
         }
     }
+    void copy_on_write(size_t min_size)
+    {
+#if REALM_ENABLE_MEMDEBUG
+        // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
+        // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the
+        // m_no_relocation
+        // member)
+        if (!m_no_relocation) {
+#else
+        if (is_read_only()) {
+#endif
+            do_copy_on_write(min_size);
+        }
+    }
+    void ensure_size(size_t min_size)
+    {
+        char* header = get_header_from_data(m_data);
+        size_t orig_capacity_bytes = get_capacity_from_header(header);
+        if (orig_capacity_bytes < min_size) {
+            do_copy_on_write(min_size);
+        }
+    }
 
     static MemRef create_node(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
                               WidthType width_type = wtype_Ignore, int width = 1);
@@ -301,6 +337,7 @@ protected:
 private:
     ArrayParent* m_parent = nullptr;
     size_t m_ndx_in_parent = 0; // Ignored if m_parent is null.
+    bool m_missing_parent_update = false;
 
     void do_copy_on_write(size_t minimum_size = 0);
 };
