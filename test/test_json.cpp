@@ -466,7 +466,7 @@ TEST(Xjson_LinkList1)
     auto k21 = table2->create_object_with_primary_key("t2o2").set(table2Coll, 500).get_key();
     auto k22 = table2->create_object_with_primary_key("t2o3").set(table2Coll, 600).get_key();
 
-    ColKey col_link2 = table1->add_column_link(type_LinkList, "linkA", *table2);
+    ColKey col_link2 = table1->add_column_list(*table2, "linkA");
 
     // set some links
     auto ll0 = obj0.get_linklist(col_link2); // Links to table 2
@@ -509,8 +509,8 @@ TEST(Xjson_LinkCycles)
 
     auto t20 = table2->create_object_with_primary_key("t2o1").set(table2Coll, "foo");
 
-    ColKey col_link1 = table1->add_column_link(type_Link, "linkA", *table2);
-    ColKey col_link2 = table2->add_column_link(type_Link, "linkB", *table1);
+    ColKey col_link1 = table1->add_column(*table2, "linkA");
+    ColKey col_link2 = table2->add_column(*table1, "linkB");
 
     // set some links
     table1->begin()->set(col_link1, t20.get_key());

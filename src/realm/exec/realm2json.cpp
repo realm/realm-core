@@ -11,17 +11,26 @@ const char* legend = "Simple tool to output the JSON representation of a Realm:\
                      " --xjson: Output should be formatted as MongoDB XJSON \n"
                      "\n";
 
-void abort2(bool b, const char* fmt, ...)
+template <typename FormatStr>
+void abort_if(bool cond, FormatStr fmt)
 {
-    if (b) {
-        va_list argv;
-        va_start(argv, fmt);
-        fprintf(stderr, "realm2json: ");
-        vfprintf(stderr, fmt, argv);
-        va_end(argv);
-        fprintf(stderr, "\n");
-        exit(1);
+    if (!cond) {
+        return;
     }
+
+    fputs(fmt, stderr);
+    std::exit(1);
+}
+
+template <typename FormatStr, typename... Args>
+void abort_if(bool cond, FormatStr fmt, Args... args)
+{
+    if (!cond) {
+        return;
+    }
+
+    fprintf(stderr, fmt, args...);
+    std::exit(1);
 }
 
 int main(int argc, char const* argv[])
@@ -30,10 +39,12 @@ int main(int argc, char const* argv[])
     size_t link_depth = 0;
     realm::JSONOutputMode output_mode = realm::output_mode_json;
 
+    abort_if(argc <= 1, legend);
+
     // Parse from 1'st argument until before source args
     for (int a = 1; a < argc - 1; ++a) {
-        abort2(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=',
-               "Please remove space characters before and after '=' signs in command line flags");
+        abort_if(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=',
+                 "Please remove space characters before and after '=' signs in command line flags");
 
         if (strncmp(argv[a], "--link-depth=", 13) == 0)
             link_depth = atoi(&argv[a][13]);
@@ -41,7 +52,7 @@ int main(int argc, char const* argv[])
             output_mode = realm::output_mode_xjson;
         }
         else {
-            abort2(true, "Received unknown option '%s' - please see description below\n\n%s", argv[a], legend);
+            abort_if(true, "Received unknown option '%s' - please see description below\n\n%s", argv[a], legend);
         }
     }
 
