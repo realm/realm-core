@@ -21,37 +21,42 @@
 
 #include "sync/app_service_client.hpp"
 #include <string>
-#include <map>
 
 namespace realm {
+class SyncUser;
+
 namespace app {
 
-class RemoteMongoDatabase;
+class MongoDatabase;
 
 /// A client responsible for communication with the Stitch API
-class RemoteMongoClient {
+class MongoClient {
 public:
-    ~RemoteMongoClient() = default;
-    RemoteMongoClient(const RemoteMongoClient&) = default;
-    RemoteMongoClient(RemoteMongoClient&&) = default;
-    RemoteMongoClient& operator=(const RemoteMongoClient&) = default;
-    RemoteMongoClient& operator=(RemoteMongoClient&&) = default;
+    ~MongoClient() = default;
+    MongoClient(const MongoClient&) = default;
+    MongoClient(MongoClient&&) = default;
+    MongoClient& operator=(const MongoClient&) = default;
+    MongoClient& operator=(MongoClient&&) = default;
 
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase operator[](const std::string& name);
+    MongoDatabase operator[](const std::string& name);
 
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase db(const std::string& name);
+    MongoDatabase db(const std::string& name);
 
 private:
-    friend class App;
+    friend class realm::SyncUser;
 
-    RemoteMongoClient(std::shared_ptr<AppServiceClient> service, std::string service_name)
-    : m_service(service)
-    , m_service_name(service_name) {}
+    MongoClient(std::shared_ptr<SyncUser> user, std::shared_ptr<AppServiceClient> service, std::string service_name)
+        : m_user(std::move(user))
+        , m_service(std::move(service))
+        , m_service_name(std::move(service_name))
+    {
+    }
 
+    std::shared_ptr<SyncUser> m_user;
     std::shared_ptr<AppServiceClient> m_service;
     std::string m_service_name;
 };

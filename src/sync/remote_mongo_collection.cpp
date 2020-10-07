@@ -41,7 +41,7 @@ static void handle_delete_count_response(util::Optional<AppError> error,
 
 static void handle_update_response(util::Optional<AppError> error,
                                    util::Optional<bson::Bson> value,
-                                   std::function<void(RemoteMongoCollection::RemoteUpdateResult,
+                                   std::function<void(MongoCollection::UpdateResult,
                                                       util::Optional<AppError>)> completion_block)
 {
 
@@ -60,7 +60,7 @@ static void handle_update_response(util::Optional<AppError> error,
             upserted_id = static_cast<ObjectId>(document["upsertedId"]);
         }
 
-        return completion_block(RemoteMongoCollection::RemoteUpdateResult {
+        return completion_block(MongoCollection::UpdateResult {
             matched_count,
             modified_count,
             upserted_id
@@ -92,9 +92,9 @@ static void handle_document_response(util::Optional<AppError> error,
                             util::none);
 }
 
-void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
-                                 RemoteFindOptions options,
-                                 std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find(const bson::BsonDocument& filter_bson,
+                           FindOptions options,
+                           std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -112,7 +112,8 @@ void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
             base_args["sort"] = *options.sort_bson;
         }
 
-        m_service->call_function("find",
+        m_service->call_function(m_user,
+                                 "find",
                                  bson::BsonArray({base_args}),
                                  m_service_name,
                                  [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -127,15 +128,15 @@ void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
     }
 }
 
-void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
-                                 std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find(const bson::BsonDocument& filter_bson,
+                           std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
     find(filter_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
-                                     RemoteFindOptions options,
-                                     std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one(const bson::BsonDocument& filter_bson,
+                               FindOptions options,
+                               std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -153,7 +154,8 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
             base_args["sort"] = *options.sort_bson;
         }
 
-        m_service->call_function("findOne",
+        m_service->call_function(m_user,
+                                 "findOne",
                                  bson::BsonArray({base_args}),
                                  m_service_name,
                                  [completion_block](util::Optional<AppError> error,
@@ -166,20 +168,21 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
     }
 }
 
-void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
-                                     std::function<void(util::Optional<bson::BsonDocument>,
-                                                        util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one(const bson::BsonDocument& filter_bson,
+                               std::function<void(util::Optional<bson::BsonDocument>,
+                                                  util::Optional<AppError>)> completion_block)
 {
     find_one(filter_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::insert_one(const bson::BsonDocument& value_bson,
-                                       std::function<void(util::Optional<bson::Bson>, util::Optional<AppError>)> completion_block)
+void MongoCollection::insert_one(const bson::BsonDocument& value_bson,
+                                 std::function<void(util::Optional<bson::Bson>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["document"] = value_bson;
 
-    m_service->call_function("insertOne",
+    m_service->call_function(m_user,
+                             "insertOne",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -189,17 +192,19 @@ void RemoteMongoCollection::insert_one(const bson::BsonDocument& value_bson,
 
         auto document = static_cast<bson::BsonDocument>(*value);
 
-        return completion_block(document["insertedId"], util::none);
+        return completion_block(document["insertedId"],
+                                util::none);
     });
 }
 
-void RemoteMongoCollection::aggregate(const bson::BsonArray& pipline,
-                                      std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
+void MongoCollection::aggregate(const bson::BsonArray& pipline,
+                                std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["pipeline"] = pipline;
 
-    m_service->call_function("aggregate",
+    m_service->call_function(m_user,
+                             "aggregate",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -211,9 +216,9 @@ void RemoteMongoCollection::aggregate(const bson::BsonArray& pipline,
     });
 }
 
-void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
-                                  int64_t limit,
-                                  std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
+void MongoCollection::count(const bson::BsonDocument& filter_bson,
+                            int64_t limit,
+                            std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
@@ -222,7 +227,8 @@ void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
         base_args["limit"] = limit;
     }
 
-    m_service->call_function("count",
+    m_service->call_function(m_user,
+                             "count",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -234,40 +240,41 @@ void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
     });
 }
 
-void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
-                                  std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
+void MongoCollection::count(const bson::BsonDocument& filter_bson,
+                            std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     count(filter_bson, 0, completion_block);
 }
 
-void RemoteMongoCollection::insert_many(bson::BsonArray documents,
-                                        std::function<void(std::vector<bson::Bson>,
-                                                           util::Optional<AppError>)> completion_block)
+void MongoCollection::insert_many(bson::BsonArray documents,
+                                  std::function<void(std::vector<bson::Bson>,
+                                                     util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["documents"] = documents;
 
-    m_service->call_function("insertMany",
+    m_service->call_function(m_user,
+                             "insertMany",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
         if (error) {
             return completion_block({}, error);
         }
-
         auto bson = static_cast<bson::BsonDocument>(*value);
         auto inserted_ids = static_cast<bson::BsonArray>(bson["insertedIds"]);
         return completion_block(std::vector<bson::Bson>(inserted_ids.begin(), inserted_ids.end()), error);
     });
 }
 
-void RemoteMongoCollection::delete_one(const bson::BsonDocument& filter_bson,
-                                       std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
+void MongoCollection::delete_one(const bson::BsonDocument& filter_bson,
+                                 std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
 
-    m_service->call_function("deleteOne",
+    m_service->call_function(m_user,
+                             "deleteOne",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -275,13 +282,14 @@ void RemoteMongoCollection::delete_one(const bson::BsonDocument& filter_bson,
     });
 }
 
-void RemoteMongoCollection::delete_many(const bson::BsonDocument& filter_bson,
-                                        std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
+void MongoCollection::delete_many(const bson::BsonDocument& filter_bson,
+                                  std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
 
-    m_service->call_function("deleteMany",
+    m_service->call_function(m_user,
+                             "deleteMany",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -289,18 +297,19 @@ void RemoteMongoCollection::delete_many(const bson::BsonDocument& filter_bson,
     });
 }
 
-void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
-                                       const bson::BsonDocument& update_bson,
-                                       bool upsert,
-                                       std::function<void(RemoteMongoCollection::RemoteUpdateResult,
-                                                          util::Optional<AppError>)> completion_block)
+void MongoCollection::update_one(const bson::BsonDocument& filter_bson,
+                                 const bson::BsonDocument& update_bson,
+                                 bool upsert,
+                                 std::function<void(MongoCollection::UpdateResult,
+                                                    util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
     base_args["update"] = update_bson;
     base_args["upsert"] = upsert;
 
-    m_service->call_function("updateOne",
+    m_service->call_function(m_user,
+                             "updateOne",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -308,26 +317,27 @@ void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
     });
 }
 
-void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
-                                       const bson::BsonDocument& update_bson,
-                                       std::function<void(RemoteMongoCollection::RemoteUpdateResult,
-                                                          util::Optional<AppError>)> completion_block)
+void MongoCollection::update_one(const bson::BsonDocument& filter_bson,
+                                 const bson::BsonDocument& update_bson,
+                                 std::function<void(MongoCollection::UpdateResult,
+                                                    util::Optional<AppError>)> completion_block)
 {
     update_one(filter_bson, update_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
-                                        const bson::BsonDocument& update_bson,
-                                        bool upsert,
-                                        std::function<void(RemoteMongoCollection::RemoteUpdateResult,
-                                                           util::Optional<AppError>)> completion_block)
+void MongoCollection::update_many(const bson::BsonDocument& filter_bson,
+                                  const bson::BsonDocument& update_bson,
+                                  bool upsert,
+                                  std::function<void(MongoCollection::UpdateResult,
+                                                     util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["query"] = filter_bson;
     base_args["update"] = update_bson;
     base_args["upsert"] = upsert;
 
-    m_service->call_function("updateMany",
+    m_service->call_function(m_user,
+                             "updateMany",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -335,24 +345,25 @@ void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
     });
 }
 
-void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
-                                        const bson::BsonDocument& update_bson,
-                                        std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
+void MongoCollection::update_many(const bson::BsonDocument& filter_bson,
+                                  const bson::BsonDocument& update_bson,
+                                  std::function<void(MongoCollection::UpdateResult, util::Optional<AppError>)> completion_block)
 {
     update_many(filter_bson, update_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
-                                                const bson::BsonDocument& update_bson,
-                                                RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
+                                          const bson::BsonDocument& update_bson,
+                                          MongoCollection::FindOneAndModifyOptions options,
+                                          std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["filter"] = filter_bson;
     base_args["update"] = update_bson;
     options.set_bson(base_args);
 
-    m_service->call_function("findOneAndUpdate",
+    m_service->call_function(m_user,
+                             "findOneAndUpdate",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -360,24 +371,25 @@ void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter
     });
 }
 
-void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
-                                                const bson::BsonDocument& update_bson,
-                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
+                                          const bson::BsonDocument& update_bson,
+                                          std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_update(filter_bson, update_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
-                                                 const bson::BsonDocument& replacement_bson,
-                                                 RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                 std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
+                                           const bson::BsonDocument& replacement_bson,
+                                           MongoCollection::FindOneAndModifyOptions options,
+                                           std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["filter"] = filter_bson;
     base_args["update"] = replacement_bson;
     options.set_bson(base_args);
 
-    m_service->call_function("findOneAndReplace",
+    m_service->call_function(m_user,
+                             "findOneAndReplace",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -385,22 +397,23 @@ void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filte
     });
 }
 
-void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
-                                                 const bson::BsonDocument& replacement_bson,
-                                                 std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
+                                           const bson::BsonDocument& replacement_bson,
+                                           std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_replace(filter_bson, replacement_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
-                                                RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
+                                          MongoCollection::FindOneAndModifyOptions options,
+                                          std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["filter"] = filter_bson;
     options.set_bson(base_args);
 
-    m_service->call_function("findOneAndDelete",
+    m_service->call_function(m_user,
+                             "findOneAndDelete",
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -408,8 +421,8 @@ void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter
     });
 }
 
-void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
-                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+void MongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
+                                          std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_delete(filter_bson, {}, completion_block);
 }

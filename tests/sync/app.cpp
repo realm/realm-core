@@ -24,6 +24,7 @@
 #include "sync/async_open_task.hpp"
 #include "sync/remote_mongo_client.hpp"
 #include "sync/remote_mongo_database.hpp"
+#include "sync/remote_mongo_collection.hpp"
 #include "sync/sync_session.hpp"
 
 #include "util/event_loop.hpp"
@@ -987,7 +988,22 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     TestSyncManager sync_manager({ .app_config = config });
     auto app = sync_manager.app();
 
-    auto remote_client = app->remote_mongo_client("BackingDB");
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    app->provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error);
+                    });
+
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        REQUIRE(user);
+        CHECK(!error);
+    });
+
+    auto remote_client = app->current_user()->mongo_client("BackingDB");
     auto db = remote_client.db("test_data");
     auto dog_collection = db["Dog"];
     auto person_collection = db["Person"];
@@ -1024,23 +1040,6 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     bson::BsonDocument bad_document {
         {"bad", "value"}
     };
-
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = random_string(10);
-    bool loginOk = false;
-    app->provider_client<App::UsernamePasswordProviderClient>()
-    .register_email(email,
-                    password,
-                    [&](Optional<app::AppError> error) {
-                        CHECK(!error);
-                    });
-
-    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-        REQUIRE(user);
-        CHECK(!error);
-        loginOk = true;
-    });
 
     dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
@@ -1177,7 +1176,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK((*documents).size() == 1);
         });
 
-        realm::app::RemoteMongoCollection::RemoteFindOptions options {
+        realm::app::MongoCollection::FindOptions options {
             2, //document limit
             util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), //project
             util::Optional<bson::BsonDocument>({{"breed", 1}}) //sort
@@ -1323,7 +1322,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 
         bool processed = false;
 
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+        realm::app::MongoCollection::FindOneAndModifyOptions find_and_modify_options {
             util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
@@ -1377,14 +1376,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         dog_collection.update_one(dog_document,
                               dog_document2,
                               true,
-                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+                              [&](realm::app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*result.upserted_id).to_string() != "");
         });
 
         dog_collection.update_one(dog_document2,
                               dog_document,
-                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+                              [&](realm::app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!result.upserted_id);
         });
@@ -1395,7 +1394,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         person_collection.update_one(person_document,
                               person_document,
                               true,
-                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult, Optional<app::AppError> error) {
+                              [&](realm::app::MongoCollection::UpdateResult, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
@@ -1412,12 +1411,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK((*object_id).to_string() != "");
         });
 
-        dog_collection.update_many(dog_document2, dog_document, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+        dog_collection.update_many(dog_document2, dog_document, true, [&](realm::app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*result.upserted_id).to_string() != "");
         });
 
-        dog_collection.update_many(dog_document2, dog_document, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+        dog_collection.update_many(dog_document2, dog_document, [&](realm::app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!result.upserted_id);
             processed = true;
@@ -1431,7 +1430,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         ObjectId dog_object_id;
         ObjectId person_object_id;
 
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+        realm::app::MongoCollection::FindOneAndModifyOptions find_and_modify_options {
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
@@ -1478,7 +1477,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             person_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions person_find_and_modify_options {
+        realm::app::MongoCollection::FindOneAndModifyOptions person_find_and_modify_options {
             util::Optional<bson::BsonDocument>({{"firstName", 1}}), //project
             util::Optional<bson::BsonDocument>({{"firstName", 1}}), //sort,
             false, //upsert
@@ -1539,7 +1538,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                    CHECK(inserted_docs.size() == 3);
                                });
 
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+        realm::app::MongoCollection::FindOneAndModifyOptions find_and_modify_options {
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert

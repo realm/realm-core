@@ -19,22 +19,23 @@
 #ifndef REMOTE_MONGO_DATABASE_HPP
 #define REMOTE_MONGO_DATABASE_HPP
 
-#include "sync/remote_mongo_collection.hpp"
 #include <json.hpp>
 #include <string>
 
 namespace realm {
+class SyncUser;
 namespace app {
 
 class AppServiceClient;
+class MongoCollection;
 
-class RemoteMongoDatabase {
+class MongoDatabase {
 public:
-    ~RemoteMongoDatabase() = default;
-    RemoteMongoDatabase(const RemoteMongoDatabase&) = default;
-    RemoteMongoDatabase(RemoteMongoDatabase&&) = default;
-    RemoteMongoDatabase& operator=(const RemoteMongoDatabase&) = default;
-    RemoteMongoDatabase& operator=(RemoteMongoDatabase&&) = default;
+    ~MongoDatabase() = default;
+    MongoDatabase(const MongoDatabase&) = default;
+    MongoDatabase(MongoDatabase&&) = default;
+    MongoDatabase& operator=(const MongoDatabase&) = default;
+    MongoDatabase& operator=(MongoDatabase&&) = default;
 
     /// The name of this database
     const std::string& name() const
@@ -45,24 +46,29 @@ public:
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection collection(const std::string& collection_name);
+    MongoCollection collection(const std::string& collection_name);
 
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection operator[](const std::string& collection_name);
+    MongoCollection operator[](const std::string& collection_name);
 
 private:
-    RemoteMongoDatabase(std::string name,
-                        std::shared_ptr<AppServiceClient> service,
-                        std::string service_name)
-    : m_name(name)
-    , m_service(service)
-    , m_service_name(service_name) { };
+    MongoDatabase(std::string name, 
+                  std::shared_ptr<SyncUser> user,
+                  std::shared_ptr<AppServiceClient> service,
+                  std::string service_name)
+    : m_name(std::move(name))
+    , m_user(std::move(user))
+    , m_service(std::move(service))
+    , m_service_name(std::move(service_name))
+    {
+    }
 
-    friend class RemoteMongoClient;
+    friend class MongoClient;
 
     std::string m_name;
+    std::shared_ptr<SyncUser> m_user;
     std::shared_ptr<AppServiceClient> m_service;
     std::string m_service_name;
 };

@@ -39,15 +39,11 @@ namespace app {
 
 class App;
 
-class RemoteMongoClient;
 typedef std::shared_ptr<App> SharedApp;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
 /// This class provides access to login and authentication.
-///
-/// Using `remote_mongo_client`, you can retrieve `RemoteMongoClient` for reading
-/// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
 class App : public std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient {
@@ -290,10 +286,6 @@ public:
     T provider_client() {
         return T(this);
     }
-
-    /// Retrieves a general-purpose service client for the Realm Cloud service
-    /// @param service_name The name of the cluster
-    RemoteMongoClient remote_mongo_client(const std::string& service_name);
 
     void call_function(std::shared_ptr<SyncUser> user,
                        const std::string& name,

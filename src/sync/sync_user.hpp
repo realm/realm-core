@@ -37,10 +37,12 @@
 namespace realm {
 namespace app {
     struct AppError;
+    class MongoClient;
 } // namespace app
 
 class SyncSession;
 class SyncManager;
+
 // A superclass that bindings can inherit from in order to store information
 // upon a `SyncUser` object.
 class SyncUserContext {
@@ -230,6 +232,11 @@ public:
     {
         return m_sync_manager;
     }
+
+    /// Retrieves a general-purpose service client for the Realm Cloud service
+    /// @param service_name The name of the cluster
+    app::MongoClient mongo_client(const std::string& service_name);
+
 private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;

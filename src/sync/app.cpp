@@ -21,13 +21,13 @@
 #include "realm/util/base64.hpp"
 #include "realm/util/uri.hpp"
 #include "sync/app_credentials.hpp"
+#include "sync/app_utils.hpp"
 #include "sync/generic_network_transport.hpp"
-#include "sync/sync_manager.hpp"
 #include "sync/impl/sync_client.hpp"
 #include "sync/impl/sync_file.hpp"
-#include "sync/remote_mongo_client.hpp"
-#include "sync/app_utils.hpp"
 #include "sync/impl/sync_metadata.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_user.hpp"
 
 #include <json.hpp>
 #include <string>
@@ -1139,11 +1139,6 @@ Request App::make_streaming_request(std::shared_ptr<SyncUser> user,
         m_request_timeout_ms,
         {{"Accept", "text/event-stream"}},
     };
-}
-
-RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
-{
-    return RemoteMongoClient(shared_from_this(), service_name);
 }
 
 PushClient App::push_notification_client(const std::string& service_name)

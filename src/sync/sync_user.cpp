@@ -21,6 +21,7 @@
 #include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
+#include "sync/remote_mongo_client.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 
@@ -404,6 +405,11 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
         case State::Removed:
             break;
     }
+}
+
+app::MongoClient SyncUser::mongo_client(const std::string& service_name)
+{
+    return app::MongoClient(shared_from_this(), m_sync_manager->app().lock(), service_name);
 }
 
 void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
