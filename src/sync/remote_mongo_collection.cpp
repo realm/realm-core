@@ -174,7 +174,7 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
 }
 
 void RemoteMongoCollection::insert_one(const bson::BsonDocument& value_bson,
-                                       std::function<void(util::Optional<ObjectId>, util::Optional<AppError>)> completion_block)
+                                       std::function<void(util::Optional<bson::Bson>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["document"] = value_bson;
@@ -189,8 +189,7 @@ void RemoteMongoCollection::insert_one(const bson::BsonDocument& value_bson,
 
         auto document = static_cast<bson::BsonDocument>(*value);
 
-        return completion_block(static_cast<ObjectId>(document["insertedId"]),
-                                util::none);
+        return completion_block(document["insertedId"], util::none);
     });
 }
 
@@ -242,7 +241,7 @@ void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
 }
 
 void RemoteMongoCollection::insert_many(bson::BsonArray documents,
-                                        std::function<void(std::vector<ObjectId>,
+                                        std::function<void(std::vector<bson::Bson>,
                                                            util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
@@ -258,7 +257,7 @@ void RemoteMongoCollection::insert_many(bson::BsonArray documents,
 
         auto bson = static_cast<bson::BsonDocument>(*value);
         auto inserted_ids = static_cast<bson::BsonArray>(bson["insertedIds"]);
-        return completion_block(std::vector<ObjectId>(inserted_ids.begin(), inserted_ids.end()), error);
+        return completion_block(std::vector<bson::Bson>(inserted_ids.begin(), inserted_ids.end()), error);
     });
 }
 

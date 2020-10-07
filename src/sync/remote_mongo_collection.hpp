@@ -162,14 +162,14 @@ public:
     /// @param value_bson  A `Document` value to insert.
     /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the inserted object on sucess
     void insert_one(const bson::BsonDocument& value_bson,
-                    std::function<void(util::Optional<ObjectId>, util::Optional<AppError>)> completion_block);
+                    std::function<void(util::Optional<bson::Bson>, util::Optional<AppError>)> completion_block);
 
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
     /// @param documents  The `Document` values in a bson array to insert.
     /// @param completion_block The result of the insert, returns an array inserted document ids in order
     void insert_many(bson::BsonArray documents,
-                     std::function<void(std::vector<ObjectId>, util::Optional<AppError>)> completion_block);
+                     std::function<void(std::vector<bson::Bson>, util::Optional<AppError>)> completion_block);
 
     /// Deletes a single matching document from the collection.
     /// @param filter_bson A `Document` as bson that should match the query.
