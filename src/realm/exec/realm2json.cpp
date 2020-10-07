@@ -2,14 +2,18 @@
 #include <iostream>
 #include <realm/history.hpp>
 
-const char* legend = "Simple tool to output the JSON representation of a Realm:\n"
-                     "  realm2json [--link-depth=N] [--xjson] <.realm file>\n"
-                     "\n"
-                     "Options:\n"
-                     " --link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
-                     "for more details. Defaults to 0.\n"
-                     " --xjson: Output should be formatted as MongoDB XJSON \n"
-                     "\n";
+const char* legend =
+    "Simple tool to output the JSON representation of a Realm:\n"
+    "  realm2json [--link-depth N] [--output-mode N] <.realm file>\n"
+    "\n"
+    "Options:\n"
+    " --link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
+    "for more details. Defaults to 0.\n"
+    " --output-mode: Optional formatting for the output \n"
+    "      0 - JSON Object\n"
+    "      1 - MongoDB Extended JSON (XJSON)\n"
+    "      2 - An extension of XJSON that adds wrappers for embdded objects, links, dictionaries, etc\n"
+    "\n";
 
 template <typename FormatStr>
 void abort_if(bool cond, FormatStr fmt)
@@ -42,17 +46,32 @@ int main(int argc, char const* argv[])
     abort_if(argc <= 1, legend);
 
     // Parse from 1'st argument until before source args
-    for (int a = 1; a < argc - 1; ++a) {
-        abort_if(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=',
-                 "Please remove space characters before and after '=' signs in command line flags");
+    for (int idx = 1; idx < argc - 1; ++idx) {
+        realm::StringData arg(argv[idx]);
+        if (arg == "--link-depth") {
+            link_depth = strtol(argv[++idx], nullptr, 0);
+        }
+        else if (arg == "--output-mode") {
+            auto output_mode_val = strtol(argv[++idx], nullptr, 0);
+            abort_if(output_mode_val > 2, "Received unknown value for output_mode option: %d", output_mode_val);
 
-        if (strncmp(argv[a], "--link-depth=", 13) == 0)
-            link_depth = atoi(&argv[a][13]);
-        else if (strncmp(argv[a], "--xjson", 7) == 0) {
-            output_mode = realm::output_mode_xjson;
+            switch (output_mode_val) {
+                case 0: {
+                    output_mode = realm::output_mode_json;
+                    break;
+                }
+                case 1: {
+                    output_mode = realm::output_mode_xjson;
+                    break;
+                }
+                case 2: {
+                    output_mode = realm::output_mode_xjson_plus;
+                    break;
+                }
+            }
         }
         else {
-            abort_if(true, "Received unknown option '%s' - please see description below\n\n%s", argv[a], legend);
+            abort_if(true, "Received unknown option '%s' - please see description below\n\n%s", argv[idx], legend);
         }
     }
 
