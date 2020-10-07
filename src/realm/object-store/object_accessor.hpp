@@ -357,7 +357,8 @@ ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& t
     }
     if (primary_prop.type == PropertyType::ObjectId) {
         if (is_nullable(primary_prop.type)) {
-            return table.find_first(primary_prop.column_key, ctx.template unbox<util::Optional<ObjectId>>(primary_value));
+            return table.find_first(primary_prop.column_key,
+                                    ctx.template unbox<util::Optional<ObjectId>>(primary_value));
         }
         return table.find_first(primary_prop.column_key, ctx.template unbox<ObjectId>(primary_value));
     }
