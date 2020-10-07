@@ -1519,9 +1519,9 @@ public:
     using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
     using BaseType = FixedBytesNodeBase<ObjectType, ArrayType>;
 
-    void init() override
+    void init(bool will_query_ranges) override
     {
-        BaseType::init();
+        BaseType::init(will_query_ranges);
 
         if (!this->m_value_is_null) {
             m_optional_value = this->m_value;
