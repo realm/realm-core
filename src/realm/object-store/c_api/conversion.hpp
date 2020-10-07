@@ -31,7 +31,10 @@ static inline realm_string_t to_capi(const std::string& str)
 
 static inline std::string capi_to_std(realm_string_t str)
 {
-    return std::string{str.data, 0, str.size};
+    if (str.data) {
+        return std::string{str.data, 0, str.size};
+    }
+    return std::string{};
 }
 
 static inline StringData from_capi(realm_string_t str)
