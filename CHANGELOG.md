@@ -14,7 +14,7 @@
 -----------
 
 ### Internals
-* None.
+* Uses OpenSSL version 1.1.1g. The prebuilt openssl libraries now have .tar.gz extension instead of .tgz.
 
 ----------------------------------------------
 
