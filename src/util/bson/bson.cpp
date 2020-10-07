@@ -339,6 +339,20 @@ bool holds_alternative<MongoTimestamp>(const Bson& bson)
     return bson.m_type == Bson::Type::Timestamp;
 }
 
+struct PrecisionGuard {
+    PrecisionGuard(std::ostream& stream, std::streamsize new_precision)
+        : stream(stream)
+        , old_precision(stream.precision(new_precision))
+        {}
+
+    ~PrecisionGuard() {
+        stream.precision(old_precision);
+    }
+
+    std::ostream& stream;
+    std::streamsize old_precision;
+};
+
 std::ostream& operator<<(std::ostream& out, const Bson& b)
 {
     switch (b.type()) {
@@ -364,6 +378,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             } else if (d == (-1 * std::numeric_limits<double>::infinity())) {
                 out << "-Infinity";
             } else {
+                PrecisionGuard precision_guard(out, std::numeric_limits<double>::max_digits10);
                 out << d;
             }
             out << '"' << "}";
