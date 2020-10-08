@@ -243,6 +243,9 @@ public:
 
     void assign_pk_and_backlinks(const Obj& other);
 
+    template <typename U>
+    U _get(ColKey::Idx col_ndx) const;
+
 private:
     friend class ArrayBacklink;
     friend class CascadeState;
@@ -282,9 +285,6 @@ private:
     TableRef get_target_table(ColKey col_key) const;
     TableRef get_target_table(ObjLink link) const;
     const Spec& get_spec() const;
-
-    template <typename U>
-    U _get(ColKey::Idx col_ndx) const;
 
     template <class T>
     int cmp(const Obj& other, ColKey::Idx col_ndx) const;
