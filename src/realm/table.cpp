@@ -2513,6 +2513,8 @@ void Table::verify() const
         m_top.verify();
     m_spec.verify();
     m_clusters.verify();
+    if (nb_unresolved())
+        m_tombstones->verify();
 #endif
 }
 
@@ -3011,7 +3013,9 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
 
 void Table::dump_objects()
 {
-    return m_clusters.dump_objects();
+    m_clusters.dump_objects();
+    if (nb_unresolved())
+        m_tombstones->dump_objects();
 }
 
 void Table::remove_object(ObjKey key)
