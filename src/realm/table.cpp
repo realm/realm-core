@@ -2327,6 +2327,9 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         else {
             m_is_embedded = false;
         }
+        if (m_tombstones)
+            m_tombstones->update_from_parent(old_baseline);
+
         refresh_content_version();
         m_has_any_embedded_objects.reset();
     }
@@ -2449,6 +2452,8 @@ void Table::refresh_accessor_tree()
     else {
         m_is_embedded = false;
     }
+    if (m_tombstones)
+        m_tombstones->init_from_parent();
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
