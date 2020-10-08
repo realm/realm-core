@@ -1883,7 +1883,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                                   << "null";
                     }
                     else {
-                        std::cout << ", " << arr.get(i);
+                        std::cout << ", " << *arr.get(i);
                     }
                     break;
                 }
