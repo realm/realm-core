@@ -201,7 +201,7 @@ void ArrayBacklink::verify() const
                 REALM_ASSERT(src_obj.get_list<ObjKey>(src_col_key).find_first(target_key) != npos);
             }
             else {
-                REALM_ASSERT(src_obj.get<ObjKey>(src_col_key) == target_key);
+                REALM_ASSERT(src_obj.get_unfiltered_link(src_col_key) == target_key);
             }
         }
     }
