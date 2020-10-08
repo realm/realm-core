@@ -168,6 +168,15 @@ typedef enum realm_errno {
     RLM_ERR_OUT_OF_MEMORY,
     RLM_ERR_NOT_CLONABLE,
 
+    RLM_ERR_INVALIDATED_OBJECT,
+    RLM_ERR_INVALID_PROPERTY,
+    RLM_ERR_MISSING_PROPERTY_VALUE,
+    RLM_ERR_PROPERTY_TYPE_MISMATCH,
+    RLM_ERR_MISSING_PRIMARY_KEY,
+    RLM_ERR_WRONG_PRIMARY_KEY_TYPE,
+    RLM_ERR_MODIFY_PRIMARY_KEY,
+    RLM_ERR_READ_ONLY_PROPERTY,
+    RLM_ERR_PROPERTY_NOT_NULLABLE,
     RLM_ERR_INVALID_ARGUMENT,
 
     RLM_ERR_LOGIC,
@@ -338,6 +347,8 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  * @return True if an error occurred.
  */
 RLM_API bool realm_get_last_error(realm_error_t* err);
+
+RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
 /**
  * Rethrow the last exception.
@@ -680,6 +691,20 @@ RLM_API bool realm_find_property_by_public_name(const realm_t*, realm_table_key_
                                                 realm_property_info_t* out_property_info);
 
 /**
+ * Find the primary key property for a class, if it has one.
+ *
+ * @param class_key The table key for this class.
+ * @param out_found Will be set to true if the property was found. May not be
+ *                  NULL.
+ * @param out_property_info A property to a `realm_property_info_t` that will be
+ *                          populated with information about the property, if it
+ *                          was found. May be NULL.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_find_primary_key_property(const realm_t*, realm_table_key_t class_key, bool* out_found,
+                                             realm_property_info_t* out_property_info);
+
+/**
  * Get the number of objects in a table (class).
  *
  * @param out_count A pointer to a `size_t` that will contain the number of
@@ -705,7 +730,7 @@ RLM_API realm_object_t* realm_get_object(const realm_t*, realm_table_key_t class
  *                  no error occurred.
  * @return A non-NULL pointer if the object was found and no exception occurred.
  */
-RLM_API realm_object_t* realm_find_object_with_primary_key(const realm_t*, realm_table_key_t, realm_value_t pk,
+RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t*, realm_table_key_t, realm_value_t pk,
                                                            bool* out_found);
 
 /**
@@ -822,9 +847,12 @@ RLM_API realm_list_t* _realm_list_from_native_move(void* plist, size_t n);
 /**
  * Get the size of a list, in number of elements.
  *
- * This function cannot fail.
+ * This function may fail if the object owning the list has been deleted.
+ *
+ * @param out_size Where to put the list size. May be NULL.
+ * @return True if no exception occurred.
  */
-RLM_API size_t realm_list_size(const realm_list_t*);
+RLM_API bool realm_list_size(const realm_list_t*, size_t* out_size);
 
 /**
  * Get the property that this list came from.
@@ -931,10 +959,31 @@ RLM_API void realm_collection_changes_get_num_changes(const realm_collection_cha
                                                       size_t* out_num_insertions, size_t* out_num_modifications,
                                                       size_t* out_num_moves);
 
+/**
+ * Get the number of various types of changes in a collection notification,
+ * suitable for acquiring the change indices as ranges, which is much more
+ * compact in memory than getting the individual indices when multiple adjacent
+ * elements have been modified.
+ *
+ * @param out_num_deletions The number of deletions. May be NULL.
+ * @param out_num_insertions The number of insertions. May be NULL.
+ * @param out_num_modifications The number of modifications. May be NULL.
+ * @param out_num_moves The number of moved elements. May be NULL.
+ */
+RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_changes_t*,
+                                                     size_t* out_num_deletion_ranges,
+                                                     size_t* out_num_insertion_ranges,
+                                                     size_t* out_num_modification_ranges, size_t* out_num_moves);
+
 typedef struct realm_collection_move {
     size_t from;
     size_t to;
 } realm_collection_move_t;
+
+typedef struct realm_index_range {
+    size_t from;
+    size_t to;
+} realm_index_range_t;
 
 /**
  * Get the indices of changes in a collection notification.
@@ -975,6 +1024,14 @@ RLM_API void realm_collection_changes_get_changes(const realm_collection_changes
                                                   size_t max_modification_indices_after,
                                                   realm_collection_move_t* out_moves, size_t max_moves);
 
+RLM_API void realm_collection_changes_get_ranges(const realm_collection_changes_t*, size_t* out_deletion_ranges,
+                                                 size_t max_deletion_ranges, size_t* out_insertion_ranges,
+                                                 size_t max_insertion_ranges, size_t* out_modification_ranges,
+                                                 size_t max_modification_ranges,
+                                                 size_t* out_modification_ranges_after,
+                                                 size_t max_modification_ranges_after,
+                                                 realm_collection_move_t* out_moves, size_t max_moves);
+
 RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
 RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
 RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_col_key_t);
@@ -994,10 +1051,8 @@ RLM_API realm_dictionary_t* _realm_dictionary_from_native_copy(const void* pdict
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_move(void* pdict, size_t n);
 RLM_API realm_dictionary_t* realm_get_dictionary(const realm_object_t*, realm_col_key_t);
 RLM_API size_t realm_dictionary_size(const realm_dictionary_t*);
-RLM_API bool realm_dictionary_get(const realm_dictionary_t*, realm_value_t* key, realm_value_t* value,
+RLM_API bool realm_dictionary_get(const realm_dictionary_t*, realm_value_t key, realm_value_t* out_value,
                                   bool* out_found);
-RLM_API bool realm_dictionary_find(const realm_dictionary_t*, realm_value_t key, realm_value_t* out_value,
-                                   bool* out_found);
 RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, realm_value_t value, bool* out_inserted,
                                      size_t* out_index);
 RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool* out_erased);
@@ -1107,6 +1162,11 @@ RLM_API bool realm_results_min(const realm_results_t*, realm_col_key_t, realm_va
 RLM_API bool realm_results_max(const realm_results_t*, realm_col_key_t, realm_value_t* out_max);
 RLM_API bool realm_results_sum(const realm_results_t*, realm_col_key_t, realm_value_t* out_sum);
 RLM_API bool realm_results_average(const realm_results_t*, realm_col_key_t, realm_value_t* out_average);
+
+RLM_API realm_notification_token_t*
+realm_results_add_notification_callback(realm_results_t*, void* userdata, realm_free_userdata_func_t,
+                                        realm_before_collection_change_func_t, realm_after_collection_change_func_t,
+                                        realm_callback_error_func_t, realm_scheduler_t*);
 
 #if defined(RLM_ENABLE_OBJECT_ACCESSOR_API)
 /**

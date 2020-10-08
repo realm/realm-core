@@ -40,6 +40,41 @@ struct ImmutableException : std::exception {
     }
 };
 
+//// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
+
+struct WrongPrimaryKeyTypeException : std::logic_error {
+    WrongPrimaryKeyTypeException(const std::string& object_type)
+        : std::logic_error(util::format("Wrong primary key type for '%1'", object_type))
+        , object_type(object_type)
+    {
+    }
+    const std::string object_type;
+};
+
+struct NotNullableException : std::logic_error {
+    NotNullableException(const std::string& object_type, const std::string& property_name)
+        : std::logic_error(util::format("Property '%2' of class '%1' cannot be NULL", object_type, property_name))
+        , object_type(object_type)
+        , property_name(property_name)
+    {
+    }
+    const std::string object_type;
+    const std::string property_name;
+};
+
+struct PropertyTypeMismatch : std::logic_error {
+    PropertyTypeMismatch(const std::string& object_type, const std::string& property_name)
+        : std::logic_error(util::format("Type mismatch for property '%2' of class '%1'", object_type, property_name))
+        , object_type(object_type)
+        , property_name(property_name)
+    {
+    }
+    const std::string object_type;
+    const std::string property_name;
+};
+
+//// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
+
 struct WrapC {
     virtual ~WrapC() {}
 
@@ -339,9 +374,8 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
     *out_extra = REALM_VERSION_EXTRA;
 }
 
-RLM_API bool realm_get_last_error(realm_error_t* err)
+static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
 {
-    std::exception_ptr* ptr = get_last_exception();
     if (ptr && *ptr) {
         err->kind.code = 0;
 
@@ -349,7 +383,7 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
             err->error = error_number;
             err->message.data = ex.what();
             err->message.size = std::strlen(err->message.data);
-            set_last_exception(std::current_exception());
+            *ptr = std::current_exception();
         };
 
         try {
@@ -357,6 +391,24 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
         }
         catch (const NotClonableException& ex) {
             populate_error(ex, RLM_ERR_NOT_CLONABLE);
+        }
+        catch (const InvalidatedObjectException& ex) {
+            populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
+        }
+        catch (const List::InvalidatedException& ex) {
+            populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
+        }
+        catch (const MissingPrimaryKeyException& ex) {
+            populate_error(ex, RLM_ERR_MISSING_PRIMARY_KEY);
+        }
+        catch (const WrongPrimaryKeyTypeException& ex) {
+            populate_error(ex, RLM_ERR_WRONG_PRIMARY_KEY_TYPE);
+        }
+        catch (const PropertyTypeMismatch& ex) {
+            populate_error(ex, RLM_ERR_PROPERTY_TYPE_MISMATCH);
+        }
+        catch (const NotNullableException& ex) {
+            populate_error(ex, RLM_ERR_PROPERTY_NOT_NULLABLE);
         }
         catch (const List::OutOfBoundsIndexException& ex) {
             populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
@@ -378,9 +430,18 @@ RLM_API bool realm_get_last_error(realm_error_t* err)
             err->error = RLM_ERR_UNKNOWN;
             err->message.data = "Unknown error";
             err->message.size = std::strlen(err->message.data);
-            set_last_exception(std::current_exception());
+            *ptr = std::current_exception();
         }
         return true;
+    }
+    return false;
+}
+
+RLM_API bool realm_get_last_error(realm_error_t* err)
+{
+    std::exception_ptr* ptr = get_last_exception();
+    if (ptr) {
+        return convert_error(ptr, err);
     }
     return false;
 }
@@ -704,14 +765,13 @@ RLM_API bool realm_find_class(const realm_t* realm, realm_string_t name, bool* o
     });
 }
 
-static inline const ObjectSchema& schema_for_table(const realm_t* realm, realm_table_key_t key)
+static inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, realm_table_key_t key)
 {
-    auto& shared_realm = **realm;
     auto table_key = from_capi(key);
 
     // Validate the table key.
-    shared_realm.read_group().get_table(table_key);
-    const auto& schema = shared_realm.schema();
+    realm->read_group().get_table(table_key);
+    const auto& schema = realm->schema();
 
     // FIXME: Faster lookup than linear search.
     for (auto& os : schema) {
@@ -722,6 +782,12 @@ static inline const ObjectSchema& schema_for_table(const realm_t* realm, realm_t
 
     // FIXME: Proper exception type.
     throw std::logic_error{"Class not in schema"};
+}
+
+static inline const ObjectSchema& schema_for_table(const realm_t* realm, realm_table_key_t key)
+{
+    auto& shared_realm = *realm;
+    return schema_for_table(shared_realm, key);
 }
 
 RLM_API bool realm_get_class(const realm_t* realm, realm_table_key_t key, realm_class_info_t* out_class_info)
@@ -897,14 +963,29 @@ RLM_API realm_object_t* realm_get_object(const realm_t* realm, realm_table_key_t
     });
 }
 
-RLM_API realm_object_t* realm_find_object_with_primary_key(const realm_t* realm, realm_table_key_t class_key,
+RLM_API realm_object_t* realm_object_find_with_primary_key(const realm_t* realm, realm_table_key_t class_key,
                                                            realm_value_t pk, bool* out_found)
 {
-    return wrap_err([&]() {
+    return wrap_err([&]() -> realm_object_t* {
         auto& shared_realm = *realm;
         auto table_key = from_capi(class_key);
         auto table = shared_realm->read_group().get_table(table_key);
-        auto obj_key = table->find_primary_key(from_capi(pk));
+        auto pk_val = from_capi(pk);
+
+        auto pk_col = table->get_primary_key_column();
+        if (pk_val.is_null() && !pk_col.is_nullable()) {
+            if (out_found)
+                *out_found = false;
+            return nullptr;
+        }
+        if (!pk_val.is_null() && ColumnType(pk_val.get_type()) != pk_col.get_type() &&
+            pk_col.get_type() != col_type_Mixed) {
+            if (out_found)
+                *out_found = false;
+            return nullptr;
+        }
+
+        auto obj_key = table->find_primary_key(pk_val);
         if (obj_key) {
             if (out_found)
                 *out_found = true;
@@ -925,6 +1006,12 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_table_key_t ta
         auto& shared_realm = *realm;
         auto tblkey = from_capi(table_key);
         auto table = shared_realm->read_group().get_table(tblkey);
+
+        if (table->get_primary_key_column()) {
+            auto& object_schema = schema_for_table(realm, table_key);
+            throw MissingPrimaryKeyException{object_schema.name};
+        }
+
         auto obj = table->create_object();
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
@@ -940,6 +1027,23 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
         auto table = shared_realm->read_group().get_table(tblkey);
         // FIXME: Provide did_create?
         auto pkval = from_capi(pk);
+
+        ColKey pkcol = table->get_primary_key_column();
+        if (!pkcol) {
+            // FIXME: Proper exception type.
+            throw std::logic_error("Class does not have a primary key");
+        }
+
+        if (pkval.is_null() && !pkcol.is_nullable()) {
+            auto& schema = schema_for_table(realm, table_key);
+            throw NotNullableException{schema.name, schema.primary_key};
+        }
+
+        if (!pkval.is_null() && pkval.get_type() != DataType(pkcol.get_type())) {
+            auto& schema = schema_for_table(realm, table_key);
+            throw WrongPrimaryKeyTypeException{schema.name};
+        }
+
         auto obj = table->create_object_with_primary_key(pkval);
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
@@ -950,6 +1054,13 @@ RLM_API bool realm_object_delete(realm_object_t* obj)
 {
     return wrap_err([&]() {
         auto o = obj->obj();
+
+        if (!obj->is_valid()) {
+            auto table = o.get_table();
+            auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+            throw InvalidatedObjectException{schema.name};
+        }
+
         o.remove();
         return true;
     });
@@ -1003,11 +1114,21 @@ RLM_API bool realm_get_value(const realm_object_t* obj, realm_col_key_t col, rea
 {
     return wrap_err([&]() {
         auto col_key = from_capi(col);
+        auto o = obj->obj();
+
+        // FIXME: For a recently deleted object, this check can be expensive. It
+        // would make sense if `Obj::remove()` immediately set `m_valid = false`.
+        if (!obj->is_valid()) {
+            auto table = o.get_table()->get_key();
+            auto& schema = schema_for_table(obj->get_realm(), to_capi(table));
+            throw InvalidatedObjectException{schema.name};
+        }
+
         if (col_key.is_collection()) {
             // FIXME: Proper exception type.
             throw std::logic_error("Accessing collection property as value.");
         }
-        auto o = obj->obj();
+
         auto val = o.get_any(col_key);
         *out_value = to_capi(val);
         return true;
@@ -1018,12 +1139,37 @@ RLM_API bool realm_set_value(realm_object_t* obj, realm_col_key_t col, realm_val
 {
     return wrap_err([&]() {
         auto col_key = from_capi(col);
+        auto o = obj->obj();
+
+        // FIXME: For a recently deleted object, this check can be expensive. It
+        // would make sense if `Obj::remove()` immediately set `m_valid = false`.
+        if (!obj->is_valid()) {
+            auto table = o.get_table()->get_key();
+            auto& schema = schema_for_table(obj->get_realm(), to_capi(table));
+            throw InvalidatedObjectException{schema.name};
+        }
+
         if (col_key.is_collection()) {
             // FIXME: Proper exception type.
             throw std::logic_error("Accessing collection property as value.");
         }
-        auto o = obj->obj();
-        o.set_any(col_key, from_capi(new_value), is_default);
+
+        auto val = from_capi(new_value);
+
+        if (val.is_null() && !col_key.is_nullable()) {
+            auto table = o.get_table();
+            auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+            throw NotNullableException{schema.name, table->get_column_name(col_key)};
+        }
+
+        if (!val.is_null() && col_key.get_type() != ColumnType(val.get_type()) &&
+            col_key.get_type() != col_type_Mixed) {
+            auto table = o.get_table();
+            auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+            throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
+        }
+
+        o.set_any(col_key, val, is_default);
         return true;
     });
 }
@@ -1128,6 +1274,15 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_col_key_t key
     return wrap_err([&]() {
         auto obj = object->obj();
         auto table = obj.get_table();
+
+        // FIXME: For a recently deleted object, this check can be expensive. It
+        // would make sense if `Obj::remove()` immediately set `m_valid = false`.
+        if (!object->is_valid()) {
+            auto table_key = table->get_key();
+            auto& schema = schema_for_table(object->get_realm(), to_capi(table_key));
+            throw InvalidatedObjectException{schema.name};
+        }
+
         auto col_key = from_capi(key);
         table->report_invalid_key(col_key);
 
@@ -1140,9 +1295,14 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_col_key_t key
     });
 }
 
-RLM_API size_t realm_list_size(const realm_list_t* list)
+RLM_API bool realm_list_size(const realm_list_t* list, size_t* out_size)
 {
-    return list->size();
+    return wrap_err([&]() {
+        size_t size = list->size();
+        if (out_size)
+            *out_size = size;
+        return true;
+    });
 }
 
 RLM_API bool realm_list_get_property(const realm_list_t* list, realm_property_info_t* out_property_info)

@@ -79,6 +79,13 @@ CPtr<T> clone_cptr(const T* ptr)
     return CPtr<T>{static_cast<T*>(clone)};
 }
 
+static void check_err(realm_errno_e e)
+{
+    realm_error_t err;
+    CHECK(realm_get_last_error(&err));
+    CHECK(err.error == e);
+}
+
 TEST_CASE("C API")
 {
     const char* file_name = "c_api_test.realm";
@@ -101,9 +108,9 @@ TEST_CASE("C API")
             },
             {
                 rlm_str("bar"),
-                rlm_str(""), // primary key
-                2,           // properties
-                0,           // computed properties,
+                rlm_str("int"), // primary key
+                2,              // properties
+                0,              // computed properties,
                 realm_table_key{},
                 RLM_CLASS_NORMAL,
             },
@@ -151,7 +158,7 @@ TEST_CASE("C API")
                 rlm_str(""),
                 rlm_str(""),
                 realm_col_key_t{},
-                RLM_PROPERTY_INDEXED,
+                RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
             },
             {
                 rlm_str("strings"),
@@ -207,183 +214,265 @@ TEST_CASE("C API")
     CHECK(checked(realm_find_class(realm, rlm_str("bar"), &found, &bar_info)));
     CHECK(found);
 
-    realm_property_info_t foo_properties[3];
-    realm_property_info_t bar_properties[2];
+    realm_property_info_t foo_int_property, foo_str_property, foo_bars_property;
+    realm_property_info_t bar_int_property, bar_strings_property;
 
-    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("int"), &found, &foo_properties[0])));
+    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("int"), &found, &foo_int_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("str"), &found, &foo_properties[1])));
+    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("str"), &found, &foo_str_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("bars"), &found, &foo_properties[2])));
+    CHECK(checked(realm_find_property(realm, foo_info.key, rlm_str("bars"), &found, &foo_bars_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("int"), &found, &bar_properties[0])));
+    CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("int"), &found, &bar_int_property)));
     CHECK(found);
-    CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("strings"), &found, &bar_properties[1])));
+    CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("strings"), &found, &bar_strings_property)));
     CHECK(found);
 
-    CHECK(checked(realm_begin_write(realm)));
-
-    auto obj1 = realm_object_create(realm, foo_info.key);
-    CHECK(checked(obj1));
-    CHECK(checked(realm_set_value(obj1, foo_properties[0].key, rlm_int_val(123), false)));
-    CHECK(checked(realm_set_value(obj1, foo_properties[1].key, rlm_str_val("Hello, World!"), false)));
-    auto obj2 = realm_object_create(realm, bar_info.key);
-    CHECK(checked(obj2));
-
-    SECTION("lists")
+    SECTION("missing primary key")
     {
-        auto bars = checked(realm_get_list(obj1, foo_properties[2].key));
-        auto bar_link = realm_object_as_link(obj2);
-        realm_value_t bar_link_val;
-        bar_link_val.type = RLM_TYPE_LINK;
-        bar_link_val.link = bar_link;
-        CHECK(checked(realm_list_insert(bars, 0, bar_link_val)));
-        CHECK(checked(realm_list_insert(bars, 1, bar_link_val)));
-        CHECK(realm_list_size(bars) == 2);
-
-        SECTION("nullable strings")
-        {
-            auto strings = make_cptr(realm_get_list(obj2, bar_properties[1].key));
-            CHECK(strings);
-
-            realm_value_t a = rlm_str_val("a");
-            realm_value_t b = rlm_str_val("b");
-            realm_value_t c = rlm_null();
-
-            SECTION("insert, then get")
-            {
-                CHECK(checked(realm_list_insert(strings.get(), 0, a)));
-                CHECK(checked(realm_list_insert(strings.get(), 1, b)));
-                CHECK(checked(realm_list_insert(strings.get(), 2, c)));
-
-                realm_value_t a2, b2, c2;
-                CHECK(checked(realm_list_get(strings.get(), 0, &a2)));
-                CHECK(checked(realm_list_get(strings.get(), 1, &b2)));
-                CHECK(checked(realm_list_get(strings.get(), 2, &c2)));
-
-                CHECK(rlm_stdstr(a2) == "a");
-                CHECK(rlm_stdstr(b2) == "b");
-                CHECK(c2.type == RLM_TYPE_NULL);
-            }
-        }
-
-        SECTION("links")
-        {
-            SECTION("get")
-            {
-                realm_value_t val;
-                CHECK(checked(realm_list_get(bars, 0, &val)));
-                CHECK(val.type == RLM_TYPE_LINK);
-                CHECK(val.link.target_table.table_key == bar_info.key.table_key);
-                CHECK(val.link.target.obj_key == realm_object_get_key(obj2).obj_key);
-
-                CHECK(checked(realm_list_get(bars, 1, &val)));
-                CHECK(val.type == RLM_TYPE_LINK);
-                CHECK(val.link.target_table.table_key == bar_info.key.table_key);
-                CHECK(val.link.target.obj_key == realm_object_get_key(obj2).obj_key);
-            }
-
-            SECTION("get out of bounds")
-            {
-                realm_value_t val;
-                CHECK(!realm_list_get(bars, 3, &val));
-                realm_error_t err;
-                CHECK(realm_get_last_error(&err));
-                CHECK(err.error == RLM_ERR_INDEX_OUT_OF_BOUNDS);
-            }
-
-            SECTION("set wrong type")
-            {
-                auto foo2 = make_cptr(realm_object_create(realm, foo_info.key));
-                CHECK(foo2);
-                realm_value_t foo2_link_val;
-                foo2_link_val.type = RLM_TYPE_LINK;
-                foo2_link_val.link = realm_object_as_link(foo2.get());
-
-                CHECK(!realm_list_set(bars, 0, foo2_link_val));
-                realm_error_t err;
-                CHECK(realm_get_last_error(&err));
-                CHECK(err.error == RLM_ERR_INVALID_ARGUMENT);
-            }
-        }
-
-        realm_release(bars);
-    } // lists
-
-    checked(realm_commit(realm));
-
-    SECTION("notifications")
-    {
-        struct State {
-            CPtr<realm_object_changes_t> changes_before;
-            CPtr<realm_object_changes_t> changes_after;
-            CPtr<realm_async_error_t> error;
-        };
-
-        State state;
-
-        auto before = [](void* userdata, const realm_object_changes_t* changes) {
-            auto state = static_cast<State*>(userdata);
-            state->changes_before = clone_cptr(changes);
-        };
-        auto after = [](void* userdata, const realm_object_changes_t* changes) {
-            auto state = static_cast<State*>(userdata);
-            state->changes_after = clone_cptr(changes);
-        };
-
-        auto on_error = [](void* userdata, realm_async_error_t* err) {
-            auto state = static_cast<State*>(userdata);
-            state->error = clone_cptr(err);
-        };
-
-        auto require_change = [&]() {
-            auto token = make_cptr(
-                realm_object_add_notification_callback(obj1, &state, nullptr, before, after, on_error, nullptr));
-            checked(realm_refresh(realm));
-            return token;
-        };
-
-        SECTION("deleting the object sends a change notification")
-        {
-            auto token = require_change();
-            write([&]() {
-                checked(realm_object_delete(obj1));
-            });
-            CHECK(!state.error);
-            CHECK(state.changes_before);
-            CHECK(state.changes_after);
-            bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
-            CHECK(deleted);
-        }
-
-        SECTION("modifying the object sends a change notification for the object, and for the changed column")
-        {
-            auto token = require_change();
-            write([&]() {
-                checked(realm_set_value(obj1, foo_properties[0].key, rlm_int_val(999), false));
-                checked(realm_set_value(obj1, foo_properties[1].key, rlm_str_val("aaa"), false));
-            });
-            CHECK(!state.error);
-            CHECK(state.changes_before);
-            CHECK(state.changes_after);
-            bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
-            CHECK(!deleted);
-            size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes_after.get());
-            CHECK(num_modified == 2);
-            realm_col_key_t modified_keys[2];
-            size_t n = realm_object_changes_get_modified_properties(state.changes_after.get(), modified_keys, 2);
-            CHECK(n == 2);
-            CHECK(modified_keys[0].col_key == foo_properties[0].key.col_key);
-            CHECK(modified_keys[1].col_key == foo_properties[1].key.col_key);
-        }
+        write([&]() {
+            auto p = realm_object_create(realm, bar_info.key);
+            CHECK(!p);
+            check_err(RLM_ERR_MISSING_PRIMARY_KEY);
+        });
     }
 
-    realm_release(obj1);
-    realm_release(obj2);
+    SECTION("wrong primary key type")
+    {
+        write([&]() {
+            auto p = realm_object_create_with_primary_key(realm, bar_info.key, rlm_str_val("Hello"));
+            CHECK(!p);
+            check_err(RLM_ERR_WRONG_PRIMARY_KEY_TYPE);
+        });
 
-    size_t num_foos, num_bars;
-    CHECK(checked(realm_get_num_objects(realm, foo_info.key, &num_foos)));
-    CHECK(checked(realm_get_num_objects(realm, bar_info.key, &num_bars)));
+        write([&]() {
+            auto p = realm_object_create_with_primary_key(realm, bar_info.key, rlm_null());
+            CHECK(!p);
+            check_err(RLM_ERR_PROPERTY_NOT_NULLABLE);
+        });
+    }
+
+    SECTION("objects")
+    {
+        CPtr<realm_object_t> obj1;
+        CPtr<realm_object_t> obj2;
+        write([&]() {
+            obj1 = checked(make_cptr(realm_object_create(realm, foo_info.key)));
+            CHECK(obj1);
+            CHECK(checked(realm_set_value(obj1.get(), foo_int_property.key, rlm_int_val(123), false)));
+            CHECK(checked(realm_set_value(obj1.get(), foo_str_property.key, rlm_str_val("Hello, World!"), false)));
+            obj2 = checked(make_cptr(realm_object_create_with_primary_key(realm, bar_info.key, rlm_int_val(1))));
+            CHECK(obj2);
+        });
+
+        size_t num_foos, num_bars;
+        CHECK(checked(realm_get_num_objects(realm, foo_info.key, &num_foos)));
+        CHECK(checked(realm_get_num_objects(realm, bar_info.key, &num_bars)));
+
+        SECTION("find with primary key")
+        {
+            bool found = false;
+
+            auto p =
+                checked(make_cptr(realm_object_find_with_primary_key(realm, bar_info.key, rlm_int_val(1), &found)));
+            CHECK(found);
+            auto p_key = realm_object_get_key(p.get());
+            auto obj2_key = realm_object_get_key(obj2.get());
+            CHECK(p_key.obj_key == obj2_key.obj_key);
+
+            // Check that finding by type-mismatched values just find nothing.
+            CHECK(!realm_object_find_with_primary_key(realm, bar_info.key, rlm_null(), &found));
+            CHECK(!found);
+            CHECK(!realm_object_find_with_primary_key(realm, bar_info.key, rlm_str_val("a"), &found));
+            CHECK(!found);
+        }
+
+        SECTION("set wrong field type")
+        {
+            write([&]() {
+                CHECK(!realm_set_value(obj1.get(), foo_int_property.key, rlm_null(), false));
+                check_err(RLM_ERR_PROPERTY_NOT_NULLABLE);
+
+                CHECK(!realm_set_value(obj1.get(), foo_int_property.key, rlm_str_val("a"), false));
+                check_err(RLM_ERR_PROPERTY_TYPE_MISMATCH);
+            });
+        }
+
+        SECTION("delete causes invalidation errors")
+        {
+            write([&]() {
+                // Get a list instance for later
+                auto list = checked(make_cptr(realm_get_list(obj1.get(), foo_bars_property.key)));
+
+                CHECK(checked(realm_object_delete(obj1.get())));
+                CHECK(!realm_object_is_valid(obj1.get()));
+
+                realm_clear_last_error();
+                CHECK(!realm_object_delete(obj1.get()));
+                check_err(RLM_ERR_INVALIDATED_OBJECT);
+
+                realm_clear_last_error();
+                CHECK(!realm_set_value(obj1.get(), foo_int_property.key, rlm_int_val(123), false));
+                check_err(RLM_ERR_INVALIDATED_OBJECT);
+
+                realm_clear_last_error();
+                auto list2 = realm_get_list(obj1.get(), foo_bars_property.key);
+                CHECK(!list2);
+                check_err(RLM_ERR_INVALIDATED_OBJECT);
+
+                size_t size;
+                CHECK(!realm_list_size(list.get(), &size));
+                check_err(RLM_ERR_INVALIDATED_OBJECT);
+            });
+        }
+
+        SECTION("lists")
+        {
+            SECTION("nullable strings")
+            {
+                auto strings = checked(make_cptr(realm_get_list(obj2.get(), bar_strings_property.key)));
+                CHECK(strings);
+
+                realm_value_t a = rlm_str_val("a");
+                realm_value_t b = rlm_str_val("b");
+                realm_value_t c = rlm_null();
+
+                SECTION("insert, then get")
+                {
+                    write([&]() {
+                        CHECK(checked(realm_list_insert(strings.get(), 0, a)));
+                        CHECK(checked(realm_list_insert(strings.get(), 1, b)));
+                        CHECK(checked(realm_list_insert(strings.get(), 2, c)));
+
+                        realm_value_t a2, b2, c2;
+                        CHECK(checked(realm_list_get(strings.get(), 0, &a2)));
+                        CHECK(checked(realm_list_get(strings.get(), 1, &b2)));
+                        CHECK(checked(realm_list_get(strings.get(), 2, &c2)));
+
+                        CHECK(rlm_stdstr(a2) == "a");
+                        CHECK(rlm_stdstr(b2) == "b");
+                        CHECK(c2.type == RLM_TYPE_NULL);
+                    });
+                }
+            }
+
+            SECTION("links")
+            {
+                CPtr<realm_list_t> bars;
+
+                write([&]() {
+                    bars = checked(make_cptr(realm_get_list(obj1.get(), foo_bars_property.key)));
+                    auto bar_link = realm_object_as_link(obj2.get());
+                    realm_value_t bar_link_val;
+                    bar_link_val.type = RLM_TYPE_LINK;
+                    bar_link_val.link = bar_link;
+                    CHECK(checked(realm_list_insert(bars.get(), 0, bar_link_val)));
+                    CHECK(checked(realm_list_insert(bars.get(), 1, bar_link_val)));
+                    size_t size;
+                    CHECK(checked(realm_list_size(bars.get(), &size)));
+                    CHECK(size == 2);
+                });
+
+                SECTION("get")
+                {
+                    realm_value_t val;
+                    CHECK(checked(realm_list_get(bars.get(), 0, &val)));
+                    CHECK(val.type == RLM_TYPE_LINK);
+                    CHECK(val.link.target_table.table_key == bar_info.key.table_key);
+                    CHECK(val.link.target.obj_key == realm_object_get_key(obj2.get()).obj_key);
+
+                    CHECK(checked(realm_list_get(bars.get(), 1, &val)));
+                    CHECK(val.type == RLM_TYPE_LINK);
+                    CHECK(val.link.target_table.table_key == bar_info.key.table_key);
+                    CHECK(val.link.target.obj_key == realm_object_get_key(obj2.get()).obj_key);
+
+                    auto result = realm_list_get(bars.get(), 2, &val);
+                    CHECK(!result);
+                    check_err(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                }
+
+                SECTION("set wrong type")
+                {
+                    write([&]() {
+                        auto foo2 = make_cptr(realm_object_create(realm, foo_info.key));
+                        CHECK(foo2);
+                        realm_value_t foo2_link_val;
+                        foo2_link_val.type = RLM_TYPE_LINK;
+                        foo2_link_val.link = realm_object_as_link(foo2.get());
+
+                        CHECK(!realm_list_set(bars.get(), 0, foo2_link_val));
+                        check_err(RLM_ERR_INVALID_ARGUMENT);
+                    });
+                }
+            }
+        }
+
+        SECTION("notifications")
+        {
+            struct State {
+                CPtr<realm_object_changes_t> changes_before;
+                CPtr<realm_object_changes_t> changes_after;
+                CPtr<realm_async_error_t> error;
+            };
+
+            State state;
+
+            auto before = [](void* userdata, const realm_object_changes_t* changes) {
+                auto state = static_cast<State*>(userdata);
+                state->changes_before = clone_cptr(changes);
+            };
+            auto after = [](void* userdata, const realm_object_changes_t* changes) {
+                auto state = static_cast<State*>(userdata);
+                state->changes_after = clone_cptr(changes);
+            };
+
+            auto on_error = [](void* userdata, realm_async_error_t* err) {
+                auto state = static_cast<State*>(userdata);
+                state->error = clone_cptr(err);
+            };
+
+            auto require_change = [&]() {
+                auto token = make_cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, before,
+                                                                              after, on_error, nullptr));
+                checked(realm_refresh(realm));
+                return token;
+            };
+
+            SECTION("deleting the object sends a change notification")
+            {
+                auto token = require_change();
+                write([&]() {
+                    checked(realm_object_delete(obj1.get()));
+                });
+                CHECK(!state.error);
+                CHECK(state.changes_before);
+                CHECK(state.changes_after);
+                bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
+                CHECK(deleted);
+            }
+
+            SECTION("modifying the object sends a change notification for the object, and for the changed column")
+            {
+                auto token = require_change();
+                write([&]() {
+                    checked(realm_set_value(obj1.get(), foo_int_property.key, rlm_int_val(999), false));
+                    checked(realm_set_value(obj1.get(), foo_str_property.key, rlm_str_val("aaa"), false));
+                });
+                CHECK(!state.error);
+                CHECK(state.changes_before);
+                CHECK(state.changes_after);
+                bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
+                CHECK(!deleted);
+                size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes_after.get());
+                CHECK(num_modified == 2);
+                realm_col_key_t modified_keys[2];
+                size_t n = realm_object_changes_get_modified_properties(state.changes_after.get(), modified_keys, 2);
+                CHECK(n == 2);
+                CHECK(modified_keys[0].col_key == foo_int_property.key.col_key);
+                CHECK(modified_keys[1].col_key == foo_str_property.key.col_key);
+            }
+        }
+    }
 
     realm_release(realm);
 }
