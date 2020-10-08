@@ -3012,18 +3012,20 @@ TEST(Table_StableIteration)
     CHECK_EQUAL(list[2], 2);
 }
 
-TEST_TYPES(Table_ListOps, int64_t, float, double, Decimal128, ObjectId, Timestamp, Optional<int64_t>, Optional<float>,
-           Optional<double>, Optional<ObjectId>, UUID)
+TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal128>, Prop<ObjectId>, Prop<UUID>,
+           Prop<Timestamp>, Prop<String>, Prop<Binary>, Prop<Bool>, Nullable<Int>, Nullable<Float>, Nullable<Double>,
+           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<UUID>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<Binary>, Nullable<Bool>)
 {
-    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
-    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
     Table table;
-    ColKey col = table.add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+    ColKey col = table.add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     Obj obj = table.create_object();
     Obj obj1 = obj;
-    Lst<TEST_TYPE> list = obj.get_list<TEST_TYPE>(col);
+    Lst<type> list = obj.get_list<type>(col);
     list.add(gen.convert_for_test<underlying_type>(1));
     list.add(gen.convert_for_test<underlying_type>(2));
     list.swap(0, 1);
@@ -3031,8 +3033,10 @@ TEST_TYPES(Table_ListOps, int64_t, float, double, Decimal128, ObjectId, Timestam
     CHECK_EQUAL(list.get(1), gen.convert_for_test<underlying_type>(1));
     CHECK_EQUAL(list.find_first(gen.convert_for_test<underlying_type>(2)), 0);
     CHECK_EQUAL(list.find_first(gen.convert_for_test<underlying_type>(1)), 1);
+    CHECK(!list.is_null(0));
+    CHECK(!list.is_null(1));
 
-    Lst<TEST_TYPE> list1;
+    Lst<type> list1;
     CHECK_EQUAL(list1.size(), 0);
     list1 = list;
     CHECK_EQUAL(list1.size(), 2);
@@ -3040,10 +3044,19 @@ TEST_TYPES(Table_ListOps, int64_t, float, double, Decimal128, ObjectId, Timestam
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
 
-    Lst<TEST_TYPE> list2 = list;
+    Lst<type> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
     list2.clear();
     CHECK_EQUAL(list2.size(), 0);
+
+    if constexpr (TEST_TYPE::is_nullable) {
+        list2.insert_null(0);
+        CHECK_EQUAL(list.size(), 1);
+        type item0 = list2.get(0);
+        CHECK(value_is_null(item0));
+        CHECK(list.is_null(0));
+        CHECK(list.get_any(0).is_null());
+    }
 }
 
 TEST(Table_ListOfPrimitives)
@@ -3176,8 +3189,9 @@ TEST(Table_ListOfPrimitives)
 }
 
 TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
-           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
-           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>,
+           Nullable<double>, Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<BinaryData>, Nullable<UUID>)
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
@@ -3229,8 +3243,9 @@ TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>,
 }
 
 TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
-           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
-           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>,
+           Nullable<double>, Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<BinaryData>, Nullable<UUID>)
 {
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
@@ -4301,10 +4316,11 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
 }
 
 TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Prop<ObjectId>, Prop<Timestamp>,
-           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Nullable<Int>, Nullable<double>, Nullable<float>,
-           Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>, Nullable<Decimal128>,
-           Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>, Indexed<StringData>, NullableIndexed<Int>,
-           NullableIndexed<ObjectId>, NullableIndexed<Timestamp>, NullableIndexed<StringData>)
+           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Prop<UUID>, Nullable<Int>, Nullable<double>,
+           Nullable<float>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>,
+           Nullable<Decimal128>, Nullable<UUID>, Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>,
+           Indexed<StringData>, Indexed<UUID>, NullableIndexed<Int>, NullableIndexed<ObjectId>,
+           NullableIndexed<Timestamp>, NullableIndexed<StringData>, NullableIndexed<UUID>)
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
