@@ -384,14 +384,19 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     parser::ParserResult res = realm::parser::parse(query_string);
     realm::query_builder::apply_predicate(q, res.predicate, args, mapping);
 
-    CHECK_EQUAL(q.count(), num_results);
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
     // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
     realm::query_builder::apply_predicate(q2, res2.predicate, args, mapping);
-    CHECK_EQUAL(q2.count(), num_results);
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
     return q2;
 }
 
@@ -1246,7 +1251,8 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p, args);
 
-    CHECK_EQUAL(q.count(), num_results);
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
     // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
@@ -1254,7 +1260,11 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2, args);
 
-    CHECK_EQUAL(q2.count(), num_results);
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
 }
 
 TEST(Parser_substitution)
