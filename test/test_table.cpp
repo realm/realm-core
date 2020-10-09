@@ -31,6 +31,7 @@
 using namespace std::chrono;
 
 #include <realm.hpp>
+#include <realm/column_type_traits.hpp>
 #include <realm/history.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
@@ -44,6 +45,7 @@ using namespace std::chrono;
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 // #include <valgrind/callgrind.h>
 // #define PERFORMACE_TESTING
@@ -3092,30 +3094,50 @@ TEST(Table_StableIteration)
     CHECK_EQUAL(list[2], 2);
 }
 
-TEST(Table_ListOps)
+TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<String>, Prop<Binary>,
+           Prop<Bool>, Nullable<Int>, Nullable<Float>, Nullable<Double>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<Binary>, Nullable<Bool>)
 {
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    using type = typename TEST_TYPE::type;
+    TestValueGenerator gen;
     Table table;
-    ColKey col = table.add_column_list(type_Int, "integers");
+    ColKey col = table.add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     Obj obj = table.create_object();
     Obj obj1 = obj;
-    Lst<Int> list = obj.get_list<Int>(col);
-    list.add(1);
-    list.add(2);
+    Lst<type> list = obj.get_list<type>(col);
+    list.add(gen.convert_for_test<underlying_type>(1));
+    list.add(gen.convert_for_test<underlying_type>(2));
     list.swap(0, 1);
-    CHECK_EQUAL(list.get(0), 2);
-    CHECK_EQUAL(list.get(1), 1);
+    CHECK_EQUAL(list.get(0), gen.convert_for_test<underlying_type>(2));
+    CHECK_EQUAL(list.get(1), gen.convert_for_test<underlying_type>(1));
+    CHECK_EQUAL(list.find_first(gen.convert_for_test<underlying_type>(2)), 0);
+    CHECK_EQUAL(list.find_first(gen.convert_for_test<underlying_type>(1)), 1);
+    CHECK(!list.is_null(0));
+    CHECK(!list.is_null(1));
 
-    Lst<Int> list1;
+    Lst<type> list1;
     CHECK_EQUAL(list1.size(), 0);
     list1 = list;
     CHECK_EQUAL(list1.size(), 2);
-    list.add(3);
+    list.add(gen.convert_for_test<underlying_type>(3));
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
 
-    Lst<Int> list2 = list;
+    Lst<type> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
+    list2.clear();
+    CHECK_EQUAL(list2.size(), 0);
+
+    if (TEST_TYPE::is_nullable) {
+        list2.insert_null(0);
+        CHECK_EQUAL(list.size(), 1);
+        type item0 = list2.get(0);
+        CHECK(value_is_null(item0));
+        CHECK(list.is_null(0));
+        CHECK(list.get_any(0).is_null());
+    }
 }
 
 TEST(Table_ListOfPrimitives)

@@ -24,6 +24,7 @@
 #include <realm/data_type.hpp>
 #include <realm/array.hpp>
 #include <realm/keys.hpp>
+#include <realm/utilities.hpp>
 
 namespace realm {
 
@@ -189,6 +190,11 @@ struct ColumnTypeTraits<BinaryData> {
 template <class T>
 struct ColumnTypeTraits<Lst<T>> {
     static const ColumnType column_id = ColumnTypeTraits<T>::column_id;
+};
+
+template <typename T>
+struct ObjectTypeTraits {
+    constexpr static bool self_contained_null = realm::is_any<T, StringData, BinaryData, Timestamp>::value;
 };
 
 template <DataType, bool Nullable>
