@@ -298,6 +298,13 @@ typedef void (*realm_on_object_change_func_t)(void* userdata, const realm_object
 typedef void (*realm_on_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
 typedef void (*realm_callback_error_func_t)(void* userdata, realm_async_error_t*);
 
+/* Scheduler types */
+typedef void (*realm_scheduler_notify_func_t)(void* userdata);
+typedef bool (*realm_scheduler_is_on_thread_func_t)(void* userdata);
+typedef bool (*realm_scheduler_can_deliver_notifications_func_t)(void* userdata);
+typedef void (*realm_scheduler_set_notify_callback_func_t)(void* userdata, void* callback_userdata,
+                                                           realm_free_userdata_func_t, realm_scheduler_notify_func_t);
+typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(void* userdata);
 
 /* Sync types */
 typedef void (*realm_sync_upload_completion_func_t)(void* userdata, realm_async_error_t*);
@@ -417,11 +424,26 @@ RLM_API bool realm_config_set_should_compact_on_launch_function(realm_config_t*,
                                                                 void* userdata);
 RLM_API bool realm_config_set_disable_format_upgrade(realm_config_t*, bool);
 RLM_API bool realm_config_set_automatic_change_notifications(realm_config_t*, bool);
-RLM_API bool realm_config_set_scheduler(realm_config_t*, void*);
+RLM_API bool realm_config_set_scheduler(realm_config_t*, const realm_scheduler_t*);
 RLM_API bool realm_config_set_sync_config(realm_config_t*, realm_sync_config_t*);
 RLM_API bool realm_config_set_force_sync_history(realm_config_t*, bool);
 RLM_API bool realm_config_set_audit_factory(realm_config_t*, void*);
 RLM_API bool realm_config_set_max_number_of_active_versions(realm_config_t*, size_t);
+
+RLM_API realm_scheduler_t* realm_scheduler_new(void* userdata, realm_free_userdata_func_t,
+                                               realm_scheduler_notify_func_t, realm_scheduler_is_on_thread_func_t,
+                                               realm_scheduler_can_deliver_notifications_func_t,
+                                               realm_scheduler_set_notify_callback_func_t);
+RLM_API realm_scheduler_t* realm_scheduler_make_default();
+RLM_API const realm_scheduler_t* realm_scheduler_get_frozen();
+RLM_API void realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t,
+                                                 realm_scheduler_default_factory_func_t);
+RLM_API void realm_scheduler_notify(realm_scheduler_t*);
+RLM_API bool realm_scheduler_is_on_thread(const realm_scheduler_t*);
+RLM_API bool realm_scheduler_can_deliver_notifications(const realm_scheduler_t*);
+RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t*, void* userdata, realm_free_userdata_func_t,
+                                                 realm_scheduler_notify_func_t);
+
 
 /**
  * Open a Realm file.

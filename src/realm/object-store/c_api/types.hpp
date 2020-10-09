@@ -12,6 +12,7 @@
 #include <realm/object-store/object_accessor.hpp>
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <stdexcept>
 #include <string>
@@ -98,6 +99,18 @@ struct realm_async_error : WrapC {
 
 struct realm_config : WrapC, Realm::Config {
     using Realm::Config::Config;
+};
+
+struct realm_scheduler : WrapC, std::shared_ptr<util::Scheduler> {
+    explicit realm_scheduler(std::shared_ptr<util::Scheduler> ptr)
+        : std::shared_ptr<util::Scheduler>(std::move(ptr))
+    {
+    }
+
+    realm_scheduler* clone() const
+    {
+        return new realm_scheduler{*this};
+    }
 };
 
 struct realm_schema : WrapC {

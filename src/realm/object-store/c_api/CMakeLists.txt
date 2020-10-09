@@ -7,6 +7,7 @@ set(REALM_FFI_SOURCES
     object.cpp
     query.cpp
     realm.cpp
+    scheduler.cpp
     schema.cpp
     util.cpp
 

@@ -100,6 +100,14 @@ RLM_API bool realm_config_set_automatic_change_notifications(realm_config_t* con
     });
 }
 
+RLM_API bool realm_config_set_scheduler(realm_config_t* config, const realm_scheduler_t* scheduler)
+{
+    return wrap_err([&]() {
+        config->scheduler = *scheduler;
+        return true;
+    });
+}
+
 RLM_API bool realm_config_set_max_number_of_active_versions(realm_config_t* config, size_t n)
 {
     return wrap_err([=]() {
