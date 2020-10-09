@@ -1,0 +1,258 @@
+#include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/c_api/util.hpp>
+
+RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size_t num_classes,
+                                         const realm_property_info** class_properties)
+{
+    return wrap_err([&]() {
+        std::vector<ObjectSchema> object_schemas;
+        object_schemas.reserve(num_classes);
+
+        for (size_t i = 0; i < num_classes; ++i) {
+            const auto& class_info = classes[i];
+            auto props_ptr = class_properties[i];
+            auto computed_props_ptr = props_ptr + class_info.num_properties;
+
+            ObjectSchema object_schema;
+            object_schema.name = capi_to_std(class_info.name);
+            object_schema.primary_key = capi_to_std(class_info.primary_key);
+            object_schema.is_embedded = ObjectSchema::IsEmbedded{bool(class_info.flags & RLM_CLASS_EMBEDDED)};
+            object_schema.persisted_properties.reserve(class_info.num_properties);
+            object_schema.computed_properties.reserve(class_info.num_computed_properties);
+
+            for (size_t j = 0; j < class_info.num_properties; ++j) {
+                Property prop = from_capi(props_ptr[j]);
+                object_schema.persisted_properties.push_back(std::move(prop));
+            }
+
+            for (size_t j = 0; j < class_info.num_computed_properties; ++j) {
+                Property prop = from_capi(computed_props_ptr[j]);
+                object_schema.computed_properties.push_back(std::move(prop));
+            }
+
+            object_schemas.push_back(std::move(object_schema));
+        }
+
+        auto schema = new realm_schema(std::make_unique<Schema>(std::move(object_schemas)));
+        return schema;
+    });
+}
+
+RLM_API const realm_schema_t* realm_get_schema(const realm_t* realm)
+{
+    return wrap_err([&]() {
+        auto& rlm = *realm;
+        return new realm_schema_t{&rlm->schema()};
+    });
+}
+
+RLM_API bool realm_schema_validate(const realm_schema_t* schema)
+{
+    return wrap_err([&]() {
+        schema->ptr->validate();
+        return true;
+    });
+}
+
+RLM_API size_t realm_get_num_classes(const realm_t* realm)
+{
+    size_t max = std::numeric_limits<size_t>::max();
+    size_t n = 0;
+    auto success = realm_get_class_keys(realm, nullptr, max, &n);
+    REALM_ASSERT(success);
+    return n;
+}
+
+RLM_API bool realm_get_class_keys(const realm_t* realm, realm_table_key_t* out_keys, size_t max, size_t* out_n)
+{
+    return wrap_err([&]() {
+        const auto& shared_realm = **realm;
+        const auto& schema = shared_realm.schema();
+        if (out_keys) {
+            size_t i = 0;
+            for (auto& os : schema) {
+                if (i >= max)
+                    break;
+                out_keys[i++] = to_capi(os.table_key);
+            }
+            if (out_n)
+                *out_n = i;
+        }
+        else {
+            if (out_n) {
+                *out_n = schema.size();
+            }
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_find_class(const realm_t* realm, realm_string_t name, bool* out_found,
+                              realm_class_info_t* out_class_info)
+{
+    return wrap_err([&]() {
+        const auto& schema = (*realm)->schema();
+        auto it = schema.find(from_capi(name));
+        if (it != schema.end()) {
+            if (out_found)
+                *out_found = true;
+            if (out_class_info)
+                *out_class_info = to_capi(*it);
+        }
+        else {
+            if (out_found)
+                *out_found = false;
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_get_class(const realm_t* realm, realm_table_key_t key, realm_class_info_t* out_class_info)
+{
+    return wrap_err([&]() {
+        auto& os = schema_for_table(realm, key);
+        *out_class_info = to_capi(os);
+        return true;
+    });
+}
+
+RLM_API bool realm_get_class_properties(const realm_t* realm, realm_table_key_t key,
+                                        realm_property_info_t* out_properties, size_t max, size_t* out_n)
+{
+    return wrap_err([&]() {
+        auto& os = schema_for_table(realm, key);
+
+        if (out_properties) {
+            size_t i = 0;
+
+            for (auto& prop : os.persisted_properties) {
+                if (i >= max)
+                    break;
+                out_properties[i++] = to_capi(prop);
+            }
+
+            for (auto& prop : os.computed_properties) {
+                if (i >= max)
+                    break;
+                out_properties[i++] = to_capi(prop);
+            }
+
+            if (out_n) {
+                *out_n = i;
+            }
+        }
+        else {
+            if (out_n) {
+                *out_n = os.persisted_properties.size() + os.computed_properties.size();
+            }
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_get_property_keys(const realm_t* realm, realm_table_key_t key, realm_col_key_t* out_keys,
+                                     size_t max, size_t* out_n)
+{
+    return wrap_err([&]() {
+        auto& os = schema_for_table(realm, key);
+
+        if (out_keys) {
+            size_t i = 0;
+
+            for (auto& prop : os.persisted_properties) {
+                if (i >= max)
+                    break;
+                out_keys[i++] = to_capi(prop.column_key);
+            }
+
+            for (auto& prop : os.computed_properties) {
+                if (i >= max)
+                    break;
+                out_keys[i++] = to_capi(prop.column_key);
+            }
+
+            if (out_n) {
+                *out_n = i;
+            }
+        }
+        else {
+            if (out_n) {
+                *out_n = os.persisted_properties.size() + os.persisted_properties.size();
+            }
+        }
+        return true;
+    });
+}
+
+RLM_API bool realm_get_property(const realm_t* realm, realm_table_key_t class_key, realm_col_key_t key,
+                                realm_property_info_t* out_property_info)
+{
+    return wrap_err([&]() {
+        auto& os = schema_for_table(realm, class_key);
+        auto col_key = from_capi(key);
+
+        // FIXME: We can do better than linear search.
+
+        for (auto& prop : os.persisted_properties) {
+            if (prop.column_key == col_key) {
+                *out_property_info = to_capi(prop);
+                return true;
+            }
+        }
+
+        for (auto& prop : os.computed_properties) {
+            if (prop.column_key == col_key) {
+                *out_property_info = to_capi(prop);
+                return true;
+            }
+        }
+
+        // FIXME: Proper exception type.
+        throw std::logic_error{"Invalid column key for this class"};
+    });
+}
+
+RLM_API bool realm_find_property(const realm_t* realm, realm_table_key_t class_key, realm_string_t name,
+                                 bool* out_found, realm_property_info_t* out_property_info)
+{
+    return wrap_err([&]() {
+        auto& os = schema_for_table(realm, class_key);
+        auto prop = os.property_for_name(from_capi(name));
+
+        if (prop) {
+            if (out_found)
+                *out_found = true;
+            if (out_property_info)
+                *out_property_info = to_capi(*prop);
+        }
+        else {
+            if (out_found)
+                *out_found = false;
+        }
+
+        return true;
+    });
+}
+
+RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_table_key_t class_key,
+                                                realm_string_t public_name, bool* out_found,
+                                                realm_property_info_t* out_property_info)
+{
+    return wrap_err([&]() {
+        auto& os = schema_for_table(realm, class_key);
+        auto prop = os.property_for_public_name(from_capi(public_name));
+
+        if (prop) {
+            if (out_found)
+                *out_found = true;
+            if (out_property_info)
+                *out_property_info = to_capi(*prop);
+        }
+        else {
+            if (out_found)
+                *out_found = false;
+        }
+
+        return true;
+    });
+}

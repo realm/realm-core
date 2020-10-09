@@ -1,3 +1,5 @@
+add_subdirectory(c_api)
+
 set(SOURCES
     binding_callback_thread_observer.cpp
     collection_notifications.cpp
