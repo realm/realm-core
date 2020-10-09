@@ -1112,8 +1112,13 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
 
 RLM_API bool realm_get_value(const realm_object_t* obj, realm_col_key_t col, realm_value_t* out_value)
 {
+    return realm_get_values(obj, 1, &col, out_value);
+}
+
+RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, const realm_col_key_t* properties,
+                              realm_value_t* out_values)
+{
     return wrap_err([&]() {
-        auto col_key = from_capi(col);
         auto o = obj->obj();
 
         // FIXME: For a recently deleted object, this check can be expensive. It
@@ -1124,21 +1129,31 @@ RLM_API bool realm_get_value(const realm_object_t* obj, realm_col_key_t col, rea
             throw InvalidatedObjectException{schema.name};
         }
 
-        if (col_key.is_collection()) {
-            // FIXME: Proper exception type.
-            throw std::logic_error("Accessing collection property as value.");
+        for (size_t i = 0; i < num_values; ++i) {
+            auto col_key = from_capi(properties[i]);
+
+            if (col_key.is_collection()) {
+                // FIXME: Proper exception type.
+                throw std::logic_error("Accessing collection property as value.");
+            }
+
+            auto val = o.get_any(col_key);
+            out_values[i] = to_capi(val);
         }
 
-        auto val = o.get_any(col_key);
-        *out_value = to_capi(val);
         return true;
     });
 }
 
 RLM_API bool realm_set_value(realm_object_t* obj, realm_col_key_t col, realm_value_t new_value, bool is_default)
 {
+    return realm_set_values(obj, 1, &col, &new_value, is_default);
+}
+
+RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const realm_col_key_t* properties,
+                              const realm_value_t* values, bool is_default)
+{
     return wrap_err([&]() {
-        auto col_key = from_capi(col);
         auto o = obj->obj();
 
         // FIXME: For a recently deleted object, this check can be expensive. It
@@ -1149,27 +1164,42 @@ RLM_API bool realm_set_value(realm_object_t* obj, realm_col_key_t col, realm_val
             throw InvalidatedObjectException{schema.name};
         }
 
-        if (col_key.is_collection()) {
-            // FIXME: Proper exception type.
-            throw std::logic_error("Accessing collection property as value.");
+        // Perform validation up front to avoid partial updates. This is
+        // unlikely to incur performance overhead because the object itself is
+        // not accessed here, just the bits of the column key and the input type.
+
+        for (size_t i = 0; i < num_values; ++i) {
+            auto col_key = from_capi(properties[i]);
+
+            if (col_key.is_collection()) {
+                // FIXME: Proper exception type.
+                throw std::logic_error("Accessing collection property as value.");
+            }
+
+            auto val = from_capi(values[i]);
+
+            if (val.is_null() && !col_key.is_nullable()) {
+                auto table = o.get_table();
+                auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+                throw NotNullableException{schema.name, table->get_column_name(col_key)};
+            }
+
+            if (!val.is_null() && col_key.get_type() != ColumnType(val.get_type()) &&
+                col_key.get_type() != col_type_Mixed) {
+                auto table = o.get_table();
+                auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
+                throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
+            }
         }
 
-        auto val = from_capi(new_value);
+        // Actually write the properties.
 
-        if (val.is_null() && !col_key.is_nullable()) {
-            auto table = o.get_table();
-            auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
-            throw NotNullableException{schema.name, table->get_column_name(col_key)};
+        for (size_t i = 0; i < num_values; ++i) {
+            auto col_key = from_capi(properties[i]);
+            auto val = from_capi(values[i]);
+            o.set_any(col_key, val, is_default);
         }
 
-        if (!val.is_null() && col_key.get_type() != ColumnType(val.get_type()) &&
-            col_key.get_type() != col_type_Mixed) {
-            auto table = o.get_table();
-            auto& schema = schema_for_table(obj->get_realm(), to_capi(table->get_key()));
-            throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
-        }
-
-        o.set_any(col_key, val, is_default);
         return true;
     });
 }

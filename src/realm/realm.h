@@ -805,6 +805,30 @@ RLM_API realm_notification_token_t* realm_object_add_notification_callback(
 RLM_API bool realm_get_value(const realm_object_t*, realm_col_key_t, realm_value_t* out_value);
 
 /**
+ * Get the values for several properties.
+ *
+ * This is provided as an alternative to calling `realm_get_value()` multiple
+ * times in a row, which is particularly useful for language runtimes where
+ * crossing the native bridge is comparatively expensive. In addition, it
+ * eliminates some parameter validation that would otherwise be repeated for
+ * each call.
+ *
+ * Example use cases:
+ *
+ *  - Extracting all properties of an object for serialization.
+ *  - Converting an object to some in-memory representation.
+ *
+ * @param num_values The number of elements in @a properties and @a out_values.
+ * @param properties The keys for the properties to fetch. May not be NULL.
+ * @param out_values Where to write the property values. If an error occurs,
+ *                   this array may only be partially initialized. May not be
+ *                   NULL.
+ * @return True if no exception occurs.
+ */
+RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const realm_col_key_t* properties,
+                              realm_value_t* out_values);
+
+/**
  * Set the value for a property.
  *
  * @param new_value The new value for the property.
@@ -814,6 +838,35 @@ RLM_API bool realm_get_value(const realm_object_t*, realm_col_key_t, realm_value
  * @return True if no exception occurred.
  */
 RLM_API bool realm_set_value(realm_object_t*, realm_col_key_t, realm_value_t new_value, bool is_default);
+
+/**
+ * Set the values for several properties.
+ *
+ * This is provided as an alternative to calling `realm_get_value()` multiple
+ * times in a row, which is particularly useful for language runtimes where
+ * crossing the native bridge is comparatively expensive. In addition, it
+ * eliminates some parameter validation that would otherwise be repeated for
+ * each call.
+ *
+ * Example use cases:
+ *
+ *  - Initializing a new object with default values.
+ *  - Deserializing some in-memory structure into a realm object.
+ *
+ * This operation is "atomic"; if an exception occurs due to invalid input (such
+ * as type mismatch, nullability mismatch, etc.), the object will remain
+ * unmodified.
+ *
+ * @param num_values The number of elements in @a properties and @a values.
+ * @param properties The keys of the properties to set. May not be NULL.
+ * @param values The values to assign to the properties. May not be NULL.
+ * @param is_default True if the properties are being set as part of setting
+ *                   default values for a new object. This has no effect in
+ *                   non-sync'ed realms.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_set_values(realm_object_t*, size_t num_values, const realm_col_key_t* properties,
+                              const realm_value_t* values, bool is_default);
 
 /**
  * Get a list instance for the property of an object.
