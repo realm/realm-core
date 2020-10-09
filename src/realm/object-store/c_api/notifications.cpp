@@ -5,20 +5,10 @@ namespace {
 struct ObjectNotificationsCallback {
     void* m_userdata;
     realm_free_userdata_func_t m_free = nullptr;
-    realm_before_object_change_func_t m_before = nullptr;
-    realm_after_object_change_func_t m_after = nullptr;
+    realm_on_object_change_func_t m_on_change = nullptr;
     realm_callback_error_func_t m_on_error = nullptr;
 
     ObjectNotificationsCallback() = default;
-
-    ObjectNotificationsCallback(ObjectNotificationsCallback&& other)
-        : m_userdata(std::exchange(other.m_userdata, nullptr))
-        , m_free(std::exchange(other.m_free, nullptr))
-        , m_before(std::exchange(other.m_before, nullptr))
-        , m_after(std::exchange(other.m_after, nullptr))
-        , m_on_error(std::exchange(other.m_on_error, nullptr))
-    {
-    }
 
     ~ObjectNotificationsCallback()
     {
@@ -27,42 +17,33 @@ struct ObjectNotificationsCallback {
         }
     }
 
-    void before(const CollectionChangeSet& changes)
+    void operator()(const CollectionChangeSet& changes, std::exception_ptr error)
     {
-        if (m_before) {
-            realm_object_changes_t c{changes};
-            m_before(m_userdata, &c);
+        if (error) {
+            if (m_on_error) {
+                realm_async_error_t err{std::move(error)};
+                m_on_error(m_userdata, &err);
+            }
         }
-    }
-
-    void after(const CollectionChangeSet& changes)
-    {
-        if (m_after) {
+        else if (m_on_change) {
             realm_object_changes_t c{changes};
-            m_after(m_userdata, &c);
-        }
-    }
-
-    void error(std::exception_ptr e)
-    {
-        if (m_on_error) {
-            realm_async_error_t err{std::move(e)};
-            m_on_error(m_userdata, &err);
+            m_on_change(m_userdata, &c);
         }
     }
 };
 } // namespace
 
-RLM_API realm_notification_token_t* realm_object_add_notification_callback(
-    realm_object_t* obj, void* userdata, realm_free_userdata_func_t free, realm_before_object_change_func_t before,
-    realm_after_object_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*)
+RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t* obj, void* userdata,
+                                                                           realm_free_userdata_func_t free,
+                                                                           realm_on_object_change_func_t on_change,
+                                                                           realm_callback_error_func_t on_error,
+                                                                           realm_scheduler_t*)
 {
     return wrap_err([&]() {
         ObjectNotificationsCallback cb;
         cb.m_userdata = userdata;
         cb.m_free = free;
-        cb.m_before = before;
-        cb.m_after = after;
+        cb.m_on_change = on_change;
         cb.m_on_error = on_error;
         auto token = obj->add_notification_callback(std::move(cb));
         return new realm_notification_token_t{std::move(token)};

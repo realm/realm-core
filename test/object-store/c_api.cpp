@@ -410,20 +410,15 @@ TEST_CASE("C API")
         SECTION("notifications")
         {
             struct State {
-                CPtr<realm_object_changes_t> changes_before;
-                CPtr<realm_object_changes_t> changes_after;
+                CPtr<realm_object_changes_t> changes;
                 CPtr<realm_async_error_t> error;
             };
 
             State state;
 
-            auto before = [](void* userdata, const realm_object_changes_t* changes) {
+            auto on_change = [](void* userdata, const realm_object_changes_t* changes) {
                 auto state = static_cast<State*>(userdata);
-                state->changes_before = clone_cptr(changes);
-            };
-            auto after = [](void* userdata, const realm_object_changes_t* changes) {
-                auto state = static_cast<State*>(userdata);
-                state->changes_after = clone_cptr(changes);
+                state->changes = clone_cptr(changes);
             };
 
             auto on_error = [](void* userdata, realm_async_error_t* err) {
@@ -432,8 +427,8 @@ TEST_CASE("C API")
             };
 
             auto require_change = [&]() {
-                auto token = make_cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, before,
-                                                                              after, on_error, nullptr));
+                auto token = make_cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, on_change,
+                                                                              on_error, nullptr));
                 checked(realm_refresh(realm));
                 return token;
             };
@@ -445,9 +440,8 @@ TEST_CASE("C API")
                     checked(realm_object_delete(obj1.get()));
                 });
                 CHECK(!state.error);
-                CHECK(state.changes_before);
-                CHECK(state.changes_after);
-                bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
+                CHECK(state.changes);
+                bool deleted = realm_object_changes_is_deleted(state.changes.get());
                 CHECK(deleted);
             }
 
@@ -459,14 +453,13 @@ TEST_CASE("C API")
                     checked(realm_set_value(obj1.get(), foo_str_property.key, rlm_str_val("aaa"), false));
                 });
                 CHECK(!state.error);
-                CHECK(state.changes_before);
-                CHECK(state.changes_after);
-                bool deleted = realm_object_changes_is_deleted(state.changes_after.get());
+                CHECK(state.changes);
+                bool deleted = realm_object_changes_is_deleted(state.changes.get());
                 CHECK(!deleted);
-                size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes_after.get());
+                size_t num_modified = realm_object_changes_get_num_modified_properties(state.changes.get());
                 CHECK(num_modified == 2);
                 realm_col_key_t modified_keys[2];
-                size_t n = realm_object_changes_get_modified_properties(state.changes_after.get(), modified_keys, 2);
+                size_t n = realm_object_changes_get_modified_properties(state.changes.get(), modified_keys, 2);
                 CHECK(n == 2);
                 CHECK(modified_keys[0].col_key == foo_int_property.key.col_key);
                 CHECK(modified_keys[1].col_key == foo_str_property.key.col_key);

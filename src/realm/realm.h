@@ -294,10 +294,8 @@ typedef enum realm_property_flags {
 typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
-typedef void (*realm_before_object_change_func_t)(void* userdata, const realm_object_changes_t*);
-typedef void (*realm_after_object_change_func_t)(void* userdata, const realm_object_changes_t*);
-typedef void (*realm_before_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
-typedef void (*realm_after_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
+typedef void (*realm_on_object_change_func_t)(void* userdata, const realm_object_changes_t*);
+typedef void (*realm_on_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
 typedef void (*realm_callback_error_func_t)(void* userdata, realm_async_error_t*);
 
 
@@ -793,9 +791,11 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_object_add_notification_callback(
-    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_object_change_func_t before,
-    realm_after_object_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t*, void* userdata,
+                                                                           realm_free_userdata_func_t free,
+                                                                           realm_on_object_change_func_t on_change,
+                                                                           realm_callback_error_func_t on_error,
+                                                                           realm_scheduler_t*);
 
 /**
  * Get the value for a property.
@@ -968,9 +968,11 @@ RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_list_add_notification_callback(
-    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_collection_change_func_t before,
-    realm_after_collection_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_object_t*, void* userdata,
+                                                                         realm_free_userdata_func_t free,
+                                                                         realm_on_collection_change_func_t on_change,
+                                                                         realm_callback_error_func_t on_error,
+                                                                         realm_scheduler_t*);
 
 /**
  * True if an object notification indicates that the object was deleted.
@@ -1095,9 +1097,11 @@ RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t out_inde
 RLM_API bool realm_set_erase(realm_set_t*, realm_value_t value, bool* out_erased);
 RLM_API bool realm_set_clear(realm_set_t*);
 RLM_API bool realm_set_assign(realm_set_t*, realm_value_t values, size_t num_values);
-RLM_API realm_notification_token_t* realm_set_add_notification_callback(
-    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_collection_change_func_t before,
-    realm_after_collection_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_object_t*, void* userdata,
+                                                                        realm_free_userdata_func_t free,
+                                                                        realm_on_collection_change_func_t on_change,
+                                                                        realm_callback_error_func_t on_error,
+                                                                        realm_scheduler_t*);
 
 
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_copy(const void* pdict, size_t n);
@@ -1112,9 +1116,10 @@ RLM_API bool realm_dictionary_erase(realm_dictionary_t*, realm_value_t key, bool
 RLM_API bool realm_dictionary_clear(realm_dictionary_t*);
 typedef realm_value_t realm_key_value_pair_t[2];
 RLM_API bool realm_dictionary_assign(realm_dictionary_t*, const realm_key_value_pair_t* pairs, size_t num_pairs);
-RLM_API realm_notification_token_t* realm_dictionary_add_notification_callback(
-    realm_object_t*, void* userdata, realm_free_userdata_func_t free, realm_before_collection_change_func_t before,
-    realm_after_collection_change_func_t after, realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t*
+realm_dictionary_add_notification_callback(realm_object_t*, void* userdata, realm_free_userdata_func_t free,
+                                           realm_on_collection_change_func_t on_change,
+                                           realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
  * Construct a new, empty query targeting @a table.
@@ -1216,10 +1221,11 @@ RLM_API bool realm_results_max(const realm_results_t*, realm_col_key_t, realm_va
 RLM_API bool realm_results_sum(const realm_results_t*, realm_col_key_t, realm_value_t* out_sum);
 RLM_API bool realm_results_average(const realm_results_t*, realm_col_key_t, realm_value_t* out_average);
 
-RLM_API realm_notification_token_t*
-realm_results_add_notification_callback(realm_results_t*, void* userdata, realm_free_userdata_func_t,
-                                        realm_before_collection_change_func_t, realm_after_collection_change_func_t,
-                                        realm_callback_error_func_t, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*, void* userdata,
+                                                                            realm_free_userdata_func_t,
+                                                                            realm_on_collection_change_func_t,
+                                                                            realm_callback_error_func_t,
+                                                                            realm_scheduler_t*);
 
 #if defined(RLM_ENABLE_OBJECT_ACCESSOR_API)
 /**
