@@ -12,7 +12,7 @@ install(FILES realm.hpp
   
 set(REALM_FFI_SOURCES
   realm/object-store/c_api.cpp
-  realm/object-store/c_api/realm.c
+  # realm/object-store/c_api/realm.c
   realm/realm.h
 )
 
