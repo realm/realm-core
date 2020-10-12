@@ -17,3 +17,16 @@ RLM_API bool realm_is_frozen(const void* ptr)
 {
     return cast_ptr<WrapC>(ptr)->is_frozen();
 }
+
+RLM_API bool realm_equals(const void* a, const void* b)
+{
+    if (a == b)
+        return true;
+    if (bool(a) != bool(b))
+        return false;
+
+    auto lhs = static_cast<const WrapC*>(a);
+    auto rhs = static_cast<const WrapC*>(b);
+
+    return lhs->equals(*rhs);
+}

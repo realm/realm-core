@@ -403,6 +403,33 @@ RLM_API void realm_release(const void* ptr);
 RLM_API void* realm_clone(const void*);
 
 /**
+ * Return true if two API objects refer to the same underlying data. Objects
+ * with different types are never equal.
+ *
+ * Note: This function cannot be used with types that have value semantics, only
+ *       opaque types that have object semantics.
+ *
+ *    - `realm_t` objects are identical if they represent the same instance (not
+ *      just if they represent the same file).
+ *    - `realm_schema_t` objects are equal if the represented schemas are equal.
+ *    - `realm_config_t` objects are equal if the configurations are equal.
+ *    - `realm_object_t` objects are identical if they belong to the same realm
+ *      and class, and have the same object key.
+ *    - `realm_list_t` and other collection objects are identical if they come
+ *      from the same object and property.
+ *    - `realm_query_t` objects are never equal.
+ *    - `realm_scheduler_t` objects are equal if they represent the same
+ *      scheduler.
+ *    - Query descriptor objects are equal if they represent equivalent
+ *      descriptors.
+ *    - `realm_async_error_t` objects are equal if they represent the same
+ *      exception instance.
+ *
+ * This function cannot fail.
+ */
+RLM_API bool realm_equals(const void*, const void*);
+
+/**
  * True if a Realm C Wrapper object is "frozen" (immutable).
  *
  * Objects, collections, and results can be frozen. For all other types, this

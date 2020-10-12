@@ -81,6 +81,11 @@ struct WrapC {
     {
         return false;
     }
+
+    virtual bool equals(const WrapC& other) const noexcept
+    {
+        return this == &other;
+    }
 };
 
 struct realm_async_error : WrapC {
@@ -94,6 +99,14 @@ struct realm_async_error : WrapC {
     realm_async_error* clone() const override
     {
         return new realm_async_error{ep};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_async_error_t*>(&other)) {
+            return ep == ptr->ep;
+        }
+        return false;
     }
 };
 
@@ -110,6 +123,14 @@ struct realm_scheduler : WrapC, std::shared_ptr<util::Scheduler> {
     realm_scheduler* clone() const
     {
         return new realm_scheduler{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_scheduler_t*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
     }
 };
 
@@ -133,6 +154,14 @@ struct realm_schema : WrapC {
         auto o = std::make_unique<Schema>(*ptr);
         return new realm_schema_t{std::move(o)};
     }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto other_ptr = dynamic_cast<const realm_schema_t*>(&other)) {
+            return *ptr == *other_ptr->ptr;
+        }
+        return false;
+    }
 };
 
 struct shared_realm : WrapC, SharedRealm {
@@ -144,6 +173,14 @@ struct shared_realm : WrapC, SharedRealm {
     shared_realm* clone() const override
     {
         return new shared_realm{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const shared_realm*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
     }
 };
 
@@ -162,6 +199,16 @@ struct realm_object : WrapC, Object {
     {
         return Object::is_frozen();
     }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_object_t*>(&other)) {
+            auto a = obj();
+            auto b = ptr->obj();
+            return a.get_table() == b.get_table() && a.get_key() == b.get_key();
+        }
+        return false;
+    }
 };
 
 struct realm_list : WrapC, List {
@@ -178,6 +225,16 @@ struct realm_list : WrapC, List {
     bool is_frozen() const override
     {
         return List::is_frozen();
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_list_t*>(&other)) {
+            return get_realm() == ptr->get_realm() && get_parent_table_key() == ptr->get_parent_table_key() &&
+                   get_parent_column_key() == ptr->get_parent_column_key() &&
+                   get_parent_object_key() == ptr->get_parent_object_key();
+        }
+        return false;
     }
 };
 
