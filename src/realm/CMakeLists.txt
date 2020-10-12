@@ -336,8 +336,10 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         COMPONENT devel)
 
 add_subdirectory(parser)
-add_subdirectory(exec)
 add_subdirectory(object-store)
 if (REALM_ENABLE_SYNC)
     add_subdirectory(sync)
+endif()
+if(NOT REALM_BUILD_LIB_ONLY)
+    add_subdirectory(exec)
 endif()

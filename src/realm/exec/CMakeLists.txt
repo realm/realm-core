@@ -1,5 +1,5 @@
 
-if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_BUILD_LIB_ONLY)
+if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # FIXME add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
     # set_target_properties(RealmImporter PROPERTIES
     #     OUTPUT_NAME "realm-importer"
