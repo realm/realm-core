@@ -115,6 +115,7 @@ if(REALM_ENABLE_SYNC)
         util/bson/mongo_timestamp.hpp)
     list(APPEND SOURCES
         sync/app.cpp
+        sync/app_utils.cpp
         sync/app_credentials.cpp
         sync/generic_network_transport.cpp
         sync/async_open_task.cpp
