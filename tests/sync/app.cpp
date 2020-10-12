@@ -1698,6 +1698,77 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     }
 }
 
+// MARK: - Token refresh
+
+TEST_CASE("app: token refresh", "[sync][app]") {
+
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+
+    TestSyncManager sync_manager({ .app_config = config });
+    auto app = sync_manager.app();
+
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+
+    app->provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error);
+                    });
+
+    std::shared_ptr<SyncUser> sync_user;
+
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        REQUIRE(user);
+        CHECK(!error);
+        sync_user = user;
+        sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
+    });
+
+    auto remote_client = app->current_user()->mongo_client("BackingDB");
+    auto db = remote_client.db("test_data");
+    auto dog_collection = db["Dog"];
+    bson::BsonDocument dog_document {
+        {"name", "fido"},
+        {"breed", "king charles"}
+    };
+
+    SECTION("access token should refresh") {
+        /*
+         Expected sequence of events:
+         - `find_one` tries to hit the server with a bad access token
+         - Server returns an error because of the bad token, error should be something like:
+            {\"error\":\"json: cannot unmarshal array into Go value of type map[string]interface {}\",\"link\":\"http://localhost:9090/groups/5f84167e776aa0f9dc27081a/apps/5f841686776aa0f9dc270876/logs?co_id=5f844c8c776aa0f9dc273db6\"}
+            http_status_code = 401
+            custom_status_code = 0
+         - App::handle_auth_failure is then called and an attempt to refresh the access token will be peformed.
+         - If the token refresh was successful, the original request will retry and we should expect no error in the callback of `find_one`
+         */
+        dog_collection.find_one(dog_document, [&](Optional<bson::BsonDocument>, Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+    }
+}
+
 // MARK: - Sync Tests
 
 TEST_CASE("app: sync integration", "[sync][app]") {
