@@ -183,8 +183,15 @@ RLM_API const realm_scheduler_t* realm_scheduler_get_frozen()
 RLM_API void realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t free_func,
                                                  realm_scheduler_default_factory_func_t factory_func)
 {
+#if REALM_ANDROID
+    static_cast<void>(userdata);
+    static_cast<void>(free_func);
+    static_cast<void>(factory_func);
+    REALM_TERMINATE("realm_scheduler_set_default_factor() not supported on Androi");
+#else
     DefaultFactory factory{userdata, free_func, factory_func};
     Scheduler::set_default_factory(std::move(factory));
+#endif
 }
 
 RLM_API void realm_scheduler_notify(realm_scheduler_t* scheduler)
