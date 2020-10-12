@@ -977,6 +977,7 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
         // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
         size_t best = find_best_node(pn);
         start = pn->m_children[best]->aggregate_local(st, start, end, findlocals, source_column);
+        double current_cost = pn->m_children[best]->cost();
 
         // Make remaining conditions compute their m_dD (statistics)
         for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
@@ -984,8 +985,7 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
                 continue;
 
             // Skip test if there is no way its cost can ever be better than best node's
-            double cost = pn->m_children[c]->cost();
-            if (pn->m_children[c]->m_dT < cost) {
+            if (pn->m_children[c]->m_dT < current_cost) {
 
                 // Limit to bestdist in order not to skip too large parts of index nodes
                 size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
