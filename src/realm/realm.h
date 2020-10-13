@@ -296,7 +296,7 @@ typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(void* userdata, const realm_object_changes_t*);
 typedef void (*realm_on_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
-typedef void (*realm_callback_error_func_t)(void* userdata, realm_async_error_t*);
+typedef void (*realm_callback_error_func_t)(void* userdata, const realm_async_error_t*);
 
 /* Scheduler types */
 typedef void (*realm_scheduler_notify_func_t)(void* userdata);
@@ -1017,7 +1017,7 @@ RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_object_t*, void* userdata,
+RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_list_t*, void* userdata,
                                                                          realm_free_userdata_func_t free,
                                                                          realm_on_collection_change_func_t on_change,
                                                                          realm_callback_error_func_t on_error,
@@ -1128,13 +1128,12 @@ RLM_API void realm_collection_changes_get_changes(const realm_collection_changes
                                                   size_t max_modification_indices_after,
                                                   realm_collection_move_t* out_moves, size_t max_moves);
 
-RLM_API void realm_collection_changes_get_ranges(const realm_collection_changes_t*, size_t* out_deletion_ranges,
-                                                 size_t max_deletion_ranges, size_t* out_insertion_ranges,
-                                                 size_t max_insertion_ranges, size_t* out_modification_ranges,
-                                                 size_t max_modification_ranges,
-                                                 size_t* out_modification_ranges_after,
-                                                 size_t max_modification_ranges_after,
-                                                 realm_collection_move_t* out_moves, size_t max_moves);
+RLM_API void realm_collection_changes_get_ranges(
+    const realm_collection_changes_t*, realm_index_range_t* out_deletion_ranges, size_t max_deletion_ranges,
+    realm_index_range_t* out_insertion_ranges, size_t max_insertion_ranges,
+    realm_index_range_t* out_modification_ranges, size_t max_modification_ranges,
+    realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
+    realm_collection_move_t* out_moves, size_t max_moves);
 
 RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
 RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);

@@ -3,7 +3,7 @@
 
 namespace {
 struct ObjectNotificationsCallback {
-    void* m_userdata;
+    void* m_userdata = nullptr;
     realm_free_userdata_func_t m_free = nullptr;
     realm_on_object_change_func_t m_on_change = nullptr;
     realm_callback_error_func_t m_on_error = nullptr;
@@ -12,8 +12,8 @@ struct ObjectNotificationsCallback {
 
     ~ObjectNotificationsCallback()
     {
-        if (m_free && m_userdata) {
-            (m_free)(m_userdata);
+        if (m_free) {
+            m_free(m_userdata);
         }
     }
 
@@ -31,6 +31,37 @@ struct ObjectNotificationsCallback {
         }
     }
 };
+
+struct CollectionNotificationsCallback {
+    void* m_userdata = nullptr;
+    realm_free_userdata_func_t m_free = nullptr;
+    realm_on_collection_change_func_t m_on_change = nullptr;
+    realm_callback_error_func_t m_on_error = nullptr;
+
+    CollectionNotificationsCallback() = default;
+
+    ~CollectionNotificationsCallback()
+    {
+        if (m_free) {
+            m_free(m_userdata);
+        }
+    }
+
+    void operator()(const CollectionChangeSet& changes, std::exception_ptr error)
+    {
+        if (error) {
+            if (m_on_error) {
+                realm_async_error_t err{std::move(err)};
+                m_on_error(m_userdata, &err);
+            }
+        }
+        else if (m_on_change) {
+            realm_collection_changes_t c{changes};
+            m_on_change(m_userdata, &c);
+        }
+    }
+};
+
 } // namespace
 
 RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t* obj, void* userdata,
@@ -75,4 +106,77 @@ RLM_API size_t realm_object_changes_get_modified_properties(const realm_object_c
         ++i;
     }
     return i;
+}
+
+RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_list_t* list, void* userdata,
+                                                                         realm_free_userdata_func_t free,
+                                                                         realm_on_collection_change_func_t on_change,
+                                                                         realm_callback_error_func_t on_error,
+                                                                         realm_scheduler_t*)
+{
+    return wrap_err([&]() {
+        CollectionNotificationsCallback cb;
+        cb.m_userdata = userdata;
+        cb.m_free = free;
+        cb.m_on_change = on_change;
+        cb.m_on_error = on_error;
+        auto token = list->add_notification_callback(std::move(cb));
+        return new realm_notification_token_t{std::move(token)};
+    });
+}
+
+RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_changes_t* changes,
+                                                     size_t* out_num_deletion_ranges,
+                                                     size_t* out_num_insertion_ranges,
+                                                     size_t* out_num_modification_ranges, size_t* out_num_moves)
+{
+    // FIXME: `std::distance()` has O(n) performance here, which seems ridiculous.
+
+    if (out_num_deletion_ranges)
+        *out_num_deletion_ranges = std::distance(changes->deletions.begin(), changes->deletions.end());
+    if (out_num_insertion_ranges)
+        *out_num_insertion_ranges = std::distance(changes->insertions.begin(), changes->insertions.end());
+    if (out_num_modification_ranges)
+        *out_num_modification_ranges = std::distance(changes->modifications.begin(), changes->modifications.end());
+    if (out_num_moves)
+        *out_num_moves = changes->moves.size();
+}
+
+static inline void copy_index_ranges(const IndexSet& index_set, realm_index_range_t* out_ranges, size_t max)
+{
+    size_t i = 0;
+    for (auto [from, to] : index_set) {
+        if (i >= max)
+            return;
+        out_ranges[i++] = realm_index_range_t{from, to};
+    }
+}
+
+RLM_API void realm_collection_changes_get_ranges(
+    const realm_collection_changes_t* changes, realm_index_range_t* out_deletion_ranges, size_t max_deletion_ranges,
+    realm_index_range_t* out_insertion_ranges, size_t max_insertion_ranges,
+    realm_index_range_t* out_modification_ranges, size_t max_modification_ranges,
+    realm_index_range_t* out_modification_ranges_after, size_t max_modification_ranges_after,
+    realm_collection_move_t* out_moves, size_t max_moves)
+{
+    if (out_deletion_ranges) {
+        copy_index_ranges(changes->deletions, out_deletion_ranges, max_deletion_ranges);
+    }
+    if (out_insertion_ranges) {
+        copy_index_ranges(changes->insertions, out_insertion_ranges, max_insertion_ranges);
+    }
+    if (out_modification_ranges) {
+        copy_index_ranges(changes->modifications, out_modification_ranges, max_modification_ranges);
+    }
+    if (out_modification_ranges_after) {
+        copy_index_ranges(changes->modifications_new, out_modification_ranges_after, max_modification_ranges_after);
+    }
+    if (out_moves) {
+        size_t i = 0;
+        for (auto [from, to] : changes->moves) {
+            if (i >= max_moves)
+                break;
+            out_moves[i] = realm_collection_move_t{from, to};
+        }
+    }
 }

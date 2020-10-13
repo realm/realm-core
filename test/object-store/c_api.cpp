@@ -405,6 +405,106 @@ TEST_CASE("C API")
                     });
                 }
             }
+
+            SECTION("notifications")
+            {
+                struct State {
+                    CPtr<realm_collection_changes_t> changes;
+                    CPtr<realm_async_error_t> error;
+                };
+
+                State state;
+
+                auto on_change = [](void* userdata, const realm_collection_changes_t* changes) {
+                    auto* state = static_cast<State*>(userdata);
+                    state->changes = clone_cptr(changes);
+                };
+
+                auto on_error = [](void* userdata, const realm_async_error_t* err) {
+                    auto* state = static_cast<State*>(userdata);
+                    state->error = clone_cptr(err);
+                };
+
+                CPtr<realm_list_t> strings = checked(make_cptr(realm_get_list(obj2.get(), bar_strings_property.key)));
+
+                auto str1 = rlm_str_val("a");
+                auto str2 = rlm_str_val("b");
+                auto null = rlm_null();
+
+                auto require_change = [&]() {
+                    auto token = make_cptr(checked(realm_list_add_notification_callback(
+                        strings.get(), &state, nullptr, on_change, on_error, nullptr)));
+                    checked(realm_refresh(realm));
+                    return token;
+                };
+
+                SECTION("insertion sends a change callback")
+                {
+                    auto token = require_change();
+                    write([&]() {
+                        checked(realm_list_insert(strings.get(), 0, str1));
+                        checked(realm_list_insert(strings.get(), 1, str2));
+                        checked(realm_list_insert(strings.get(), 2, null));
+                    });
+                    CHECK(!state.error);
+                    CHECK(state.changes);
+
+                    size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
+                    realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
+                                                            &num_insertion_ranges, &num_modification_ranges,
+                                                            &num_moves);
+                    CHECK(num_deletion_ranges == 0);
+                    CHECK(num_insertion_ranges == 1);
+                    CHECK(num_modification_ranges == 0);
+                    CHECK(num_moves == 0);
+
+                    realm_index_range_t insertion_range;
+                    realm_collection_changes_get_ranges(state.changes.get(), nullptr, 0, &insertion_range, 1, nullptr,
+                                                        0, nullptr, 0, nullptr, 0);
+                    CHECK(insertion_range.from == 0);
+                    CHECK(insertion_range.to == 3);
+                }
+
+                SECTION("insertion, deletion, modification, modification after")
+                {
+                    write([&]() {
+                        checked(realm_list_insert(strings.get(), 0, str1));
+                        checked(realm_list_insert(strings.get(), 1, str2));
+                        checked(realm_list_insert(strings.get(), 2, str1));
+                    });
+
+                    auto token = require_change();
+
+                    write([&]() {
+                        checked(realm_list_erase(strings.get(), 1));
+                        checked(realm_list_insert(strings.get(), 0, null));
+                        checked(realm_list_insert(strings.get(), 1, null));
+
+                        // This element was previously at 0, and ends up at 2.
+                        checked(realm_list_set(strings.get(), 2, str1));
+                    });
+                    CHECK(!state.error);
+                    CHECK(state.changes);
+
+                    size_t num_deletion_ranges, num_insertion_ranges, num_modification_ranges, num_moves;
+                    realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
+                                                            &num_insertion_ranges, &num_modification_ranges,
+                                                            &num_moves);
+                    CHECK(num_deletion_ranges == 1);
+                    CHECK(num_insertion_ranges == 1);
+                    CHECK(num_modification_ranges == 1);
+                    CHECK(num_moves == 0);
+
+                    realm_index_range_t deletions, insertions, modifications, modifications_after;
+                    realm_collection_changes_get_ranges(state.changes.get(), &deletions, 1, &insertions, 1,
+                                                        &modifications, 1, &modifications_after, 1, nullptr, 0);
+                    CHECK(deletions.from == 1);
+                    CHECK(insertions.from == 0);
+                    CHECK(insertions.to == 2);
+                    CHECK(modifications.from == 0);
+                    CHECK(modifications_after.from == 2);
+                }
+            }
         }
 
         SECTION("notifications")
@@ -421,7 +521,7 @@ TEST_CASE("C API")
                 state->changes = clone_cptr(changes);
             };
 
-            auto on_error = [](void* userdata, realm_async_error_t* err) {
+            auto on_error = [](void* userdata, const realm_async_error_t* err) {
                 auto state = static_cast<State*>(userdata);
                 state->error = clone_cptr(err);
             };
