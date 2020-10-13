@@ -22,114 +22,99 @@
 namespace realm {
 namespace app {
 
-static void handle_delete_count_response(util::Optional<AppError> error,
-                                         util::Optional<bson::Bson> value,
-                                         std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
+using ResponseHandler = std::function<void(util::Optional<app::AppError>, util::Optional<bson::Bson>)>;
+
+namespace {
+
+ResponseHandler get_delete_count_handler(
+    std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    if (value && !error) {
+    return [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (value && !error) {
+            try {
+                auto document = static_cast<bson::BsonDocument>(*value);
+                auto count = static_cast<int32_t>(document["deletedCount"]);
+                return completion_block(count, error);
+            }
+            catch (const std::exception& e) {
+                return completion_block(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+            }
+        }
+
+        return completion_block(0, error);
+    };
+}
+
+ResponseHandler get_update_handler(
+    std::function<void(MongoCollection::UpdateResult, util::Optional<AppError>)> completion_block)
+{
+    return [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block({}, error);
+        }
+
         try {
             auto document = static_cast<bson::BsonDocument>(*value);
-            auto count = static_cast<int32_t>(document["deletedCount"]);
-            return completion_block(count, error);
-        } catch (const std::exception& e) {
-            return completion_block(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
-        }
-    }
+            auto matched_count = static_cast<int32_t>(document["matchedCount"]);
+            auto modified_count = static_cast<int32_t>(document["modifiedCount"]);
 
-    return completion_block(0, error);
+            util::Optional<ObjectId> upserted_id;
+            auto it = document.find("upsertedId");
+            if (it != document.end()) {
+                upserted_id = static_cast<ObjectId>(document["upsertedId"]);
+            }
+
+            return completion_block(MongoCollection::UpdateResult{
+                matched_count,
+                modified_count,
+                upserted_id
+            }, error);
+        }
+        catch (const std::exception& e) {
+            return completion_block({}, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+        }
+    };
 }
 
-static void handle_update_response(util::Optional<AppError> error,
-                                   util::Optional<bson::Bson> value,
-                                   std::function<void(MongoCollection::UpdateResult,
-                                                      util::Optional<AppError>)> completion_block)
+ResponseHandler get_document_handler(
+    std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-
-    if (error) {
-        return completion_block({}, error);
-    }
-
-    try {
-        auto document = static_cast<bson::BsonDocument>(*value);
-        auto matched_count = static_cast<int32_t>(document["matchedCount"]);
-        auto modified_count = static_cast<int32_t>(document["modifiedCount"]);
-
-        util::Optional<ObjectId> upserted_id;
-        auto it = document.find("upsertedId");
-        if (it != document.end()) {
-            upserted_id = static_cast<ObjectId>(document["upsertedId"]);
+    return [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(util::none, error);
         }
 
-        return completion_block(MongoCollection::UpdateResult {
-            matched_count,
-            modified_count,
-            upserted_id
-        }, error);
-    } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
-    }
+        if (!value) {
+            // no docs were found
+            return completion_block(util::none, util::none);
+        }
+
+        if (bson::holds_alternative<util::None>(*value)) {
+            // no docs were found
+            return completion_block(util::none, util::none);
+        }
+
+        return completion_block(static_cast<bson::BsonDocument>(*value), util::none);
+    };
 }
 
-static void handle_document_response(util::Optional<AppError> error,
-                                     util::Optional<bson::Bson> value,
-                                     std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
-{
-    if (error) {
-        return completion_block(util::none, error);
-    }
-
-    if (!value) {
-        // no docs were found
-        return completion_block(util::none, util::none);
-    }
-
-    if (bson::holds_alternative<util::None>(*value)) {
-        // no docs were found
-        return completion_block(util::none, util::none);
-    }
-
-    return completion_block(static_cast<bson::BsonDocument>(*value),
-                            util::none);
-}
+} // anonymous namespace
 
 void MongoCollection::find(const bson::BsonDocument& filter_bson,
                            FindOptions options,
                            std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args["query"] = filter_bson;
-
-        if (options.limit) {
-            base_args["limit"] = *options.limit;
+    find_bson(filter_bson, options, [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        if (error) {
+            return completion_block(util::none, error);
         }
 
-        if (options.projection_bson) {
-            base_args["project"] = *options.projection_bson;
-        }
-
-        if (options.sort_bson) {
-            base_args["sort"] = *options.sort_bson;
-        }
-
-        m_service->call_function(m_user,
-                                 "find",
-                                 bson::BsonArray({base_args}),
-                                 m_service_name,
-                                 [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-            if (error) {
-                return completion_block(util::none, error);
-            }
-
-            return completion_block(util::some<bson::BsonArray>(static_cast<bson::BsonArray>(*value)), util::none);
-        });
-    } catch (const std::exception& e) {
-        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+        return completion_block(static_cast<bson::BsonArray>(*value), util::none);
+    });
 }
 
 void MongoCollection::find(const bson::BsonDocument& filter_bson,
-                           std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
+                            std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
     find(filter_bson, {}, completion_block);
 }
@@ -138,39 +123,12 @@ void MongoCollection::find_one(const bson::BsonDocument& filter_bson,
                                FindOptions options,
                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    try {
-        auto base_args = m_base_operation_args;
-        base_args["query"] = filter_bson;
-
-        if (options.limit) {
-            base_args["limit"] = *options.limit;
-        }
-
-        if (options.projection_bson) {
-            base_args["project"] = *options.projection_bson;
-        }
-
-        if (options.sort_bson) {
-            base_args["sort"] = *options.sort_bson;
-        }
-
-        m_service->call_function(m_user,
-                                 "findOne",
-                                 bson::BsonArray({base_args}),
-                                 m_service_name,
-                                 [completion_block](util::Optional<AppError> error,
-                                                    util::Optional<bson::Bson> value) {
-            handle_document_response(error, value, completion_block);
-        });
-
-    } catch (const std::exception& e) {
-        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-    }
+    find_one_bson(filter_bson, options, get_document_handler(completion_block));
 }
 
 void MongoCollection::find_one(const bson::BsonDocument& filter_bson,
-                               std::function<void(util::Optional<bson::BsonDocument>,
-                                                  util::Optional<AppError>)> completion_block)
+                                std::function<void(util::Optional<bson::BsonDocument>,
+                                util::Optional<AppError>)> completion_block)
 {
     find_one(filter_bson, {}, completion_block);
 }
@@ -178,36 +136,21 @@ void MongoCollection::find_one(const bson::BsonDocument& filter_bson,
 void MongoCollection::insert_one(const bson::BsonDocument& value_bson,
                                  std::function<void(util::Optional<bson::Bson>, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["document"] = value_bson;
-
-    m_service->call_function(m_user,
-                             "insertOne",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+    insert_one_bson(value_bson, [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
         if (error) {
             return completion_block(util::none, error);
         }
 
         auto document = static_cast<bson::BsonDocument>(*value);
 
-        return completion_block(document["insertedId"],
-                                util::none);
+        return completion_block(document["insertedId"], util::none);
     });
 }
 
-void MongoCollection::aggregate(const bson::BsonArray& pipline,
+void MongoCollection::aggregate(const bson::BsonArray& pipeline,
                                 std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["pipeline"] = pipline;
-
-    m_service->call_function(m_user,
-                             "aggregate",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+    aggregate_bson(pipeline, [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
         if (error) {
             return completion_block(util::none, error);
         }
@@ -220,18 +163,7 @@ void MongoCollection::count(const bson::BsonDocument& filter_bson,
                             int64_t limit,
                             std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-
-    if (limit != 0) {
-        base_args["limit"] = limit;
-    }
-
-    m_service->call_function(m_user,
-                             "count",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+    count_bson(filter_bson, limit, [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
         if (error) {
             return completion_block(0, error);
         }
@@ -247,20 +179,13 @@ void MongoCollection::count(const bson::BsonDocument& filter_bson,
 }
 
 void MongoCollection::insert_many(bson::BsonArray documents,
-                                  std::function<void(std::vector<bson::Bson>,
-                                                     util::Optional<AppError>)> completion_block)
+                                  std::function<void(std::vector<bson::Bson>, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["documents"] = documents;
-
-    m_service->call_function(m_user,
-                             "insertMany",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+    insert_many_bson(documents, [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
         if (error) {
             return completion_block({}, error);
         }
+
         auto bson = static_cast<bson::BsonDocument>(*value);
         auto inserted_ids = static_cast<bson::BsonArray>(bson["insertedIds"]);
         return completion_block(std::vector<bson::Bson>(inserted_ids.begin(), inserted_ids.end()), error);
@@ -270,57 +195,26 @@ void MongoCollection::insert_many(bson::BsonArray documents,
 void MongoCollection::delete_one(const bson::BsonDocument& filter_bson,
                                  std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-
-    m_service->call_function(m_user,
-                             "deleteOne",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_delete_count_response(error, value, completion_block);
-    });
+    delete_one_bson(filter_bson, get_delete_count_handler(completion_block));
 }
 
 void MongoCollection::delete_many(const bson::BsonDocument& filter_bson,
-                                  std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
+                                    std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-
-    m_service->call_function(m_user,
-                             "deleteMany",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_delete_count_response(error, value, completion_block);
-    });
+    delete_many_bson(filter_bson, get_delete_count_handler(completion_block));
 }
 
 void MongoCollection::update_one(const bson::BsonDocument& filter_bson,
                                  const bson::BsonDocument& update_bson,
                                  bool upsert,
-                                 std::function<void(MongoCollection::UpdateResult,
-                                                    util::Optional<AppError>)> completion_block)
+                                 std::function<void(MongoCollection::UpdateResult, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-    base_args["update"] = update_bson;
-    base_args["upsert"] = upsert;
-
-    m_service->call_function(m_user,
-                             "updateOne",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_update_response(error, value, completion_block);
-    });
+    update_one_bson(filter_bson, update_bson, upsert, get_update_handler(completion_block));
 }
 
 void MongoCollection::update_one(const bson::BsonDocument& filter_bson,
                                  const bson::BsonDocument& update_bson,
-                                 std::function<void(MongoCollection::UpdateResult,
-                                                    util::Optional<AppError>)> completion_block)
+                                 std::function<void(MongoCollection::UpdateResult, util::Optional<AppError>)> completion_block)
 {
     update_one(filter_bson, update_bson, {}, completion_block);
 }
@@ -328,21 +222,9 @@ void MongoCollection::update_one(const bson::BsonDocument& filter_bson,
 void MongoCollection::update_many(const bson::BsonDocument& filter_bson,
                                   const bson::BsonDocument& update_bson,
                                   bool upsert,
-                                  std::function<void(MongoCollection::UpdateResult,
-                                                     util::Optional<AppError>)> completion_block)
+                                  std::function<void(MongoCollection::UpdateResult, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
-    base_args["update"] = update_bson;
-    base_args["upsert"] = upsert;
-
-    m_service->call_function(m_user,
-                             "updateMany",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_update_response(error, value, completion_block);
-    });
+    update_many_bson(filter_bson, update_bson, upsert, get_update_handler(completion_block));
 }
 
 void MongoCollection::update_many(const bson::BsonDocument& filter_bson,
@@ -357,18 +239,7 @@ void MongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
                                           MongoCollection::FindOneAndModifyOptions options,
                                           std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["filter"] = filter_bson;
-    base_args["update"] = update_bson;
-    options.set_bson(base_args);
-
-    m_service->call_function(m_user,
-                             "findOneAndUpdate",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_document_response(error, value, completion_block);
-    });
+    find_one_and_update_bson(filter_bson, update_bson, options, get_document_handler(completion_block));
 }
 
 void MongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
@@ -383,18 +254,7 @@ void MongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson
                                            MongoCollection::FindOneAndModifyOptions options,
                                            std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["filter"] = filter_bson;
-    base_args["update"] = replacement_bson;
-    options.set_bson(base_args);
-
-    m_service->call_function(m_user,
-                             "findOneAndReplace",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_document_response(error, value, completion_block);
-    });
+    find_one_and_replace_bson(filter_bson, replacement_bson, options, get_document_handler(completion_block));
 }
 
 void MongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
@@ -408,23 +268,223 @@ void MongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
                                           MongoCollection::FindOneAndModifyOptions options,
                                           std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    auto base_args = m_base_operation_args;
-    base_args["filter"] = filter_bson;
-    options.set_bson(base_args);
-
-    m_service->call_function(m_user,
-                             "findOneAndDelete",
-                             bson::BsonArray({base_args}),
-                             m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        handle_document_response(error, value, completion_block);
-    });
+    find_one_and_delete_bson(filter_bson, options, get_document_handler(completion_block));
 }
 
 void MongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
                                           std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_delete(filter_bson, {}, completion_block);
+}
+
+void MongoCollection::find_bson(const bson::BsonDocument& filter_bson,
+                                FindOptions options,
+                                std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) try
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+
+    if (options.limit) {
+        base_args["limit"] = *options.limit;
+    }
+
+    if (options.projection_bson) {
+        base_args["project"] = *options.projection_bson;
+    }
+
+    if (options.sort_bson) {
+        base_args["sort"] = *options.sort_bson;
+    }
+
+    m_service->call_function(m_user, "find",
+                                bson::BsonArray({ base_args }),
+                                m_service_name,
+                                completion_block);
+} catch (const std::exception& e) {
+    return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()), util::none);
+}
+
+void MongoCollection::find_one_bson(const bson::BsonDocument& filter_bson,
+                                    FindOptions options,
+                                    std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) try
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+
+    if (options.limit) {
+        base_args["limit"] = *options.limit;
+    }
+
+    if (options.projection_bson) {
+        base_args["project"] = *options.projection_bson;
+    }
+
+    if (options.sort_bson) {
+        base_args["sort"] = *options.sort_bson;
+    }
+
+    m_service->call_function(m_user, "findOne",
+                                bson::BsonArray({ base_args }),
+                                m_service_name,
+                                completion_block);
+}
+catch (const std::exception& e) {
+    return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()), util::none);
+}
+
+void MongoCollection::insert_one_bson(const bson::BsonDocument& value_bson,
+                                      std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["document"] = value_bson;
+
+    m_service->call_function(m_user, "insertOne",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::aggregate_bson(const bson::BsonArray& pipline,
+                                     std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["pipeline"] = pipline;
+
+    m_service->call_function(m_user, "aggregate",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::count_bson(const bson::BsonDocument& filter_bson,
+                                 int64_t limit,
+                                 std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+
+    if (limit != 0) {
+        base_args["limit"] = limit;
+    }
+
+    m_service->call_function(m_user, "count",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::insert_many_bson(bson::BsonArray documents,
+                                       std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["documents"] = documents;
+
+    m_service->call_function(m_user, "insertMany",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::delete_one_bson(const bson::BsonDocument& filter_bson,
+                                      std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+
+    m_service->call_function(m_user, "deleteOne",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::delete_many_bson(const bson::BsonDocument& filter_bson,
+                                       std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+
+    m_service->call_function(m_user, "deleteMany",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::update_one_bson(const bson::BsonDocument& filter_bson,
+                                      const bson::BsonDocument& update_bson,
+                                      bool upsert,
+                                      std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    base_args["update"] = update_bson;
+    base_args["upsert"] = upsert;
+
+    m_service->call_function(m_user, "updateOne",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::update_many_bson(const bson::BsonDocument& filter_bson,
+                                       const bson::BsonDocument& update_bson,
+                                       bool upsert,
+                                       std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["query"] = filter_bson;
+    base_args["update"] = update_bson;
+    base_args["upsert"] = upsert;
+
+    m_service->call_function(m_user, "updateMany",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::find_one_and_update_bson(const bson::BsonDocument& filter_bson,
+                                               const bson::BsonDocument& update_bson,
+                                               MongoCollection::FindOneAndModifyOptions options,
+                                               std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["filter"] = filter_bson;
+    base_args["update"] = update_bson;
+    options.set_bson(base_args);
+
+    m_service->call_function(m_user, "findOneAndUpdate",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::find_one_and_replace_bson(const bson::BsonDocument& filter_bson,
+                                                const bson::BsonDocument& replacement_bson,
+                                                MongoCollection::FindOneAndModifyOptions options,
+                                                std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["filter"] = filter_bson;
+    base_args["update"] = replacement_bson;
+    options.set_bson(base_args);
+
+    m_service->call_function(m_user, "findOneAndReplace",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
+}
+
+void MongoCollection::find_one_and_delete_bson(const bson::BsonDocument& filter_bson,
+                                               MongoCollection::FindOneAndModifyOptions options,
+                                               std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
+    base_args["filter"] = filter_bson;
+    options.set_bson(base_args);
+
+    m_service->call_function(m_user, "findOneAndDelete",
+                             bson::BsonArray({ base_args }),
+                             m_service_name,
+                             completion_block);
 }
 
 void WatchStream::feed_buffer(std::string_view input) {

@@ -110,7 +110,7 @@ public:
 
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param options `RemoteFindOptions` to use when executing the command.
+    /// @param options `FindOptions` to use when executing the command.
     /// @param completion_block The resulting bson array of documents or error if one occurs
     void find(const bson::BsonDocument& filter_bson,
               FindOptions options,
@@ -127,7 +127,7 @@ public:
     /// returns the first document according to the query's sort order or natural
     /// order.
     /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param options `RemoteFindOptions` to use when executing the command.
+    /// @param options `FindOptions` to use when executing the command.
     /// @param completion_block The resulting bson or error if one occurs
     void find_one(const bson::BsonDocument& filter_bson,
                   FindOptions options,
@@ -232,7 +232,7 @@ public:
     /// operations.
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
-    /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
+    /// @param options Optional `FindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to update a document.
     void find_one_and_update(const bson::BsonDocument& filter_bson,
                              const bson::BsonDocument& update_bson,
@@ -260,7 +260,7 @@ public:
     /// find and update operations.
     /// @param filter_bson  A `Document` that should match the query.
     /// @param replacement_bson  A `Document` describing the update.
-    /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
+    /// @param options Optional `FindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to replace a document.
     void find_one_and_replace(const bson::BsonDocument& filter_bson,
                               const bson::BsonDocument& replacement_bson,
@@ -287,7 +287,7 @@ public:
     /// other update operations changing the document between separate find and
     /// delete operations.
     /// @param filter_bson  A `Document` that should match the query.
-    /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
+    /// @param options Optional `FindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              FindOneAndModifyOptions options,
@@ -303,6 +303,60 @@ public:
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+
+    // The following methods are equivalent to the ones without _bson suffix with the exception
+     // that they return the raw bson response from the function instead of attempting to parse it.
+
+    void find_bson(const bson::BsonDocument& filter_bson,
+        FindOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_bson(const bson::BsonDocument& filter_bson,
+        FindOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void aggregate_bson(const bson::BsonArray& pipeline,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void count_bson(const bson::BsonDocument& filter_bson,
+        int64_t limit,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void insert_one_bson(const bson::BsonDocument& value_bson,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void insert_many_bson(bson::BsonArray documents,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void delete_one_bson(const bson::BsonDocument& filter_bson,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void delete_many_bson(const bson::BsonDocument& filter_bson,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void update_one_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& update_bson,
+        bool upsert,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void update_many_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& update_bson,
+        bool upsert,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_and_update_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& update_bson,
+        FindOneAndModifyOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_and_replace_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& replacement_bson,
+        FindOneAndModifyOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_and_delete_bson(const bson::BsonDocument& filter_bson,
+        FindOneAndModifyOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
 
     /*
      * SDKs should also support a watch method with the following 3 overloads:
