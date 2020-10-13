@@ -499,10 +499,16 @@ TEST_CASE("C API")
                     realm_collection_changes_get_ranges(state.changes.get(), &deletions, 1, &insertions, 1,
                                                         &modifications, 1, &modifications_after, 1, nullptr, 0);
                     CHECK(deletions.from == 1);
+                    CHECK(deletions.to == 2);
+
                     CHECK(insertions.from == 0);
                     CHECK(insertions.to == 2);
+
                     CHECK(modifications.from == 0);
+                    CHECK(modifications.to == 1);
+
                     CHECK(modifications_after.from == 2);
+                    CHECK(modifications_after.to == 3);
                 }
             }
         }
