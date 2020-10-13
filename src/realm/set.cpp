@@ -25,7 +25,7 @@
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 #include "realm/array_typed_link.hpp"
 #include "realm/array_mixed.hpp"
 #include "realm/replication.hpp"
@@ -81,6 +81,12 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
                 return std::make_unique<Set<util::Optional<ObjectId>>>(*this, col_key);
             else
                 return std::make_unique<Set<ObjectId>>(*this, col_key);
+        }
+        case type_UUID: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<UUID>>>(*this, col_key);
+            else
+                return std::make_unique<Set<UUID>>(*this, col_key);
         }
         case type_TypedLink: {
             return std::make_unique<Set<ObjLink>>(*this, col_key);

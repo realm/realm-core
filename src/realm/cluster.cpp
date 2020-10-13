@@ -1169,6 +1169,9 @@ void Cluster::verify() const
                 case col_type_ObjectId:
                     verify_set<ObjectId>(arr, *sz);
                     break;
+                case col_type_UUID:
+                    verify_set<UUID>(arr, *sz);
+                    break;
                 case col_type_Link:
                     verify_set<ObjKey>(arr, *sz);
                     break;

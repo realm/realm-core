@@ -174,6 +174,8 @@ struct SetElementLessThan<Mixed> {
                 return a.get<Decimal128>() < b.get<Decimal128>();
             case type_ObjectId:
                 return a.get<ObjectId>() < b.get<ObjectId>();
+            case type_UUID:
+                return a.get<UUID>() < b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() < b.get<ObjLink>();
             case type_OldTable:
@@ -228,6 +230,8 @@ struct SetElementEquals<Mixed> {
                 return a.get<Decimal128>() == b.get<Decimal128>();
             case type_ObjectId:
                 return a.get<ObjectId>() == b.get<ObjectId>();
+            case type_UUID:
+                return a.get<UUID>() == b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() == b.get<ObjLink>();
             case type_OldTable:

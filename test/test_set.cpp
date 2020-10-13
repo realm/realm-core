@@ -22,6 +22,7 @@
 #include <realm/array_mixed.hpp>
 
 #include "test.hpp"
+#include "test_types_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -215,4 +216,53 @@ TEST(Set_Links)
     CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
+}
+
+// FIXME: Set::erase_null() doesn't work for nullable float/double
+TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>, Prop<ObjectId>,
+           Prop<Decimal128>, Prop<BinaryData>, Nullable<Int>, Nullable<String>,
+           /*Nullable<Float>, Nullable<Double>,*/ Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>,
+           Nullable<Decimal128>, Nullable<BinaryData>)
+{
+    using type = typename TEST_TYPE::type;
+    TestValueGenerator gen;
+    Group g;
+
+    auto t = g.add_table("foo");
+    auto col = t->add_column_set(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    CHECK(col.is_set());
+
+    auto obj = t->create_object();
+    {
+        auto s = obj.get_set<type>(col);
+        auto values = gen.values_from_int<type>({0, 1, 2, 3});
+        for (auto v : values) {
+            s.insert(v);
+        }
+        CHECK_EQUAL(s.size(), values.size());
+        for (auto v : values) {
+            auto ndx = s.find(v);
+            CHECK_NOT_EQUAL(ndx, realm::npos);
+        }
+        auto [erased_ndx, erased] = s.erase(values[0]);
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 0);
+        CHECK_EQUAL(s.size(), values.size() - 1);
+
+        s.clear();
+        CHECK_EQUAL(s.size(), 0);
+
+        if (TEST_TYPE::is_nullable) {
+            s.insert_null();
+            CHECK_EQUAL(s.size(), 1);
+            auto null_value = TEST_TYPE::default_value();
+            CHECK(value_is_null(null_value));
+            auto ndx = s.find(null_value);
+            CHECK_NOT_EQUAL(ndx, realm::npos);
+            s.erase_null();
+            CHECK_EQUAL(s.size(), 0);
+            ndx = s.find(null_value);
+            CHECK_EQUAL(ndx, realm::npos);
+        }
+    }
 }
