@@ -142,6 +142,22 @@ RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_chan
         *out_num_moves = changes->moves.size();
 }
 
+RLM_API void realm_collection_changes_get_num_changes(const realm_collection_changes_t* changes,
+                                                      size_t* out_num_deletions, size_t* out_num_insertions,
+                                                      size_t* out_num_modifications, size_t* out_num_moves)
+{
+    // FIXME: This has O(n) performance, which seems ridiculous.
+
+    if (out_num_deletions)
+        *out_num_deletions = changes->deletions.count();
+    if (out_num_insertions)
+        *out_num_insertions = changes->insertions.count();
+    if (out_num_modifications)
+        *out_num_modifications = changes->modifications.count();
+    if (out_num_moves)
+        *out_num_moves = changes->moves.size();
+}
+
 static inline void copy_index_ranges(const IndexSet& index_set, realm_index_range_t* out_ranges, size_t max)
 {
     size_t i = 0;
@@ -170,6 +186,44 @@ RLM_API void realm_collection_changes_get_ranges(
     }
     if (out_modification_ranges_after) {
         copy_index_ranges(changes->modifications_new, out_modification_ranges_after, max_modification_ranges_after);
+    }
+    if (out_moves) {
+        size_t i = 0;
+        for (auto [from, to] : changes->moves) {
+            if (i >= max_moves)
+                break;
+            out_moves[i] = realm_collection_move_t{from, to};
+        }
+    }
+}
+
+static inline void copy_indices(const IndexSet& index_set, size_t* out_indices, size_t max)
+{
+    size_t i = 0;
+    for (auto index : index_set.as_indexes()) {
+        if (i >= max)
+            return;
+        out_indices[i] = index;
+    }
+}
+
+RLM_API void realm_collection_changes_get_changes(const realm_collection_changes_t* changes, size_t* out_deletions,
+                                                  size_t max_deletions, size_t* out_insertions, size_t max_insertions,
+                                                  size_t* out_modifications, size_t max_modifications,
+                                                  size_t* out_modifications_after, size_t max_modifications_after,
+                                                  realm_collection_move_t* out_moves, size_t max_moves)
+{
+    if (out_deletions) {
+        copy_indices(changes->deletions, out_deletions, max_deletions);
+    }
+    if (out_insertions) {
+        copy_indices(changes->insertions, out_insertions, max_insertions);
+    }
+    if (out_modifications) {
+        copy_indices(changes->modifications, out_modifications, max_modifications);
+    }
+    if (out_modifications_after) {
+        copy_indices(changes->modifications_new, out_modifications_after, max_modifications_after);
     }
     if (out_moves) {
         size_t i = 0;
