@@ -30,6 +30,7 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
+#include <realm/list.hpp>
 
 #include "sync_fixtures.hpp"
 
@@ -8154,6 +8155,138 @@ TEST(Sync_Dictionary_Links)
 
         CHECK(dict.find("b") != dict.end());
         CHECK((*dict.find("b")).second == Mixed{b.get_link()});
+    }
+}
+
+TEST(Sync_Set)
+{
+    // Test replication and synchronization of Set values.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    ColKey col_ints, col_strings, col_mixeds;
+    {
+        WriteTransaction wt{db_1};
+        auto t = sync::create_table_with_primary_key(wt, "class_Foo", type_Int, "pk");
+        col_ints = t->add_column_set(type_Int, "ints");
+        col_strings = t->add_column_set(type_String, "strings");
+        col_mixeds = t->add_column_set(type_Mixed, "mixeds");
+
+        auto obj = t->create_object_with_primary_key(0);
+
+        auto ints = obj.get_set<int64_t>(col_ints);
+        auto strings = obj.get_set<StringData>(col_strings);
+        auto mixeds = obj.get_set<Mixed>(col_mixeds);
+
+        ints.insert(123);
+        ints.insert(456);
+        ints.insert(789);
+        ints.insert(123);
+        ints.insert(456);
+        ints.insert(789);
+
+        CHECK_EQUAL(ints.size(), 3);
+        CHECK_EQUAL(ints.find(123), 0);
+        CHECK_EQUAL(ints.find(456), 1);
+        CHECK_EQUAL(ints.find(789), 2);
+
+        strings.insert("a");
+        strings.insert("b");
+        strings.insert("c");
+        strings.insert("a");
+        strings.insert("b");
+        strings.insert("c");
+
+        CHECK_EQUAL(strings.size(), 3);
+        CHECK_EQUAL(strings.find("a"), 0);
+        CHECK_EQUAL(strings.find("b"), 1);
+        CHECK_EQUAL(strings.find("c"), 2);
+
+        mixeds.insert(Mixed{123});
+        mixeds.insert(Mixed{"a"});
+        mixeds.insert(Mixed{456.0});
+        mixeds.insert(Mixed{123});
+        mixeds.insert(Mixed{"a"});
+        mixeds.insert(Mixed{456.0});
+
+        CHECK_EQUAL(mixeds.size(), 3);
+        CHECK_EQUAL(mixeds.find(123), 0);
+        CHECK_EQUAL(mixeds.find("a"), 1);
+        CHECK_EQUAL(mixeds.find(456.0), 2);
+
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    // Create a conflict. Session 1 should lose, because it has a lower peer ID.
+    {
+        WriteTransaction wt{db_1};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.insert(999);
+
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    {
+        WriteTransaction wt{db_2};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.insert(999);
+        ints.erase(999);
+
+        session_2.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+        CHECK(compare_groups(read_1, read_2));
+    }
+
+    {
+        WriteTransaction wt{db_1};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.clear();
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+        CHECK(compare_groups(read_1, read_2));
     }
 }
 

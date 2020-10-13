@@ -46,6 +46,7 @@ set(REALM_SOURCES
     query_engine.cpp
     query_expression.cpp
     replication.cpp
+    set.cpp
     spec.cpp
     string_data.cpp
     table.cpp
@@ -163,6 +164,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     query_expression.hpp
     realm_nmmintrin.h
     replication.hpp
+    set.hpp
     spec.hpp
     string_data.hpp
     table.hpp
@@ -338,8 +340,10 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         COMPONENT devel)
 
 add_subdirectory(parser)
-add_subdirectory(exec)
 add_subdirectory(object-store)
 if (REALM_ENABLE_SYNC)
     add_subdirectory(sync)
+endif()
+if(NOT REALM_BUILD_LIB_ONLY)
+    add_subdirectory(exec)
 endif()

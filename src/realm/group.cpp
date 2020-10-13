@@ -1620,6 +1620,19 @@ public:
         return true; // No-op
     }
 
+    bool set_insert(size_t)
+    {
+        return true; // No-op
+    }
+    bool set_erase(size_t)
+    {
+        return true; // No-op
+    }
+    bool set_clear(size_t)
+    {
+        return true; // No-op
+    }
+
 private:
     bool& m_schema_changed;
 };

@@ -35,7 +35,10 @@ namespace sync {
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
     X(ArrayErase)                                                                                                    \
-    X(ArrayClear)
+    X(ArrayClear)                                                                                                    \
+    X(SetInsert)                                                                                                     \
+    X(SetErase)                                                                                                      \
+    X(SetClear)
 
 struct StringBufferRange {
     uint32_t offset, size;
@@ -476,9 +479,9 @@ struct AddColumn : TableInstruction {
 
     InternString field;
 
-    // `none` for Mixed columns. Mixed columns are always nullable.
+    // `Type::Null` for Mixed columns. Mixed columns are always nullable.
     Payload::Type type;
-    // `none` for other than dictionary columns
+    // `Type::Null` for other than dictionary columns
     Payload::Type key_type;
 
     bool nullable;
@@ -608,6 +611,36 @@ struct ArrayClear : PathInstruction {
     }
 };
 
+struct SetInsert : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+
+    bool operator==(const SetInsert& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value;
+    }
+};
+
+struct SetErase : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+
+    bool operator==(const SetErase& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value;
+    }
+};
+
+struct SetClear : PathInstruction {
+    using PathInstruction::PathInstruction;
+
+    bool operator==(const SetClear& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs);
+    }
+};
+
+
 } // namespace instr
 
 struct Instruction {
@@ -638,6 +671,9 @@ struct Instruction {
         ArrayMove = 9,
         ArrayErase = 10,
         ArrayClear = 11,
+        SetInsert = 12,
+        SetErase = 13,
+        SetClear = 14,
     };
 
     template <Type t>

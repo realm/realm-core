@@ -211,6 +211,21 @@ void ChangesetEncoder::operator()(const Instruction::ArrayClear& instr)
     append_path_instr(Instruction::Type::ArrayClear, instr, instr.prior_size);
 }
 
+void ChangesetEncoder::operator()(const Instruction::SetInsert& instr)
+{
+    append_path_instr(Instruction::Type::SetInsert, instr, instr.value);
+}
+
+void ChangesetEncoder::operator()(const Instruction::SetErase& instr)
+{
+    append_path_instr(Instruction::Type::SetErase, instr, instr.value);
+}
+
+void ChangesetEncoder::operator()(const Instruction::SetClear& instr)
+{
+    append_path_instr(Instruction::Type::SetClear, instr);
+}
+
 InternString ChangesetEncoder::intern_string(StringData str)
 {
     auto it = m_intern_strings_rev.find(str);

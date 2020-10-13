@@ -363,6 +363,17 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
+ColKey Table::add_column_set(DataType type, StringData name, bool nullable)
+{
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_Set);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
+}
+
 ColKey Table::add_column_list(Table& target, StringData name)
 {
     // Both origin and target must be group-level tables, and in the same group.
@@ -380,6 +391,24 @@ ColKey Table::add_column_list(Table& target, StringData name)
     ColKey col_key = generate_col_key(col_type_LinkList, attr);
 
     return do_insert_column(col_key, type_LinkList, name, &target); // Throws
+}
+
+ColKey Table::add_column_set(Table& target, StringData name)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+    if (target.is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_Set);
+    ColKey col_key = generate_col_key(col_type_Link, attr);
+    return do_insert_column(col_key, type_Link, name, &target); // Throws
 }
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
