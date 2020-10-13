@@ -124,7 +124,7 @@ std::error_code make_client_error_code(ClientErrorCode) noexcept;
 struct AppError {
 
     std::error_code error_code;
-    util::Optional<std::error_code> http_status_code;
+    util::Optional<int> http_status_code;
 
     std::string message;
     std::string link_to_server_logs;
@@ -132,7 +132,7 @@ struct AppError {
     AppError(std::error_code error_code,
              std::string message,
              std::string link = "",
-             util::Optional<std::error_code> http_error_code = util::none)
+             util::Optional<int> http_error_code = util::none)
     : error_code(error_code)
     , http_status_code(http_error_code)
     , message(message)

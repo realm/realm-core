@@ -53,12 +53,12 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
                 return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
                                 message != body.end() ? message->get<std::string>() : "no error message",
                                 std::move(parsed_link),
-                                make_http_error_code(response.http_status_code));
+                                response.http_status_code);
             } else if (message != body.end()) {
                 return AppError(make_error_code(ServiceErrorCode::unknown),
                                 message->get<std::string>(),
                                 std::move(parsed_link),
-                                make_http_error_code(response.http_status_code));
+                                response.http_status_code);
             }
         }
     } catch (const std::exception&) {
@@ -70,7 +70,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         return AppError(make_custom_error_code(response.custom_status_code),
                         error_msg,
                         "",
-                        make_http_error_code(response.http_status_code));
+                        response.http_status_code);
     }
 
     if (http_status_code_is_fatal)
@@ -78,7 +78,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
         return AppError(make_http_error_code(response.http_status_code),
                         "http error code considered fatal",
                         "",
-                        make_http_error_code(response.http_status_code));
+                        response.http_status_code);
     }
 
     return {};

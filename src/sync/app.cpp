@@ -978,7 +978,7 @@ void App::handle_auth_failure(const AppError& error,
     };
 
     // Only handle auth failures
-    if (*error.http_status_code && (*error.http_status_code).value() == 401) {
+    if (*error.http_status_code && *error.http_status_code == 401) {
         if (request.uses_refresh_token) {
             if (sync_user && sync_user->is_logged_in()) {
                 sync_user->log_out();
