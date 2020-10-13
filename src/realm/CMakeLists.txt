@@ -46,6 +46,7 @@ set(REALM_SOURCES
     query_engine.cpp
     query_expression.cpp
     replication.cpp
+    set.cpp
     spec.cpp
     string_data.cpp
     table.cpp
@@ -162,6 +163,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     query_expression.hpp
     realm_nmmintrin.h
     replication.hpp
+    set.hpp
     spec.hpp
     string_data.hpp
     table.hpp

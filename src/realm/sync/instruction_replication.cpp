@@ -353,6 +353,13 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
             REALM_ASSERT(key_type == type_String);
             instr.key_type = get_payload_type(key_type);
         }
+        else if (col_key.is_set()) {
+            instr.collection_type = CollectionType::Set;
+            auto value_type = table->get_column_type(col_key);
+            REALM_ASSERT(value_type != type_LinkList);
+            instr.type = get_payload_type(value_type);
+            instr.key_type = Instruction::Payload::Type::Null;
+        }
         else {
             REALM_ASSERT(!col_key.is_collection());
             instr.collection_type = CollectionType::Single;
@@ -543,6 +550,40 @@ void SyncReplication::list_clear(const CollectionBase& view)
     }
 }
 
+void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed value)
+{
+    TrivialReplication::set_insert(set, set_ndx, value);
+
+    if (select_collection(set)) {
+        Instruction::SetInsert instr;
+        populate_path_instr(instr, set);
+        instr.value = as_payload(set, value);
+        emit(instr);
+    }
+}
+
+void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
+{
+    TrivialReplication::set_erase(set, set_ndx, value);
+
+    if (select_collection(set)) {
+        Instruction::SetErase instr;
+        populate_path_instr(instr, set);
+        instr.value = as_payload(set, value);
+        emit(instr);
+    }
+}
+
+void SyncReplication::set_clear(const CollectionBase& set)
+{
+    TrivialReplication::set_clear(set);
+
+    if (select_collection(set)) {
+        Instruction::SetClear instr;
+        populate_path_instr(instr, set);
+        emit(instr);
+    }
+}
 
 void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
 {
@@ -570,7 +611,6 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
     }
 }
 
-
 void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
 {
     TrivialReplication::dictionary_erase(dict, key);
@@ -586,7 +626,6 @@ void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
         emit(instr);
     }
 }
-
 
 void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
 {

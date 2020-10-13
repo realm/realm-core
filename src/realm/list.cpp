@@ -38,6 +38,7 @@
 
 namespace realm {
 
+// FIXME: This method belongs in obj.cpp.
 LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 {
     auto attr = get_table()->get_column_attr(col_key);

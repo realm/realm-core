@@ -134,13 +134,16 @@ public:
     size_t find_first(ObjLink value, size_t begin, size_t end) const noexcept
     {
         int64_t tk = (value.get_table_key().value + 1) & 0x7FFFFFFF;
+        size_t element_ndx = begin * 2;
+        size_t element_end = end * 2;
         for (;;) {
-            auto ndx = Array::find_first(tk, begin << 1, end << 1);
-            if (ndx == realm::npos)
+            element_ndx = Array::find_first(tk, element_ndx, element_end);
+            if (element_ndx == realm::npos)
                 return realm::npos;
-            if (!(ndx & 1) && (Array::get(ndx + 1) - 1) == value.get_obj_key().value) {
-                return ndx >> 1;
+            if (!(element_ndx & 1) && (Array::get(element_ndx + 1) - 1) == value.get_obj_key().value) {
+                return element_ndx / 2;
             }
+            ++element_ndx;
         }
         return realm::npos;
     }

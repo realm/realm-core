@@ -372,6 +372,26 @@ void Changeset::Reflector::operator()(const Instruction::ArrayClear& p) const
     m_tracer.field("prior_size", p.prior_size);
 }
 
+void Changeset::Reflector::operator()(const Instruction::SetInsert& p) const
+{
+    m_tracer.name("SetInsert");
+    path_instr(p);
+    m_tracer.field("value", p.value);
+}
+
+void Changeset::Reflector::operator()(const Instruction::SetErase& p) const
+{
+    m_tracer.name("SetErase");
+    path_instr(p);
+    m_tracer.field("value", p.value);
+}
+
+void Changeset::Reflector::operator()(const Instruction::SetClear& p) const
+{
+    m_tracer.name("SetClear");
+    path_instr(p);
+}
+
 void Changeset::Reflector::operator()(const Instruction::AddColumn& p) const
 {
     m_tracer.name("AddColumn");

@@ -35,6 +35,7 @@ class TableView;
 class CollectionBase;
 class CascadeState;
 class LstBase;
+class SetBase;
 struct GlobalKey;
 
 template <class>
@@ -42,10 +43,13 @@ class Lst;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
 using LstBasePtr = std::unique_ptr<LstBase>;
+using SetBasePtr = std::unique_ptr<SetBase>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 
+template <class>
+class Set;
 class Dictionary;
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
@@ -238,6 +242,14 @@ public:
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
+    template <typename U>
+    Set<U> get_set(StringData col_name) const
+    {
+        return get_set<U>(get_column_key(col_name));
+    }
+    template <typename U>
+    Set<U> get_set(ColKey col_key) const;
+    SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
@@ -257,6 +269,8 @@ private:
     friend class LnkLst;
     friend class Dictionary;
     friend class LinkMap;
+    template <class>
+    friend class Set;
     friend class Table;
     friend class Transaction;
 

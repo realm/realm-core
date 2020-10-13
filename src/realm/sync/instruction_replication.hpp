@@ -86,6 +86,10 @@ public:
     void list_erase(const CollectionBase&, size_t link_ndx) override;
     void list_clear(const CollectionBase&) override;
 
+    void set_insert(const CollectionBase& list, size_t list_ndx, Mixed value) override;
+    void set_erase(const CollectionBase& list, size_t list_ndx, Mixed value) override;
+    void set_clear(const CollectionBase& list) override;
+
     void dictionary_insert(const CollectionBase&, Mixed key, Mixed val) override;
     void dictionary_erase(const CollectionBase&, Mixed key) override;
 

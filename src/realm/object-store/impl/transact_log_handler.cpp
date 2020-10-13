@@ -299,6 +299,18 @@ public:
     {
         return true;
     }
+    bool set_insert(size_t)
+    {
+        return true;
+    }
+    bool set_erase(size_t)
+    {
+        return true;
+    }
+    bool set_clear(size_t)
+    {
+        return true;
+    }
 };
 
 
