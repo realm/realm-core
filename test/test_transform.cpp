@@ -28,6 +28,8 @@
 #include "util/compare_groups.hpp"
 #include "util/dump_changesets.hpp"
 
+extern unsigned int unit_test_random_seed;
+
 namespace {
 
 using namespace realm;
@@ -982,7 +984,7 @@ TEST(Transform_Randomized)
     int num_major_rounds = 1;
     int num_minor_rounds = 1;
 
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    Random random(unit_test_random_seed); // Seed from slow global generator
     FuzzTester<Random> randomized(random, trace);
 
     for (int major_round = 0; major_round < num_major_rounds; ++major_round) {
