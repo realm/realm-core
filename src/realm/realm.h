@@ -1399,6 +1399,28 @@ RLM_API bool realm_query_max(realm_query_t*, realm_col_key_t, realm_value_t* out
 RLM_API bool realm_query_sum(realm_query_t*, realm_col_key_t, realm_value_t* out_sum);
 RLM_API bool realm_query_average(realm_query_t*, realm_col_key_t, realm_value_t* out_average);
 
+RLM_API size_t realm_results_count(realm_results_t*);
+RLM_API realm_value_t realm_results_get(realm_results_t*, size_t index);
+RLM_API bool realm_results_delete_all(realm_results_t*);
+RLM_API bool realm_results_filter(realm_results_t*, const realm_query_t*);
+RLM_API bool realm_results_sort(realm_results_t*, const realm_sort_descriptor_t*);
+RLM_API bool realm_results_distinct(realm_results_t*, const realm_distinct_descriptor_t*);
+RLM_API bool realm_results_limit(realm_results_t*, const realm_limit_descriptor_t*);
+RLM_API bool realm_results_apply_ordering(realm_results_t*, const realm_descriptor_ordering_t*);
+RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
+RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const realm_t* frozen_realm);
+RLM_API bool realm_results_min(const realm_results_t*, realm_col_key_t, realm_value_t* out_min);
+RLM_API bool realm_results_max(const realm_results_t*, realm_col_key_t, realm_value_t* out_max);
+RLM_API bool realm_results_sum(const realm_results_t*, realm_col_key_t, realm_value_t* out_sum);
+RLM_API bool realm_results_average(const realm_results_t*, realm_col_key_t, realm_value_t* out_average);
+
+RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*, void* userdata,
+                                                                            realm_free_userdata_func_t,
+                                                                            realm_on_collection_change_func_t,
+                                                                            realm_callback_error_func_t,
+                                                                            realm_scheduler_t*);
+
+#if defined(RLM_ENABLE_QUERY_BUILDER_API)
 typedef enum realm_query_op {
     RLM_QUERY_AND,
     RLM_QUERY_OR,
@@ -1433,27 +1455,7 @@ RLM_API bool realm_query_push_cond_property(realm_query_t*, realm_col_key_t lhs,
                                             realm_col_key_t rhs, int flags);
 RLM_API bool realm_query_push_query(realm_query_t*, realm_query_t*);
 RLM_API bool realm_query_validate(const realm_query_t*);
-
-RLM_API size_t realm_results_count(realm_results_t*);
-RLM_API realm_value_t realm_results_get(realm_results_t*, size_t index);
-RLM_API bool realm_results_delete_all(realm_results_t*);
-RLM_API bool realm_results_filter(realm_results_t*, const realm_query_t*);
-RLM_API bool realm_results_sort(realm_results_t*, const realm_sort_descriptor_t*);
-RLM_API bool realm_results_distinct(realm_results_t*, const realm_distinct_descriptor_t*);
-RLM_API bool realm_results_limit(realm_results_t*, const realm_limit_descriptor_t*);
-RLM_API bool realm_results_apply_ordering(realm_results_t*, const realm_descriptor_ordering_t*);
-RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
-RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const realm_t* frozen_realm);
-RLM_API bool realm_results_min(const realm_results_t*, realm_col_key_t, realm_value_t* out_min);
-RLM_API bool realm_results_max(const realm_results_t*, realm_col_key_t, realm_value_t* out_max);
-RLM_API bool realm_results_sum(const realm_results_t*, realm_col_key_t, realm_value_t* out_sum);
-RLM_API bool realm_results_average(const realm_results_t*, realm_col_key_t, realm_value_t* out_average);
-
-RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*, void* userdata,
-                                                                            realm_free_userdata_func_t,
-                                                                            realm_on_collection_change_func_t,
-                                                                            realm_callback_error_func_t,
-                                                                            realm_scheduler_t*);
+#endif // RLM_ENABLE_QUERY_BUILDER_API
 
 #if defined(RLM_ENABLE_OBJECT_ACCESSOR_API)
 /**
