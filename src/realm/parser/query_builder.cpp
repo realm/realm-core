@@ -885,4 +885,82 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
 }
 
 } // namespace query_builder
+
+namespace {
+
+class MixedArguments : public Arguments {
+public:
+    MixedArguments(const std::vector<Mixed>& args)
+        : m_args(args)
+    {
+    }
+    bool bool_for_argument(size_t n)
+    {
+        return m_args[n].get<bool>();
+    }
+    long long long_for_argument(size_t n)
+    {
+        return m_args[n].get<int64_t>();
+    }
+    float float_for_argument(size_t n)
+    {
+        return m_args[n].get<float>();
+    }
+    double double_for_argument(size_t n)
+    {
+        return m_args[n].get<double>();
+    }
+    StringData string_for_argument(size_t n)
+    {
+        return m_args[n].get<StringData>();
+    }
+    BinaryData binary_for_argument(size_t n)
+    {
+        return m_args[n].get<BinaryData>();
+    }
+    Timestamp timestamp_for_argument(size_t n)
+    {
+        return m_args[n].get<Timestamp>();
+    }
+    ObjectId objectid_for_argument(size_t n)
+    {
+        return m_args[n].get<ObjectId>();
+    }
+    Decimal128 decimal128_for_argument(size_t n)
+    {
+        return m_args[n].get<Decimal128>();
+    }
+    ObjKey object_index_for_argument(size_t n)
+    {
+        return m_args[n].get<ObjKey>();
+    }
+    bool is_argument_null(size_t n)
+    {
+        return m_args[n].is_null();
+    }
+
+private:
+    const std::vector<Mixed>& m_args;
+};
+
+} // namespace
+
+// Functions placed here in order not to require the Parser Library if this function is not used.
+Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const
+{
+    MixedArguments args(arguments);
+    return query(query_string, args, {});
+}
+
+Query Table::query(const std::string& query_string, query_builder::Arguments& arguments,
+                   const parser::KeyPathMapping& mapping) const
+{
+    auto q = where();
+
+    parser::ParserResult res = realm::parser::parse(query_string);
+    realm::query_builder::apply_predicate(q, res.predicate, arguments, mapping);
+
+    return q;
+}
+
 } // namespace realm
