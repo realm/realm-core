@@ -34,6 +34,10 @@ struct ImmutableException : std::exception {
     }
 };
 
+struct InvalidQueryException : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 //// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
 struct WrongPrimaryKeyTypeException : std::logic_error {

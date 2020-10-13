@@ -113,6 +113,16 @@ static inline ObjKey from_capi(realm_obj_key_t key)
     return ObjKey{key.obj_key};
 }
 
+static inline ObjLink from_capi(realm_link_t val)
+{
+    return ObjLink{from_capi(val.target_table), from_capi(val.target)};
+}
+
+static inline realm_link_t to_capi(ObjLink link)
+{
+    return realm_link_t{to_capi(link.get_table_key()), to_capi(link.get_obj_key())};
+}
+
 static inline Mixed from_capi(realm_value_t val)
 {
     switch (val.type) {

@@ -106,6 +106,9 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
         catch (const List::OutOfBoundsIndexException& ex) {
             populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
         }
+        catch (const InvalidQueryException& ex) {
+            populate_error(ex, RLM_ERR_INVALID_QUERY);
+        }
         catch (const tao::pegtl::parse_error& ex) {
             populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
         }

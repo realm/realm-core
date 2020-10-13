@@ -200,6 +200,7 @@ typedef enum realm_errno {
     RLM_ERR_INDEX_OUT_OF_BOUNDS,
 
     RLM_ERR_INVALID_QUERY_STRING,
+    RLM_ERR_INVALID_QUERY,
     // ...
 } realm_errno_e;
 
@@ -1428,10 +1429,10 @@ RLM_API bool realm_query_begin_group(realm_query_t*);
 RLM_API bool realm_query_end_group(realm_query_t*);
 RLM_API bool realm_query_push_cond(realm_query_t*, realm_col_key_t, realm_query_cond_e, const realm_value_t* values,
                                    size_t num_values, int flags);
-RLM_API bool realm_query_push_cond_properties(realm_query_t*, realm_col_key_t lhs, realm_query_cond_e,
-                                              realm_col_key_t rhs, int flags);
+RLM_API bool realm_query_push_cond_property(realm_query_t*, realm_col_key_t lhs, realm_query_cond_e,
+                                            realm_col_key_t rhs, int flags);
 RLM_API bool realm_query_push_query(realm_query_t*, realm_query_t*);
-RLM_API bool realm_query_negate(realm_query_t*);
+RLM_API bool realm_query_validate(const realm_query_t*);
 
 RLM_API size_t realm_results_count(realm_results_t*);
 RLM_API realm_value_t realm_results_get(realm_results_t*, size_t index);
