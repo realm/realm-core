@@ -353,8 +353,31 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  */
 RLM_API bool realm_get_last_error(realm_error_t* err);
 
-RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+/**
+ * Get information about an async error, potentially coming from another thread.
+ *
+ * This function does not allocate any memory.
+ *
+ * @param err A pointer to a `realm_error_t` struct that will be populated with
+ *            information about the error. May not be NULL.
+ * @see realm_get_last_error()
+ */
+RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
 
+/**
+ * Convert the last error to `realm_async_error_t`, which can safely be passed
+ * between threads.
+ *
+ * Note: This function does not clear the last error.
+ *
+ * @return A non-null pointer if there was an error on this thread.
+ * @see realm_get_last_error()
+ * @see realm_get_async_error()
+ * @see realm_clear_last_error()
+ */
+RLM_API realm_async_error_t* realm_get_last_error_as_async_error();
+
+#if defined(__cplusplus)
 /**
  * Rethrow the last exception.
  *
@@ -363,7 +386,6 @@ RLM_API bool realm_get_async_error(const realm_async_error_t* err, realm_error_t
  * in a linker error. When called from C++, `std::rethrow_exception` will be
  * called to propagate the exception unchanged.
  */
-#if defined(__cplusplus)
 RLM_EXPORT void realm_rethrow_last_error();
 #endif // __cplusplus
 
@@ -437,37 +459,194 @@ RLM_API bool realm_equals(const void*, const void*);
  */
 RLM_API bool realm_is_frozen(const void*);
 
+/**
+ * Allocate a new configuration with default options.
+ */
 RLM_API realm_config_t* realm_config_new();
+
+/**
+ * Set the path of the realm being opened.
+ */
 RLM_API bool realm_config_set_path(realm_config_t*, realm_string_t);
-RLM_API bool realm_config_set_encryption_key(realm_config_t*, realm_binary_t);
-RLM_API bool realm_config_set_schema(realm_config_t*, const realm_schema_t*);
+
+/**
+ * Set the encryption key for the realm.
+ *
+ * The key must be either 64 bytes long or have length zero (in which case
+ * encryption is disabled).
+ */
+RLM_API bool realm_config_set_encryption_key(realm_config_t*, realm_binary_t key);
+
+/**
+ * Set the schema object for this realm.
+ *
+ * This does not take ownership of the schema object, and it should be released
+ * afterwards.
+ *
+ * @param schema The schema object. May be NULL if the realm is opened without a
+ *               schema.
+ */
+RLM_API bool realm_config_set_schema(realm_config_t*, const realm_schema_t* schema);
+
+/**
+ * Set the schema version of the schema.
+ */
 RLM_API bool realm_config_set_schema_version(realm_config_t*, uint64_t version);
+
+/**
+ * Set the schema mode.
+ */
 RLM_API bool realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
+
+/**
+ * Set the migration callback.
+ *
+ * The migration function is called during a migration for schema modes
+ * `RLM_SCHEMA_MODE_AUTOMATIC` and `RLM_SCHEMA_MODE_MANUAL`. The callback is
+ * invoked with a realm instance before the migration and the realm instance
+ * that is currently performing the migration.
+ */
 RLM_API bool realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata);
+
+/**
+ * Set the data initialization function.
+ *
+ * The callback is invoked the first time the schema is created, such that the
+ * user can perform one-time initialization of the data in the realm.
+ *
+ * The realm instance passed to the callback is in a write transaction.
+ */
 RLM_API bool realm_config_set_data_initialization_function(realm_config_t*, realm_data_initialization_func_t,
                                                            void* userdata);
+
+/**
+ * Set the should-compact-on-launch callback.
+ *
+ * The callback is invoked the first time a realm file is opened in this process
+ * to decide whether the realm file should be compacted.
+ *
+ * Note: If another process has the realm file open, it will not be compacted.
+ */
 RLM_API bool realm_config_set_should_compact_on_launch_function(realm_config_t*,
                                                                 realm_should_compact_on_launch_func_t,
                                                                 void* userdata);
+
+/**
+ * Disable file format upgrade on open (default: false).
+ *
+ * If a migration is needed to open the realm file with the provided schema, an
+ * error is thrown rather than automatically performing the migration.
+ */
 RLM_API bool realm_config_set_disable_format_upgrade(realm_config_t*, bool);
+
+/**
+ * Automatically generated change notifications (default: true).
+ */
 RLM_API bool realm_config_set_automatic_change_notifications(realm_config_t*, bool);
+
+/**
+ * The scheduler which this realm should be bound to (default: NULL).
+ *
+ * If NULL, the realm will be bound to the default scheduler for the current thread.
+ */
 RLM_API bool realm_config_set_scheduler(realm_config_t*, const realm_scheduler_t*);
+
+/**
+ * Sync configuration for this realm (default: NULL).
+ */
 RLM_API bool realm_config_set_sync_config(realm_config_t*, realm_sync_config_t*);
+
+/**
+ * Force the realm file to be initialized as a synchronized realm, even if no
+ * sync config is provided (default: false).
+ */
 RLM_API bool realm_config_set_force_sync_history(realm_config_t*, bool);
+
+/**
+ * Set the audit interface for the realm (unimplemented).
+ */
 RLM_API bool realm_config_set_audit_factory(realm_config_t*, void*);
+
+/**
+ * Maximum number of active versions in the realm file allowed before an
+ * exception is thrown (default: UINT64_MAX).
+ */
 RLM_API bool realm_config_set_max_number_of_active_versions(realm_config_t*, size_t);
 
-RLM_API realm_scheduler_t* realm_scheduler_new(void* userdata, realm_free_userdata_func_t,
-                                               realm_scheduler_notify_func_t, realm_scheduler_is_on_thread_func_t,
-                                               realm_scheduler_can_deliver_notifications_func_t,
-                                               realm_scheduler_set_notify_callback_func_t);
+/**
+ * Create a custom scheduler object from callback functions.
+ *
+ * @param userdata Pointer passed to all callbacks.
+ * @param notify Function to trigger a call to the registered callback on the
+ *               scheduler's event loop. This function must be thread-safe, or
+ *               NULL, in which case the scheduler is considered unable to
+ *               deliver notifications.
+ * @param is_on_thread Function to return true if called from the same thread as
+ *                     the scheduler. This function must be thread-safe.
+ * @param can_deliver_notifications Function to return true if the scheduler can
+ *                                  support `notify()`. This function does not
+ *                                  need to be thread-safe.
+ * @param set_notify_callback Function to accept a callback that will be invoked
+ *                            by `notify()` on the scheduler's event loop. This
+ *                            function does not need to be thread-safe.
+ */
+RLM_API realm_scheduler_t*
+realm_scheduler_new(void* userdata, realm_free_userdata_func_t, realm_scheduler_notify_func_t notify,
+                    realm_scheduler_is_on_thread_func_t is_on_thread,
+                    realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications,
+                    realm_scheduler_set_notify_callback_func_t set_notify_callback);
+
+/**
+ * Create an instance of the default scheduler for the current platform,
+ * normally confined to the calling thread.
+ */
 RLM_API realm_scheduler_t* realm_scheduler_make_default();
+
+/**
+ * Get the scheduler used by frozen realms. This scheduler does not support
+ * notifications, and does not perform any thread checking.
+ */
 RLM_API const realm_scheduler_t* realm_scheduler_get_frozen();
+
+/**
+ * For platforms with no default scheduler implementation, register a factory
+ * function which can produce custom schedulers.
+ *
+ * The provided callback may produce a scheduler by calling `realm_scheduler_new()`.
+ */
 RLM_API void realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t,
                                                  realm_scheduler_default_factory_func_t);
+
+/**
+ * Trigger a call to the registered notifier callback on the scheduler's event loop.
+ *
+ * This function is thread-safe.
+ */
 RLM_API void realm_scheduler_notify(realm_scheduler_t*);
+
+/**
+ * Returns true if the caller is currently running on the scheduler's thread.
+ *
+ * This function is thread-safe.
+ */
 RLM_API bool realm_scheduler_is_on_thread(const realm_scheduler_t*);
+
+/**
+ * Returns true if the scheduler is able to deliver notifications.
+ *
+ * A false return value may indicate that notifications are not applicable for
+ * the scheduler, not implementable, or a temporary inability to deliver
+ * notifications.
+ *
+ * This function is not thread-safe.
+ */
 RLM_API bool realm_scheduler_can_deliver_notifications(const realm_scheduler_t*);
+
+/**
+ * Set the callback that will be invoked by `realm_scheduler_notify()`.
+ *
+ * This function is not thread-safe.
+ */
 RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t*, void* userdata, realm_free_userdata_func_t,
                                                  realm_scheduler_notify_func_t);
 
