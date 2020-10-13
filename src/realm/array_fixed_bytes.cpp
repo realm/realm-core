@@ -166,10 +166,10 @@ template <class ObjectType, int ElementSize>
 void ArrayFixedBytesNull<ObjectType, ElementSize>::insert(size_t ndx, const util::Optional<ObjectType>& value)
 {
     if (value) {
-        Parent::insert(ndx, *value);
+        Base::insert(ndx, *value);
     }
     else {
-        Parent::insert(ndx, Sentinel<ObjectType>::null_value);
+        Base::insert(ndx, Sentinel<ObjectType>::null_value);
         set_null(ndx);
     }
 }

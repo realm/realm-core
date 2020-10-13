@@ -164,17 +164,17 @@ protected:
     }
 };
 
-// The nullable ObjectId array uses the same layout and is compatible with the non-nullable one. It adds support for
+// The nullable ObjectType array uses the same layout and is compatible with the non-nullable one. It adds support for
 // operations on null. Because the base class maintains null markers, we are able to defer to it for many operations.
 template <class ObjectType, int ElementSize>
 class ArrayFixedBytesNull : public ArrayFixedBytes<ObjectType, ElementSize> {
 public:
-    using Parent = ArrayFixedBytes<ObjectType, ElementSize>;
+    using Base = ArrayFixedBytes<ObjectType, ElementSize>;
     ArrayFixedBytesNull(Allocator& alloc) noexcept
         : ArrayFixedBytes<ObjectType, ElementSize>(alloc)
     {
     }
-    static util::Optional<ObjectType> default_value(bool nullable)
+    static constexpr util::Optional<ObjectType> default_value(bool nullable)
     {
         if (nullable)
             return util::none;
@@ -184,7 +184,7 @@ public:
     void set(size_t ndx, const util::Optional<ObjectType>& value)
     {
         if (value) {
-            Parent::set(ndx, *value);
+            Base::set(ndx, *value);
         }
         else {
             set_null(ndx);
@@ -207,7 +207,7 @@ public:
     size_t find_first(const util::Optional<ObjectType>& value, size_t begin = 0, size_t end = npos) const
     {
         if (value) {
-            return Parent::find_first(*value, begin, end);
+            return Base::find_first(*value, begin, end);
         }
         else {
             return find_first_null(begin, end);
