@@ -125,6 +125,22 @@ RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_l
     });
 }
 
+RLM_API realm_notification_token_t*
+realm_results_add_notification_callback(realm_results_t* results, void* userdata, realm_free_userdata_func_t free,
+                                        realm_on_collection_change_func_t on_change,
+                                        realm_callback_error_func_t on_error, realm_scheduler_t*)
+{
+    return wrap_err([&]() {
+        CollectionNotificationsCallback cb;
+        cb.m_userdata = userdata;
+        cb.m_free = free;
+        cb.m_on_change = on_change;
+        cb.m_on_error = on_error;
+        auto token = results->add_notification_callback(std::move(cb));
+        return new realm_notification_token_t{std::move(token)};
+    });
+}
+
 RLM_API void realm_collection_changes_get_num_ranges(const realm_collection_changes_t* changes,
                                                      size_t* out_num_deletion_ranges,
                                                      size_t* out_num_insertion_ranges,
