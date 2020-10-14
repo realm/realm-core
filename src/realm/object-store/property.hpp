@@ -187,6 +187,11 @@ inline constexpr bool is_set(PropertyType a)
     return to_underlying(a & PropertyType::Set) == to_underlying(PropertyType::Set);
 }
 
+inline constexpr bool is_collection(PropertyType a)
+{
+    return to_underlying(a & PropertyType::Collection) != 0;
+}
+
 inline constexpr bool is_nullable(PropertyType a)
 {
     return to_underlying(a & PropertyType::Nullable) == to_underlying(PropertyType::Nullable);
@@ -298,8 +303,9 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 
 inline bool Property::type_is_indexable() const noexcept
 {
-    return type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
-           type == PropertyType::String || type == PropertyType::ObjectId;
+    return !is_collection(type) &&
+           (type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
+            type == PropertyType::String || type == PropertyType::ObjectId);
 }
 
 inline bool Property::type_is_nullable() const noexcept
