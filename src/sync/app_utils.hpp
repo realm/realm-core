@@ -27,57 +27,11 @@
 
 namespace realm {
 namespace app {
-static util::Optional<AppError> check_for_errors(const Response& response)
-{
-    bool http_status_code_is_fatal = response.http_status_code >= 300 ||
-        (response.http_status_code < 200 && response.http_status_code != 0);
 
-    auto find_case_insensitive_header = [&response](const std::string& needle) {
-        for (auto it = response.headers.begin(); it != response.headers.end(); ++it) {
-            if (std::equal(it->first.begin(), it->first.end(),
-                              needle.begin(), needle.end(),
-                              [](char a, char b) {
-                                  return tolower(a) == tolower(b);
-            })) {
-                return it;
-            }
-        }
-        return response.headers.end();
-    };
-
-    try {
-        auto ct = find_case_insensitive_header("content-type");
-        if (ct != response.headers.end() && ct->second == "application/json") {
-            auto body = nlohmann::json::parse(response.body);
-            auto message = body.find("error");
-            auto link = body.find("link");
-            std::string parsed_link = link == body.end() ? "" : link->get<std::string>();
-
-            if (auto error_code = body.find("error_code"); error_code != body.end() &&
-                !error_code->get<std::string>().empty())
-            {
-                return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
-                                message != body.end() ? message->get<std::string>() : "no error message", std::move(parsed_link));
-            } else if (message != body.end()) {
-                return AppError(make_error_code(ServiceErrorCode::unknown), message->get<std::string>(), std::move(parsed_link));
-            }
-        }
-    } catch (const std::exception&) {
-        // ignore parse errors from our attempt to read the error from json
-    }
-
-    if (response.custom_status_code != 0) {
-        std::string error_msg = (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
-        return AppError(make_custom_error_code(response.custom_status_code), error_msg);
-    }
-
-    if (http_status_code_is_fatal)
-    {
-        return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal");
-    }
-
-    return {};
-}
+class AppUtils {
+public:
+    static util::Optional<AppError> check_for_errors(const Response& response);
+};
 } // namespace app
 } // namespace realm
 
