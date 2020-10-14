@@ -99,9 +99,13 @@ add_custom_command(TARGET ObjectStoreTests POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:ObjectStoreTests>)
 
 if(NOT APPLE)
-    find_package(LibUV REQUIRED)
-    # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
-    target_link_libraries(ObjectStore PUBLIC LibUV::LibUV)
+    if(REALM_BUILD_LIBUV_MODULE)
+        target_link_libraries(ObjectStore PUBLIC uv_a)
+    else()
+        find_package(LibUV REQUIRED)
+        # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
+        target_link_libraries(ObjectStore PUBLIC LibUV::LibUV)
+    endif()
     target_compile_definitions(ObjectStore PUBLIC
         REALM_HAVE_UV=1)
 endif()

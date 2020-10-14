@@ -170,6 +170,10 @@ if(UNIX)
     check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
+if(REALM_BUILD_LIBUV_MODULE)
+    add_subdirectory(src/external/libuv)
+endif()
+
 if (NOT APPLE AND NOT WIN32 AND NOT ANDROID)
     set(REALM_INCLUDE_CERTS_DEFAULT ON)
 else()
