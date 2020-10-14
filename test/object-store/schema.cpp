@@ -183,6 +183,7 @@ TEST_CASE("ObjectSchema")
         add_set(table, type_Timestamp, "date set", false);
         add_set(table, type_ObjectId, "object id set", false);
         add_set(table, type_Decimal, "decimal set", false);
+        add_set(table, type_UUID, "uuid set", false);
         add_set(table, type_Int, "int? set", true);
         add_set(table, type_Bool, "bool? set", true);
         add_set(table, type_Float, "float? set", true);
@@ -192,6 +193,7 @@ TEST_CASE("ObjectSchema")
         add_set(table, type_Timestamp, "date? set", true);
         add_set(table, type_ObjectId, "object id? set", true);
         add_set(table, type_Decimal, "decimal? set", true);
+        add_set(table, type_UUID, "uuid? set", true);
 
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
@@ -288,6 +290,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date set", Date | PropertyType::Set);
         REQUIRE_PROPERTY("object id set", ObjectId | PropertyType::Set);
         REQUIRE_PROPERTY("decimal set", Decimal | PropertyType::Set);
+        REQUIRE_PROPERTY("uuid set", UUID | PropertyType::Set);
         REQUIRE_PROPERTY("int? set", Int | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool? set", Bool | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("float? set", Float | PropertyType::Set | PropertyType::Nullable);
@@ -297,6 +300,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date? set", Date | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("object id? set", ObjectId | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("uuid? set", UUID | PropertyType::Set | PropertyType::Nullable);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
