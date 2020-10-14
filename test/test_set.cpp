@@ -164,6 +164,7 @@ TEST(Set_Links)
     set_links.insert(bar3.get_key());
 
     CHECK_EQUAL(set_links.size(), 3);
+    CHECK_EQUAL(bar1.get_backlink_count(), 1);
     CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_links.find(bar3.get_key()), realm::npos);
@@ -184,6 +185,7 @@ TEST(Set_Links)
     set_typed_links.insert(cab2.get_link());
     CHECK_EQUAL(set_typed_links.size(), 4);
 
+    CHECK_EQUAL(bar1.get_backlink_count(), 2);
     CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_typed_links.find(bar2.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_typed_links.find(cab1.get_link()), realm::npos);
@@ -200,19 +202,32 @@ TEST(Set_Links)
     set_mixeds.insert(cab2.get_link());
 
     CHECK_EQUAL(set_mixeds.size(), 4);
+    CHECK_EQUAL(bar1.get_backlink_count(), 3);
     CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(bar2.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(cab1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(cab2.get_link()), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar3.get_link()), realm::npos);
 
-    bar1.invalidate();
+    bar1.remove();
 
-    CHECK_EQUAL(set_links.size(), 3);
-    CHECK_EQUAL(set_typed_links.size(), 4);
-    CHECK_EQUAL(set_mixeds.size(), 4);
+    CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(set_typed_links.size(), 3);
+    CHECK_EQUAL(set_mixeds.size(), 3);
 
-    CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
-    CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
-    CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
+    CHECK_EQUAL(set_links.find(bar1.get_key()), realm::npos);
+    CHECK_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
+    CHECK_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
+
+    auto bar2_key = bar2.get_key();
+    auto bar2_link = bar2.get_link();
+    bar2.invalidate();
+
+    CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(set_typed_links.size(), 3);
+    CHECK_EQUAL(set_mixeds.size(), 3);
+
+    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);
+    CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
+    CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
 }
