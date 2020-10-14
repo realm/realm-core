@@ -155,4 +155,12 @@ if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
     target_link_libraries(ObjectStore PUBLIC Sync)
     target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
+
+    set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
+    install(FILES ${HEADERS}
+            DESTINATION include/realm/ObjectStore
+            COMPONENT devel)
+    install(TARGETS ObjectStore EXPORT realm
+            ARCHIVE DESTINATION lib
+            COMPONENT devel)
 endif()

@@ -52,10 +52,10 @@ jobWrapper {
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
-        isPublishingRun = false
-        if (gitTag) {
-            isPublishingRun = currentBranch.contains('release')
-        }
+        isPublishingRun = true//false
+        // if (gitTag) {
+        //     isPublishingRun = currentBranch.contains('release')
+        // }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
@@ -95,61 +95,61 @@ jobWrapper {
         }
     }
 
-    stage('Checking') {
-        def buildOptions = [
-            buildType : "Debug",
-            maxBpNodeSize: "1000",
-            enableEncryption: "ON",
-            enableSync: "OFF",
-            runTests: true,
-        ]
-        def linuxOptionsNoEncrypt = [
-            buildType : "Debug",
-            maxBpNodeSize: "4",
-            enableEncryption: "OFF",
-            enableSync: "OFF",
-        ]
-        def armhfQemuTestOptions = [
-            emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
-        ]
-        def armhfNativeTestOptions = [
-            nativeNode: 'docker-arm',
-            nativeDocker: 'armhf-native.Dockerfile',
-            nativeDockerPlatform: 'linux/arm/v7',
-        ]
+    // stage('Checking') {
+    //     def buildOptions = [
+    //         buildType : "Debug",
+    //         maxBpNodeSize: "1000",
+    //         enableEncryption: "ON",
+    //         enableSync: "OFF",
+    //         runTests: true,
+    //     ]
+    //     def linuxOptionsNoEncrypt = [
+    //         buildType : "Debug",
+    //         maxBpNodeSize: "4",
+    //         enableEncryption: "OFF",
+    //         enableSync: "OFF",
+    //     ]
+    //     def armhfQemuTestOptions = [
+    //         emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
+    //     ]
+    //     def armhfNativeTestOptions = [
+    //         nativeNode: 'docker-arm',
+    //         nativeDocker: 'armhf-native.Dockerfile',
+    //         nativeDockerPlatform: 'linux/arm/v7',
+    //     ]
 
-        parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker(buildOptions),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: "4", buildType : "Release"]),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync : "ON"]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: "OFF"]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
-            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
-            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
-            buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
-            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
-            checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
-            checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
-            addressSanitizer        : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "address"]),
-            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
-        ]
-        if (releaseTesting) {
-            extendedChecks = [
-                checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
-                checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
-                checkMacOsDebug               : doBuildMacOs('Debug', true),
-                buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
-                androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
-                coverage                      : doBuildCoverage(),
-                // valgrind                : doCheckValgrind()
-            ]
-            parallelExecutors.putAll(extendedChecks)
-        }
-        parallel parallelExecutors
-    }
+    //     parallelExecutors = [
+    //         checkLinuxDebug         : doCheckInDocker(buildOptions),
+    //         checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: "4", buildType : "Release"]),
+    //         checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync : "ON"]),
+    //         checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: "OFF"]),
+    //         checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
+    //         checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
+    //         checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+    //         buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+    //         buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+    //         buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
+    //         buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+    //         checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
+    //         checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
+    //         threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
+    //         addressSanitizer        : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "address"]),
+    //         performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
+    //     ]
+    //     if (releaseTesting) {
+    //         extendedChecks = [
+    //             checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
+    //             checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
+    //             checkMacOsDebug               : doBuildMacOs('Debug', true),
+    //             buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
+    //             androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+    //             coverage                      : doBuildCoverage(),
+    //             // valgrind                : doCheckValgrind()
+    //         ]
+    //         parallelExecutors.putAll(extendedChecks)
+    //     }
+    //     parallel parallelExecutors
+    // }
 
     if (isPublishingRun) {
         stage('BuildPackages') {
@@ -168,14 +168,14 @@ jobWrapper {
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
 
-            androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
-            androidBuildTypes = ['Debug', 'Release']
+            // androidAbis = ['armeabi-v7a', 'x86', 'x86_64', 'arm64-v8a']
+            // androidBuildTypes = ['Debug', 'Release']
 
-            for (abi in androidAbis) {
-                for (buildType in androidBuildTypes) {
-                    parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
-                }
-            }
+            // for (abi in androidAbis) {
+            //     for (buildType in androidBuildTypes) {
+            //         parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, false)
+            //     }
+            // }
 
             appleSdks = ['iphoneos', 'iphonesimulator',
                          'appletvos', 'appletvsimulator',
@@ -188,26 +188,26 @@ jobWrapper {
                 }
             }
 
-            linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
-            linuxCrossCompileTargets = ['armhf']
+            // linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
+            // linuxCrossCompileTargets = ['armhf']
 
-            for (buildType in linuxBuildTypes) {
-                parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
-                for (target in linuxCrossCompileTargets) {
-                    parallelExecutors["crossCompileLinux-${target}-${buildType}"] = doLinuxCrossCompile(target, buildType)
-                }
-            }
+            // for (buildType in linuxBuildTypes) {
+            //     parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
+            //     for (target in linuxCrossCompileTargets) {
+            //         parallelExecutors["crossCompileLinux-${target}-${buildType}"] = doLinuxCrossCompile(target, buildType)
+            //     }
+            // }
 
-            windowsBuildTypes = ['Debug', 'Release']
-            windowsPlatforms = ['Win32', 'x64']
+            // windowsBuildTypes = ['Debug', 'Release']
+            // windowsPlatforms = ['Win32', 'x64']
 
-            for (buildType in windowsBuildTypes) {
-                for (platform in windowsPlatforms) {
-                    parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
-                    parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
-                }
-                parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
-            }
+            // for (buildType in windowsBuildTypes) {
+            //     for (platform in windowsPlatforms) {
+            //         parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
+            //         parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
+            //     }
+            //     parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
+            // }
 
             parallel parallelExecutors
         }
@@ -228,20 +228,20 @@ jobWrapper {
                         publishingStashes << "cocoa-xz"
                         publishingStashes << "cocoa-gz"
                     }
-                },
-                android: {
-                    node('docker') {
-                        getArchive()
-                        for (androidStash in androidStashes) {
-                            unstash name: androidStash
-                        }
-                        sh 'tools/build-android.sh'
-                        archiveArtifacts('realm-core-android*.tar.gz')
-                        def stashName = 'android'
-                        stash includes: 'realm-core-android*.tar.gz', name: stashName
-                        publishingStashes << stashName
-                    }
-                }
+                }//,
+                // android: {
+                //     node('docker') {
+                //         getArchive()
+                //         for (androidStash in androidStashes) {
+                //             unstash name: androidStash
+                //         }
+                //         sh 'tools/build-android.sh'
+                //         archiveArtifacts('realm-core-android*.tar.gz')
+                //         def stashName = 'android'
+                //         stash includes: 'realm-core-android*.tar.gz', name: stashName
+                //         publishingStashes << stashName
+                //     }
+                // }
             )
         }
         stage('publish-packages') {
