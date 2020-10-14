@@ -296,16 +296,23 @@ if [[ -n $COPY ]]; then
     fi
 else
     rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"
-    rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
     # .tar.gz package is used by realm-js, which uses the parser
     tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" --exclude "realm-monorepo*.xcframework" core
     # .tar.xz package is used by cocoa, which doesn't use the parser
     tar -cJvf "realm-monorepo-cocoa-${VERSION}.tar.xz" --exclude "realm-monorepo*.xcframework" core
-    tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
 
     if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+        rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
+        tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
         rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
         # until realmjs requires an xcframework, only package as .xz
         tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo.xcframework core/realm-monorepo-dbg.xcframework
+
+        # Swift Package Manager only supports a zip containing only the xcframework
+        (
+            cd core
+            cp -R realm-monorepo.xcframework RealmMonorepo.xcframework
+            zip -r "../realm-monorepo-${VERSION}.xcframework.zip" RealmMonorepo.xcframework
+        )
     fi
 fi
