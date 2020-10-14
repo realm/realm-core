@@ -131,6 +131,7 @@ TEST_CASE("ObjectSchema")
 
         table->add_column(*target, "object");
         table->add_column_list(*target, "array");
+        table->add_column_set(*target, "set");
 
         table->add_column(type_Int, "int?", true);
         table->add_column(type_Bool, "bool?", true);
@@ -164,6 +165,29 @@ TEST_CASE("ObjectSchema")
         add_list(table, type_Timestamp, "date? array", true);
         add_list(table, type_ObjectId, "object id? array", true);
         add_list(table, type_Decimal, "decimal? array", true);
+
+        auto add_set = [](TableRef table, DataType type, StringData name, bool nullable) {
+            table->add_column_set(type, name, nullable);
+        };
+
+        add_set(table, type_Int, "int set", false);
+        add_set(table, type_Bool, "bool set", false);
+        add_set(table, type_Float, "float set", false);
+        add_set(table, type_Double, "double set", false);
+        add_set(table, type_String, "string set", false);
+        add_set(table, type_Binary, "data set", false);
+        add_set(table, type_Timestamp, "date set", false);
+        add_set(table, type_ObjectId, "object id set", false);
+        add_set(table, type_Decimal, "decimal set", false);
+        add_set(table, type_Int, "int? set", true);
+        add_set(table, type_Bool, "bool? set", true);
+        add_set(table, type_Float, "float? set", true);
+        add_set(table, type_Double, "double? set", true);
+        add_set(table, type_String, "string? set", true);
+        add_set(table, type_Binary, "data? set", true);
+        add_set(table, type_Timestamp, "date? set", true);
+        add_set(table, type_ObjectId, "object id? set", true);
+        add_set(table, type_Decimal, "decimal? set", true);
 
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
@@ -214,6 +238,7 @@ TEST_CASE("ObjectSchema")
 
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
+        REQUIRE_PROPERTY("set", Set | PropertyType::Object, "target");
 
         REQUIRE_PROPERTY("int?", Int | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool?", Bool | PropertyType::Nullable);
@@ -243,6 +268,25 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date? array", Date | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("object id? array", ObjectId | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal? array", Decimal | PropertyType::Array | PropertyType::Nullable);
+
+        REQUIRE_PROPERTY("int set", Int | PropertyType::Set);
+        REQUIRE_PROPERTY("bool set", Bool | PropertyType::Set);
+        REQUIRE_PROPERTY("float set", Float | PropertyType::Set);
+        REQUIRE_PROPERTY("double set", Double | PropertyType::Set);
+        REQUIRE_PROPERTY("string set", String | PropertyType::Set);
+        REQUIRE_PROPERTY("data set", Data | PropertyType::Set);
+        REQUIRE_PROPERTY("date set", Date | PropertyType::Set);
+        REQUIRE_PROPERTY("object id set", ObjectId | PropertyType::Set);
+        REQUIRE_PROPERTY("decimal set", Decimal | PropertyType::Set);
+        REQUIRE_PROPERTY("int? set", Int | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("bool? set", Bool | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("float? set", Float | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("double? set", Double | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("string? set", String | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("data? set", Data | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("date? set", Date | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("object id? set", ObjectId | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
@@ -585,6 +629,7 @@ TEST_CASE("Schema")
                                   {"data", PropertyType::Data},
                                   {"object", PropertyType::Object | PropertyType::Nullable, "object"},
                                   {"array", PropertyType::Array | PropertyType::Object, "object"},
+                                  {"set", PropertyType::Set | PropertyType::Int},
                                   {"decimal", PropertyType::Decimal},
                               }}};
             for (auto& prop : schema.begin()->persisted_properties) {
