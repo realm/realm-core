@@ -1389,8 +1389,9 @@ RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_lis
  * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_query* realm_query_parse_for_results(const realm_results_t* target_results, realm_string_t query_string,
-                                                   size_t num_args, const realm_value_t* values);
+RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* target_results,
+                                                     realm_string_t query_string, size_t num_args,
+                                                     const realm_value_t* values);
 
 /**
  * Count the number of objects found by this query.
