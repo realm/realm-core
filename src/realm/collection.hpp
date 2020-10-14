@@ -221,12 +221,12 @@ public:
     }
 
     // Ensure that `Interface` implements `CollectionBase`.
+    // We do not need to import size() from Interface because we've implemented it above.
     using Interface::avg;
     using Interface::distinct;
     using Interface::is_attached;
     using Interface::max;
     using Interface::min;
-    using Interface::size;
     using Interface::sort;
     using Interface::sum;
     using Interface::update_content_version;

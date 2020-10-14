@@ -202,8 +202,8 @@ buildvariants:
   display_name: "RHEL 7"
   run_on: rhel70-small
   expansions:
-    c_compiler: /opt/mongodbtoolchain/v3/bin/clang
-    cxx_compiler: /opt/mongodbtoolchain/v3/bin/clang++
+    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
+    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
   tasks:
