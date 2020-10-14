@@ -51,14 +51,6 @@ typedef struct realm_dictionary realm_dictionary_t;
 
 /* Query types */
 typedef struct realm_query realm_query_t;
-typedef struct realm_parsed_query realm_parsed_query_t;
-typedef struct realm_parsed_query_arguments realm_parsed_query_arguments_t;
-typedef struct realm_descriptor_ordering realm_descriptor_ordering_t;
-typedef struct realm_sort_descriptor realm_sort_descriptor_t;
-typedef struct realm_distinct_descriptor realm_distinct_descriptor_t;
-typedef struct realm_limit_descriptor realm_limit_descriptor_t;
-typedef struct realm_include_descriptor realm_include_descriptor_t;
-typedef struct realm_key_path_mapping realm_key_path_mapping_t;
 typedef struct realm_results realm_results_t;
 
 /* Config types */
@@ -1350,69 +1342,177 @@ realm_dictionary_add_notification_callback(realm_object_t*, void* userdata, real
                                            realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
- * Construct a new, empty query targeting @a table.
- *
- * @return A non-null pointer if no exception occurred.
- */
-RLM_API realm_query_t* realm_query_new(const realm_t*, realm_table_key_t table);
-
-/**
- * Construct a new query targeting the results of a previous query.
- *
- * @return A non-null pointer if no exception occurred.
- */
-RLM_API realm_query_t* realm_query_new_with_results(realm_results_t*);
-
-/**
- * Parse a query string.
+ * Parse a query string and bind it to a table.
  *
  * If the query failed to parse, the parser error is available from
  * `realm_get_last_error()`.
  *
- * @return A non-null pointer if the query was successfully parsed, and no
+ * @param target_table The table on which to run this query.
+ * @param query_string A string in the Realm Query Language, optionally
+ *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param num_args The number of arguments for this query.
+ * @param args A pointer to a list of argument values.
+ * @return A non-null pointer if the query was successfully parsed and no
  *         exception occurred.
  */
-RLM_API realm_parsed_query_t* realm_query_parse(realm_string_t);
+RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_table_key_t target_table, realm_string_t query_string,
+                                         size_t num_args, const realm_value_t* args);
 
-RLM_API realm_descriptor_ordering_t* realm_new_descriptor_ordering();
-RLM_API bool realm_descriptor_ordering_append_sort(realm_descriptor_ordering_t*, void*);
-RLM_API bool realm_descriptor_ordering_append_distinct(realm_descriptor_ordering_t*,
-                                                       const realm_distinct_descriptor_t*);
-RLM_API bool realm_descriptor_ordering_append_limit(realm_descriptor_ordering_t*, const realm_limit_descriptor_t*);
-RLM_API bool realm_descriptor_ordering_append_include(realm_descriptor_ordering_t*,
-                                                      const realm_include_descriptor_t*);
+/**
+ * Parse a query string and bind it to a list.
+ *
+ * If the query failed to parse, the parser error is available from
+ * `realm_get_last_error()`.
+ *
+ * @param target_list The list on which to run this query.
+ * @param query_string A string in the Realm Query Language, optionally
+ *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param num_args The number of arguments for this query.
+ * @param args A pointer to a list of argument values.
+ * @return A non-null pointer if the query was successfully parsed and no
+ *         exception occurred.
+ */
+RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* target_list, realm_string_t query_string,
+                                                  size_t num_args, const realm_value_t* values);
 
-RLM_API bool realm_apply_parsed_predicate(realm_query_t*, const realm_parsed_query_t*,
-                                          const realm_parsed_query_arguments_t*, const realm_key_path_mapping_t*);
-RLM_API bool realm_apply_parsed_descriptor_ordering(realm_descriptor_ordering_t*, const realm_t*,
-                                                    realm_table_key_t target, const realm_parsed_query_t*,
-                                                    const realm_key_path_mapping_t*);
+/**
+ * Parse a query string and bind it to another query result.
+ *
+ * If the query failed to parse, the parser error is available from
+ * `realm_get_last_error()`.
+ *
+ * @param target_results The results on which to run this query.
+ * @param query_string A string in the Realm Query Language, optionally
+ *                     containing argument placeholders (`$0`, `$1`, etc.).
+ * @param num_args The number of arguments for this query.
+ * @param args A pointer to a list of argument values.
+ * @return A non-null pointer if the query was successfully parsed and no
+ *         exception occurred.
+ */
+RLM_API realm_query* realm_query_parse_for_results(const realm_results_t* target_results, realm_string_t query_string,
+                                                   size_t num_args, const realm_value_t* values);
 
+/**
+ * Count the number of objects found by this query.
+ */
 RLM_API bool realm_query_count(const realm_query_t*, size_t* out_count);
-RLM_API bool realm_query_find_first(realm_query_t*, realm_obj_key_t* out_key, bool* out_found);
+
+/**
+ * Return the first object matched by this query.
+ *
+ * Note: This function can only produce objects, not values. Use the
+ *       `realm_results_t` returned by `realm_query_find_all()` to retrieve
+ *       values from a list of primitive values.
+ *
+ * @param out_value Where to write the result, if any object matched the query.
+ *                  May be NULL.
+ * @param out_found Where to write whether the object was found. May be NULL.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_query_find_first(realm_query_t*, realm_value_t* out_value, bool* out_found);
+
+/**
+ * Produce a results object for this query.
+ *
+ * Note: This does not actually run the query until the results are accessed in
+ *       some way.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
 RLM_API realm_results_t* realm_query_find_all(realm_query_t*);
-RLM_API realm_results_t* realm_query_find_all_with_ordering(realm_query_t*, const realm_descriptor_ordering_t*);
+
+/**
+ * Delete all objects matched by a query.
+ */
 RLM_API bool realm_query_delete_all(const realm_query_t*);
 
-RLM_API bool realm_query_min(realm_query_t*, realm_col_key_t, realm_value_t* out_min);
-RLM_API bool realm_query_max(realm_query_t*, realm_col_key_t, realm_value_t* out_max);
-RLM_API bool realm_query_sum(realm_query_t*, realm_col_key_t, realm_value_t* out_sum);
-RLM_API bool realm_query_average(realm_query_t*, realm_col_key_t, realm_value_t* out_average);
+/**
+ * Count the number of results.
+ *
+ * If the result is "live" (not a snapshot), this may rerun the query if things
+ * have changed.
+ *
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_results_count(realm_results_t*, size_t* out_count);
 
-RLM_API size_t realm_results_count(realm_results_t*);
-RLM_API realm_value_t realm_results_get(realm_results_t*, size_t index);
+/**
+ * Get the matching element at @a index in the results.
+ *
+ * If the result is "live" (not a snapshot), this may rerun the query if things
+ * have changed.
+ *
+ * Note: The bound returned by `realm_results_count()` for a non-snapshot result
+ *       is not a reliable way to iterate over elements in the result, because
+ *       the result will be live-updated if changes are made in each iteration
+ *       that may change the number of query results or even change the
+ *       ordering. In other words, this method should probably only be used with
+ *       snapshot results.
+ *
+ * @return True if no exception occurred (including out-of-bounds).
+ */
+RLM_API bool realm_results_get(realm_results_t*, size_t index, realm_value_t* out_value);
+
+/**
+ * Delete all objects in the result.
+ *
+ * If the result if "live" (not a snapshot), this may rerun the query if things
+ * have changed.
+ *
+ * @return True if no exception occurred.
+ */
 RLM_API bool realm_results_delete_all(realm_results_t*);
-RLM_API bool realm_results_filter(realm_results_t*, const realm_query_t*);
-RLM_API bool realm_results_sort(realm_results_t*, const realm_sort_descriptor_t*);
-RLM_API bool realm_results_distinct(realm_results_t*, const realm_distinct_descriptor_t*);
-RLM_API bool realm_results_limit(realm_results_t*, const realm_limit_descriptor_t*);
-RLM_API bool realm_results_apply_ordering(realm_results_t*, const realm_descriptor_ordering_t*);
+
+/**
+ * Return a snapshot of the results that never automatically updates.
+ *
+ * The returned result is suitable for use with `realm_results_count()` +
+ * `realm_results_get()`.
+ */
 RLM_API realm_results_t* realm_results_snapshot(const realm_results_t*);
+
+/**
+ * Map the results into a frozen realm instance.
+ */
 RLM_API realm_results_t* realm_results_freeze(const realm_results_t*, const realm_t* frozen_realm);
-RLM_API bool realm_results_min(const realm_results_t*, realm_col_key_t, realm_value_t* out_min);
-RLM_API bool realm_results_max(const realm_results_t*, realm_col_key_t, realm_value_t* out_max);
-RLM_API bool realm_results_sum(const realm_results_t*, realm_col_key_t, realm_value_t* out_sum);
-RLM_API bool realm_results_average(const realm_results_t*, realm_col_key_t, realm_value_t* out_average);
+
+/**
+ * Compute the minimum value of a property in the results.
+ *
+ * @param out_min Where to write the result, if there were matching rows.
+ * @param out_found Set to true if there are matching rows.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_results_min(realm_results_t*, realm_col_key_t, realm_value_t* out_min, bool* out_found);
+
+/**
+ * Compute the maximum value of a property in the results.
+ *
+ * @param out_max Where to write the result, if there were matching rows.
+ * @param out_found Set to true if there are matching rows.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_results_max(realm_results_t*, realm_col_key_t, realm_value_t* out_max, bool* out_found);
+
+/**
+ * Compute the sum value of a property in the results.
+ *
+ * @param out_sum Where to write the result. Zero if no rows matched.
+ * @param out_found Set to true if there are matching rows.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_results_sum(realm_results_t*, realm_col_key_t, realm_value_t* out_sum, bool* out_found);
+
+/**
+ * Compute the average value of a property in the results.
+ *
+ * Note: For numeric columns, the average is always converted to double.
+ *
+ * @param out_average Where to write the result.
+ * @param out_found Set to true if there are matching rows.
+ * @return True if no exception occurred.
+ */
+RLM_API bool realm_results_average(realm_results_t*, realm_col_key_t, realm_value_t* out_average, bool* out_found);
 
 RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*, void* userdata,
                                                                             realm_free_userdata_func_t,

@@ -273,32 +273,25 @@ struct realm_notification_token : WrapC, NotificationToken {
     }
 };
 
-struct realm_parsed_query : WrapC, parser::ParserResult {
-    explicit realm_parsed_query(parser::ParserResult result)
-        : parser::ParserResult(std::move(result))
-    {
-    }
-
-    realm_parsed_query* clone() const override
-    {
-        return new realm_parsed_query{*this};
-    }
-};
-
 struct realm_query : WrapC {
-    std::unique_ptr<Query> ptr;
+    Query query;
+    DescriptorOrdering ordering;
     std::weak_ptr<Realm> weak_realm;
 
-    explicit realm_query(Query query, std::weak_ptr<Realm> realm)
-        : ptr(std::make_unique<Query>(std::move(query)))
+    explicit realm_query(Query query, DescriptorOrdering ordering, std::weak_ptr<Realm> realm)
+        : query(std::move(query))
+        , ordering(std::move(ordering))
         , weak_realm(realm)
     {
     }
 
     realm_query* clone() const override
     {
-        return new realm_query{*ptr, weak_realm};
+        return new realm_query{*this};
     }
+
+private:
+    realm_query(const realm_query&) = default;
 };
 
 struct realm_results : WrapC, Results {
@@ -315,20 +308,6 @@ struct realm_results : WrapC, Results {
     bool is_frozen() const override
     {
         return Results::is_frozen();
-    }
-};
-
-struct realm_descriptor_ordering : WrapC, DescriptorOrdering {
-    realm_descriptor_ordering() = default;
-
-    explicit realm_descriptor_ordering(DescriptorOrdering o)
-        : DescriptorOrdering(std::move(o))
-    {
-    }
-
-    realm_descriptor_ordering* clone() const override
-    {
-        return new realm_descriptor_ordering{static_cast<const DescriptorOrdering&>(*this)};
     }
 };
 

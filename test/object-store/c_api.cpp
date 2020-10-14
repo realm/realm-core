@@ -287,6 +287,56 @@ TEST_CASE("C API")
             CHECK(!found);
         }
 
+        SECTION("query basics")
+        {
+            auto arg = rlm_str_val("Hello, World!");
+            auto q = make_cptr(checked(realm_query_parse(realm, foo_info.key, rlm_str("str == $0"), 1, &arg)));
+            size_t count;
+            CHECK(checked(realm_query_count(q.get(), &count)));
+            CHECK(count == 1);
+
+            // find first:
+            realm_value_t found_value = rlm_null();
+            bool found;
+            CHECK(checked(realm_query_find_first(q.get(), &found_value, &found)));
+            CHECK(found);
+            CHECK(found_value.type == RLM_TYPE_LINK);
+            CHECK(found_value.link.target_table.table_key == foo_info.key.table_key);
+            CHECK(found_value.link.target.obj_key == realm_object_get_key(obj1.get()).obj_key);
+
+            auto r = make_cptr(checked(realm_query_find_all(q.get())));
+
+            // results count:
+            CHECK(checked(realm_results_count(r.get(), &count)));
+            CHECK(count == 1);
+
+            realm_value_t value;
+
+            // min:
+            CHECK(checked(realm_results_min(r.get(), foo_int_property.key, &value, &found)));
+            CHECK(found);
+            CHECK(value.type == RLM_TYPE_INT);
+            CHECK(value.integer == 123);
+
+            // max:
+            CHECK(checked(realm_results_max(r.get(), foo_int_property.key, &value, &found)));
+            CHECK(found);
+            CHECK(value.type == RLM_TYPE_INT);
+            CHECK(value.integer == 123);
+
+            // sum:
+            CHECK(checked(realm_results_sum(r.get(), foo_int_property.key, &value, &found)));
+            CHECK(found);
+            CHECK(value.type == RLM_TYPE_INT);
+            CHECK(value.integer == 123);
+
+            // average:
+            CHECK(checked(realm_results_average(r.get(), foo_int_property.key, &value, &found)));
+            CHECK(found);
+            CHECK(value.type == RLM_TYPE_DOUBLE);
+            CHECK(value.dnum == 123.0);
+        }
+
         SECTION("set wrong field type")
         {
             write([&]() {
@@ -574,18 +624,4 @@ TEST_CASE("C API")
     }
 
     realm_release(realm);
-}
-
-TEST_CASE("C API Query Parser")
-{
-    static const char invalid_query[] = "SORT(p ASCENDING)";
-
-    SECTION("invalid query error")
-    {
-        auto parsed = make_cptr(realm_query_parse(rlm_str(invalid_query)));
-        CHECK(!parsed);
-        realm_error_t err;
-        realm_get_last_error(&err);
-        CHECK(err.error == RLM_ERR_INVALID_QUERY_STRING);
-    }
 }
