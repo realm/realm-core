@@ -34,9 +34,11 @@ done
 shift $((OPTIND-1))
 
 readonly BUILD_TYPES=( Release MinSizeDebug )
-[[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator ) || PLATFORMS=( macosx )
+# [[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator ) || PLATFORMS=( macosx )
+[[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst iphoneos iphonesimulator ) || PLATFORMS=( macosx )
 
-readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator )
+# readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator )
+readonly device_platforms=( iphoneos iphonesimulator )
 
 function build_macos {
     local platform="$1"
@@ -179,8 +181,8 @@ for bt in "${BUILD_TYPES[@]}"; do
 
     # merge the libraries for other Apple platforms
     combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
-    combine_libraries "watchos${suffix}" "watchsimulator${suffix}" "watchos${suffix}"
-    combine_libraries "appletvos${suffix}" "appletvsimulator${suffix}" "tvos${suffix}"
+    # combine_libraries "watchos${suffix}" "watchsimulator${suffix}" "watchos${suffix}"
+    # combine_libraries "appletvos${suffix}" "appletvsimulator${suffix}" "tvos${suffix}"
     fi
 done
 
@@ -258,10 +260,10 @@ EOF
             add_to_xcframework "$xcf" "$library" "ios" "iphoneos" "$bt"
             add_to_xcframework "$xcf" "$library" "ios" "iphonesimulator" "$bt"
             add_to_xcframework "$xcf" "$library" "ios" "maccatalyst" "$bt"
-            add_to_xcframework "$xcf" "$library" "watchos" "watchos" "$bt"
-            add_to_xcframework "$xcf" "$library" "watchos" "watchsimulator" "$bt"
-            add_to_xcframework "$xcf" "$library" "tvos" "appletvos" "$bt"
-            add_to_xcframework "$xcf" "$library" "tvos" "appletvsimulator" "$bt"
+            # add_to_xcframework "$xcf" "$library" "watchos" "watchos" "$bt"
+            # add_to_xcframework "$xcf" "$library" "watchos" "watchsimulator" "$bt"
+            # add_to_xcframework "$xcf" "$library" "tvos" "appletvos" "$bt"
+            # add_to_xcframework "$xcf" "$library" "tvos" "appletvsimulator" "$bt"
         fi
 
         cat << EOF >> "$xcf/Info.plist"
