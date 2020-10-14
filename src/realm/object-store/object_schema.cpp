@@ -73,6 +73,8 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
         flags |= PropertyType::Nullable;
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
+    else if (attr.test(col_attr_Set))
+        flags |= PropertyType::Set;
     switch (col.get_type()) {
         case col_type_Int:
             return PropertyType::Int | flags;
@@ -96,8 +98,14 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
             return PropertyType::Decimal | flags;
         case col_type_UUID:
             return PropertyType::UUID | flags;
-        case col_type_Link:
-            return PropertyType::Object | PropertyType::Nullable;
+        case col_type_Link: {
+            if (attr.test(col_attr_Set)) {
+                return PropertyType::Object | flags;
+            }
+            else {
+                return PropertyType::Object | PropertyType::Nullable;
+            }
+        }
         case col_type_LinkList:
             return PropertyType::Object | PropertyType::Array;
         default:
@@ -223,7 +231,7 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
         exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.", object_name, prop.name,
                                 string_for_property_type(prop.type));
     }
-    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_array(prop.type)) {
+    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
 

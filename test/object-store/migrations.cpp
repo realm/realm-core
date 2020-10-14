@@ -872,6 +872,13 @@ TEST_CASE("migration: Automatic")
             std::swap(properties[0], properties[1]);
             VERIFY_SCHEMA_IN_MIGRATION(schema2);
         }
+        SECTION("change linklist to set")
+        {
+            auto schema2 = schema;
+            auto prop = schema2.find("link origin")->property_for_name("array");
+            prop->type = PropertyType::Set | PropertyType::Object;
+            VERIFY_SCHEMA_IN_MIGRATION(schema2);
+        }
     }
 
     SECTION("object accessors inside migrations")
@@ -1459,6 +1466,26 @@ TEST_CASE("migration: Automatic")
             FAILED_RENAME(schema, schema2,
                           "Cannot rename property 'origin.link' to 'new' because it would change from type "
                           "'array<target>' to 'array<origin>'.",
+                          {"origin", "link", "new"});
+        }
+
+        SECTION("different object set targets")
+        {
+            Schema schema = {
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"origin",
+                 {
+                     {"link", PropertyType::Set | PropertyType::Object, "target"},
+                 }},
+            };
+            auto schema2 = set_target(schema, "origin", "link", "origin");
+            schema2.find("origin")->property_for_name("link")->name = "new";
+            FAILED_RENAME(schema, schema2,
+                          "Cannot rename property 'origin.link' to 'new' because it would change from type "
+                          "'set<target>' to 'set<origin>'.",
                           {"origin", "link", "new"});
         }
 
