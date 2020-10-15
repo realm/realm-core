@@ -2502,7 +2502,8 @@ void Table::update_from_parent(size_t old_baseline) noexcept
 }
 
 
-void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames,
+                    JSONOutputMode output_mode) const
 {
     // Represent table as list of objects
     out << "[";
@@ -2515,7 +2516,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
         else {
             out << ",";
         }
-        obj.to_json(out, link_depth, renames);
+        obj.to_json(out, link_depth, renames, output_mode);
     }
 
     out << "]";

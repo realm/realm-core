@@ -556,8 +556,8 @@ public:
     LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+                 JSONOutputMode output_mode = output_mode_json) const;
 
     /// \brief Compare two tables for equality.
     ///

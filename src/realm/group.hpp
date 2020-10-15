@@ -509,7 +509,8 @@ public:
 
     // Conversion
     template <class S>
-    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
+    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+                 JSONOutputMode output_mode = output_mode_json) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
     /// only if, they contain the same tables in the same order, that
@@ -1046,7 +1047,8 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 }
 
 template <class S>
-void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames,
+                    JSONOutputMode output_mode) const
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
@@ -1072,7 +1074,7 @@ void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string
                 out << ",";
             out << "\"" << name << "\"";
             out << ":";
-            table->to_json(out, link_depth, renames);
+            table->to_json(out, link_depth, renames, output_mode);
             out << std::endl;
             first = false;
         }
