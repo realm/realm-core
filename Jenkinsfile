@@ -224,10 +224,8 @@ jobWrapper {
                         archiveArtifacts('realm-*-cocoa*.tar.xz')
                         stash includes: 'realm-*-cocoa*.tar.xz', name: "cocoa-xz"
                         stash includes: 'realm-*-cocoa*.tar.gz', name: "cocoa-gz"
-                        stash includes: "realm-monorepo*.xcframework.zip", name: "monorepo-xcframework-zip"
                         publishingStashes << "cocoa-xz"
                         publishingStashes << "cocoa-gz"
-                        publishingStashes << "monorepo-xcframework-zip"
                     }
                 },
                 android: {

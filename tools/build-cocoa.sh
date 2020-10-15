@@ -307,12 +307,5 @@ else
         rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
         # until realmjs requires an xcframework, only package as .xz
         tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo.xcframework core/realm-monorepo-dbg.xcframework
-
-        # Swift Package Manager only supports a zip containing only the xcframework
-        (
-            cd core
-            cp -R realm-monorepo.xcframework RealmMonorepo.xcframework
-            zip -r "../realm-monorepo-${VERSION}.xcframework.zip" RealmMonorepo.xcframework
-        )
     fi
 fi

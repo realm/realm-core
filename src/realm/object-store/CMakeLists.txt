@@ -158,7 +158,7 @@ if(REALM_ENABLE_SYNC)
 
     set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
     install(FILES ${HEADERS}
-            DESTINATION include/realm/ObjectStore
+            DESTINATION include/realm/object-store
             COMPONENT devel)
     install(TARGETS ObjectStore EXPORT realm
             ARCHIVE DESTINATION lib
