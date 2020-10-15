@@ -671,7 +671,7 @@ def doBuildMacOs(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('osx_pro') {
+        node('osx') {
             getArchive()
 
             dir("build-macosx-${buildType}") {
