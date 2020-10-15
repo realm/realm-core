@@ -2011,4 +2011,1140 @@ TEST(Transform_Set)
     });
 }
 
+TEST(Transform_Fuzz)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    std::unique_ptr<Peer> server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    std::unique_ptr<Peer> client_2 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
+    std::unique_ptr<Peer> client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+    std::unique_ptr<Peer> client_4 = Peer::create_client(test_context, 4, changeset_dump_dir_gen.get());
+    std::unique_ptr<Peer> client_5 = Peer::create_client(test_context, 5, changeset_dump_dir_gen.get());
+    client_3->history.advance_time(4);
+    client_3->start_transaction();
+    sync::create_table(*client_3->group, "class_D");
+    client_3->commit(); // changeset 2
+    client_2->start_transaction();
+    sync::create_table(*client_2->group, "class_B");
+    client_2->commit(); // changeset 2
+    client_4->history.advance_time(5);
+    client_4->start_transaction();
+    sync::create_table_with_primary_key(*client_4->group, "class_A", type_Int, "pk");
+    client_4->commit(); // changeset 2
+    client_3->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    sync::create_table_with_primary_key(*client_5->group, "class_A", type_Int, "pk");
+    client_5->commit(); // changeset 3
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_A");
+    client_4->selected_table->add_column_list(type_String, "h", 0);
+    client_4->commit(); // changeset 4
+    client_2->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_2);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_table->create_object_with_primary_key(0);
+    client_5->commit(); // changeset 5
+    client_3->history.advance_time(1);
+    client_3->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(3);
+    client_5->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_4);
+    client_2->history.advance_time(2);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->add_column(type_String, "d", 1);
+    client_2->commit(); // changeset 3
+    client_3->history.advance_time(5);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_table->add_column_list(type_Int, "g", 0);
+    client_4->commit(); // changeset 5
+    client_3->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_table->add_column(type_Int, "b", 1);
+    client_3->commit(); // changeset 6
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_A");
+    client_4->selected_table->create_object_with_primary_key(8);
+    client_4->commit(); // changeset 6
+    server->integrate_next_changeset_from(*client_3);
+    server->integrate_next_changeset_from(*client_4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_table->add_column_list(type_String, "h", 0);
+    client_5->commit(); // changeset 7
+    client_2->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_2);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->create_object();
+    client_2->commit(); // changeset 4
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(1);
+    client_2->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->get_object(ObjKey(0)).set(ColKey(67239936), "1", 0);
+    client_2->commit(); // changeset 6
+    client_3->history.advance_time(2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_A");
+    client_3->selected_table->create_object_with_primary_key(6);
+    client_3->commit(); // changeset 7
+    server->integrate_next_changeset_from(*client_2);
+    client_4->history.advance_time(4);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->create_object();
+    client_2->commit(); // changeset 7
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->commit(); // changeset 9
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->commit(); // changeset 10
+    client_5->history.advance_time(2);
+    client_5->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(5);
+    client_3->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->remove_object(ObjKey(0));
+    client_2->commit(); // changeset 8
+    client_2->history.advance_time(1);
+    client_2->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_5);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(-15);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->history.advance_time(1);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_A");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(8)).get_list_ptr<StringData>(ColKey(134348801));
+    static_cast<Lst<StringData>*>(client_4->selected_array.get())->insert(0, "");
+    client_4->commit(); // changeset 9
+    client_2->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_2);
+    client_4->history.advance_time(2);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_A");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(8)).get_list_ptr<StringData>(ColKey(134348801));
+    static_cast<Lst<StringData>*>(client_4->selected_array.get())->insert(0, "");
+    client_4->commit(); // changeset 10
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_table->add_column_list(type_Int, "g", 0);
+    client_4->commit(); // changeset 11
+    client_5->history.advance_time(3);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(1);
+    client_5->start_transaction();
+    sync::create_table_with_primary_key(*client_5->group, "class_E", type_Int, "pk");
+    client_5->commit(); // changeset 14
+    client_3->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->add_column(type_Int, "a", 0);
+    client_5->commit(); // changeset 15
+    client_2->history.advance_time(2);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->commit(); // changeset 9
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->history.advance_time(1);
+    client_5->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_5);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_table->create_object();
+    client_5->commit(); // changeset 17
+    client_3->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_5);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->insert(0, 0);
+    client_5->commit(); // changeset 18
+    client_2->start_transaction();
+    client_2->commit(); // changeset 13
+    client_2->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_table->create_object();
+    client_3->commit(); // changeset 11
+    client_5->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_table->create_object();
+    client_2->commit(); // changeset 14
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->commit(); // changeset 19
+    client_4->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_table->create_object();
+    client_5->commit(); // changeset 20
+    client_4->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(0, 0);
+    client_3->commit(); // changeset 12
+    client_2->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(5);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_2);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->history.advance_time(1);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_table->create_object();
+    client_4->commit(); // changeset 14
+    client_3->integrate_next_changeset_from(*server);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_table->create_object();
+    client_4->commit(); // changeset 15
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->create_object();
+    client_2->commit(); // changeset 16
+    client_4->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_4);
+    client_4->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->history.advance_time(-2);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(5);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->create_object_with_primary_key(1);
+    client_5->commit(); // changeset 21
+    client_4->integrate_next_changeset_from(*server);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(2281701376));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 17
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(2)).get_list_ptr<StringData>(ColKey(134348801));
+    static_cast<Lst<StringData>*>(client_2->selected_array.get())->insert(0, "");
+    client_2->commit(); // changeset 20
+    server->integrate_next_changeset_from(*client_5);
+    client_2->history.advance_time(5);
+    client_2->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->commit(); // changeset 22
+    server->integrate_next_changeset_from(*client_3);
+    client_3->integrate_next_changeset_from(*server);
+    client_5->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959552));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 19
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_4);
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    client_5->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->history.advance_time(1);
+    client_3->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(4);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959553));
+    static_cast<Lst<int64_t>*>(client_2->selected_array.get())->insert(0, 0);
+    client_2->commit(); // changeset 22
+    client_5->history.advance_time(4);
+    client_5->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->set(0, 560);
+    client_5->commit(); // changeset 25
+    client_2->history.advance_time(4);
+    client_2->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->commit(); // changeset 16
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_table->get_object(ObjKey(512)).set(ColKey(1140981760), "2", 0);
+    client_3->commit(); // changeset 17
+    server->integrate_next_changeset_from(*client_3);
+    client_4->start_transaction();
+    sync::create_table_with_primary_key(*client_4->group, "class_E", type_Int, "pk");
+    client_4->commit(); // changeset 20
+    client_5->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_E");
+    client_4->commit(); // changeset 21
+    client_2->start_transaction();
+    sync::create_table(*client_2->group, "class_F");
+    client_2->commit(); // changeset 25
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(5);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(2281832448));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(0, "");
+    client_5->commit(); // changeset 28
+    client_2->start_transaction();
+    sync::create_table_with_primary_key(*client_2->group, "class_C", type_Int, "pk");
+    client_2->commit(); // changeset 26
+    client_4->integrate_next_changeset_from(*server);
+    client_5->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_4);
+    client_5->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->history.advance_time(-3);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_table->remove_object(ObjKey(512));
+    client_3->commit(); // changeset 18
+    client_2->history.advance_time(4);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(-1);
+    client_2->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(5);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(-11);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->remove_object(ObjKey(1));
+    client_5->commit(); // changeset 30
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_3);
+    client_4->history.advance_time(3);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(5);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_E");
+    client_4->selected_table->create_object_with_primary_key(3);
+    client_4->commit(); // changeset 25
+    client_2->history.advance_time(2);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_E");
+    client_2->selected_table->create_object_with_primary_key(5);
+    client_2->commit(); // changeset 31
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_E");
+    client_4->selected_table->remove_object(ObjKey(3));
+    client_4->commit(); // changeset 26
+    client_3->history.advance_time(1);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_A");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(6)).get_list_ptr<StringData>(ColKey(2281832449));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(0, "");
+    client_3->commit(); // changeset 20
+    client_5->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->history.advance_time(3);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959552));
+    client_4->selected_array->remove(0, 1);
+    client_4->commit(); // changeset 27
+    client_5->history.advance_time(3);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(0, "");
+    client_5->commit(); // changeset 32
+    client_3->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_3);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959553));
+    client_2->selected_array->remove(0, 1);
+    client_2->commit(); // changeset 32
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_2);
+    server->integrate_next_changeset_from(*client_4);
+    client_4->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->set(0, 454);
+    client_5->commit(); // changeset 33
+    client_4->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->set(0, "abc");
+    client_5->commit(); // changeset 34
+    server->integrate_next_changeset_from(*client_4);
+    client_2->history.advance_time(2);
+    client_2->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_2);
+    client_4->history.advance_time(-14);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959553));
+    static_cast<Lst<int64_t>*>(client_2->selected_array.get())->insert(0, 0);
+    client_2->commit(); // changeset 34
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_2);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(1);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_4);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(513)).get_list_ptr<int64_t>(ColKey(2281701376));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 31
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(4);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959553));
+    static_cast<Lst<int64_t>*>(client_2->selected_array.get())->insert(1, 0);
+    client_2->commit(); // changeset 38
+    client_3->history.advance_time(2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_table->get_object(ObjKey(513)).set(ColKey(1140981760), "3", 0);
+    client_3->commit(); // changeset 22
+    client_5->history.advance_time(4);
+    client_5->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_4);
+    client_4->history.advance_time(1);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_2);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(2281832448));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(0, "");
+    client_5->commit(); // changeset 37
+    client_3->history.advance_time(5);
+    client_3->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    client_4->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(5);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_3);
+    client_3->history.advance_time(4);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_table->create_object();
+    client_3->commit(); // changeset 24
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(1, 0);
+    client_3->commit(); // changeset 25
+    client_3->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(5);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    client_5->selected_array->remove(0, 1);
+    client_5->commit(); // changeset 38
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(2);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->commit(); // changeset 39
+    client_4->history.advance_time(1);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959552));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 38
+    client_3->history.advance_time(3);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(1, 0);
+    client_3->commit(); // changeset 27
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_E");
+    client_4->selected_table->add_column(type_String, "c", 0);
+    client_4->commit(); // changeset 39
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->insert(0, 0);
+    client_5->commit(); // changeset 40
+    client_5->history.advance_time(1);
+    client_5->integrate_next_changeset_from(*server);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_A");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(134348801));
+    static_cast<Lst<StringData>*>(client_4->selected_array.get())->insert(0, "");
+    client_4->commit(); // changeset 40
+    client_5->history.advance_time(-6);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_4);
+    client_4->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_4);
+    client_3->history.advance_time(1);
+    client_3->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->create_object_with_primary_key(3);
+    client_5->commit(); // changeset 42
+    client_4->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_4);
+    client_4->history.advance_time(5);
+    client_4->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->set(0, "abc");
+    client_5->commit(); // changeset 43
+    client_4->history.advance_time(1);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->history.advance_time(1);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(-13);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(1024)).get_list_ptr<int64_t>(ColKey(1207959553));
+    static_cast<Lst<int64_t>*>(client_2->selected_array.get())->insert(0, 0);
+    client_2->commit(); // changeset 42
+    server->integrate_next_changeset_from(*client_2);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(2281832448));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(1, "");
+    client_5->commit(); // changeset 45
+    client_2->history.advance_time(5);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_A");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(6)).get_list_ptr<StringData>(ColKey(2281832449));
+    static_cast<Lst<StringData>*>(client_2->selected_array.get())->insert(0, "");
+    client_2->commit(); // changeset 44
+    client_5->history.advance_time(2);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(1024)).get_list_ptr<int64_t>(ColKey(2281701378));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->insert(0, 0);
+    client_5->commit(); // changeset 48
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->set(2, 932);
+    client_3->commit(); // changeset 29
+    client_2->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_2);
+    client_5->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(2);
+    client_4->integrate_next_changeset_from(*server);
+    client_3->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_3);
+    client_4->integrate_next_changeset_from(*server);
+    client_3->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(513)).get_list_ptr<int64_t>(ColKey(2281701378));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->insert(0, 0);
+    client_5->commit(); // changeset 50
+    client_5->integrate_next_changeset_from(*server);
+    client_3->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_3);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_E");
+    client_4->selected_table->create_object_with_primary_key(0);
+    client_4->commit(); // changeset 46
+    client_5->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->history.advance_time(4);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_A");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(2281832449));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(0, "");
+    client_3->commit(); // changeset 33
+    client_4->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_4);
+    client_3->history.advance_time(5);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(0, "");
+    client_3->commit(); // changeset 34
+    client_5->history.advance_time(5);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(1);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(1024)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_5->selected_array.get())->insert(0, 0);
+    client_5->commit(); // changeset 53
+    client_5->history.advance_time(2);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(0, "");
+    client_5->commit(); // changeset 54
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(0, "");
+    client_3->commit(); // changeset 35
+    client_4->history.advance_time(3);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(768)).get_list_ptr<int64_t>(ColKey(1207959552));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 47
+    client_3->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    sync::create_table_with_primary_key(*client_5->group, "class_C", type_Int, "pk");
+    client_5->commit(); // changeset 55
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(2281832450));
+    static_cast<Lst<StringData>*>(client_4->selected_array.get())->insert(0, "");
+    client_4->commit(); // changeset 48
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(1024)).get_list_ptr<StringData>(ColKey(2281832448));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(0, "");
+    client_5->commit(); // changeset 56
+    client_5->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_table->get_object(ObjKey(514)).set(ColKey(2214723585), "4", 0);
+    client_4->commit(); // changeset 49
+    client_4->history.advance_time(-7);
+    client_4->start_transaction();
+    client_4->commit(); // changeset 50
+    server->integrate_next_changeset_from(*client_5);
+    client_5->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->history.advance_time(5);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->history.advance_time(2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->set(0, "abc");
+    client_3->commit(); // changeset 37
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_D");
+    client_5->selected_table->create_object();
+    client_5->commit(); // changeset 57
+    client_4->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(3, 0);
+    client_3->commit(); // changeset 38
+    server->integrate_next_changeset_from(*client_3);
+    client_4->history.advance_time(4);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(2);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_table->remove_object(ObjKey(2));
+    client_2->commit(); // changeset 46
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(4, 0);
+    client_3->commit(); // changeset 39
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_C");
+    client_2->selected_table->create_object_with_primary_key(1);
+    client_2->commit(); // changeset 47
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_A");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(8)).get_list_ptr<StringData>(ColKey(2281832449));
+    static_cast<Lst<StringData>*>(client_2->selected_array.get())->set(1, "abc");
+    client_2->commit(); // changeset 48
+    client_4->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_4);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(1, "");
+    client_3->commit(); // changeset 40
+    client_5->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_4);
+    client_2->history.advance_time(-6);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->start_transaction();
+    client_2->commit(); // changeset 50
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_E");
+    client_2->selected_table->get_object(ObjKey(5)).set(ColKey(5368709121), 5, 0);
+    client_2->commit(); // changeset 51
+    client_2->history.advance_time(5);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->integrate_next_changeset_from(*server);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(3);
+    client_4->integrate_next_changeset_from(*server);
+    client_4->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->history.advance_time(1);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(6)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_5->selected_array.get())->insert(0, "");
+    client_5->commit(); // changeset 59
+    client_3->history.advance_time(3);
+    client_3->start_transaction();
+    client_3->commit(); // changeset 43
+    client_2->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_E");
+    client_3->selected_table->create_object_with_primary_key(3);
+    client_3->commit(); // changeset 44
+    client_4->history.advance_time(1);
+    server->integrate_next_changeset_from(*client_4);
+    client_3->history.advance_time(3);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(0, "");
+    client_3->commit(); // changeset 45
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(512)).get_list_ptr<int64_t>(ColKey(1207959552));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 57
+    client_2->history.advance_time(4);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(1);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(2);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->create_object_with_primary_key(6);
+    client_5->commit(); // changeset 60
+    client_4->history.advance_time(3);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(513)).get_list_ptr<int64_t>(ColKey(2281701376));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->set(0, 725);
+    client_4->commit(); // changeset 59
+    client_5->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(3);
+    client_4->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    client_4->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->set(0, "abc");
+    client_3->commit(); // changeset 47
+    client_3->history.advance_time(4);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(3);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_A");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(134348801));
+    client_4->selected_array->remove(0, 1);
+    client_4->commit(); // changeset 63
+    client_4->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_A");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(2281832449));
+    client_3->selected_array->remove(0, 1);
+    client_3->commit(); // changeset 49
+    client_5->history.advance_time(5);
+    server->integrate_next_changeset_from(*client_5);
+    client_5->history.advance_time(4);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->remove_object(ObjKey(3));
+    client_5->commit(); // changeset 62
+    server->integrate_next_changeset_from(*client_2);
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->history.advance_time(2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_E");
+    client_3->selected_table->create_object_with_primary_key(1);
+    client_3->commit(); // changeset 50
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(2281832450));
+    client_4->selected_array->remove(0, 1);
+    client_4->commit(); // changeset 65
+    client_4->history.advance_time(1);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_D");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(1207959552));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(1, 0);
+    client_4->commit(); // changeset 66
+    server->integrate_next_changeset_from(*client_4);
+    client_2->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(3);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_F");
+    client_2->selected_table->add_column(type_String, "d", 1);
+    client_2->commit(); // changeset 57
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(512)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(0, 0);
+    client_3->commit(); // changeset 51
+    client_3->start_transaction();
+    sync::create_table(*client_3->group, "class_F");
+    client_3->commit(); // changeset 52
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(1);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(2281832450));
+    static_cast<Lst<StringData>*>(client_4->selected_array.get())->insert(0, "");
+    client_4->commit(); // changeset 67
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_F");
+    client_3->commit(); // changeset 53
+    client_2->history.advance_time(2);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(3);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_E");
+    client_3->selected_table->remove_object(ObjKey(1));
+    client_3->commit(); // changeset 54
+    client_4->history.advance_time(2);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(1280)).get_list_ptr<StringData>(ColKey(134348801));
+    static_cast<Lst<StringData>*>(client_2->selected_array.get())->insert(0, "");
+    client_2->commit(); // changeset 61
+    client_5->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_E");
+    client_2->selected_table->get_object(ObjKey(5)).add_int(ColKey(5368709121), 6);
+    client_2->commit(); // changeset 62
+    client_5->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(5);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_B");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(1024)).get_list_ptr<int64_t>(ColKey(2281701378));
+    client_5->selected_array->remove(0, 1);
+    client_5->commit(); // changeset 65
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_C");
+    client_5->selected_table->add_column(type_Int, "a", 0);
+    client_5->commit(); // changeset 66
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(2281832450));
+    static_cast<Lst<StringData>*>(client_4->selected_array.get())->set(0, "abc");
+    client_4->commit(); // changeset 69
+    client_2->history.advance_time(5);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->history.advance_time(3);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    client_4->history.advance_time(5);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_F");
+    client_4->selected_table->add_column(type_Int, "a", 0);
+    client_4->commit(); // changeset 71
+    client_3->integrate_next_changeset_from(*server);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_B");
+    client_4->selected_array =
+        client_4->selected_table->get_object(ObjKey(514)).get_list_ptr<int64_t>(ColKey(2281701376));
+    static_cast<Lst<int64_t>*>(client_4->selected_array.get())->insert(0, 0);
+    client_4->commit(); // changeset 72
+    client_3->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_3);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_C");
+    client_5->selected_table->create_object_with_primary_key(0);
+    client_5->commit(); // changeset 67
+    client_5->history.advance_time(4);
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_2);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(0)).get_list_ptr<int64_t>(ColKey(134217729));
+    client_3->selected_array->remove(3, 4);
+    client_3->commit(); // changeset 56
+    client_5->history.advance_time(5);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_C");
+    client_5->selected_table->remove_object(ObjKey(0));
+    client_5->commit(); // changeset 68
+    client_5->history.advance_time(3);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_E");
+    client_5->selected_table->remove_object(ObjKey(6));
+    client_5->commit(); // changeset 70
+    client_3->history.advance_time(2);
+    client_3->start_transaction();
+    client_3->commit(); // changeset 57
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_D");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(1024)).get_list_ptr<int64_t>(ColKey(1207959553));
+    client_2->selected_array->remove(0, 1);
+    client_2->commit(); // changeset 65
+    client_5->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_2);
+    server->integrate_next_changeset_from(*client_5);
+    client_4->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(4);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(513)).get_list_ptr<StringData>(ColKey(1208090625));
+    client_3->selected_array->remove(0, 1);
+    client_3->commit(); // changeset 58
+    server->integrate_next_changeset_from(*client_2);
+    client_4->start_transaction();
+    sync::create_table_with_primary_key(*client_4->group, "class_C", type_Int, "pk");
+    client_4->commit(); // changeset 74
+    client_3->history.advance_time(4);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_A");
+    client_3->selected_table->create_object_with_primary_key(1);
+    client_3->commit(); // changeset 59
+    client_4->history.advance_time(2);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->history.advance_time(3);
+    client_2->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(4);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_E");
+    client_4->selected_table->get_object(ObjKey(0)).set(ColKey(3221356546), "7", 0);
+    client_4->commit(); // changeset 76
+    client_3->history.advance_time(1);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->integrate_next_changeset_from(*server);
+    client_5->integrate_next_changeset_from(*server);
+    client_2->start_transaction();
+    client_2->selected_table = client_2->group->get_table("class_B");
+    client_2->selected_array =
+        client_2->selected_table->get_object(ObjKey(1024)).get_list_ptr<StringData>(ColKey(134348801));
+    static_cast<Lst<StringData>*>(client_2->selected_array.get())->insert(0, "");
+    client_2->commit(); // changeset 68
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_B");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(1024)).get_list_ptr<StringData>(ColKey(1208090625));
+    static_cast<Lst<StringData>*>(client_3->selected_array.get())->insert(0, "");
+    client_3->commit(); // changeset 61
+    client_4->history.advance_time(1);
+    client_4->start_transaction();
+    client_4->selected_table = client_4->group->get_table("class_F");
+    client_4->selected_table->create_object();
+    client_4->commit(); // changeset 78
+    client_5->start_transaction();
+    client_5->selected_table = client_5->group->get_table("class_A");
+    client_5->selected_array =
+        client_5->selected_table->get_object(ObjKey(0)).get_list_ptr<StringData>(ColKey(1208090625));
+    client_5->selected_array->remove(1, 2);
+    client_5->commit(); // changeset 73
+    server->integrate_next_changeset_from(*client_5);
+    client_4->history.advance_time(2);
+    client_4->integrate_next_changeset_from(*server);
+    server->integrate_next_changeset_from(*client_2);
+    client_2->integrate_next_changeset_from(*server);
+    client_3->history.advance_time(3);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->history.advance_time(2);
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_5);
+    client_3->history.advance_time(1);
+    client_3->start_transaction();
+    client_3->selected_table = client_3->group->get_table("class_D");
+    client_3->selected_array =
+        client_3->selected_table->get_object(ObjKey(1024)).get_list_ptr<int64_t>(ColKey(134217729));
+    static_cast<Lst<int64_t>*>(client_3->selected_array.get())->insert(0, 0);
+    client_3->commit(); // changeset 63
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_4);
+    client_3->history.advance_time(4);
+    client_3->integrate_next_changeset_from(*server);
+    client_4->integrate_next_changeset_from(*server);
+    client_2->integrate_next_changeset_from(*server);
+    client_5->history.advance_time(3);
+    server->integrate_next_changeset_from(*client_5);
+}
+
 } // unnamed namespace

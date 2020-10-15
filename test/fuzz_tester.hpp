@@ -368,7 +368,7 @@ private:
                       << nullable << ");\n";
         }
 
-        ColKey col_key = table->add_column(type, name, nullable);
+        ColKey col_key = table->add_column_list(type, name, nullable);
         m_array_columns.push_back(col_key);
     }
 
@@ -472,10 +472,7 @@ private:
 
         if (!pk_col_key) {
             if (m_trace) {
-                std::cerr << "sync::create_object(*" << trace_client(client)
-                          << "->"
-                             "group, *"
-                          << trace_selected_table(client) << ");\n";
+                std::cerr << trace_selected_table(client) << "->create_object();\n";
             }
             client.selected_table->create_object();
         }
@@ -492,10 +489,7 @@ private:
                 pk_int = draw_int_max(10); // Low number to ensure some collisions
             }
             if (m_trace) {
-                std::cerr << "sync::create_object_with_primary_key(*" << trace_client(client)
-                          << "->"
-                             "group, *"
-                          << trace_selected_table(client) << ", ";
+                std::cerr << trace_selected_table(client) << "->create_object_with_primary_key(";
                 if (is_string_pk)
                     std::cerr << "\"" << pk_string << "\"";
                 else
@@ -602,7 +596,7 @@ private:
         else {
             StringData value = "abc";
             if (m_trace) {
-                std::cerr << trace_selected_string_array(client) << "->set(" << ndx << ", " << value << ");\n";
+                std::cerr << trace_selected_string_array(client) << "->set(" << ndx << ", \"" << value << "\");\n";
             }
             static_cast<Lst<StringData>*>(client.selected_array.get())->set(ndx, value);
         }
