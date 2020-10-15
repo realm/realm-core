@@ -894,49 +894,49 @@ public:
         : m_args(args)
     {
     }
-    bool bool_for_argument(size_t n)
+    bool bool_for_argument(size_t n) final
     {
-        return m_args[n].get<bool>();
+        return m_args.at(n).get<bool>();
     }
-    long long long_for_argument(size_t n)
+    long long long_for_argument(size_t n) final
     {
-        return m_args[n].get<int64_t>();
+        return m_args.at(n).get<int64_t>();
     }
-    float float_for_argument(size_t n)
+    float float_for_argument(size_t n) final
     {
-        return m_args[n].get<float>();
+        return m_args.at(n).get<float>();
     }
-    double double_for_argument(size_t n)
+    double double_for_argument(size_t n) final
     {
-        return m_args[n].get<double>();
+        return m_args.at(n).get<double>();
     }
-    StringData string_for_argument(size_t n)
+    StringData string_for_argument(size_t n) final
     {
-        return m_args[n].get<StringData>();
+        return m_args.at(n).get<StringData>();
     }
-    BinaryData binary_for_argument(size_t n)
+    BinaryData binary_for_argument(size_t n) final
     {
-        return m_args[n].get<BinaryData>();
+        return m_args.at(n).get<BinaryData>();
     }
-    Timestamp timestamp_for_argument(size_t n)
+    Timestamp timestamp_for_argument(size_t n) final
     {
-        return m_args[n].get<Timestamp>();
+        return m_args.at(n).get<Timestamp>();
     }
-    ObjectId objectid_for_argument(size_t n)
+    ObjectId objectid_for_argument(size_t n) final
     {
-        return m_args[n].get<ObjectId>();
+        return m_args.at(n).get<ObjectId>();
     }
-    Decimal128 decimal128_for_argument(size_t n)
+    Decimal128 decimal128_for_argument(size_t n) final
     {
-        return m_args[n].get<Decimal128>();
+        return m_args.at(n).get<Decimal128>();
     }
-    ObjKey object_index_for_argument(size_t n)
+    ObjKey object_index_for_argument(size_t n) final
     {
-        return m_args[n].get<ObjKey>();
+        return m_args.at(n).get<ObjKey>();
     }
-    bool is_argument_null(size_t n)
+    bool is_argument_null(size_t n) final
     {
-        return m_args[n].is_null();
+        return m_args.at(n).is_null();
     }
 
 private:
