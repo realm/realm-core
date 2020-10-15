@@ -256,7 +256,7 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
         VacuumCommand
         EncryptionTransformer
         DumpCommand
-        StatCommand
+        # StatCommand
         # HistCommand
         VerifyServerFileCommand
         ServerIndexCommand
