@@ -30,7 +30,7 @@ modules:
 - name: zlib
   repo: git@github.com:madler/zlib.git
   prefix: src/external
-  branch: v1.21.11
+  branch: v1.2.11
 
 - name: libuv
   repo: git@github.com:libuv/libuv.git
