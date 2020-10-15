@@ -106,8 +106,7 @@ if(NOT APPLE)
         # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
         target_link_libraries(ObjectStore PUBLIC LibUV::LibUV)
     endif()
-    target_compile_definitions(ObjectStore PUBLIC
-        REALM_HAVE_UV=1)
+    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
 endif()
 
 add_subdirectory(notifications-fuzzer)
