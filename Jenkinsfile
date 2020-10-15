@@ -219,7 +219,6 @@ jobWrapper {
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
                         }
-                        sh 'tools/build-cocoa.sh'
                         sh 'tools/build-cocoa.sh -x'
                         archiveArtifacts('realm-*-cocoa*.tar.gz')
                         archiveArtifacts('realm-*-cocoa*.tar.xz')
