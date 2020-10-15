@@ -175,6 +175,9 @@ install(FILES ${UTIL_METERED_INSTALL_HEADERS}
 install(FILES ../../external/mpark/variant.hpp
         DESTINATION include/external/mpark
         COMPONENT devel)
+install(FILES ../../external/json/json.hpp
+        DESTINATION include/external/json
+        COMPONENT devel)
 
 if(REALM_BUILD_COMMANDLINE_TOOLS)
     add_executable(SyncWorker server_command.cpp)
