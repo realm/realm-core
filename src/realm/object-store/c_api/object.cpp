@@ -171,6 +171,19 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object)
     return realm_link_t{to_capi(table_key), to_capi(obj_key)};
 }
 
+RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* realm,
+                                                                realm_thread_safe_reference_t* tsr)
+{
+    return wrap_err([&]() {
+        if (tsr->m_type != ThreadSafeReferenceType::Object) {
+            throw std::logic_error{"Thread safe reference type mismatch"};
+        }
+
+        auto obj = tsr->resolve<Object>(*realm);
+        return new realm_object_t{std::move(obj)};
+    });
+}
+
 RLM_API bool realm_get_value(const realm_object_t* obj, realm_col_key_t col, realm_value_t* out_value)
 {
     return realm_get_values(obj, 1, &col, out_value);
@@ -502,5 +515,17 @@ RLM_API bool realm_list_clear(realm_list_t* list)
     return wrap_err([&]() {
         list->remove_all();
         return true;
+    });
+}
+
+RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm, realm_thread_safe_reference_t* tsr)
+{
+    return wrap_err([&]() {
+        if (tsr->m_type != ThreadSafeReferenceType::List) {
+            throw std::logic_error{"Thread safe reference type mismatch"};
+        }
+
+        auto list = tsr->resolve<List>(*realm);
+        return new realm_list_t{std::move(list)};
     });
 }

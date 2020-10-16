@@ -13,6 +13,7 @@
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
 #include <stdexcept>
 #include <string>
@@ -73,6 +74,12 @@ struct PropertyTypeMismatch : std::logic_error {
 
 //// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
+enum class ThreadSafeReferenceType {
+    Object,
+    List,
+    Results,
+};
+
 struct WrapC {
     virtual ~WrapC() {}
 
@@ -89,6 +96,11 @@ struct WrapC {
     virtual bool equals(const WrapC& other) const noexcept
     {
         return this == &other;
+    }
+
+    virtual std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const
+    {
+        throw std::logic_error{"Thread safe references cannot be created for this object type"};
     }
 };
 
@@ -213,6 +225,11 @@ struct realm_object : WrapC, Object {
         }
         return false;
     }
+
+    std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const final
+    {
+        return {ThreadSafeReference{static_cast<const Object&>(*this)}, ThreadSafeReferenceType::Object};
+    }
 };
 
 struct realm_list : WrapC, List {
@@ -239,6 +256,11 @@ struct realm_list : WrapC, List {
                    get_parent_object_key() == ptr->get_parent_object_key();
         }
         return false;
+    }
+
+    std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const final
+    {
+        return {ThreadSafeReference{static_cast<const List&>(*this)}, ThreadSafeReferenceType::List};
     }
 };
 
@@ -309,6 +331,23 @@ struct realm_results : WrapC, Results {
     {
         return Results::is_frozen();
     }
+
+    std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const final
+    {
+        return {ThreadSafeReference{static_cast<const Results&>(*this)}, ThreadSafeReferenceType::Results};
+    }
+};
+
+struct realm_thread_safe_reference : WrapC, ThreadSafeReference {
+    using Type = ThreadSafeReferenceType;
+
+    explicit realm_thread_safe_reference(ThreadSafeReference tsr, Type type)
+        : ThreadSafeReference(std::move(tsr))
+        , m_type(type)
+    {
+    }
+
+    Type m_type;
 };
 
 

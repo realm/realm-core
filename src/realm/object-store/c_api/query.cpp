@@ -341,3 +341,16 @@ RLM_API bool realm_results_average(realm_results_t* results, realm_col_key_t col
         return true;
     });
 }
+
+RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t* realm,
+                                                                  realm_thread_safe_reference_t* tsr)
+{
+    return wrap_err([&]() {
+        if (tsr->m_type != ThreadSafeReferenceType::Results) {
+            throw std::logic_error{"Thread safe reference type mismatch"};
+        }
+
+        auto results = tsr->resolve<Results>(*realm);
+        return new realm_results_t{std::move(results)};
+    });
+}

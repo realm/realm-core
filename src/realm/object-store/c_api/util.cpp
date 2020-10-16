@@ -30,3 +30,12 @@ RLM_API bool realm_equals(const void* a, const void* b)
 
     return lhs->equals(*rhs);
 }
+
+RLM_API realm_thread_safe_reference_t* realm_create_thread_safe_reference(const void* ptr)
+{
+    return wrap_err([=]() {
+        auto cptr = static_cast<const WrapC*>(ptr);
+        auto [tsr, type] = cptr->get_thread_safe_reference();
+        return new realm_thread_safe_reference_t{std::move(tsr), type};
+    });
+}

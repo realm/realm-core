@@ -40,6 +40,7 @@
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
+typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
 typedef void (*realm_free_userdata_func_t)(void*);
 typedef void* (*realm_clone_userdata_func_t)(const void*);
 
@@ -451,6 +452,26 @@ RLM_API bool realm_equals(const void*, const void*);
  * function always returns false.
  */
 RLM_API bool realm_is_frozen(const void*);
+
+/**
+ * Get a thread-safe reference representing the same underlying object as some
+ * API object.
+ *
+ * The thread safe reference can be passed to a different thread and resolved
+ * against a different `realm_t` instance, which succeeds if the underlying
+ * object still exists.
+ *
+ * The following types can produce thread safe references:
+ *
+ * - `realm_object_t`
+ * - `realm_results_t`
+ * - `realm_list_t`
+ *
+ * This does not assume ownership of the object.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_thread_safe_reference_t* realm_create_thread_safe_reference(const void*);
 
 /**
  * Allocate a new configuration with default options.
@@ -1039,6 +1060,12 @@ RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm
                                                                            realm_scheduler_t*);
 
 /**
+ * Get an object from a thread-safe reference, potentially originating in a
+ * different `realm_t` instance
+ */
+RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
+
+/**
  * Get the value for a property.
  *
  * @return True if no exception occurred.
@@ -1214,6 +1241,12 @@ RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_l
                                                                          realm_on_collection_change_func_t on_change,
                                                                          realm_callback_error_func_t on_error,
                                                                          realm_scheduler_t*);
+
+/**
+ * Get an list from a thread-safe reference, potentially originating in a
+ * different `realm_t` instance
+ */
+RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
 
 /**
  * True if an object notification indicates that the object was deleted.
@@ -1540,5 +1573,11 @@ RLM_API realm_notification_token_t* realm_results_add_notification_callback(real
                                                                             realm_on_collection_change_func_t,
                                                                             realm_callback_error_func_t,
                                                                             realm_scheduler_t*);
+
+/**
+ * Get an results object from a thread-safe reference, potentially originating
+ * in a different `realm_t` instance
+ */
+RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*, realm_thread_safe_reference_t*);
 
 #endif // REALM_H
