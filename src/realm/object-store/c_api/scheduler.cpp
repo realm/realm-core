@@ -187,10 +187,14 @@ RLM_API void realm_scheduler_set_default_factory(void* userdata, realm_free_user
     static_cast<void>(userdata);
     static_cast<void>(free_func);
     static_cast<void>(factory_func);
-    REALM_TERMINATE("realm_scheduler_set_default_factor() not supported on Androi");
+    REALM_TERMINATE("realm_scheduler_set_default_factory() not supported on Android");
 #else
-    DefaultFactory factory{userdata, free_func, factory_func};
-    Scheduler::set_default_factory(std::move(factory));
+    static_cast<void>(userdata);
+    static_cast<void>(free_func);
+    static_cast<void>(factory_func);
+    REALM_TERMINATE("Not implemented yet");
+    // DefaultFactory factory{userdata, free_func, factory_func};
+    // Scheduler::set_default_factory(std::move(factory));
 #endif
 }
 
