@@ -11,10 +11,6 @@
 #define REALM_HAS_DEFAULT_SCHEDULER 0
 #endif
 
-#if !REALM_HAS_DEFAULT_SCHEDULER
-#include <realm/object-store/util/generic/scheduler.hpp>
-#endif
-
 using namespace realm::util;
 
 namespace {
