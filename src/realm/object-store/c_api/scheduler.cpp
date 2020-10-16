@@ -193,14 +193,14 @@ RLM_API const realm_scheduler_t* realm_scheduler_get_frozen()
 
 // FIXME: Move this into `GenericScheduler` (i.e. make `Scheduler::set_default_factory()` thread-safe).
 static std::mutex s_default_factory_mutex;
+static bool s_default_factory_set = false;
 
 RLM_API bool realm_scheduler_has_default_factory()
 {
 #if REALM_HAS_DEFAULT_SCHEDULER
     return true;
 #else
-    std::unique_lock<std::mutex> lock(s_default_factory_mutex);
-    return bool(s_factory);
+    return s_default_factory_set;
 #endif
 }
 
@@ -212,6 +212,8 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
         static_cast<void>(userdata);
         static_cast<void>(free_func);
         static_cast<void>(factory_func);
+        static_cast<void>(s_default_factory_mutex);
+        static_cast<void>(s_default_factory_set);
         throw std::logic_error{"This platform already has a default scheduler implementation"};
         return true;
 #else
@@ -221,7 +223,7 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
         }
         DefaultFactory factory{userdata, free_func, factory_func};
         Scheduler::set_default_factory(std::move(factory));
-        REALM_ASSERT(s_factory);
+        s_default_factory_set = true;
         return true;
 #endif
     });
