@@ -2073,7 +2073,7 @@ TEST(Transform_Set)
     });
 }
 
-ONLY(Transform_Fuzz)
+TEST(Transform_Fuzz)
 {
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
     std::unique_ptr<Peer> server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
@@ -3219,6 +3219,72 @@ ONLY(Transform_Fuzz)
     REALM_ASSERT(compare_groups(rt_0, rt_3));
     ReadTransaction rt_4(client_5->shared_group);
     REALM_ASSERT(compare_groups(rt_0, rt_4));
+}
+
+
+TEST(Transform_Fuzz1)
+{
+    // This test case recreates the problem that the above test exposes
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+    auto client_4 = Peer::create_client(test_context, 4, changeset_dump_dir_gen.get());
+    auto client_5 = Peer::create_client(test_context, 5, changeset_dump_dir_gen.get());
+
+    client_3->create_schema([](WriteTransaction& tr) {
+        auto t = tr.get_group().add_table_with_primary_key("class_A", type_Int, "pk");
+        t->add_column_list(type_String, "h");
+        t->create_object_with_primary_key(5);
+    });
+
+    synchronize(server.get(), {client_3.get(), client_4.get(), client_5.get()});
+
+    client_5->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "5abc");
+    });
+
+    client_4->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "4abc");
+    });
+
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_4);
+
+    client_3->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "3abc");
+    });
+
+    client_5->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "5def");
+    });
+
+    server->integrate_next_changeset_from(*client_3);
+    server->integrate_next_changeset_from(*client_5);
+
+    // Client 4 should integrate server changes here
+    client_4->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.remove(0);
+    });
+
+    // Client 5 should integrate server changes here
+    client_5->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.remove(0);
+    });
+
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_5);
 }
 
 } // unnamed namespace
