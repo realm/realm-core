@@ -128,11 +128,6 @@ file(GLOB REQUIRED_TEST_FILES
 add_executable(CoreTests ${CORE_TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES} ${REALM_TEST_HEADERS})
 set_target_properties(CoreTests PROPERTIES OUTPUT_NAME "realm-tests")
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
-	find_package(ProcPS REQUIRED)
-	target_link_libraries(CoreTests rt PROCPS::PROCPS)
-endif()
-
 # Resources required for running the tests copied to the target directory
 if(CMAKE_GENERATOR STREQUAL Xcode)
     # a simple copy doesn't work for an Xcode build because Xcode also needs to sign them
@@ -191,7 +186,6 @@ if(REALM_ENABLE_SYNC)
 	    util/demangle.cpp
 	    util/dump_changesets.cpp
 	    util/jsmn.cpp
-	    util/mem.cpp
 	    util/misc.cpp
 	    util/mock_metrics.cpp
 	    util/quote.cpp
@@ -213,7 +207,6 @@ if(REALM_ENABLE_SYNC)
 	    util/crypt_key.hpp
 	    util/demangle.hpp
 	    util/jsmn.hpp
-	    util/mem.hpp
 	    util/misc.hpp
 	    util/mock_metrics.hpp
 	    util/number_names.hpp
@@ -298,16 +291,6 @@ if(REALM_ENABLE_SYNC)
 
 	add_library(TestUtils STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
 	target_link_libraries(TestUtils PUBLIC Storage)
-
-	if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
-	    include(Findprocps)
-            if(${PROCPS_FOUND})
-                target_link_libraries(TestUtils rt ${PROCPS_LIBRARY})
-                target_include_directories(TestUtils PRIVATE ${PROCPS_INCLUDE_DIR})
-            else()
-                target_link_libraries(TestUtils rt)
-            endif()
-	endif()
 
 	if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 	    # Embed the manifest on Windows. The manifest allows very long paths (>255).
