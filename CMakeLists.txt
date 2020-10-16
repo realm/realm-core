@@ -292,6 +292,7 @@ set(REALM_EXPORTED_TARGETS
     QueryParser
     ObjectStore
     RealmFFI
+    RealmFFIStatic
 )
 if(${REALM_ENABLE_SYNC})
     list(APPEND REALM_EXPORTED_TARGETS Sync)
