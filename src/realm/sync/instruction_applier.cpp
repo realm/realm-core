@@ -574,7 +574,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                 [&](Mixed value) {
                     if (value.is_null()) {
                         if (col.is_nullable()) {
-                            list.set_null(index);
+                            list.insert_null(index);
                         }
                         else {
                             bad_transaction_log("ArrayInsert: NULL in non-nullable list '%2.%1'", field_name,
