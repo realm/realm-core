@@ -1,4 +1,19 @@
 #include <realm/object-store/c_api/util.hpp>
+#include <realm/object-store/util/scheduler.hpp>
+
+#if defined(REALM_USE_UV) && REALM_USE_UV
+#define REALM_HAS_DEFAULT_SCHEDULER 1
+#elif defined(REALM_USE_CF) && REALM_USE_CF
+#define REALM_HAS_DEFAULT_SCHEDULER 1
+#elif defined(REALM_USE_ALOOPER) && REALM_USE_ALOOPER
+#define REALM_HAS_DEFAULT_SCHEDULER 1
+#else
+#define REALM_HAS_DEFAULT_SCHEDULER 0
+#endif
+
+#if !REALM_HAS_DEFAULT_SCHEDULER
+#include <realm/object-store/util/generic/scheduler.hpp>
+#endif
 
 using namespace realm::util;
 
@@ -180,22 +195,40 @@ RLM_API const realm_scheduler_t* realm_scheduler_get_frozen()
     });
 }
 
-RLM_API void realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t free_func,
+// FIXME: Move this into `GenericScheduler` (i.e. make `Scheduler::set_default_factory()` thread-safe).
+static std::mutex s_default_factory_mutex;
+
+RLM_API bool realm_scheduler_has_default_factory()
+{
+#if REALM_HAS_DEFAULT_SCHEDULER
+    return true;
+#else
+    std::unique_lock<std::mutex> lock(s_default_factory_mutex);
+    return bool(s_factory);
+#endif
+}
+
+RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t free_func,
                                                  realm_scheduler_default_factory_func_t factory_func)
 {
-#if REALM_ANDROID
-    static_cast<void>(userdata);
-    static_cast<void>(free_func);
-    static_cast<void>(factory_func);
-    REALM_TERMINATE("realm_scheduler_set_default_factory() not supported on Android");
+    return wrap_err([&]() {
+#if REALM_HAS_DEFAULT_SCHEDULER
+        static_cast<void>(userdata);
+        static_cast<void>(free_func);
+        static_cast<void>(factory_func);
+        throw std::logic_error{"This platform already has a default scheduler implementation"};
+        return true;
 #else
-    static_cast<void>(userdata);
-    static_cast<void>(free_func);
-    static_cast<void>(factory_func);
-    REALM_TERMINATE("Not implemented yet");
-    // DefaultFactory factory{userdata, free_func, factory_func};
-    // Scheduler::set_default_factory(std::move(factory));
+        std::unique_lock<std::mutex> lock{s_default_factory_mutex};
+        if (s_factory) {
+            throw std::logic_error{"A default scheduler factory has already been registered"};
+        }
+        DefaultFactory factory{userdata, free_func, factory_func};
+        Scheduler::set_default_factory(std::move(factory));
+        REALM_ASSERT(s_factory);
+        return true;
 #endif
+    });
 }
 
 RLM_API void realm_scheduler_notify(realm_scheduler_t* scheduler)
