@@ -40,6 +40,16 @@ endif()
 target_include_directories(RealmFFI PRIVATE ${PEGTL_INCLUDE_DIR})
 target_include_directories(RealmFFIStatic PRIVATE ${PEGTL_INCLUDE_DIR})
 
+target_include_directories(RealmFFIStatic INTERFACE
+    $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(RealmFFI INTERFACE
+    $<BUILD_INTERFACE:${RealmCore_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
 set_target_properties(RealmFFI PROPERTIES
     OUTPUT_NAME "realm-ffi"
     CXX_VISIBILITY_PRESET hidden
