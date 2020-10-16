@@ -218,7 +218,7 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
         return true;
 #else
         std::unique_lock<std::mutex> lock{s_default_factory_mutex};
-        if (s_factory) {
+        if (s_default_factory_set) {
             throw std::logic_error{"A default scheduler factory has already been registered"};
         }
         DefaultFactory factory{userdata, free_func, factory_func};
