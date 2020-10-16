@@ -109,7 +109,7 @@ public:
     }
 
     template <typename C = std::chrono::system_clock, typename D = typename C::duration>
-    std::chrono::time_point<C, D> get_time_point()
+    std::chrono::time_point<C, D> get_time_point() const
     {
         REALM_ASSERT(!m_is_null);
 
