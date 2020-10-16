@@ -119,6 +119,12 @@ public:
         return std::chrono::time_point<C, D>(duration);
     }
 
+    template <typename C = std::chrono::system_clock, typename D = typename C::duration>
+    explicit operator std::chrono::time_point<C, D>() const
+    {
+        return get_time_point();
+    }
+
     bool operator==(const Timestamp& rhs) const
     {
         if (is_null() && rhs.is_null())
