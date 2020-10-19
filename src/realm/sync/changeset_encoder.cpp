@@ -80,6 +80,9 @@ void ChangesetEncoder::append_value(const Instruction::Payload& payload)
         case Type::ObjectId: {
             return append_value(data.object_id);
         }
+        case Type::UUID: {
+            return append_value(data.uuid);
+        }
         case Type::Link: {
             return append_value(data.link);
         }
@@ -136,6 +139,10 @@ void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
         [&](ObjectId id) {
             append_value(Type::ObjectId);
             append_value(id);
+        },
+        [&](UUID uuid) {
+            append_value(Type::UUID);
+            append_value(uuid);
         },
     };
     mpark::visit(std::move(append), pk);
@@ -366,6 +373,12 @@ void ChangesetEncoder::append_value(Timestamp timestamp)
 void ChangesetEncoder::append_value(ObjectId id)
 {
     append_bytes(&id, sizeof(id));
+}
+
+void ChangesetEncoder::append_value(UUID id)
+{
+    const auto bytes = id.to_bytes();
+    append_bytes(bytes.data(), bytes.size());
 }
 
 void ChangesetEncoder::append_value(Decimal128 id)

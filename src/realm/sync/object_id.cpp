@@ -30,6 +30,9 @@ std::ostream& realm::sync::operator<<(std::ostream& os, format_pk fmt)
         [&](ObjectId x) {
             os << "ObjectId{" << x << "}";
         },
+        [&](UUID x) {
+            os << "UUID{" << x << "}";
+        },
     };
     mpark::visit(formatter, key);
     return os;

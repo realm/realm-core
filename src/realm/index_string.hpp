@@ -105,9 +105,11 @@ private:
     void index_string_all_ins(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 };
 
-// 12 is the biggest element size of any non-string/binary Realm type
-constexpr size_t string_conversion_buffer_size = 12;
+// 16 is the biggest element size of any non-string/binary Realm type
+constexpr size_t string_conversion_buffer_size = 16;
 using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
+static_assert(sizeof(UUID::UUIDBytes) <= string_conversion_buffer_size,
+              "if you change the size of a UUID then also change the string index buffer space");
 
 // The purpose of this class is to get easy access to fields in a specific column in the
 // cluster. When you have an object like this, you can get a string version of the relevant
@@ -163,7 +165,7 @@ public:
     static bool type_supported(realm::DataType type)
     {
         return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
-                type == type_ObjectId || type == type_Mixed);
+                type == type_ObjectId || type == type_Mixed || type == type_UUID);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -410,6 +412,16 @@ struct GetIndexData<ObjectId> {
     {
         memcpy(&buffer, &value, sizeof(ObjectId));
         return StringData{buffer.data(), sizeof(ObjectId)};
+    }
+};
+
+template <>
+struct GetIndexData<UUID> {
+    static StringData get_index_data(UUID value, StringConversionBuffer& buffer)
+    {
+        const auto bytes = value.to_bytes();
+        std::copy_n(bytes.data(), bytes.size(), buffer.begin());
+        return StringData{buffer.data(), bytes.size()};
     }
 };
 

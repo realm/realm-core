@@ -96,6 +96,8 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
             return PropertyType::ObjectId | flags;
         case col_type_Decimal:
             return PropertyType::Decimal | flags;
+        case col_type_UUID:
+            return PropertyType::UUID | flags;
         case col_type_Link: {
             if (attr.test(col_attr_Set)) {
                 return PropertyType::Object | flags;
@@ -236,7 +238,7 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     // check primary keys
     if (prop.is_primary) {
         if (prop.type != PropertyType::Int && prop.type != PropertyType::String &&
-            prop.type != PropertyType::ObjectId) {
+            prop.type != PropertyType::ObjectId && prop.type != PropertyType::UUID) {
             exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.", object_name,
                                     prop.name, string_for_property_type(prop.type));
         }

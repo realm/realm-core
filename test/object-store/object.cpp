@@ -108,6 +108,7 @@ TEST_CASE("object")
              {"date", PropertyType::Date},
              {"object id", PropertyType::ObjectId},
              {"decimal", PropertyType::Decimal},
+             {"uuid", PropertyType::UUID},
              {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
 
              {"bool array", PropertyType::Array | PropertyType::Bool},
@@ -119,6 +120,7 @@ TEST_CASE("object")
              {"date array", PropertyType::Array | PropertyType::Date},
              {"object array", PropertyType::Array | PropertyType::Object, "array target"},
              {"object id array", PropertyType::Array | PropertyType::ObjectId},
+             {"uuid array", PropertyType::Array | PropertyType::UUID},
              {"decimal array", PropertyType::Array | PropertyType::Decimal},
          }},
         {"all optional types",
@@ -133,6 +135,7 @@ TEST_CASE("object")
              {"date", PropertyType::Date | PropertyType::Nullable},
              {"object id", PropertyType::ObjectId | PropertyType::Nullable},
              {"decimal", PropertyType::Decimal | PropertyType::Nullable},
+             {"uuid", PropertyType::UUID | PropertyType::Nullable},
 
              {"bool array", PropertyType::Array | PropertyType::Bool | PropertyType::Nullable},
              {"int array", PropertyType::Array | PropertyType::Int | PropertyType::Nullable},
@@ -143,6 +146,7 @@ TEST_CASE("object")
              {"date array", PropertyType::Array | PropertyType::Date | PropertyType::Nullable},
              {"object id array", PropertyType::Array | PropertyType::ObjectId | PropertyType::Nullable},
              {"decimal array", PropertyType::Array | PropertyType::Decimal | PropertyType::Nullable},
+             {"uuid array", PropertyType::Array | PropertyType::UUID | PropertyType::Nullable},
          }},
         {"link target",
          {
@@ -174,6 +178,10 @@ TEST_CASE("object")
         {"nullable object id pk",
          {
              {"pk", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
+         }},
+        {"nullable uuid pk",
+         {
+             {"pk", PropertyType::UUID | PropertyType::Nullable, Property::IsPrimary{true}},
          }},
         {"person",
          {
@@ -366,6 +374,7 @@ TEST_CASE("object")
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-abba-baba-caca-4136c566a962")},
 
             {"bool array", AnyVec{true, false}},
             {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -377,6 +386,7 @@ TEST_CASE("object")
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
+            {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
         });
 
         auto row = obj.obj();
@@ -395,6 +405,7 @@ TEST_CASE("object")
         REQUIRE(row.get<ObjKey>(table->get_column_key("object")) == link_target.get_key());
         REQUIRE(row.get<ObjectId>(table->get_column_key("object id")) == ObjectId("000000000000000000000001"));
         REQUIRE(row.get<Decimal128>(table->get_column_key("decimal")) == Decimal128("1.23e45"));
+        REQUIRE(row.get<UUID>(table->get_column_key("uuid")) == UUID("3b241101-abba-baba-caca-4136c566a962"));
 
         REQUIRE(link_target.get<Int>(target_table->get_column_key("value")) == 10);
 
@@ -403,7 +414,7 @@ TEST_CASE("object")
             using U = typename decltype(vec)::value_type;
             auto list = row.get_list<U>(col);
             size_t i = 0;
-            for (const auto& value : vec) {
+            for (auto value : vec) {
                 CAPTURE(i);
                 REQUIRE(i < list.size());
                 REQUIRE(value == list.get(i));
@@ -420,6 +431,7 @@ TEST_CASE("object")
         check_array(table->get_column_key("object id array"), ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"),
                     ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB"));
         check_array(table->get_column_key("decimal array"), Decimal128("1.23e45"), Decimal128("6.78e9"));
+        check_array(table->get_column_key("uuid array"), UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
 
         auto list = row.get_linklist_ptr(table->get_column_key("object array"));
         REQUIRE(list->size() == 1);
@@ -439,6 +451,7 @@ TEST_CASE("object")
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-1111-2222-3333-4136c566a962")},
 
             {"bool array", AnyVec{true, false}},
             {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -450,6 +463,7 @@ TEST_CASE("object")
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
+            {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
         };
 
         auto obj = create(AnyDict{
@@ -469,6 +483,7 @@ TEST_CASE("object")
         REQUIRE(row.get<Timestamp>(table->get_column_key("date")) == Timestamp(10, 20));
         REQUIRE(row.get<ObjectId>(table->get_column_key("object id")) == ObjectId("000000000000000000000001"));
         REQUIRE(row.get<Decimal128>(table->get_column_key("decimal")) == Decimal128("1.23e45"));
+        REQUIRE(row.get<UUID>(table->get_column_key("uuid")) == UUID("3b241101-1111-2222-3333-4136c566a962"));
 
         REQUIRE(row.get_listbase_ptr(table->get_column_key("bool array"))->size() == 2);
         REQUIRE(row.get_listbase_ptr(table->get_column_key("int array"))->size() == 2);
@@ -480,6 +495,7 @@ TEST_CASE("object")
         REQUIRE(row.get_listbase_ptr(table->get_column_key("object array"))->size() == 1);
         REQUIRE(row.get_listbase_ptr(table->get_column_key("object id array"))->size() == 2);
         REQUIRE(row.get_listbase_ptr(table->get_column_key("decimal array"))->size() == 2);
+        REQUIRE(row.get_listbase_ptr(table->get_column_key("uuid array"))->size() == 2);
     }
 
     SECTION("create can use defaults for primary key")
@@ -499,6 +515,7 @@ TEST_CASE("object")
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-0000-0000-0000-4136c566a962")},
         });
 
         auto row = obj.obj();
@@ -520,6 +537,8 @@ TEST_CASE("object")
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "string").has_value());
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "data").has_value());
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "date").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object id").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "uuid").has_value());
 
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 0);
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).size() == 0);
@@ -528,6 +547,8 @@ TEST_CASE("object")
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).size() == 0);
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).size() == 0);
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).size() == 0);
+        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).size() == 0);
     }
 
     SECTION("create throws for missing values if there is no default")
@@ -568,6 +589,7 @@ TEST_CASE("object")
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
 
             {"bool array", AnyVec{true, false}},
             {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -579,7 +601,7 @@ TEST_CASE("object")
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
-        });
+            {"uuid array", AnyVec{UUID(), UUID("3b241101-1234-5678-9012-4136c566a962")}}});
 
         auto token = obj.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             change = c;
@@ -612,6 +634,7 @@ TEST_CASE("object")
         REQUIRE(row.get<Timestamp>(table->get_column_key("date")) == Timestamp(10, 20));
         REQUIRE(row.get<ObjectId>(table->get_column_key("object id")) == ObjectId("000000000000000000000001"));
         REQUIRE(row.get<Decimal128>(table->get_column_key("decimal")) == Decimal128("1.23e45"));
+        REQUIRE(row.get<UUID>(table->get_column_key("uuid")) == UUID("3b241101-9999-9999-9999-4136c566a962"));
     }
 
     SECTION("create with update - only with diffs")
@@ -700,7 +723,7 @@ TEST_CASE("object")
             {"object", sub_obj},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
-
+            {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
         });
 
         auto obj_table = r->read_group().get_table("class_all types");
@@ -729,6 +752,9 @@ TEST_CASE("object")
                 {"string", "hello"s},
                 {"data", "olleh"s},
                 {"date", Timestamp(10, 20)},
+                {"object id", ObjectId("000000000000000000000001")},
+                {"decimal", Decimal128("1.23e45")},
+                {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
                 {"object", AnyDict{{"value", INT64_C(10)}}},
             },
             CreatePolicy::UpdateModified);
@@ -753,6 +779,9 @@ TEST_CASE("object")
                 {"string", "hello"s},
                 {"data", "olleh"s},
                 {"date", Timestamp(10, 20)},
+                {"object id", ObjectId("000000000000000000000001")},
+                {"decimal", Decimal128("1.23e45")},
+                {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
                 {"object", AnyDict{{"value", INT64_C(11)}}},
             },
             CreatePolicy::UpdateModified);
@@ -781,6 +810,7 @@ TEST_CASE("object")
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(21)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
         };
         Object obj = create(dict);
 
@@ -819,6 +849,7 @@ TEST_CASE("object")
                 {"date", Timestamp(10, 20)},
                 {"object id", ObjectId("000000000000000000000001")},
                 {"decimal", Decimal128("1.23e45")},
+                {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
 
                 {"bool array", AnyVec{true, false}},
                 {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -830,6 +861,7 @@ TEST_CASE("object")
                 {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
                 {"object id array", AnyVec{ObjectId("000000000000000000000001")}},
                 {"decimal array", AnyVec{Decimal128("1.23e45")}},
+                {"uuid array", AnyVec{UUID("3b241101-1111-bbbb-cccc-4136c566a962")}},
             };
             r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values));
@@ -847,6 +879,8 @@ TEST_CASE("object")
             REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
                     ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
+            REQUIRE(any_cast<util::Optional<UUID>>(obj.get_property_value<util::Any>(d, "uuid")) ==
+                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
             REQUIRE(
                 any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
@@ -865,6 +899,9 @@ TEST_CASE("object")
                         .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
                     Decimal128("1.23e45"));
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
+                UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
 
             // Set all properties to null
             AnyDict null_values{
@@ -878,6 +915,7 @@ TEST_CASE("object")
                 {"date", util::Any()},
                 {"object id", util::Any()},
                 {"decimal", util::Any()},
+                {"uuid", util::Any()},
 
                 {"bool array", AnyVec{util::Any()}},
                 {"int array", AnyVec{util::Any()}},
@@ -888,6 +926,7 @@ TEST_CASE("object")
                 {"date array", AnyVec{Timestamp()}},
                 {"object id array", AnyVec{util::Any()}},
                 {"decimal array", AnyVec{Decimal128(realm::null())}},
+                {"uuid array", AnyVec{util::Any()}},
             };
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(null_values), policy);
 
@@ -900,6 +939,7 @@ TEST_CASE("object")
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "date").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object id").has_value());
             REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "decimal").has_value());
+            REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "uuid").has_value());
 
             REQUIRE(
                 any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
@@ -922,6 +962,9 @@ TEST_CASE("object")
                         .get<util::Optional<ObjectId>>(0) == util::none);
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal>(0) ==
                     Decimal128(realm::null()));
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
+                util::none);
 
             // Set all properties back to non-null
             Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values), policy);
@@ -934,6 +977,8 @@ TEST_CASE("object")
             REQUIRE(any_cast<util::Optional<ObjectId>>(obj.get_property_value<util::Any>(d, "object id")).value() ==
                     ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("1.23e45"));
+            REQUIRE(any_cast<util::Optional<UUID>>(obj.get_property_value<util::Any>(d, "uuid")) ==
+                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
             REQUIRE(
                 any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).get<util::Optional<bool>>(0) ==
@@ -952,6 +997,9 @@ TEST_CASE("object")
                         .get<util::Optional<ObjectId>>(0) == ObjectId("000000000000000000000001"));
             REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "decimal array")).get<Decimal128>(0) ==
                     Decimal128("1.23e45"));
+            REQUIRE(
+                any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).get<util::Optional<UUID>>(0) ==
+                UUID("3b241101-1111-bbbb-cccc-4136c566a962"));
         }
     }
 
@@ -970,6 +1018,7 @@ TEST_CASE("object")
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
         });
         REQUIRE_THROWS(create(AnyDict{
             {"pk", INT64_C(1)},
@@ -984,6 +1033,7 @@ TEST_CASE("object")
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
         }));
     }
 
@@ -1081,6 +1131,10 @@ TEST_CASE("object")
         obj.set_property_value(d, "decimal", util::Any(Decimal128("42.4242e42")));
         REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("42.4242e42"));
 
+        obj.set_property_value(d, "uuid", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
+        REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "uuid")) ==
+                UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
+
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));
         REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
@@ -1111,6 +1165,7 @@ TEST_CASE("object")
             {"date", Timestamp(10, 20)},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
+            {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
 
             {"bool array", AnyVec{true, false}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},

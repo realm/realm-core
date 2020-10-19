@@ -970,6 +970,8 @@ struct MergeUtils {
             }
             case Type::ObjectId:
                 return left.data.object_id == right.data.object_id;
+            case Type::UUID:
+                return left.data.uuid == right.data.uuid;
         }
 
         REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");

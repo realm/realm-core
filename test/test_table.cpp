@@ -3012,30 +3012,51 @@ TEST(Table_StableIteration)
     CHECK_EQUAL(list[2], 2);
 }
 
-TEST(Table_ListOps)
+TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal128>, Prop<ObjectId>, Prop<UUID>,
+           Prop<Timestamp>, Prop<String>, Prop<Binary>, Prop<Bool>, Nullable<Int>, Nullable<Float>, Nullable<Double>,
+           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<UUID>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<Binary>, Nullable<Bool>)
 {
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    using type = typename TEST_TYPE::type;
+    TestValueGenerator gen;
     Table table;
-    ColKey col = table.add_column_list(type_Int, "integers");
+    ColKey col = table.add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     Obj obj = table.create_object();
     Obj obj1 = obj;
-    Lst<Int> list = obj.get_list<Int>(col);
-    list.add(1);
-    list.add(2);
+    Lst<type> list = obj.get_list<type>(col);
+    list.add(gen.convert_for_test<underlying_type>(1));
+    list.add(gen.convert_for_test<underlying_type>(2));
     list.swap(0, 1);
-    CHECK_EQUAL(list.get(0), 2);
-    CHECK_EQUAL(list.get(1), 1);
+    CHECK_EQUAL(list.get(0), gen.convert_for_test<underlying_type>(2));
+    CHECK_EQUAL(list.get(1), gen.convert_for_test<underlying_type>(1));
+    CHECK_EQUAL(list.find_first(gen.convert_for_test<underlying_type>(2)), 0);
+    CHECK_EQUAL(list.find_first(gen.convert_for_test<underlying_type>(1)), 1);
+    CHECK(!list.is_null(0));
+    CHECK(!list.is_null(1));
 
-    Lst<Int> list1;
+    Lst<type> list1;
     CHECK_EQUAL(list1.size(), 0);
     list1 = list;
     CHECK_EQUAL(list1.size(), 2);
-    list.add(3);
+    list.add(gen.convert_for_test<underlying_type>(3));
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
 
-    Lst<Int> list2 = list;
+    Lst<type> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
+    list2.clear();
+    CHECK_EQUAL(list2.size(), 0);
+
+    if constexpr (TEST_TYPE::is_nullable) {
+        list2.insert_null(0);
+        CHECK_EQUAL(list.size(), 1);
+        type item0 = list2.get(0);
+        CHECK(value_is_null(item0));
+        CHECK(list.is_null(0));
+        CHECK(list.get_any(0).is_null());
+    }
 }
 
 TEST(Table_ListOfPrimitives)
@@ -3168,8 +3189,9 @@ TEST(Table_ListOfPrimitives)
 }
 
 TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
-           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
-           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>,
+           Nullable<double>, Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<BinaryData>, Nullable<UUID>)
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
@@ -3221,8 +3243,9 @@ TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>,
 }
 
 TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
-           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
-           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>,
+           Nullable<double>, Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<BinaryData>, Nullable<UUID>)
 {
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
@@ -4293,10 +4316,11 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
 }
 
 TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Prop<ObjectId>, Prop<Timestamp>,
-           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Nullable<Int>, Nullable<double>, Nullable<float>,
-           Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>, Nullable<Decimal128>,
-           Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>, Indexed<StringData>, NullableIndexed<Int>,
-           NullableIndexed<ObjectId>, NullableIndexed<Timestamp>, NullableIndexed<StringData>)
+           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Prop<UUID>, Nullable<Int>, Nullable<double>,
+           Nullable<float>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>,
+           Nullable<Decimal128>, Nullable<UUID>, Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>,
+           Indexed<StringData>, Indexed<UUID>, NullableIndexed<Int>, NullableIndexed<ObjectId>,
+           NullableIndexed<Timestamp>, NullableIndexed<StringData>, NullableIndexed<UUID>)
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
@@ -4598,6 +4622,21 @@ ObjectId generate_value()
 {
     return ObjectId::gen();
 }
+template <>
+UUID generate_value()
+{
+    std::string str;
+    str.resize(36);
+    std::generate<std::string::iterator, char (*)()>(str.begin(), str.end(), []() -> char {
+        char c = test_util::random_int<char>(0, 15);
+        return c >= 10 ? (c - 10 + 'a') : (c + '0');
+    });
+    str.at(8) = '-';
+    str.at(13) = '-';
+    str.at(18) = '-';
+    str.at(23) = '-';
+    return UUID(str.c_str());
+}
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
@@ -4803,6 +4842,7 @@ TEST(List_Ops)
     test_lists<Timestamp>(test_context, sg, type_Timestamp);
     test_lists<Decimal128>(test_context, sg, type_Decimal);
     test_lists<ObjectId>(test_context, sg, type_ObjectId);
+    test_lists<UUID>(test_context, sg, type_UUID);
 
     test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -4813,6 +4853,7 @@ TEST(List_Ops)
     test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
     test_lists<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_lists<Optional<UUID>>(test_context, sg, type_UUID, true);
 }
 
 template <typename T, typename U = T>
@@ -5031,6 +5072,7 @@ TEST(Table_Ops)
     test_tables<Timestamp>(test_context, sg, type_Timestamp);
     test_tables<Decimal128>(test_context, sg, type_Decimal);
     test_tables<ObjectId>(test_context, sg, type_ObjectId);
+    test_tables<UUID>(test_context, sg, type_UUID);
 
     test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -5041,6 +5083,7 @@ TEST(Table_Ops)
     test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_tables<Decimal128>(test_context, sg, type_Decimal, true);
     test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_tables<UUID>(test_context, sg, type_UUID, true);
 }
 
 template <typename TFrom, typename TTo>
@@ -5150,6 +5193,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
     test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, type_UUID);
     // lists...:
     test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
     test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
@@ -5161,6 +5205,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
     test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, type_UUID);
 }
 
 /*
@@ -5568,6 +5613,7 @@ TEST(Table_IndexOnMixed)
     auto k7 = foos->create_object().set(col, Mixed(1)).get_key();
     auto k8 = foos->create_object().set(col, Mixed(true)).get_key();
     auto k9 = foos->create_object().set(col, Mixed(bar.get_link())).get_key();
+    auto k10 = foos->create_object().set(col, Mixed(UUID("3b241101-e2bb-4255-8caf-4136c566a962"))).get_key();
 
     CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
     CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
@@ -5579,6 +5625,7 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
     CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
     CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
 
     foos->remove_search_index(col);
 
@@ -5592,6 +5639,7 @@ TEST(Table_IndexOnMixed)
     CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
     CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
     CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
 }
 
 #endif // TEST_TABLE

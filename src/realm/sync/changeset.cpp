@@ -121,6 +121,9 @@ std::ostream& Changeset::print_value(std::ostream& os, const Instruction::Payloa
         case Type::Decimal:
             os << data.decimal;
             break;
+        case Type::UUID:
+            os << data.uuid;
+            break;
         case Type::Link: {
             os << "target_table = " << get_string(data.link.target_table) << ", "
                << "target = " << format_pk(get_key(data.link.target));
@@ -507,6 +510,9 @@ std::string Changeset::Printer::primary_key_to_string(const Instruction::Primary
             std::stringstream ss;
             ss << id;
             return ss.str();
+        },
+        [&](UUID uuid) {
+            return uuid.to_string();
         },
     };
     return mpark::visit(convert, key);

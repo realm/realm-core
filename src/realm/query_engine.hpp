@@ -96,7 +96,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/array_list.hpp>
 #include <realm/array_bool.hpp>
@@ -818,35 +818,7 @@ public:
                 s = find_first_haystack<22>(*this->m_leaf_ptr, m_needles, start, end);
             }
             else if (has_search_index()) {
-                ObjKey first_key = BaseType::m_cluster->get_real_key(start);
-                if (first_key < m_last_start_key) {
-                    // We are not advancing through the clusters. We basically don't know where we are,
-                    // so just start over from the beginning.
-                    auto it = std::lower_bound(m_result.begin(), m_result.end(), first_key);
-                    m_result_get = (it == m_result.end()) ? realm::npos : (it - m_result.begin());
-                }
-                m_last_start_key = first_key;
-
-                if (m_result_get < m_result.size()) {
-                    auto actual_key = m_result[m_result_get];
-                    // skip through keys which are in "earlier" leafs than the one selected by start..end:
-                    while (first_key > actual_key) {
-                        m_result_get++;
-                        if (m_result_get == m_result.size())
-                            return not_found;
-                        actual_key = m_result[m_result_get];
-                    }
-
-                    // if actual key is bigger than last key, it is not in this leaf
-                    ObjKey last_key = BaseType::m_cluster->get_real_key(end - 1);
-                    if (actual_key > last_key)
-                        return not_found;
-
-                    // key is known to be in this leaf, so find key whithin leaf keys
-                    return BaseType::m_cluster->lower_bound_key(
-                        ObjKey(actual_key.value - BaseType::m_cluster->get_offset()));
-                }
-                return not_found;
+                return do_search_index(m_last_start_key, m_result_get, m_result, BaseType::m_cluster, start, end);
             }
             else if (end - start == 1) {
                 if (this->m_leaf_ptr->get(start) == this->m_value) {
@@ -1420,19 +1392,23 @@ protected:
     }
 };
 
-class ObjectIdNodeBase : public ParentNode {
+size_t do_search_index(ObjKey& last_start_key, size_t& result_get, std::vector<ObjKey>& results,
+                       const Cluster* cluster, size_t start, size_t end);
+
+template <class ObjectType, class ArrayType>
+class FixedBytesNodeBase : public ParentNode {
 public:
-    using TConditionValue = ObjectId;
+    using TConditionValue = ObjectType;
     static const bool special_null_node = false;
 
-    ObjectIdNodeBase(ObjectId v, ColKey column)
+    FixedBytesNodeBase(ObjectType v, ColKey column)
         : m_value(v)
     {
         m_condition_column_key = column;
     }
 
-    ObjectIdNodeBase(null, ColKey column)
-        : ObjectIdNodeBase(ObjectId{}, column)
+    FixedBytesNodeBase(null, ColKey column)
+        : FixedBytesNodeBase(ObjectType{}, column)
     {
         m_value_is_null = true;
     }
@@ -1440,7 +1416,7 @@ public:
     void cluster_changed() override
     {
         m_array_ptr = nullptr;
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayObjectIdNull(m_table.unchecked_ptr()->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayType(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -1453,39 +1429,38 @@ public:
     }
 
 protected:
-    ObjectIdNodeBase(const ObjectIdNodeBase& from)
+    FixedBytesNodeBase(const FixedBytesNodeBase& from)
         : ParentNode(from)
         , m_value(from.m_value)
         , m_value_is_null(from.m_value_is_null)
     {
     }
 
-    ObjectId m_value;
+    ObjectType m_value;
     bool m_value_is_null = false;
-    using LeafCacheStorage =
-        typename std::aligned_storage<sizeof(ArrayObjectIdNull), alignof(ArrayObjectIdNull)>::type;
-    using LeafPtr = std::unique_ptr<ArrayObjectIdNull, PlacementDelete>;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayType), alignof(ArrayType)>::type;
+    using LeafPtr = std::unique_ptr<ArrayType, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    const ArrayObjectIdNull* m_leaf_ptr = nullptr;
+    const ArrayType* m_leaf_ptr = nullptr;
 };
 
-template <class TConditionFunction>
-class ObjectIdNode : public ObjectIdNodeBase {
+template <class TConditionFunction, class ObjectType, class ArrayType>
+class FixedBytesNode : public FixedBytesNodeBase<ObjectType, ArrayType> {
 public:
-    using ObjectIdNodeBase::ObjectIdNodeBase;
+    using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
 
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
         for (size_t i = start; i < end; i++) {
-            util::Optional<ObjectId> val = m_leaf_ptr->get(i);
+            util::Optional<ObjectType> val = this->m_leaf_ptr->get(i);
             if (val) {
-                if (cond(*val, m_value, false, m_value_is_null))
+                if (cond(*val, this->m_value, false, this->m_value_is_null))
                     return i;
             }
             else {
-                if (cond(ObjectId{}, m_value, true, m_value_is_null))
+                if (cond(ObjectType{}, this->m_value, true, this->m_value_is_null))
                     return i;
             }
         }
@@ -1494,24 +1469,118 @@ public:
 
     std::string describe(util::serializer::SerialisationState& state) const override
     {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+        REALM_ASSERT(this->m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, this->m_condition_column_key) + " " +
                TConditionFunction::description() + " " +
-               (m_value_is_null ? util::serializer::print_value(realm::null())
-                                : util::serializer::print_value(ObjectIdNode::m_value));
+               (this->m_value_is_null ? util::serializer::print_value(realm::null())
+                                      : util::serializer::print_value(this->m_value));
     }
 
     std::unique_ptr<ParentNode> clone() const override
     {
-        return std::unique_ptr<ParentNode>(new ObjectIdNode(*this));
+        return std::unique_ptr<ParentNode>(new FixedBytesNode(*this));
     }
 
 protected:
-    ObjectIdNode(const ObjectIdNode& from, Transaction* tr)
-        : ObjectIdNode(from, tr)
+    FixedBytesNode(const FixedBytesNode& from, Transaction* tr)
+        : FixedBytesNode(from, tr)
     {
     }
 };
+
+template <class ObjectType, class ArrayType>
+class FixedBytesNode<Equal, ObjectType, ArrayType> : public FixedBytesNodeBase<ObjectType, ArrayType> {
+public:
+    using FixedBytesNodeBase<ObjectType, ArrayType>::FixedBytesNodeBase;
+    using BaseType = FixedBytesNodeBase<ObjectType, ArrayType>;
+
+    void init(bool will_query_ranges) override
+    {
+        BaseType::init(will_query_ranges);
+
+        if (!this->m_value_is_null) {
+            m_optional_value = this->m_value;
+        }
+
+        if (has_search_index()) {
+            // _search_index_init();
+            m_result.clear();
+            auto index = BaseType::m_table->get_search_index(BaseType::m_condition_column_key);
+            index->find_all(m_result, m_optional_value);
+            m_result_get = 0;
+            m_last_start_key = ObjKey();
+            this->m_dT = 0;
+        }
+    }
+
+    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    {
+        for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
+            auto obj = this->m_table->get_object(m_result[t]);
+            if (evaluator(obj)) {
+                --limit;
+            }
+        }
+    }
+
+    bool has_search_index() const override
+    {
+        return this->m_table->has_search_index(BaseType::m_condition_column_key);
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(this->m_table);
+        size_t s = realm::npos;
+
+        if (start < end) {
+            if (has_search_index()) {
+                return do_search_index(m_last_start_key, m_result_get, m_result, this->m_cluster, start, end);
+            }
+
+            if (end - start == 1) {
+                if (this->m_leaf_ptr->get(start) == m_optional_value) {
+                    s = start;
+                }
+            }
+            else {
+                s = this->m_leaf_ptr->find_first(m_optional_value, start, end);
+            }
+        }
+
+        return s;
+    }
+
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(this->m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, this->m_condition_column_key) + " " + Equal::description() +
+               " " +
+               (this->m_value_is_null ? util::serializer::print_value(realm::null())
+                                      : util::serializer::print_value(this->m_value));
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new FixedBytesNode(*this));
+    }
+
+protected:
+    FixedBytesNode(const FixedBytesNode& from, Transaction* tr)
+        : FixedBytesNode(from, tr)
+    {
+    }
+    util::Optional<ObjectType> m_optional_value;
+    std::vector<ObjKey> m_result;
+    size_t m_result_get = 0;
+    ObjKey m_last_start_key;
+};
+
+
+template <typename T>
+using ObjectIdNode = FixedBytesNode<T, ObjectId, ArrayObjectIdNull>;
+template <typename T>
+using UUIDNode = FixedBytesNode<T, UUID, ArrayUUIDNull>;
 
 class MixedNodeBase : public ParentNode {
 public:

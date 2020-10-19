@@ -1151,11 +1151,13 @@ REALM_RESULTS_TYPE(BinaryData)
 REALM_RESULTS_TYPE(Timestamp)
 REALM_RESULTS_TYPE(ObjectId)
 REALM_RESULTS_TYPE(Decimal)
+REALM_RESULTS_TYPE(UUID)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)
 REALM_RESULTS_TYPE(util::Optional<double>)
 REALM_RESULTS_TYPE(util::Optional<ObjectId>)
+REALM_RESULTS_TYPE(util::Optional<UUID>)
 
 #undef REALM_RESULTS_TYPE
 

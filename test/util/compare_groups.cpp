@@ -353,6 +353,15 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
             }
             break;
         }
+        case type_UUID: {
+            auto a = obj_1.get_list<UUID>(col.key_1);
+            auto b = obj_2.get_list<UUID>(col.key_2);
+            if (!compare_arrays(a, b)) {
+                logger.error("List mismatch in column '%1'", col.name);
+                return false;
+            }
+            break;
+        }
         case type_Decimal: {
             auto a = obj_1.get_list<Decimal128>(col.key_1);
             auto b = obj_2.get_list<Decimal128>(col.key_2);
@@ -529,6 +538,15 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
         case type_ObjectId: {
             auto a = obj_1.get_set<ObjectId>(col.key_1);
             auto b = obj_2.get_set<ObjectId>(col.key_2);
+            if (!compare_set_values(a, b)) {
+                logger.error("Set mismatch in column '%1'", col.name);
+                return false;
+            }
+            break;
+        }
+        case type_UUID: {
+            auto a = obj_1.get_set<UUID>(col.key_1);
+            auto b = obj_2.get_set<UUID>(col.key_2);
             if (!compare_set_values(a, b)) {
                 logger.error("Set mismatch in column '%1'", col.name);
                 return false;
@@ -726,6 +744,15 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
             case type_Mixed: {
                 auto a = obj_1.get<Mixed>(col.key_1);
                 auto b = obj_2.get<Mixed>(col.key_2);
+                if (a != b) {
+                    logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name, a, b);
+                    equal = false;
+                }
+                continue;
+            }
+            case type_UUID: {
+                auto a = obj_1.get<UUID>(col.key_1);
+                auto b = obj_2.get<UUID>(col.key_2);
                 if (a != b) {
                     logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name, a, b);
                     equal = false;

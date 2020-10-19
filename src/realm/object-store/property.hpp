@@ -40,6 +40,7 @@ class ObjectId;
 class StringData;
 class Table;
 class Timestamp;
+class UUID;
 
 enum class PropertyType : unsigned short {
     Int = 0,
@@ -57,6 +58,7 @@ enum class PropertyType : unsigned short {
 
     ObjectId = 10,
     Decimal = 11,
+    UUID = 12,
 
     // Flags which can be combined with any of the above types except as noted
     Required = 0,
@@ -236,6 +238,8 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
             return is_optional ? fn((util::Optional<ObjectId>*)0) : fn((ObjectId*)0);
         case PT::Decimal:
             return fn((Decimal128*)0);
+        case PT::UUID:
+            return is_optional ? fn((util::Optional<UUID>*)0) : fn((UUID*)0);
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -270,6 +274,8 @@ static const char* string_for_property_type(PropertyType type)
             return "object";
         case PropertyType::Any:
             return "any";
+        case PropertyType::UUID:
+            return "uuid";
         case PropertyType::LinkingObjects:
             return "linking objects";
         case PropertyType::ObjectId:
@@ -305,7 +311,7 @@ inline bool Property::type_is_indexable() const noexcept
 {
     return !is_collection(type) &&
            (type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
-            type == PropertyType::String || type == PropertyType::ObjectId);
+            type == PropertyType::String || type == PropertyType::ObjectId || type == PropertyType::UUID);
 }
 
 inline bool Property::type_is_nullable() const noexcept

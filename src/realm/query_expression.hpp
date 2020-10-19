@@ -134,7 +134,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/array_list.hpp>
 #include <realm/array_key.hpp>
 #include <realm/array_bool.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/table.hpp>
@@ -825,7 +825,9 @@ Query create(L left, const Subexpr2<R>& right)
                    (std::is_same_v<L, float> && std::is_same_v<R, float>) ||
                    (std::is_same_v<L, Timestamp> && std::is_same_v<R, Timestamp>) ||
                    (std::is_same_v<L, StringData> && std::is_same_v<R, StringData>) ||
-                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>))) {
+                   (std::is_same_v<L, BinaryData> && std::is_same_v<R, BinaryData>) ||
+                   (std::is_same_v<L, ObjectId> && std::is_same_v<R, ObjectId>) ||
+                   (std::is_same_v<L, UUID> && std::is_same_v<R, UUID>))) {
         const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
         // TODO: recognize size operator expressions
         // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
@@ -1069,6 +1071,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, Timestamp>,
                  public Overloads<T, ObjectId>,
                  public Overloads<T, Decimal128>,
+                 public Overloads<T, UUID>,
                  public Overloads<T, null> {
 public:
     virtual ~Subexpr2()
@@ -1091,6 +1094,7 @@ public:
     RLM_U2(Timestamp, o)                                                                                             \
     RLM_U2(ObjectId, o)                                                                                              \
     RLM_U2(Decimal128, o)                                                                                            \
+    RLM_U2(UUID, o)                                                                                                  \
     RLM_U2(null, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
@@ -1389,6 +1393,12 @@ Query operator==(bool left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
 }
+template <class R>
+Query operator==(UUID left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
+
 
 template <class R>
 Query operator>=(double left, const Subexpr2<R>& right)
@@ -1499,6 +1509,11 @@ Query operator!=(Decimal128 left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(bool left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(UUID left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }
@@ -2018,8 +2033,8 @@ public:
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
                 if (link_translation_key) {
                     const Obj obj = m_link_map.get_target_table()->get_object(link_translation_key);
-                    if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                    if constexpr (realm::is_any_v<T, ObjectId, UUID>) {
+                        auto opt_val = obj.get<util::Optional<T>>(m_column_key);
                         if (opt_val) {
                             destination.set(0, *opt_val);
                         }
@@ -2037,8 +2052,8 @@ public:
                 destination.init(true, links.size());
                 for (size_t t = 0; t < links.size(); t++) {
                     const Obj obj = m_link_map.get_target_table()->get_object(links[t]);
-                    if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                    if constexpr (realm::is_any_v<T, ObjectId, UUID>) {
+                        auto opt_val = obj.get<util::Optional<T>>(m_column_key);
                         if (opt_val) {
                             destination.set(t, *opt_val);
                         }
@@ -2114,6 +2129,11 @@ class Columns<Decimal128> : public SimpleQuerySupport<Decimal128> {
 
 template <>
 class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
+    using SimpleQuerySupport::SimpleQuerySupport;
+};
+
+template <>
+class Columns<UUID> : public SimpleQuerySupport<UUID> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
@@ -2838,7 +2858,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
             if (m_is_nullable_storage) {
                 evaluate<util::Optional<T>>(index, destination);
                 return;
@@ -2930,7 +2950,7 @@ public:
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
             if (this->m_is_nullable_storage) {
                 evaluate<util::Optional<T>>(index, destination);
                 return;
@@ -3088,7 +3108,7 @@ public:
 
     void evaluate(size_t index, ValueBase& destination) override
     {
-        if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
             if (m_list.m_is_nullable_storage) {
                 evaluate<util::Optional<T>>(index, destination);
                 return;

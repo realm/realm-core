@@ -16,19 +16,33 @@
  *
  **************************************************************************/
 
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 
 namespace realm {
 
-// This is only for debugging. We use the null bit vector for checking if an index is null.
+// Intuitively the null T value could be a static member variable of the ArrayFixedBytesNull<T>
+// class, but there is a MSVC bug which we would have to make an ugly workaround for, so
+// instead of that, we keep it self contained in this cpp file as an implementation detail.
+template <class T>
+struct Sentinel {
+    const static T null_value;
+};
+
+// The null value is only for debugging. We use the null bit vector for checking if an index is null.
 // This value should be easy to spot in hex dumps, and should also be unlikely to be a "real" ObjectId. For one thing,
 // if using the normal generation algorithm, it can only be generated at precisely 2088-05-21T00:11:25. Of course
 // users could also be using this as a sentinel so we must support storing this value in a non-null OID.
-const ObjectId ArrayObjectIdNull::null_oid = ObjectId("DEADDEAD"
-                                                      "DEADDEAD"
-                                                      "DEADDEAD");
+template <>
+const ObjectId Sentinel<ObjectId>::null_value = ObjectId("DEADDEAD"
+                                                         "DEADDEAD"
+                                                         "DEADDEAD");
 
-void ArrayObjectId::set(size_t ndx, const ObjectId& value)
+template <>
+const UUID Sentinel<UUID>::null_value = UUID("DEADBEEF-DEAD-BEEF-DEAD-BEEFDEADBEEF");
+
+
+template <class ObjectType, int ElementSize>
+void ArrayFixedBytes<ObjectType, ElementSize>::set(size_t ndx, const ObjectType& value)
 {
     REALM_ASSERT(is_valid_ndx(ndx));
     copy_on_write();
@@ -38,7 +52,8 @@ void ArrayObjectId::set(size_t ndx, const ObjectId& value)
     pos.set_null(this, false);
 }
 
-void ArrayObjectId::insert(size_t ndx, const ObjectId& value)
+template <class ObjectType, int ElementSize>
+void ArrayFixedBytes<ObjectType, ElementSize>::insert(size_t ndx, const ObjectType& value)
 {
     const auto old_size = size();
     REALM_ASSERT(ndx <= old_size);
@@ -67,8 +82,8 @@ void ArrayObjectId::insert(size_t ndx, const ObjectId& value)
     dest.set_value(this, value);
     dest.set_null(this, false);
 }
-
-void ArrayObjectId::erase(size_t ndx)
+template <class ObjectType, int ElementSize>
+void ArrayFixedBytes<ObjectType, ElementSize>::erase(size_t ndx)
 {
     REALM_ASSERT(is_valid_ndx(ndx));
 
@@ -90,7 +105,8 @@ void ArrayObjectId::erase(size_t ndx)
     }
 }
 
-void ArrayObjectId::move(ArrayObjectId& dst_arr, size_t ndx)
+template <class ObjectType, int ElementSize>
+void ArrayFixedBytes<ObjectType, ElementSize>::move(ArrayFixedBytes<ObjectType, ElementSize>& dst_arr, size_t ndx)
 {
     REALM_ASSERT(is_valid_ndx(ndx));
 
@@ -128,7 +144,9 @@ void ArrayObjectId::move(ArrayObjectId& dst_arr, size_t ndx)
     truncate(ndx);
 }
 
-size_t ArrayObjectId::find_first(const ObjectId& value, size_t start, size_t end) const noexcept
+template <class ObjectType, int ElementSize>
+size_t ArrayFixedBytes<ObjectType, ElementSize>::find_first(const ObjectType& value, size_t start, size_t end) const
+    noexcept
 {
     auto sz = size();
     if (end == size_t(-1))
@@ -144,15 +162,37 @@ size_t ArrayObjectId::find_first(const ObjectId& value, size_t start, size_t end
     return realm::npos;
 }
 
-size_t ArrayObjectIdNull::find_first_null(size_t start, size_t end) const
+template <class ObjectType, int ElementSize>
+void ArrayFixedBytesNull<ObjectType, ElementSize>::insert(size_t ndx, const util::Optional<ObjectType>& value)
 {
-    auto sz = size();
+    if (value) {
+        Base::insert(ndx, *value);
+    }
+    else {
+        Base::insert(ndx, Sentinel<ObjectType>::null_value);
+        set_null(ndx);
+    }
+}
+
+template <class ObjectType, int ElementSize>
+void ArrayFixedBytesNull<ObjectType, ElementSize>::set_null(size_t ndx)
+{
+    this->copy_on_write();
+    auto pos = this->get_pos(ndx);
+    pos.set_value(this, Sentinel<ObjectType>::null_value);
+    pos.set_null(this, true);
+}
+
+template <class ObjectType, int ElementSize>
+size_t ArrayFixedBytesNull<ObjectType, ElementSize>::find_first_null(size_t start, size_t end) const
+{
+    auto sz = this->size();
     if (end == size_t(-1))
         end = sz;
     REALM_ASSERT(start <= sz && end <= sz && start <= end);
 
     auto ndx = start;
-    auto bit_ptr = m_data + get_pos(ndx).base_byte;
+    auto bit_ptr = this->m_data + this->get_pos(ndx).base_byte;
     auto offset = ndx % 8;
 
     // Look at the bit vector at the start of each block.
@@ -164,11 +204,17 @@ size_t ArrayObjectIdNull::find_first_null(size_t start, size_t end) const
         }
 
         ndx += 8 - offset;
-        bit_ptr += s_block_size;
+        bit_ptr += this->s_block_size;
         offset = 0; // offset only used during first pass of loop.
     }
 
     return realm::npos;
 }
+
+// actual definitions forced here
+template class ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
+template class ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
+template class ArrayFixedBytes<UUID, UUID::num_bytes>;
+template class ArrayFixedBytesNull<UUID, UUID::num_bytes>;
 
 } // namespace realm

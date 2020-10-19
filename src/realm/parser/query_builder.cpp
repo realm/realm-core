@@ -145,20 +145,6 @@ Query make_numeric_constraint_query(Predicate::Operator operatorType, A lhs, B r
     }
 }
 
-template <typename A, typename B>
-Query make_bool_constraint_query(Predicate::Operator operatorType, A lhs, B rhs)
-{
-    switch (operatorType) {
-        case Predicate::Operator::In:
-        case Predicate::Operator::Equal:
-            return lhs == rhs;
-        case Predicate::Operator::NotEqual:
-            return lhs != rhs;
-        default:
-            throw_logic_error("Unsupported operator for numeric queries.");
-    }
-}
-
 const char* operator_description(const Predicate::Operator& op)
 {
     switch (op) {
@@ -189,6 +175,22 @@ const char* operator_description(const Predicate::Operator& op)
     }
     REALM_ASSERT_DEBUG(false);
     return "";
+}
+
+template <typename A, typename B>
+Query make_bool_constraint_query(Predicate::Operator operatorType, A lhs, B rhs)
+{
+    switch (operatorType) {
+        case Predicate::Operator::In:
+        case Predicate::Operator::Equal:
+            return lhs == rhs;
+        case Predicate::Operator::NotEqual:
+            return lhs != rhs;
+        default:
+            throw_logic_error(util::format(
+                "Unsupported operator '%1' in query. Only equal (==) and not equal (!=) are supported for this type.",
+                operator_description(operatorType)));
+    }
 }
 
 // (string column OR list of primitive strings) vs (string literal OR string column)
@@ -389,6 +391,9 @@ Query do_make_comparison_query(const Predicate::Comparison& cmp, A& lhs, B& rhs,
         case type_Decimal:
             return make_numeric_constraint_query(cmp.op, lhs.template value_of_type_for_query<Decimal128>(),
                                                  rhs.template value_of_type_for_query<Decimal128>());
+        case type_UUID:
+            return make_bool_constraint_query(cmp.op, lhs.template value_of_type_for_query<UUID>(),
+                                              rhs.template value_of_type_for_query<UUID>());
         default:
             throw_logic_error(util::format("Object type '%1' not supported", data_type_to_str(type)));
     }
@@ -455,6 +460,8 @@ Query do_make_null_comparison_query(const Predicate::Comparison& cmp, const T& e
             return do_make_null_comparison_query<Decimal128>(cmp.op, expr);
         case realm::type_Link:
             return do_make_null_comparison_query<Link>(cmp.op, expr);
+        case realm::type_UUID:
+            return do_make_null_comparison_query<UUID>(cmp.op, expr);
         default:
             throw_logic_error(util::format("Object type '%1' not supported", util::data_type_to_str(type)));
     }
@@ -925,6 +932,10 @@ public:
     ObjectId objectid_for_argument(size_t n) final
     {
         return m_args.at(n).get<ObjectId>();
+    }
+    UUID uuid_for_argument(size_t n) final
+    {
+        return m_args.at(n).get<UUID>();
     }
     Decimal128 decimal128_for_argument(size_t n) final
     {

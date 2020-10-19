@@ -58,7 +58,8 @@ enum DataType {
     type_Link = 12,
     type_LinkList = 13,
     type_ObjectId = 15,
-    type_TypedLink = 16
+    type_TypedLink = 16,
+    type_UUID = 17
 };
 
 const char* get_data_type_name(DataType type) noexcept;

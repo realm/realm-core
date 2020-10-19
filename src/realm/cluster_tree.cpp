@@ -23,7 +23,7 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 
 /*
  * Node-splitting is done in the way that if the new element comes after all the

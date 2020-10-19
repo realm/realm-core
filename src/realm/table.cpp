@@ -39,7 +39,7 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -295,14 +295,24 @@ const char* get_data_type_name(DataType type) noexcept
             return "timestamp";
         case type_ObjectId:
             return "ObjectId";
+        case type_Decimal:
+            return "decimal128";
+        case type_UUID:
+            return "uuid";
+        case type_Mixed:
+            return "mixed";
         case type_Link:
             return "link";
         case type_LinkList:
             return "linklist";
-        default:
-            return "unknown";
+        case type_OldTable:
+            return "oldTable";
+        case type_OldDateTime:
+            return "oldDateTime";
+        case type_TypedLink:
+            return "typedLink";
     }
-    return "";
+    return "unknown";
 }
 } // namespace realm
 
@@ -668,6 +678,16 @@ void Table::populate_search_index(ColKey col_key)
                 index->insert(key, value); // Throws
             }
         }
+        else if (type == type_UUID) {
+            if (is_nullable(col_key)) {
+                Optional<UUID> value = o.get<Optional<UUID>>(col_key);
+                index->insert(key, value); // Throws
+            }
+            else {
+                UUID value = o.get<UUID>(col_key);
+                index->insert(key, value); // Throws
+            }
+        }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
         }
@@ -754,6 +774,14 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
                     break;
                 case col_type_Mixed:
                     index->insert(key, init_value);
+                    break;
+                case col_type_UUID:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayUUIDNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<UUID>());
+                    }
                     break;
                 default:
                     REALM_UNREACHABLE();
@@ -2282,7 +2310,9 @@ template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 template ObjKey Table::find_first(ColKey col_key, Mixed) const;
+template ObjKey Table::find_first(ColKey col_key, UUID) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<UUID>) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -2338,6 +2368,11 @@ ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
 ObjKey Table::find_first_null(ColKey col_key) const
 {
     return where().equal(col_key, null{}).find();
+}
+
+ObjKey Table::find_first_uuid(ColKey col_key, UUID value) const
+{
+    return find_first(col_key, value);
 }
 
 template <class T>
@@ -2776,7 +2811,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int || type == type_UUID);
 
     if (did_create)
         *did_create = false;
@@ -3491,6 +3526,11 @@ ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
     return val.value();
 }
+template <>
+UUID remove_optional<Optional<UUID>>(Optional<UUID> val)
+{
+    return val.value();
+}
 } // namespace
 
 template <class F, class T>
@@ -3614,6 +3654,14 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Decimal:
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
+            case type_UUID:
+                if (is_nullable(from)) {
+                    change_nullability_list<Optional<UUID>, UUID>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability_list<UUID, Optional<UUID>>(from, to, throw_on_null);
+                }
+                break;
             case type_Link:
             case type_TypedLink:
             case type_LinkList:
@@ -3664,6 +3712,14 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_Decimal:
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
+                break;
+            case type_UUID:
+                if (is_nullable(from)) {
+                    change_nullability<Optional<UUID>, UUID>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability<UUID, Optional<UUID>>(from, to, throw_on_null);
+                }
                 break;
             case type_TypedLink:
             case type_Link:

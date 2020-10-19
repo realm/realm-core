@@ -89,6 +89,8 @@ DataType to_core_type(PropertyType type)
             return type_ObjectId;
         case PropertyType::Decimal:
             return type_Decimal;
+        case PropertyType::UUID:
+            return type_UUID;
         case PropertyType::Any:
             return type_Mixed;
         default:

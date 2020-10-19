@@ -11,10 +11,10 @@ set(REALM_SOURCES
     array_blobs_small.cpp
     array_blobs_big.cpp
     array_decimal128.cpp
+    array_fixed_bytes.cpp
     array_integer.cpp
     array_key.cpp
     array_mixed.cpp
-    array_object_id.cpp
     array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
@@ -57,6 +57,7 @@ set(REALM_SOURCES
     sort_descriptor.cpp
     unicode.cpp
     utilities.cpp
+    uuid.cpp
     version.cpp
 ) # REALM_SOURCES
 
@@ -114,11 +115,11 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_bool.hpp
     array_decimal128.hpp
     array_direct.hpp
+    array_fixed_bytes.hpp
     array_integer.hpp
     array_mixed.hpp
     array_key.hpp
     array_list.hpp
-    array_object_id.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp
@@ -175,6 +176,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     timestamp.hpp
     unicode.hpp
     utilities.hpp
+    uuid.hpp
     version.hpp
     version_id.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
