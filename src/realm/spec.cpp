@@ -46,36 +46,21 @@ void Spec::init(MemRef mem) noexcept
     REALM_ASSERT(top_size > 2 && top_size <= 6);
 
     m_types.init_from_ref(m_top.get_as_ref(0));
-    m_types.set_parent(&m_top, 0);
     m_names.init_from_ref(m_top.get_as_ref(1));
-    m_names.set_parent(&m_top, 1);
     m_attr.init_from_ref(m_top.get_as_ref(2));
-    m_attr.set_parent(&m_top, 2);
-
-    // Reset optional subarrays in the case of moving
-    // from initialized children to uninitialized
-    m_oldsubspecs.detach();
-    m_enumkeys.detach();
-
-    // Subspecs array is only there and valid when there are subtables
-    // if there are enumkey, but no subtables yet it will be a zero-ref
-    if ((m_top.size() > 3) && (m_top.get_as_ref(3) != 0)) {
-        ref_type ref = m_top.get_as_ref(3);
-        m_oldsubspecs.init_from_ref(ref);
-        m_oldsubspecs.set_parent(&m_top, 3);
-    }
-
-    // Enumkeys array is only there when there are StringEnum columns
-    if ((m_top.size() > 4) && (m_top.get_as_ref(4) != 0)) {
-        m_enumkeys.init_from_ref(m_top.get_as_ref(4));
-        m_enumkeys.set_parent(&m_top, 4);
-    }
 
     while (m_top.size() < 6) {
         m_top.add(0);
     }
 
-    m_keys.set_parent(&m_top, 5);
+    // Enumkeys array is only there when there are StringEnum columns
+    if (auto ref = m_top.get_as_ref(4)) {
+        m_enumkeys.init_from_ref(ref);
+    }
+    else {
+        m_enumkeys.detach();
+    }
+
     if (m_top.get_as_ref(5) == 0) {
         // This is an upgrade - create column key array
         MemRef mem_ref = Array::create_empty_array(Array::type_Normal, false, m_top.get_alloc()); // Throws
@@ -117,13 +102,6 @@ void Spec::update_from_parent() noexcept
     m_types.update_from_parent();
     m_names.update_from_parent();
     m_attr.update_from_parent();
-
-    if (m_top.get_as_ref(3) != 0) {
-        m_oldsubspecs.update_from_parent();
-    }
-    else {
-        m_oldsubspecs.detach();
-    }
 
     if (m_top.get_as_ref(4) != 0) {
         m_enumkeys.update_from_parent();
@@ -210,6 +188,7 @@ bool Spec::convert_column_attributes()
 {
     bool changes = false;
     size_t enumkey_ndx = 0;
+
     for (size_t column_ndx = 0; column_ndx < m_types.size(); column_ndx++) {
         if (column_ndx < m_names.size()) {
             StringData name = m_names.get(column_ndx);
@@ -228,14 +207,19 @@ bool Spec::convert_column_attributes()
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
         switch (type) {
             case col_type_OldTable: {
+                Array subspecs(m_top.get_alloc());
+                subspecs.set_parent(&m_top, 3);
+                subspecs.init_from_parent();
+
                 Spec sub_spec(get_alloc());
                 size_t subspec_ndx = get_subspec_ndx(column_ndx);
-                ref_type ref = to_ref(m_oldsubspecs.get(subspec_ndx)); // Throws
+                ref_type ref = to_ref(subspecs.get(subspec_ndx)); // Throws
                 sub_spec.init(ref);
                 m_types.set(column_ndx, sub_spec.get_column_type(0));
                 m_attr.set(column_ndx, m_attr.get(column_ndx) | sub_spec.m_attr.get(0) | col_attr_List);
                 sub_spec.destroy();
-                m_oldsubspecs.erase(subspec_ndx);
+
+                subspecs.erase(subspec_ndx);
                 changes = true;
                 break;
             }
@@ -379,6 +363,11 @@ void Spec::erase_column(size_t column_ndx)
 }
 
 
+// For link and link list columns the old subspec array contain an entry which
+// is the group-level table index of the target table, and for backlink
+// columns the first entry is the group-level table index of the origin
+// table, and the second entry is the index of the origin column in the
+// origin table.
 size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == col_type_Link ||
@@ -437,7 +426,9 @@ TableKey Spec::get_opposite_link_table_key(size_t column_ndx) const noexcept
     // Key of opposite table is stored as tagged int in the
     // subspecs array
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    int64_t tagged_value = m_oldsubspecs.get(subspec_ndx);
+    Array subspecs(m_top.get_alloc());
+    subspecs.init_from_ref(m_top.get_as_ref(3));
+    int64_t tagged_value = subspecs.get(subspec_ndx);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     uint64_t table_ref = uint64_t(tagged_value) >> 1;
@@ -453,7 +444,9 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 
     // Origin column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    int64_t tagged_value = m_oldsubspecs.get(subspec_ndx + 1);
+    Array subspecs(m_top.get_alloc());
+    subspecs.init_from_ref(m_top.get_as_ref(3));
+    int64_t tagged_value = subspecs.get(subspec_ndx + 1);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
     return size_t(tagged_value) >> 1;
 }
@@ -462,14 +455,16 @@ ColKey Spec::find_backlink_column(TableKey origin_table_key, size_t spec_ndx) co
 {
     size_t backlinks_column_start = m_num_public_columns;
     size_t backlinks_start = get_subspec_ndx(backlinks_column_start);
-    size_t count = m_oldsubspecs.size();
+    Array subspecs(m_top.get_alloc());
+    subspecs.init_from_ref(m_top.get_as_ref(3));
+    size_t count = subspecs.size();
 
     int64_t tagged_table_ndx = (origin_table_key.value << 1) + 1;
     int64_t tagged_column_ndx = (spec_ndx << 1) + 1;
 
     size_t col_ndx = realm::npos;
     for (size_t i = backlinks_start; i < count; i += 2) {
-        if (m_oldsubspecs.get(i) == tagged_table_ndx && m_oldsubspecs.get(i + 1) == tagged_column_ndx) {
+        if (subspecs.get(i) == tagged_table_ndx && subspecs.get(i + 1) == tagged_column_ndx) {
             size_t pos = (i - backlinks_start) / 2;
             col_ndx = backlinks_column_start + pos;
             break;
