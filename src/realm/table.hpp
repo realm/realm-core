@@ -779,7 +779,7 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.

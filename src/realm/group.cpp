@@ -627,19 +627,15 @@ void Group::remap(size_t new_file_size)
 
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
-    size_t old_baseline = m_alloc.get_baseline();
-
     m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
     auto mapping_version = m_alloc.get_mapping_version();
     if (mapping_version != m_last_seen_mapping_version) {
-        // force re-translation of all refs
-        old_baseline = 0;
         m_last_seen_mapping_version = mapping_version;
     }
-    update_refs(new_top_ref, old_baseline);
+    update_refs(new_top_ref);
 }
 
 void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
@@ -1352,8 +1348,6 @@ void Group::commit()
     // Mark all managed space (beyond the attached file) as free.
     reset_free_space_tracking(); // Throws
 
-    size_t old_baseline = m_alloc.get_baseline();
-
     // Update view of the file
     size_t new_file_size = out.get_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -1365,44 +1359,28 @@ void Group::commit()
     auto mapping_version = m_alloc.get_mapping_version();
     if (mapping_version != m_last_seen_mapping_version) {
         // force re-translation of all refs
-        old_baseline = 0;
         m_last_seen_mapping_version = mapping_version;
     }
-    update_refs(top_ref, old_baseline);
+    update_refs(top_ref);
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
+void Group::update_refs(ref_type top_ref) noexcept
 {
-    old_baseline = 0; // force update of all accessors
     // After Group::commit() we will always have free space tracking
     // info.
     REALM_ASSERT_3(m_top.size(), >=, 5);
 
-    // Array nodes that are part of the previous version of the
-    // database will not be overwritten by Group::commit(). This is
-    // necessary for robustness in the face of abrupt termination of
-    // the process. It also means that we can be sure that an array
-    // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous baseline.
-
-    if (top_ref < old_baseline && m_top.get_ref() == top_ref)
-        return;
-
     m_top.init_from_ref(top_ref);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent(old_baseline);
-
-    // If m_tables has not been modfied we don't
-    // need to update attached table accessors
-    if (!m_tables.update_from_parent(old_baseline))
-        return;
+    m_table_names.update_from_parent();
+    m_tables.update_from_parent();
 
     // Update all attached table accessors.
     for (auto& table_accessor : m_table_accessors) {
         if (table_accessor) {
-            table_accessor->update_from_parent(old_baseline);
+            table_accessor->update_from_parent();
         }
     }
 }

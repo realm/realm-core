@@ -2192,30 +2192,24 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
 }
 
 
-void Table::update_from_parent(size_t old_baseline) noexcept
+void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        if (!m_top.update_from_parent(old_baseline))
-            return;
-
-        m_spec.update_from_parent(old_baseline);
-        if (m_top.size() > top_position_for_cluster_tree) {
-            m_clusters.update_from_parent(old_baseline);
-        }
-        if (m_top.size() > top_position_for_search_indexes) {
-            if (m_index_refs.update_from_parent(old_baseline)) {
-                for (auto index : m_index_accessors) {
-                    if (index != nullptr) {
-                        index->update_from_parent(old_baseline);
-                    }
-                }
+        m_top.update_from_parent();
+        m_spec.update_from_parent();
+        m_clusters.update_from_parent();
+        m_index_refs.update_from_parent();
+        for (auto index : m_index_accessors) {
+            if (index != nullptr) {
+                index->update_from_parent();
             }
         }
+        // FIXME: REMOVE CONDITIONAL CHECKS?
         if (m_top.size() > top_position_for_opposite_table)
-            m_opposite_table.update_from_parent(old_baseline);
+            m_opposite_table.update_from_parent();
         if (m_top.size() > top_position_for_opposite_column)
-            m_opposite_column.update_from_parent(old_baseline);
+            m_opposite_column.update_from_parent();
         refresh_content_version();
     }
     m_alloc.bump_storage_version();
