@@ -243,7 +243,11 @@ if(REALM_NEEDS_OPENSSL)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
 endif()
 
-if(REALM_ENABLE_SYNC)
+# Use Zlib for Sync, but allow integrators to override it
+# Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
+# so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
+# Just use -lz and let Xcode figure it out
+if(REALM_ENABLE_SYNC AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
     find_package(ZLIB REQUIRED)
 endif()
 
@@ -286,13 +290,18 @@ endif()
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
+# Only prepare install/package targets if we're not a submodule
+if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    return()
+endif()
+
 # Make the project importable from the build directory
 set(REALM_EXPORTED_TARGETS
     Storage
     QueryParser
     ObjectStore
 )
-if(${REALM_ENABLE_SYNC})
+if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)
 endif()
 export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
@@ -319,4 +328,3 @@ set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)
 cpack_add_component(devel DEPENDS devel)
-
