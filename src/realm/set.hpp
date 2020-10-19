@@ -107,7 +107,24 @@ private:
             create();
         }
     }
+    void do_insert(size_t ndx, T value);
+    void do_erase(size_t ndx);
 };
+
+template <>
+void Set<ObjKey>::do_insert(size_t, ObjKey);
+template <>
+void Set<ObjKey>::do_erase(size_t);
+
+template <>
+void Set<ObjLink>::do_insert(size_t, ObjLink);
+template <>
+void Set<ObjLink>::do_erase(size_t);
+
+template <>
+void Set<Mixed>::do_insert(size_t, Mixed);
+template <>
+void Set<Mixed>::do_erase(size_t);
 
 /// Compare set elements.
 ///
@@ -298,7 +315,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
         this->insert_repl(repl, it.index(), value);
     }
 
-    m_tree->insert(it.index(), value);
+    do_insert(it.index(), value);
     CollectionBase::m_obj.bump_content_version();
     return {it.index(), true};
 }
@@ -336,7 +353,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
     if (Replication* repl = m_obj.get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
-    m_tree->erase(it.index());
+    do_erase(it.index());
     CollectionBase::m_obj.bump_content_version();
     return {it.index(), true};
 }
@@ -451,6 +468,18 @@ inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 {
     auto ascending = !sort_order || *sort_order;
     sort(indices, ascending);
+}
+
+template <class T>
+void Set<T>::do_insert(size_t ndx, T value)
+{
+    m_tree->insert(ndx, value);
+}
+
+template <class T>
+void Set<T>::do_erase(size_t ndx)
+{
+    m_tree->erase(ndx);
 }
 
 } // namespace realm

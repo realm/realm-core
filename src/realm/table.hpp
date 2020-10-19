@@ -72,6 +72,12 @@ class TableFriend;
 namespace metrics {
 class QueryInfo;
 }
+namespace query_builder {
+class Arguments;
+}
+namespace parser {
+class KeyPathMapping;
+}
 
 class Table {
 public:
@@ -519,6 +525,10 @@ public:
         return Query(m_own_ref, list);
     }
 
+    Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
+    Query query(const std::string& query_string, query_builder::Arguments& arguments,
+                const parser::KeyPathMapping&) const;
+
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
     /// to itself. Be aware if assigning the return value of link() to a variable; this might be an error!
@@ -547,8 +557,8 @@ public:
     LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+                 JSONOutputMode output_mode = output_mode_json) const;
 
     /// \brief Compare two tables for equality.
     ///
