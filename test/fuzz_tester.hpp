@@ -1007,7 +1007,13 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
     for (int i = 0; i < num_clients; ++i) {
         ReadTransaction rt_1(clients[i]->shared_group);
         bool same = CHECK(compare_groups(rt_0, rt_1));
-        REALM_ASSERT(same);
+        if (!same) {
+            std::cout << "Server" << std::endl;
+            rt_0.get_group().to_json(std::cout);
+            std::cout << "Client_" << clients[i]->local_file_ident << std::endl;
+            rt_1.get_group().to_json(std::cout);
+        }
+        CHECK(same);
     }
 }
 
