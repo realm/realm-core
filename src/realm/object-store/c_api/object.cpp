@@ -177,11 +177,12 @@ RLM_API realm_object_t* realm_object_from_thread_safe_reference(const realm_t* r
                                                                 realm_thread_safe_reference_t* tsr)
 {
     return wrap_err([&]() {
-        if (tsr->m_type != ThreadSafeReferenceType::Object) {
+        auto otsr = dynamic_cast<realm_object::thread_safe_reference*>(tsr);
+        if (!otsr) {
             throw std::logic_error{"Thread safe reference type mismatch"};
         }
 
-        auto obj = tsr->resolve<Object>(*realm);
+        auto obj = otsr->resolve<Object>(*realm);
         return new realm_object_t{std::move(obj)};
     });
 }
@@ -523,11 +524,12 @@ RLM_API bool realm_list_clear(realm_list_t* list)
 RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm, realm_thread_safe_reference_t* tsr)
 {
     return wrap_err([&]() {
-        if (tsr->m_type != ThreadSafeReferenceType::List) {
+        auto ltsr = dynamic_cast<realm_list::thread_safe_reference*>(tsr);
+        if (!ltsr) {
             throw std::logic_error{"Thread safe reference type mismatch"};
         }
 
-        auto list = tsr->resolve<List>(*realm);
+        auto list = ltsr->resolve<List>(*realm);
         return new realm_list_t{std::move(list)};
     });
 }

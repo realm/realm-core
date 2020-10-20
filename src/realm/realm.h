@@ -696,6 +696,18 @@ RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t*, void* userd
 RLM_API realm_t* realm_open(const realm_config_t* config);
 
 /**
+ * Create a `realm_t` object from a thread-safe reference to the same realm.
+ *
+ * @param tsr Thread-safe reference object created by calling
+ *            `realm_get_thread_safe_reference()` with a `realm_t` instance.
+ * @param scheduler The scheduler to use for the new `realm_t` instance. May be
+ *                  NULL, in which case the default scheduler for the current
+ *                  thread is used.
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t* tsr, realm_scheduler_t* scheduler);
+
+/**
  * Create a `realm_t*` from a `std::shared_ptr<Realm>*`.
  *
  * This is intended as a migration path for users of the C++ Object Store API.

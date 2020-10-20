@@ -84,3 +84,22 @@ RLM_API bool realm_compact(realm_t* realm, bool* did_compact)
         return true;
     });
 }
+
+RLM_API realm_t* realm_from_thread_safe_reference(realm_thread_safe_reference_t* tsr, realm_scheduler_t* scheduler)
+{
+    return wrap_err([&]() {
+        auto rtsr = dynamic_cast<shared_realm::thread_safe_reference*>(tsr);
+        if (!rtsr) {
+            throw std::logic_error{"Thread safe reference type mismatch"};
+        }
+
+        // FIXME: This moves out of the ThreadSafeReference, so it isn't
+        // reusable.
+        std::shared_ptr<util::Scheduler> sch;
+        if (scheduler) {
+            sch = *scheduler;
+        }
+        auto realm = Realm::get_shared_realm(static_cast<ThreadSafeReference&&>(*rtsr), sch);
+        return new shared_realm{std::move(realm)};
+    });
+}

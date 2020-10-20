@@ -35,7 +35,6 @@ RLM_API realm_thread_safe_reference_t* realm_create_thread_safe_reference(const 
 {
     return wrap_err([=]() {
         auto cptr = static_cast<const WrapC*>(ptr);
-        auto [tsr, type] = cptr->get_thread_safe_reference();
-        return new realm_thread_safe_reference_t{std::move(tsr), type};
+        return cptr->get_thread_safe_reference();
     });
 }

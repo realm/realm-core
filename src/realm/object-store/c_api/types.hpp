@@ -74,12 +74,6 @@ struct PropertyTypeMismatch : std::logic_error {
 
 //// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
-enum class ThreadSafeReferenceType {
-    Object,
-    List,
-    Results,
-};
-
 struct WrapC {
     virtual ~WrapC() {}
 
@@ -98,7 +92,7 @@ struct WrapC {
         return this == &other;
     }
 
-    virtual std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const
+    virtual realm_thread_safe_reference_t* get_thread_safe_reference() const
     {
         throw std::logic_error{"Thread safe references cannot be created for this object type"};
     }
@@ -124,6 +118,13 @@ struct realm_async_error : WrapC {
         }
         return false;
     }
+};
+
+struct realm_thread_safe_reference : WrapC {
+    realm_thread_safe_reference(const realm_thread_safe_reference&) = delete;
+
+protected:
+    realm_thread_safe_reference() {}
 };
 
 struct realm_config : WrapC, Realm::Config {
@@ -198,6 +199,18 @@ struct shared_realm : WrapC, SharedRealm {
         }
         return false;
     }
+
+    struct thread_safe_reference : realm_thread_safe_reference, ThreadSafeReference {
+        thread_safe_reference(const std::shared_ptr<Realm>& rlm)
+            : ThreadSafeReference(rlm)
+        {
+        }
+    };
+
+    realm_thread_safe_reference_t* get_thread_safe_reference() const final
+    {
+        return new thread_safe_reference{*this};
+    }
 };
 
 struct realm_object : WrapC, Object {
@@ -226,9 +239,16 @@ struct realm_object : WrapC, Object {
         return false;
     }
 
-    std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const final
+    struct thread_safe_reference : realm_thread_safe_reference, ThreadSafeReference {
+        thread_safe_reference(const Object& obj)
+            : ThreadSafeReference(obj)
+        {
+        }
+    };
+
+    realm_thread_safe_reference_t* get_thread_safe_reference() const final
     {
-        return {ThreadSafeReference{static_cast<const Object&>(*this)}, ThreadSafeReferenceType::Object};
+        return new thread_safe_reference{*this};
     }
 };
 
@@ -258,9 +278,16 @@ struct realm_list : WrapC, List {
         return false;
     }
 
-    std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const final
+    struct thread_safe_reference : realm_thread_safe_reference, ThreadSafeReference {
+        thread_safe_reference(const List& list)
+            : ThreadSafeReference(list)
+        {
+        }
+    };
+
+    realm_thread_safe_reference_t* get_thread_safe_reference() const final
     {
-        return {ThreadSafeReference{static_cast<const List&>(*this)}, ThreadSafeReferenceType::List};
+        return new thread_safe_reference{*this};
     }
 };
 
@@ -332,22 +359,17 @@ struct realm_results : WrapC, Results {
         return Results::is_frozen();
     }
 
-    std::pair<ThreadSafeReference, ThreadSafeReferenceType> get_thread_safe_reference() const final
+    struct thread_safe_reference : realm_thread_safe_reference_t, ThreadSafeReference {
+        thread_safe_reference(const Results& results)
+            : ThreadSafeReference(results)
+        {
+        }
+    };
+
+    realm_thread_safe_reference_t* get_thread_safe_reference() const final
     {
-        return {ThreadSafeReference{static_cast<const Results&>(*this)}, ThreadSafeReferenceType::Results};
+        return new thread_safe_reference{*this};
     }
-};
-
-struct realm_thread_safe_reference : WrapC, ThreadSafeReference {
-    using Type = ThreadSafeReferenceType;
-
-    explicit realm_thread_safe_reference(ThreadSafeReference tsr, Type type)
-        : ThreadSafeReference(std::move(tsr))
-        , m_type(type)
-    {
-    }
-
-    Type m_type;
 };
 
 

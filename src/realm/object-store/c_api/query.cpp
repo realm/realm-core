@@ -346,11 +346,12 @@ RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*
                                                                   realm_thread_safe_reference_t* tsr)
 {
     return wrap_err([&]() {
-        if (tsr->m_type != ThreadSafeReferenceType::Results) {
+        auto rtsr = dynamic_cast<realm_results::thread_safe_reference*>(tsr);
+        if (!rtsr) {
             throw std::logic_error{"Thread safe reference type mismatch"};
         }
 
-        auto results = tsr->resolve<Results>(*realm);
+        auto results = rtsr->resolve<Results>(*realm);
         return new realm_results_t{std::move(results)};
     });
 }
