@@ -2101,7 +2101,7 @@ DEFINE_NESTED_MERGE(Instruction::ArrayErase)
 
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 {
-    if (same_path(left, right)) {
+    if (same_container(left, right)) {
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);

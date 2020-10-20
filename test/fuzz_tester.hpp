@@ -368,7 +368,7 @@ private:
                       << nullable << ");\n";
         }
 
-        ColKey col_key = table->add_column(type, name, nullable);
+        ColKey col_key = table->add_column_list(type, name, nullable);
         m_array_columns.push_back(col_key);
     }
 
@@ -472,10 +472,7 @@ private:
 
         if (!pk_col_key) {
             if (m_trace) {
-                std::cerr << "sync::create_object(*" << trace_client(client)
-                          << "->"
-                             "group, *"
-                          << trace_selected_table(client) << ");\n";
+                std::cerr << trace_selected_table(client) << "->create_object();\n";
             }
             client.selected_table->create_object();
         }
@@ -492,10 +489,7 @@ private:
                 pk_int = draw_int_max(10); // Low number to ensure some collisions
             }
             if (m_trace) {
-                std::cerr << "sync::create_object_with_primary_key(*" << trace_client(client)
-                          << "->"
-                             "group, *"
-                          << trace_selected_table(client) << ", ";
+                std::cerr << trace_selected_table(client) << "->create_object_with_primary_key(";
                 if (is_string_pk)
                     std::cerr << "\"" << pk_string << "\"";
                 else
@@ -602,7 +596,7 @@ private:
         else {
             StringData value = "abc";
             if (m_trace) {
-                std::cerr << trace_selected_string_array(client) << "->set(" << ndx << ", " << value << ");\n";
+                std::cerr << trace_selected_string_array(client) << "->set(" << ndx << ", \"" << value << "\");\n";
             }
             static_cast<Lst<StringData>*>(client.selected_array.get())->set(ndx, value);
         }
@@ -766,8 +760,10 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
 {
     m_current_value = 0;
 
-    if (m_trace)
-        std::cerr << "std::unique_ptr<Peer> server = Peer::create_server(test_context);\n";
+    if (m_trace) {
+        std::cerr << "auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);\n"
+                  << "auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());\n";
+    }
     auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
     auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get(), path_add_on);
     std::vector<std::unique_ptr<Peer>> clients(num_clients);
@@ -775,10 +771,8 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
         using file_ident_type = Peer::file_ident_type;
         file_ident_type client_file_ident = 2 + i;
         if (m_trace) {
-            std::cerr << "std::unique_ptr<Peer> client_" << client_file_ident
-                      << " = "
-                         "Peer::create_client(test_context, "
-                      << client_file_ident << ");\n";
+            std::cerr << "auto client_" << client_file_ident << " = Peer::create_client(test_context, "
+                      << client_file_ident << ", changeset_dump_dir_gen.get());\n";
         }
         clients[i] = Peer::create_client(test_context, client_file_ident, changeset_dump_dir_gen.get(), path_add_on);
     }
