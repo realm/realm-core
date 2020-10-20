@@ -253,3 +253,7 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
         COMPONENT runtime
     )
 endif()
+
+if (REALM_BUILD_INSPECTOR)
+    add_subdirectory(inspector)
+endif()
