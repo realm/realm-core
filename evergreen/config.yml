@@ -26,17 +26,6 @@ functions:
           set -o errexit
           git submodule update --init --recursive
 
-modules:
-- name: zlib
-  repo: git@github.com:madler/zlib.git
-  prefix: src/external
-  branch: v1.2.11
-
-- name: libuv
-  repo: git@github.com:libuv/libuv.git
-  prefix: src/external
-  branch: v1.40.0
-
 tasks:
 - name: compile
   commands:
@@ -52,14 +41,18 @@ tasks:
         else
             mkdir cmake_vars
         fi
-
+        
         set_cmake_var() {
             file=$1
             var_name=$2
             var_type=$3
             shift; shift; shift;
             var_arg=$@
-            echo "set($var_name $var_arg CACHE $var_type \"\")" >> cmake_vars/$file.txt
+            if [ "$var_type" = "PATH" -o "$var_type" = "STRING" ]; then
+                echo "set($var_name \"$var_arg\" CACHE $var_type \"\")" >> cmake_vars/$file.txt
+            else
+                echo "set($var_name $var_arg CACHE $var_type \"\")" >> cmake_vars/$file.txt
+            fi
         }
         ensure_cmake_var_file() {
             touch cmake_vars/$1.txt
@@ -72,17 +65,51 @@ tasks:
             set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH ${cxx_compiler}
         fi
 
+        export CMAKE=$(./evergreen/realpath.sh ${cmake_bindir}/cmake)
+
+        if [ -n "${build_libuv|}" ]; then
+            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
+                ./evergreen/build_libuv.sh \
+                    -p libuv_prefix \
+                    -b v1.40.0 \
+                    -e "${extra_flags}" \
+                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+
+            if [ "$OS" = "Windows_NT" ]; then
+                set_cmake_var libuv_vars LibUV_LIBRARY PATH "$(cygpath -ma ./libuv_prefix/lib/Debug/uv.lib)"
+                set_cmake_var libuv_vars LibUV_INCLUDE_DIR PATH "$(cygpath -ma ./libuv_prefix/include)"
+            else
+                set_cmake_var libuv_vars LibUV_LIBRARY PATH $(pwd)/libuv_prefix/lib/libuv.so
+                set_cmake_var libuv_vars LibUV_INCLUDE_DIR PATH $(pwd)/libuv_prefix/include
+            fi
+        fi
+       
+        if [ -n "${build_zlib|}" ]; then
+            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
+                ./evergreen/build_zlib.sh \
+                    -p zlib_prefix \
+                    -b v1.2.11 \
+                    -e "${extra_flags}" \
+                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+
+            if [ "$OS" = "Windows_NT" ]; then
+                set_cmake_var zlib_vars ZLIB_LIBRARY PATH "$(cygpath -ma ./zlib_prefix/lib/zlibstaticd.lib)"
+                set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH "$(cygpath -ma ./zlib_prefix/include)"
+            else
+                set_cmake_var zlib_vars ZLIB_LIBRARY PATH $(pwd)/zlib_prefix/lib/libz.a
+                set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH $(pwd)/zlib_prefix/include
+            fi
+        fi
+
         ensure_cmake_var_file realm_vars
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
-        set_cmake_var realm_vars REALM_BUILD_LIBUV_MODULE BOOL ${use_libuv_module|Off}
-        set_cmake_var realm_vars REALM_BUILD_ZLIB_MODULE BOOL ${use_zlib_module|Off}
 
         cat cmake_vars/*.txt | tee cmake_vars.txt
         
         mkdir build
-        ${cmake_bindir}/cmake \
+        $CMAKE \
           -B build \
           -C cmake_vars.txt ${extra_flags} \
           -G "${cmake_generator|Unix Makefiles}"
@@ -101,15 +128,6 @@ tasks:
 
         cd build
         $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
-  - command: s3.put
-    params:
-      aws_key: '${artifacts_aws_access_key}'
-      aws_secret: '${artifacts_aws_secret_key}'
-      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-core-artifacts-Unspecified.tar.gz'
-      bucket: mciuploads
-      permissions: public-read
-      local_file: 'realm-core/build/realm-core-artifacts-Unspecified.tar.gz'
-      content_type: '${content_type|application/x-gzip}'
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
@@ -177,12 +195,10 @@ buildvariants:
 - name: ubuntu2004
   display_name: "Ubuntu 20.04"
   run_on: ubuntu2004-small
-  modules:
-  - libuv
   expansions:
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    use_libuv_module: On
+    build_libuv: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -191,14 +207,12 @@ buildvariants:
 - name: rhel70
   display_name: "RHEL 7"
   run_on: rhel70-small
-  modules:
-  - libuv
   expansions:
     c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
     cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
-    use_libuv_module: On
+    build_libuv: On
   tasks:
   - name: compile_test_and_package
     distros:
@@ -230,9 +244,6 @@ buildvariants:
 - name: windows-64-vs2019
   display_name: "Windows x86_64 VS 2019"
   run_on: windows-64-vs2019-test 
-  modules:
-  - zlib
-  - libuv
   expansions:
     cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-win64-x64.zip"
     cmake_bindir: "./cmake-3.18.2-win64-x64/bin"
@@ -241,8 +252,8 @@ buildvariants:
     test_flags: "-C Debug"
     package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
-    use_libuv_module: On
-    use_zlib_module: On
+    build_libuv: On
+    build_zlib: On
   tasks:
   - name: compile_test_and_package
     distros:
