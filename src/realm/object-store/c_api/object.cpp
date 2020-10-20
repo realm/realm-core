@@ -1,6 +1,8 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
 
+#include <realm/util/overloaded.hpp>
+
 RLM_API bool realm_get_num_objects(const realm_t* realm, realm_table_key_t key, size_t* out_count)
 {
     return wrap_err([&]() {
