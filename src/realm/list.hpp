@@ -340,7 +340,7 @@ public:
     }
     bool is_null(size_t ndx) const final
     {
-        return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
+        return m_nullable && value_is_null(get(ndx));
     }
     Mixed get_any(size_t ndx) const final
     {

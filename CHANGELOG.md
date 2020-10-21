@@ -5,7 +5,7 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, (since v6.0.0).
  
 ### Breaking changes
 * None.

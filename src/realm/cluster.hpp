@@ -96,7 +96,7 @@ public:
         return m_keys.get(ndx);
     }
 
-    virtual bool update_from_parent(size_t old_baseline) noexcept = 0;
+    virtual void update_from_parent() noexcept = 0;
     virtual bool is_leaf() const = 0;
     virtual int get_sub_tree_depth() const = 0;
     virtual size_t node_size() const = 0;
@@ -180,7 +180,7 @@ public:
 
     void create(size_t nb_leaf_columns); // Note: leaf columns - may include holes
     void init(MemRef mem) override;
-    bool update_from_parent(size_t old_baseline) noexcept override;
+    void update_from_parent() noexcept override;
     bool is_writeable() const
     {
         return !Array::is_read_only();

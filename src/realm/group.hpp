@@ -711,7 +711,7 @@ private:
     /// that exists across Group::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
-    void update_refs(ref_type top_ref, size_t old_baseline) noexcept;
+    void update_refs(ref_type top_ref) noexcept;
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;

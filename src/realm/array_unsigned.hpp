@@ -43,7 +43,7 @@ public:
         init_from_mem(MemRef(header, ref, m_alloc));
     }
 
-    bool update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     size_t lower_bound(uint64_t value) const noexcept;
     size_t upper_bound(uint64_t value) const noexcept;
