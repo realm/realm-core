@@ -58,6 +58,10 @@ R Table::aggregate(ColKey column_key, T value, size_t* resultcount, ObjKey* retu
     return st.m_match_count ? st.m_state : R{};
 }
 
+template <>
+Decimal128 Table::aggregate<act_Sum, Decimal128, Decimal128>(ColKey column_key, Decimal128, size_t* resultcount,
+                                                             ObjKey*) const;
+
 template <typename T>
 double Table::average(ColKey col_key, size_t* resultcount) const
 {

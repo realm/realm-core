@@ -198,15 +198,23 @@ std::string create_column_name(DataType t)
         case type_Timestamp:
             str = "date_";
             break;
+        case type_Decimal:
+            str = "decimal_";
+            break;
+        case type_ObjectId:
+            str = "id_";
+            break;
         case type_Link:
             str = "link_";
             break;
         case type_LinkList:
             str = "link_list_";
             break;
+        case type_OldMixed:
+            str = "any_";
+            break;
         case type_OldDateTime:
         case type_OldTable:
-        case type_OldMixed:
             break;
     }
     return str + util::to_string(column_index++);

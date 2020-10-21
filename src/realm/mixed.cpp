@@ -88,12 +88,18 @@ inline int compare_float(Float a_raw, Float b_raw)
 
 int Mixed::compare(const Mixed& b) const
 {
-    // nulls are treated as being less than all other values
-    if (is_null()) {
-        return b.is_null() ? 0 : -1;
-    }
-    if (b.is_null())
+    // Comparing types first makes it possible to make a sort of a list of Mixed
+    // This will also handle the case where null values are considered lower than all other values
+    if (m_type > b.m_type)
         return 1;
+    else if (m_type < b.m_type)
+        return -1;
+
+    // Now we are sure the two types are the same
+    if (is_null()) {
+        // Both are null
+        return 0;
+    }
 
     switch (get_type()) {
         case type_Int:
@@ -124,16 +130,31 @@ int Mixed::compare(const Mixed& b) const
             else if (get<Timestamp>() < b.get<Timestamp>())
                 return -1;
             break;
+        case type_ObjectId: {
+            auto l = get<ObjectId>();
+            auto r = b.get<ObjectId>();
+            if (l > r)
+                return 1;
+            else if (l < r)
+                return -1;
+            break;
+        }
+        case type_Decimal: {
+            auto l = get<Decimal128>();
+            auto r = b.get<Decimal128>();
+            if (l > r)
+                return 1;
+            else if (l < r)
+                return -1;
+            break;
+        }
         case type_Link:
             if (get<ObjKey>() > b.get<ObjKey>())
                 return 1;
             else if (get<ObjKey>() < b.get<ObjKey>())
                 return -1;
             break;
-        case type_OldTable:
-        case type_OldDateTime:
-        case type_OldMixed:
-        case type_LinkList:
+        default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
     }
@@ -163,14 +184,21 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 out << m.double_val;
                 break;
             case type_String:
-                out << StringData(m.str_val, m.short_val);
+                out << m.string_val;
                 break;
             case type_Binary:
-                out << BinaryData(m.str_val, m.short_val);
+                out << m.binary_val;
                 break;
             case type_Timestamp:
-                out << Timestamp(m.int_val, m.short_val);
+                out << m.date_val;
                 break;
+            case type_Decimal:
+                out << m.decimal_val;
+                break;
+            case type_ObjectId: {
+                out << m.get<ObjectId>();
+                break;
+            }
             case type_Link:
                 out << ObjKey(m.int_val);
                 break;

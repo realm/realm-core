@@ -29,6 +29,7 @@
 #include <realm/util/string_buffer.hpp>
 
 #include <cctype>
+#include <cmath>
 
 namespace realm {
 namespace util {
@@ -52,13 +53,43 @@ std::string print_value<>(bool b)
     return "false";
 }
 
+template <typename T>
+inline std::string print_with_nan_check(T val)
+{
+    // we standardize NaN because some implementations (windows) will
+    // print the different types of NaN such as "nan(ind)" to indicate "indefinite"
+    if (std::isnan(val)) {
+        // preserving the sign of nan is not strictly required but is good etiquette
+        if (std::signbit(val)) {
+            return "-nan";
+        }
+        return "nan";
+    }
+    std::stringstream ss;
+    ss << val;
+    return ss.str();
+}
+
+template <>
+std::string print_value<>(float val)
+{
+    return print_with_nan_check(val);
+}
+
+template <>
+std::string print_value<>(double val)
+{
+    return print_with_nan_check(val);
+}
+
 template <>
 std::string print_value<>(realm::null)
 {
     return "NULL";
 }
 
-bool contains_invalids(StringData data) {
+bool contains_invalids(StringData data)
+{
     // the custom whitelist is different from std::isprint because it doesn't include quotations
     const static std::string whitelist = " {|}~:;<=>?@!#$%&()*+,-./[]^_`";
     for (size_t i = 0; i < data.size(); ++i) {
@@ -87,7 +118,8 @@ std::string print_value<>(StringData data)
         encode_buffer.resize(util::base64_encoded_size(len));
         util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
         out = "B64\"" + encode_buffer.str() + "\"";
-    } else {
+    }
+    else {
         out.reserve(len + 2);
         out += '"';
         for (const char* i = start; i != start + len; ++i) {
@@ -112,6 +144,12 @@ std::string print_value<>(realm::Timestamp t)
         ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
     }
     return ss.str();
+}
+
+template <>
+std::string print_value<>(realm::ObjectId oid)
+{
+    return "oid(" + oid.to_string() + ")";
 }
 
 template <>
@@ -226,6 +264,20 @@ std::string SerialisationState::describe_columns(const LinkMap& link_map, ColKey
         desc += get_column_name(target, target_col_key);
     }
     return desc;
+}
+
+std::string SerialisationState::describe_expression_type(ExpressionComparisonType type)
+{
+    switch (type) {
+        case ExpressionComparisonType::Any:
+            return ""; // ANY is implied
+        case ExpressionComparisonType::All:
+            return "ALL ";
+        case ExpressionComparisonType::None:
+            return "NONE ";
+    }
+    REALM_UNREACHABLE();
+    return "";
 }
 
 } // namespace serializer

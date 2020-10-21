@@ -125,6 +125,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     REALM_ASSERT(!get_context_flag());
     size_t remove_size = end - begin;
     size_t add_size = add_zero_term ? data_size + 1 : data_size;
+    size_t old_size = m_size;
     size_t new_size = m_size - remove_size + add_size;
 
     // If size of BinaryData is below 'max_binary_size', the data is stored directly
@@ -151,9 +152,9 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
 
     // Resize previous space to fit new data
     // (not needed if we append to end)
-    if (begin != m_size) {
+    if (begin != old_size) {
         const char* old_begin = m_data + end;
-        const char* old_end = m_data + m_size;
+        const char* old_end = m_data + old_size;
         if (remove_size < add_size) { // expand gap
             char* new_end = m_data + new_size;
             std::copy_backward(old_begin, old_end, new_end);
@@ -169,15 +170,12 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     if (add_zero_term)
         *modify_begin = 0;
 
-    m_size = new_size;
-
     return get_ref();
 }
 
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
-
 void ArrayBlob::verify() const
 {
+#ifdef REALM_DEBUG
     if (get_context_flag()) {
         REALM_ASSERT(has_refs());
         for (size_t i = 0; i < size(); ++i) {
@@ -191,37 +189,5 @@ void ArrayBlob::verify() const
     else {
         REALM_ASSERT(!has_refs());
     }
+#endif
 }
-
-void ArrayBlob::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    out << "</FONT></TD>" << std::endl;
-
-    // Values
-    out << "<TD>";
-    out << blob_size() << " bytes"; // TODO: write content
-    out << "</TD>" << std::endl;
-
-    out << "</TR></TABLE>>];" << std::endl;
-
-    if (title.size() != 0)
-        out << "}" << std::endl;
-
-    to_dot_parent_edge(out);
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions

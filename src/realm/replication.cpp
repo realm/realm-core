@@ -89,6 +89,12 @@ void Replication::set(const Table* table, ColKey col_key, ObjKey key, Mixed valu
         case type_Timestamp:
             set_timestamp(table, col_key, key, value.get<Timestamp>(), variant);
             break;
+        case type_Decimal:
+            set_decimal(table, col_key, key, value.get<Decimal128>(), variant);
+            break;
+        case type_ObjectId:
+            set_object_id(table, col_key, key, value.get<ObjectId>(), variant);
+            break;
         case type_Link:
             set_link(table, col_key, key, value.get<ObjKey>(), variant);
             break;

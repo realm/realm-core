@@ -50,6 +50,11 @@ public:
         return m_arr->is_attached();
     }
 
+    void detach() const
+    {
+        m_arr->detach();
+    }
+
     ref_type get_ref() const
     {
         return m_arr->get_ref();
@@ -124,7 +129,7 @@ private:
         std::aligned_storage<sizeof(ArrayStringShort), alignof(ArrayStringShort)>::type m_string_short;
         std::aligned_storage<sizeof(ArraySmallBlobs), alignof(ArraySmallBlobs)>::type m_string_long;
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
-        std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type m_enum;
+        std::aligned_storage<sizeof(Array), alignof(Array)>::type m_enum;
     };
     enum class Type { small_strings, medium_strings, big_strings, enum_strings };
 
@@ -167,7 +172,7 @@ public:
     template <Action action>
     bool uses_val()
     {
-        return (action == act_Count);
+        return false;
     }
 
     QueryState(Action, Array* = nullptr, size_t limit = -1)

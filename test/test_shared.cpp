@@ -161,7 +161,7 @@ DWORD winfork(std::string unit_test_name)
     CloseHandle(process.hThread);
     return process.dwProcessId;
 }
-}
+} // namespace
 #endif
 
 
@@ -190,7 +190,7 @@ std::vector<ColKey> test_table_add_columns(TableRef t)
     res.push_back(t->add_column(type_Timestamp, "fifth"));
     return res;
 }
-}
+} // namespace
 
 void writer(DBRef sg, uint64_t id)
 {
@@ -205,7 +205,8 @@ void writer(DBRef sg, uint64_t id)
             auto t1 = tr->get_table("test");
             ColKeys _cols = t1->get_column_keys();
             std::vector<ColKey> cols;
-            for (auto e : _cols) cols.push_back(e);
+            for (auto e : _cols)
+                cols.push_back(e);
             Obj obj = t1->get_object(ObjKey(id));
             done = obj.get<Bool>(cols[2]);
             if (i & 1) {
@@ -439,7 +440,8 @@ TEST(Shared_CompactingOnTheFly)
             auto t1 = wt.add_table("test");
             test_table_add_columns(t1);
             ColKeys _cols = t1->get_column_keys();
-            for (auto e : _cols) cols.push_back(e);
+            for (auto e : _cols)
+                cols.push_back(e);
             for (int i = 0; i < 100; ++i) {
                 t1->create_object(ObjKey(i)).set_all(0, i, false, "test");
             }
@@ -919,7 +921,6 @@ TEST(Shared_try_begin_write)
     bool init_complete = false;
 
     auto do_async = [&]() {
-
         auto tr = sg->start_write(true);
         bool success = bool(tr);
         CHECK(success);
@@ -943,7 +944,7 @@ TEST(Shared_try_begin_write)
 
     // wait for the thread to start a write transaction
     std::unique_lock<std::mutex> lock(cv_lock);
-    cv.wait(lock, [&]{ return init_complete; });
+    cv.wait(lock, [&] { return init_complete; });
 
     // Try to also obtain a write lock. This should fail but not block.
     auto tr = sg->start_write(true);
@@ -1426,7 +1427,6 @@ TEST(Many_ConcurrentReaders)
 }
 
 
-
 TEST(Shared_WritesSpecialOrder)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1475,10 +1475,8 @@ TEST(Shared_WritesSpecialOrder)
 
 namespace {
 
-void writer_threads_thread(TestContext& test_context, std::string path, ObjKey key)
+void writer_threads_thread(TestContext& test_context, const DBRef& sg, ObjKey key)
 {
-    // Open shared db
-    DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
 
     for (size_t i = 0; i < 100; ++i) {
         // Increment cell
@@ -1501,7 +1499,8 @@ void writer_threads_thread(TestContext& test_context, std::string path, ObjKey k
         // read and write transactions
         {
             ReadTransaction rt(sg);
-            rt.get_group().verify();
+            // rt.get_group().verify(); // verify() is not supported on a read transaction
+            // concurrently with writes.
             auto t = rt.get_table("test");
             auto cols = t->get_column_keys();
             int64_t v = t->get_object(key).get<Int>(cols[0]);
@@ -1536,7 +1535,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (int i = 0; i < thread_count; ++i)
-            threads[i].start([this, &path, i] { writer_threads_thread(test_context, path, ObjKey(i)); });
+            threads[i].start([this, &sg, i] { writer_threads_thread(test_context, sg, ObjKey(i)); });
 
         // Wait for all threads to complete
         for (int i = 0; i < thread_count; ++i)
@@ -2207,7 +2206,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if 0  // FIXME: Reenable when it can pass reliably
+#if 0 // FIXME: Reenable when it can pass reliably
 #ifdef _WIN32
 
 TEST(Shared_WaitForChangeAfterOwnCommit)
@@ -2602,7 +2601,8 @@ TEST(Shared_EncryptionKeyCheck)
     bool ok = false;
     try {
         DBRef sg_2 = DB::create(path, false, DBOptions());
-    } catch (std::runtime_error&) {
+    }
+    catch (std::runtime_error&) {
         ok = true;
     }
     CHECK(ok);
@@ -2618,7 +2618,8 @@ TEST(Shared_EncryptionKeyCheck_2)
     bool ok = false;
     try {
         DBRef sg_2 = DB::create(path, false, DBOptions(crypt_key(true)));
-    } catch (std::runtime_error&) {
+    }
+    catch (std::runtime_error&) {
         ok = true;
     }
     CHECK(ok);
@@ -3510,7 +3511,7 @@ TEST(Shared_LockFileOfWrongSizeThrows)
         CHECK(f.is_attached());
 
         size_t wrong_size = 100; // < sizeof(SharedInfo)
-        f.resize(wrong_size); // ftruncate will fill with 0, which will set the init_complete flag to 0.
+        f.resize(wrong_size);    // ftruncate will fill with 0, which will set the init_complete flag to 0.
         f.seek(0);
 
         // On Windows, we implement a shared lock on a file by locking the first byte of the file. Since
@@ -3806,7 +3807,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
     // Page size of system that reads the .realm file must be the same as on the system
     // that created it, because we are running with encryption
     std::string path = test_util::get_test_resource_path() + "test_shared_decrypt_" +
-                        realm::util::to_string(page_size() / 1024) + "k_page.realm";
+                       realm::util::to_string(page_size() / 1024) + "k_page.realm";
 
 #if 0 // set to 1 to generate the .realm file
     {

@@ -77,7 +77,7 @@ namespace util {
 
 // Note: Should conform with the future std::optional.
 template <class T>
-class Optional : private _impl::OptionalStorage<T> {
+class Optional : private realm::_impl::OptionalStorage<T> {
 public:
     using value_type = T;
 
@@ -119,8 +119,11 @@ public:
     template <class... Args>
     void emplace(Args&&...);
     // FIXME: std::optional specifies an std::initializer_list overload for `emplace` as well.
+
+    void reset();
+
 private:
-    using Storage = _impl::OptionalStorage<T>;
+    using Storage = realm::_impl::OptionalStorage<T>;
     using Storage::m_engaged;
     using Storage::m_value;
 
@@ -132,7 +135,6 @@ private:
     {
         m_engaged = b;
     }
-    void clear();
 };
 
 
@@ -327,7 +329,7 @@ constexpr Optional<T>::Optional(InPlace, Args&&... args)
 }
 
 template <class T>
-void Optional<T>::clear()
+void Optional<T>::reset()
 {
     if (m_engaged) {
         m_value.~T();
@@ -338,7 +340,7 @@ void Optional<T>::clear()
 template <class T>
 Optional<T>& Optional<T>::operator=(None) noexcept
 {
-    clear();
+    reset();
     return *this;
 }
 
@@ -350,7 +352,7 @@ Optional<T>& Optional<T>::operator=(Optional<T>&& other) noexcept(std::is_nothro
             m_value = std::move(other.m_value);
         }
         else {
-            clear();
+            reset();
         }
     }
     else {
@@ -370,7 +372,7 @@ Optional<T>& Optional<T>::operator=(const Optional<T>& other) noexcept(std::is_n
             m_value = other.m_value;
         }
         else {
-            clear();
+            reset();
         }
     }
     else {
@@ -484,7 +486,7 @@ template <class T>
 template <class... Args>
 void Optional<T>::emplace(Args&&... args)
 {
-    clear();
+    reset();
     new (&m_value) T(std::forward<Args>(args)...);
     m_engaged = true;
 }

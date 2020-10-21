@@ -169,7 +169,9 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 {
     REALM_ASSERT_DEBUG(m_width >= 8);
     bool do_expand = value > m_ubound;
-    uint8_t new_width = do_expand ? bit_width(value) : m_width;
+    const uint8_t old_width = m_width;
+    const uint8_t new_width = do_expand ? bit_width(value) : m_width;
+    const auto old_size = m_size;
 
     REALM_ASSERT_DEBUG(!do_expand || new_width > m_width);
     REALM_ASSERT_DEBUG(ndx <= m_size);
@@ -180,10 +182,10 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
 
     // Move values above insertion (may expand)
     if (do_expand) {
-        size_t i = m_size;
+        size_t i = old_size;
         while (i > ndx) {
             --i;
-            auto tmp = _get(i, m_width);
+            auto tmp = _get(i, old_width);
             _set(i + 1, new_width, tmp);
         }
     }
@@ -191,7 +193,7 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
         size_t w = (new_width >> 3);
 
         char* src_begin = m_data + ndx * w;
-        char* src_end = m_data + m_size * w;
+        char* src_end = m_data + old_size * w;
         char* dst = src_end + w;
 
         std::copy_backward(src_begin, src_end, dst);
@@ -205,14 +207,9 @@ void ArrayUnsigned::insert(size_t ndx, uint64_t value)
         size_t i = ndx;
         while (i != 0) {
             --i;
-            _set(i, new_width, _get(i, m_width));
+            _set(i, new_width, _get(i, old_width));
         }
-        set_width(new_width);
     }
-
-    // Update size
-    // (no need to do it in header as it has been done by Alloc)
-    ++m_size;
 }
 
 void ArrayUnsigned::erase(size_t ndx)
@@ -244,18 +241,17 @@ void ArrayUnsigned::set(size_t ndx, uint64_t value)
     copy_on_write(); // Throws
 
     if (value > m_ubound) {
-        uint8_t new_width = bit_width(value);
+        const uint8_t old_width = m_width;
+        const uint8_t new_width = bit_width(value);
 
         alloc(m_size, new_width); // Throws
 
         size_t i = m_size;
         while (i) {
             i--;
-            auto v = _get(i, m_width);
+            auto v = _get(i, old_width);
             _set(i, new_width, v);
         }
-
-        set_width(new_width);
     }
 
     _set(ndx, m_width, value);
@@ -268,6 +264,7 @@ void ArrayUnsigned::truncate(size_t ndx)
     set_header_size(m_size);
     if (ndx == 0) {
         set_width(8);
+        set_width_in_header(8, get_header());
     }
 }
 

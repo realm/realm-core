@@ -60,6 +60,28 @@ inline Timestamp TestValueGenerator::convert_for_test<Timestamp>(int64_t v)
 }
 
 template <>
+inline ObjectId TestValueGenerator::convert_for_test<ObjectId>(int64_t v)
+{
+    static const char hex_digits[] = "0123456789abcdef";
+    std::string value;
+    uint64_t cur = static_cast<uint64_t>(v);
+    for (size_t i = 0; i < 24; ++i) {
+        value += char(hex_digits[cur % 16]);
+        cur -= (cur % 16);
+        if (cur == 0) {
+            cur += static_cast<uint64_t>(v);
+        }
+    }
+    return ObjectId(value.c_str());
+}
+
+template <>
+inline util::Optional<ObjectId> TestValueGenerator::convert_for_test<util::Optional<ObjectId>>(int64_t v)
+{
+    return util::Optional<ObjectId>(convert_for_test<ObjectId>(v));
+}
+
+template <>
 inline StringData TestValueGenerator::convert_for_test<StringData>(int64_t t)
 {
     std::string str = util::format("string %1", t);
@@ -114,7 +136,7 @@ struct Prop<T, state,
     using underlying_type = T;
     static type default_value()
     {
-        if (realm::is_any<type, util::Optional<float>, util::Optional<double>>::value) {
+        if constexpr (realm::is_any_v<type, util::Optional<float>, util::Optional<double>>) {
             return type(); // optional float/double would return NaN and for consistency we want to operate on null
         }
         return ColumnTypeTraits<type>::cluster_leaf_type::default_value(is_nullable);

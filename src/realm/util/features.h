@@ -183,7 +183,16 @@
 #endif
 
 
-#if defined(__GNUC__) || defined(__HP_aCC)
+#if REALM_HAS_CPP_ATTRIBUTE(gnu::cold)
+#define REALM_COLD [[gnu::cold]]
+#else
+#define REALM_COLD
+#endif
+
+
+#if REALM_HAS_CPP_ATTRIBUTE(gnu::noinline)
+#define REALM_NOINLINE [[gnu::noinline]]
+#elif defined(__GNUC__) || defined(__HP_aCC)
 #define REALM_NOINLINE __attribute__((noinline))
 #elif defined(_MSC_VER)
 #define REALM_NOINLINE __declspec(noinline)

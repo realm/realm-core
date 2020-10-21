@@ -22,7 +22,6 @@
 #include <realm/util/features.h>
 #include <realm/array.hpp>
 #include <realm/array_string_short.hpp>
-#include <realm/array_integer.hpp>
 #include <realm/data_type.hpp>
 #include <realm/column_type.hpp>
 #include <realm/keys.hpp>
@@ -37,8 +36,6 @@ public:
     ~Spec() noexcept;
 
     Allocator& get_alloc() const noexcept;
-
-    bool has_strong_link_columns() noexcept;
 
     // insert column at index
     void insert_column(size_t column_ndx, ColKey column_key, ColumnType type, StringData name,
@@ -85,10 +82,7 @@ public:
     size_t get_ndx_in_parent() const noexcept;
     void set_ndx_in_parent(size_t) noexcept;
 
-#ifdef REALM_DEBUG
     void verify() const;
-    void to_dot(std::ostream&, StringData title = StringData()) const;
-#endif
 
 private:
     // Underlying array structure.
@@ -102,14 +96,13 @@ private:
     // table, and the second entry is the index of the origin column in the
     // origin table.
     Array m_top;
-    ArrayInteger m_types; // 1st slot in m_top
+    Array m_types;            // 1st slot in m_top
     ArrayStringShort m_names; // 2nd slot in m_top
-    ArrayInteger m_attr;  // 3rd slot in m_top
+    Array m_attr;             // 3rd slot in m_top
     Array m_oldsubspecs;  // 4th slot in m_top
     Array m_enumkeys;     // 5th slot in m_top
-    ArrayInteger m_keys;  // 6th slot in m_top
+    Array m_keys;         // 6th slot in m_top
     size_t m_num_public_columns;
-    bool m_has_strong_link_columns;
 
     Spec(Allocator&) noexcept; // Unattached
 
@@ -168,11 +161,6 @@ private:
 inline Allocator& Spec::get_alloc() const noexcept
 {
     return m_top.get_alloc();
-}
-
-inline bool Spec::has_strong_link_columns() noexcept
-{
-    return m_has_strong_link_columns;
 }
 
 // Uninitialized Spec (call init() to init)

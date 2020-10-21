@@ -20,7 +20,6 @@
 
 #include <realm/array_blobs_small.hpp>
 #include <realm/array_blob.hpp>
-#include <realm/array_integer.hpp>
 #include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
@@ -104,7 +103,7 @@ BinaryData ArraySmallBlobs::get(const char* header, size_t ndx, Allocator& alloc
 {
     int64_t ref_val = Array::get(header, 2);
     const char* nulls_header = alloc.translate(to_ref(ref_val));
-    int64_t n = ArrayInteger::get(nulls_header, ndx);
+    int64_t n = Array::get(nulls_header, ndx);
     // 0 or 1 is all that is ever written to m_nulls; any other content would be a bug
     REALM_ASSERT_3(n == 1, ||, n == 0);
     bool null = (n != 0);
@@ -140,7 +139,7 @@ MemRef ArraySmallBlobs::create_array(size_t size, Allocator& alloc, BinaryData v
     {
         bool context_flag = false;
         int64_t value = 0;
-        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.get_ref());
         int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
@@ -158,7 +157,7 @@ MemRef ArraySmallBlobs::create_array(size_t size, Allocator& alloc, BinaryData v
         // Always create a m_nulls array, regardless if its column is marked as nullable or not.
         bool context_flag = false;
         int64_t value = values.is_null() ? 1 : 0;
-        MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.get_ref());
         int64_t v = from_ref(mem.get_ref());
         top.add(v); // Throws
@@ -219,24 +218,3 @@ StringData ArraySmallBlobs::get_string_legacy(size_t ndx) const
         return str;
     }
 }
-
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
-
-void ArraySmallBlobs::to_dot(std::ostream& out, bool, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    out << "subgraph cluster_binary" << ref << " {" << std::endl;
-    out << " label = \"ArrayBinary";
-    if (title.size() != 0)
-        out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
-
-    Array::to_dot(out, "binary_top");
-    m_offsets.to_dot(out, "offsets");
-    m_blob.to_dot(out, "blob");
-
-    out << "}" << std::endl;
-}
-
-#endif // LCOV_EXCL_STOP ignore debug functions
