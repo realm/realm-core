@@ -3,6 +3,9 @@ set -o pipefail
 set -o errexit
 set -o xtrace
 
+BASE_PATH=$(cd $(dirname "$0"); pwd)
+source $BASE_PATH/cmake_vars_utils.sh
+
 CMAKE=${CMAKE:=cmake}
 GENERATOR="${GENERATOR:=Unix Makefiles}"
 if [ -n "$CC" ]; then
@@ -32,10 +35,8 @@ fi
 
 if [ "$OS" = "Windows_NT" ]; then
     PREFIX=$(cygpath -ma $PREFIX)
-elif [ "$(uname -s)" = "Darwin" ]; then
-    PREFIX=$(pwd)/$PREFIX
 else
-    PREFIX=$(realpath $PREFIX)
+    PREFIX=$($BASE_PATH/realpath.sh $PREFIX)
 fi
 
 BUILD_CONFIG=${BUILD_CONFIG:=Debug}
@@ -63,3 +64,11 @@ $CMAKE \
     $CC $EXTRA_ARGS
 $CMAKE --build build $JOBS --config "$BUILD_CONFIG"
 $CMAKE --install build --config "$BUILD_CONFIG"
+
+if [ "$OS" = "Windows_NT" ]; then
+    set_cmake_var libuv_vars LibUV_LIBRARY PATH "$(cygpath -ma $PREFIX/lib/Debug/uv.lib)"
+    set_cmake_var libuv_vars LibUV_INCLUDE_DIR PATH "$(cygpath -ma $PREFIX/include)"
+else
+    set_cmake_var libuv_vars LibUV_LIBRARY PATH "$PREFIX/lib/libuv.so"
+    set_cmake_var libuv_vars LibUV_INCLUDE_DIR PATH "$PREFIX/include"
+fi

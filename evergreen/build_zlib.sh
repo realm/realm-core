@@ -3,6 +3,9 @@ set -o pipefail
 set -o errexit
 set -o xtrace
 
+BASE_PATH=$(cd $(dirname "$0"); pwd)
+source $BASE_PATH/cmake_vars_utils.sh
+
 CMAKE=${CMAKE:=cmake}
 GENERATOR="${GENERATOR:=Unix Makefiles}"
 if [ -n "$CC" ]; then
@@ -61,3 +64,11 @@ $CMAKE \
     $CC $EXTRA_ARGS
 $CMAKE --build build $JOBS --config "$BUILD_CONFIG"
 $CMAKE --install build --config "$BUILD_CONFIG"
+
+if [ "$OS" = "Windows_NT" ]; then
+    set_cmake_var zlib_vars ZLIB_LIBRARY PATH "$(cygpath -ma $PREFIX/lib/zlibstaticd.lib)"
+    set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH "$(cygpath -ma $PREFIX/include)"
+else
+    set_cmake_var zlib_vars ZLIB_LIBRARY PATH $PREFIX/lib/libz.a
+    set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH $PREFIX/include
+fi

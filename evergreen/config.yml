@@ -38,34 +38,16 @@ tasks:
 
         if [ -d cmake_vars ]; then
             rm cmake_vars/*.txt
-        else
-            mkdir cmake_vars
         fi
+        export CMAKE_VARS_DIR=$(./evergreen/realpath.sh cmake_vars)
+        source evergreen/cmake_vars_utils.sh
+        export CMAKE=$(./evergreen/realpath.sh ${cmake_bindir}/cmake)
         
-        set_cmake_var() {
-            file=$1
-            var_name=$2
-            var_type=$3
-            shift; shift; shift;
-            var_arg=$@
-            if [ "$var_type" = "PATH" -o "$var_type" = "STRING" ]; then
-                echo "set($var_name \"$var_arg\" CACHE $var_type \"\")" >> cmake_vars/$file.txt
-            else
-                echo "set($var_name $var_arg CACHE $var_type \"\")" >> cmake_vars/$file.txt
-            fi
-        }
-        ensure_cmake_var_file() {
-            touch cmake_vars/$1.txt
-        }
-
-        ensure_cmake_var_file compiler_vars
         if [ -n "${c_compiler}" ]; then
             [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
             set_cmake_var compiler_vars CMAKE_C_COMPILER PATH ${c_compiler}
             set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH ${cxx_compiler}
         fi
-
-        export CMAKE=$(./evergreen/realpath.sh ${cmake_bindir}/cmake)
 
         if [ -n "${build_libuv|}" ]; then
             CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
@@ -74,14 +56,6 @@ tasks:
                     -b v1.40.0 \
                     -e "${extra_flags}" \
                     -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
-
-            if [ "$OS" = "Windows_NT" ]; then
-                set_cmake_var libuv_vars LibUV_LIBRARY PATH "$(cygpath -ma ./libuv_prefix/lib/Debug/uv.lib)"
-                set_cmake_var libuv_vars LibUV_INCLUDE_DIR PATH "$(cygpath -ma ./libuv_prefix/include)"
-            else
-                set_cmake_var libuv_vars LibUV_LIBRARY PATH $(pwd)/libuv_prefix/lib/libuv.so
-                set_cmake_var libuv_vars LibUV_INCLUDE_DIR PATH $(pwd)/libuv_prefix/include
-            fi
         fi
        
         if [ -n "${build_zlib|}" ]; then
@@ -91,17 +65,8 @@ tasks:
                     -b v1.2.11 \
                     -e "${extra_flags}" \
                     -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
-
-            if [ "$OS" = "Windows_NT" ]; then
-                set_cmake_var zlib_vars ZLIB_LIBRARY PATH "$(cygpath -ma ./zlib_prefix/lib/zlibstaticd.lib)"
-                set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH "$(cygpath -ma ./zlib_prefix/include)"
-            else
-                set_cmake_var zlib_vars ZLIB_LIBRARY PATH $(pwd)/zlib_prefix/lib/libz.a
-                set_cmake_var zlib_vars ZLIB_INCLUDE_DIR PATH $(pwd)/zlib_prefix/include
-            fi
         fi
 
-        ensure_cmake_var_file realm_vars
         set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
         set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
         set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
