@@ -64,11 +64,11 @@ struct null {
     {
         throw(LogicError::type_mismatch);
     }
-//    template <class T>
-//    operator std::optional<T>()
-//    {
-//        return std::nullopt;
-//    }
+    template <class T>
+    explicit operator std::optional<T>() const
+    {
+        return std::nullopt;
+    }
 
     template <class T>
     bool operator==(const T&) const

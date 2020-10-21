@@ -160,10 +160,6 @@ public:
 
     template <class T>
     T get() const noexcept;
-//    template <class T>
-//    std::optional<T> get() const noexcept;
-//    template <typename T, std::enable_if<util::is_optional<T>::value>>
-//    T get() const noexcept;
 
     // These functions are kept to be backwards compatible
     int64_t get_int() const;

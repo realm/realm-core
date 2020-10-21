@@ -66,7 +66,7 @@ struct GlobalKey {
     }
     static GlobalKey from_string(StringData);
 
-    constexpr GlobalKey()
+    constexpr GlobalKey(std::nullopt_t = std::nullopt)
         : m_lo(-1)
         , m_hi(-1)
     {
