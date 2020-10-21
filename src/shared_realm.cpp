@@ -327,7 +327,7 @@ void Realm::set_schema_subset(Schema schema)
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
-    schema.validate();
+    schema.validate(bool(m_config.sync_config));
 
     bool was_in_read_transaction =  is_in_read_transaction();
     Schema actual_schema = get_full_schema();

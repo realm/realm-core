@@ -1881,6 +1881,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     };
     std::string base_url = get_base_url();
     std::string config_path = get_config_path();
+    const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
     auto app_config = App::Config {
@@ -1920,7 +1921,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         });
         return app;
     };
-    auto setup_and_get_config = [&base_path](std::shared_ptr<App> app) -> realm::Realm::Config {
+    auto setup_and_get_config = [&base_path, &valid_pk_name](std::shared_ptr<App> app) -> realm::Realm::Config {
         realm::Realm::Config config;
         config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -1930,13 +1931,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         config.schema_version = 1;
         config.path = base_path + "/default.realm";
         const auto dog_schema = realm::ObjectSchema("Dog", {
-            realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+            realm::Property(valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true),
             realm::Property("breed", PropertyType::String | PropertyType::Nullable),
             realm::Property("name", PropertyType::String),
             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)
         });
         const auto person_schema = realm::ObjectSchema("Person", {
-            realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+            realm::Property(valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true),
             realm::Property("age", PropertyType::Int),
             realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
             realm::Property("firstName", PropertyType::String),
@@ -1986,7 +1987,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             r->begin_transaction();
             CppContext c;
             Object::create(c, r, "Dog", util::Any(realm::AnyDict {
-                { "_id", util::Any(ObjectId::gen()) },
+                { valid_pk_name, util::Any(ObjectId::gen()) },
                 { "breed", std::string("bulldog") },
                 { "name", std::string("fido") },
                 { "realm_id", std::string("foo") }
@@ -2037,7 +2038,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             r->begin_transaction();
             CppContext c;
             Object::create(c, r, "Dog", util::Any(realm::AnyDict {
-                { "_id", util::Any(ObjectId::gen()) },
+                { valid_pk_name, util::Any(ObjectId::gen()) },
                 { "breed", std::string("bulldog") },
                 { "name", std::string("fido") },
                 { "realm_id", std::string("foo") }
@@ -2067,8 +2068,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
-    SECTION("invalid partition error handling")
-    {
+    SECTION("invalid partition error handling") {
         TestSyncManager sync_manager({.app_config = app_config});
         auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
@@ -2082,6 +2082,35 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto session = app->current_user()->session_for_on_disk_path(r->config().path);
         util::EventLoop::main().run_until([&]{ return error_did_occur.load(); });
         REQUIRE(error_did_occur.load());
+    }
+
+    SECTION("invalid pk schema error handling") {
+        const std::string invalid_pk_name = "my_primary_key";
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+        auto it = config.schema->find("Dog");
+        REQUIRE(it != config.schema->end());
+        REQUIRE(it->primary_key_property());
+        REQUIRE(it->primary_key_property()->name == valid_pk_name);
+        it->primary_key_property()->name = invalid_pk_name;
+        it->primary_key = invalid_pk_name;
+        REQUIRE_THROWS_CONTAINING(realm::Realm::get_shared_realm(config),
+                            util::format("The primary key property on a synchronized Realm must be named '%1' but found '%2' for type 'Dog'", valid_pk_name, invalid_pk_name));
+    }
+
+    SECTION("missing pk schema error handling") {
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+        auto it = config.schema->find("Dog");
+        REQUIRE(it != config.schema->end());
+        REQUIRE(it->primary_key_property());
+        it->primary_key_property()->is_primary = false;
+        it->primary_key = "";
+        REQUIRE(!it->primary_key_property());
+        REQUIRE_THROWS_CONTAINING(realm::Realm::get_shared_realm(config),
+                            util::format("There must be a primary key property named '%1' on a synchronized Realm but none was found for type 'Dog'", valid_pk_name));
     }
 }
 

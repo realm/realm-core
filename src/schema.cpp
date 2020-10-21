@@ -127,7 +127,7 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
 }
 }
 
-void Schema::validate() const
+void Schema::validate(bool for_sync) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
@@ -144,7 +144,7 @@ void Schema::validate() const
     }
 
     for (auto const& object : *this) {
-        object.validate(*this, exceptions);
+        object.validate(*this, exceptions, for_sync);
     }
 
     // TODO: remove this client side check once the server supports it

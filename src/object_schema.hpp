@@ -76,7 +76,7 @@ public:
     }
     bool property_is_computed(Property const& property) const noexcept;
 
-    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const;
+    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions, bool for_sync) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 

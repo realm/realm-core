@@ -609,6 +609,7 @@ TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
 
     auto schema = Schema{
         {"object", {
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
             {"value", PropertyType::Int},
         }},
     };

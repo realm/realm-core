@@ -280,7 +280,7 @@ static void validate_property(Schema const& schema,
     }
 }
 
-void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const
+void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions, bool for_sync) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
@@ -347,6 +347,16 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
+
+    if (for_sync && !is_embedded) {
+        if (primary_key.empty()) {
+            exceptions.emplace_back(util::format("There must be a primary key property named '_id' on a synchronized Realm but none was found for type '%1'", name));
+        }
+        else if (primary_key != "_id") {
+            exceptions.emplace_back(util::format("The primary key property on a synchronized Realm must be named '_id' but found '%1' for type '%2'", primary_key, name));
+        }
+    }
+
 }
 
 namespace realm {

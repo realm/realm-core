@@ -55,7 +55,7 @@ public:
 
     // Verify that this schema is internally consistent (i.e. all properties are
     // valid, links link to types that actually exist, etc.)
-    void validate() const;
+    void validate(bool for_sync = false) const;
 
     // Get the changes which must be applied to this schema to produce the passed-in schema
     std::vector<SchemaChange> compare(Schema const&, bool include_removals=false) const;

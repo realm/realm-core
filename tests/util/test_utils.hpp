@@ -69,6 +69,9 @@ static inline std::string random_string(std::string::size_type length)
 	REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management"); \
 } while (0)
 
+#define REQUIRE_THROWS_CONTAINING(expr, msg) \
+    REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
+
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 
 #endif // REALM_TEST_UTILS_HPP

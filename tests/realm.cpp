@@ -508,7 +508,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     local_config.schema_version = 1;
     local_config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int}
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
+            {"value", PropertyType::Int},
         }},
     };
 
@@ -520,6 +521,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     config.cache = false;
     config.schema = Schema{
         {"object", {
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
             {"value", PropertyType::Int},
         }},
     };
@@ -547,7 +549,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         {
             auto realm = Realm::get_shared_realm(config2);
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
         }
@@ -572,7 +574,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         {
             auto realm = Realm::get_shared_realm(config2);
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
         }
