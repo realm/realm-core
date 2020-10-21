@@ -32,6 +32,7 @@ tasks:
   - command: shell.exec
     params:
       working_dir: realm-core
+      shell: bash
       script: |-
         set -o errexit
         set -o verbose
