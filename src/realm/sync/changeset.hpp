@@ -351,6 +351,7 @@ struct Changeset::Reflector {
         : m_tracer(tracer)
         , m_changeset(changeset)
     {
+        tracer.set_changeset(&changeset);
     }
 
     void visit_all() const;

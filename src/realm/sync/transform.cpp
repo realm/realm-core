@@ -541,6 +541,7 @@ public:
             Instruction after = side.get();
             if (print_unmodified || (before != after)) {
                 FieldTracer before_tracer;
+                before_tracer.set_changeset(&before_log);
                 PrintDiffTracer after_tracer{os, before_tracer};
                 Changeset::Reflector before_reflector{before_tracer, *side.m_changeset};
                 Changeset::Reflector after_reflector{after_tracer, *side.m_changeset};
@@ -825,7 +826,7 @@ struct TransformerImpl::Transformer {
         m_minor_side.skip_tombstones();
 
 #if defined(REALM_DEBUG) // LCOV_EXCL_START Debug tracing
-        const bool print_noop_merges = false;
+        const bool print_noop_merges = true;
         bool new_major = true; // print an instruction every time we go to the next major regardless
 #endif                         // LCOV_EXCL_STOP REALM_DEBUG
 
