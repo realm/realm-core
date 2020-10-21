@@ -10,6 +10,7 @@ from matplotlib.mlab import csv2rec
 from matplotlib.cbook import get_sample_data
 from matplotlib.ticker import Formatter, MultipleLocator
 import numpy as np
+import re
 from os.path import basename, splitext
 
 
@@ -161,29 +162,79 @@ def makeSummaryGraph(outputDirectory, summary):
 
     return summaryGraphName
 
+# separate out into a list the semvar parts of the tag
+# "v10.0.0-alpha.4" -> ['10', '0', '0', 'alpha', '4']
+# separator characters are one of: "v", ".", "-"
+semVerRegex = re.compile(r"[v\.\-]")
+def splitTagSemVer(tag):
+    return list(filter(None, semVerRegex.split(tag)))
+
+# if the string is a number, return it. Otherwise convert
+# the string to a numeric value that sorts alphabetically
+# Assumes characters have a max value of 255.
+# This function should produce values so that tags are sorted as follows:
+# v0.9       -> 0, 9, 0
+# v1.0-alpha -> 1, 0, -670576722593
+# v1.0-beta  -> 1, 0, -2628935152
+# v1.0       -> 1, 0, 0
+# v1.0-10    -> 1, 0, 10
+def numericValueOf(s):
+    try:
+        return int(s)
+    except ValueError:
+        accumulate = 0
+        ts = s[:min(7, len(s))] # more than 7 can overflow 64 bits
+        for (ndx, char) in enumerate(reversed(ts)):
+            accumulate -= (255 - (ord(ts[ndx]))) * pow(255, ndx)
+        return accumulate
+
+orderingColumns = ['versionMajor', 'versionMinor', 'versionPatch', 'versionExtra', 'versionExtra2', 'versionExtra3']
+def addVersionColumns(data):
+    types = {'names': list(orderingColumns), 'formats': ['int32', 'int32', 'int32', 'int32', 'int32', 'int32']}
+    for element in data.dtype.descr:
+        types['names'].append(element[0])
+        types['formats'].append(element[1])
+    newStructure = np.dtype(types)
+    space = np.zeros(data.shape, dtype=newStructure)
+    for col in list(data.dtype.fields):
+        space[col] = data[col]
+    for row in space:
+        try:
+            splits = splitTagSemVer(row['tag'])
+            row['versionMajor'] = numericValueOf(splits[0])
+            row['versionMinor'] = numericValueOf(splits[1])
+            row['versionPatch'] = numericValueOf(splits[2])
+            if len(splits) >= 4:
+                row['versionExtra'] = numericValueOf(splits[3])
+            if len(splits) >= 5:
+                row['versionExtra2'] = numericValueOf(splits[4])
+            if len(splits) >= 6:
+                row['versionExtra3'] = numericValueOf(splits[5])
+        except Exception as e:
+            print("parse error while processing semver of " + str(row['tag']) + ": " + str(e))
+    return space
 
 def generateStats(outputDirectory, statsfiles):
     summary = {}
     colors = ['yellow', 'indigo', 'orange', 'lightblue', 'green', 'violet',
               'orangered', 'gray', 'lightblue', 'limegreen', 'navy']
     for index, fname in enumerate(statsfiles):
-        bench_data = csv2rec(fname)
-        # FIXME This sorts alphabetically, doesn't work whith multidigit numbers
-        # ideally we would want something that understands semantic versioning
-        # bench_data = np.sort(bench_data, order='tag')
+        benchmarkData = csv2rec(fname, delimiter=',')
+        benchmarkData = addVersionColumns(benchmarkData)
+        benchmarkData = np.sort(benchmarkData, order=orderingColumns)
         print ("generating stats graph: " + str(index + 1) +
                "/" + str(len(statsfiles)) + " (" + fname + ")")
-        formatter = TagFormatter(bench_data['tag'])
+        formatter = TagFormatter(benchmarkData['tag'])
         fig, ax = plt.subplots()
         ax.xaxis.set_major_formatter(formatter)
         tick_spacing = 1
         ax.xaxis.set_major_locator(MultipleLocator(tick_spacing))
         plt.grid(True)
-        exclusions = ['sha', 'tag']
+        exclusions = orderingColumns + ['sha', 'tag']
         lines = []
-        for ndx, col in enumerate(bench_data.dtype.names):
+        for ndx, col in enumerate(benchmarkData.dtype.names):
             if col not in exclusions:
-                line, = plt.plot(bench_data[col], lw=2.5,
+                line, = plt.plot(benchmarkData[col], lw=2.5,
                                  color=colors[ndx % len(colors)])
                 line.set_label(col)
                 lines.append(line)
@@ -204,7 +255,6 @@ def generateStats(outputDirectory, statsfiles):
         summary[title] = {'title': title, 'src': imgName}
     return summary
 
-
 def generateReport(outputDirectory, csvFiles, statsfiles):
     metrics = ['min', 'max', 'med', 'avg']
     colors = {'min': '#1f77b4', 'max': '#aec7e8', 'med': '#ff7f0e',
@@ -213,16 +263,15 @@ def generateReport(outputDirectory, csvFiles, statsfiles):
     summary = {}
 
     for index, fname in enumerate(csvFiles):
-        bench_data = csv2rec(fname)
-        # do not assume that the csv files are ordered correctly (they are not)
-        # well....actually, they are! (they are in commit timestamp order AFAIK)
-        # FIXME This sorts alphabetically, doesn't work whith multidigit numbers
-        # ideally we would want something that understands semantic versioning
-        # bench_data = np.sort(bench_data, order='tag')
+        benchmarkData = csv2rec(fname, delimiter=',')
+        # csv files are ordered by commit timestamp which will sort properly most of the time
+        # but not when comparing branches under concurrent development
+        benchmarkData = addVersionColumns(benchmarkData)
+        benchmarkData = np.sort(benchmarkData, order=orderingColumns)
 
         print ("generating graph: " + str(index + 1) + "/" +
                str(len(csvFiles)) + " (" + fname + ")")
-        formatter = TagFormatter(bench_data['tag'])
+        formatter = TagFormatter(benchmarkData['tag'])
 
         fig, ax = plt.subplots()
         ax.xaxis.set_major_formatter(formatter)
@@ -232,7 +281,7 @@ def generateReport(outputDirectory, csvFiles, statsfiles):
         lines_to_scale_to = []
         plt.grid(True)
         for rank, column in enumerate(metrics):
-            line, = plt.plot(bench_data[column], lw=2.5, color=colors[column])
+            line, = plt.plot(benchmarkData[column], lw=2.5, color=colors[column])
             line.set_label(column)
             if column != "max":
                 lines_to_scale_to.append(line)
@@ -244,7 +293,7 @@ def generateReport(outputDirectory, csvFiles, statsfiles):
         # rotate x axis labels for readability
         fig.autofmt_xdate()
 
-        threshold, last_value, last_std = getThreshold(bench_data['avg'])
+        threshold, last_value, last_std = getThreshold(benchmarkData['avg'])
         plt.axhline(y=threshold, color=colors['threshold'])
 
         title = splitext(basename(fname))[0]

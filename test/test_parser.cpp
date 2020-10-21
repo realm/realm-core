@@ -62,6 +62,7 @@
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 #include <chrono>
 #include <string>
@@ -353,16 +354,18 @@ static std::vector<std::string> invalid_queries = {
 };
 // clang-format on
 
-TEST(Parser_valid_queries) {
+TEST(Parser_valid_queries)
+{
     for (auto& query : valid_queries) {
-        //std::cout << "query: " << query << std::endl;
+        // std::cout << "query: " << query << std::endl;
         realm::parser::parse(query);
     }
 }
 
-TEST(Parser_invalid_queries) {
+TEST(Parser_invalid_queries)
+{
     for (auto& query : invalid_queries) {
-        //std::cout << "query: " << query << std::endl;
+        // std::cout << "query: " << query << std::endl;
         CHECK_THROW_ANY(realm::parser::parse(query));
     }
 }
@@ -372,21 +375,28 @@ TEST(Parser_grammar_analysis)
     CHECK(realm::parser::analyze_grammar() == 0);
 }
 
-Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, size_t num_results) {
+Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                   size_t num_results, parser::KeyPathMapping mapping = {})
+{
     Query q = t->where();
     realm::query_builder::NoArguments args;
 
     parser::ParserResult res = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, res.predicate, args);
+    realm::query_builder::apply_predicate(q, res.predicate, args, mapping);
 
-    CHECK_EQUAL(q.count(), num_results);
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
-    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
-    realm::query_builder::apply_predicate(q2, res2.predicate, args);
-    CHECK_EQUAL(q2.count(), num_results);
+    realm::query_builder::apply_predicate(q2, res2.predicate, args, mapping);
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
     return q2;
 }
 
@@ -459,17 +469,18 @@ TEST(Parser_basic_serialisation)
     auto int_col_key = t->add_column(type_Int, "age");
     t->add_column(type_String, "name");
     t->add_column(type_Double, "fees", true);
+    t->add_column(type_Float, "float_fees", true);
     t->add_column(type_Bool, "licensed", true);
     auto link_col = t->add_column_link(type_Link, "buddy", *t);
     auto time_col = t->add_column(type_Timestamp, "time", true);
     t->add_search_index(int_col_key);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
     std::vector<ObjKey> keys;
 
     t->create_objects(5, keys);
     for (size_t i = 0; i < t->size(); ++i) {
-        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i], (i % 2 == 0));
+        t->get_object(keys[i]).set_all(int(i), StringData(names[i]), fees[i], float(fees[i]), (i % 2 == 0));
     }
     t->get_object(keys[0]).set(time_col, Timestamp(realm::null()));
     t->get_object(keys[1]).set(time_col, Timestamp(1512130073, 0));   // 2017/12/02 @ 12:47am (UTC)
@@ -504,6 +515,32 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "fees = 0 || fees = 1", 0);
 
     verify_query(test_context, t, "fees != 2.22 && fees > 2.2", 3);
+    verify_query(test_context, t, "fees > 2.0E0", 4);
+    verify_query(test_context, t, "fees > 200e-2", 4);
+    verify_query(test_context, t, "fees > 0.002e3", 4);
+    verify_query(test_context, t, "fees < inf", 5);
+    verify_query(test_context, t, "fees < +inf", 5);
+    verify_query(test_context, t, "fees > -iNf", 5);
+    verify_query(test_context, t, "fees < Infinity", 5);
+    verify_query(test_context, t, "fees < +inFINITY", 5);
+    verify_query(test_context, t, "fees > -INFinity", 5);
+    verify_query(test_context, t, "fees == NaN", 0);
+    verify_query(test_context, t, "fees != Nan", 5);
+    verify_query(test_context, t, "fees == -naN", 0);
+    verify_query(test_context, t, "fees != -nAn", 5);
+    verify_query(test_context, t, "float_fees > 2.0E0", 4);
+    verify_query(test_context, t, "float_fees > 200e-2", 4);
+    verify_query(test_context, t, "float_fees > 0.002E3", 4);
+    verify_query(test_context, t, "float_fees < INF", 5);
+    verify_query(test_context, t, "float_fees < +InF", 5);
+    verify_query(test_context, t, "float_fees > -inf", 5);
+    verify_query(test_context, t, "float_fees < InFiNiTy", 5);
+    verify_query(test_context, t, "float_fees < +iNfInItY", 5);
+    verify_query(test_context, t, "float_fees > -infinity", 5);
+    verify_query(test_context, t, "float_fees == NAN", 0);
+    verify_query(test_context, t, "float_fees != nan", 5);
+    verify_query(test_context, t, "float_fees == -NaN", 0);
+    verify_query(test_context, t, "float_fees != -NAn", 5);
     verify_query(test_context, t, "(age > 1 || fees >= 2.25) && age == 4", 1);
     verify_query(test_context, t, "licensed == true", 3);
     verify_query(test_context, t, "licensed == false", 2);
@@ -535,6 +572,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_ANY(verify_query(test_context, t, "buddy.age > $0", 0)); // no external parameters provided
+    CHECK_THROW_ANY(verify_query(test_context, t, "age == infinity", 0));  // integer vs infinity is not supported
+    CHECK_THROW_ANY(verify_query(test_context, t, "name == infinity", 0)); // string vs infinity is an invalid query
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing_property > 2", 0), message);
@@ -636,13 +675,17 @@ TEST(Parser_LinksToDifferentTable)
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
 
-    verify_query(test_context, t, "items.@count > 2", 3); // how many people bought more than two items?
-    verify_query(test_context, t, "items.price > 3.0", 3); // how many people buy items over $3.0?
+    verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
+    verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
     verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
-    verify_query(test_context, t, "items.discount.active == true", 3); // how many people bought items with an active sale?
-    verify_query(test_context, t, "items.discount.reduced_by > 2.0", 2); // how many people bought an item marked down by more than $2.0?
-    verify_query(test_context, t, "items.@sum.price > 50", 1); // how many people would spend more than $50 without sales applied?
-    verify_query(test_context, t, "items.@avg.price > 7", 1); // how manay people like to buy items more expensive on average than $7?
+    verify_query(test_context, t, "items.discount.active == true",
+                 3); // how many people bought items with an active sale?
+    verify_query(test_context, t, "items.discount.reduced_by > 2.0",
+                 2); // how many people bought an item marked down by more than $2.0?
+    verify_query(test_context, t, "items.@sum.price > 50",
+                 1); // how many people would spend more than $50 without sales applied?
+    verify_query(test_context, t, "items.@avg.price > 7",
+                 1); // how manay people like to buy items more expensive on average than $7?
 
     std::string message;
     // missing property
@@ -657,7 +700,7 @@ TEST(Parser_LinksToDifferentTable)
     CHECK(message.find("nonexistent_property") != std::string::npos);
     // property is not a link
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "customer_id.property > 2", 0), message);
-    CHECK(message.find("Person") != std::string::npos); // without the "class_" prefix
+    CHECK(message.find("Person") != std::string::npos);      // without the "class_" prefix
     CHECK(message.find("customer_id") != std::string::npos); // is not a link
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price.property > 2", 0), message);
     CHECK(message.find("Items") != std::string::npos); // without the "class_" prefix
@@ -801,10 +844,12 @@ TEST(Parser_Timestamps)
         verify_query(test_context, t, "birthday != NULL", 5);
         verify_query(test_context, t, "birthday != NIL", 5);
         verify_query(test_context, t, "birthday == T0:0", 3);
-        verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0", 3); // epoch is default non-null Timestamp
+        verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0",
+                     3); // epoch is default non-null Timestamp
 
 #ifndef _WIN32 // windows native functions do not support pre epoch conversions, other platforms stop at ~1901
-        verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:1", 1); // just before epoch
+        verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:1",
+                     1); // just before epoch
         verify_query(test_context, t, std::string("birthday > 1905-12-31") + separator + "23:59:59", 5);
         verify_query(test_context, t, std::string("birthday > 1905-12-31") + separator + "23:59:59:2020", 5);
 #endif
@@ -813,15 +858,20 @@ TEST(Parser_Timestamps)
         verify_query(test_context, t, "birthday == T399", 1); // a null entry matches
 
         // dates pre 1900 are not supported by functions like timegm
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday > 1800-12-31") + separator + "23:59:59:2020", 4));
 
         // negative nanoseconds are not allowed
         CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T-1:1", 0));
         CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:-1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:1:-1", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1969-12-31") + separator + "23:59:59:-1", 1));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:-1", 1));
 
         // Invalid predicate
         CHECK_THROW_ANY(verify_query(test_context, t, "birthday == T1:", 0));
@@ -833,8 +883,10 @@ TEST(Parser_Timestamps)
         CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0", 0));
         CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:", 0));
         CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0));
-        CHECK_THROW_ANY(verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:", 0));
+        CHECK_THROW_ANY(
+            verify_query(test_context, t, std::string("birthday == 1970-1-1") + separator + "0:0:0:0:0", 0));
     };
 
     // both versions are allowed
@@ -987,6 +1039,8 @@ TEST(Parser_TwoColumnExpressionBasics)
     ColKey int_col = table->add_column(type_Int, "ints", true);
     ColKey double_col = table->add_column(type_Double, "doubles");
     ColKey string_col = table->add_column(type_String, "strings");
+    ColKey decimal_col = table->add_column(type_Decimal, "decimals");
+    ColKey objectid_col = table->add_column(type_ObjectId, "objectids");
     ColKey link_col = table->add_column_link(type_Link, "link", *table);
     std::vector<ObjKey> keys;
     table->create_objects(3, keys);
@@ -996,6 +1050,8 @@ TEST(Parser_TwoColumnExpressionBasics)
         obj.set(double_col, double(i));
         std::string str(i, 'a');
         obj.set(string_col, StringData(str));
+        obj.set(decimal_col, Decimal128(int64_t(i)));
+        obj.set(objectid_col, ObjectId::gen());
     }
     table->get_object(keys[1]).set(link_col, keys[0]);
 
@@ -1011,15 +1067,17 @@ TEST(Parser_TwoColumnExpressionBasics)
     verify_query(test_context, table, "doubles == doubles", 3);
     verify_query(test_context, table, "strings == strings", 3);
     verify_query(test_context, table, "ints == link.@count", 2); // row 0 has 0 links, row 1 has 1 link
+    verify_query(test_context, table, "decimals == decimals", 3);
+    verify_query(test_context, table, "objectids == objectids", 3);
 
     // type mismatch
     CHECK_THROW_ANY(verify_query(test_context, table, "doubles == ints", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "doubles == strings", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "ints == doubles", 0));
     CHECK_THROW_ANY(verify_query(test_context, table, "strings == doubles", 0));
-
+    CHECK_THROW_ANY(verify_query(test_context, table, "ints == decimals", 0));
+    CHECK_THROW_ANY(verify_query(test_context, table, "objectids == ints", 0));
 }
-
 
 TEST(Parser_TwoColumnAggregates)
 {
@@ -1046,6 +1104,8 @@ TEST(Parser_TwoColumnAggregates)
     TableRef items = g.add_table("class_Items");
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
+    ColKey item_price_float_col = items->add_column(type_Float, "price_float");
+    ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
     ColKey item_discount_col = items->add_column_link(type_Link, "discount", *discounts);
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
@@ -1055,6 +1115,8 @@ TEST(Parser_TwoColumnAggregates)
         Obj obj = items->get_object(item_keys[i]);
         obj.set(item_name_col, StringData(item_info[i].first));
         obj.set(item_price_col, item_info[i].second);
+        obj.set(item_price_float_col, float(item_info[i].second));
+        obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
     items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
@@ -1064,6 +1126,8 @@ TEST(Parser_TwoColumnAggregates)
     ColKey id_col = t->add_column(type_Int, "customer_id");
     ColKey account_col = t->add_column(type_Double, "account_balance");
     ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
+    ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
+    ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
 
     Obj person0 = t->create_object();
     Obj person1 = t->create_object();
@@ -1071,10 +1135,16 @@ TEST(Parser_TwoColumnAggregates)
 
     person0.set(id_col, int64_t(0));
     person0.set(account_col, double(10.0));
+    person0.set(account_float_col, float(10.0));
+    person0.set(account_decimal_col, Decimal128(10.0));
     person1.set(id_col, int64_t(1));
     person1.set(account_col, double(20.0));
+    person1.set(account_float_col, float(20.0));
+    person1.set(account_decimal_col, Decimal128(20.0));
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
+    person2.set(account_float_col, float(30.0));
+    person2.set(account_decimal_col, Decimal128(30.0));
 
     LnkLst list_0 = person0.get_linklist(items_col);
     list_0.add(item_keys[0]);
@@ -1105,10 +1175,32 @@ TEST(Parser_TwoColumnAggregates)
     CHECK_THROW_ANY(verify_query(test_context, items, "price < name.@size", 3));
 
     // double vs double
+    verify_query(test_context, t, "items.@sum.price == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price == 6.375", 1); // person0
     verify_query(test_context, t, "items.@sum.price > account_balance", 2);
     verify_query(test_context, t, "items.@min.price > account_balance", 0);
     verify_query(test_context, t, "items.@max.price > account_balance", 0);
     verify_query(test_context, t, "items.@avg.price > account_balance", 0);
+    // float vs float
+    verify_query(test_context, t, "items.@sum.price_float == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price_float == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price_float == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price_float == 6.375", 1); // person0
+    verify_query(test_context, t, "items.@sum.price_float > account_balance_float", 2);
+    verify_query(test_context, t, "items.@min.price_float > account_balance_float", 0);
+    verify_query(test_context, t, "items.@max.price_float > account_balance_float", 0);
+    verify_query(test_context, t, "items.@avg.price_float > account_balance_float", 0);
+    // Decimal128 vs Decimal128
+    verify_query(test_context, t, "items.@sum.price_decimal == 25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@min.price_decimal == 4.0", 1);   // person0
+    verify_query(test_context, t, "items.@max.price_decimal == 9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@avg.price_decimal == 6.375", 1); // person0
+    verify_query(test_context, t, "items.@sum.price_decimal > account_balance_decimal", 2);
+    verify_query(test_context, t, "items.@min.price_decimal > account_balance_decimal", 0);
+    verify_query(test_context, t, "items.@max.price_decimal > account_balance_decimal", 0);
+    verify_query(test_context, t, "items.@avg.price_decimal > account_balance_decimal", 0);
 
     // cannot aggregate string
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@min.name > account_balance", 0));
@@ -1122,7 +1214,7 @@ TEST(Parser_TwoColumnAggregates)
     CHECK_THROW_ANY(verify_query(test_context, t, "items.@avg.discount > account_balance", 0));
 
     verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
-    verify_query(test_context, t, "items.@count > 3", 2);   // linklist count vs literal int
+    verify_query(test_context, t, "items.@count > 3", 2);               // linklist count vs literal int
     // linklist count vs literal double, integer promotion done here so this is true!
     verify_query(test_context, t, "items.@count == 3.1", 1);
 
@@ -1146,7 +1238,9 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string, const util::Any* arg_list, size_t num_args, size_t num_results) {
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      const util::Any* arg_list, size_t num_args, size_t num_results)
+{
 
     query_builder::AnyContext ctx;
     std::string empty_string;
@@ -1157,15 +1251,20 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p, args);
 
-    CHECK_EQUAL(q.count(), num_results);
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
-    //std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2, args);
 
-    CHECK_EQUAL(q2.count(), num_results);
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
 }
 
 TEST(Parser_substitution)
@@ -1183,7 +1282,7 @@ TEST(Parser_substitution)
     ColKey link_col = t->add_column_link(type_Link, "links", *t);
     ColKey list_col = t->add_column_link(type_LinkList, "list", *t);
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    std::vector<double> fees = { 2.0, 2.23, 2.22, 2.25, 3.73 };
+    std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
     std::vector<ObjKey> obj_keys;
     t->create_objects(names.size(), obj_keys);
 
@@ -1298,7 +1397,7 @@ TEST(Parser_substitution)
     // string
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $1", args, num_args, 0));
-                    verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
+    verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $6", args, num_args, 0));
@@ -1307,7 +1406,7 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $2", args, num_args, 0));
-                    verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $6", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $7", args, num_args, 0));
@@ -1315,7 +1414,7 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $2", args, num_args, 0));
-                    verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
+    verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $6", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $7", args, num_args, 0));
@@ -1323,7 +1422,7 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $1", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $2", args, num_args, 0));
-                    verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
+    verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
@@ -1429,8 +1528,7 @@ TEST(Parser_string_binary_encoding)
         "\"''''\"'\"",
         "\"'\"'\"''''\"",
         "<foo val=“bar” />",
-        "<foo val=`bar' />"
-    };
+        "<foo val=`bar' />"};
 
     t->create_object(); // nulls
     // add a single char of each value
@@ -1532,7 +1630,7 @@ TEST(Parser_string_binary_encoding)
             }
         }
 
-        //std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
+        // std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
 
         query_builder::NoArguments args;
         Query qstr2 = t->where();
@@ -1570,8 +1668,7 @@ TEST(Parser_collection_aggregates)
     auto courses_col = people->add_column_link(type_LinkList, "courses_taken", *courses);
     auto binary_col = people->add_column(type_Binary, "hash");
     using info_t = std::pair<std::string, int64_t>;
-    std::vector<info_t> person_info
-        = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
+    std::vector<info_t> person_info = {{"Billy", 18}, {"Bob", 17}, {"Joe", 19}, {"Jane", 20}, {"Joel", 18}};
     size_t j = 0;
     for (info_t i : person_info) {
         Obj obj = people->create_object();
@@ -1582,9 +1679,9 @@ TEST(Parser_collection_aggregates)
         obj.set(binary_col, payload);
     }
     using cinfo = std::tuple<std::string, double, int64_t, float>;
-    std::vector<cinfo> course_info
-            = { cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f}, cinfo{"Chemistry", 4.0, 41, 0.40f},
-            cinfo{"English", 3.5, 40, 0.07f}, cinfo{"Physics", 4.5, 42, 0.42f} };
+    std::vector<cinfo> course_info = {cinfo{"Math", 5.0, 42, 0.36f}, cinfo{"Comp Sci", 4.5, 45, 0.25f},
+                                      cinfo{"Chemistry", 4.0, 41, 0.40f}, cinfo{"English", 3.5, 40, 0.07f},
+                                      cinfo{"Physics", 4.5, 42, 0.42f}};
     std::vector<ObjKey> course_keys;
     for (cinfo course : course_info) {
         Obj obj = courses->create_object();
@@ -1692,6 +1789,7 @@ TEST(Parser_NegativeAgg)
     ColKey item_name_col = items->add_column(type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
     ColKey item_price_float_col = items->add_column(type_Float, "price_float");
+    ColKey item_price_decimal_col = items->add_column(type_Decimal, "price_decimal");
     using item_t = std::pair<std::string, double>;
     std::vector<item_t> item_info = {{"milk", -5.5}, {"oranges", -4.0}, {"pizza", -9.5}, {"cereal", -6.5}};
     std::vector<ObjKey> item_keys;
@@ -1701,6 +1799,7 @@ TEST(Parser_NegativeAgg)
         obj.set(item_name_col, StringData(item_info[i].first));
         obj.set(item_price_col, item_info[i].second);
         obj.set(item_price_float_col, float(item_info[i].second));
+        obj.set(item_price_decimal_col, Decimal128(item_info[i].second));
     }
 
     TableRef t = g.add_table("class_Person");
@@ -1708,6 +1807,7 @@ TEST(Parser_NegativeAgg)
     ColKey account_col = t->add_column(type_Double, "account_balance");
     ColKey items_col = t->add_column_link(type_LinkList, "items", *items);
     ColKey account_float_col = t->add_column(type_Float, "account_balance_float");
+    ColKey account_decimal_col = t->add_column(type_Decimal, "account_balance_decimal");
 
     Obj person0 = t->create_object();
     Obj person1 = t->create_object();
@@ -1716,12 +1816,15 @@ TEST(Parser_NegativeAgg)
     person0.set(id_col, int64_t(0));
     person0.set(account_col, double(10.0));
     person0.set(account_float_col, float(10.0));
+    person0.set(account_decimal_col, Decimal128(10.0));
     person1.set(id_col, int64_t(1));
     person1.set(account_col, double(20.0));
     person1.set(account_float_col, float(20.0));
+    person1.set(account_decimal_col, Decimal128(20.0));
     person2.set(id_col, int64_t(2));
     person2.set(account_col, double(30.0));
     person2.set(account_float_col, float(30.0));
+    person2.set(account_decimal_col, Decimal128(30.0));
 
     LnkLst list_0 = person0.get_linklist(items_col);
     list_0.add(item_keys[0]);
@@ -1748,6 +1851,427 @@ TEST(Parser_NegativeAgg)
     verify_query(test_context, t, "items.@max.price_float == -4.0", 1);   // person0
     verify_query(test_context, t, "items.@sum.price_float == -25.5", 2);  // person0, person2
     verify_query(test_context, t, "items.@avg.price_float == -6.375", 1); // person0
+
+    verify_query(test_context, t, "items.@min.price_decimal == -9.5", 2);   // person0, person2
+    verify_query(test_context, t, "items.@max.price_decimal == -4.0", 1);   // person0
+    verify_query(test_context, t, "items.@sum.price_decimal == -25.5", 2);  // person0, person2
+    verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
+}
+
+TEST(Parser_list_of_primitive_ints)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    auto col_int_list = t->add_column_list(type_Int, "integers");
+    auto col_int = t->add_column(type_Int, "single_int");
+    auto col_int_list_nullable = t->add_column_list(type_Int, "integers_nullable", true);
+    auto col_int_nullable = t->add_column(type_Int, "single_int_nullable", true);
+    CHECK_THROW_ANY(t->add_search_index(col_int_list));
+
+    size_t num_objects = 10;
+    for (size_t i = 0; i < num_objects; ++i) {
+        Obj obj = t->create_object();
+        obj.get_list<Int>(col_int_list).add(i);
+        obj.set<Int>(col_int, i);
+        obj.get_list<Optional<Int>>(col_int_list_nullable).add(i);
+        obj.set<Optional<Int>>(col_int_nullable, i);
+    }
+
+    TableRef t2 = g.add_table("table2");
+
+    auto col_link = t2->add_column_link(type_Link, "link", *t);
+    auto col_list = t2->add_column_link(type_LinkList, "list", *t);
+    {
+        // object with link to 1, list with {1}
+        Obj obj0 = t2->create_object();
+        ObjKey linkedObj0 = t->find_first(col_int, Int(1));
+        obj0.set(col_link, linkedObj0);
+        LnkLst list0 = obj0.get_linklist(col_list);
+        list0.add(linkedObj0);
+        // object with link to 2, list with all values
+        Obj obj1 = t2->create_object();
+        obj1.set(col_link, t->find_first(col_int, Int(2)));
+        LnkLst list1 = obj1.get_linklist(col_list);
+        for (auto it = t->begin(); it != t->end(); ++it) {
+            list1.add(it->get_key());
+        }
+        // empty object, null link, empty list
+        Obj obj2 = t2->create_object();
+    }
+
+    for (size_t i = 0; i < num_objects; ++i) {
+        verify_query(test_context, t, util::format("integers == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@min == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@max == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@avg == %1", i), 1);
+        verify_query(test_context, t, util::format("integers.@sum == %1", i), 1);
+        verify_query(test_context, t, util::format("ANY integers == %1", i), 1);
+        verify_query(test_context, t, util::format("SOME integers == %1", i), 1);
+        verify_query(test_context, t, util::format("ALL integers == %1", i), 1);
+        verify_query(test_context, t, util::format("NONE integers == %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(ANY integers == %1)", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(SOME integers == %1)", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(ALL integers == %1)", i), num_objects - 1);
+        verify_query(test_context, t, util::format("!(NONE integers == %1)", i), 1);
+        verify_query(test_context, t, util::format("ANY integers != %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("SOME integers != %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("ALL integers != %1", i), num_objects - 1);
+        verify_query(test_context, t, util::format("NONE integers != %1", i), 1);
+        verify_query(test_context, t, util::format("%1 IN integers", i), 1);
+    }
+    verify_query(test_context, t, "integers.@count == 0", 0);
+    verify_query(test_context, t, "integers.@size == 0", 0);
+    verify_query(test_context, t, "integers.@count == 1", num_objects);
+    verify_query(test_context, t, "integers.@size == 1", num_objects);
+
+    // add two more objects; one with defaults, one with null in the list
+    Obj obj_defaults = t->create_object();
+    Obj obj_nulls_in_lists = t->create_object();
+    obj_nulls_in_lists.get_list<Optional<Int>>(col_int_list_nullable).add(Optional<Int>());
+    num_objects += 2;
+    verify_query(test_context, t, "integers.@count == 0", 2);
+    verify_query(test_context, t, "integers == NULL", 0);
+    verify_query(test_context, t, "ALL integers == NULL", 2); // the two empty lists match ALL
+    verify_query(test_context, t, "NONE integers == NULL", num_objects);
+    verify_query(test_context, t, "integers_nullable.@count == 0", 1);
+    verify_query(test_context, t, "integers_nullable == NULL", 1);
+    verify_query(test_context, t, "ALL integers_nullable == NULL",
+                 2); // matches the empty list and the list containing one NULL
+    verify_query(test_context, t, "NONE integers_nullable == NULL", num_objects - 1);
+    // list vs property
+    verify_query(test_context, t, "integers == single_int", num_objects - 2);
+    verify_query(test_context, t, "integers_nullable == single_int", num_objects - 2);
+    verify_query(test_context, t, "integers == single_int_nullable", num_objects - 2);
+    verify_query(test_context, t, "integers_nullable == single_int_nullable", num_objects - 1);
+    // aggregate vs property x nullable
+    verify_query(test_context, t, "integers.@min == single_int", num_objects - 2); // two empty lists don't match
+    verify_query(test_context, t, "integers.@min == single_int_nullable",
+                 num_objects); // the min of 2 empty lists is null which matches the nullable int
+    verify_query(test_context, t, "integers_nullable.@min == single_int",
+                 num_objects - 2); // two empty lists don't match 0
+    verify_query(test_context, t, "integers_nullable.@min == single_int_nullable",
+                 num_objects); // the min of empty list matches null, and the min of only null matches null
+    verify_query(test_context, t, "integers.@max == single_int", num_objects - 2); // two empty lists don't match 0s
+    verify_query(test_context, t, "integers.@max == single_int_nullable",
+                 num_objects); // the max of 2 empty lists is null which matches the null int
+    verify_query(test_context, t, "integers_nullable.@max == single_int",
+                 num_objects - 2); // max of null doesn't match 0
+    verify_query(test_context, t, "integers_nullable.@max == single_int_nullable",
+                 num_objects); // the max of an empty list matches null, and the max of only null matches null
+    verify_query(test_context, t, "integers.@sum == single_int", num_objects); // sum of an empty list matches 0
+    verify_query(test_context, t, "integers.@sum == single_int_nullable",
+                 num_objects - 2); // sum of empty list does not match null
+    verify_query(test_context, t, "integers_nullable.@sum == single_int",
+                 num_objects); // sum of empty list matches 0, sum of list containing null matches 0
+    verify_query(test_context, t, "integers_nullable.@sum == single_int_nullable",
+                 num_objects -
+                     2); // sum of empty list does not match null, sum of list containing null does not match null
+    verify_query(test_context, t, "integers.@avg == single_int",
+                 num_objects - 2); // avg of empty lists is null, does not match 0
+    verify_query(test_context, t, "integers.@avg == single_int_nullable",
+                 num_objects); // avg of empty lists matches null
+    verify_query(test_context, t, "integers_nullable.@avg == single_int",
+                 num_objects - 2); // avg of empty list is null does not match 0, avg of list containing null is not 0
+    verify_query(test_context, t, "integers_nullable.@avg == single_int_nullable",
+                 num_objects); // avg of empty list matches null, avg of list containing null matches null
+    verify_query(test_context, t, "integers.@count == single_int",
+                 2 + 1); // 2x count of empty list matches 0, count of {1} matches 1
+    verify_query(test_context, t, "integers.@count == single_int_nullable", 1); // count of empty list matches 0
+    verify_query(test_context, t, "integers_nullable.@count == single_int",
+                 1 + 1); // count of {1} matches 1, count of empty list matches 0
+    verify_query(test_context, t, "integers_nullable.@count == single_int_nullable", 1); // count of {1} matches 1
+    // operations across links
+    verify_query(test_context, t2, "link.integers == 0 || link.integers == 3", 0);
+    verify_query(test_context, t2, "link.integers == 1", 1);
+    verify_query(test_context, t2, "link.integers == 2", 1);
+    verify_query(test_context, t2, "link.integers == NULL", 0);
+    verify_query(test_context, t2, "link.integers_nullable == NULL", 0);
+    verify_query(test_context, t2, "link.integers.@count == 1", 2);
+    verify_query(test_context, t2, "link.integers.@count == 0", 1);
+    verify_query(test_context, t2, "link.integers.@min == 1", 1);
+    verify_query(test_context, t2, "link.integers.@max == 1", 1);
+    verify_query(test_context, t2, "link.integers.@sum == 1", 1);
+    verify_query(test_context, t2, "link.integers.@avg == 1", 1);
+    // operations across lists
+    verify_query(test_context, t2, "list.integers == 1", 2);
+    verify_query(test_context, t2, "list.integers == 2", 1);
+    verify_query(test_context, t2, "list.integers == NULL", 0);
+    verify_query(test_context, t2, "list.integers.@count == 1", 2);
+    verify_query(test_context, t2, "list.integers.@min == 1", 2);
+    verify_query(test_context, t2, "list.integers.@max == 1", 2);
+    verify_query(test_context, t2, "list.integers.@avg == 1", 2);
+    verify_query(test_context, t2, "list.integers.@sum == 1", 2);
+    verify_query(test_context, t2, "list.integers.@min == 1", 2);
+    // aggregate operators across multiple lists
+    // we haven't supported aggregates across multiple lists previously
+    // but the implementation works and applies the aggregate to the primitive list
+    // this may be surprising, but it is one way to interpret the expression
+    verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
+    verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
+
+    Obj obj0 = *t->begin();
+    util::Any args[] = {Int(1)};
+    size_t num_args = 1;
+    verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers.@min.no_property == 0", 0), message);
+    CHECK_EQUAL(message, "An extraneous property 'no_property' was found for operation '@min' when applied to a list "
+                         "of primitive values 'integers'");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(integers, $x, $x == 1).@count > 0", 0),
+                                message);
+    CHECK_EQUAL(message, "A subquery can not operate on a list of primitive values (property 'integers')");
+    // list vs list is not implemented yet
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers != integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers > integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers < integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers endswith integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like integers", 0), message);
+    CHECK_EQUAL(message,
+                "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
+    // string operators are not supported on an integer column
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains[c] 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers ENDSWITH 0", 0), message);
+    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
+    CHECK_EQUAL(message, "Cannot convert string 'string'");
+}
+
+TEST(Parser_list_of_primitive_strings)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    constexpr bool nullable = true;
+    auto col_str_list = t->add_column_list(type_String, "strings", nullable);
+    CHECK_THROW_ANY(t->add_search_index(col_str_list));
+
+    auto get_string = [](size_t i) -> std::string { return util::format("string_%1", i); };
+    size_t num_populated_objects = 10;
+    for (size_t i = 0; i < num_populated_objects; ++i) {
+        Obj obj = t->create_object();
+        std::string si = get_string(i);
+        obj.get_list<String>(col_str_list).add(si);
+    }
+    Obj obj_empty_list = t->create_object();
+    Obj obj_with_null = t->create_object();
+    obj_with_null.get_list<String>(col_str_list).add(StringData(realm::null()));
+    Obj obj_with_empty_string = t->create_object();
+    obj_with_empty_string.get_list<String>(col_str_list).add("");
+    size_t num_special_objects = 3;
+    size_t num_total_objects = num_populated_objects + num_special_objects;
+
+    for (size_t i = 0; i < num_populated_objects; ++i) {
+        std::string si = get_string(i);
+        verify_query(test_context, t, util::format("strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("ANY strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("SOME strings == '%1'", si), 1);
+        verify_query(test_context, t, util::format("ALL strings == '%1'", si), 2); // empty list also matches
+        verify_query(test_context, t, util::format("NONE strings == '%1'", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("!(ANY strings == '%1')", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("!(SOME strings == '%1')", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("!(ALL strings == '%1')", si),
+                     num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("!(NONE strings == '%1')", si), 1);
+        verify_query(test_context, t, util::format("ANY strings != '%1'", si),
+                     num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("SOME strings != '%1'", si),
+                     num_total_objects - 2); // empty list also does not match
+        verify_query(test_context, t, util::format("ALL strings != '%1'", si), num_total_objects - 1);
+        verify_query(test_context, t, util::format("NONE strings != '%1'", si), 2); // empty list also matches
+        verify_query(test_context, t, util::format("'%1' IN strings", si), 1);
+        verify_query(test_context, t, util::format("strings CONTAINS[c] '%1'", si), 1);
+        verify_query(test_context, t, util::format("strings BEGINSWITH[c] '%1'", si), 1);
+        verify_query(test_context, t, util::format("strings ENDSWITH[c] '%1'", si), 1);
+        verify_query(test_context, t, util::format("strings LIKE[c] '%1'", si), 1);
+    }
+    verify_query(test_context, t, "strings CONTAINS[c] 'STR'", num_populated_objects);
+    verify_query(test_context, t, "strings BEGINSWITH[c] 'STR'", num_populated_objects);
+    verify_query(test_context, t, "strings ENDSWITH[c] 'G_1'", 1);
+    verify_query(test_context, t, "strings LIKE[c] 'StRiNg_*'", num_populated_objects);
+    verify_query(test_context, t, "ALL strings CONTAINS[c] 'STR'", num_populated_objects + 1);   // + empty list
+    verify_query(test_context, t, "ALL strings BEGINSWITH[c] 'STR'", num_populated_objects + 1); // + empty list
+    verify_query(test_context, t, "ALL strings ENDSWITH[c] 'G_1'", 2);                          // {"string_1"} and {}
+    verify_query(test_context, t, "ALL strings LIKE[c] 'StRiNg_*'", num_populated_objects + 1); // + empty list
+    verify_query(test_context, t, "NONE strings CONTAINS[c] 'STR'", 3);                         // {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings BEGINSWITH[c] 'STR'", 3);                       // {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings ENDSWITH[c] 'G_1'",
+                 num_populated_objects - 1 + 3);                         // - {"string_1"} + {}, {null}, {""}
+    verify_query(test_context, t, "NONE strings LIKE[c] 'StRiNg_*'", 3); // {}, {null}, {""}
+
+    verify_query(test_context, t, "strings.@count == 0", 1);                     // {}
+    verify_query(test_context, t, "strings.@size == 0", 1);                      // {}
+    verify_query(test_context, t, "strings.@count == 1", num_total_objects - 1); // - empty list
+    verify_query(test_context, t, "strings.@size == 1", num_total_objects - 1);  // - empty list
+    verify_query(test_context, t, "strings.length == 0", 2);                     // {""}, {null}
+    verify_query(test_context, t, "strings.length == 8", num_populated_objects); // "strings_0", ...  "strings_9"
+
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@min == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@max == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@sum == 2", 0));
+    CHECK_THROW_ANY(verify_query(test_context, t, "strings.@avg == 2", 0));
+}
+
+TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+
+    constexpr bool nullable = true;
+    auto col_list = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", nullable);
+    t->add_column(type_Int, "length"); // "length" is still a usable column name
+    auto col_link = t->add_column_link(type_Link, "link", *t);
+
+    Obj obj_empty_list = t->create_object();
+    Obj obj_with_null = t->create_object();
+    TEST_TYPE null_value;
+    CHECK(null_value.is_null());
+    obj_with_null.get_list<TEST_TYPE>(col_list).add(null_value);
+    Obj obj_with_empty_string = t->create_object();
+    TEST_TYPE empty_value("", 0);
+    CHECK_EQUAL(empty_value.size(), 0);
+    CHECK_EQUAL(empty_value.is_null(), false);
+    obj_with_empty_string.get_list<TEST_TYPE>(col_list).add(empty_value);
+    std::string value1 = "value1";
+    std::string value2 = "value2";
+    TEST_TYPE v1(value1);
+    TEST_TYPE v2(value2);
+    Obj obj_with_v1 = t->create_object();
+    obj_with_v1.get_list<TEST_TYPE>(col_list).add(v1);
+    Obj obj_with_v2 = t->create_object();
+    obj_with_v2.get_list<TEST_TYPE>(col_list).add(v2);
+    Obj obj_with_v1_v2 = t->create_object();
+    obj_with_v1_v2.get_list<TEST_TYPE>(col_list).add(v1);
+    obj_with_v1_v2.get_list<TEST_TYPE>(col_list).add(v2);
+
+    for (auto it = t->begin(); it != t->end(); ++it) {
+        it->set<ObjKey>(col_link, it->get_key());
+    }
+
+    // repeat the same tests but over links, the tests are only the same because the links are self cycles
+    std::vector<std::string> column_prefix = {"", "link.", "link.link."};
+
+    for (auto path : column_prefix) {
+        // {}, {null}, {""}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("%1values.@count == 0", path), 1);
+        verify_query(test_context, t, util::format("%1values.@size == 0", path), 1);
+        verify_query(test_context, t, util::format("%1values.@count == 1", path), 4);
+        verify_query(test_context, t, util::format("%1values.@size == 1", path), 4);
+        verify_query(test_context, t, util::format("%1values.@count == 2", path), 1);
+        verify_query(test_context, t, util::format("%1values.@size == 2", path), 1);
+        verify_query(test_context, t, util::format("%1length == 0", path), 6);
+        verify_query(test_context, t, util::format("%1link == null", path), 0);
+        verify_query(test_context, t, util::format("%1values == null", path), 1);
+
+        std::vector<std::string> any_prefix = {"", "ANY", "SOME", "aNy", "sOME"};
+        for (auto prefix : any_prefix) {
+            verify_query(test_context, t, util::format("0 IN %1 %2values.length", prefix, path), 2);
+            verify_query(test_context, t, util::format("%1 %2values.length == 0", prefix, path), 2);
+            verify_query(test_context, t, util::format("%1 %2values.length > 0", prefix, path), 3);
+            verify_query(test_context, t, util::format("%1 %2values.length == 6", prefix, path), 3);
+            verify_query(test_context, t, util::format("%1 %2values.length == length", prefix, path),
+                         2); // element length vs column
+        }
+
+        verify_query(test_context, t, util::format("ALL %1values.length == 0", path), 3);      // {}, {null}, {""}
+        verify_query(test_context, t, util::format("ALL %1values.length == length", path), 3); // {}, {null}, {""}
+        verify_query(test_context, t, util::format("ALL %1values.length == 6", path), 4); // the empty list matches
+
+        verify_query(test_context, t, util::format("NONE %1values.length == 0", path),
+                     4); // {}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("NONE %1values.length == length", path),
+                     4); // {}, {"value1"}, {"value2"}, {"value1", "value2"}
+        verify_query(test_context, t, util::format("NONE %1values.length == 6", path), 3); // {}, {null}, {""}
+    }
+
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
+    CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
+}
+
+TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
+           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    TestValueGenerator gen;
+
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
+    ColKey col = t->add_column_list(ColumnTypeTraits<TEST_TYPE>::id, "values", is_optional);
+    auto col_link = t->add_column_link(type_Link, "link", *t);
+
+    auto obj1 = t->create_object();
+    std::vector<TEST_TYPE> values = gen.values_from_int<TEST_TYPE>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    obj1.set_list_values(col, values);
+    auto obj2 = t->create_object(); // empty list
+    auto obj3 = t->create_object(); // {1}
+    underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
+    obj3.get_list<TEST_TYPE>(col).add(value_1);
+    auto obj4 = t->create_object(); // {1, 1}
+    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    obj4.get_list<TEST_TYPE>(col).add(value_1);
+    auto obj5 = t->create_object(); // {null} or {0}
+    if constexpr (is_optional) {
+        obj5.get_list<TEST_TYPE>(col).add(none);
+    }
+    else {
+        obj5.get_list<TEST_TYPE>(col).add(gen.convert_for_test<underlying_type>(0));
+    }
+    for (auto it = t->begin(); it != t->end(); ++it) {
+        it->set<ObjKey>(col_link, it->get_key()); // self links
+    }
+
+    // repeat the same tests but over links, the tests are only the same because the links are self cycles
+    std::vector<std::string> column_prefix = {"", "link.", "link.link."};
+
+    for (auto path : column_prefix) {
+        verify_query(test_context, t, util::format("%1values.@count == 0", path), 1);  // obj2
+        verify_query(test_context, t, util::format("%1values.@count == 1", path), 2);  // obj3, obj5
+        verify_query(test_context, t, util::format("%1values.@count == 2", path), 1);  // obj4
+        verify_query(test_context, t, util::format("%1values.@count > 0", path), 4);   // obj1, obj3, obj4, obj5
+        verify_query(test_context, t, util::format("%1values.@count == 13", path), 1); // obj1
+        verify_query(test_context, t, util::format("%1values == NULL", path), (is_optional ? 1 : 0)); // obj5
+
+        util::Any args[] = {value_1};
+        size_t num_args = 1;
+        verify_query_sub(test_context, t, util::format("%1values == $0", path), args, num_args,
+                         3); // obj1, obj3, obj4
+        verify_query_sub(test_context, t, util::format("%1values != $0", path), args, num_args, 2); // obj1, obj5
+        verify_query_sub(test_context, t, util::format("ANY %1values == $0", path), args, num_args,
+                         3); // obj1, obj3, obj4
+        verify_query_sub(test_context, t, util::format("ANY %1values != $0", path), args, num_args, 2); // obj1, obj5
+
+        verify_query_sub(test_context, t, util::format("ALL %1values == $0", path), args, num_args,
+                         3); // obj2, obj3, obj4
+        verify_query_sub(test_context, t, util::format("ALL %1values != $0", path), args, num_args, 2);  // obj2, obj5
+        verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args, 2); // obj2, obj5
+        verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args,
+                         3); // obj2, obj3, obj4
+    }
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
@@ -1795,7 +2319,8 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv.sort(age_col, true);
     tv.sort(SortDescriptor({{account_col, balance_col}, {account_col, transaction_col}}, {true, false}));
     std::string description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") != std::string::npos);
+    CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC, age ASC, name DESC)") !=
+          std::string::npos);
 
     // distinct serialisation
     tv = people->where().find_all();
@@ -1803,7 +2328,8 @@ TEST(Parser_SortAndDistinctSerialisation)
     tv.distinct(age_col);
     tv.distinct(DistinctDescriptor({{account_col, balance_col}, {account_col, transaction_col}}));
     description = tv.get_descriptor_ordering_description();
-    CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") != std::string::npos);
+    CHECK(description.find("DISTINCT(name) DISTINCT(age) DISTINCT(account.balance, account.num_transactions)") !=
+          std::string::npos);
 
     // combined sort and distinct serialisation
     tv = people->where().find_all();
@@ -1827,7 +2353,7 @@ TableView get_sorted_view(TableRef t, std::string query_string)
     std::string ordering_description = ordering.get_description(t);
     std::string combined = query_description + " " + ordering_description;
 
-    //std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
     Query q2 = t->where();
 
     parser::ParserResult result2 = realm::parser::parse(combined);
@@ -2430,7 +2956,9 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     auto eli = people->create_object().set(name_col, "Eli").set(link_col, jonathan.get_key());
 
     // include serialisation
-    TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) INCLUDE(@links.person.father.@links.person.father.@links.person.father.@links.person.father)");
+    TableView tv = get_sorted_view(people, "name contains[c] 'bone' SORT(name DESC) "
+                                           "INCLUDE(@links.person.father.@links.person.father.@links.person.father.@"
+                                           "links.person.father)");
     IncludeDescriptor includes = tv.get_include_descriptors();
     CHECK(includes.is_valid());
     CHECK_EQUAL(tv.size(), 1);
@@ -2548,10 +3076,10 @@ TEST(Parser_Backlinks)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
-    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_EQUAL(message, "Comparing linking object properties to 'null' is not supported");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1),
                                 message);
-    CHECK_EQUAL(message, "Comparing a list property to 'null' is not supported");
+    CHECK_EQUAL(message, "Comparing linking object properties to 'null' is not supported");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
     CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
@@ -2562,41 +3090,46 @@ TEST(Parser_Backlinks)
     parser::KeyPathMapping mapping;
     mapping.add_mapping(items, "purchasers", "@links.class_Person.items");
     mapping.add_mapping(t, "money", "account_balance");
-    query_builder::NoArguments args;
 
-    q = items->where();
-    realm::parser::Predicate p = realm::parser::parse("purchasers.@count > 2").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping);
-    CHECK_EQUAL(q.count(), 2);
-
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping);
-    CHECK_EQUAL(q.count(), 3);
+    verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
+    verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
 
     // disable parsing backlink queries
     mapping.set_allow_backlinks(false);
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
-    CHECK_EQUAL(message, "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
-                         "of property 'items' on type 'Person'");
-
+    {
+        query_builder::NoArguments args;
+        q = items->where();
+        auto p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
+        CHECK_THROW_ANY_GET_MESSAGE(realm::query_builder::apply_predicate(q, p, args, mapping), message);
+        CHECK_EQUAL(message,
+                    "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
+                    "of property 'items' on type 'Person'");
+    }
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
     mapping_with_prefix.add_mapping(items, "purchasers", "@links.Person.items");
     mapping_with_prefix.add_mapping(t, "money", "account_balance");
+    mapping_with_prefix.add_mapping(t, "funds", "money");     // double indirection
+    mapping_with_prefix.add_mapping(t, "capital", "capital"); // self loop
+    mapping_with_prefix.add_mapping(t, "banknotes", "finances");
+    mapping_with_prefix.add_mapping(t, "finances", "banknotes"); // indirect loop
 
-    q = items->where();
-    p = realm::parser::parse("purchasers.@count > 2").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
-    CHECK_EQUAL(q.count(), 2);
-
-    q = items->where();
-    p = realm::parser::parse("purchasers.@max.money >= 20").predicate;
-    realm::query_builder::apply_predicate(q, p, args, mapping_with_prefix);
-    CHECK_EQUAL(q.count(), 3);
+    verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
+    verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
+    // double substitution via subquery "$x"->"" and "money"->"account_balance"
+    verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
+    // double indirection is allowed
+    verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
+    // infinite loops are detected
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "purchasers.@max.banknotes >= 20", 3, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "Substitution loop detected while processing property 'finances' -> 'banknotes' found in "
+                         "type 'Person'. Check property aliases.");
+    CHECK_THROW_ANY_GET_MESSAGE(
+        verify_query(test_context, items, "purchasers.@max.capital >= 20", 3, mapping_with_prefix), message);
+    CHECK_EQUAL(message, "Substitution loop detected while processing property 'capital' -> 'capital' found in type "
+                         "'Person'. Check property aliases.");
 }
 
 
@@ -2936,10 +3469,10 @@ TEST(Parser_Subquery)
 }
 
 
-TEST(Parser_AggregateShortcuts)
+TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
 {
     Group g;
-
+    constexpr bool indexed_toggle = TEST_TYPE::value;
     TableRef allergens = g.add_table("class_Allergens");
     ColKey ingredient_name_col = allergens->add_column(type_String, "name");
     ColKey population_col = allergens->add_column(type_Double, "population_affected");
@@ -3014,6 +3547,12 @@ TEST(Parser_AggregateShortcuts)
         }
     }
 
+    if (indexed_toggle) {
+        allergens->add_search_index(ingredient_name_col);
+        items->add_search_index(item_name_col);
+        t->add_search_index(id_col);
+    }
+
     // any is implied over list properties
     verify_query(test_context, t, "items.price == 5.5", 2);
 
@@ -3022,6 +3561,12 @@ TEST(Parser_AggregateShortcuts)
     verify_query(test_context, t, "SOME items.price == 5.5", 2); // 0, 1
     verify_query(test_context, t, "ALL items.price == 5.5", 1);  // 1
     verify_query(test_context, t, "NONE items.price == 5.5", 1); // 2
+
+    // basic string equality
+    verify_query(test_context, t, "ANY items.name == 'milk'", 2);  // 0, 1
+    verify_query(test_context, t, "SOME items.name == 'milk'", 2); // 0, 1
+    verify_query(test_context, t, "ALL items.name == 'milk'", 1);  // 1
+    verify_query(test_context, t, "NONE items.name == 'milk'", 1); // 2
 
     // and
     verify_query(test_context, t, "customer_id > 0 and ANY items.price == 5.5", 1);
@@ -3074,16 +3619,13 @@ TEST(Parser_AggregateShortcuts)
     verify_query(test_context, t, "ANY items.price > items.@avg.price", 2);
     verify_query(test_context, t, "SOME items.price > items.@avg.price", 2);
 
-    // ALL/NONE do not support testing against other columns currently because of how they are implemented in a
-    // subquery
-    // The restriction is because subqueries must operate on properties on the target table and cannot reference
-    // properties in the parent scope. This restriction may be lifted if we actually implement ALL/NONE in core.
-    std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.name == fav_item.name", 1), message);
-    CHECK_EQUAL(message, "The comparison in an 'ALL' clause must be between a keypath and a value");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.name == fav_item.name", 1), message);
-    CHECK_EQUAL(message, "The comparison in an 'NONE' clause must be between a keypath and a value");
+    // aggregate list compared with column (over links)
+    verify_query(test_context, t, "ALL items.name == fav_item.name",
+                 0); // no people have bought only their favourite item
+    verify_query(test_context, t, "NONE items.name == fav_item.name",
+                 1); // only person 1 has items which are not their favourite
 
+    std::string message;
     // no list in path should throw
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
@@ -3220,7 +3762,6 @@ TEST(Parser_OperatorIN)
         "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
 }
 
-
 // we won't support full object comparisons until we have stable keys in core, but as an exception
 // we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
 TEST(Parser_Object)
@@ -3268,7 +3809,8 @@ TEST(Parser_Between)
     // operator between is not supported yet, but we at least use a friendly error message.
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "age between {20, 25}", 1), message);
-    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.") != std::string::npos);
+    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the "
+                       "expression using '>' and '<'.") != std::string::npos);
 }
 
 TEST(Parser_ChainedStringEqualQueries)
@@ -3346,6 +3888,7 @@ TEST(Parser_ChainedIntEqualQueries)
     }
     auto default_obj = table->create_object(); // one null/default 0 object
 
+    verify_query(test_context, table, "a == NULL", 0);
     verify_query(test_context, table, "a == 0 or a == 1 or a == 2", 4);
     verify_query(test_context, table, "a == 1 or b == 2 or a == 3 or b == 4", 4);
     verify_query(test_context, table,
@@ -3385,15 +3928,439 @@ TEST(Parser_TimestampNullable)
     table->create_object().set(a_col, Timestamp(7, 0)).set(b_col, Timestamp(17, 0));
 
     Query q = table->where()
-      .equal(b_col, Timestamp(200, 0))
-      .group()
-      .equal(a_col, Timestamp(100, 0))
-      .Or()
-      .equal(a_col, Timestamp(realm::null()))
-      .end_group();
+                  .equal(b_col, Timestamp(200, 0))
+                  .group()
+                  .equal(a_col, Timestamp(100, 0))
+                  .Or()
+                  .equal(a_col, Timestamp(realm::null()))
+                  .end_group();
     std::string description = q.get_description();
     CHECK(description.find("NULL") != std::string::npos);
     CHECK_EQUAL(description, "b == T200:0 and (a == T100:0 or a == NULL)");
+}
+
+TEST(Parser_ObjectIdTimestamp)
+{
+    using util::serializer::print_value;
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
+    auto pk_col_key = table->get_primary_key_column();
+    auto nullable_oid_col_key = table->add_column(type_ObjectId, "nid", true);
+    auto ts_col_key = table->add_column(type_Timestamp, "ts");
+    auto nullable_ts_col_key = table->add_column(type_Timestamp, "nts", true);
+
+    auto now = std::chrono::system_clock::now();
+
+    Timestamp ts_t1{1, 1};
+    Timestamp ts_now{now};
+    Timestamp ts_t25{now + std::chrono::seconds(25)};
+    Timestamp ts_00{0, 0};
+    std::vector<Timestamp> times = {ts_t1, ts_now, ts_t25, ts_00};
+    int machine_id = 0;
+    int process_id = 0;
+    ObjectId t1{ts_t1, machine_id, process_id};
+    ObjectId tNow{ts_now, machine_id, process_id};
+    ObjectId t25{ts_t25, machine_id, process_id};
+    ObjectId t00{ts_00, machine_id, process_id};
+    std::vector<ObjectId> ids = {t1, tNow, t25, t00};
+
+    for (size_t i = 0; i < times.size(); ++i) {
+        auto obj = table->create_object_with_primary_key({ids[i]});
+        obj.set(nullable_oid_col_key, ids[i]);
+        obj.set(ts_col_key, times[i]);
+        obj.set(nullable_ts_col_key, times[i]);
+    }
+    // add one object with default values, we assume time > now, and null
+    auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
+    ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
+    CHECK(std::abs(generated_pk.get_timestamp().get_seconds() - ts_now.get_seconds()) <= 1);
+    auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
+    CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
+    CHECK(!generated_nullable);
+
+    //  id  |  nid  |  ts  |  nts  |
+    // -----------------------------
+    //  t1  |  t1   |  t1  |  t1   |
+    //  tNow|  tNow |  tNow|  tNow |
+    //  t25 |  t25  |  t25 |  t25  |
+    //  t00 |  t00  |  t00 |  t00  |
+    //  tNow|  null |  t00 |  null |
+
+    verify_query(test_context, table, "id == oid(" + generated_pk.to_string() + ")", 1);
+    verify_query(test_context, table, "nid == NULL", 1);
+    verify_query(test_context, table, "ts == " + print_value(Timestamp(0, 0)), 2);
+    verify_query(test_context, table, "nts == NULL", 1);
+
+    for (auto oid : ids) {
+        verify_query(test_context, table, "id == oid(" + oid.to_string() + ")", 1);
+        verify_query(test_context, table, "id != oid(" + oid.to_string() + ")", table->size() - 1);
+        verify_query(test_context, table, "nid == oid(" + oid.to_string() + ")", 1);
+        verify_query(test_context, table, "nid != oid(" + oid.to_string() + ")", table->size() - 1);
+    }
+
+    for (auto ts : times) {
+        verify_query(test_context, table, "ts == " + print_value(ts), ts == Timestamp(0, 0) ? 2 : 1);
+        verify_query(test_context, table, "ts != " + print_value(ts),
+                     table->size() - (ts == Timestamp(0, 0) ? 2 : 1));
+        verify_query(test_context, table, "nts == " + print_value(ts), 1);
+        verify_query(test_context, table, "nts != " + print_value(ts), table->size() - 1);
+    }
+
+    // everything should match >= 0, except for null
+    verify_query(test_context, table, "id >= oid(000000000000000000000000)", table->size());
+    verify_query(test_context, table, "nid >= oid(000000000000000000000000)", table->size() - 1);
+    // everything should match <= max value, except for null
+    verify_query(test_context, table, "id <= oid(ffffffffffffffffffffffff)", table->size());
+    verify_query(test_context, table, "nid <= oid(ffffffffffffffffffffffff)", table->size() - 1);
+    // a non nullable column should never contain null values
+    verify_query(test_context, table, "id == NULL", 0);
+    // a nullable column should find the null created by the default constructed row
+    verify_query(test_context, table, "nid == NULL", 1);
+
+    // argument substitution checks with an ObjectId
+    util::Any args[] = {t1, tNow, t25, t00, realm::null()};
+    util::Any ts_args[] = {ts_t1, ts_now, ts_t25, ts_00, Timestamp{realm::null()}};
+    size_t num_args = 5;
+    verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $4", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $3", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $4", args, num_args, 1);
+
+    verify_query_sub(test_context, table, "ts == $0", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "ts == $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "ts == $2", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "ts == $3", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "ts == $4", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nts == $0", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nts == $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nts == $2", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nts == $3", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nts == $4", ts_args, num_args, 1);
+
+    // ObjectId property queries against a Timestamp value
+    // null
+    verify_query_sub(test_context, table, "id == $4", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid == $4", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "id != $4", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "nid != $4", ts_args, num_args, table->size() - 1);
+
+    // equality
+    verify_query_sub(test_context, table, "id == $0", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "id == $1", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "id == $2", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "id == $3", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $0", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid == $1", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid == $2", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid == $3", ts_args, num_args, 1);
+    verify_query(test_context, table, util::format("id == %1", print_value(times[0])), 0);
+    verify_query(test_context, table, util::format("id == %1", print_value(times[1])), 0);
+    verify_query(test_context, table, util::format("id == %1", print_value(times[2])), 0);
+    verify_query(test_context, table, util::format("id == %1", print_value(times[3])), 1);
+    verify_query(test_context, table, util::format("nid == %1", print_value(times[0])), 0);
+    verify_query(test_context, table, util::format("nid == %1", print_value(times[1])), 0);
+    verify_query(test_context, table, util::format("nid == %1", print_value(times[2])), 0);
+    verify_query(test_context, table, util::format("nid == %1", print_value(times[3])), 1);
+
+    // inequality
+    verify_query_sub(test_context, table, "id != $0", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "id != $1", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "id != $2", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "id != $3", ts_args, num_args, table->size() - 1);
+    verify_query_sub(test_context, table, "nid != $0", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "nid != $1", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "nid != $2", ts_args, num_args, table->size());
+    verify_query_sub(test_context, table, "nid != $3", ts_args, num_args, table->size() - 1);
+    verify_query(test_context, table, util::format("id != %1", print_value(times[0])), table->size());
+    verify_query(test_context, table, util::format("id != %1", print_value(times[1])), table->size());
+    verify_query(test_context, table, util::format("id != %1", print_value(times[2])), table->size());
+    verify_query(test_context, table, util::format("id != %1", print_value(times[3])), table->size() - 1);
+    verify_query(test_context, table, util::format("nid != %1", print_value(times[0])), table->size());
+    verify_query(test_context, table, util::format("nid != %1", print_value(times[1])), table->size());
+    verify_query(test_context, table, util::format("nid != %1", print_value(times[2])), table->size());
+    verify_query(test_context, table, util::format("nid != %1", print_value(times[3])), table->size() - 1);
+
+    // greater
+    verify_query_sub(test_context, table, "id > $0", ts_args, num_args, 3);
+    verify_query_sub(test_context, table, "id > $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "id > $2", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "id > $3", ts_args, num_args, 4);
+    verify_query_sub(test_context, table, "nid > $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "nid > $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nid > $2", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid > $3", ts_args, num_args, 3);
+    verify_query(test_context, table, util::format("id > %1", print_value(times[0])), 3);
+    verify_query(test_context, table, util::format("id > %1", print_value(times[1])), 1);
+    verify_query(test_context, table, util::format("id > %1", print_value(times[2])), 0);
+    verify_query(test_context, table, util::format("id > %1", print_value(times[3])), 4);
+    verify_query(test_context, table, util::format("nid > %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("nid > %1", print_value(times[1])), 1);
+    verify_query(test_context, table, util::format("nid > %1", print_value(times[2])), 0);
+    verify_query(test_context, table, util::format("nid > %1", print_value(times[3])), 3);
+
+    // greater equal
+    verify_query_sub(test_context, table, "id >= $0", ts_args, num_args, 3);
+    verify_query_sub(test_context, table, "id >= $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "id >= $2", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "id >= $3", ts_args, num_args, 5);
+    verify_query_sub(test_context, table, "nid >= $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "nid >= $1", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nid >= $2", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid >= $3", ts_args, num_args, 4);
+    verify_query(test_context, table, util::format("id >= %1", print_value(times[0])), 3);
+    verify_query(test_context, table, util::format("id >= %1", print_value(times[1])), 1);
+    verify_query(test_context, table, util::format("id >= %1", print_value(times[2])), 0);
+    verify_query(test_context, table, util::format("id >= %1", print_value(times[3])), 5);
+    verify_query(test_context, table, util::format("nid >= %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("nid >= %1", print_value(times[1])), 1);
+    verify_query(test_context, table, util::format("nid >= %1", print_value(times[2])), 0);
+    verify_query(test_context, table, util::format("nid >= %1", print_value(times[3])), 4);
+
+    // less
+    verify_query_sub(test_context, table, "id < $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "id < $1", ts_args, num_args, 4);
+    verify_query_sub(test_context, table, "id < $2", ts_args, num_args, 5);
+    verify_query_sub(test_context, table, "id < $3", ts_args, num_args, 0);
+    verify_query_sub(test_context, table, "nid < $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "nid < $1", ts_args, num_args, 3);
+    verify_query_sub(test_context, table, "nid < $2", ts_args, num_args, 4);
+    verify_query_sub(test_context, table, "nid < $3", ts_args, num_args, 0);
+    verify_query(test_context, table, util::format("id < %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("id < %1", print_value(times[1])), 4);
+    verify_query(test_context, table, util::format("id < %1", print_value(times[2])), 5);
+    verify_query(test_context, table, util::format("id < %1", print_value(times[3])), 0);
+    verify_query(test_context, table, util::format("nid < %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("nid < %1", print_value(times[1])), 3);
+    verify_query(test_context, table, util::format("nid < %1", print_value(times[2])), 4);
+    verify_query(test_context, table, util::format("nid < %1", print_value(times[3])), 0);
+
+    // less equal
+    verify_query_sub(test_context, table, "id <= $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "id <= $1", ts_args, num_args, 4);
+    verify_query_sub(test_context, table, "id <= $2", ts_args, num_args, 5);
+    verify_query_sub(test_context, table, "id <= $3", ts_args, num_args, 1);
+    verify_query_sub(test_context, table, "nid <= $0", ts_args, num_args, 2);
+    verify_query_sub(test_context, table, "nid <= $1", ts_args, num_args, 3);
+    verify_query_sub(test_context, table, "nid <= $2", ts_args, num_args, 4);
+    verify_query_sub(test_context, table, "nid <= $3", ts_args, num_args, 1);
+    verify_query(test_context, table, util::format("id <= %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("id <= %1", print_value(times[1])), 4);
+    verify_query(test_context, table, util::format("id <= %1", print_value(times[2])), 5);
+    verify_query(test_context, table, util::format("id <= %1", print_value(times[3])), 1);
+    verify_query(test_context, table, util::format("nid <= %1", print_value(times[0])), 2);
+    verify_query(test_context, table, util::format("nid <= %1", print_value(times[1])), 3);
+    verify_query(test_context, table, util::format("nid <= %1", print_value(times[2])), 4);
+    verify_query(test_context, table, util::format("nid <= %1", print_value(times[3])), 1);
+
+    //
+    // Timestamp property queries against a ObjectId value
+    // equality
+    verify_query_sub(test_context, table, "ts == $0", args, num_args, 0);
+    verify_query_sub(test_context, table, "ts == $1", args, num_args, 0);
+    verify_query_sub(test_context, table, "ts == $2", args, num_args, 0);
+    verify_query_sub(test_context, table, "ts == $3", args, num_args, 2);
+    verify_query_sub(test_context, table, "nts == $0", args, num_args, 0);
+    verify_query_sub(test_context, table, "nts == $1", args, num_args, 0);
+    verify_query_sub(test_context, table, "nts == $2", args, num_args, 0);
+    verify_query_sub(test_context, table, "nts == $3", args, num_args, 1);
+    verify_query(test_context, table, util::format("ts == %1", print_value(ids[0])), 0);
+    verify_query(test_context, table, util::format("ts == %1", print_value(ids[1])), 0);
+    verify_query(test_context, table, util::format("ts == %1", print_value(ids[2])), 0);
+    verify_query(test_context, table, util::format("ts == %1", print_value(ids[3])), 2);
+    verify_query(test_context, table, util::format("nts == %1", print_value(ids[0])), 0);
+    verify_query(test_context, table, util::format("nts == %1", print_value(ids[1])), 0);
+    verify_query(test_context, table, util::format("nts == %1", print_value(ids[2])), 0);
+    verify_query(test_context, table, util::format("nts == %1", print_value(ids[3])), 1);
+
+    // inequality
+    verify_query_sub(test_context, table, "ts != $0", args, num_args, table->size());
+    verify_query_sub(test_context, table, "ts != $1", args, num_args, table->size());
+    verify_query_sub(test_context, table, "ts != $2", args, num_args, table->size());
+    verify_query_sub(test_context, table, "ts != $3", args, num_args, table->size() - 2);
+    verify_query_sub(test_context, table, "nts != $0", args, num_args, table->size());
+    verify_query_sub(test_context, table, "nts != $1", args, num_args, table->size());
+    verify_query_sub(test_context, table, "nts != $2", args, num_args, table->size());
+    verify_query_sub(test_context, table, "nts != $3", args, num_args, table->size() - 1);
+    verify_query(test_context, table, util::format("ts != %1", print_value(ids[0])), table->size());
+    verify_query(test_context, table, util::format("ts != %1", print_value(ids[1])), table->size());
+    verify_query(test_context, table, util::format("ts != %1", print_value(ids[2])), table->size());
+    verify_query(test_context, table, util::format("ts != %1", print_value(ids[3])), table->size() - 2);
+    verify_query(test_context, table, util::format("nts != %1", print_value(ids[0])), table->size());
+    verify_query(test_context, table, util::format("nts != %1", print_value(ids[1])), table->size());
+    verify_query(test_context, table, util::format("nts != %1", print_value(ids[2])), table->size());
+    verify_query(test_context, table, util::format("nts != %1", print_value(ids[3])), table->size() - 1);
+
+    // greater
+    verify_query_sub(test_context, table, "ts > $0", args, num_args, 3);
+    verify_query_sub(test_context, table, "ts > $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "ts > $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "ts > $3", args, num_args, 3);
+    verify_query_sub(test_context, table, "nts > $0", args, num_args, 3);
+    verify_query_sub(test_context, table, "nts > $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "nts > $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "nts > $3", args, num_args, 3);
+    verify_query(test_context, table, util::format("ts > %1", print_value(ids[0])), 3);
+    verify_query(test_context, table, util::format("ts > %1", print_value(ids[1])), 2);
+    verify_query(test_context, table, util::format("ts > %1", print_value(ids[2])), 1);
+    verify_query(test_context, table, util::format("ts > %1", print_value(ids[3])), 3);
+    verify_query(test_context, table, util::format("nts > %1", print_value(ids[0])), 3);
+    verify_query(test_context, table, util::format("nts > %1", print_value(ids[1])), 2);
+    verify_query(test_context, table, util::format("nts > %1", print_value(ids[2])), 1);
+    verify_query(test_context, table, util::format("nts > %1", print_value(ids[3])), 3);
+
+    // greater equal
+    verify_query_sub(test_context, table, "ts >= $0", args, num_args, 3);
+    verify_query_sub(test_context, table, "ts >= $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "ts >= $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "ts >= $3", args, num_args, 5);
+    verify_query_sub(test_context, table, "nts >= $0", args, num_args, 3);
+    verify_query_sub(test_context, table, "nts >= $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "nts >= $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "nts >= $3", args, num_args, 4);
+    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[0])), 3);
+    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[1])), 2);
+    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[2])), 1);
+    verify_query(test_context, table, util::format("ts >= %1", print_value(ids[3])), 5);
+    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[0])), 3);
+    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[1])), 2);
+    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[2])), 1);
+    verify_query(test_context, table, util::format("nts >= %1", print_value(ids[3])), 4);
+
+    // less
+    verify_query_sub(test_context, table, "ts < $0", args, num_args, 2);
+    verify_query_sub(test_context, table, "ts < $1", args, num_args, 3);
+    verify_query_sub(test_context, table, "ts < $2", args, num_args, 4);
+    verify_query_sub(test_context, table, "ts < $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nts < $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "nts < $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "nts < $2", args, num_args, 3);
+    verify_query_sub(test_context, table, "nts < $3", args, num_args, 0);
+    verify_query(test_context, table, util::format("ts < %1", print_value(ids[0])), 2);
+    verify_query(test_context, table, util::format("ts < %1", print_value(ids[1])), 3);
+    verify_query(test_context, table, util::format("ts < %1", print_value(ids[2])), 4);
+    verify_query(test_context, table, util::format("ts < %1", print_value(ids[3])), 0);
+    verify_query(test_context, table, util::format("nts < %1", print_value(ids[0])), 1);
+    verify_query(test_context, table, util::format("nts < %1", print_value(ids[1])), 2);
+    verify_query(test_context, table, util::format("nts < %1", print_value(ids[2])), 3);
+    verify_query(test_context, table, util::format("nts < %1", print_value(ids[3])), 0);
+
+    // less equal
+    verify_query_sub(test_context, table, "ts <= $0", args, num_args, 2);
+    verify_query_sub(test_context, table, "ts <= $1", args, num_args, 3);
+    verify_query_sub(test_context, table, "ts <= $2", args, num_args, 4);
+    verify_query_sub(test_context, table, "ts <= $3", args, num_args, 2);
+    verify_query_sub(test_context, table, "nts <= $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "nts <= $1", args, num_args, 2);
+    verify_query_sub(test_context, table, "nts <= $2", args, num_args, 3);
+    verify_query_sub(test_context, table, "nts <= $3", args, num_args, 1);
+    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[0])), 2);
+    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[1])), 3);
+    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[2])), 4);
+    verify_query(test_context, table, util::format("ts <= %1", print_value(ids[3])), 2);
+    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[0])), 1);
+    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[1])), 2);
+    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[2])), 3);
+    verify_query(test_context, table, util::format("nts <= %1", print_value(ids[3])), 1);
+}
+
+TEST(Parser_Decimal128)
+{
+    Group g;
+    auto table = g.add_table("table");
+    auto col_key = table->add_column(type_Decimal, "dec");
+    auto nullable_col_key = table->add_column(type_Decimal, "nullable_dec", true);
+
+    // the test assumes that these are all unique
+    std::vector<std::string> values = {
+        "123",
+        "0.1",
+        "3.141592653589793238", // currently limited to 19 digits
+        // sign variations
+        "1E1",
+        "+2E2",
+        "+3E+3",
+        "4E+4",
+        "-5E5",
+        "-6E-6",
+        "7E-7",
+        "+8E-8",
+        "-9E+9",
+        // decimal sign variations
+        "1.1E1",
+        "+2.1E2",
+        "+3.1E+3",
+        "4.1E+4",
+        "-5.1E5",
+        "-6.1E-6",
+        "7.1E-7",
+        "+8.1E-8",
+        "-9.1E+9",
+        // + and - infinity are treated differently
+        "inf",
+        "-infinity",
+    };
+
+    std::vector<std::string> invalids = {
+        ".", "e10", "E-12", "infin", "-+2", "+-2", "2e+-12", "2e-+12", "2e1.3", "/2.0", "*2.0",
+    };
+
+    for (auto value : values) {
+        auto obj = table->create_object();
+        obj.set(col_key, Decimal128(value));
+        obj.set(nullable_col_key, Decimal128(value));
+    }
+    // add one object with default values, 0 and null
+    auto obj_generated = table->create_object();
+    Decimal128 generated = obj_generated.get<Decimal128>(col_key);
+    Decimal128 generated_nullable = obj_generated.get<Decimal128>(nullable_col_key);
+    CHECK_EQUAL(generated, Decimal128(0));
+    CHECK(generated_nullable.is_null());
+    verify_query(test_context, table, "dec == " + generated.to_string(), 1);
+    verify_query(test_context, table, "nullable_dec == " + generated_nullable.to_string(), 1);
+    verify_query(test_context, table, "dec == 0.", 1);
+
+    for (auto value : values) {
+        verify_query(test_context, table, "dec == " + value, 1);
+        verify_query(test_context, table, "nullable_dec == " + value, 1);
+    }
+
+    for (auto value : invalids) {
+        CHECK_THROW_ANY(verify_query(test_context, table, "dec == " + value, 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nullable_dec == " + value, 0));
+    }
+
+    // none of the non-nullable values are null
+    verify_query(test_context, table, "dec == NULL", 0);
+    // the default generated nullable value is null
+    verify_query(test_context, table, "nullable_dec == NULL", 1);
+    constexpr size_t num_nans = 0;
+    // everything should be less than positive infinity (except NaNs)
+    verify_query(test_context, table, "dec <= infinity", table->size() - num_nans);
+    // everything should be greater than or equal to negative infinity (except NaNs)
+    verify_query(test_context, table, "dec >= -infinity", table->size() - num_nans);
+
+    // argument substitution checks
+    util::Any args[] = {Decimal128("0"), Decimal128("123"), realm::null{}};
+    size_t num_args = 3;
+    verify_query_sub(test_context, table, "dec == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "dec == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "dec == $2", args, num_args, 0);
+    verify_query_sub(test_context, table, "nullable_dec == $2", args, num_args, 1);
+
+    // column vs column
+    constexpr size_t num_different_rows = 1; // default generated row is (0, null)
+    verify_query(test_context, table, "dec == nullable_dec", table->size() - num_different_rows);
+    verify_query(test_context, table, "dec >= nullable_dec", table->size() - num_different_rows);
+    verify_query(test_context, table, "dec <= nullable_dec", table->size() - num_different_rows);
+    verify_query(test_context, table, "dec > nullable_dec", 0);
+    verify_query(test_context, table, "dec < nullable_dec", 0);
+    verify_query(test_context, table, "dec != nullable_dec", num_different_rows);
 }
 
 

@@ -40,19 +40,11 @@ class Logger;
 // FIXME: Be careful about the possibility of one modification function being called by another where both do
 // transaction logging.
 
-// FIXME: The current table/subtable selection scheme assumes that a TableRef of a subtable is not accessed after any
-// modification of one of its ancestor tables.
-
-// FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store
-// m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance via
-// Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
-
 /// Replication is enabled by passing an instance of an implementation of this
-/// class to the SharedGroup constructor.
+/// class to the DB constructor.
 class Replication : public _impl::TransactLogConvenientEncoder {
 public:
-    // Be sure to keep this type aligned with what is actually used in
-    // SharedGroup.
+    // Be sure to keep this type aligned with what is actually used in DB.
     using version_type = _impl::History::version_type;
     using InputStream = _impl::NoCopyInputStream;
     class TransactLogApplier;
@@ -61,33 +53,30 @@ public:
 
     virtual std::string get_database_path() const = 0;
 
-    /// Called during construction of the associated SharedGroup object.
+    /// Called during construction of the associated DB object.
     ///
-    /// \param shared_group The assocoated SharedGroup object.
-    virtual void initialize(DB& shared_group) = 0;
+    /// \param db The associated DB object.
+    virtual void initialize(DB& db) = 0;
 
 
-    /// Called by the associated SharedGroup object when a session is
-    /// initiated. A *session* is a sequence of of temporally overlapping
+    /// Called by the associated DB object when a session is
+    /// initiated. A *session* is a sequence of temporally overlapping
     /// accesses to a specific Realm file, where each access consists of a
-    /// SharedGroup object through which the Realm file is open. Session
+    /// DB object through which the Realm file is open. Session
     /// initiation occurs during the first opening of the Realm file within such
     /// a session.
     ///
     /// Session initiation fails if this function throws.
     ///
-    /// \param version The current version of the associated Realm. Out-of-Realm
-    /// history implementation can use this to trim off history entries that
-    /// were successfully added to the history, but for which the corresponding
-    /// subsequent commits on the Realm file failed.
+    /// \param version The current version of the associated Realm.
     ///
     /// The default implementation does nothing.
     virtual void initiate_session(version_type version) = 0;
 
-    /// Called by the associated SharedGroup object when a session is
+    /// Called by the associated DB object when a session is
     /// terminated. See initiate_session() for the definition of a
     /// session. Session termination occurs upon closing the Realm through the
-    /// last SharedGroup object within the session.
+    /// last DB object within the session.
     ///
     /// The default implementation does nothing.
     virtual void terminate_session() noexcept = 0;
@@ -96,24 +85,24 @@ public:
     //@{
 
     /// From the point of view of the Replication class, a transaction is
-    /// initiated when, and only when the associated SharedGroup object calls
+    /// initiated when, and only when the associated Transaction object calls
     /// initiate_transact() and the call is successful. The associated
-    /// SharedGroup object must terminate every initiated transaction either by
+    /// Transaction object must terminate every initiated transaction either by
     /// calling finalize_commit() or by calling abort_transact(). It may only
     /// call finalize_commit(), however, after calling prepare_commit(), and
     /// only when prepare_commit() succeeds. If prepare_commit() fails (i.e.,
     /// throws) abort_transact() must still be called.
     ///
-    /// The associated SharedGroup object is supposed to terminate a transaction
+    /// The associated Transaction object is supposed to terminate a transaction
     /// as soon as possible, and is required to terminate it before attempting
     /// to initiate a new one.
     ///
-    /// initiate_transact() is called by the associated SharedGroup object as
+    /// initiate_transact() is called by the associated Transaction object as
     /// part of the initiation of a transaction, and at a time where the caller
     /// has acquired exclusive write access to the local Realm. The Replication
     /// implementation is allowed to perform "precursor transactions" on the
     /// local Realm at this time. During the initiated transaction, the
-    /// associated SharedGroup object must inform the Replication object of all
+    /// associated DB object must inform the Replication object of all
     /// modifying operations by calling set_value() and friends.
     ///
     /// FIXME: There is currently no way for implementations to perform
@@ -123,12 +112,12 @@ public:
     /// function.
     ///
     /// prepare_commit() serves as the first phase of a two-phase commit. This
-    /// function is called by the associated SharedGroup object immediately
+    /// function is called by the associated Transaction object immediately
     /// before the commit operation on the local Realm. The associated
-    /// SharedGroup object will then, as the second phase, either call
+    /// Transaction object will then, as the second phase, either call
     /// finalize_commit() or abort_transact() depending on whether the commit
     /// operation succeeded or not. The Replication implementation is allowed to
-    /// modify the Realm via the associated SharedGroup object at this time
+    /// modify the Realm via the associated Transaction object at this time
     /// (important to in-Realm histories).
     ///
     /// initiate_transact() and prepare_commit() are allowed to block the
@@ -142,16 +131,16 @@ public:
     /// initiate_transact() or prepare_commit() throws Interrupted, it counts as
     /// a failed operation.
     ///
-    /// finalize_commit() is called by the associated SharedGroup object
+    /// finalize_commit() is called by the associated Transaction object
     /// immediately after a successful commit operation on the local Realm. This
     /// happens at a time where modification of the Realm is no longer possible
-    /// via the associated SharedGroup object. In the case of in-Realm
+    /// via the associated Transaction object. In the case of in-Realm
     /// histories, the changes are automatically finalized as part of the commit
     /// operation performed by the caller prior to the invocation of
     /// finalize_commit(), so in that case, finalize_commit() might not need to
     /// do anything.
     ///
-    /// abort_transact() is called by the associated SharedGroup object to
+    /// abort_transact() is called by the associated Transaction object to
     /// terminate a transaction without committing. That is, any transaction
     /// that is not terminated by finalize_commit() is terminated by
     /// abort_transact(). This could be due to an explicit rollback, or due to a
@@ -509,6 +498,13 @@ inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Tim
 }
 
 template <>
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, ObjectId value,
+                             _impl::Instruction variant)
+{
+    set_object_id(table, col_key, key, value, variant);
+}
+
+template <>
 inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, bool value, _impl::Instruction variant)
 {
     set_bool(table, col_key, key, value, variant);
@@ -524,6 +520,18 @@ template <>
 inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, double value, _impl::Instruction variant)
 {
     set_double(table, col_key, key, value, variant);
+}
+
+template <>
+inline void Replication::set(const Table* table, ColKey col_key, ObjKey key, Decimal128 value,
+                             _impl::Instruction variant)
+{
+    if (value.is_null()) {
+        set_null(table, col_key, key, variant);
+    }
+    else {
+        set_decimal(table, col_key, key, value, variant);
+    }
 }
 
 template <>

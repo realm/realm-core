@@ -84,33 +84,34 @@ void ArrayStringShort::set(size_t ndx, StringData value)
     if (m_width <= value.size()) {
         // Calc min column width
         size_t new_width = ::round_up(value.size() + 1);
+        const size_t old_width = m_width;
         alloc(m_size, new_width); // Throws
 
         char* base = m_data;
         char* new_end = base + m_size * new_width;
 
         // Expand the old values in reverse order
-        if (0 < m_width) {
-            const char* old_end = base + m_size * m_width;
+        if (old_width > 0) {
+            const char* old_end = base + m_size * old_width;
             while (new_end != base) {
-                *--new_end = char(*--old_end + (new_width - m_width));
+                *--new_end = char(*--old_end + (new_width - old_width));
                 {
                     // extend 0-padding
-                    char* new_begin = new_end - (new_width - m_width);
+                    char* new_begin = new_end - (new_width - old_width);
                     std::fill(new_begin, new_end, 0);
                     new_end = new_begin;
                 }
                 {
                     // copy string payload
-                    const char* old_begin = old_end - (m_width - 1);
-                    if (static_cast<size_t>(old_end - old_begin) < m_width) // non-null string
+                    const char* old_begin = old_end - (old_width - 1);
+                    if (static_cast<size_t>(old_end - old_begin) < old_width) // non-null string
                         new_end = std::copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
             }
         }
         else {
-            // m_width == 0. Expand to new width.
+            // old_width == 0. Expand to new width.
             while (new_end != base) {
                 REALM_ASSERT_3(new_width, <=, max_width);
                 *--new_end = static_cast<char>(new_width);
@@ -121,8 +122,6 @@ void ArrayStringShort::set(size_t ndx, StringData value)
                 }
             }
         }
-
-        m_width = uint_least8_t(new_width);
     }
     else if (is_read_only()) {
         if (get(ndx) == value)
@@ -160,12 +159,11 @@ void ArrayStringShort::insert(size_t ndx, StringData value)
     // bit complex.
 
     // Allocate room for the new value
+    const auto old_size = m_size;
     alloc(m_size + 1, m_width); // Throws
 
     // Make gap for new value
-    memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (m_size - ndx));
-
-    m_size++;
+    memmove(m_data + m_width * (ndx + 1), m_data + m_width * ndx, m_width * (old_size - ndx));
 
     // Set new value
     set(ndx, value);
@@ -324,35 +322,6 @@ void ArrayStringShort::string_stats() const
     std::cout << "     longest: " << longest << "\n";
     std::cout << "Bytes zeroes: " << zeroes << "\n";
     std::cout << "         avg: " << zavg << "\n";
-}
-
-
-void ArrayStringShort::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
-    out << "0x" << std::hex << ref << std::dec << "</FONT></TD>" << std::endl;
-
-    for (size_t i = 0; i < m_size; ++i)
-        out << "<TD>\"" << get(i) << "\"</TD>" << std::endl;
-
-    out << "</TR></TABLE>>];" << std::endl;
-
-    if (title.size() != 0)
-        out << "}" << std::endl;
-
-    to_dot_parent_edge(out);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

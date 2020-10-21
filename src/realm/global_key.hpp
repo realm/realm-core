@@ -70,7 +70,7 @@ struct GlobalKey {
     {
     }
 
-    // Construct an ObjectId from either a string or an integer
+    // Construct an GlobalKey from either a string, an integer or a GlobalId
     GlobalKey(Mixed pk);
 
     // Construct an object id from the local squeezed ObjKey

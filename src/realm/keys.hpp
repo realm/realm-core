@@ -108,6 +108,14 @@ struct ColKey {
                  ((tag & 0xFFFFFFFFUL) << 30))
     {
     }
+    bool is_nullable()
+    {
+        return get_attrs().test(col_attr_Nullable);
+    }
+    bool is_list()
+    {
+        return get_attrs().test(col_attr_List);
+    }
     ColKey& operator=(int64_t val) noexcept
     {
         value = val;
@@ -168,6 +176,14 @@ struct ObjKey {
     explicit constexpr ObjKey(int64_t val) noexcept
         : value(val)
     {
+    }
+    bool is_unresolved() const
+    {
+        return value <= -2;
+    }
+    ObjKey get_unresolved() const
+    {
+        return ObjKey(-2 - value);
     }
     ObjKey& operator=(int64_t val) noexcept
     {

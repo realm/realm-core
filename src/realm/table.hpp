@@ -30,7 +30,6 @@
 #include <realm/util/function_ref.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/list.hpp>
 #include <realm/spec.hpp>
 #include <realm/query.hpp>
 #include <realm/cluster_tree.hpp>
@@ -58,7 +57,6 @@ template <class>
 class Columns;
 template <class>
 class SubQuery;
-struct LinkTargetInfo;
 class ColKeys;
 struct GlobalKey;
 class LinkChain;
@@ -78,32 +76,16 @@ class QueryInfo;
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
-    /// lifetime.
-    ///
-    /// This constructor should be used only when placing a table
-    /// instance on the stack, and it is then the responsibility of
-    /// the application that there are no objects of type TableRef or
-    /// ConstTableRef that refer to it, or to any of its subtables,
-    /// when it goes out of scope.
+    /// lifetime. For debugging only.
     Table(Allocator& = Allocator::get_default());
 
     /// Construct a copy of the specified table as a new freestanding
-    /// top-level table with static lifetime.
-    ///
-    /// This constructor should be used only when placing a table
-    /// instance on the stack, and it is then the responsibility of
-    /// the application that there are no objects of type TableRef or
-    /// ConstTableRef that refer to it, or to any of its subtables,
-    /// when it goes out of scope.
+    /// top-level table with static lifetime. For debugging only.
     Table(const Table&, Allocator& = Allocator::get_default());
 
     ~Table() noexcept;
 
     Allocator& get_alloc() const;
-
-    /// Construct a copy of the specified table as a new freestanding top-level
-    /// table with dynamic lifetime. This method is deprecated.
-    TableRef copy(Allocator& = Allocator::get_default()) const;
 
     /// Get the name of this table, if it has one. Only group-level tables have
     /// names. For a table of any other kind, this function returns the empty
@@ -119,6 +101,7 @@ public:
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
+    bool is_embedded() const noexcept; // true if table holds embedded objects
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
@@ -142,77 +125,18 @@ public:
     static const uint64_t max_num_columns = 0xFFFFUL; // <-- must be power of two -1
     ColKey add_column(DataType type, StringData name, bool nullable = false);
     ColKey add_column_list(DataType type, StringData name, bool nullable = false);
-    ColKey add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
 
-    // Pass a ColKey() as first argument to have a new colkey generated
-    // Requesting a specific ColKey may fail with invalidkey exception, if the key is already in use
-    // We recommend allowing Core to choose the ColKey.
-    ColKey insert_column(ColKey col_key, DataType type, StringData name, bool nullable = false);
-    ColKey insert_column_link(ColKey col_key, DataType type, StringData name, Table& target,
-                              LinkType link_type = link_Weak);
+    ColKey add_column_link(DataType type, StringData name, Table& target);
+
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
     void check_column(ColKey col_key) const;
+    // Change the embedded property of a table. If switching to being embedded, the table must
+    // not have a primary key and all objects must have exactly 1 backlink. Return value
+    // indicates if the conversion was done
+    bool set_embedded(bool embedded);
     //@}
-
-    /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
-    /// that implies ownership, i.e., that the origin object (parent) owns the
-    /// target parent (child). Simply stated, this means that when the origin object
-    /// (parent) is removed, so is the target object (child). If there are multiple
-    /// strong links to an object, the origin objects share ownership, and the
-    /// target object is removed when the last owner disappears. Weak links do not
-    /// imply ownership, and will be nullified or removed when the target object
-    /// disappears.
-    ///
-    /// To put this in precise terms; when a strong link is broken, and the
-    /// target object has no other strong links to it, the target object is removed. A
-    /// object that is implicitly removed in this way, is said to be
-    /// *cascade-removed*. When a weak link is broken, nothing is
-    /// cascade-removed.
-    ///
-    /// A link is considered broken if
-    ///
-    ///  - the link is nullified, removed, or replaced by a different link
-    ///
-    ///  - the origin object is explicitly removed
-    ///
-    ///  - the origin object is cascade-removed, or if
-    ///
-    ///  - the origin field is removed from the table (Table::remove_column()),
-    ///    or if
-    ///
-    ///  - the origin table is removed from the group.
-    ///
-    /// Note that a link is *not* considered broken when it is replaced by a
-    /// link to the same target object. I.e., no objects will be cascade-removed
-    /// due to such an operation.
-    ///
-    /// When a object is explicitly removed (such as by Table::move_last_over()),
-    /// all links to it are automatically removed or nullified. For single link
-    /// columns (type_Link), links to the removed object are nullified. For link
-    /// list columns (type_LinkList), links to the removed object are removed from
-    /// the list.
-    ///
-    /// When a object is cascade-removed there can no longer be any strong links to
-    /// it, but if there are any weak links, they will be removed or nullified.
-    ///
-    /// It is important to understand that this cascade-removal scheme is too
-    /// simplistic to enable detection and removal of orphaned link-cycles. In
-    /// this respect, it suffers from the same limitations as a reference
-    /// counting scheme generally does.
-    ///
-    /// It is also important to understand, that the possible presence of a link
-    /// cycle can cause a object to be cascade-removed as a consequence of being
-    /// modified. This happens, for example, if two objects, A and B, have strong
-    /// links to each other, and there are no other strong links to either of
-    /// them. In this case, if A->B is changed to A->C, then both A and B will
-    /// be cascade-removed. This can lead to obscure bugs in some applications.
-    ///
-    /// The link type must be specified at column creation and cannot be changed
-    // Returns the link type for the given column.
-    // Throws an LogicError if target column is not a link column.
-    LinkType get_link_type(ColKey col_key) const;
 
     /// True for `col_type_Link` and `col_type_LinkList`.
     static bool is_link_type(ColumnType) noexcept;
@@ -266,7 +190,14 @@ public:
 
     // Table size and deletion
     bool is_empty() const noexcept;
-    size_t size() const noexcept;
+    size_t size() const noexcept
+    {
+        return m_clusters.size();
+    }
+    size_t nb_unresolved() const noexcept
+    {
+        return m_tombstones ? m_tombstones->size() : 0;
+    }
 
     //@{
 
@@ -274,11 +205,30 @@ public:
 
     // Create an object with key. If the key is omitted, a key will be generated by the system
     Obj create_object(ObjKey key = {}, const FieldValues& = {});
-    // Create an object with specific GlobalKey.
+    // Create an object with specific GlobalKey - or return already existing object
+    // Potential tombstone will be resurrected
     Obj create_object(GlobalKey object_id, const FieldValues& = {});
     // Create an object with primary key. If an object with the given primary key already exists, it
     // will be returned and did_create (if supplied) will be set to false.
-    Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr);
+    // Potential tombstone will be resurrected
+    Obj create_object_with_primary_key(const Mixed& primary_key, FieldValues&&, bool* did_create = nullptr);
+    Obj create_object_with_primary_key(const Mixed& primary_key, bool* did_create = nullptr)
+    {
+        return create_object_with_primary_key(primary_key, {{}}, did_create);
+    }
+    // Return key for existing object or return null key.
+    ObjKey find_primary_key(Mixed value) const;
+    // Return ObjKey for object identified by id. If objects does not exist, return null key
+    ObjKey get_objkey(GlobalKey id) const;
+    // Return key for existing object or return unresolved key.
+    // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
+    // observe an unresolved key. Ever.
+    ObjKey get_objkey_from_primary_key(const Mixed& primary_key);
+    // Return key for existing object or return unresolved key.
+    // Important: This is to be used ONLY by the Sync client. SDKs should NEVER
+    // observe an unresolved key. Ever.
+    // Important (2): This function must not be called for tables with primary keys.
+    ObjKey get_objkey_from_global_key(GlobalKey key);
     /// Create a number of objects and add corresponding keys to a vector
     void create_objects(size_t number, std::vector<ObjKey>& keys);
     /// Create a number of objects with keys supplied
@@ -288,14 +238,15 @@ public:
     {
         return m_clusters.is_valid(key);
     }
-    ObjKey get_obj_key(GlobalKey id) const;
     GlobalKey get_object_id(ObjKey key) const;
     Obj get_object(ObjKey key)
     {
+        REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
     ConstObj get_object(ObjKey key) const
     {
+        REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
     }
     Obj get_object(size_t ndx)
@@ -306,6 +257,10 @@ public:
     {
         return m_clusters.get(ndx);
     }
+    // Get object based on primary key
+    Obj get_object_with_primary_key(Mixed pk);
+    // Get primary key based on ObjKey
+    Mixed get_primary_key(ObjKey key);
     // Get logical index for object. This function is not very efficient
     size_t get_object_ndx(ObjKey key) const
     {
@@ -320,14 +275,23 @@ public:
     }
 
     /// remove_object() removes the specified object from the table.
-    /// The removal of an object a table may cause other linked objects to be
-    /// cascade-removed. The clearing of a table may also cause linked objects
-    /// to be cascade-removed, but in this respect, the effect is exactly as if
-    /// each object had been removed individually. See set_link_type() for details.
+    /// Any links from the specified object into objects residing in an embedded
+    /// table will cause those objects to be deleted as well, and so on recursively.
     void remove_object(ObjKey key);
     /// remove_object_recursive() will delete linked rows if the removed link was the
     /// last one holding on to the row in question. This will be done recursively.
     void remove_object_recursive(ObjKey key);
+    // Invalidate object. To be used by the Sync client.
+    // - turns the object into a tombstone if links exist
+    // - otherwise works just as remove_object()
+    void invalidate_object(ObjKey key);
+    ConstObj get_tombstone(ObjKey key) const
+    {
+        REALM_ASSERT(key.is_unresolved());
+        REALM_ASSERT(m_tombstones);
+        return m_tombstones->get(key);
+    }
+
     void clear();
     using Iterator = ClusterTree::Iterator;
     using ConstIterator = ClusterTree::ConstIterator;
@@ -348,10 +312,6 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
-    // FIXME: These limits should be chosen independently of the underlying
-    // platform's choice to define int64_t and independent of the integer
-    // representation. The current values only work for 2's complement, which is
-    // not guaranteed by the standard.
     static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
     static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
 
@@ -380,21 +340,26 @@ public:
     size_t count_string(ColKey col_key, StringData value) const;
     size_t count_float(ColKey col_key, float value) const;
     size_t count_double(ColKey col_key, double value) const;
+    size_t count_decimal(ColKey col_key, Decimal128 value) const;
 
     int64_t sum_int(ColKey col_key) const;
     double sum_float(ColKey col_key) const;
     double sum_double(ColKey col_key) const;
+    Decimal128 sum_decimal(ColKey col_key) const;
     int64_t maximum_int(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     float maximum_float(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     double maximum_double(ColKey col_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 maximum_decimal(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     Timestamp maximum_timestamp(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     int64_t minimum_int(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     float minimum_float(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     double minimum_double(ColKey col_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 minimum_decimal(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     Timestamp minimum_timestamp(ColKey col_key, ObjKey* return_ndx = nullptr) const;
     double average_int(ColKey col_key, size_t* value_count = nullptr) const;
     double average_float(ColKey col_key, size_t* value_count = nullptr) const;
     double average_double(ColKey col_key, size_t* value_count = nullptr) const;
+    Decimal128 average_decimal(ColKey col_key, size_t* value_count = nullptr) const;
 
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
@@ -410,8 +375,10 @@ public:
     ObjKey find_first_int(ColKey col_key, int64_t value) const;
     ObjKey find_first_bool(ColKey col_key, bool value) const;
     ObjKey find_first_timestamp(ColKey col_key, Timestamp value) const;
+    ObjKey find_first_object_id(ColKey col_key, ObjectId value) const;
     ObjKey find_first_float(ColKey col_key, float value) const;
     ObjKey find_first_double(ColKey col_key, double value) const;
+    ObjKey find_first_decimal(ColKey col_key, Decimal128 value) const;
     ObjKey find_first_string(ColKey col_key, StringData value) const;
     ObjKey find_first_binary(ColKey col_key, BinaryData value) const;
     ObjKey find_first_null(ColKey col_key) const;
@@ -432,10 +399,6 @@ public:
     ConstTableView find_all_binary(ColKey col_key, BinaryData value) const;
     TableView find_all_null(ColKey col_key);
     ConstTableView find_all_null(ColKey col_key) const;
-
-    /// The following column types are supported: String, Integer, OldDateTime, Bool
-    TableView get_distinct_view(ColKey col_key);
-    ConstTableView get_distinct_view(ColKey col_key) const;
 
     TableView get_sorted_view(ColKey col_key, bool ascending = true);
     ConstTableView get_sorted_view(ColKey col_key, bool ascending = true) const;
@@ -518,6 +481,9 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
+    Obj create_linked_object(GlobalKey = {});
+    /// Changes embeddedness unconditionally. Called only from Group::do_get_or_add_table()
+    void do_set_embedded(bool embedded);
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
@@ -529,48 +495,6 @@ public:
     ColKey spec_ndx2colkey(size_t ndx) const;
     void report_invalid_key(ColKey col_key) const;
     size_t num_leaf_cols() const;
-    //@{
-    /// Find the lower/upper bound according to a column that is
-    /// already sorted in ascending order.
-    ///
-    /// For an integer column at index 0, and an integer value '`v`',
-    /// lower_bound_int(0,v) returns the index '`l`' of the first row
-    /// such that `get_int(0,l) &ge; v`, and upper_bound_int(0,v)
-    /// returns the index '`u`' of the first row such that
-    /// `get_int(0,u) &gt; v`. In both cases, if no such row is found,
-    /// the returned value is the number of rows in the table.
-    ///
-    ///     3 3 3 4 4 4 5 6 7 9 9 9
-    ///     ^     ^     ^     ^     ^
-    ///     |     |     |     |     |
-    ///     |     |     |     |      -- Lower and upper bound of 15
-    ///     |     |     |     |
-    ///     |     |     |      -- Lower and upper bound of 8
-    ///     |     |     |
-    ///     |     |      -- Upper bound of 4
-    ///     |     |
-    ///     |      -- Lower bound of 4
-    ///     |
-    ///      -- Lower and upper bound of 1
-    ///
-    /// These functions are similar to std::lower_bound() and
-    /// std::upper_bound().
-    ///
-    /// The string versions assume that the column is sorted according
-    /// to StringData::operator<().
-    ///
-    /// FIXME: Deprecate or change to return ObjKey.
-    size_t lower_bound_int(ColKey col_key, int64_t value) const noexcept;
-    size_t upper_bound_int(ColKey col_key, int64_t value) const noexcept;
-    size_t lower_bound_bool(ColKey col_key, bool value) const noexcept;
-    size_t upper_bound_bool(ColKey col_key, bool value) const noexcept;
-    size_t lower_bound_float(ColKey col_key, float value) const noexcept;
-    size_t upper_bound_float(ColKey col_key, float value) const noexcept;
-    size_t lower_bound_double(ColKey col_key, double value) const noexcept;
-    size_t upper_bound_double(ColKey col_key, double value) const noexcept;
-    size_t lower_bound_string(ColKey col_key, StringData value) const noexcept;
-    size_t upper_bound_string(ColKey col_key, StringData value) const noexcept;
-    //@}
 
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
@@ -682,6 +606,7 @@ private:
     }
     Spec m_spec;            // 1st slot in m_top
     ClusterTree m_clusters; // 3rd slot in m_top
+    std::unique_ptr<ClusterTree> m_tombstones; // 13th slot in m_top
     TableKey m_key;     // 4th slot in m_top
     Array m_index_refs; // 5th slot in m_top
     Array m_opposite_table;  // 7th slot in m_top
@@ -691,6 +616,7 @@ private:
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
     bool m_is_frozen = false;
+    util::Optional<bool> m_has_any_embedded_objects;
     TableRef m_own_ref;
 
     void batch_erase_rows(const KeyColumn& keys);
@@ -701,7 +627,7 @@ private:
     // Migration support
     void migrate_column_info();
     bool verify_column_keys();
-    void migrate_indexes();
+    void migrate_indexes(ColKey pk_col_key);
     void migrate_subspec();
     void create_columns();
     bool migrate_objects(ColKey pk_col_key); // Returns true if there are no links to migrate
@@ -731,25 +657,21 @@ private:
     void revive(Replication* const* repl, Allocator& new_allocator, bool writable);
 
     void init(ref_type top_ref, ArrayParent*, size_t ndx_in_parent, bool is_writable, bool is_frozen);
+    void ensure_graveyard();
 
     void set_key(TableKey key);
 
-    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target_info,
-                            bool nullable = false, bool listtype = false, LinkType link_type = link_Weak);
+    ColKey do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
     struct RenameSubtableColumns;
 
-    ColKey insert_root_column(ColKey col_key, DataType type, StringData name, LinkTargetInfo& link_target,
-                              bool nullable = false, bool linktype = false, LinkType link_type = link_Weak);
     void erase_root_column(ColKey col_key);
-    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name, bool nullable = false,
-                                 bool listtype = false, LinkType link_type = link_Weak);
+    ColKey do_insert_root_column(ColKey col_key, ColumnType, StringData name);
     void do_erase_root_column(ColKey col_key);
-    ColKey insert_backlink_column(TableKey origin_table_key, ColKey origin_col_key, ColKey backlink_col_key);
-    void erase_backlink_column(ColKey backlink_col_key);
 
+    bool has_any_embedded_objects();
     void set_opposite_column(ColKey col_key, TableKey opposite_table, ColKey opposite_column);
     void do_set_primary_key_column(ColKey col_key);
     void validate_column_is_unique(ColKey col_key) const;
@@ -771,8 +693,12 @@ private:
     /// for both \a incoming_id and \a colliding_id.
     ObjKey allocate_local_id_after_hash_collision(GlobalKey incoming_id, GlobalKey colliding_id,
                                                   ObjKey colliding_local_id);
+    /// Create a placeholder for a not yet existing object and return key to it
+    Obj get_or_create_tombstone(ObjKey key, const FieldValues& values);
     /// Should be called when an object is deleted
     void free_local_id_after_hash_collision(ObjKey key);
+    /// Should be called when last entry is removed - or when table is cleared
+    void free_collision_table();
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
@@ -802,97 +728,6 @@ private:
 
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
-    //@{
-
-    /// Cascading removal of strong links.
-    ///
-    /// FIXME: Update this explanation
-    ///
-    /// cascade_break_backlinks_to() removes all backlinks pointing to the row
-    /// at \a row_ndx. Additionally, if this causes the number of **strong**
-    /// backlinks originating from a particular opposite row (target row of
-    /// corresponding forward link) to drop to zero, and that row is not already
-    /// in \a state.rows, then that row is added to \a state.rows, and
-    /// cascade_break_backlinks_to() is called recursively for it. This
-    /// operation is the first half of the cascading row removal operation. The
-    /// second half is performed by passing the resulting contents of \a
-    /// state.rows to remove_backlink_broken_rows().
-    ///
-    /// Operations that trigger cascading row removal due to explicit removal of
-    /// one or more rows (the *initiating rows*), should add those rows to \a
-    /// rows initially, and then call cascade_break_backlinks_to() once for each
-    /// of them in turn. This is opposed to carrying out the explicit row
-    /// removals independently, which is also possible, but does require that
-    /// any initiating rows, that end up in \a state.rows due to link cycles,
-    /// are removed before passing \a state.rows to
-    /// remove_backlink_broken_rows(). In the case of clear(), where all rows of
-    /// a table are explicitly removed, it is better to use
-    /// cascade_break_backlinks_to_all_rows(), and then carry out the table
-    /// clearing as an independent step. For operations that trigger cascading
-    /// row removal for other reasons than explicit row removal, \a state.rows
-    /// must be empty initially, but cascade_break_backlinks_to() must still be
-    /// called for each of the initiating rows.
-    ///
-    /// When the last non-recursive invocation of cascade_break_backlinks_to()
-    /// returns, all forward links originating from a row in \a state.rows have
-    /// had their reciprocal backlinks removed, so remove_backlink_broken_rows()
-    /// does not perform reciprocal backlink removal at all. Additionally, all
-    /// remaining backlinks originating from rows in \a state.rows are
-    /// guaranteed to point to rows that are **not** in \a state.rows. This is
-    /// true because any backlink that was pointing to a row in \a state.rows
-    /// has been removed by one of the invocations of
-    /// cascade_break_backlinks_to(). The set of forward links, that correspond
-    /// to these remaining backlinks, is precisely the set of forward links that
-    /// need to be removed/nullified by remove_backlink_broken_rows(), which it
-    /// does by way of reciprocal forward link removal. Note also, that while
-    /// all the rows in \a state.rows can have remaining **weak** backlinks
-    /// originating from them, only the initiating rows in \a state.rows can
-    /// have remaining **strong** backlinks originating from them. This is true
-    /// because a non-initiating row is added to \a state.rows only when the
-    /// last backlink originating from it is lost.
-    ///
-    /// Each row removal is replicated individually (as opposed to one
-    /// replication instruction for the entire cascading operation). This is
-    /// done because it provides an easy way for Group::advance_transact() to
-    /// know which tables are affected by the cascade. Note that this has
-    /// several important consequences: First of all, the replication log
-    /// receiver must execute the row removal instructions in a non-cascading
-    /// fashion, meaning that there will be an asymmetry between the two sides
-    /// in how the effect of the cascade is brought about. While this is fine
-    /// for simple 1-to-1 replication, it may end up interfering badly with
-    /// *transaction merging*, when that feature is introduced. Imagine for
-    /// example that the cascade initiating operation gets canceled during
-    /// conflict resolution, but some, or all of the induced row removals get to
-    /// stay. That would break causal consistency. It is important, however, for
-    /// transaction merging that the cascaded row removals are explicitly
-    /// mentioned in the replication log, such that they can be used to adjust
-    /// row indexes during the *operational transform*.
-    ///
-    /// cascade_break_backlinks_to_all_rows() has the same affect as calling
-    /// cascade_break_backlinks_to() once for each row in the table. When
-    /// calling this function, \a state.stop_on_table must be set to the origin
-    /// table (origin table of corresponding forward links), and \a
-    /// state.stop_on_link_list_column must be null.
-    ///
-    /// It is immaterial which table remove_backlink_broken_rows() is called on,
-    /// as long it that table is in the same group as the removed rows.
-
-    void cascade_break_backlinks_to(size_t, CascadeState&)
-    {
-        REALM_ASSERT(false); // unimplemented
-    }
-
-    void cascade_break_backlinks_to_all_rows(CascadeState&)
-    {
-        REALM_ASSERT(false); // unimplemented
-    }
-
-    void remove_backlink_broken_rows(const CascadeState&)
-    {
-        REALM_ASSERT(false); // unimplemented
-    }
-
-    //@}
 
     /// Used by query. Follows chain of link columns and returns final target table
     const Table* get_link_chain_target(const std::vector<ColKey>&) const;
@@ -917,7 +752,7 @@ private:
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
-
+    bool m_is_embedded = false;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
 
     static constexpr int top_position_for_spec = 0;
@@ -932,7 +767,10 @@ private:
     static constexpr int top_position_for_sequence_number = 9;
     static constexpr int top_position_for_collision_map = 10;
     static constexpr int top_position_for_pk_col = 11;
-    static constexpr int top_array_size = 12;
+    static constexpr int top_position_for_flags = 12;
+    // flags contents: bit 0 - is table embedded?
+    static constexpr int top_position_for_tombstones = 13;
+    static constexpr int top_array_size = 14;
 
     enum { s_collision_map_lo = 0, s_collision_map_hi = 1, s_collision_map_local_id = 2, s_collision_map_num_slots };
 
@@ -959,6 +797,7 @@ private:
     friend class ColKeyIterator;
     friend class ConstObj;
     friend class Obj;
+    friend class LnkLst;
     friend class IncludeDescriptor;
 };
 
@@ -1037,13 +876,20 @@ private:
     const Table* m_table;
 };
 
+enum class ExpressionComparisonType : unsigned char {
+    Any,
+    All,
+    None,
+};
+
 // Class used to collect a chain of links when building up a Query following links.
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t)
+    LinkChain(ConstTableRef t, ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_current_table(t.unchecked_ptr())
         , m_base_table(t)
+        , m_comparison_type(type)
     {
     }
     const Table* get_base_table()
@@ -1080,7 +926,7 @@ public:
             m_link_cols.push_back(col_key);
         }
 
-        return Columns<T>(col_key, m_base_table, m_link_cols);
+        return Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key)
@@ -1119,6 +965,7 @@ private:
     std::vector<ColKey> m_link_cols;
     const Table* m_current_table;
     ConstTableRef m_base_table;
+    ExpressionComparisonType m_comparison_type;
 
     void add(ColKey ck)
     {
@@ -1187,6 +1034,11 @@ inline size_t Table::get_column_count() const noexcept
     return m_spec.get_public_column_count();
 }
 
+inline bool Table::is_embedded() const noexcept
+{
+    return m_is_embedded;
+}
+
 inline StringData Table::get_column_name(ColKey column_key) const
 {
     auto spec_ndx = colkey2spec_ndx(column_key);
@@ -1222,7 +1074,7 @@ inline Table::Table(Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
-    , m_clusters(this, m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
@@ -1244,7 +1096,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     : m_alloc(alloc)
     , m_top(m_alloc)
     , m_spec(m_alloc)
-    , m_clusters(this, m_alloc)
+    , m_clusters(this, m_alloc, top_position_for_cluster_tree)
     , m_index_refs(m_alloc)
     , m_opposite_table(m_alloc)
     , m_opposite_column(m_alloc)
@@ -1331,12 +1183,6 @@ inline bool Table::is_empty() const noexcept
 {
     return size() == 0;
 }
-
-inline size_t Table::size() const noexcept
-{
-    return m_clusters.size();
-}
-
 
 inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
 {
@@ -1446,26 +1292,8 @@ bool inline Table::valid_column(ColKey col_key) const noexcept
 inline void Table::check_column(ColKey col_key) const
 {
     if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw InvalidKey("No such column");
+        throw ColumnNotFound();
 }
-
-// This class groups together information about the target of a link column
-// This is not a valid link if the target table == nullptr
-struct LinkTargetInfo {
-    LinkTargetInfo(Table* target = nullptr, ColKey backlink_key = ColKey())
-        : m_target_table(target)
-        , m_backlink_col_key(backlink_key)
-    {
-        if (backlink_key)
-            m_target_table->report_invalid_key(backlink_key);
-    }
-    bool is_valid() const
-    {
-        return (m_target_table != nullptr);
-    }
-    Table* m_target_table;
-    ColKey m_backlink_col_key; // a value of ColKey() indicates the backlink should be appended
-};
 
 // The purpose of this class is to give internal access to some, but
 // not all of the non-public parts of the Table class.
@@ -1496,6 +1324,15 @@ public:
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
+    }
+    // Temporary hack
+    static Obj create_linked_object(Table& table, GlobalKey id)
+    {
+        return table.create_linked_object(id);
+    }
+    static ObjKey global_to_local_object_id_hashed(const Table& table, GlobalKey global_id)
+    {
+        return table.global_to_local_object_id_hashed(global_id);
     }
 };
 

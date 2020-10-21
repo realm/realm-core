@@ -141,12 +141,13 @@ void BasicArray<T>::insert(size_t ndx, T value)
     copy_on_write(); // Throws
 
     // Make room for the new value
+    const auto old_size = m_size;
     alloc(m_size + 1, m_width); // Throws
 
     // Move values below insertion
-    if (ndx != m_size) {
+    if (ndx != old_size) {
         char* src_begin = m_data + ndx * m_width;
-        char* src_end = m_data + m_size * m_width;
+        char* src_end = m_data + old_size * m_width;
         char* dst_end = src_end + m_width;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -154,8 +155,6 @@ void BasicArray<T>::insert(size_t ndx, T value)
     // Set the value
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
-
-    ++m_size;
 }
 
 template <class T>
@@ -372,44 +371,6 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
     size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
-
-#ifdef REALM_DEBUG
-
-// LCOV_EXCL_START
-template <class T>
-void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-    if (title.size() != 0) {
-        out << "subgraph cluster_" << ref << " {\n";
-        out << " label = \"" << title << "\";\n";
-        out << " color = white;\n";
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>\n";
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    out << "</FONT></TD>\n";
-
-    // Values
-    size_t n = m_size;
-    for (size_t i = 0; i != n; ++i)
-        out << "<TD>" << get(i) << "</TD>\n";
-
-    out << "</TR></TABLE>>];\n";
-
-    if (title.size() != 0)
-        out << "}\n";
-
-    to_dot_parent_edge(out);
-}
-// LCOV_EXCL_STOP
-
-#endif // REALM_DEBUG
-
 
 } // namespace realm
 

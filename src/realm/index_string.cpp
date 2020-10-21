@@ -87,6 +87,16 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
         GetIndexData<Timestamp> stringifier;
         return stringifier.get_index_data(obj.get<Timestamp>(m_column_key), buffer);
     }
+    else if (type == type_ObjectId) {
+        if (is_nullable()) {
+            GetIndexData<Optional<ObjectId>> stringifier;
+            return stringifier.get_index_data(obj.get<Optional<ObjectId>>(m_column_key), buffer);
+        }
+        else {
+            GetIndexData<ObjectId> stringifier;
+            return stringifier.get_index_data(obj.get<ObjectId>(m_column_key), buffer);
+        }
+    }
     // It should not be possible to reach this line through public Core API
     REALM_ASSERT_RELEASE(false);
     return {};
@@ -1166,60 +1176,6 @@ bool StringIndex::leaf_insert(ObjKey obj_key, key_type key, size_t offset, Strin
     return true;
 }
 
-
-void StringIndex::distinct(BPlusTree<ObjKey>& result) const
-{
-    Allocator& alloc = m_array->get_alloc();
-    const size_t array_size = m_array->size();
-
-    // Get first matching row for every key
-    if (m_array->is_inner_bptree_node()) {
-        for (size_t i = 1; i < array_size; ++i) {
-            size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, nullptr, 0, m_target_column, alloc);
-            ndx.distinct(result);
-        }
-    }
-    else {
-        for (size_t i = 1; i < array_size; ++i) {
-            uint64_t ref = m_array->get(i);
-
-            // low bit set indicate literal ref (shifted)
-            if (ref & 1) {
-                ObjKey k(int64_t(ref >> 1));
-                result.add(k);
-            }
-            else {
-                // A real ref either points to a list or a subindex
-                char* header = alloc.translate(ref_type(ref));
-                if (Array::get_context_flag_from_header(header)) {
-                    StringIndex ndx(ref_type(ref), m_array.get(), i, m_target_column, alloc);
-                    ndx.distinct(result);
-                }
-                else {
-                    IntegerColumn sub(alloc, ref_type(ref)); // Throws
-                    if (sub.size() == 1) {                 // Optimization.
-                        ObjKey k = ObjKey(sub.get(0));     // get first match
-                        result.add(k);
-                    }
-                    else {
-                        // Add all unique values from this sorted list
-                        IntegerColumn::const_iterator it = sub.cbegin();
-                        IntegerColumn::const_iterator it_end = sub.cend();
-                        SortedListComparator slc(m_target_column);
-                        StringConversionBuffer buffer;
-                        while (it != it_end) {
-                            result.add(ObjKey(*it));
-                            StringData it_data = get(ObjKey(*it), buffer);
-                            it = std::upper_bound(it, it_end, it_data, slc);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 StringData StringIndex::get(ObjKey key, StringConversionBuffer& buffer) const
 {
     return m_target_column.get_index_data(key, buffer);
@@ -1639,129 +1595,6 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
 {
     dump_node_structure(*m_array, out, level);
-}
-
-
-void StringIndex::to_dot() const
-{
-    to_dot(std::cerr);
-}
-
-
-void StringIndex::to_dot(std::ostream& out, StringData title) const
-{
-    out << "digraph G {" << std::endl;
-
-    to_dot_2(out, title);
-
-    out << "}" << std::endl;
-}
-
-
-void StringIndex::to_dot_2(std::ostream& out, StringData title) const
-{
-    ref_type ref = get_ref();
-
-    out << "subgraph cluster_string_index" << ref << " {" << std::endl;
-    out << " label = \"Search index";
-    if (title.size() != 0)
-        out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
-
-    array_to_dot(out, *m_array);
-
-    out << "}" << std::endl;
-}
-
-
-void StringIndex::array_to_dot(std::ostream& out, const Array& array)
-{
-    if (!array.get_context_flag()) {
-        /* FIXME
-        IntegerColumn col(array.get_alloc(), array.get_ref()); // Throws
-        col.set_parent(array.get_parent(), array.get_ndx_in_parent());
-        col.to_dot(out, "ref_list");
-        */
-        return;
-    }
-
-    Allocator& alloc = array.get_alloc();
-    Array offsets(alloc);
-    get_child(const_cast<Array&>(array), 0, offsets);
-    REALM_ASSERT(array.size() == offsets.size() + 1);
-    ref_type ref = array.get_ref();
-
-    if (array.is_inner_bptree_node()) {
-        out << "subgraph cluster_string_index_inner_node" << ref << " {" << std::endl;
-        out << " label = \"Inner node\";" << std::endl;
-    }
-    else {
-        out << "subgraph cluster_string_index_leaf" << ref << " {" << std::endl;
-        out << " label = \"Leaf\";" << std::endl;
-    }
-
-    array.to_dot(out);
-    keys_to_dot(out, offsets, "keys");
-
-    out << "}" << std::endl;
-
-    size_t count = array.size();
-    for (size_t i = 1; i < count; ++i) {
-        int64_t v = array.get(i);
-        if (v & 1)
-            continue; // ignore literals
-
-        Array r(alloc);
-        get_child(const_cast<Array&>(array), i, r);
-        array_to_dot(out, r);
-    }
-}
-
-
-void StringIndex::keys_to_dot(std::ostream& out, const Array& array, StringData title)
-{
-    ref_type ref = array.get_ref();
-
-    if (0 < title.size()) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
-    }
-
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
-
-    // Header
-    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    if (array.is_inner_bptree_node())
-        out << "IsNode<BR/>";
-    if (array.has_refs())
-        out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << std::endl;
-
-    // Values
-    size_t count = array.size();
-    for (size_t i = 0; i < count; ++i) {
-        uint64_t v = array.get(i); // Never right shift signed values
-
-        char str[5] = "\0\0\0\0";
-        str[3] = char(v & 0xFF);
-        str[2] = char((v >> 8) & 0xFF);
-        str[1] = char((v >> 16) & 0xFF);
-        str[0] = char((v >> 24) & 0xFF);
-        const char* s = str;
-
-        out << "<TD>" << s << "</TD>" << std::endl;
-    }
-
-    out << "</TR></TABLE>>];" << std::endl;
-    if (0 < title.size())
-        out << "}" << std::endl;
-
-    array.to_dot_parent_edge(out);
-
-    out << std::endl;
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

@@ -1071,11 +1071,13 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 }
 #endif
 
+
 TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_6_to_7.realm";
 
+#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1111,6 +1113,7 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_int(col, row, 123);
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+#endif
 }
 
 TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1118,6 +1121,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_7_to_8.realm";
 
+#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1153,6 +1157,7 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_int(col, row, 123);
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+#endif
 }
 
 
@@ -1161,6 +1166,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_8_to_9.realm";
     std::string validation_str = "test string";
+#ifndef REALM_CLUSTER_IF
 #if TEST_READ_UPGRADE_MODE
 
     // Automatic upgrade from SharedGroup
@@ -1201,6 +1207,7 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     t->set_string(str_col, row, validation_str);
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
+#endif
 }
 
 TEST(Upgrade_Database_6_10)
@@ -1289,74 +1296,6 @@ TEST(Upgrade_Database_9_10_with_pk_table)
 
     pk_col = t_dog->get_primary_key_column();
     CHECK(pk_col);
-}
-
-TEST(Upgrade_Database_9_10_with_oid)
-{
-    /* File has this content:
-    "pk":[
-        {"_key":0,"pk_table":"bar","pk_property":"ident"},
-        {"_key":1,"pk_table":"origin","pk_property":"num"}
-    ]
-    ,"metadata":[
-        {"_key":0,"version":0}
-    ]
-    ,"class_bar":[
-        {"_key":717911018529132092,"ident":"goodbye","value":800,"optional":-87},
-        {"_key":2515477941069477034,"ident":"hello","value":7,"optional":null},
-        {"_key":6444968757765087612,"ident":"world","value":35,"optional":null}
-    ]
-    ,"class_foo":[
-        {"_key":512,"name":"Tom","age":5},
-        {"_key":513,"name":"Pluto","age":10},
-        {"_key":514,"name":"Jerry","age":7}
-    ]
-    ,"class_origin":[
-        {"_key":0,"num":1,"object":null,"array":{"table": "class_foo", "keys": []}},
-        {"_key":1,"num":2,"object":{"table": "class_bar", "key": 2515477941069477034},
-            "array":{"table": "class_foo","keys": []}},
-        {"_key":2,"num":3,"object":null,"array":{"table": "class_foo", "keys": [512,514]}}
-    ]
-    }
-    */
-    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_oid.realm";
-    SHARED_GROUP_TEST_PATH(temp_copy);
-
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
-    File::copy(path, temp_copy);
-    ReplSyncClient repl(temp_copy, 10, 2);
-    auto sg = DB::create(repl);
-    ReadTransaction rt(sg);
-    rt.get_group().verify();
-    // rt.get_group().to_json(std::cout);
-
-    ConstTableRef t_bar = rt.get_table("class_bar");
-    ConstTableRef t_origin = rt.get_table("class_origin");
-
-    auto pk_col = t_bar->get_primary_key_column();
-    CHECK(pk_col);
-    CHECK_EQUAL(t_bar->get_column_name(pk_col), "ident");
-    auto hello_key = t_bar->find_first_string(pk_col, "hello");
-    auto obj1 = t_bar->get_object(hello_key);
-    CHECK_EQUAL(obj1.get<Int>("value"), 7);
-
-    pk_col = t_origin->get_primary_key_column();
-    CHECK(pk_col);
-    CHECK_EQUAL(t_origin->get_column_name(pk_col), "num");
-    auto key_3 = t_origin->find_first_int(pk_col, 3);
-    auto obj2 = t_origin->get_object(key_3);
-    auto ll = obj2.get_linklist(t_origin->get_column_key("array"));
-    CHECK_EQUAL(ll.get_object(0).get<String>("name"), "Tom");
-    CHECK_EQUAL(ll.get_object(1).get<String>("name"), "Jerry");
-
-    // Check that the objects can be found by primary key
-    pk_col = t_bar->get_primary_key_column();
-    for (auto&& obj : *t_bar) {
-        StringData id = obj.get<String>(pk_col);
-        auto tv = (t_bar->column<String>(pk_col) == id).find_all();
-        CHECK_EQUAL(tv.size(), 1);
-    }
 }
 
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
@@ -1573,6 +1512,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     // NOTE: This code must be executed from an old file-format-version 9
     // core in order to create a file-format-version 9 test file!
 
+#ifndef REALM_CLUSTER_IF
     Group g;
     TableRef t = g.add_table("table");
     TableRef o = g.add_table("other");
@@ -1690,6 +1630,54 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     t->set_binary(col_binary, 17, BinaryData(bigbin));
     t->insert_empty_row(insert_pos);
     t->set_string(col_string_i, insert_pos, "This is a rather long string, that should not be very much shorter");
+
+    g.write(path);
+#endif
+#endif // TEST_READ_UPGRADE_MODE
+}
+
+TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_10_to_11.realm";
+    std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the version 9 database so that we keep the
+    // original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history(temp_copy);
+    auto sg = DB::create(*hist);
+    auto rt = sg->start_read();
+
+    auto t = rt->get_table("table");
+    auto o = rt->get_table("origin");
+    auto col = o->get_column_key("link");
+
+    auto it = o->begin();
+    for (auto id : ids) {
+        auto obj = t->get_object_with_primary_key(id);
+        CHECK_EQUAL(obj.get_backlink_count(), 1);
+        CHECK_EQUAL(it->get<ObjKey>(col), obj.get_key());
+        ++it;
+    }
+
+#else
+    // NOTE: This code must be executed from an old file-format-version 10
+    // core in order to create a file-format-version 10 test file!
+
+    Group g;
+    TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
+    TableRef o = g.add_table("origin");
+    auto col = o->add_column_link(type_Link, "link", *t);
+
+    for (auto id : ids) {
+        auto obj = t->create_object_with_primary_key(id);
+        o->create_object().set(col, obj.get_key());
+    }
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE

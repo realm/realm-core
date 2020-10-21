@@ -204,7 +204,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     }
     else {
         m_free_positions.create(Array::type_Normal); // Throws
-        _impl::DestroyGuard<ArrayInteger> dg(&m_free_positions);
+        _impl::DestroyGuard<Array> dg(&m_free_positions);
         m_free_positions.update_parent(); // Throws
         dg.release();
     }
@@ -216,7 +216,7 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     }
     else {
         m_free_lengths.create(Array::type_Normal); // Throws
-        _impl::DestroyGuard<ArrayInteger> dg(&m_free_lengths);
+        _impl::DestroyGuard<Array> dg(&m_free_lengths);
         m_free_lengths.update_parent(); // Throws
         dg.release();
     }
@@ -244,8 +244,8 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
             top.set(6, 1 + 2 * uint64_t(initial_version));      // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
-            m_free_versions.Array::create(Array::type_Normal, context_flag, n, value); // Throws
-            _impl::DestroyGuard<ArrayInteger> dg(&m_free_versions);
+            m_free_versions.create(Array::type_Normal, context_flag, n, value); // Throws
+            _impl::DestroyGuard<Array> dg(&m_free_versions);
             m_free_versions.update_parent(); // Throws
             dg.release();
         }

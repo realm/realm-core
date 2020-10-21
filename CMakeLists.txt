@@ -18,12 +18,13 @@ include(SpecialtyBuilds)
 include(GetVersion)
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceRuns)
+include(CheckSymbolExists)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
 
 # Project-wide build flags
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(ANDROID)
@@ -107,7 +108,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_OPTIONS
     $<$<CONFIG:MinSizeDebug>:-g>
 )
 
-set(OPENSSL_VERSION "1.1.1b")
+set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
 set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
@@ -151,6 +152,8 @@ if(MSVC)
         # https://docs.microsoft.com/bg-bg/cpp/build/reference/md-mt-ld-use-run-time-library
         # https://cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
         foreach(flag_var
+            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
             if(${flag_var} MATCHES "/MD")
@@ -177,6 +180,14 @@ if(APPLE)
     find_library(Foundation Foundation)
 elseif(ANDROID)
     list(APPEND PLATFORM_LIBRARIES log android)
+endif()
+
+if(UNIX)
+    # Enable access to large file APIs, but don't make them the default.
+    add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
+    set(CMAKE_REQUIRED_DEFINITIONS "-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE")
+    # Use readdir64 if available.
+    check_symbol_exists(readdir64 "dirent.h" REALM_HAVE_READDIR64)
 endif()
 
 # Find dependencies

@@ -25,60 +25,6 @@
 using namespace realm;
 
 
-void ArrayInteger::create(Array::Type type, bool context_flag)
-{
-    Array::create(type, context_flag, 0, 0);
-}
-
-
-// Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
-// Useful for counting-sort functions
-template <size_t w>
-bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const
-{
-    int64_t min2;
-    int64_t max2;
-    size_t t;
-
-    max2 = Array::get<w>(from);
-    min2 = max2;
-
-    for (t = from + 1; t < to; t++) {
-        int64_t v = Array::get<w>(t);
-        // Utilizes that range test is only needed if max2 or min2 were changed
-        if (v < min2) {
-            min2 = v;
-            if (uint64_t(max2 - min2) > maxdiff)
-                break;
-        }
-        else if (v > max2) {
-            max2 = v;
-            if (uint64_t(max2 - min2) > maxdiff)
-                break;
-        }
-    }
-
-    if (t < to) {
-        *max = 0;
-        *min = 0;
-        return false;
-    }
-    else {
-        *max = max2;
-        *min = min2;
-        return true;
-    }
-}
-
-void ArrayRef::verify() const
-{
-#ifdef REALM_DEBUG
-    Array::verify();
-    REALM_ASSERT(has_refs());
-#endif
-}
-
-
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, Allocator& alloc)
 {
     // Create an array with null value as the first element
@@ -113,7 +59,7 @@ int64_t next_null_candidate(int64_t previous_candidate)
     // Increment by a prime number. This guarantees that we will
     // eventually hit every possible integer in the 2^64 range.
     x += 0xfffffffbULL;
-    return util::from_twos_compl<int64_t>(x);
+    return int64_t(x);
 }
 }
 

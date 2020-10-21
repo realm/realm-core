@@ -32,16 +32,49 @@ struct Predicate;
 
 struct Expression
 {
-    enum class Type { None, Number, String, KeyPath, Argument, True, False, Null, Timestamp, Base64, SubQuery } type;
+    enum class Type {
+        None,
+        Number,
+        String,
+        KeyPath,
+        Argument,
+        True,
+        False,
+        Null,
+        Timestamp,
+        Base64,
+        SubQuery,
+        ObjectId
+    } type;
     enum class KeyPathOp { None, Min, Max, Avg, Sum, Count, SizeString, SizeBinary, BacklinkCount } collection_op;
     std::string s;
     std::vector<std::string> time_inputs;
     std::string op_suffix;
     std::string subquery_path, subquery_var;
     std::shared_ptr<Predicate> subquery;
-    Expression(Type t = Type::None, std::string input = "") : type(t), collection_op(KeyPathOp::None), s(input) {}
-    Expression(std::vector<std::string>&& timestamp) : type(Type::Timestamp), collection_op(KeyPathOp::None), time_inputs(timestamp) {}
-    Expression(std::string prefix, KeyPathOp op, std::string suffix) : type(Type::KeyPath), collection_op(op), s(prefix), op_suffix(suffix) {}
+    enum class ComparisonType { Unspecified, Any, All, None } comparison_type = ComparisonType::Unspecified;
+    Expression(Type t = Type::None, std::string input = "")
+        : type(t)
+        , collection_op(KeyPathOp::None)
+        , s(input)
+        , comparison_type(ComparisonType::Unspecified)
+    {
+    }
+    Expression(std::vector<std::string>&& timestamp)
+        : type(Type::Timestamp)
+        , collection_op(KeyPathOp::None)
+        , time_inputs(timestamp)
+        , comparison_type(ComparisonType::Unspecified)
+    {
+    }
+    Expression(std::string prefix, KeyPathOp op, std::string suffix, ComparisonType agg_type)
+        : type(Type::KeyPath)
+        , collection_op(op)
+        , s(prefix)
+        , op_suffix(suffix)
+        , comparison_type(agg_type)
+    {
+    }
 };
 
 struct Predicate
@@ -76,19 +109,11 @@ struct Predicate
         CaseInsensitive,
     };
 
-    enum class ComparisonType {
-        Unspecified,
-        Any,
-        All,
-        None,
-    };
-
     struct Comparison
     {
         Operator op = Operator::None;
         OperatorOption option = OperatorOption::None;
         Expression expr[2] = {{Expression::Type::None, ""}, {Expression::Type::None, ""}};
-        ComparisonType compare_type = ComparisonType::Unspecified;
     };
 
     struct Compound

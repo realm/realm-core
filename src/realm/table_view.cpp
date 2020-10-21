@@ -26,18 +26,16 @@
 using namespace realm;
 
 ConstTableView::ConstTableView(ConstTableView& src, Transaction*, PayloadPolicy)
-    : ObjList(&m_table_view_key_values)
-    , m_source_column_key(src.m_source_column_key)
-    , m_table_view_key_values(Allocator::get_default())
+    : m_source_column_key(src.m_source_column_key)
+    , m_key_values(Allocator::get_default())
 {
     REALM_ASSERT(false); // unimplemented
 }
 
 ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, PayloadPolicy mode)
-    : ObjList(&m_table_view_key_values)
-    , m_source_column_key(src.m_source_column_key)
+    : m_source_column_key(src.m_source_column_key)
     , m_linked_obj_key(src.m_linked_obj_key)
-    , m_table_view_key_values(Allocator::get_default())
+    , m_key_values(Allocator::get_default())
 {
     bool was_in_sync = src.is_in_sync();
     m_query = Query(src.m_query, tr, mode);
@@ -63,13 +61,13 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
         m_linked_table = tr->import_copy_of(src.m_linked_table);
     }
     // don't use methods which throw after this point...or m_table_view_key_values will leak
-    if (mode == PayloadPolicy::Copy && src.m_table_view_key_values.is_attached()) {
-        m_table_view_key_values = src.m_table_view_key_values;
+    if (mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
+        m_key_values = src.m_key_values;
     }
-    else if (mode == PayloadPolicy::Move && src.m_table_view_key_values.is_attached())
-        m_table_view_key_values = std::move(src.m_table_view_key_values);
+    else if (mode == PayloadPolicy::Move && src.m_key_values.is_attached())
+        m_key_values = std::move(src.m_key_values);
     else {
-        m_table_view_key_values.create();
+        m_key_values.create();
     }
     if (mode == PayloadPolicy::Move) {
         src.m_last_seen_versions.clear();
@@ -85,7 +83,6 @@ ConstTableView::ConstTableView(const ConstTableView& src, Transaction* tr, Paylo
 template <Action action, typename T, typename R>
 R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* return_key) const
 {
-    check_cookie();
     size_t non_nulls = 0;
 
     if (return_key)
@@ -96,7 +93,7 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
     REALM_ASSERT(action == act_Sum || action == act_Max || action == act_Min || action == act_Average);
     REALM_ASSERT(m_table->valid_column(column_key));
 
-    if ((m_key_values->size()) == 0) {
+    if ((m_key_values.size()) == 0) {
         return {};
     }
 
@@ -104,7 +101,7 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 
     // FIXME: Optimization temporarely removed for stability
     /*
-        if (m_num_detached_refs == 0 && m_key_values->size() == column->size()) {
+        if (m_num_detached_refs == 0 && m_table_view_key_values.size() == column->size()) {
             // direct aggregate on the column
             if (action == act_Count)
                 return static_cast<R>(column->count(count_target));
@@ -128,9 +125,9 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 */
     R res = R{};
     bool is_first = true;
-    for (size_t tv_index = 0; tv_index < m_key_values->size(); ++tv_index) {
+    for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
 
-        ObjKey key(m_key_values->get(tv_index));
+        ObjKey key(get_key(tv_index));
 
         // skip detached references:
         if (key == realm::null_key)
@@ -192,17 +189,16 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
 template <typename T>
 size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
 {
-    check_cookie();
     REALM_ASSERT(m_table->valid_column(column_key));
 
-    if ((m_key_values->size()) == 0) {
+    if ((m_key_values.size()) == 0) {
         return {};
     }
 
     size_t cnt = 0;
-    for (size_t tv_index = 0; tv_index < m_key_values->size(); ++tv_index) {
+    for (size_t tv_index = 0; tv_index < m_key_values.size(); ++tv_index) {
 
-        ObjKey key(m_key_values->get(tv_index));
+        ObjKey key(get_key(tv_index));
 
         // skip detached references:
         if (key == realm::null_key)
@@ -216,7 +212,7 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
                 cnt++;
             }
         }
-        catch (const realm::InvalidKey&) {
+        catch (const realm::KeyNotFound&) {
         }
     }
 
@@ -265,6 +261,11 @@ double ConstTableView::sum_double(ColKey column_key) const
     return aggregate<act_Sum, double, double>(column_key);
 }
 
+Decimal128 ConstTableView::sum_decimal(ColKey column_key) const
+{
+    return aggregate<act_Sum, Decimal128, Decimal128>(column_key);
+}
+
 // Maximum
 int64_t ConstTableView::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
@@ -285,7 +286,10 @@ Timestamp ConstTableView::maximum_timestamp(ColKey column_key, ObjKey* return_ke
 {
     return minmax_timestamp<realm::Greater>(column_key, return_key);
 }
-
+Decimal128 ConstTableView::maximum_decimal(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Max, Decimal128, Decimal128>(column_key, nullptr, return_key);
+}
 
 // Minimum
 int64_t ConstTableView::minimum_int(ColKey column_key, ObjKey* return_key) const
@@ -307,6 +311,10 @@ Timestamp ConstTableView::minimum_timestamp(ColKey column_key, ObjKey* return_ke
 {
     return minmax_timestamp<realm::Less>(column_key, return_key);
 }
+Decimal128 ConstTableView::minimum_decimal(ColKey column_key, ObjKey* return_key) const
+{
+    return aggregate<act_Min, Decimal128, Decimal128>(column_key, nullptr, return_key);
+}
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
 double ConstTableView::average_int(ColKey column_key, size_t* value_count) const
@@ -323,6 +331,10 @@ double ConstTableView::average_float(ColKey column_key, size_t* value_count) con
 double ConstTableView::average_double(ColKey column_key, size_t* value_count) const
 {
     return aggregate<act_Average, double, double>(column_key, value_count);
+}
+Decimal128 ConstTableView::average_decimal(ColKey column_key, size_t* value_count) const
+{
+    return aggregate<act_Average, Decimal128, Decimal128>(column_key, value_count);
 }
 
 // Count
@@ -347,7 +359,7 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
         try {
-            ObjKey key = m_key_values->get(t);
+            ObjKey key = get_key(t);
             ConstObj obj = m_table->get_object(key);
             auto ts = obj.get<Timestamp>(column_key);
             realm::Equal e;
@@ -355,16 +367,20 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
                 count++;
             }
         }
-        catch (const InvalidKey&) {
+        catch (const KeyNotFound&) {
             // Just skip objects that might have been deleted
         }
     }
     return count;
 }
 
+size_t ConstTableView::count_decimal(ColKey column_key, Decimal128 target) const
+{
+    return aggregate_count<Decimal128>(column_key, target);
+}
+
 void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
 {
-    check_cookie();
     // Represent table as list of objects
     out << "[";
 
@@ -402,8 +418,6 @@ bool ConstTableView::depends_on_deleted_object() const
 
 void ConstTableView::get_dependencies(TableVersions& ret) const
 {
-    check_cookie();
-
     if (m_linklist_source) {
         // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
         if (m_linklist_source->is_attached()) {
@@ -433,8 +447,6 @@ void ConstTableView::get_dependencies(TableVersions& ret) const
 
 bool ConstTableView::is_in_sync() const
 {
-    check_cookie();
-
     return !m_table ? false : m_last_seen_versions == get_dependency_versions();
 }
 
@@ -450,14 +462,14 @@ void ConstTableView::sync_if_needed() const
 void TableView::remove(size_t row_ndx)
 {
     m_table.check();
-    REALM_ASSERT(row_ndx < m_key_values->size());
+    REALM_ASSERT(row_ndx < m_key_values.size());
 
     bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
 
-    ObjKey key = m_key_values->get(row_ndx);
+    ObjKey key = get_key(row_ndx);
 
     // Update refs
-    m_key_values->erase(row_ndx);
+    m_key_values.erase(row_ndx);
 
     // Delete row in origin table
     get_parent()->remove_object(key);
@@ -479,9 +491,9 @@ void TableView::clear()
 
     bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
 
-    _impl::TableFriend::batch_erase_rows(*get_parent(), *m_key_values); // Throws
+    _impl::TableFriend::batch_erase_rows(*get_parent(), m_key_values); // Throws
 
-    m_key_values->clear();
+    m_key_values.clear();
 
     // It is important to not accidentally bring us in sync, if we were
     // not in sync to start with:
@@ -552,7 +564,7 @@ void ConstTableView::sort(SortDescriptor order)
 
 void ConstTableView::do_sync()
 {
-    CriticalSection cs(m_race_detector);
+    util::CriticalSection cs(m_race_detector);
     // This TableView can be "born" from 4 different sources:
     // - LinkView
     // - Query::find_all()
@@ -562,18 +574,12 @@ void ConstTableView::do_sync()
     m_last_seen_versions.clear();
 
     if (m_linklist_source) {
-        m_key_values->clear();
+        m_key_values.clear();
         std::for_each(m_linklist_source->begin(), m_linklist_source->end(),
-                      [this](ObjKey key) { m_key_values->add(key); });
-    }
-    else if (m_distinct_column_source) {
-        m_key_values->clear();
-        auto index = m_table->get_search_index(m_distinct_column_source);
-        REALM_ASSERT(index);
-        index->distinct(*m_key_values);
+                      [this](ObjKey key) { m_key_values.add(key); });
     }
     else if (m_source_column_key) {
-        m_key_values->clear();
+        m_key_values.clear();
         if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
             ConstObj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
             if (m_table->valid_column(m_source_column_key)) { // return empty result, if column has been removed
@@ -582,7 +588,7 @@ void ConstTableView::do_sync()
                 m_linked_table->report_invalid_key(backlink_col);
                 auto backlinks = m_linked_obj.get_all_backlinks(backlink_col);
                 for (auto k : backlinks) {
-                    m_key_values->add(k);
+                    m_key_values.add(k);
                 }
             }
         }
@@ -592,10 +598,10 @@ void ConstTableView::do_sync()
         m_query.m_table.check();
 
         // valid query, so clear earlier results and reexecute it.
-        if (m_key_values->is_attached())
-            m_key_values->clear();
+        if (m_key_values.is_attached())
+            m_key_values.clear();
         else
-            m_key_values->create();
+            m_key_values.create();
 
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
@@ -607,6 +613,54 @@ void ConstTableView::do_sync()
     m_last_seen_versions = get_dependency_versions();
 }
 
+void ConstTableView::do_sort(const DescriptorOrdering& ordering)
+{
+    if (ordering.is_empty())
+        return;
+    size_t sz = size();
+    if (sz == 0)
+        return;
+
+    // Gather the current rows into a container we can use std algorithms on
+    size_t detached_ref_count = 0;
+    BaseDescriptor::IndexPairs index_pairs;
+    index_pairs.reserve(sz);
+    // always put any detached refs at the end of the sort
+    // FIXME: reconsider if this is the right thing to do
+    // FIXME: consider specialized implementations in derived classes
+    // (handling detached refs is not required in linkviews)
+    for (size_t t = 0; t < sz; t++) {
+        ObjKey key = get_key(t);
+        if (m_table->is_valid(key)) {
+            index_pairs.emplace_back(key, t);
+        }
+        else
+            ++detached_ref_count;
+    }
+
+    const int num_descriptors = int(ordering.size());
+    for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
+        const BaseDescriptor* base_descr = ordering[desc_ndx];
+        const BaseDescriptor* next = ((desc_ndx + 1) < num_descriptors) ? ordering[desc_ndx + 1] : nullptr;
+        BaseDescriptor::Sorter predicate = base_descr->sorter(*m_table, index_pairs);
+
+        // Sorting can be specified by multiple columns, so that if two entries in the first column are
+        // identical, then the rows are ordered according to the second column, and so forth. For the
+        // first column, we cache all the payload of fields of the view in a std::vector<Mixed>
+        predicate.cache_first_column(index_pairs);
+
+        base_descr->execute(index_pairs, predicate, next);
+    }
+    // Apply the results
+    m_limit_count = index_pairs.m_removed_by_limit;
+    m_key_values.clear();
+    for (auto& pair : index_pairs) {
+        m_key_values.add(pair.key_for_object);
+    }
+    for (size_t t = 0; t < detached_ref_count; ++t)
+        m_key_values.add(null_key);
+}
+
 bool ConstTableView::is_in_table_order() const
 {
     if (!m_table) {
@@ -614,9 +668,6 @@ bool ConstTableView::is_in_table_order() const
     }
     else if (m_linklist_source) {
         return false;
-    }
-    else if (m_distinct_column_source) {
-        return !m_descriptor_ordering.will_apply_sort();
     }
     else if (m_source_column_key) {
         return false;

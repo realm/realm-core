@@ -42,7 +42,7 @@ namespace util {
 struct SharedFileInfo;
 }
 
-/// Thrown by Group and SharedGroup constructors if the specified file
+/// Thrown by Group and DB constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid Realm
 /// database.
 struct InvalidDatabase;
@@ -75,7 +75,7 @@ public:
     /// the SlabAlloc.
     ///
     /// \var Config::is_shared
-    /// Must be true if, and only if we are called on behalf of SharedGroup.
+    /// Must be true if, and only if we are called on behalf of DB.
     ///
     /// \var Config::read_only
     /// Open the file in read-only mode. This implies \a Config::no_create.
@@ -85,7 +85,7 @@ public:
     ///
     /// \var Config::skip_validate
     /// Skip validation of file header. In a
-    /// set of overlapping SharedGroups, only the first one (the one
+    /// set of overlapping DBs, only the first one (the one
     /// that creates/initlializes the coordination file) may validate
     /// the header, otherwise it will result in a race condition.
     ///
@@ -129,8 +129,8 @@ public:
     /// application to ensure that the Realm file is not modified concurrently
     /// from any other thread or process.
     ///
-    /// In shared mode (when this function is called on behalf of a SharedGroup
-    /// instance), the caller (SharedGroup::do_open()) must take steps to ensure
+    /// In shared mode (when this function is called on behalf of a DB
+    /// instance), the caller (DB::do_open()) must take steps to ensure
     /// cross-process mutual exclusion.
     ///
     /// Except for \a file_path, the parameters are passed in through a
@@ -306,8 +306,7 @@ public:
     /// Get an ID for the current mapping version. This ID changes whenever any part
     /// of an existing mapping is changed. Such a change requires all refs to be
     /// retranslated to new pointers. The allocator tries to avoid this, and we
-    /// believe it will only ever occur on Windows based platforms, and when a
-    /// compatibility mapping is used to read earlier file versions.
+    /// believe it will only ever occur on Windows based platforms.
     uint64_t get_mapping_version()
     {
         return m_mapping_version;
@@ -378,8 +377,8 @@ private:
         attach_None,        // Nothing is attached
         attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
         attach_UsersBuffer, // We do not own the buffer
-        attach_SharedFile,  // On behalf of SharedGroup
-        attach_UnsharedFile // Not on behalf of SharedGroup
+        attach_SharedFile,  // On behalf of DB
+        attach_UnsharedFile // Not on behalf of DB
     };
 
     // A slab is a dynamically allocated contiguous chunk of memory used to
@@ -580,23 +579,12 @@ private:
 
     // mappings used by newest transactions - additional mappings may be open
     // and in use by older transactions. These translations are in m_old_mappings.
-    std::vector<util::File::Map<char>> m_mappings;
-    // The section nr for the first mapping in m_mappings. Will be 0 for newer file formats,
-    // but will be nonzero if a compatibility mapping is in use. In that case, the ref for
-    // the first mapping is the *last* section boundary in the file. Note: in this
-    // mode, the first mapping in m_mappings may overlap with the last part of the
-    // file, leading to aliasing.
-    int m_sections_in_compatibility_mapping = 0;
-    // if the file has an older format, it needs to be mapped by a single
-    // mapping. This is the compatibility mapping. As such files extend, additional
-    // mappings are added to m_mappings (above) - the compatibility mapping remains
-    // unchanged until the file is closed.
-    // Note: If the initial file is smaller than a single section, the compatibility
-    // mapping is not needed and not used. Hence, it is not possible for the first mapping
-    // in m_mappings to completely overlap the compatibility mapping. Hence, we do not
-    // need special logic to detect if the compatibility mapping can be unmapped.
-    util::File::Map<char> m_compatibility_mapping;
-
+    struct MapEntry {
+        util::File::Map<char> primary_mapping;
+        size_t lowest_possible_xover_offset = 0;
+        util::File::Map<char> xover_mapping;
+    };
+    std::vector<MapEntry> m_mappings;
     size_t m_translation_table_size = 0;
     uint64_t m_mapping_version = 1;
     uint64_t m_youngest_live_version = 1;
@@ -615,8 +603,7 @@ private:
     // Add a translation covering a new section in the slab area. The translation is always
     // added at the end.
     void extend_fast_mapping_with_slab(char* address);
-    // Prepare the initial mapping for a file which requires use of the compatibility mapping
-    void setup_compatibility_mapping(size_t file_size);
+    void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size) override;
 
     const char* m_data = nullptr;
     size_t m_initial_section_size = 0;
@@ -656,7 +643,10 @@ private:
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    void validate_header(const char* data, size_t len, const std::string& path);
+    /// Returns the top_ref for the latest commit.
+    ref_type validate_header(const char* data, size_t len, const std::string& path);
+    ref_type validate_header(const Header* header, const StreamingFooter* footer, size_t size,
+                             const std::string& path);
     void throw_header_exception(std::string msg, const Header& header, const std::string& path);
 
     static bool is_file_on_streaming_form(const Header& header);

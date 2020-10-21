@@ -133,7 +133,6 @@ TEST(Transactions_Frozen)
 }
 
 
-
 TEST(Transactions_ConcurrentFrozenTableGetByName)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -433,9 +432,8 @@ private:
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     TransactionRef rt = sg->start_read();
@@ -448,7 +446,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Try to advance after an empty write transaction
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.commit();
     }
     rt->advance_read();
@@ -457,7 +455,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Try to advance after a superfluous rollback
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         // Implicit rollback
     }
     rt->advance_read();
@@ -466,7 +464,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Try to advance after a propper rollback
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.add_table("bad");
         // Implicit rollback
     }
@@ -477,7 +475,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Create a table via the other SharedGroup
     ObjKey k0;
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef foo_w = wt.add_table("foo");
         foo_w->add_column(type_Int, "i");
         k0 = foo_w->create_object().get_key();
@@ -498,24 +496,32 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     // Modify the table via the other SharedGroup
     ObjKey k1;
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef foo_w = wt.get_table("foo");
         foo_w->add_column(type_String, "s");
+        foo_w->add_column(type_Bool, "b");
+        foo_w->add_column(type_Float, "f");
+        foo_w->add_column(type_Double, "d");
+        foo_w->add_column(type_Binary, "bin");
+        foo_w->add_column(type_Timestamp, "t");
+        foo_w->add_column(type_Decimal, "dec");
+        foo_w->add_column(type_ObjectId, "oid");
+        foo_w->add_column_link(type_Link, "link", *foo_w);
         cols = foo_w->get_column_keys();
-        k1 = foo_w->create_object().get_key();
+        auto obj1 = foo_w->create_object();
         auto obj0 = foo_w->get_object(k0);
-        auto obj1 = foo_w->get_object(k1);
+        k1 = obj1.get_key();
+        obj1.set_all(2, StringData("b"), true, 1.1f, 1.2, BinaryData("hopla"), Timestamp(100, 300), Decimal("100"),
+                     ObjectId("abcdefabcdefabcdefabcdef"), k1);
         obj0.set<int>(cols[0], 1);
-        obj1.set<int>(cols[0], 2);
         obj0.set<StringData>(cols[1], "a");
-        obj1.set<StringData>(cols[1], "b");
         wt.commit();
     }
     rt->advance_read();
     CHECK(version != foo->get_content_version());
     rt->verify();
     cols = foo->get_column_keys();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -525,12 +531,20 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(2, obj1.get<int64_t>(cols[0]));
     CHECK_EQUAL("a", obj0.get<StringData>(cols[1]));
     CHECK_EQUAL("b", obj1.get<StringData>(cols[1]));
+    CHECK_EQUAL(obj1.get<Bool>(cols[2]), true);
+    CHECK_EQUAL(obj1.get<float>(cols[3]), 1.1f);
+    CHECK_EQUAL(obj1.get<double>(cols[4]), 1.2);
+    CHECK_EQUAL(obj1.get<BinaryData>(cols[5]), BinaryData("hopla"));
+    CHECK_EQUAL(obj1.get<Timestamp>(cols[6]), Timestamp(100, 300));
+    CHECK_EQUAL(obj1.get<Decimal>(cols[7]), Decimal("100"));
+    CHECK_EQUAL(obj1.get<ObjectId>(cols[8]), ObjectId("abcdefabcdefabcdefabcdef"));
+    CHECK_EQUAL(obj1.get<ObjKey>(cols[9]), obj1.get_key());
     CHECK_EQUAL(foo, rt->get_table("foo"));
 
     // Again, with no change
     rt->advance_read();
     rt->verify();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(2, foo->size());
@@ -542,27 +556,27 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Perform several write transactions before advancing the read transaction
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef bar_w = wt.add_table("bar");
         bar_w->add_column(type_Int, "a");
         wt.commit();
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         wt.commit();
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef bar_w = wt.get_table("bar");
         bar_w->add_column(type_Float, "b");
         wt.commit();
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         // Implicit rollback
     }
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef bar_w = wt.get_table("bar");
         bar_w->add_column(type_Double, "c");
         wt.commit();
@@ -571,7 +585,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->advance_read();
     rt->verify();
     CHECK_EQUAL(2, rt->size());
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     cols = foo->get_column_keys();
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
@@ -590,7 +604,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 
     // Clear tables - not supported before backlinks work again
     {
-        WriteTransaction wt(sg_w);
+        WriteTransaction wt(sg);
         TableRef foo_w = wt.get_table("foo");
         foo_w->clear();
         TableRef bar_w = wt.get_table("bar");
@@ -601,14 +615,14 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     rt->verify();
 
     size_t free_space, used_space;
-    sg_w->get_stats(free_space, used_space);
+    sg->get_stats(free_space, used_space);
     auto state_size = rt->compute_aggregated_byte_size(Group::SizeAggregateControl::size_of_all);
     CHECK_EQUAL(used_space, state_size);
 
     CHECK_EQUAL(2, rt->size());
     CHECK(foo);
     cols = foo->get_column_keys();
-    CHECK_EQUAL(2, foo->get_column_count());
+    CHECK_EQUAL(10, foo->get_column_count());
     CHECK_EQUAL(type_Int, foo->get_column_type(cols[0]));
     CHECK_EQUAL(type_String, foo->get_column_type(cols[1]));
     CHECK_EQUAL(0, foo->size());
@@ -1195,7 +1209,7 @@ void deleter_thread(ConcurrentQueue<LnkLstPtr>& queue)
         // just let 'r' die
     }
 }
-}
+} // namespace
 
 TEST(LangBindHelper_ConcurrentLinkViewDeletes)
 {
@@ -1443,6 +1457,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     CHECK(epsilon);
 }
 
+
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1453,8 +1468,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     {
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
-        auto target = wt.add_table("target");
-        col = origin->add_column_link(type_Link, "o_1", *target, link_Strong);
+        auto target = wt.add_embedded_table("target");
+        col = origin->add_column_link(type_Link, "o_1", *target);
         target->add_column(type_Int, "t_1");
         wt.commit();
     }
@@ -1478,12 +1493,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
             target_w->clear();
             auto o0 = origin_w->create_object();
             auto o1 = origin_w->create_object();
-            auto t0 = target_w->create_object();
-            auto t1 = target_w->create_object();
-            target_key0 = t0.get_key();
-            target_key1 = t1.get_key();
-            o0.set(col, target_key0);
-            o1.set(col, target_key1);
+            target_key0 = o0.create_and_set_linked_object(col).get_key();
+            target_key1 = o1.create_and_set_linked_object(col).get_key();
             wt.commit();
         }
 
@@ -1519,83 +1530,15 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([&](Table& origin) { origin.get_object(1).set(col, target_key0); });
+    perform_change([&](Table& origin) { origin.get_object(1).create_and_set_linked_object(col); });
     CHECK(target_obj0.is_valid());
     CHECK(!target_obj1.is_valid());
-    CHECK_EQUAL(target->size(), 1);
-
-    // Avoid breaking link by reassigning self
-    perform_change([&](Table& origin) { origin.get_object(1).set(col, target_key1); });
-    // Should not delete anything
-    CHECK(target_obj0.is_valid());
-    CHECK(target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);
 }
 
-// to be ported
+
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
-    /*
-    SHARED_GROUP_TEST_PATH(path);
-    ShortCircuitHistory hist(path);
-    DBRef sg = DB::create(hist, DBOptions(crypt_key()));
-    DBRef sg_w = DB::create(hist, DBOptions(crypt_key()));
-
-    {
-        WriteTransaction wt(sg_w);
-        Table& origin = *wt.add_table("origin");
-        Table& target = *wt.add_table("target");
-        origin.add_column_link(type_LinkList, "o_1", target, link_Strong);
-        target.add_column(type_Int, "t_1");
-        wt.commit();
-    }
-
-    // Start a read transaction (to be repeatedly advanced)
-    TransactionRef rt = sg->start_read() const Group& group = rt;
-    const Table& target = *rt->get_table("target");
-
-    ConstRow target_row_0, target_row_1;
-
-    auto perform_change = [&](util::FunctionRef<void(Table&)> func) {
-        // Ensure there are two rows in each table, with the first row in `origin`
-        // linking to the first row in `target`, and the second row in `origin`
-        // linking to both rows in `target`
-        {
-            WriteTransaction wt(sg_w);
-            Table& origin_w = *wt.get_table("origin");
-            Table& target_w = *wt.get_table("target");
-
-            origin_w.clear();
-            target_w.clear();
-            origin_w.add_empty_row(2);
-            target_w.add_empty_row(2);
-            origin_w[0].get_linklist(0)->add(0);
-            origin_w[1].get_linklist(0)->add(0);
-            origin_w[1].get_linklist(0)->add(1);
-
-
-            wt.commit();
-        }
-
-        // Grab the row accessors before applying the modification being tested
-        rt->advance_read();
-        rt->verify();
-        target_row_0 = target.get(0);
-        target_row_1 = target.get(1);
-
-        // Perform the modification
-        {
-            WriteTransaction wt(sg_w);
-            func(*wt.get_table("origin"));
-            wt.commit();
-        }
-
-        rt->advance_read();
-        rt->verify();
-        // Leave `group` and the target accessors in a state which can be tested
-        // with the changes applied
-    };
-*/
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
     DBRef sg = DB::create(hist, DBOptions(crypt_key()));
@@ -1604,8 +1547,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     {
         WriteTransaction wt(sg);
         auto origin = wt.add_table("origin");
-        auto target = wt.add_table("target");
-        col = origin->add_column_link(type_LinkList, "o_1", *target, link_Strong);
+        auto target = wt.add_embedded_table("target");
+        col = origin->add_column_link(type_LinkList, "o_1", *target);
         target->add_column(type_Int, "t_1");
         wt.commit();
     }
@@ -1629,13 +1572,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
             target_w->clear();
             auto o0 = origin_w->create_object();
             auto o1 = origin_w->create_object();
-            auto t0 = target_w->create_object();
-            auto t1 = target_w->create_object();
-            target_key0 = t0.get_key();
-            target_key1 = t1.get_key();
-            o0.get_linklist(col).add(target_key0);
-            o1.get_linklist(col).add(target_key0);
-            o1.get_linklist(col).add(target_key1);
+            target_key0 = o0.get_linklist(col).create_and_insert_linked_object(0).get_key();
+            target_key1 = o1.get_linklist(col).create_and_insert_linked_object(0).get_key();
             wt.commit();
         }
 
@@ -1665,19 +1603,13 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by removal from list
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).remove(1); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).remove(0); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key0); });
+    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).create_and_set_linked_object(0); });
     CHECK(target_obj0.is_valid() && !target_obj1.is_valid());
-    CHECK_EQUAL(target->size(), 1);
-
-    // Avoid breaking link by reassigning self
-    perform_change([&](Table& origin) { origin.get_object(1).get_linklist(col).set(1, target_key1); });
-    // Should not delete anything
-    CHECK(target_obj0.is_valid() && target_obj1.is_valid());
     CHECK_EQUAL(target->size(), 2);
 
     // Break link by clearing table
@@ -1763,7 +1695,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get(0), realm::InvalidKey);
+    CHECK_THROW(tv.get(0), realm::KeyNotFound);
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -1836,9 +1768,7 @@ private:
     ObjKey m_current_linkview_row;
 
 public:
-    void parse_complete()
-    {
-    }
+    void parse_complete() {}
 
     bool select_table(TableKey t)
     {
@@ -1939,10 +1869,6 @@ public:
     {
         return false;
     }
-    bool clear_table(size_t) noexcept
-    {
-        return false;
-    }
     bool list_set(size_t)
     {
         return false;
@@ -1964,10 +1890,6 @@ public:
         return false;
     }
     bool list_move(size_t, size_t)
-    {
-        return false;
-    }
-    bool list_swap(size_t, size_t)
     {
         return false;
     }
@@ -2798,8 +2720,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
     TableRef origin = group->add_table("origin");
     TableRef target = group->add_table("target");
 
-    target->add_column(type_Int, "int");
     auto c1 = origin->add_column_link(type_LinkList, "linklist", *target);
+    target->add_column(type_Int, "int");
     auto c2 = origin->add_column_link(type_Link, "link", *target);
 
     Obj t = target->create_object();
@@ -3079,14 +3001,13 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
-    ColKey col;
     {
         // initialize table with 200 entries holding 0..200
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("A");
-        col = tr->add_column(type_Int, "first");
+        auto col = tr->add_column(type_Int, "first");
         for (int j = 0; j < 200; j++) {
-            tr->create_object().set_all(j);
+            tr->create_object().set(col, j);
         }
         auto table_b = wt.add_table("B");
         table_b->add_column(type_Int, "bussemand");
@@ -3131,15 +3052,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 #if !REALM_ANDROID && !REALM_IOS
 // fork should not be used on android or ios.
 
-/*
-This unit test has been disabled as it occasionally gets itself into a hang
-(which has plauged the testing process for a long time). It is unknown to me
-(Kristian) whether this is due to a bug in Core or a bug in this test.
-*/
-
-#if 0
-// This disabled unittest will need porting
-// if we ever try to re-enable it.
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
@@ -3151,15 +3063,20 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
     int pid = fork();
     if (pid == 0) {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
         {
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            // initialize table with 200 entries holding 0..200
             WriteTransaction wt(sg);
-            TableRef tr = wt.add_table("table");
-            tr->add_column(type_Int, "first");
-            for (int i = 0; i < 200; ++i)
-                tr->add_empty_row();
-            tr->set_int(0, 100, 42);
+            TableRef tr = wt.add_table("A");
+            auto col = tr->add_column(type_Int, "first");
+            for (int j = 0; j < 200; j++) {
+                tr->create_object().set(col, j);
+            }
+            auto table_b = wt.add_table("B");
+            table_b->add_column(type_Int, "bussemand");
+            table_b->create_object().set_all(99);
+            wt.add_table("C");
             wt.commit();
         }
         exit(0);
@@ -3173,7 +3090,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < write_process_count; ++i) {
         writepids[i] = fork();
         if (writepids[i] == 0) {
-            multiple_trackers_writer_thread(std::string(path));
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            multiple_trackers_writer_thread(sg);
             exit(0);
         }
     }
@@ -3182,7 +3101,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
         if (readpids[i] == 0) {
-            multiple_trackers_reader_thread(test_context, path);
+            std::unique_ptr<Replication> hist(make_in_realm_history(path));
+            DBRef sg = DB::create(*hist);
+            multiple_trackers_reader_thread(test_context, sg);
             exit(0);
         }
     }
@@ -3193,27 +3114,17 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         waitpid(writepids[i], &status, 0);
     }
 
-    // Wait for all reader threads to find and lock onto value '42'
-    {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
-        for (;;) {
-            TransactionRef rt = sg->start_read()
-            ConstTableRef tr = rt.get_table("table");
-            if (tr->get_int(0, 0) == read_process_count) break;
-            sched_yield();
-        }
-    }
+    // Allow readers time to catch up
+    for (int k = 0; k < 100; ++k)
+        std::this_thread::yield();
 
     // signal to all readers to complete
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         DBRef sg = DB::create(*hist);
         WriteTransaction wt(sg);
-        TableRef tr = wt.get_table("table");
-        Query q = tr->where().equal(0, 42);
-        int idx = q.find();
-        tr->set_int(0, idx, 43);
+        TableRef tr = wt.get_table("C");
+        tr->create_object();
         wt.commit();
     }
 
@@ -3225,7 +3136,6 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 
 }
 
-#endif // 0
 #endif // !REALM_ANDROID && !REALM_IOS
 #endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
@@ -3817,9 +3727,7 @@ struct HandoverControl {
         m_has_feedback = false;
     }
     HandoverControl(const HandoverControl&) = delete;
-    HandoverControl()
-    {
-    }
+    HandoverControl() {}
 };
 
 void handover_writer(DBRef db)
@@ -3946,7 +3854,9 @@ void attacher(std::string path, ColKey col)
 } // anonymous namespace
 
 
-TEST(LangBindHelper_RacingAttachers)
+// Disable with TSAN because it needs to synchronize between multiple DBs, and TSAN isn't able to track
+// acquire/release across multiple mappings of the same underlying memory.
+TEST_IF(LangBindHelper_RacingAttachers, !running_with_tsan)
 {
     const int num_attachers = 10;
     SHARED_GROUP_TEST_PATH(path);
@@ -4181,13 +4091,14 @@ TEST(LangBindHelper_HandoverTableViewWithQueryOnLink)
 }
 
 
-#ifdef LEGACY_TESTS   // (not useful as std unittest)
+#ifdef LEGACY_TESTS // (not useful as std unittest)
 namespace {
 
-void do_write_work(std::string path, size_t id, size_t num_rows) {
+void do_write_work(std::string path, size_t id, size_t num_rows)
+{
     const size_t num_iterations = 5000000; // this makes it run for a loooong time
     const size_t payload_length_small = 10;
-    const size_t payload_length_large = 5000; // > 4096 == page_size
+    const size_t payload_length_large = 5000;   // > 4096 == page_size
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     const char* key = crypt_key(true);
     for (size_t rep = 0; rep < num_iterations; ++rep) {
@@ -4212,7 +4123,8 @@ void do_write_work(std::string path, size_t id, size_t num_rows) {
     }
 }
 
-void do_read_verify(std::string path) {
+void do_read_verify(std::string path)
+{
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     const char* key = crypt_key(true);
     while (true) {
@@ -4228,7 +4140,8 @@ void do_read_verify(std::string path) {
             StringData c = t->get_string(1, r);
             if (c == "stop reading") {
                 return;
-            } else {
+            }
+            else {
                 REALM_ASSERT_EX(c.size() == 1, c.size());
             }
             REALM_ASSERT_EX(t->get_name() == StringData("class_Table_Emulation_Name"), t->get_name().data());
@@ -4258,7 +4171,7 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
     SHARED_GROUP_TEST_PATH(path);
     const int num_writer_threads = 2;
     const int num_reader_threads = 2;
-    const int num_rows = 200; //2 + REALM_MAX_BPNODE_SIZE;
+    const int num_rows = 200; // 2 + REALM_MAX_BPNODE_SIZE;
     const char* key = crypt_key(true);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(key));
@@ -4288,7 +4201,7 @@ TEST_IF(Thread_AsynchronousIODataConsistency, false)
 
     {
         WriteTransaction wt(sg);
-        Group &group = wt.get_group();
+        Group& group = wt.get_group();
         TableRef t = rt->get_table("class_Table_Emulation_Name");
         t->set_string(1, 0, "stop reading");
         wt.commit();
@@ -4953,7 +4866,6 @@ TEST(LangBindHelper_Compact)
     }
 }
 
-#if !REALM_ANDROID // FIXME
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -4985,7 +4897,6 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         CHECK_EQUAL(N, table->size());
     }
 }
-#endif
 
 TEST(LangBindHelper_CloseDBvsTransactions)
 {
@@ -4999,9 +4910,9 @@ TEST(LangBindHelper_CloseDBvsTransactions)
     CHECK_THROW(sg->close(), LogicError);
     tr1->rollback();
     // closing the DB explicitly while there are open read transactions will fail
-    CHECK_THROW(sg->close(), LogicError); 
+    CHECK_THROW(sg->close(), LogicError);
     // unless we explicitly ask for it to succeed()
-    sg->close(true); 
+    sg->close(true);
     CHECK(!sg->is_attached());
     CHECK(!tr0->is_attached());
     CHECK(!tr1->is_attached());
@@ -5103,8 +5014,8 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
         }
         rt->verify();
         {
-        	realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
-        	query.find_all(); // <-- fails
+            realm::Query query = dog->link(c3).column<String>(c0) == "owner" + to_string(rand() % numberOfOwner);
+            query.find_all(); // <-- fails
         }
         rt->commit();
     }
@@ -5118,7 +5029,7 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
             vector_mutex.lock();
             if (qs.size() > 0) {
 
-            	auto t = vids[0];
+                auto t = vids[0];
                 vids.erase(vids.begin());
                 auto q = std::move(qs[0]);
                 qs.erase(qs.begin());
@@ -5153,7 +5064,7 @@ TEST_IF(LangBindHelper_HandoverFuzzyTest, TEST_DURATION > 0)
         rt->commit_and_continue_as_read();
         if (qs.size() < 100) {
             for (size_t t = 0; t < 5; t++) {
-            	auto t2 = rt->duplicate();
+                auto t2 = rt->duplicate();
                 qs.push_back(t2->import_copy_of(query, PayloadPolicy::Move));
                 vids.push_back(t2);
             }
@@ -5634,7 +5545,7 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1.size(), i);
 }
 
-#ifdef LEGACY_TESTS   // FIXME: Requires get_at() method to be available on ConstObj.
+#ifdef LEGACY_TESTS // FIXME: Requires get_at() method to be available on ConstObj.
 ONLY(LangBindHelper_BigBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -5755,7 +5666,8 @@ TEST(LangBindHelper_OpenAsEncrypted)
         bool is_okay = false;
         try {
             DBRef sg_encrypt = DB::create(*hist_encrypt, DBOptions(key));
-        } catch (std::runtime_error&) {
+        }
+        catch (std::runtime_error&) {
             is_okay = true;
         }
         CHECK(is_okay);
@@ -5854,7 +5766,7 @@ TEST(LangBindHelper_RemoveObject)
         wt->commit();
     }
     rt->advance_read();
-    CHECK_THROW(o1.get<int64_t>(col), InvalidKey);
+    CHECK_THROW(o1.get<int64_t>(col), KeyNotFound);
     CHECK_EQUAL(o2.get<int64_t>(col), 2);
 }
 
@@ -6044,6 +5956,65 @@ TEST(LangBindHelper_SearchIndexAccessor)
         persons->create_object().set(col_name, "Poul");
     }
     tr->commit();
+}
+
+TEST(LangBindHelper_ArrayXoverMapping)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+    ColKey my_col;
+    {
+        auto tr = db->start_write();
+        auto tbl = tr->add_table("my_table");
+        my_col = tbl->add_column(type_String, "my_col");
+        std::string s(1'000'000, 'a');
+        for (auto i = 0; i < 100; ++i)
+            tbl->create_object().set_all(s);
+        tr->commit();
+    }
+    REALM_ASSERT(db->compact());
+    {
+        auto tr = db->start_read();
+        auto tbl = tr->get_table("my_table");
+        for (auto i = 0; i < 100; ++i) {
+            auto o = tbl->get_object(i);
+            StringData str = o.get<String>(my_col);
+            for (auto j = 0; j < 1'000'000; ++j)
+                REALM_ASSERT(str[j] == 'a');
+        }
+    }
+}
+
+TEST(LangBindHelper_SchemaChangeNotification)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto rt = db->start_read();
+    bool handler_called;
+    rt->set_schema_change_notification_handler([&handler_called]() { handler_called = true; });
+    CHECK(rt->has_schema_change_notification_handler());
+
+    {
+        auto tr = db->start_write();
+        tr->add_table("my_table");
+        tr->commit();
+    }
+    handler_called = false;
+    rt->advance_read();
+    CHECK(handler_called);
+
+    {
+        auto tr = db->start_write();
+        auto table = tr->get_table("my_table");
+        table->add_column(type_Int, "integer");
+        tr->commit();
+    }
+    handler_called = false;
+    rt->advance_read();
+    CHECK(handler_called);
 }
 
 #endif

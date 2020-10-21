@@ -40,7 +40,7 @@ jobWrapper {
             }
             targetSHA1 = 'NONE'
             if (isPullRequest) {
-                targetSHA1 = sh(returnStdout: true, script: "git merge-base origin/${targetBranch} HEAD").trim()
+                targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
             }
         }
 
@@ -93,26 +93,39 @@ jobWrapper {
             }
         }
     }
+    def armhfQemuTestOptions = [
+        emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
+    ]
+    def armhfNativeTestOptions = [
+        nativeNode: 'docker-arm',
+        nativeDocker: 'armhf-native.Dockerfile',
+        nativeDockerPlatform: 'linux/arm/v7',
+    ]
     stage('Checking') {
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Release', '4', 'OFF'),
+            checkLinuxRelease       : doCheckInDocker('Release'),
+            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
             checkMacOsRelease       : doBuildMacOs('Release', true),
             checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
             checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
             iosDebug                : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
             androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
+            checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
             addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+            performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
-                checkLinuxRelease       : doCheckInDocker('Release'),
-                checkMacOsDebug         : doBuildMacOs('Debug', true),
-                buildUwpx64Debug        : doBuildWindows('Debug', true, 'x64', false),
-                androidArmeabiRelease   : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
-                coverage                : doBuildCoverage(),
-                performance             : buildPerformance(),
+                checkLinuxRelease             : doCheckInDocker('Release'),
+                checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
+                checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
+                checkMacOsDebug               : doBuildMacOs('Debug', true),
+                buildUwpx64Debug              : doBuildWindows('Debug', true, 'x64', false),
+                androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
             ]
             parallelExecutors.putAll(extendedChecks)
@@ -128,20 +141,6 @@ jobWrapper {
                 buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
-                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32', false),
-                buildWin32Release   : doBuildWindows('Release', false, 'Win32', false),
-                buildWin64Debug     : doBuildWindows('Debug', false, 'x64', false),
-                buildWin64Release   : doBuildWindows('Release', false, 'x64', false),
-                buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32', false),
-                buildUwpWin32Release: doBuildWindows('Release', true, 'Win32', false),
-                buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64', false),
-                buildUwpx64Release  : doBuildWindows('Release', true, 'x64', false),
-                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM', false),
-                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM', false),
-
-                buildLinuxDebug     : doBuildLinux('Debug'),
-                buildLinuxRelease   : doBuildLinux('Release'),
-                buildLinuxRelAssert : doBuildLinux('RelAssert'),
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
             ]
@@ -164,6 +163,27 @@ jobWrapper {
                 for (buildType in appleBuildTypes) {
                     parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
                 }
+            }
+
+            linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
+            linuxCrossCompileTargets = ['armhf']
+
+            for (buildType in linuxBuildTypes) {
+                parallelExecutors["buildLinux${buildType}"] = doBuildLinux(buildType)
+                for (target in linuxCrossCompileTargets) {
+                    parallelExecutors["crossCompileLinux-${target}-${buildType}"] = doLinuxCrossCompile(target, buildType)
+                }
+            }
+
+            windowsBuildTypes = ['Debug', 'Release']
+            windowsPlatforms = ['Win32', 'x64']
+
+            for (buildType in windowsBuildTypes) {
+                for (platform in windowsPlatforms) {
+                    parallelExecutors["buildWindows-${platform}-${buildType}"] = doBuildWindows(buildType, false, platform, false)
+                    parallelExecutors["buildWindowsUniversal-${platform}-${buildType}"] = doBuildWindows(buildType, true, platform, false)
+                }
+                parallelExecutors["buildWindowsUniversal-ARM-${buildType}"] = doBuildWindows(buildType, true, 'ARM', false)
             }
 
             parallel parallelExecutors
@@ -217,16 +237,11 @@ def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enab
             withEnv(environment) {
                 buildEnv.inside() {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        dir('build-dir') {
+                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja .."
+                            runAndCollectWarnings(script: "ninja", name: "linux-${buildType}-encrypt${enableEncryption}-BPNODESIZE_${maxBpNodeSize}")
+                            sh "./test/realm-tests"
+                        }
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -254,16 +269,11 @@ def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String saniti
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
-                        sh """
-                           mkdir build-dir
-                           cd build-dir
-                           cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja ..
-                        """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
-                        sh """
-                           cd build-dir/test
-                           ./realm-tests
-                        """
+                        dir('build-dir') {
+                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja .."
+                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}-${maxBpNodeSize}-${sanitizeMode}")
+                            sh "./test/realm-tests"
+                        }
                     } finally {
                         recordTests("Linux-${buildType}")
                     }
@@ -305,13 +315,11 @@ def doBuildLinuxClang(String buildType) {
         node('docker') {
             getArchive()
             docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
-                sh """
-                   mkdir build-dir
-                   cd build-dir
-                   cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
-                   ninja
-                   cpack -G TGZ
-                """
+                dir('build-dir') {
+                    sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
+                    runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}")
+                    sh 'cpack -G TGZ'
+                }
             }
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
@@ -339,7 +347,7 @@ def doCheckValgrind() {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarnings(script: "cd build-dir && ninja", name: "linux-valgrind")
                         sh """
                             cd build-dir/test
                             valgrind --version
@@ -380,7 +388,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}", name: "android-armeabi-${abi}-${buildType}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
@@ -432,7 +440,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 
     return {
-        node('windows-vs2017') {
+        node('windows') {
             getArchive()
 
             dir('build-dir') {
@@ -444,7 +452,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
                         name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
                         filters: warningFilters
-                        )
+                    )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
                 if (gitTag) {
@@ -472,9 +480,36 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 }
 
+def optionalBuildPerformance(boolean force) {
+    if (force) {
+        return {
+            buildPerformance()
+        }
+    } else {
+        return {
+            def doPerformance = true
+            stage("Input") {
+                try {
+                    timeout(time: 10, unit: 'MINUTES') {
+                        script {
+                            input message: 'Build Performance?', ok: 'Yes'
+                        }
+                    }
+                } catch (err) { // manual abort or timeout
+                    println "Not building performance on this run: ${err}"
+                    doPerformance = false
+                }
+            }
+            if (doPerformance) {
+                stage("Build") {
+                    buildPerformance()
+                }
+            }
+        }
+    }
+}
 
 def buildPerformance() {
-  return {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('brix && exclusive') {
@@ -493,20 +528,19 @@ def buildPerformance() {
             cd test/bench
             mkdir -p core-benchmarks results
             ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
-            ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
           rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
-          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance Report'])
+          sh 'cd test/bench && ./parse_bench_hist.py --local-html results/ core-benchmarks/'
+          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance_Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
               sh "curl -H \"Authorization: token ${env.githubToken}\" " +
-                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
+                 "-d '{ \"body\": \"Check the performance result [here](${env.BUILD_URL}Performance_5fReport).\"}' " +
                  "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
           }
         }
       }
     }
-  }
 }
 
 def doBuildMacOs(String buildType, boolean runTests) {
@@ -535,8 +569,11 @@ def doBuildMacOs(String buildType, boolean runTests) {
                         }
                     }
 
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-clang-${buildType}")
                 }
+            }
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build', name: "osx-clang-xcrun-swift-${buildType}")
             }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
@@ -582,7 +619,7 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_BUILD_LIB_ONLY=ON \\
                                   -G Ninja ..
                         """
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package')
+                    runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-maccatalyst-${buildType}")
                 }
             }
 
@@ -628,6 +665,78 @@ def doBuildAppleDevice(String sdk, String buildType) {
     }
 }
 
+def doLinuxCrossCompile(String target, String buildType, Map testOptions = null) {
+    def runTests = { emulated ->
+            def runner = emulated ? testOptions.emulator : ''
+            try {
+                def environment = environment()
+                environment << 'UNITTEST_PROGRESS=1'
+                if (emulated) {
+                    environment << 'UNITTEST_FILTER=- Thread_RobustMutex*'  // robust mutexes can't work under qemu
+                }
+                withEnv(environment) {
+                    sh """
+                        cd test
+                        ulimit -s 256 # launching thousands of threads in 32-bit address space requires smaller stacks
+                        ${runner} ./realm-tests
+                    """
+                }
+            } finally {
+                dir('..') {
+                    def suffix = emulated ? '-emulated' : ''
+                    recordTests("Linux-${target}-${buildType}${suffix}")
+                }
+            }
+    }
+    return {
+        node('docker') {
+            getArchive()
+            docker.build("realm-core-crosscompiling:${target}", "-f ${target}.Dockerfile .").inside {
+                dir('build-dir') {
+                    sh """
+                        cmake -GNinja \
+                            -DREALM_SKIP_SHARED_LIB=ON \
+                            -DCMAKE_TOOLCHAIN_FILE=$WORKSPACE/tools/cmake/${target}.toolchain.cmake \
+                            -DCMAKE_BUILD_TYPE=${buildType} \
+                            -DREALM_NO_TESTS=${testOptions ? 'OFF' : 'ON'} \
+                            -DCPACK_SYSTEM_NAME=Linux-${target} \
+                            ..
+                    """
+
+                    runAndCollectWarnings(script: "ninja", name: "linux-x_compile-${target}-${buildType}")
+
+                    if (testOptions != null) {
+                        if (testOptions.get('emulator')) {
+                            runTests(true)
+                        }
+                        if (testOptions.get('nativeNode')) {
+                            stash includes: 'test/**/*', name: "realm-tests-Linux-${target}"
+                        }
+                    } else {
+                        sh 'cpack'
+                        archiveArtifacts '*.tar.gz'
+                        def stashName = "linux-${target}___${buildType}"
+                        stash includes:"*.tar.gz", name:stashName
+                        publishingStashes << stashName
+                    }
+                }
+            }
+
+            if (testOptions != null && testOptions.get('nativeNode')) {
+                node(testOptions.nativeNode) {
+                    getArchive()
+                    docker.build("realm-core-native:${target}", "-f ${testOptions.nativeDocker} --platform ${testOptions.nativeDockerPlatform} .").inside {
+                        dir('build-dir') {
+                            unstash "realm-tests-Linux-${target}"
+                            runTests(false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 def doBuildCoverage() {
   return {
     node('docker') {
@@ -667,7 +776,7 @@ def recordTests(tag) {
     def tests = readFile('build-dir/test/unit-test-report.xml')
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
-    junit 'build-dir/test/modified-test-report.xml'
+    junit testResults: 'build-dir/test/modified-test-report.xml'
 }
 
 def environment() {

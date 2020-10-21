@@ -23,6 +23,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/to_string.hpp>
 
 namespace realm {
 
@@ -64,12 +65,11 @@ public:
 /// constructor when opening a database that uses a deprecated file format
 /// and/or a deprecated history schema which this version of Realm cannot
 /// upgrade from.
-class UnsupportedFileFormatVersion : public ExceptionWithBacktrace<std::exception> {
+class UnsupportedFileFormatVersion : public ExceptionWithBacktrace<> {
 public:
     UnsupportedFileFormatVersion(int source_version);
     /// The unsupported version of the file.
     int source_version = 0;
-    const char* message() const noexcept override;
 };
 
 
@@ -103,11 +103,37 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
-/// Thrown when a key can not be used (either not found or already existing
-/// when trying to create a new object)
-class InvalidKey : public std::runtime_error {
+/// Thrown when a key can not by found
+class KeyNotFound : public std::runtime_error {
 public:
-    InvalidKey(const std::string& msg)
+    KeyNotFound(const std::string& msg)
+        : std::runtime_error(msg)
+    {
+    }
+};
+
+/// Thrown when a column can not by found
+class ColumnNotFound : public std::runtime_error {
+public:
+    ColumnNotFound()
+        : std::runtime_error("Column not found")
+    {
+    }
+};
+
+/// Thrown when a column key is already used
+class ColumnAlreadyExists : public std::runtime_error {
+public:
+    ColumnAlreadyExists()
+        : std::runtime_error("Column already exists")
+    {
+    }
+};
+
+/// Thrown when a key is already existing when trying to create a new object
+class KeyAlreadyUsed : public std::runtime_error {
+public:
+    KeyAlreadyUsed(const std::string& msg)
         : std::runtime_error(msg)
     {
     }
@@ -243,31 +269,28 @@ public:
 
         /// Group::open() is called on a group accessor that is already in the
         /// attached state. Or Group::open() or Group::commit() is called on a
-        /// group accessor that is managed by a SharedGroup object.
+        /// group accessor that is managed by a DB object.
         wrong_group_state,
 
-        /// No active transaction on a particular SharedGroup object (e.g.,
-        /// SharedGroup::commit()), or the active transaction on the SharedGroup
-        /// object is of the wrong type (read/write), or an attampt was made to
-        /// initiate a new transaction while one is already in progress on the
-        /// same SharedGroup object.
+        /// No active transaction on a particular Transaction object (e.g. after commit)
+        /// or the Transaction object is of the wrong type (write to a read-only transaction)
         wrong_transact_state,
 
-        /// Attempted use of a continuous transaction through a SharedGroup
+        /// Attempted use of a continuous transaction through a DB
         /// object with no history. See Replication::get_history().
         no_history,
 
-        /// Durability setting (as passed to the SharedGroup constructor) was
+        /// Durability setting (as passed to the DB constructor) was
         /// not consistent across the session.
         mixed_durability,
 
         /// History type (as specified by the Replication implementation passed
-        /// to the SharedGroup constructor) was not consistent across the
+        /// to the DB constructor) was not consistent across the
         /// session.
         mixed_history_type,
 
         /// History schema version (as specified by the Replication
-        /// implementation passed to the SharedGroup constructor) was not
+        /// implementation passed to the DB constructor) was not
         /// consistent across the session.
         mixed_history_schema_version,
 
@@ -319,13 +342,10 @@ inline const char* DescriptorMismatch::message() const noexcept
 }
 
 inline UnsupportedFileFormatVersion::UnsupportedFileFormatVersion(int version)
-: source_version(version)
+    : ExceptionWithBacktrace<>(
+          util::format("Database has an unsupported version (%1) and cannot be upgraded", version))
+    , source_version(version)
 {
-}
-
-inline const char* UnsupportedFileFormatVersion::message() const noexcept
-{
-    return "Database has an unsupported version and cannot be upgraded";
 }
 
 inline const char* MultipleSyncAgents::message() const noexcept

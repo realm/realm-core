@@ -35,6 +35,7 @@ set(NORMAL_TESTS
     test_column_float.cpp
     test_column_string.cpp
     test_column_timestamp.cpp
+    test_decimal128.cpp
     test_destroy_guard.cpp
     test_file.cpp
     test_file_locks.cpp
@@ -44,8 +45,10 @@ set(NORMAL_TESTS
     test_json.cpp
     test_link_query_view.cpp
     test_links.cpp
+    test_unresolved_links.cpp
     test_metrics.cpp
     test_global_key.cpp
+    test_object_id.cpp
     test_optional.cpp
     test_priority_queue.cpp
     test_replication.cpp
@@ -62,6 +65,7 @@ set(NORMAL_TESTS
     test_util_any.cpp
     test_util_backtrace.cpp
     test_util_base64.cpp
+    test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
     test_util_inspect.cpp

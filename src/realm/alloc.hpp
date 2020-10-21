@@ -166,10 +166,46 @@ protected:
     // The ref translation splits the full ref-space (both below and above baseline)
     // into equal chunks.
     struct RefTranslation {
-        char* mapping_addr;
+        char* mapping_addr = nullptr;
+        std::atomic<size_t> lowest_possible_xover_offset = 0;
+
+        // member 'xover_mapping_addr' is used for memory synchronization of the fields
+        // 'xover_mapping_base' and 'xover_encrypted_mapping'. It also imposes an ordering
+        // on 'lowest_possible_xover_offset' such that once a non-null value of 'xover_mapping_addr'
+        // has been acquired, 'lowest_possible_xover_offset' will never change.
+        std::atomic<char*> xover_mapping_addr = nullptr;
+        size_t xover_mapping_base = 0;
 #if REALM_ENABLE_ENCRYPTION
-        util::EncryptedFileMapping* encrypted_mapping;
+        util::EncryptedFileMapping* encrypted_mapping = nullptr;
+        util::EncryptedFileMapping* xover_encrypted_mapping = nullptr;
 #endif
+        explicit RefTranslation(char* addr)
+            : mapping_addr(addr)
+        {
+        }
+        RefTranslation() = default;
+        RefTranslation& operator=(const RefTranslation& from)
+        {
+            if (&from != this) {
+                mapping_addr = from.mapping_addr;
+#if REALM_ENABLE_ENCRYPTION
+                encrypted_mapping = from.encrypted_mapping;
+#endif
+                const auto local_xover_mapping_addr = from.xover_mapping_addr.load(std::memory_order_acquire);
+
+                // This must be loaded after xover_mapping_addr to ensure it isn't stale.
+                lowest_possible_xover_offset.store(from.lowest_possible_xover_offset, std::memory_order_relaxed);
+
+                if (local_xover_mapping_addr) {
+                    xover_mapping_base = from.xover_mapping_base;
+#if REALM_ENABLE_ENCRYPTION
+                    xover_encrypted_mapping = from.xover_encrypted_mapping;
+#endif
+                    xover_mapping_addr.store(local_xover_mapping_addr, std::memory_order_release);
+                }
+            }
+            return *this;
+        }
     };
     // This pointer may be changed concurrently with access, so make sure it is
     // atomic!
@@ -200,7 +236,9 @@ protected:
     /// then entirely the responsibility of the caller that the memory
     /// is not modified by way of the returned memory pointer.
     virtual char* do_translate(ref_type ref) const noexcept = 0;
-
+    char* translate_critical(RefTranslation*, ref_type ref) const noexcept;
+    char* translate_less_critical(RefTranslation*, ref_type ref) const noexcept;
+    virtual void get_or_add_xover_mapping(RefTranslation&, size_t, size_t, size_t) = 0;
     Allocator() noexcept;
     size_t get_section_index(size_t pos) const noexcept;
     inline size_t get_section_base(size_t index) const noexcept;
@@ -305,6 +343,12 @@ public:
         set_read_only(!writable);
     }
 
+protected:
+    void get_or_add_xover_mapping(RefTranslation& txl, size_t index, size_t offset, size_t size) override
+    {
+        m_alloc->get_or_add_xover_mapping(txl, index, offset, size);
+    }
+
 private:
     Allocator* m_alloc;
     MemRef do_alloc(const size_t size) override
@@ -352,7 +396,7 @@ inline int_fast64_t from_ref(ref_type v) noexcept
                   "If ref_type changes, from_ref and to_ref should probably be updated");
 
     // Make sure that we preserve the bit pattern of the ref_type (without sign extension).
-    return util::from_twos_compl<int_fast64_t>(uint_fast64_t(v));
+    return int_fast64_t(uint_fast64_t(v));
 }
 
 inline ref_type to_ref(int_fast64_t v) noexcept
@@ -503,24 +547,39 @@ inline Allocator::~Allocator() noexcept
 {
 }
 
-inline char* Allocator::translate(ref_type ref) const noexcept
+// performance critical part of the translation process. Less critical code is in translate_less_critical.
+inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept
 {
-    if (auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire)) {
-        char* base_addr;
-        size_t idx = get_section_index(ref);
-        base_addr = ref_translation_ptr[idx].mapping_addr;
-        size_t offset = ref - get_section_base(idx);
-        auto addr = base_addr + offset;
+    size_t idx = get_section_index(ref);
+    RefTranslation& txl = ref_translation_ptr[idx];
+    size_t offset = ref - get_section_base(idx);
+    size_t lowest_possible_xover_offset = txl.lowest_possible_xover_offset.load(std::memory_order_relaxed);
+    if (REALM_LIKELY(offset < lowest_possible_xover_offset)) {
+        // the lowest possible xover offset may grow concurrently, but that will not affect this code path
+        char* addr = txl.mapping_addr + offset;
 #if REALM_ENABLE_ENCRYPTION
-        realm::util::encryption_read_barrier(addr, NodeHeader::header_size,
-                                             ref_translation_ptr[idx].encrypted_mapping,
+        realm::util::encryption_read_barrier(addr, NodeHeader::header_size, txl.encrypted_mapping,
                                              NodeHeader::get_byte_size_from_header);
 #endif
         return addr;
     }
-    else
-        return do_translate(ref);
+    else {
+        // the lowest possible xover offset may grow concurrently, but that will be handled inside the call
+        return translate_less_critical(ref_translation_ptr, ref);
+    }
 }
+
+inline char* Allocator::translate(ref_type ref) const noexcept
+{
+    auto ref_translation_ptr = m_ref_translation_ptr.load(std::memory_order_acquire);
+    if (REALM_LIKELY(ref_translation_ptr)) {
+        return translate_critical(ref_translation_ptr, ref);
+    }
+    else {
+        return do_translate(ref);
+    }
+}
+
 
 } // namespace realm
 
