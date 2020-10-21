@@ -236,7 +236,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
                 // We are not advancing through the clusters. We basically don't know where we are,
                 // so just start over from the beginning.
                 m_results_ndx = m_results_start;
-                m_actual_key = get_key(m_results_ndx);
+                m_actual_key = (m_results_start != m_results_end) ? get_key(m_results_start) : ObjKey();
             }
             m_last_start_key = first_key;
 
