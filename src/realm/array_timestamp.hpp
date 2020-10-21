@@ -74,7 +74,7 @@ public:
     void insert(size_t ndx, Timestamp value);
     Timestamp get(size_t ndx) const
     {
-        util::Optional<int64_t> seconds = m_seconds.get(ndx);
+        std::optional<int64_t> seconds = m_seconds.get(ndx);
         return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
     }
     bool is_null(size_t ndx) const

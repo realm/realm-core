@@ -566,7 +566,7 @@ void Table::populate_search_index(ColKey col_key)
 
         if (type == type_Int) {
             if (is_nullable(col_key)) {
-                Optional<int64_t> value = o.get<Optional<int64_t>>(col_key);
+                std::optional<int64_t> value = o.get<std::optional<int64_t>>(col_key);
                 index->insert(key, value); // Throws
             }
             else {
@@ -576,7 +576,7 @@ void Table::populate_search_index(ColKey col_key)
         }
         else if (type == type_Bool) {
             if (is_nullable(col_key)) {
-                Optional<bool> value = o.get<Optional<bool>>(col_key);
+                std::optional<bool> value = o.get<std::optional<bool>>(col_key);
                 index->insert(key, value); // Throws
             }
             else {
@@ -594,7 +594,7 @@ void Table::populate_search_index(ColKey col_key)
         }
         else if (type == type_ObjectId) {
             if (is_nullable(col_key)) {
-                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
+                std::optional<ObjectId> value = o.get<std::optional<ObjectId>>(col_key);
                 index->insert(key, value); // Throws
             }
             else {
@@ -1110,12 +1110,12 @@ public:
 
     Timestamp get(size_t ndx) const
     {
-        util::Optional<int64_t> seconds = m_seconds.get(ndx);
+        std::optional<int64_t> seconds = m_seconds.get(ndx);
         return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
     }
 
 private:
-    BPlusTree<util::Optional<Int>> m_seconds;
+    BPlusTree<std::optional<Int>> m_seconds;
     BPlusTree<Int> m_nanoseconds;
 };
 
@@ -1125,7 +1125,7 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
     switch (col_type) {
         case col_type_Int:
             if (nullable) {
-                auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
+                auto val = static_cast<BPlusTree<std::optional<Int>>*>(accessor)->get(ndx);
                 return Mixed{val};
             }
             else {
@@ -1133,7 +1133,7 @@ Mixed get_val_from_column(size_t ndx, ColumnType col_type, bool nullable, BPlusT
             }
         case col_type_Bool:
             if (nullable) {
-                auto val = static_cast<BPlusTree<util::Optional<Int>>*>(accessor)->get(ndx);
+                auto val = static_cast<BPlusTree<std::optional<Int>>*>(accessor)->get(ndx);
                 return val ? Mixed{bool(*val)} : Mixed{};
             }
             else {
@@ -1171,19 +1171,19 @@ void copy_list(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
 }
 
 template <>
-void copy_list<util::Optional<Bool>>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
+void copy_list<std::optional<Bool>>(ref_type sub_table_ref, Obj& obj, ColKey col, Allocator& alloc)
 {
     if (sub_table_ref) {
         // Actual list is in the columns array position 0
         Array cols(alloc);
         cols.init_from_ref(sub_table_ref);
-        BPlusTree<util::Optional<Int>> from_list(alloc);
+        BPlusTree<std::optional<Int>> from_list(alloc);
         from_list.set_parent(&cols, 0);
         from_list.init_from_parent();
         size_t list_size = from_list.size();
-        auto l = obj.get_list<util::Optional<Bool>>(col);
+        auto l = obj.get_list<std::optional<Bool>>(col);
         for (size_t j = 0; j < list_size; j++) {
-            util::Optional<Bool> val;
+            std::optional<Bool> val;
             auto int_val = from_list.get(j);
             if (int_val) {
                 val = (*int_val != 0);
@@ -1317,7 +1317,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
                 case col_type_Int:
                 case col_type_Bool:
                     if (nullable) {
-                        acc = std::make_unique<BPlusTree<util::Optional<Int>>>(m_alloc);
+                        acc = std::make_unique<BPlusTree<std::optional<Int>>>(m_alloc);
                     }
                     else {
                         acc = std::make_unique<BPlusTree<Int>>(m_alloc);
@@ -1447,7 +1447,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
             switch (it.first.get_type()) {
                 case col_type_Int: {
                     if (it.first.get_attrs().test(col_attr_Nullable)) {
-                        copy_list<util::Optional<int64_t>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                        copy_list<std::optional<int64_t>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
                     }
                     else {
                         copy_list<int64_t>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
@@ -1456,7 +1456,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
                 }
                 case col_type_Bool:
                     if (it.first.get_attrs().test(col_attr_Nullable)) {
-                        copy_list<util::Optional<Bool>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
+                        copy_list<std::optional<Bool>>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
                     }
                     else {
                         copy_list<Bool>(to_ref(it.second->get(row_ndx)), obj, it.first, m_alloc);
@@ -1813,7 +1813,7 @@ size_t Table::count_int(ColKey col_key, int64_t value) const
 
     size_t count;
     if (is_nullable(col_key)) {
-        aggregate<act_Count, util::Optional<int64_t>, int64_t>(col_key, value, &count);
+        aggregate<act_Count, std::optional<int64_t>, int64_t>(col_key, value, &count);
     }
     else {
         aggregate<act_Count, int64_t, int64_t>(col_key, value, &count);
@@ -1896,7 +1896,7 @@ Decimal128 Table::aggregate<act_Sum, Decimal128, Decimal128>(ColKey column_key, 
 int64_t Table::sum_int(ColKey col_key) const
 {
     if (is_nullable(col_key)) {
-        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(col_key);
+        return aggregate<act_Sum, std::optional<int64_t>, int64_t>(col_key);
     }
     return aggregate<act_Sum, int64_t, int64_t>(col_key);
 }
@@ -1918,7 +1918,7 @@ Decimal128 Table::sum_decimal(ColKey col_key) const
 double Table::average_int(ColKey col_key, size_t* value_count) const
 {
     if (is_nullable(col_key)) {
-        return average<util::Optional<int64_t>>(col_key, value_count);
+        return average<std::optional<int64_t>>(col_key, value_count);
     }
     return average<int64_t>(col_key, value_count);
 }
@@ -1949,7 +1949,7 @@ Decimal128 Table::average_decimal(ColKey col_key, size_t* value_count) const
 int64_t Table::minimum_int(ColKey col_key, ObjKey* return_ndx) const
 {
     if (is_nullable(col_key)) {
-        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
+        return aggregate<act_Min, std::optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
     }
     return aggregate<act_Min, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
 }
@@ -2001,7 +2001,7 @@ Timestamp Table::minimum_timestamp(ColKey col_key, ObjKey* return_ndx) const
 int64_t Table::maximum_int(ColKey col_key, ObjKey* return_ndx) const
 {
     if (is_nullable(col_key)) {
-        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
+        return aggregate<act_Max, std::optional<int64_t>, int64_t>(col_key, 0, nullptr, return_ndx);
     }
     return aggregate<act_Max, int64_t, int64_t>(col_key, 0, nullptr, return_ndx);
 }
@@ -2085,13 +2085,13 @@ ObjKey Table::find_first(ColKey col_key, T value) const
 namespace realm {
 
 template <>
-ObjKey Table::find_first(ColKey col_key, util::Optional<float> value) const
+ObjKey Table::find_first(ColKey col_key, std::optional<float> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
 }
 
 template <>
-ObjKey Table::find_first(ColKey col_key, util::Optional<double> value) const
+ObjKey Table::find_first(ColKey col_key, std::optional<double> value) const
 {
     return value ? find_first(col_key, *value) : find_first_null(col_key);
 }
@@ -2111,15 +2111,15 @@ template ObjKey Table::find_first(ColKey col_key, double) const;
 template ObjKey Table::find_first(ColKey col_key, Decimal128) const;
 template ObjKey Table::find_first(ColKey col_key, ObjectId) const;
 template ObjKey Table::find_first(ColKey col_key, ObjKey) const;
-template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
-template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
+template ObjKey Table::find_first(ColKey col_key, std::optional<bool>) const;
+template ObjKey Table::find_first(ColKey col_key, std::optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
-template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
+template ObjKey Table::find_first(ColKey col_key, std::optional<ObjectId>) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
     if (is_nullable(col_key))
-        return find_first<util::Optional<int64_t>>(col_key, value);
+        return find_first<std::optional<int64_t>>(col_key, value);
     else
         return find_first<int64_t>(col_key, value);
 }
@@ -2127,7 +2127,7 @@ ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 ObjKey Table::find_first_bool(ColKey col_key, bool value) const
 {
     if (is_nullable(col_key))
-        return find_first<util::Optional<bool>>(col_key, value);
+        return find_first<std::optional<bool>>(col_key, value);
     else
         return find_first<bool>(col_key, value);
 }
@@ -3321,17 +3321,17 @@ typename util::RemoveOptional<T>::type remove_optional(T val)
     return val;
 }
 template <>
-int64_t remove_optional<Optional<int64_t>>(Optional<int64_t> val)
+int64_t remove_optional<std::optional<int64_t>>(std::optional<int64_t> val)
 {
     return val.value();
 }
 template <>
-bool remove_optional<Optional<bool>>(Optional<bool> val)
+bool remove_optional<std::optional<bool>>(std::optional<bool> val)
 {
     return val.value();
 }
 template <>
-ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
+ObjectId remove_optional<std::optional<ObjectId>>(std::optional<ObjectId> val)
 {
     return val.value();
 }
@@ -3423,10 +3423,10 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
         switch (type_id) {
             case type_Int:
                 if (is_nullable(from)) {
-                    change_nullability_list<Optional<int64_t>, int64_t>(from, to, throw_on_null);
+                    change_nullability_list<std::optional<int64_t>, int64_t>(from, to, throw_on_null);
                 }
                 else {
-                    change_nullability_list<int64_t, Optional<int64_t>>(from, to, throw_on_null);
+                    change_nullability_list<int64_t, std::optional<int64_t>>(from, to, throw_on_null);
                 }
                 break;
             case type_Float:
@@ -3436,7 +3436,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 change_nullability_list<double, double>(from, to, throw_on_null);
                 break;
             case type_Bool:
-                change_nullability_list<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
+                change_nullability_list<std::optional<bool>, std::optional<bool>>(from, to, throw_on_null);
                 break;
             case type_String:
                 change_nullability_list<StringData, StringData>(from, to, throw_on_null);
@@ -3449,10 +3449,10 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_ObjectId:
                 if (is_nullable(from)) {
-                    change_nullability_list<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                    change_nullability_list<std::optional<ObjectId>, ObjectId>(from, to, throw_on_null);
                 }
                 else {
-                    change_nullability_list<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                    change_nullability_list<ObjectId, std::optional<ObjectId>>(from, to, throw_on_null);
                 }
                 break;
             case type_Decimal:
@@ -3473,10 +3473,10 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
         switch (type_id) {
             case type_Int:
                 if (is_nullable(from)) {
-                    change_nullability<Optional<int64_t>, int64_t>(from, to, throw_on_null);
+                    change_nullability<std::optional<int64_t>, int64_t>(from, to, throw_on_null);
                 }
                 else {
-                    change_nullability<int64_t, Optional<int64_t>>(from, to, throw_on_null);
+                    change_nullability<int64_t, std::optional<int64_t>>(from, to, throw_on_null);
                 }
                 break;
             case type_Float:
@@ -3486,7 +3486,7 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 change_nullability<double, double>(from, to, throw_on_null);
                 break;
             case type_Bool:
-                change_nullability<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
+                change_nullability<std::optional<bool>, std::optional<bool>>(from, to, throw_on_null);
                 break;
             case type_String:
                 change_nullability<StringData, StringData>(from, to, throw_on_null);
@@ -3499,10 +3499,10 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_ObjectId:
                 if (is_nullable(from)) {
-                    change_nullability<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
+                    change_nullability<std::optional<ObjectId>, ObjectId>(from, to, throw_on_null);
                 }
                 else {
-                    change_nullability<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
+                    change_nullability<ObjectId, std::optional<ObjectId>>(from, to, throw_on_null);
                 }
                 break;
             case type_Decimal:

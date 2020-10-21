@@ -55,7 +55,7 @@ void ArrayTimestamp::set(size_t ndx, Timestamp value)
         return set_null(ndx);
     }
 
-    util::Optional<int64_t> seconds = util::make_optional(value.get_seconds());
+    std::optional<int64_t> seconds = std::make_optional(value.get_seconds());
     int32_t nanoseconds = value.get_nanoseconds();
 
     m_seconds.set(ndx, seconds);
@@ -65,11 +65,11 @@ void ArrayTimestamp::set(size_t ndx, Timestamp value)
 void ArrayTimestamp::insert(size_t ndx, Timestamp value)
 {
     if (value.is_null()) {
-        m_seconds.insert(ndx, util::none);
+        m_seconds.insert(ndx, std::nullopt);
         m_nanoseconds.insert(ndx, 0); // Throws
     }
     else {
-        util::Optional<int64_t> seconds = util::make_optional(value.get_seconds());
+        std::optional<int64_t> seconds = std::make_optional(value.get_seconds());
         int32_t nanoseconds = value.get_nanoseconds();
 
         m_seconds.insert(ndx, seconds);
@@ -92,7 +92,7 @@ size_t ArrayTimestamp::find_first<Greater>(Timestamp value, size_t begin, size_t
         if (ret == not_found)
             return not_found;
 
-        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        std::optional<int64_t> seconds = m_seconds.get(ret);
         if (*seconds > sec) {
             return ret;
         }
@@ -121,7 +121,7 @@ size_t ArrayTimestamp::find_first<Less>(Timestamp value, size_t begin, size_t en
         if (ret == not_found)
             return not_found;
 
-        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        std::optional<int64_t> seconds = m_seconds.get(ret);
         if (*seconds < sec) {
             return ret;
         }
@@ -141,7 +141,7 @@ template <>
 size_t ArrayTimestamp::find_first<GreaterEqual>(Timestamp value, size_t begin, size_t end) const noexcept
 {
     if (value.is_null()) {
-        return m_seconds.find_first<Equal>(util::none, begin, end);
+        return m_seconds.find_first<Equal>(std::nullopt, begin, end);
     }
     int64_t sec = value.get_seconds();
     while (begin < end) {
@@ -150,7 +150,7 @@ size_t ArrayTimestamp::find_first<GreaterEqual>(Timestamp value, size_t begin, s
         if (ret == not_found)
             return not_found;
 
-        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        std::optional<int64_t> seconds = m_seconds.get(ret);
         if (*seconds > sec) {
             return ret;
         }
@@ -170,7 +170,7 @@ template <>
 size_t ArrayTimestamp::find_first<LessEqual>(Timestamp value, size_t begin, size_t end) const noexcept
 {
     if (value.is_null()) {
-        return m_seconds.find_first<Equal>(util::none, begin, end);
+        return m_seconds.find_first<Equal>(std::nullopt, begin, end);
     }
     int64_t sec = value.get_seconds();
     while (begin < end) {
@@ -179,7 +179,7 @@ size_t ArrayTimestamp::find_first<LessEqual>(Timestamp value, size_t begin, size
         if (ret == not_found)
             return not_found;
 
-        util::Optional<int64_t> seconds = m_seconds.get(ret);
+        std::optional<int64_t> seconds = m_seconds.get(ret);
         if (*seconds < sec) {
             return ret;
         }
@@ -199,7 +199,7 @@ template <>
 size_t ArrayTimestamp::find_first<Equal>(Timestamp value, size_t begin, size_t end) const noexcept
 {
     if (value.is_null()) {
-        return m_seconds.find_first<Equal>(util::none, begin, end);
+        return m_seconds.find_first<Equal>(std::nullopt, begin, end);
     }
     while (begin < end) {
         auto res = m_seconds.find_first(value.get_seconds(), begin, end);
@@ -216,11 +216,11 @@ template <>
 size_t ArrayTimestamp::find_first<NotEqual>(Timestamp value, size_t begin, size_t end) const noexcept
 {
     if (value.is_null()) {
-        return m_seconds.find_first<NotEqual>(util::none, begin, end);
+        return m_seconds.find_first<NotEqual>(std::nullopt, begin, end);
     }
     int64_t sec = value.get_seconds();
     while (begin < end) {
-        util::Optional<int64_t> seconds = m_seconds.get(begin);
+        std::optional<int64_t> seconds = m_seconds.get(begin);
         if (!seconds || *seconds != sec) {
             return begin;
        }

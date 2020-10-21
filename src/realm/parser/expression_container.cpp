@@ -329,7 +329,7 @@ SubqueryExpression& ExpressionContainer::get_subexpression()
 
 DataType ExpressionContainer::check_type_compatibility(DataType other_type)
 {
-    util::Optional<DataType> self_type;
+    std::optional<DataType> self_type;
     switch (type) {
         case ExpressionInternal::exp_Value:
             self_type = other_type; // we'll try to parse the value as other_type and fail there if not possible
@@ -411,7 +411,7 @@ bool is_count_type(ExpressionContainer::ExpressionInternal exp_type)
            exp_type == ExpressionContainer::ExpressionInternal::exp_OpSizeBinaryPrimitive;
 }
 
-Optional<DataType> primitive_list_property_type(ExpressionContainer& exp)
+std::optional<DataType> primitive_list_property_type(ExpressionContainer& exp)
 {
     using ExpType = ExpressionContainer::ExpressionInternal;
     if (exp.type == ExpType::exp_PrimitiveList) {
@@ -429,7 +429,7 @@ Optional<DataType> primitive_list_property_type(ExpressionContainer& exp)
     else if (exp.type == ExpType::exp_OpAvgPrimitive) {
         return exp.get_primitive_avg().operative_col_type;
     }
-    return util::none;
+    return std::nullopt;
 }
 
 DataType ExpressionContainer::get_comparison_type(ExpressionContainer& rhs) {

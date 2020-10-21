@@ -45,25 +45,25 @@ ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
     switch (get_table()->get_column_type(col_key)) {
         case type_Int: {
             if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Int>>>(*this, col_key);
+                return std::make_unique<ConstLst<std::optional<Int>>>(*this, col_key);
             else
                 return std::make_unique<ConstLst<Int>>(*this, col_key);
         }
         case type_Bool: {
             if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Bool>>>(*this, col_key);
+                return std::make_unique<ConstLst<std::optional<Bool>>>(*this, col_key);
             else
                 return std::make_unique<ConstLst<Bool>>(*this, col_key);
         }
         case type_Float: {
             if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Float>>>(*this, col_key);
+                return std::make_unique<ConstLst<std::optional<Float>>>(*this, col_key);
             else
                 return std::make_unique<ConstLst<Float>>(*this, col_key);
         }
         case type_Double: {
             if (nullable)
-                return std::make_unique<ConstLst<util::Optional<Double>>>(*this, col_key);
+                return std::make_unique<ConstLst<std::optional<Double>>>(*this, col_key);
             else
                 return std::make_unique<ConstLst<Double>>(*this, col_key);
         }
@@ -81,7 +81,7 @@ ConstLstBasePtr ConstObj::get_listbase_ptr(ColKey col_key) const
         }
         case type_ObjectId: {
             if (nullable) {
-                return std::make_unique<ConstLst<util::Optional<ObjectId>>>(*this, col_key);
+                return std::make_unique<ConstLst<std::optional<ObjectId>>>(*this, col_key);
             }
             else {
                 return std::make_unique<ConstLst<ObjectId>>(*this, col_key);
@@ -110,25 +110,25 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
     switch (get_table()->get_column_type(col_key)) {
         case type_Int: {
             if (nullable)
-                return std::make_unique<Lst<util::Optional<Int>>>(*this, col_key);
+                return std::make_unique<Lst<std::optional<Int>>>(*this, col_key);
             else
                 return std::make_unique<Lst<Int>>(*this, col_key);
         }
         case type_Bool: {
             if (nullable)
-                return std::make_unique<Lst<util::Optional<Bool>>>(*this, col_key);
+                return std::make_unique<Lst<std::optional<Bool>>>(*this, col_key);
             else
                 return std::make_unique<Lst<Bool>>(*this, col_key);
         }
         case type_Float: {
             if (nullable)
-                return std::make_unique<Lst<util::Optional<Float>>>(*this, col_key);
+                return std::make_unique<Lst<std::optional<Float>>>(*this, col_key);
             else
                 return std::make_unique<Lst<Float>>(*this, col_key);
         }
         case type_Double: {
             if (nullable)
-                return std::make_unique<Lst<util::Optional<Double>>>(*this, col_key);
+                return std::make_unique<Lst<std::optional<Double>>>(*this, col_key);
             else
                 return std::make_unique<Lst<Double>>(*this, col_key);
         }
@@ -146,7 +146,7 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
         }
         case type_ObjectId: {
             if (nullable)
-                return std::make_unique<Lst<util::Optional<ObjectId>>>(*this, col_key);
+                return std::make_unique<Lst<std::optional<ObjectId>>>(*this, col_key);
             else
                 return std::make_unique<Lst<ObjectId>>(*this, col_key);
         }
@@ -373,7 +373,7 @@ void ConstLstIf<T>::sort(std::vector<size_t>& indices, bool ascending) const
 }
 
 template <class T>
-void ConstLstIf<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+void ConstLstIf<T>::distinct(std::vector<size_t>& indices, std::optional<bool> sort_order) const
 {
     indices.clear();
     sort(indices, sort_order ? *sort_order : true);
@@ -662,7 +662,7 @@ void Lst<Int>::set_repl(Replication* repl, size_t ndx, int64_t value)
 }
 
 template <>
-void Lst<util::Optional<Int>>::set_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
+void Lst<std::optional<Int>>::set_repl(Replication* repl, size_t ndx, std::optional<Int> value)
 {
     if (value) {
         repl->list_set_int(*this, ndx, *value);
@@ -679,7 +679,7 @@ void Lst<Bool>::set_repl(Replication* repl, size_t ndx, bool value)
 }
 
 template <>
-void Lst<util::Optional<bool>>::set_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
+void Lst<std::optional<bool>>::set_repl(Replication* repl, size_t ndx, std::optional<bool> value)
 {
     if (value) {
         repl->list_set_bool(*this, ndx, *value);
@@ -696,7 +696,7 @@ void Lst<Float>::set_repl(Replication* repl, size_t ndx, float value)
 }
 
 template <>
-void Lst<util::Optional<Float>>::set_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
+void Lst<std::optional<Float>>::set_repl(Replication* repl, size_t ndx, std::optional<Float> value)
 {
     if (value) {
         repl->list_set_float(*this, ndx, *value);
@@ -713,7 +713,7 @@ void Lst<Double>::set_repl(Replication* repl, size_t ndx, double value)
 }
 
 template <>
-void Lst<util::Optional<Double>>::set_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
+void Lst<std::optional<Double>>::set_repl(Replication* repl, size_t ndx, std::optional<Double> value)
 {
     if (value) {
         repl->list_set_double(*this, ndx, *value);
@@ -763,7 +763,7 @@ void Lst<ObjectId>::set_repl(Replication* repl, size_t ndx, ObjectId value)
 }
 
 template <>
-void Lst<util::Optional<ObjectId>>::set_repl(Replication* repl, size_t ndx, util::Optional<ObjectId> value)
+void Lst<std::optional<ObjectId>>::set_repl(Replication* repl, size_t ndx, std::optional<ObjectId> value)
 {
     if (value) {
         repl->list_set_object_id(*this, ndx, *value);
@@ -804,7 +804,7 @@ void Lst<Int>::insert_repl(Replication* repl, size_t ndx, int64_t value)
 }
 
 template <>
-void Lst<util::Optional<Int>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Int> value)
+void Lst<std::optional<Int>>::insert_repl(Replication* repl, size_t ndx, std::optional<Int> value)
 {
     if (value) {
         repl->list_insert_int(*this, ndx, *value);
@@ -821,7 +821,7 @@ void Lst<Bool>::insert_repl(Replication* repl, size_t ndx, bool value)
 }
 
 template <>
-void Lst<util::Optional<bool>>::insert_repl(Replication* repl, size_t ndx, util::Optional<bool> value)
+void Lst<std::optional<bool>>::insert_repl(Replication* repl, size_t ndx, std::optional<bool> value)
 {
     if (value) {
         repl->list_insert_bool(*this, ndx, *value);
@@ -838,7 +838,7 @@ void Lst<Float>::insert_repl(Replication* repl, size_t ndx, float value)
 }
 
 template <>
-void Lst<util::Optional<Float>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Float> value)
+void Lst<std::optional<Float>>::insert_repl(Replication* repl, size_t ndx, std::optional<Float> value)
 {
     if (value) {
         repl->list_insert_float(*this, ndx, *value);
@@ -855,7 +855,7 @@ void Lst<Double>::insert_repl(Replication* repl, size_t ndx, double value)
 }
 
 template <>
-void Lst<util::Optional<Double>>::insert_repl(Replication* repl, size_t ndx, util::Optional<Double> value)
+void Lst<std::optional<Double>>::insert_repl(Replication* repl, size_t ndx, std::optional<Double> value)
 {
     if (value) {
         repl->list_insert_double(*this, ndx, *value);
@@ -905,7 +905,7 @@ void Lst<ObjectId>::insert_repl(Replication* repl, size_t ndx, ObjectId value)
 }
 
 template <>
-void Lst<util::Optional<ObjectId>>::insert_repl(Replication* repl, size_t ndx, util::Optional<ObjectId> value)
+void Lst<std::optional<ObjectId>>::insert_repl(Replication* repl, size_t ndx, std::optional<ObjectId> value)
 {
     if (value) {
         repl->list_insert_object_id(*this, ndx, *value);
@@ -941,51 +941,51 @@ void Lst<Decimal128>::insert_repl(Replication* repl, size_t ndx, Decimal128 valu
 /************************* template instantiations ***************************/
 
 template class ConstLstIf<int64_t>;
-template class ConstLstIf<util::Optional<Int>>;
+template class ConstLstIf<std::optional<Int>>;
 template class ConstLstIf<bool>;
-template class ConstLstIf<util::Optional<bool>>;
+template class ConstLstIf<std::optional<bool>>;
 template class ConstLstIf<float>;
-template class ConstLstIf<util::Optional<float>>;
+template class ConstLstIf<std::optional<float>>;
 template class ConstLstIf<double>;
-template class ConstLstIf<util::Optional<double>>;
+template class ConstLstIf<std::optional<double>>;
 template class ConstLstIf<StringData>;
 template class ConstLstIf<BinaryData>;
 template class ConstLstIf<Timestamp>;
 template class ConstLstIf<ObjKey>;
 template class ConstLstIf<Decimal128>;
 template class ConstLstIf<ObjectId>;
-template class ConstLstIf<util::Optional<ObjectId>>;
+template class ConstLstIf<std::optional<ObjectId>>;
 
 template class ConstLst<int64_t>;
-template class ConstLst<util::Optional<Int>>;
+template class ConstLst<std::optional<Int>>;
 template class ConstLst<bool>;
-template class ConstLst<util::Optional<bool>>;
+template class ConstLst<std::optional<bool>>;
 template class ConstLst<float>;
-template class ConstLst<util::Optional<float>>;
+template class ConstLst<std::optional<float>>;
 template class ConstLst<double>;
-template class ConstLst<util::Optional<double>>;
+template class ConstLst<std::optional<double>>;
 template class ConstLst<StringData>;
 template class ConstLst<BinaryData>;
 template class ConstLst<Timestamp>;
 template class ConstLst<ObjKey>;
 template class ConstLst<Decimal128>;
 template class ConstLst<ObjectId>;
-template class ConstLst<util::Optional<ObjectId>>;
+template class ConstLst<std::optional<ObjectId>>;
 
 template class Lst<int64_t>;
-template class Lst<util::Optional<Int>>;
+template class Lst<std::optional<Int>>;
 template class Lst<bool>;
-template class Lst<util::Optional<bool>>;
+template class Lst<std::optional<bool>>;
 template class Lst<float>;
-template class Lst<util::Optional<float>>;
+template class Lst<std::optional<float>>;
 template class Lst<double>;
-template class Lst<util::Optional<double>>;
+template class Lst<std::optional<double>>;
 template class Lst<StringData>;
 template class Lst<BinaryData>;
 template class Lst<Timestamp>;
 template class Lst<ObjKey>;
 template class Lst<Decimal128>;
 template class Lst<ObjectId>;
-template class Lst<util::Optional<ObjectId>>;
+template class Lst<std::optional<ObjectId>>;
 
 } // namespace realm

@@ -1383,7 +1383,7 @@ void DB::open(Replication& repl, const DBOptions options)
 // Unmapping (during close()) while transactions are live, is not considered an error. There
 // is a potential race between unmapping during close() and any operation carried out by a live
 // transaction. The user must ensure that this race never happens if she uses DB::close().
-bool DB::compact(bool bump_version_number, util::Optional<const char*> output_encryption_key)
+bool DB::compact(bool bump_version_number, std::optional<const char*> output_encryption_key)
 {
     std::string tmp_path = m_db_path + ".tmp_compaction_space";
 

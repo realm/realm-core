@@ -1058,7 +1058,7 @@ int64_t Query::sum_int(ColKey column_key) const
 #endif
 
     if (m_table->is_nullable(column_key)) {
-        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_key);
+        return aggregate<act_Sum, std::optional<int64_t>, int64_t>(column_key);
     }
     return aggregate<act_Sum, int64_t, int64_t>(column_key);
 }
@@ -1097,7 +1097,7 @@ int64_t Query::maximum_int(ColKey column_key, ObjKey* return_ndx) const
 #endif
 
     if (m_table->is_nullable(column_key)) {
-        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_ndx);
+        return aggregate<act_Max, std::optional<int64_t>, int64_t>(column_key, nullptr, return_ndx);
     }
     return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_ndx);
 }
@@ -1138,7 +1138,7 @@ int64_t Query::minimum_int(ColKey column_key, ObjKey* return_ndx) const
 #endif
 
     if (m_table->is_nullable(column_key)) {
-        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_ndx);
+        return aggregate<act_Min, std::optional<int64_t>, int64_t>(column_key, nullptr, return_ndx);
     }
     return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_ndx);
 }
@@ -1209,7 +1209,7 @@ double Query::average(ColKey column_key, size_t* resultcount) const
 double Query::average_int(ColKey column_key, size_t* resultcount) const
 {
     if (m_table->is_nullable(column_key)) {
-        return average<util::Optional<int64_t>, true>(column_key, resultcount);
+        return average<std::optional<int64_t>, true>(column_key, resultcount);
     }
     return average<int64_t, false>(column_key, resultcount);
 }
@@ -1591,7 +1591,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_Count);
 #endif
-    realm::util::Optional<size_t> min_limit = descriptor.get_min_limit();
+    std::optional<size_t> min_limit = descriptor.get_min_limit();
 
     if (bool(min_limit) && *min_limit == 0)
         return 0;

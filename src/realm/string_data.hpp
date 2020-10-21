@@ -21,8 +21,8 @@
 
 #include <realm/null.hpp>
 #include <realm/util/features.h>
-#include <realm/util/optional.hpp>
 
+#include <optional>
 #include <algorithm>
 #include <array>
 #include <cfloat>
@@ -98,7 +98,7 @@ public:
     operator std::basic_string<char, T, A>() const;
 
     template <class T, class A>
-    StringData(const util::Optional<std::basic_string<char, T, A>>&);
+    StringData(const std::optional<std::basic_string<char, T, A>>&);
 
     StringData(const null&) noexcept;
 
@@ -209,7 +209,7 @@ inline StringData::operator std::basic_string<char, T, A>() const
 }
 
 template <class T, class A>
-inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
+inline StringData::StringData(const std::optional<std::basic_string<char, T, A>>& s)
     : m_data(s ? s->data() : nullptr)
     , m_size(s ? s->size() : 0)
 {

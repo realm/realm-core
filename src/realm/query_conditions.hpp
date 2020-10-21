@@ -840,7 +840,7 @@ struct LessEqual : public HackClass {
 
         return (!v1null && !v2null && v1 <= v2);
     }
-    bool operator()(const util::Optional<bool>& v1, const util::Optional<bool>& v2, bool v1null, bool v2null) const
+    bool operator()(const std::optional<bool>& v1, const std::optional<bool>& v2, bool v1null, bool v2null) const
     {
         if (v1null && v2null)
             return false;
@@ -870,7 +870,7 @@ struct GreaterEqual : public HackClass {
 
         return (!v1null && !v2null && v1 >= v2);
     }
-    bool operator()(const util::Optional<bool>& v1, const util::Optional<bool>& v2, bool v1null, bool v2null) const
+    bool operator()(const std::optional<bool>& v1, const std::optional<bool>& v2, bool v1null, bool v2null) const
     {
         if (v1null && v2null)
             return false;

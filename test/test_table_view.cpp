@@ -421,13 +421,13 @@ TEST(TableView_Find)
 
     // Look for the values in the second row
     CHECK_EQUAL(1, all.find_first<Int>(col0, 1));
-    CHECK_EQUAL(1, all.find_first(col1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(1, all.find_first(col1, std::optional<int64_t>(1)));
     CHECK_EQUAL(0, all.find_first(col2, false));
-    CHECK_EQUAL(1, all.find_first(col3, util::make_optional(false)));
+    CHECK_EQUAL(1, all.find_first(col3, std::make_optional(false)));
     CHECK_EQUAL(1, all.find_first(col4, 1.1f));
-    CHECK_EQUAL(1, all.find_first(col5, util::make_optional(1.1f)));
+    CHECK_EQUAL(1, all.find_first(col5, std::make_optional(1.1f)));
     CHECK_EQUAL(1, all.find_first(col6, 1.1));
-    CHECK_EQUAL(1, all.find_first(col7, util::make_optional(1.1)));
+    CHECK_EQUAL(1, all.find_first(col7, std::make_optional(1.1)));
     CHECK_EQUAL(1, all.find_first(col8, Timestamp(1, 1)));
     CHECK_EQUAL(1, all.find_first(col9, Timestamp(1, 1)));
     CHECK_EQUAL(1, all.find_first(col10, StringData("a")));
@@ -436,13 +436,13 @@ TEST(TableView_Find)
     CHECK_EQUAL(1, all.find_first(col13, BinaryData("a", 1)));
 
     CHECK_EQUAL(0, after_first.find_first<Int>(col0, 1));
-    CHECK_EQUAL(0, after_first.find_first(col1, util::Optional<int64_t>(1)));
+    CHECK_EQUAL(0, after_first.find_first(col1, std::optional<int64_t>(1)));
     CHECK_EQUAL(0, after_first.find_first(col2, false));
-    CHECK_EQUAL(0, after_first.find_first(col3, util::make_optional(false)));
+    CHECK_EQUAL(0, after_first.find_first(col3, std::make_optional(false)));
     CHECK_EQUAL(0, after_first.find_first(col4, 1.1f));
-    CHECK_EQUAL(0, after_first.find_first(col5, util::make_optional(1.1f)));
+    CHECK_EQUAL(0, after_first.find_first(col5, std::make_optional(1.1f)));
     CHECK_EQUAL(0, after_first.find_first(col6, 1.1));
-    CHECK_EQUAL(0, after_first.find_first(col7, util::make_optional(1.1)));
+    CHECK_EQUAL(0, after_first.find_first(col7, std::make_optional(1.1)));
     CHECK_EQUAL(0, after_first.find_first(col8, Timestamp(1, 1)));
     CHECK_EQUAL(0, after_first.find_first(col9, Timestamp(1, 1)));
     CHECK_EQUAL(0, after_first.find_first(col10, StringData("a")));
@@ -452,13 +452,13 @@ TEST(TableView_Find)
 
     // Look for the values in the third row
     CHECK_EQUAL(2, all.find_first<Int>(col0, 2));
-    CHECK_EQUAL(0, all.find_first(col1, util::Optional<int64_t>()));
+    CHECK_EQUAL(0, all.find_first(col1, std::optional<int64_t>()));
     CHECK_EQUAL(2, all.find_first(col2, true));
-    CHECK_EQUAL(0, all.find_first(col3, util::Optional<bool>()));
+    CHECK_EQUAL(0, all.find_first(col3, std::optional<bool>()));
     CHECK_EQUAL(2, all.find_first(col4, 2.2f));
-    CHECK_EQUAL(0, all.find_first(col5, util::Optional<float>()));
+    CHECK_EQUAL(0, all.find_first(col5, std::optional<float>()));
     CHECK_EQUAL(2, all.find_first(col6, 2.2));
-    CHECK_EQUAL(0, all.find_first(col7, util::Optional<double>()));
+    CHECK_EQUAL(0, all.find_first(col7, std::optional<double>()));
     CHECK_EQUAL(2, all.find_first(col8, Timestamp(2, 2)));
     CHECK_EQUAL(0, all.find_first(col9, Timestamp()));
     CHECK_EQUAL(2, all.find_first(col10, StringData("b")));
@@ -467,13 +467,13 @@ TEST(TableView_Find)
     CHECK_EQUAL(0, all.find_first(col13, BinaryData()));
 
     CHECK_EQUAL(1, after_first.find_first<Int>(col0, 2));
-    CHECK_EQUAL(1, after_first.find_first(col1, util::Optional<int64_t>()));
+    CHECK_EQUAL(1, after_first.find_first(col1, std::optional<int64_t>()));
     CHECK_EQUAL(1, after_first.find_first(col2, true));
-    CHECK_EQUAL(1, after_first.find_first(col3, util::Optional<bool>()));
+    CHECK_EQUAL(1, after_first.find_first(col3, std::optional<bool>()));
     CHECK_EQUAL(1, after_first.find_first(col4, 2.2f));
-    CHECK_EQUAL(1, after_first.find_first(col5, util::Optional<float>()));
+    CHECK_EQUAL(1, after_first.find_first(col5, std::optional<float>()));
     CHECK_EQUAL(1, after_first.find_first(col6, 2.2));
-    CHECK_EQUAL(1, after_first.find_first(col7, util::Optional<double>()));
+    CHECK_EQUAL(1, after_first.find_first(col7, std::optional<double>()));
     CHECK_EQUAL(1, after_first.find_first(col8, Timestamp(2, 2)));
     CHECK_EQUAL(1, after_first.find_first(col9, Timestamp()));
     CHECK_EQUAL(1, after_first.find_first(col10, StringData("b")));
@@ -483,11 +483,11 @@ TEST(TableView_Find)
 
     // Look for values that aren't present
     CHECK_EQUAL(npos, all.find_first<Int>(col0, 5));
-    CHECK_EQUAL(npos, all.find_first(col1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, all.find_first(col1, std::optional<int64_t>(5)));
     CHECK_EQUAL(npos, all.find_first(col4, 3.3f));
-    CHECK_EQUAL(npos, all.find_first(col5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, all.find_first(col5, std::make_optional(3.3f)));
     CHECK_EQUAL(npos, all.find_first(col6, 3.3));
-    CHECK_EQUAL(npos, all.find_first(col7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, all.find_first(col7, std::make_optional(3.3)));
     CHECK_EQUAL(npos, all.find_first(col8, Timestamp(3, 3)));
     CHECK_EQUAL(npos, all.find_first(col9, Timestamp(3, 3)));
     CHECK_EQUAL(npos, all.find_first(col10, StringData("c")));
@@ -496,11 +496,11 @@ TEST(TableView_Find)
     CHECK_EQUAL(npos, all.find_first(col13, BinaryData("c", 1)));
 
     CHECK_EQUAL(npos, after_first.find_first<Int>(col0, 5));
-    CHECK_EQUAL(npos, after_first.find_first(col1, util::Optional<int64_t>(5)));
+    CHECK_EQUAL(npos, after_first.find_first(col1, std::optional<int64_t>(5)));
     CHECK_EQUAL(npos, after_first.find_first(col4, 3.3f));
-    CHECK_EQUAL(npos, after_first.find_first(col5, util::make_optional(3.3f)));
+    CHECK_EQUAL(npos, after_first.find_first(col5, std::make_optional(3.3f)));
     CHECK_EQUAL(npos, after_first.find_first(col6, 3.3));
-    CHECK_EQUAL(npos, after_first.find_first(col7, util::make_optional(3.3)));
+    CHECK_EQUAL(npos, after_first.find_first(col7, std::make_optional(3.3)));
     CHECK_EQUAL(npos, after_first.find_first(col8, Timestamp(3, 3)));
     CHECK_EQUAL(npos, after_first.find_first(col9, Timestamp(3, 3)));
     CHECK_EQUAL(npos, after_first.find_first(col10, StringData("c")));

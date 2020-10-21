@@ -76,9 +76,9 @@ inline ObjectId TestValueGenerator::convert_for_test<ObjectId>(int64_t v)
 }
 
 template <>
-inline util::Optional<ObjectId> TestValueGenerator::convert_for_test<util::Optional<ObjectId>>(int64_t v)
+inline std::optional<ObjectId> TestValueGenerator::convert_for_test<std::optional<ObjectId>>(int64_t v)
 {
-    return util::Optional<ObjectId>(convert_for_test<ObjectId>(v));
+    return std::optional<ObjectId>(convert_for_test<ObjectId>(v));
 }
 
 template <>
@@ -132,11 +132,11 @@ struct Prop<T, state,
     static constexpr bool is_nullable = col_state_is_nullable<state>;
     static constexpr bool is_indexed = col_state_is_indexed<state>;
     static constexpr DataType data_type = ColumnTypeTraits<T>::id;
-    using type = typename util::Optional<T>;
+    using type = typename std::optional<T>;
     using underlying_type = T;
     static type default_value()
     {
-        if constexpr (realm::is_any_v<type, util::Optional<float>, util::Optional<double>>) {
+        if constexpr (realm::is_any_v<type, std::optional<float>, std::optional<double>>) {
             return type(); // optional float/double would return NaN and for consistency we want to operate on null
         }
         return ColumnTypeTraits<type>::cluster_leaf_type::default_value(is_nullable);

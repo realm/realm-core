@@ -3106,7 +3106,7 @@ NONCONCURRENT_TEST(Shared_StaticFuzzTestRunSanityCheck)
             // If using std::cerr, you can copy/paste the console output into a unit test
             // to get a reproduction test case
             // parse_and_apply_instructions(instr, path, std::cerr);
-            parse_and_apply_instructions(instr, path, util::none);
+            parse_and_apply_instructions(instr, path, std::nullopt);
         }
     }
 }

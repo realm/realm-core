@@ -595,7 +595,7 @@ inline R bptree_aggregate_value(T val)
     return val;
 }
 template <class T>
-inline bool bptree_aggregate_not_null(util::Optional<T> val)
+inline bool bptree_aggregate_not_null(std::optional<T> val)
 {
     return !!val;
 }
@@ -628,7 +628,7 @@ inline bool bptree_aggregate_not_null(Decimal128 val)
     return !val.is_null();
 }
 template <class T>
-inline T bptree_aggregate_value(util::Optional<T> val)
+inline T bptree_aggregate_value(std::optional<T> val)
 {
     return *val;
 }

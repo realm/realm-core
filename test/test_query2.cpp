@@ -3395,7 +3395,7 @@ TEST(Query_NegativeNumbers)
         id = -1;
         for (size_t i = 0; i < view.size(); ++i) {
             if (nullable == 0) {
-                CHECK_EQUAL(id, view.get(i).get<Optional<Int>>(c0));
+                CHECK_EQUAL(id, view.get(i).get<std::optional<Int>>(c0));
             }
             else {
                 CHECK_EQUAL(id, view.get(i).get<Int>(c0));
@@ -3412,16 +3412,16 @@ int64_t unbox(const T& val)
 }
 
 template <>
-int64_t unbox(const util::Optional<int64_t>& val)
+int64_t unbox(const std::optional<int64_t>& val)
 {
     return *val;
 }
 
-TEST_TYPES(Query_EqualityInts, int64_t, util::Optional<int64_t>)
+TEST_TYPES(Query_EqualityInts, int64_t, std::optional<int64_t>)
 {
     Group group;
     TableRef table = group.add_table("test");
-    auto col_ndx = table->add_column(type_Int, "int", std::is_same<TEST_TYPE, util::Optional<int64_t>>::value);
+    auto col_ndx = table->add_column(type_Int, "int", std::is_same<TEST_TYPE, std::optional<int64_t>>::value);
 
     int64_t id = -1;
     int64_t sum = 0;
@@ -5107,7 +5107,7 @@ TEST(Query_LinkListIntPastOneIsNull)
     auto table_bar = g.add_table("Bar");
     auto col_int = table_foo->add_column(type_Int, "int", true);
     auto col_list = table_bar->add_column_link(type_LinkList, "foo_link", *table_foo);
-    std::vector<util::Optional<int64_t>> values = {{0}, {1}, {2}, {util::none}};
+    std::vector<std::optional<int64_t>> values = {{0}, {1}, {2}, {std::nullopt}};
     auto bar_obj = table_bar->create_object();
     auto list = bar_obj.get_linklist(col_list);
 

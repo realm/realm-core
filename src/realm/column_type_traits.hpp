@@ -66,7 +66,7 @@ struct AggregateResultType {
 };
 
 template <class T, Action action>
-struct AggregateResultType<util::Optional<T>, action> {
+struct AggregateResultType<std::optional<T>, action> {
     using result_type = T;
 };
 
@@ -95,7 +95,7 @@ struct ColumnTypeTraits<ref_type> {
 };
 
 template <>
-struct ColumnTypeTraits<util::Optional<int64_t>> {
+struct ColumnTypeTraits<std::optional<int64_t>> {
     using leaf_type = ArrayIntNull;
     using cluster_leaf_type = ArrayIntNull;
     using sum_type = int64_t;
@@ -114,7 +114,7 @@ struct ColumnTypeTraits<bool> {
 };
 
 template <>
-struct ColumnTypeTraits<util::Optional<bool>> {
+struct ColumnTypeTraits<std::optional<bool>> {
     using cluster_leaf_type = ArrayBoolNull;
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
@@ -151,7 +151,7 @@ struct ColumnTypeTraits<float> {
 };
 
 template <>
-struct ColumnTypeTraits<util::Optional<float>> {
+struct ColumnTypeTraits<std::optional<float>> {
     using cluster_leaf_type = BasicArrayNull<float>;
     using sum_type = double;
     using minmax_type = float;
@@ -173,7 +173,7 @@ struct ColumnTypeTraits<double> {
 };
 
 template <>
-struct ColumnTypeTraits<util::Optional<double>> {
+struct ColumnTypeTraits<std::optional<double>> {
     using cluster_leaf_type = BasicArrayNull<double>;
     using sum_type = double;
     using minmax_type = double;
@@ -199,7 +199,7 @@ struct ColumnTypeTraits<ObjectId> {
 };
 
 template <>
-struct ColumnTypeTraits<util::Optional<ObjectId>> {
+struct ColumnTypeTraits<std::optional<ObjectId>> {
     using cluster_leaf_type = ArrayObjectIdNull;
     static const DataType id = type_ObjectId;
     static const ColumnType column_id = col_type_ObjectId;
@@ -303,7 +303,7 @@ inline bool value_is_null(const T& val)
     return val.is_null();
 }
 template <class T>
-inline bool value_is_null(const util::Optional<T>& val)
+inline bool value_is_null(const std::optional<T>& val)
 {
     return !val;
 }

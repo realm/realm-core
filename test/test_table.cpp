@@ -111,27 +111,27 @@ struct value_copier {
 
 // copy from non-nullable to nullable
 template <typename T1, typename T2>
-struct value_copier<T1, Optional<T2>> {
+struct value_copier<T1, std::optional<T2>> {
     value_copier(bool throw_on_null)
         : internal_copier(throw_on_null)
     {
     }
     value_copier<T1, T2> internal_copier; // we need state for strings and binaries.
-    Optional<T2> operator()(T1 from_value, bool)
+    std::optional<T2> operator()(T1 from_value, bool)
     {
-        return Optional<T2>(internal_copier(from_value));
+        return std::optional<T2>(internal_copier(from_value));
     }
 };
 
 // copy from nullable to non-nullable - nulls may trigger exception or become default value
 template <typename T1, typename T2>
-struct value_copier<Optional<T1>, T2> {
+struct value_copier<std::optional<T1>, T2> {
     value_copier(bool throw_on_null)
         : m_throw_on_null(throw_on_null)
     {
     }
     bool m_throw_on_null;
-    T2 operator()(Optional<T1> from_value, bool)
+    T2 operator()(std::optional<T1> from_value, bool)
     {
         if (bool(from_value))
             return from_value.value();
@@ -146,11 +146,11 @@ struct value_copier<Optional<T1>, T2> {
 
 // identical to non-specialized case, but specialization needed to avoid capture by 2 previous decls
 template <typename T1, typename T2>
-struct value_copier<Optional<T1>, Optional<T2>> {
+struct value_copier<std::optional<T1>, std::optional<T2>> {
     value_copier(bool)
     {
     }
-    Optional<T2> operator()(Optional<T1> from_value, bool)
+    std::optional<T2> operator()(std::optional<T1> from_value, bool)
     {
         return from_value;
     }
@@ -714,7 +714,7 @@ TEST(Table_AggregateFuzz)
             i = table->maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(i, table->get_object(largest_pos).get<std::optional<Int>>(int_col));
 
             key = 123;
             ts = table->maximum_timestamp(date_col, &key);
@@ -733,7 +733,7 @@ TEST(Table_AggregateFuzz)
             i = table->minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(i, table->get_object(smallest_pos).get<std::optional<Int>>(int_col));
 
             key = 123;
             ts = table->minimum_timestamp(date_col, &key);
@@ -780,7 +780,7 @@ TEST(Table_AggregateFuzz)
             i = table->where().find_all().maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(i, table->get_object(largest_pos).get<std::optional<Int>>(int_col));
 
             key = 123;
             ts = table->where().find_all().maximum_timestamp(date_col, &key);
@@ -799,7 +799,7 @@ TEST(Table_AggregateFuzz)
             i = table->where().find_all().minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(i, table->get_object(smallest_pos).get<std::optional<Int>>(int_col));
 
             key = 123;
             ts = table->where().find_all().minimum_timestamp(date_col, &key);
@@ -847,7 +847,7 @@ TEST(Table_AggregateFuzz)
             i = table->where().maximum_int(int_col, &key);
             CHECK_EQUAL(key, largest_pos);
             if (largest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(largest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(i, table->get_object(largest_pos).get<std::optional<Int>>(int_col));
 
             key = 123;
             // Note: Method arguments different from metholds on other column types
@@ -867,7 +867,7 @@ TEST(Table_AggregateFuzz)
             i = table->where().minimum_int(int_col, &key);
             CHECK_EQUAL(key, smallest_pos);
             if (smallest_pos != null_key)
-                CHECK_EQUAL(i, table->get_object(smallest_pos).get<util::Optional<Int>>(int_col));
+                CHECK_EQUAL(i, table->get_object(smallest_pos).get<std::optional<Int>>(int_col));
 
             key = 123;
             // Note: Method arguments different from metholds on other column types
@@ -2287,15 +2287,15 @@ TEST(Table_NullableChecks)
 
     StringData str0 = obj.get<String>(str_col);
     CHECK(str0.is_null());
-    util::Optional<int64_t> int0 = obj.get<util::Optional<int64_t>>(int_col);
+    std::optional<int64_t> int0 = obj.get<std::optional<int64_t>>(int_col);
     CHECK(!int0);
-    util::Optional<bool> bool0 = obj.get<util::Optional<bool>>(bool_col);
+    std::optional<bool> bool0 = obj.get<std::optional<bool>>(bool_col);
     CHECK(!bool0);
     Timestamp ts0 = obj.get<Timestamp>(ts_col);
     CHECK(ts0.is_null());
-    util::Optional<float> float0 = obj.get<util::Optional<float>>(float_col);
+    std::optional<float> float0 = obj.get<std::optional<float>>(float_col);
     CHECK(!float0);
-    util::Optional<double> double0 = obj.get<util::Optional<double>>(double_col);
+    std::optional<double> double0 = obj.get<std::optional<double>>(double_col);
     CHECK(!double0);
     BinaryData binary0 = obj.get<Binary>(binary_col);
     CHECK(binary0.is_null());
@@ -2480,15 +2480,15 @@ TEST(Table_Nulls)
         CHECK_EQUAL(k0, t.find_first_float(col_float, 1.23f));
         CHECK_EQUAL(k0, t.find_first_double(col_double, 12.3));
 
-        util::Optional<Float> f_val = 5.f;
+        std::optional<Float> f_val = 5.f;
         obj0.set(col_float, f_val);
         CHECK_NOT(obj0.is_null(col_float));
-        CHECK_EQUAL(obj0.get<Optional<float>>(col_float), 5.f);
+        CHECK_EQUAL(obj0.get<std::optional<float>>(col_float), 5.f);
 
-        util::Optional<Double> d_val = 5.;
+        std::optional<Double> d_val = 5.;
         obj0.set(col_double, d_val);
         CHECK_NOT(obj0.is_null(col_double));
-        CHECK_EQUAL(obj0.get<Optional<double>>(col_double), 5.);
+        CHECK_EQUAL(obj0.get<std::optional<double>>(col_double), 5.);
 
         obj0.set_null(col_float);
         obj0.set_null(col_double);
@@ -2680,7 +2680,7 @@ TEST(Table_object_basic)
 
     CHECK_EQUAL(100, y.get<int64_t>(int_col));
     CHECK(!y.is_null(intnull_col));
-    CHECK_EQUAL(7, y.get<util::Optional<int64_t>>(intnull_col));
+    CHECK_EQUAL(7, y.get<std::optional<int64_t>>(intnull_col));
     y.set_null(intnull_col);
     CHECK(y.is_null(intnull_col));
 
@@ -2696,7 +2696,7 @@ TEST(Table_object_basic)
 
     CHECK_EQUAL(true, y.get<Bool>(bool_col));
     CHECK(!y.is_null(boolnull_col));
-    auto bool_val = y.get<util::Optional<Bool>>(boolnull_col);
+    auto bool_val = y.get<std::optional<Bool>>(boolnull_col);
     CHECK_EQUAL(true, bool(bool_val));
     CHECK_EQUAL(false, *bool_val);
     y.set_null(boolnull_col);
@@ -2714,7 +2714,7 @@ TEST(Table_object_basic)
 
     CHECK_EQUAL(2.7182818f, y.get<Float>(float_col));
     CHECK(!y.is_null(floatnull_col));
-    CHECK_EQUAL(3.1415927f, y.get<util::Optional<Float>>(floatnull_col));
+    CHECK_EQUAL(3.1415927f, y.get<std::optional<Float>>(floatnull_col));
     y.set_null(floatnull_col);
     CHECK(y.is_null(floatnull_col));
 
@@ -2730,7 +2730,7 @@ TEST(Table_object_basic)
 
     CHECK_EQUAL(2.718281828459045, y.get<Double>(double_col));
     CHECK(!y.is_null(doublenull_col));
-    CHECK_EQUAL(3.141592653589793, y.get<util::Optional<Double>>(doublenull_col));
+    CHECK_EQUAL(3.141592653589793, y.get<std::optional<Double>>(doublenull_col));
     y.set_null(doublenull_col);
     CHECK(y.is_null(doublenull_col));
 
@@ -2909,7 +2909,7 @@ TEST(Table_list_basic)
 
 template <typename T>
 struct NullableTypeConverter {
-    using NullableType = util::Optional<T>;
+    using NullableType = std::optional<T>;
     static bool is_null(NullableType t)
     {
         return !bool(t);
@@ -3140,7 +3140,7 @@ TEST(Table_ListOfPrimitives)
     auto int_list2 = obj.get_list<int64_t>(int_col);
     CHECK_EQUAL(0, int_list2.size());
 
-    CHECK_THROW_ANY(obj.get_list<util::Optional<int64_t>>(int_col));
+    CHECK_THROW_ANY(obj.get_list<std::optional<int64_t>>(int_col));
 
     auto bool_list = obj.get_list<bool>(bool_col);
     lists.push_back(&bool_list);
@@ -3149,8 +3149,8 @@ TEST(Table_ListOfPrimitives)
         CHECK_EQUAL(bool_vector[i], bool_list[i]);
     }
 
-    auto bool_list_nullable = obj.get_list<util::Optional<bool>>(bool_col);
-    CHECK_THROW_ANY(bool_list_nullable.set(0, util::none));
+    auto bool_list_nullable = obj.get_list<std::optional<bool>>(bool_col);
+    CHECK_THROW_ANY(bool_list_nullable.set(0, std::nullopt));
 
     auto string_list = obj.get_list<StringData>(string_col);
     auto str_min = string_list.min();
@@ -3309,7 +3309,7 @@ TEST(Table_object_merge_nodes)
             int64_t key_val = key_set[j];
             Obj o = table.get_object(ObjKey(key_val));
             CHECK_EQUAL(key_val << 1, o.get<int64_t>(c0));
-            CHECK_EQUAL(key_val << 2, o.get<util::Optional<int64_t>>(c1));
+            CHECK_EQUAL(key_val << 2, o.get<std::optional<int64_t>>(c1));
         }
     }
 }
@@ -3345,7 +3345,7 @@ TEST(Table_object_forward_iterator)
         int64_t key_value = o.get_key().value;
         // std::cout << "Key value: " << std::hex << key_value << std::dec << std::endl;
         CHECK_EQUAL(key_value << 1, o.get<int64_t>(c0));
-        CHECK_EQUAL(key_value << 2, o.get<util::Optional<int64_t>>(c1));
+        CHECK_EQUAL(key_value << 2, o.get<std::optional<int64_t>>(c1));
 
         Obj x = table.get_object(ndx);
         CHECK_EQUAL(o.get_key(), x.get_key());
@@ -3571,7 +3571,7 @@ TEST(Table_object_sequential)
             for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
                 Obj o = table->get_object(ObjKey(j));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
-                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
+                CHECK_EQUAL(j << 1, o.get<std::optional<int64_t>>(c1));
             }
 
 #endif
@@ -3854,7 +3854,7 @@ TEST(Table_object_random)
             for (int j = i + 1; j < nb_rows; j += nb_rows / 100) {
                 Obj o = table->get_object(ObjKey(key_values[j]));
                 CHECK_EQUAL(j << 2, o.get<int64_t>(c0));
-                CHECK_EQUAL(j << 1, o.get<util::Optional<int64_t>>(c1));
+                CHECK_EQUAL(j << 1, o.get<std::optional<int64_t>>(c1));
             }
 #endif
         }
@@ -3989,9 +3989,9 @@ TEST(Table_CreateObjectWithPrimaryKeyDidCreate)
     CHECK_NOT(did_create);
     int_table->create_object_with_primary_key(2, &did_create);
     CHECK(did_create);
-    int_table->create_object_with_primary_key(util::Optional<int64_t>(), &did_create);
+    int_table->create_object_with_primary_key(std::optional<int64_t>(), &did_create);
     CHECK(did_create);
-    int_table->create_object_with_primary_key(util::Optional<int64_t>(), &did_create);
+    int_table->create_object_with_primary_key(std::optional<int64_t>(), &did_create);
     CHECK_NOT(did_create);
 }
 
@@ -4534,16 +4534,16 @@ TEST(Table_search_index_fuzzer)
     // Syntax for Tester<T, nullable>:
     // T:         Type that must be used in calls too Obj::get<T>
     // nullable:  If the columns must be is nullable or not
-    // Obj::set() will be automatically be called with set<RemoveOptional<T>>()
+    // Obj::set() will be automatically be called with set<Removestd::optional<T>>()
 
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     auto db = DB::create(*hist);
     Tester<bool, false>::run(db, type_Bool);
-    Tester<Optional<bool>, true>::run(db, type_Bool);
+    Tester<std::optional<bool>, true>::run(db, type_Bool);
 
     Tester<int64_t, false>::run(db, type_Int);
-    Tester<Optional<int64_t>, true>::run(db, type_Int);
+    Tester<std::optional<int64_t>, true>::run(db, type_Int);
 
     // Self-contained null state
     Tester<Timestamp, false>::run(db, type_Timestamp);
@@ -4738,22 +4738,22 @@ struct generator<ObjectId> {
 };
 
 template <typename T>
-struct generator<Optional<T>> {
-    static managed<Optional<T>> get(bool)
+struct generator<std::optional<T>> {
+    static managed<std::optional<T>> get(bool)
     {
         if ((test_util::random_int<int>() % 10) == 0)
-            return managed<Optional<T>>{Optional<T>()};
+            return managed<std::optional<T>>{std::optional<T>()};
         else
-            return managed<Optional<T>>{generate_value<T>()};
+            return managed<std::optional<T>>{generate_value<T>()};
     }
 };
 
-// specialize for Optional<StringData> and Optional<BinaryData> just to trigger errors if ever used
+// specialize for std::optional<StringData> and std::optional<BinaryData> just to trigger errors if ever used
 template <>
-struct generator<Optional<StringData>> {
+struct generator<std::optional<StringData>> {
 };
 template <>
-struct generator<Optional<BinaryData>> {
+struct generator<std::optional<BinaryData>> {
 };
 
 template <typename T>
@@ -4826,15 +4826,15 @@ TEST(List_Ops)
     test_lists<Decimal128>(test_context, sg, type_Decimal);
     test_lists<ObjectId>(test_context, sg, type_ObjectId);
 
-    test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
-    test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
-    test_lists<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-    test_lists<Optional<bool>>(test_context, sg, type_Bool, true);
-    test_lists<Optional<float>>(test_context, sg, type_Float, true);
-    test_lists<Optional<double>>(test_context, sg, type_Double, true);
-    test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_lists<std::optional<int64_t>>(test_context, sg, type_Int, true);
+    test_lists<StringData>(test_context, sg, type_String, true); // always std::optional?
+    test_lists<BinaryData>(test_context, sg, type_Binary, true); // always std::optional?
+    test_lists<std::optional<bool>>(test_context, sg, type_Bool, true);
+    test_lists<std::optional<float>>(test_context, sg, type_Float, true);
+    test_lists<std::optional<double>>(test_context, sg, type_Double, true);
+    test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always std::optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
-    test_lists<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_lists<std::optional<ObjectId>>(test_context, sg, type_ObjectId, true);
 }
 
 template <typename T, typename U = T>
@@ -4935,7 +4935,7 @@ TEST(List_AggOps)
     test_lists_numeric_agg<double>(test_context, sg, type_Double);
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal);
 
-    test_lists_numeric_agg<Optional<int64_t>>(test_context, sg, type_Int, Optional<int64_t>{}, true);
+    test_lists_numeric_agg<std::optional<int64_t>>(test_context, sg, type_Int, std::optional<int64_t>{}, true);
     test_lists_numeric_agg<float>(test_context, sg, type_Float, realm::null::get_null_float<float>(), true);
     test_lists_numeric_agg<double>(test_context, sg, type_Double, realm::null::get_null_float<double>(), true);
     test_lists_numeric_agg<Decimal128>(test_context, sg, type_Decimal, Decimal128(realm::null()), true);
@@ -5054,15 +5054,15 @@ TEST(Table_Ops)
     test_tables<Decimal128>(test_context, sg, type_Decimal);
     test_tables<ObjectId>(test_context, sg, type_ObjectId);
 
-    test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
-    test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
-    test_tables<BinaryData>(test_context, sg, type_Binary, true); // always Optional?
-    test_tables<Optional<bool>>(test_context, sg, type_Bool, true);
-    test_tables<Optional<float>>(test_context, sg, type_Float, true);
-    test_tables<Optional<double>>(test_context, sg, type_Double, true);
-    test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
+    test_tables<std::optional<int64_t>>(test_context, sg, type_Int, true);
+    test_tables<StringData>(test_context, sg, type_String, true); // always std::optional?
+    test_tables<BinaryData>(test_context, sg, type_Binary, true); // always std::optional?
+    test_tables<std::optional<bool>>(test_context, sg, type_Bool, true);
+    test_tables<std::optional<float>>(test_context, sg, type_Float, true);
+    test_tables<std::optional<double>>(test_context, sg, type_Double, true);
+    test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always std::optional?
     test_tables<Decimal128>(test_context, sg, type_Decimal, true);
-    test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_tables<std::optional<ObjectId>>(test_context, sg, type_ObjectId, true);
 }
 
 template <typename TFrom, typename TTo>
@@ -5122,10 +5122,10 @@ void test_dynamic_conversion_list(TestContext& test_context, DBRef sg, realm::Da
 template <typename T>
 void test_dynamic_conversion_combi(TestContext& test_context, DBRef sg, realm::DataType type_id)
 {
-    test_dynamic_conversion<T, Optional<T>>(test_context, sg, type_id, false, true);
-    test_dynamic_conversion<Optional<T>, T>(test_context, sg, type_id, true, false);
+    test_dynamic_conversion<T, std::optional<T>>(test_context, sg, type_id, false, true);
+    test_dynamic_conversion<std::optional<T>, T>(test_context, sg, type_id, true, false);
     test_dynamic_conversion<T, T>(test_context, sg, type_id, false, false);
-    test_dynamic_conversion<Optional<T>, Optional<T>>(test_context, sg, type_id, true, true);
+    test_dynamic_conversion<std::optional<T>, std::optional<T>>(test_context, sg, type_id, true, true);
 }
 
 template <typename T>
@@ -5140,10 +5140,10 @@ void test_dynamic_conversion_combi_sametype(TestContext& test_context, DBRef sg,
 template <typename T>
 void test_dynamic_conversion_list_combi(TestContext& test_context, DBRef sg, realm::DataType type_id)
 {
-    test_dynamic_conversion_list<T, Optional<T>>(test_context, sg, type_id, false, true);
-    test_dynamic_conversion_list<Optional<T>, T>(test_context, sg, type_id, true, false);
+    test_dynamic_conversion_list<T, std::optional<T>>(test_context, sg, type_id, false, true);
+    test_dynamic_conversion_list<std::optional<T>, T>(test_context, sg, type_id, true, false);
     test_dynamic_conversion_list<T, T>(test_context, sg, type_id, false, false);
-    test_dynamic_conversion_list<Optional<T>, Optional<T>>(test_context, sg, type_id, true, true);
+    test_dynamic_conversion_list<std::optional<T>, std::optional<T>>(test_context, sg, type_id, true, true);
 }
 
 template <typename T>
@@ -5193,10 +5193,10 @@ TEST(Table_Column_Conversions)
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
 
-    test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, type_Int);
-    test_column_conversion<float, Optional<float>>(test_context, sg, type_Float);
-    test_column_conversion<double, Optional<double>>(test_context, sg, type_Double);
-    test_column_conversion<bool, Optional<bool>>(test_context, sg, type_Bool);
+    test_column_conversion<int64_t, std::optional<int64_t>>(test_context, sg, type_Int);
+    test_column_conversion<float, std::optional<float>>(test_context, sg, type_Float);
+    test_column_conversion<double, std::optional<double>>(test_context, sg, type_Double);
+    test_column_conversion<bool, std::optional<bool>>(test_context, sg, type_Bool);
     test_column_conversion<StringData, StringData>(test_context, sg, type_String);
     test_column_conversion<BinaryData, BinaryData>(test_context, sg, type_Binary);
     test_column_conversion<Timestamp, Timestamp>(test_context, sg, type_Timestamp);

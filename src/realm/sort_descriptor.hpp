@@ -189,12 +189,12 @@ public:
         return DescriptorType::Sort;
     }
 
-    util::Optional<bool> is_ascending(size_t ndx) const
+    std::optional<bool> is_ascending(size_t ndx) const
     {
         if (ndx < m_ascending.size()) {
-            return util::Optional<bool>(m_ascending[ndx]);
+            return std::optional<bool>(m_ascending[ndx]);
         }
-        return util::none;
+        return std::nullopt;
     }
 
     enum class MergeMode {
@@ -307,11 +307,11 @@ public:
     void append_distinct(DistinctDescriptor distinct);
     void append_limit(LimitDescriptor limit);
     void append_include(IncludeDescriptor include);
-    realm::util::Optional<size_t> get_min_limit() const;
+    std::optional<size_t> get_min_limit() const;
     /// Remove all LIMIT statements from this descriptor ordering, returning the
     /// minimum LIMIT value that existed. If there was no LIMIT statement,
     /// returns `none`.
-    util::Optional<size_t> remove_all_limits();
+    std::optional<size_t> remove_all_limits();
     bool will_limit_to_zero() const;
     DescriptorType get_type(size_t index) const;
     bool is_empty() const

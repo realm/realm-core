@@ -102,7 +102,7 @@ TEST(ObjectId_ArrayNull)
     CHECK_EQUAL(arr.find_first(id2), 1);
     CHECK_EQUAL(arr.find_first_null(), npos);
 
-    arr.add(util::none);
+    arr.add(std::nullopt);
     CHECK_EQUAL(arr.find_first_null(0), 3);
     CHECK_EQUAL(arr.find_first_null(1), 3);
     CHECK_EQUAL(arr.find_first_null(2), 3);
@@ -136,7 +136,7 @@ TEST(ObjectId_ArrayNullMove)
     ArrayObjectIdNull arr(Allocator::get_default());
     arr.create();
 
-    auto get_value_for_ndx = [&](size_t ndx) -> util::Optional<ObjectId> {
+    auto get_value_for_ndx = [&](size_t ndx) -> std::optional<ObjectId> {
         if (ndx % 3 == 0) {
             return {str0};
         }
@@ -144,7 +144,7 @@ TEST(ObjectId_ArrayNullMove)
             return {str1};
         }
         else {
-            return util::none;
+            return std::nullopt;
         }
     };
 
@@ -156,7 +156,7 @@ TEST(ObjectId_ArrayNullMove)
     arr1.create();
     arr1.add({str0});
     arr1.add({str1});
-    arr1.add(util::none);
+    arr1.add(std::nullopt);
     arr.move(arr1, 0);
 
     CHECK_EQUAL(arr1.size(), 6);
@@ -183,14 +183,14 @@ TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
         ArrayObjectIdNull arr(Allocator::get_default());
         arr.create();
         for (int i = 0; i < size; i++) {
-            arr.add(util::none);
+            arr.add(std::nullopt);
         }
 
         for (unsigned mask = 0; mask < (1u << size); mask++) {
             // Set nulls to match mask.
             for (int i = 0; i < size; i++) {
                 if (mask & (1 << i)) {
-                    arr.set(i, util::none);
+                    arr.set(i, std::nullopt);
                 }
                 else {
                     arr.set(i, ObjectId());
@@ -230,24 +230,24 @@ TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
     CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
     CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
     CHECK_NOT(obj2.is_null(col_id));
-    CHECK_EQUAL(obj0.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str0));
-    CHECK_EQUAL(obj1.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str1));
+    CHECK_EQUAL(obj0.get<std::optional<ObjectId>>(col_id_null), ObjectId(str0));
+    CHECK_EQUAL(obj1.get<std::optional<ObjectId>>(col_id_null), ObjectId(str1));
     CHECK(obj2.is_null(col_id_null));
-    auto id = obj1.get<util::Optional<ObjectId>>(col_id_null);
+    auto id = obj1.get<std::optional<ObjectId>>(col_id_null);
     CHECK(id);
-    id = obj2.get<util::Optional<ObjectId>>(col_id_null);
+    id = obj2.get<std::optional<ObjectId>>(col_id_null);
     CHECK_NOT(id);
     auto key = t.find_first(col_id, ObjectId(str0));
     CHECK_EQUAL(key, obj0.get_key());
     key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
-    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str0}));
+    key = t.find_first(col_id_null, std::optional<ObjectId>(ObjectId{str0}));
     CHECK_EQUAL(key, obj0.get_key());
-    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str1}));
+    key = t.find_first(col_id_null, std::optional<ObjectId>(ObjectId{str1}));
     CHECK_EQUAL(key, obj1.get_key());
     key = t.find_first_null(col_id_null);
     CHECK_EQUAL(key, obj2.get_key());
-    key = t.find_first(col_id_null, util::Optional<ObjectId>{});
+    key = t.find_first(col_id_null, std::optional<ObjectId>{});
     CHECK_EQUAL(key, obj2.get_key());
 }
 

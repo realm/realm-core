@@ -428,31 +428,31 @@ inline Obj& Obj::set(ColKey col_key, realm::null, bool is_default)
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, util::Optional<bool> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, std::optional<bool> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, util::Optional<int64_t> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, std::optional<int64_t> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, util::Optional<float> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, std::optional<float> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, util::Optional<double> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, std::optional<double> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }
 
 template <>
-inline Obj& Obj::set(ColKey col_key, util::Optional<ObjectId> value, bool is_default)
+inline Obj& Obj::set(ColKey col_key, std::optional<ObjectId> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }

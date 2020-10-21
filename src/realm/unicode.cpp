@@ -353,7 +353,7 @@ return true;
 // If an output character differs in size, it is simply substituded by
 // the original character. This may of course give wrong search
 // results in very special cases. Todo.
-util::Optional<std::string> case_map(StringData source, bool upper)
+std::optional<std::string> case_map(StringData source, bool upper)
 {
     std::string result;
     result.resize(source.size());
@@ -365,13 +365,13 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     while (begin != end) {
         int n = static_cast<int>(sequence_length(*begin));
         if (n == 0 || end - begin < n)
-            return util::none;
+            return std::nullopt;
 
         wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
 
         int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
         if (n2 == 0)
-            return util::none;
+            return std::nullopt;
 
         REALM_ASSERT(n2 == 1);
         tmp[n2] = 0;
@@ -391,7 +391,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         DWORD flags = 0;
         int n3 = WideCharToMultiByte(CP_UTF8, flags, mapped_tmp, 1, &*output, static_cast<int>(end - begin), 0, 0);
         if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
-            return util::none;
+            return std::nullopt;
 
         if (n3 != n) {
             realm::safe_copy_n(begin, n, output); // Cannot handle different size, copy source

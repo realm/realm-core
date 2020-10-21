@@ -78,7 +78,7 @@ public:
         Array::insert(ndx, value);
     }
 
-    size_t find_first(util::Optional<bool> value, size_t begin = 0, size_t end = npos) const noexcept
+    size_t find_first(std::optional<bool> value, size_t begin = 0, size_t end = npos) const noexcept
     {
         if (value) {
             return Array::find_first(*value, begin, end);
@@ -95,14 +95,14 @@ protected:
 
 class ArrayBoolNull : public ArrayBool {
 public:
-    using value_type = util::Optional<bool>;
+    using value_type = std::optional<bool>;
     using ArrayBool::ArrayBool;
 
-    static util::Optional<bool> default_value(bool nullable)
+    static std::optional<bool> default_value(bool nullable)
     {
-        return nullable ? util::none : util::some<bool>(false);
+        return nullable ? std::nullopt : std::make_optional<bool>(false);
     }
-    void set(size_t ndx, util::Optional<bool> value)
+    void set(size_t ndx, std::optional<bool> value)
     {
         if (value) {
             Array::set(ndx, *value);
@@ -111,7 +111,7 @@ public:
             Array::set(ndx, null_value);
         }
     }
-    void add(util::Optional<bool> value)
+    void add(std::optional<bool> value)
     {
         if (value) {
             Array::add(*value);
@@ -120,7 +120,7 @@ public:
             Array::add(null_value);
         }
     }
-    void insert(size_t ndx, util::Optional<bool> value)
+    void insert(size_t ndx, std::optional<bool> value)
     {
         if (value) {
             Array::insert(ndx, *value);
@@ -137,10 +137,10 @@ public:
     {
         return Array::get(ndx) == null_value;
     }
-    util::Optional<bool> get(size_t ndx) const
+    std::optional<bool> get(size_t ndx) const
     {
         int64_t val = Array::get(ndx);
-        return (val == null_value) ? util::none : util::make_optional(val != 0);
+        return (val == null_value) ? std::nullopt : std::make_optional(val != 0);
     }
 };
 }

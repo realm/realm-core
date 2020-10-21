@@ -21,7 +21,7 @@
 
 #include <realm/array.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/optional.hpp>
+#include <optional>
 
 namespace realm {
 
@@ -70,14 +70,14 @@ public:
 
 class ArrayIntNull : public Array, public ArrayPayload {
 public:
-    using value_type = util::Optional<int64_t>;
+    using value_type = std::optional<int64_t>;
 
     explicit ArrayIntNull(Allocator&) noexcept;
     ~ArrayIntNull() noexcept override;
 
     static value_type default_value(bool nullable)
     {
-        return nullable ? util::none : util::Optional<int64_t>(0);
+        return nullable ? std::nullopt : std::optional<int64_t>(0);
     }
 
     /// Construct an array of the specified type and size, and return just the
@@ -233,9 +233,9 @@ inline ArrayIntNull::value_type ArrayIntNull::get(size_t ndx) const noexcept
 {
     int64_t value = Array::get(ndx + 1);
     if (value == null_value()) {
-        return util::none;
+        return std::nullopt;
     }
-    return util::some<int64_t>(value);
+    return std::make_optional<int64_t>(value);
 }
 
 inline ArrayIntNull::value_type ArrayIntNull::get(const char* header, size_t ndx) noexcept
@@ -243,10 +243,10 @@ inline ArrayIntNull::value_type ArrayIntNull::get(const char* header, size_t ndx
     int64_t null_value = Array::get(header, 0);
     int64_t value = Array::get(header, ndx + 1);
     if (value == null_value) {
-        return util::none;
+        return std::nullopt;
     }
     else {
-        return util::some<int64_t>(value);
+        return std::make_optional<int64_t>(value);
     }
 }
 

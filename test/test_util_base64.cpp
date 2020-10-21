@@ -30,7 +30,7 @@ TEST(Base64_Decode)
 {
     std::vector<char> buffer;
     buffer.resize(1024);
-    Optional<size_t> r;
+    std::optional<size_t> r;
 
     static const char* inputs[] = {
         "",
@@ -81,7 +81,7 @@ TEST(Base64_Decode_AdjacentBuffers)
 {
     char buffer[10] = "Zg==\0"; // "f" + blank space + terminating zero
     const char expected[] = "f";
-    Optional<size_t> r = base64_decode(buffer, buffer + 4, 3);
+    std::optional<size_t> r = base64_decode(buffer, buffer + 4, 3);
     CHECK(r);
     CHECK_EQUAL(*r, 1);
     CHECK_EQUAL(StringData{buffer + 4}, StringData{expected});
@@ -120,7 +120,7 @@ TEST(Base64_Encode)
         CHECK_EQUAL(return_size, tbs[i].encoded_buffer_size);
         CHECK_EQUAL(StringData(buffer.data(), return_size), tbs[i].encoded_buffer);
 
-        Optional<size_t> return_size_opt = base64_decode(StringData(tbs[i].encoded_buffer, tbs[i].encoded_buffer_size), buffer.data(), buffer.size());
+        std::optional<size_t> return_size_opt = base64_decode(StringData(tbs[i].encoded_buffer, tbs[i].encoded_buffer_size), buffer.data(), buffer.size());
         CHECK(return_size_opt);
         CHECK_EQUAL(*return_size_opt, tbs[i].decoded_buffer_size);
         for (size_t j = 0; j < *return_size_opt; ++j) {
@@ -132,12 +132,12 @@ TEST(Base64_Encode)
 TEST(Base64_DecodeToVector)
 {
     {
-        Optional<std::vector<char>> vec = base64_decode_to_vector("======");
+        std::optional<std::vector<char>> vec = base64_decode_to_vector("======");
         CHECK(!vec);
     }
 
     {
-        Optional<std::vector<char>> vec = base64_decode_to_vector("SGVsb G8sIF\ndvc mxkIQ==");
+        std::optional<std::vector<char>> vec = base64_decode_to_vector("SGVsb G8sIF\ndvc mxkIQ==");
         std::string str(vec->begin(), vec->end());
         CHECK_EQUAL("Hello, World!", str);
     }

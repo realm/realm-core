@@ -21,7 +21,7 @@
 
 #include <vector>
 #include <realm/string_data.hpp>
-#include <realm/util/optional.hpp>
+#include <optional>
 
 namespace realm {
 namespace util {
@@ -55,7 +55,7 @@ inline size_t base64_encoded_size(size_t in_buffer_size) noexcept
 ///
 /// \returns the number of successfully decoded bytes written to out_buffer, or
 /// none if the whole input was not valid base64.
-Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_buffer_len) noexcept;
+std::optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_buffer_len) noexcept;
 
 /// Return an upper bound on the decoded size of a Base64-encoded data
 /// stream of length \a base64_size. The returned value is suitable for
@@ -70,7 +70,7 @@ inline size_t base64_decoded_size(size_t base64_size) noexcept
 /// base64_decode_to_vector() is a convenience function that decodes \param
 /// encoded and returns the result in a std::vector<char> with the correct size.
 /// This function returns none if the input is invalid.
-Optional<std::vector<char>> base64_decode_to_vector(StringData encoded);
+std::optional<std::vector<char>> base64_decode_to_vector(StringData encoded);
 
 } // namespace util
 } // namespace realm

@@ -61,8 +61,8 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
 
     if (type == type_Int) {
         if (is_nullable()) {
-            GetIndexData<Optional<int64_t>> stringifier;
-            return stringifier.get_index_data(obj.get<Optional<int64_t>>(m_column_key), buffer);
+            GetIndexData<std::optional<int64_t>> stringifier;
+            return stringifier.get_index_data(obj.get<std::optional<int64_t>>(m_column_key), buffer);
         }
         else {
             GetIndexData<int64_t> stringifier;
@@ -71,8 +71,8 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
     }
     else if (type == type_Bool) {
         if (is_nullable()) {
-            GetIndexData<Optional<bool>> stringifier;
-            return stringifier.get_index_data(obj.get<Optional<bool>>(m_column_key), buffer);
+            GetIndexData<std::optional<bool>> stringifier;
+            return stringifier.get_index_data(obj.get<std::optional<bool>>(m_column_key), buffer);
         }
         else {
             GetIndexData<bool> stringifier;
@@ -89,8 +89,8 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
     }
     else if (type == type_ObjectId) {
         if (is_nullable()) {
-            GetIndexData<Optional<ObjectId>> stringifier;
-            return stringifier.get_index_data(obj.get<Optional<ObjectId>>(m_column_key), buffer);
+            GetIndexData<std::optional<ObjectId>> stringifier;
+            return stringifier.get_index_data(obj.get<std::optional<ObjectId>>(m_column_key), buffer);
         }
         else {
             GetIndexData<ObjectId> stringifier;
@@ -420,7 +420,7 @@ struct SearchList {
         key_type key;
     };
 
-    SearchList(const util::Optional<std::string>& upper_value, const util::Optional<std::string>& lower_value)
+    SearchList(const std::optional<std::string>& upper_value, const std::optional<std::string>& lower_value)
         : m_upper_value(upper_value)
         , m_lower_value(lower_value)
     {
@@ -468,8 +468,8 @@ private:
 
     std::vector<Item> m_items;
 
-    const util::Optional<std::string> m_upper_value;
-    const util::Optional<std::string> m_lower_value;
+    const std::optional<std::string> m_upper_value;
+    const std::optional<std::string> m_lower_value;
 
     std::vector<key_type> m_keys_seen;
 };
@@ -487,8 +487,8 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
         return index_string_all(value, result, column);
     }
 
-    const util::Optional<std::string> upper_value = case_map(value, true);
-    const util::Optional<std::string> lower_value = case_map(value, false);
+    const std::optional<std::string> upper_value = case_map(value, true);
+    const std::optional<std::string> lower_value = case_map(value, false);
     SearchList search_list(upper_value, lower_value);
 
     const char* top_header = get_header_from_data(m_data);
@@ -540,7 +540,7 @@ void IndexArray::index_string_all_ins(StringData value, std::vector<ObjKey>& res
             // The buffer is needed when for when this is an integer index.
             StringConversionBuffer buffer;
             const StringData str = column.get_index_data(k, buffer);
-            const util::Optional<std::string> upper_str = case_map(str, true);
+            const std::optional<std::string> upper_str = case_map(str, true);
             if (upper_str == upper_value) {
                 result.push_back(k);
             }

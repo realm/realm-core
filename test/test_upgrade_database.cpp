@@ -1430,9 +1430,9 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         ConstObj obj = t->get_object(ObjKey(insert_pos));
 
         CHECK_EQUAL(obj17.get<Int>(col_int), 17);
-        CHECK_EQUAL(obj17.get<util::Optional<Int>>(col_int_null), 17);
+        CHECK_EQUAL(obj17.get<std::optional<Int>>(col_int_null), 17);
         CHECK_EQUAL(obj17.get<Bool>(col_bool), false);
-        CHECK_EQUAL(obj17.get<util::Optional<Bool>>(col_bool_null), false);
+        CHECK_EQUAL(obj17.get<std::optional<Bool>>(col_bool_null), false);
         CHECK_EQUAL(obj17.get<Float>(col_float), 17 * 1.5f);
         CHECK_EQUAL(obj17.get<Double>(col_double), 17 * 2.5);
         CHECK_EQUAL(obj17.get<String>(col_string), "This is a medium long string");
@@ -1453,7 +1453,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         CHECK_EQUAL(int_list.get(0), 24);
         CHECK_EQUAL(int_list.get(17), 41);
 
-        auto int_null_list = obj23.get_list<util::Optional<Int>>(col_int_null_list);
+        auto int_null_list = obj23.get_list<std::optional<Int>>(col_int_null_list);
         CHECK(!int_null_list.is_empty());
         CHECK_EQUAL(int_null_list.size(), 10);
         CHECK_EQUAL(int_null_list.get(1), 5);

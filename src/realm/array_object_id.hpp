@@ -167,14 +167,14 @@ protected:
 class ArrayObjectIdNull : public ArrayObjectId {
 public:
     using ArrayObjectId::ArrayObjectId;
-    static util::Optional<ObjectId> default_value(bool nullable)
+    static std::optional<ObjectId> default_value(bool nullable)
     {
         if (nullable)
-            return util::none;
+            return std::nullopt;
         return ObjectId();
     }
 
-    void set(size_t ndx, const util::Optional<ObjectId>& value)
+    void set(size_t ndx, const std::optional<ObjectId>& value)
     {
         if (value) {
             ArrayObjectId::set(ndx, *value);
@@ -183,11 +183,11 @@ public:
             set_null(ndx);
         }
     }
-    void add(const util::Optional<ObjectId>& value)
+    void add(const std::optional<ObjectId>& value)
     {
         insert(size(), value);
     }
-    void insert(size_t ndx, const util::Optional<ObjectId>& value)
+    void insert(size_t ndx, const std::optional<ObjectId>& value)
     {
         if (value) {
             ArrayObjectId::insert(ndx, *value);
@@ -204,15 +204,15 @@ public:
         pos.set_value(this, null_oid);
         pos.set_null(this, true);
     }
-    util::Optional<ObjectId> get(size_t ndx) const noexcept
+    std::optional<ObjectId> get(size_t ndx) const noexcept
     {
         auto pos = get_pos(ndx);
         if (pos.is_null(this)) {
-            return util::none;
+            return std::nullopt;
         }
         return pos.get_value(this);
     }
-    size_t find_first(const util::Optional<ObjectId>& value, size_t begin = 0, size_t end = npos) const
+    size_t find_first(const std::optional<ObjectId>& value, size_t begin = 0, size_t end = npos) const
     {
         if (value) {
             return ArrayObjectId::find_first(*value, begin, end);

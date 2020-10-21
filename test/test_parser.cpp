@@ -1874,8 +1874,8 @@ TEST(Parser_list_of_primitive_ints)
         Obj obj = t->create_object();
         obj.get_list<Int>(col_int_list).add(i);
         obj.set<Int>(col_int, i);
-        obj.get_list<Optional<Int>>(col_int_list_nullable).add(i);
-        obj.set<Optional<Int>>(col_int_nullable, i);
+        obj.get_list<std::optional<Int>>(col_int_list_nullable).add(i);
+        obj.set<std::optional<Int>>(col_int_nullable, i);
     }
 
     TableRef t2 = g.add_table("table2");
@@ -1928,7 +1928,7 @@ TEST(Parser_list_of_primitive_ints)
     // add two more objects; one with defaults, one with null in the list
     Obj obj_defaults = t->create_object();
     Obj obj_nulls_in_lists = t->create_object();
-    obj_nulls_in_lists.get_list<Optional<Int>>(col_int_list_nullable).add(Optional<Int>());
+    obj_nulls_in_lists.get_list<std::optional<Int>>(col_int_list_nullable).add(std::optional<Int>());
     num_objects += 2;
     verify_query(test_context, t, "integers.@count == 0", 2);
     verify_query(test_context, t, "integers == NULL", 0);
@@ -2212,8 +2212,8 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
 }
 
-TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
-           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>)
+TEST_TYPES(Parser_list_of_primitive_types, Int, std::optional<Int>, Bool, std::optional<Bool>, Float, std::optional<Float>, Double,
+           std::optional<Double>, Decimal128, ObjectId, std::optional<ObjectId>)
 {
     Group g;
     TableRef t = g.add_table("table");
@@ -2236,7 +2236,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     obj4.get_list<TEST_TYPE>(col).add(value_1);
     auto obj5 = t->create_object(); // {null} or {0}
     if constexpr (is_optional) {
-        obj5.get_list<TEST_TYPE>(col).add(none);
+        obj5.get_list<TEST_TYPE>(col).add(std::nullopt);
     }
     else {
         obj5.get_list<TEST_TYPE>(col).add(gen.convert_for_test<underlying_type>(0));
@@ -3974,7 +3974,7 @@ TEST(Parser_ObjectIdTimestamp)
     auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
     CHECK(std::abs(generated_pk.get_timestamp().get_seconds() - ts_now.get_seconds()) <= 1);
-    auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
+    auto generated_nullable = obj_generated.get<std::optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);
 

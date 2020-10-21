@@ -142,7 +142,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/query.hpp>
 #include <realm/list.hpp>
 #include <realm/metrics/query_info.hpp>
-#include <realm/util/optional.hpp>
+#include <optional>
 #include <realm/util/serializer.hpp>
 
 #include <numeric>
@@ -887,7 +887,7 @@ struct NullableVector {
     using t_storage = TypeMapper<T,                        //
                                  std::pair<bool, int64_t>, //
                                  std::pair<int, int64_t>,  //
-                                 std::pair<ObjectId, util::Optional<ObjectId>>>;
+                                 std::pair<ObjectId, std::optional<ObjectId>>>;
 
     NullableVector()
     {
@@ -958,15 +958,15 @@ struct NullableVector {
         m_first[index] = value;
     }
 
-    inline util::Optional<T> get(size_t index) const
+    inline std::optional<T> get(size_t index) const
     {
         if (is_null(index))
-            return util::none;
+            return std::nullopt;
 
-        return util::make_optional((*this)[index]);
+        return std::make_optional((*this)[index]);
     }
 
-    inline void set(size_t index, util::Optional<T> value)
+    inline void set(size_t index, std::optional<T> value)
     {
         if (value) {
             set(index, *value);
@@ -1016,7 +1016,7 @@ struct NullableVector {
         }
     }
 
-    void init(const std::vector<util::Optional<T>>& values)
+    void init(const std::vector<std::optional<T>>& values)
     {
         size_t sz = values.size();
         init(sz);
@@ -1047,7 +1047,7 @@ struct NullableVector {
 };
 
 template <typename T, size_t prealloc>
-struct NullableVector<util::Optional<T>, prealloc>; // NullableVector<Optional<T>> is banned.
+struct NullableVector<std::optional<T>, prealloc>; // NullableVector<Optional<T>> is banned.
 
 // Double
 // NOTE: fails in gcc 4.8 without `inline`. Do not remove. Same applies for all methods below.
@@ -1206,18 +1206,18 @@ inline void NullableVector<ObjKey>::set_null(size_t index)
 template <typename Operator>
 struct OperatorOptionalAdapter {
     template <typename L, typename R>
-    util::Optional<typename Operator::type> operator()(const util::Optional<L>& left, const util::Optional<R>& right)
+    std::optional<typename Operator::type> operator()(const std::optional<L>& left, const std::optional<R>& right)
     {
         if (!left || !right)
-            return util::none;
+            return std::nullopt;
         return Operator()(*left, *right);
     }
 
     template <typename T>
-    util::Optional<typename Operator::type> operator()(const util::Optional<T>& arg)
+    std::optional<typename Operator::type> operator()(const std::optional<T>& arg)
     {
         if (!arg)
-            return util::none;
+            return std::nullopt;
         return Operator()(*arg);
     }
 };
@@ -1322,7 +1322,7 @@ public:
         ValueBase::m_values = values.size();
     }
 
-    void init(bool from_link_list, const std::vector<util::Optional<T>>& values)
+    void init(bool from_link_list, const std::vector<std::optional<T>>& values)
     {
         m_storage.init(values);
         ValueBase::m_from_link_list = from_link_list;
@@ -1686,7 +1686,7 @@ class ConstantStringValue : public Value<StringData> {
 public:
     ConstantStringValue(const StringData& string)
         : Value()
-        , m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
+    , m_string(string.is_null() ? std::nullopt : std::make_optional(std::string(string)))
     {
         init(false, 1, m_string);
     }
@@ -1704,7 +1704,7 @@ private:
         init(other.m_from_link_list, other.m_values, m_string);
     }
 
-    util::Optional<std::string> m_string;
+    std::optional<std::string> m_string;
 };
 
 // All overloads where left-hand-side is L:
@@ -2393,7 +2393,7 @@ public:
                 if (link_translation_key) {
                     ConstObj obj = m_link_map.get_target_table()->get_object(link_translation_key);
                     if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                        auto opt_val = obj.get<std::optional<ObjectId>>(m_column_key);
                         if (opt_val) {
                             d.m_storage.set(0, *opt_val);
                         }
@@ -2413,7 +2413,7 @@ public:
                 for (size_t t = 0; t < links.size(); t++) {
                     ConstObj obj = m_link_map.get_target_table()->get_object(links[t]);
                     if constexpr (std::is_same_v<T, ObjectId>) {
-                        auto opt_val = obj.get<util::Optional<ObjectId>>(m_column_key);
+                        auto opt_val = obj.get<std::optional<ObjectId>>(m_column_key);
                         if (opt_val) {
                             v.m_storage.set(t, *opt_val);
                         }
@@ -3207,7 +3207,7 @@ public:
     {
         if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
             if (m_is_nullable_storage) {
-                evaluate<util::Optional<T>>(index, destination);
+                evaluate<std::optional<T>>(index, destination);
                 return;
             }
         }
@@ -3300,7 +3300,7 @@ public:
     {
         if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
             if (this->m_is_nullable_storage) {
-                evaluate<util::Optional<T>>(index, destination);
+                evaluate<std::optional<T>>(index, destination);
                 return;
             }
         }
@@ -3462,7 +3462,7 @@ public:
     {
         if constexpr (std::is_same_v<T, ObjectId> || std::is_same_v<T, Int> || std::is_same_v<T, Bool>) {
             if (m_list.m_is_nullable_storage) {
-                evaluate<util::Optional<T>>(index, destination);
+                evaluate<std::optional<T>>(index, destination);
                 return;
             }
         }
@@ -3779,12 +3779,12 @@ public:
         auto obj = table.unchecked_ptr()->get_object(key);
         if (m_nullable && std::is_same_v<typename LeafType::value_type, int64_t>) {
             Value<int64_t> v(false, 1);
-            v.m_storage.set(0, obj.template get<util::Optional<int64_t>>(m_column_key));
+            v.m_storage.set(0, obj.template get<std::optional<int64_t>>(m_column_key));
             destination.import(v);
         }
         else if (m_nullable && std::is_same_v<typename LeafType::value_type, bool>) {
             Value<bool> v(false, 1);
-            v.m_storage.set(0, obj.template get<util::Optional<bool>>(m_column_key));
+            v.m_storage.set(0, obj.template get<std::optional<bool>>(m_column_key));
             destination.import(v);
         }
         else {
@@ -4096,7 +4096,7 @@ public:
         m_result = Derived::apply(m_result, value);
     }
 
-    void accumulate(util::Optional<T> value)
+    void accumulate(std::optional<T> value)
     {
         if (value) {
             m_count++;

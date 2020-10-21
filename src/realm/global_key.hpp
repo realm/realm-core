@@ -20,7 +20,9 @@
 #define REALM_GLOBAL_KEY_HPP
 
 #include <realm/keys.hpp>
-#include <realm/util/optional.hpp>
+#include <realm/util/assert.hpp>
+
+#include <optional>
 #include <limits>
 #include <cstdint>
 
@@ -64,7 +66,7 @@ struct GlobalKey {
     }
     static GlobalKey from_string(StringData);
 
-    constexpr GlobalKey(realm::util::None = realm::util::none)
+    constexpr GlobalKey()
         : m_lo(-1)
         , m_hi(-1)
     {

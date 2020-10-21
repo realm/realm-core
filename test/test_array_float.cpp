@@ -398,16 +398,16 @@ template <class T>
 std::vector<T> get_values();
 
 template <>
-std::vector<util::Optional<float>> get_values<util::Optional<float>>()
+std::vector<std::optional<float>> get_values<std::optional<float>>()
 {
-    using T = util::Optional<float>;
+    using T = std::optional<float>;
     std::vector<T> values({T(1.1f), T(2.2f), T(), T(-1.0f), T(5.5f), T(1.1f), T(4.4f), T()});
     return values;
 }
 template <>
-std::vector<util::Optional<double>> get_values<util::Optional<double>>()
+std::vector<std::optional<double>> get_values<std::optional<double>>()
 {
-    using T = util::Optional<double>;
+    using T = std::optional<double>;
     std::vector<T> values({T(1.1), T(2.2), T(), T(-1.0), T(5.5), T(1.1), T(4.4), T()});
     return values;
 }
@@ -467,11 +467,11 @@ void BasicArray_Find(TestContext& test_context)
 }
 TEST(ArrayFloat_Find)
 {
-    BasicArray_Find<ArrayFloatNull, util::Optional<float>>(test_context);
+    BasicArray_Find<ArrayFloatNull, std::optional<float>>(test_context);
 }
 TEST(ArrayDouble_Find)
 {
-    BasicArray_Find<ArrayDoubleNull, util::Optional<double>>(test_context);
+    BasicArray_Find<ArrayDoubleNull, std::optional<double>>(test_context);
 }
 
 

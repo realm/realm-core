@@ -166,7 +166,7 @@ void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
     Array::get_chunk(ndx + 1, tmp);
     int64_t null = null_value();
     for (size_t i = 0; i < 8; ++i) {
-        res[i] = tmp[i] == null ? util::Optional<int64_t>() : tmp[i];
+        res[i] = tmp[i] == null ? std::optional<int64_t>() : tmp[i];
     }
 }
 

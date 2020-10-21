@@ -114,7 +114,7 @@ size_t base64_encode(const char *in_buffer, size_t in_buffer_size, char* out_buf
 }
 
 
-Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_buffer_len) noexcept
+std::optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_buffer_len) noexcept
 {
     REALM_ASSERT_EX(input.size() < std::numeric_limits<size_t>::max() / 3, input.size());
     size_t required_buffer_len = (input.size() * 3 + 3) / 4;
@@ -146,11 +146,11 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
         switch (x) {
             case equals:     ++num_trailing_equals; continue;
             case whitespace: continue; // ignore whitespace
-            case invalid:    return none;
+            case invalid:    return std::nullopt;
         }
 
         if (num_trailing_equals > 0)
-            return none; // data after the end-padding
+            return std::nullopt; // data after the end-padding
 
         REALM_ASSERT_EX(x < 64, x);
         buffer = buffer << 6 | x;
@@ -175,7 +175,7 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
     // trailing bytes
     if (num_trailing_equals == 0) {
         if (buffer_size != 0)
-            return none; // stuff was left in buffer, so input was not sufficiently padded.
+            return std::nullopt; // stuff was left in buffer, so input was not sufficiently padded.
     }
     else if (num_trailing_equals == 1) {
         *o++ = (buffer >> 10) & 0xff;
@@ -187,19 +187,19 @@ Optional<size_t> base64_decode(StringData input, char* out_buffer, size_t out_bu
         bytes_written += 1;
     }
     else {
-        return none;
+        return std::nullopt;
     }
 
     return bytes_written;
 }
 
-Optional<std::vector<char>> base64_decode_to_vector(StringData encoded)
+std::optional<std::vector<char>> base64_decode_to_vector(StringData encoded)
 {
     size_t max_size = base64_decoded_size(encoded.size());
     std::vector<char> decoded(max_size); // Throws
-    Optional<size_t> actual_size = base64_decode(encoded, decoded.data(), decoded.size());
+    std::optional<size_t> actual_size = base64_decode(encoded, decoded.data(), decoded.size());
     if (!actual_size)
-        return none;
+        return std::nullopt;
 
     decoded.resize(*actual_size); // Throws
     return decoded;

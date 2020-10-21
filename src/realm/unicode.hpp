@@ -134,7 +134,7 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
 
 /// If successful, returns a string of the same size as \a source.
 /// Returns none if invalid UTF-8 encoding was encountered.
-util::Optional<std::string> case_map(StringData source, bool upper);
+std::optional<std::string> case_map(StringData source, bool upper);
 
 enum IgnoreErrorsTag { IgnoreErrors };
 std::string case_map(StringData source, bool upper, IgnoreErrorsTag);

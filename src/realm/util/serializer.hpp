@@ -20,7 +20,7 @@
 #define REALM_UTIL_SERIALIZER_HPP
 
 #include <realm/table_ref.hpp>
-#include <realm/util/optional.hpp>
+#include <optional>
 
 #include <string>
 #include <sstream>
@@ -47,7 +47,7 @@ template <typename T>
 std::string print_value(T value);
 
 template <typename T>
-std::string print_value(Optional<T> value);
+std::string print_value(std::optional<T> value);
 
 const static std::string value_separator = ".";
 
@@ -76,7 +76,7 @@ std::string print_value(T value)
 }
 
 template <typename T>
-std::string print_value(Optional<T> value)
+std::string print_value(std::optional<T> value)
 {
     if (bool(value)) {
         return print_value(*value);

@@ -135,7 +135,7 @@ public:
     {
         return nullable ? null::get_null_float<T>() : T(0.0);
     }
-    void set(size_t ndx, util::Optional<T> value)
+    void set(size_t ndx, std::optional<T> value)
     {
         if (value) {
             BasicArray<T>::set(ndx, *value);
@@ -144,7 +144,7 @@ public:
             BasicArray<T>::set(ndx, null::get_null_float<T>());
         }
     }
-    void add(util::Optional<T> value)
+    void add(std::optional<T> value)
     {
         if (value) {
             BasicArray<T>::add(*value);
@@ -153,7 +153,7 @@ public:
             BasicArray<T>::add(null::get_null_float<T>());
         }
     }
-    void insert(size_t ndx, util::Optional<T> value)
+    void insert(size_t ndx, std::optional<T> value)
     {
         if (value) {
             BasicArray<T>::insert(ndx, *value);
@@ -169,12 +169,12 @@ public:
         set(ndx, null::get_null_float<T>());
     }
 
-    util::Optional<T> get(size_t ndx) const noexcept
+    std::optional<T> get(size_t ndx) const noexcept
     {
         T val = BasicArray<T>::get(ndx);
-        return null::is_null_float(val) ? util::none : util::make_optional(val);
+        return null::is_null_float(val) ? std::nullopt : std::make_optional(val);
     }
-    size_t find_first(util::Optional<T> value, size_t begin = 0, size_t end = npos) const
+    size_t find_first(std::optional<T> value, size_t begin = 0, size_t end = npos) const
     {
         if (value) {
             return BasicArray<T>::find_first(*value, begin, end);
@@ -183,7 +183,7 @@ public:
             return find_first_null(begin, end);
         }
     }
-    void find_all(IntegerColumn* result, util::Optional<T> value, size_t add_offset = 0, size_t begin = 0,
+    void find_all(IntegerColumn* result, std::optional<T> value, size_t add_offset = 0, size_t begin = 0,
                   size_t end = npos) const
     {
         if (value) {

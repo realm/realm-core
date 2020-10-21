@@ -521,7 +521,7 @@ public:
 
     // Called for each search result
     template <Action action, class Callback>
-    bool find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state,
+    bool find_action(size_t index, std::optional<int64_t> value, QueryState<int64_t>* state,
                      Callback callback) const;
 
     template <Action action, class Callback>
@@ -847,7 +847,7 @@ public:
     }
 
     template <Action action, bool pattern>
-    inline bool match(size_t index, uint64_t indexpattern, util::Optional<int64_t> value)
+    inline bool match(size_t index, uint64_t indexpattern, std::optional<int64_t> value)
     {
         // FIXME: This is a temporary hack for nullable integers.
         if (value) {
@@ -1312,7 +1312,7 @@ such a pattern.
 // unused, such that caller's computation of these values will not be made. Only works if find_action() and
 // find_action_pattern() rewritten as macros. Note: This problem has been fixed in next upcoming array.hpp version
 template <Action action, class Callback>
-bool Array::find_action(size_t index, util::Optional<int64_t> value, QueryState<int64_t>* state,
+bool Array::find_action(size_t index, std::optional<int64_t> value, QueryState<int64_t>* state,
                         Callback callback) const
 {
     if (action == act_CallbackIdx)
@@ -1490,7 +1490,7 @@ bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t basei
                 int64_t v = get<bitwidth>(start2 + 1);
                 bool value_is_null = (v == null_value);
                 if (c(v, value, value_is_null, find_null)) {
-                    util::Optional<int64_t> v2(value_is_null ? util::none : util::make_optional(v));
+                    std::optional<int64_t> v2(value_is_null ? std::nullopt : std::make_optional(v));
                     if (!find_action<action, Callback>(start2 + baseindex, v2, state, callback))
                         return false; // tell caller to stop aggregating/search
                 }

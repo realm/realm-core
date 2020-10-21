@@ -30,11 +30,6 @@ class IntegerColumnIterator;
 template <class T>
 class BPlusTree;
 
-namespace util {
-template <class>
-class Optional;
-}
-
 // Shortcuts, aka typedefs.
 using DoubleColumn = BPlusTree<double>;
 using FloatColumn = BPlusTree<float>;

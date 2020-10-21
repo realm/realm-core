@@ -1203,7 +1203,7 @@ class BoolNode : public ParentNode {
 public:
     using TConditionValue = bool;
 
-    BoolNode(util::Optional<bool> v, ColKey column)
+    BoolNode(std::optional<bool> v, ColKey column)
         : m_value(v)
     {
         m_condition_column_key = column;
@@ -1235,7 +1235,7 @@ public:
         TConditionFunction condition;
         bool m_value_is_null = !m_value;
         for (size_t s = start; s < end; ++s) {
-            util::Optional<bool> value = m_leaf_ptr->get(s);
+            std::optional<bool> value = m_leaf_ptr->get(s);
             if (condition(value, m_value, !value, m_value_is_null))
                 return s;
         }
@@ -1254,7 +1254,7 @@ public:
     }
 
 private:
-    util::Optional<bool> m_value;
+    std::optional<bool> m_value;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayBoolNull), alignof(ArrayBoolNull)>::type;
     using LeafPtr = std::unique_ptr<ArrayBoolNull, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
@@ -1478,7 +1478,7 @@ public:
     {
         TConditionFunction cond;
         for (size_t i = start; i < end; i++) {
-            util::Optional<ObjectId> val = m_leaf_ptr->get(i);
+            std::optional<ObjectId> val = m_leaf_ptr->get(i);
             if (val) {
                 if (cond(*val, m_value, false, m_value_is_null))
                     return i;
@@ -1518,7 +1518,7 @@ public:
     static const bool special_null_node = true;
 
     StringNodeBase(StringData v, ColKey column)
-        : m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
+        : m_value(v.is_null() ? std::nullopt : std::make_optional(std::string(v)))
     {
         m_condition_column_key = column;
     }
@@ -1577,7 +1577,7 @@ public:
     }
 
 protected:
-    util::Optional<std::string> m_value;
+    std::optional<std::string> m_value;
 
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayString), alignof(ArrayString)>::type;
     using LeafPtr = std::unique_ptr<ArrayString, PlacementDelete>;

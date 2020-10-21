@@ -247,7 +247,7 @@ Timestamp ConstTableView::minmax_timestamp(ColKey column_key, ObjKey* return_key
 int64_t ConstTableView::sum_int(ColKey column_key) const
 {
     if (m_table->is_nullable(column_key))
-        return aggregate<act_Sum, util::Optional<int64_t>, int64_t>(column_key, 0);
+        return aggregate<act_Sum, std::optional<int64_t>, int64_t>(column_key, 0);
     else {
         return aggregate<act_Sum, int64_t, int64_t>(column_key, 0);
     }
@@ -270,7 +270,7 @@ Decimal128 ConstTableView::sum_decimal(ColKey column_key) const
 int64_t ConstTableView::maximum_int(ColKey column_key, ObjKey* return_key) const
 {
     if (m_table->is_nullable(column_key))
-        return aggregate<act_Max, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
+        return aggregate<act_Max, std::optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
         return aggregate<act_Max, int64_t, int64_t>(column_key, nullptr, return_key);
 }
@@ -295,7 +295,7 @@ Decimal128 ConstTableView::maximum_decimal(ColKey column_key, ObjKey* return_key
 int64_t ConstTableView::minimum_int(ColKey column_key, ObjKey* return_key) const
 {
     if (m_table->is_nullable(column_key))
-        return aggregate<act_Min, util::Optional<int64_t>, int64_t>(column_key, nullptr, return_key);
+        return aggregate<act_Min, std::optional<int64_t>, int64_t>(column_key, nullptr, return_key);
     else
         return aggregate<act_Min, int64_t, int64_t>(column_key, nullptr, return_key);
 }
@@ -320,7 +320,7 @@ Decimal128 ConstTableView::minimum_decimal(ColKey column_key, ObjKey* return_key
 double ConstTableView::average_int(ColKey column_key, size_t* value_count) const
 {
     if (m_table->is_nullable(column_key))
-        return aggregate<act_Average, util::Optional<int64_t>, double>(column_key, value_count);
+        return aggregate<act_Average, std::optional<int64_t>, double>(column_key, value_count);
     else
         return aggregate<act_Average, int64_t, double>(column_key, value_count);
 }
@@ -341,7 +341,7 @@ Decimal128 ConstTableView::average_decimal(ColKey column_key, size_t* value_coun
 size_t ConstTableView::count_int(ColKey column_key, int64_t target) const
 {
     if (m_table->is_nullable(column_key))
-        return aggregate_count<util::Optional<int64_t>>(column_key, target);
+        return aggregate_count<std::optional<int64_t>>(column_key, target);
     else
         return aggregate_count<int64_t>(column_key, target);
 }

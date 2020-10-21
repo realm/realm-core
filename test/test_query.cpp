@@ -3618,13 +3618,13 @@ TEST(Query_SortLinkChains)
     tv.sort(SortDescriptor({{t1_link_col, t2_link_col, t3_int_col}}, {true}));
     // No guarantees about nullified links except they are at the end.
     CHECK(tv.size() >= results3.size());
-    util::Optional<int64_t> last;
+    std::optional<int64_t> last;
     for (size_t i = 0; i < results3.size(); ++i) {
         CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results3[i]);
-        util::Optional<int64_t> current = tv[i]
+        std::optional<int64_t> current = tv[i]
                                               .get_linked_object(t1_link_col)
                                               .get_linked_object(t2_link_col)
-                                              .get<util::Optional<int64_t>>(t3_int_col);
+                                              .get<std::optional<int64_t>>(t3_int_col);
         CHECK(!last || current.value() >= last.value());
         last = current;
     }

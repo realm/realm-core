@@ -236,7 +236,7 @@ public:
     // that is free in current version, but being used in still live versions.
     // Notice that we will always have two live versions - the current and the
     // previous.
-    void get_stats(size_t& free_space, size_t& used_space, util::Optional<size_t&> locked_space = util::none) const;
+    void get_stats(size_t& free_space, size_t& used_space, std::optional<std::reference_wrapper<size_t>> locked_space = std::nullopt);
     //@}
 
     enum TransactStage {
@@ -284,7 +284,7 @@ public:
     /// because it's not crash safe! It may corrupt your database if something fails
     ///
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
-    bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
+    bool compact(bool bump_version_number = false, std::optional<const char*> output_encryption_key = std::nullopt);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();
@@ -523,12 +523,12 @@ private:
     friend class Transaction;
 };
 
-inline void DB::get_stats(size_t& free_space, size_t& used_space, util::Optional<size_t&> locked_space) const
+inline void DB::get_stats(size_t& free_space, size_t& used_space, std::optional<std::reference_wrapper<size_t>> locked_space)
 {
     free_space = m_free_space;
     used_space = m_used_space;
     if (locked_space) {
-        *locked_space = m_locked_space;
+        locked_space.emplace(std::ref(m_locked_space));
     }
 }
 

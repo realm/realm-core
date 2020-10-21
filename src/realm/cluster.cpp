@@ -915,7 +915,7 @@ inline void Cluster::set_spec(ArrayString& arr, ColKey::Idx col_ndx) const
 template <class T>
 inline void Cluster::do_insert_row(size_t ndx, ColKey col, Mixed init_val, bool nullable)
 {
-    using U = typename util::RemoveOptional<typename T::value_type>::type;
+    using U = typename util::RemoveOptional<T>::type::value_type;
 
     T arr(m_alloc);
     auto col_ndx = col.get_index();
@@ -1595,7 +1595,7 @@ void Cluster::add_leaf(ColKey col_key, ref_type ref)
 }
 
 template <typename ArrayType>
-void Cluster::verify(ref_type ref, size_t index, util::Optional<size_t>& sz) const
+void Cluster::verify(ref_type ref, size_t index, std::optional<size_t>& sz) const
 {
     ArrayType arr(get_alloc());
     set_spec(arr, ColKey::Idx{unsigned(index) - 1});
@@ -1629,7 +1629,7 @@ void verify_list(ArrayRef& arr, size_t sz)
 void Cluster::verify() const
 {
 #ifdef REALM_DEBUG
-    util::Optional<size_t> sz;
+    std::optional<size_t> sz;
 
     auto verify_column = [this, &sz](ColKey col_key) {
         size_t col = col_key.get_index().val + s_first_col_index;
@@ -1653,7 +1653,7 @@ void Cluster::verify() const
             switch (col_type) {
                 case col_type_Int:
                     if (nullable) {
-                        verify_list<util::Optional<int64_t>>(arr, *sz);
+                        verify_list<std::optional<int64_t>>(arr, *sz);
                     }
                     else {
                         verify_list<int64_t>(arr, *sz);

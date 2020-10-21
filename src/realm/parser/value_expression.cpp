@@ -90,7 +90,7 @@ StringData from_base64(const std::string& input, util::StringBuffer& decode_buff
     size_t buffer_size = util::base64_decoded_size(encoded_size);
     decode_buffer.resize(buffer_size);
     StringData window(input.data() + 4, encoded_size);
-    util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+    std::optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
     if (!decoded_size) {
         throw std::runtime_error("Invalid base64 value");
     }

@@ -40,7 +40,7 @@ using namespace realm::util;
 #define REALM_DO_IF_VERIFY(log, op)                                                                                  \
     do {                                                                                                             \
         if (log)                                                                                                     \
-            *log << #op << ";\n";                                                                                    \
+            (*log).get() << #op << ";\n";                                                                                    \
         op;                                                                                                          \
     } while (false)
 #else
@@ -157,7 +157,7 @@ std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
 }
 
 // returns random binary blob data in a string, logs to a variable called "blob" if logging is enabled
-std::string construct_binary_payload(State& s, util::Optional<std::ostream&> log)
+std::string construct_binary_payload(State& s, std::optional<std::ostream> log)
 {
     size_t rand_char = get_next(s);
     size_t blob_size = static_cast<uint64_t>(get_int64(s)) % (ArrayBlob::max_binary_size + 1);
@@ -241,7 +241,7 @@ namespace {
 int iteration;
 }
 
-void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
+void parse_and_apply_instructions(std::string& in, const std::string& path, std::optional<std::reference_wrapper<std::ostream>> log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
@@ -260,9 +260,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     const char* encryption_key = use_encryption ? get_encryption_key() : nullptr;
 
     if (log) {
-        *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
-        *log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
-        *log << "// ----------------------------------------------------------------------\n";
+        (*log).get() << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+        (*log).get() << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
+        (*log).get() << "// ----------------------------------------------------------------------\n";
         std::string printable_key;
         if (encryption_key == nullptr) {
             printable_key = "nullptr";
@@ -271,17 +271,17 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             printable_key = std::string("\"") + encryption_key + "\"";
         }
 
-        *log << "SHARED_GROUP_TEST_PATH(path);\n";
+        (*log).get() << "SHARED_GROUP_TEST_PATH(path);\n";
 
-        *log << "const char* key = " << printable_key << ";\n";
-        *log << "std::unique_ptr<Replication> hist(make_in_realm_history(path));\n";
+        (*log).get() << "const char* key = " << printable_key << ";\n";
+        (*log).get() << "std::unique_ptr<Replication> hist(make_in_realm_history(path));\n";
 
-        *log << "DBRef db = DB::create(*hist, DBOptions(key));\n";
-        *log << "auto wt = db->start_write();\n";
-        *log << "auto rt = db->start_read();\n";
-        *log << "std::vector<TableView> table_views;\n";
+        (*log).get() << "DBRef db = DB::create(*hist, DBOptions(key));\n";
+        (*log).get() << "auto wt = db->start_write();\n";
+        (*log).get() << "auto rt = db->start_read();\n";
+        (*log).get() << "std::vector<TableView> table_views;\n";
 
-        *log << "\n";
+        (*log).get() << "\n";
     }
 
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -307,14 +307,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             if (instr == ADD_TABLE && wt->size() < max_tables) {
                 std::string name = create_table_name();
                 if (log) {
-                    *log << "wt->add_table(\"" << name << "\");\n";
+                    (*log).get() << "wt->add_table(\"" << name << "\");\n";
                 }
                 wt->add_table(name);
             }
             else if (instr == REMOVE_TABLE && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 if (log) {
-                    *log << "try { wt->remove_table(" << table_key << "); }"
+                    (*log).get() << "try { wt->remove_table(" << table_key << "); }"
                                                                       " catch (const CrossTableLinkTarget&) { }\n";
                 }
                 try {
@@ -322,14 +322,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 catch (const CrossTableLinkTarget&) {
                     if (log) {
-                        *log << "// Exception\n";
+                        (*log).get() << "// Exception\n";
                     }
                 }
             }
             else if (instr == CLEAR_TABLE && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 if (log) {
-                    *log << "wt->get_table(" << table_key << ")->clear();\n";
+                    (*log).get() << "wt->get_table(" << table_key << ")->clear();\n";
                 }
                 wt->get_table(table_key)->clear();
             }
@@ -338,7 +338,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t num_rows = get_next(s);
                 if (wt->get_table(table_key)->size() + num_rows < max_rows) {
                     if (log) {
-                        *log << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
+                        (*log).get() << "{ std::vector<ObjKey> keys; wt->get_table(" << table_key << ")->create_objects("
                              << num_rows % add_empty_row_max << ", keys); }\n";
                     }
                     std::vector<ObjKey> keys;
@@ -352,12 +352,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 // Mixed cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "wt->get_table(" << table_key << ")->add_column(DataType(" << int(type) << "), \"" << name
+                    (*log).get() << "wt->get_table(" << table_key << ")->add_column(DataType(" << int(type) << "), \"" << name
                          << "\", " << (nullable ? "true" : "false") << ");";
                 }
                 auto col = wt->get_table(table_key)->add_column(type, name, nullable);
                 if (log) {
-                    *log << " // -> " << col << "\n";
+                    (*log).get() << " // -> " << col << "\n";
                 }
             }
             else if (instr == REMOVE_COLUMN && wt->size() > 0) {
@@ -367,7 +367,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (!column_keys.empty()) {
                     ColKey col = column_keys[get_next(s) % column_keys.size()];
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->remove_column(" << col << ");\n";
+                        (*log).get() << "wt->get_table(" << table_key << ")->remove_column(" << col << ");\n";
                     }
                     t->remove_column(col);
                 }
@@ -380,7 +380,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     ColKey col = column_keys[get_next(s) % column_keys.size()];
                     std::string name = create_column_name(t->get_column_type(col));
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->rename_column(" << col << ", \"" << name
+                        (*log).get() << "wt->get_table(" << table_key << ")->rename_column(" << col << ", \"" << name
                              << "\");\n";
                     }
                     t->rename_column(col, name);
@@ -396,7 +396,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
                     if (supports_search_index) {
                         if (log) {
-                            *log << "wt->get_table(" << table_key << ")->add_search_index(" << col << ");\n";
+                            (*log).get() << "wt->get_table(" << table_key << ")->add_search_index(" << col << ");\n";
                         }
                         t->add_search_index(col);
                     }
@@ -412,7 +412,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     // off
                     // because Realm will just do a no-op at worst (no exception or assert).
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->remove_search_index(" << col << ");\n";
+                        (*log).get() << "wt->get_table(" << table_key << ")->remove_search_index(" << col << ");\n";
                     }
                     t->remove_search_index(col);
                 }
@@ -424,12 +424,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t2 = wt->get_table(table_key_2);
                 std::string name = create_column_name(type_Link);
                 if (log) {
-                    *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_Link, \"" << name
+                    (*log).get() << "wt->get_table(" << table_key_1 << ")->add_column_link(type_Link, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
                 }
                 auto col = t1->add_column_link(type_Link, name, *t2);
                 if (log) {
-                    *log << " // -> " << col << "\n";
+                    (*log).get() << " // -> " << col << "\n";
                 }
             }
             else if (instr == ADD_COLUMN_LINK_LIST && wt->size() >= 2) {
@@ -439,12 +439,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t2 = wt->get_table(table_key_2);
                 std::string name = create_column_name(type_LinkList);
                 if (log) {
-                    *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
+                    (*log).get() << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
                 }
                 auto col = t1->add_column_link(type_LinkList, name, *t2);
                 if (log) {
-                    *log << " // -> " << col << "\n";
+                    (*log).get() << " // -> " << col << "\n";
                 }
             }
             else if (instr == SET && wt->size() > 0) {
@@ -457,20 +457,20 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     DataType type = t->get_column_type(col);
                     Obj obj = t->get_object(row);
                     if (log) {
-                        *log << "{\nObj obj = wt->get_table(" << table_key << ")->get_object(" << row << ");\n";
+                        (*log).get() << "{\nObj obj = wt->get_table(" << table_key << ")->get_object(" << row << ");\n";
                     }
 
                     // With equal probability, either set to null or to a value
                     if (get_next(s) % 2 == 0 && t->is_nullable(col)) {
                         if (type == type_Link) {
                             if (log) {
-                                *log << "obj.set(" << col << ", null_key);\n";
+                                (*log).get() << "obj.set(" << col << ", null_key);\n";
                             }
                             obj.set(col, null_key);
                         }
                         else {
                             if (log) {
-                                *log << "obj.set_null(" << col << ");\n";
+                                (*log).get() << "obj.set_null(" << col << ");\n";
                             }
                             obj.set_null(col);
                         }
@@ -479,14 +479,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         if (type == type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "obj.set(" << col << ", \"" << str << "\");\n";
+                                (*log).get() << "obj.set(" << col << ", \"" << str << "\");\n";
                             }
                             obj.set(col, StringData(str));
                         }
                         else if (type == type_Binary) {
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "obj.set<Binary>(" << col << ", BinaryData{\"" << str << "\", " << str.size()
+                                (*log).get() << "obj.set<Binary>(" << col << ", BinaryData{\"" << str << "\", " << str.size()
                                      << "});\n";
                             }
                             obj.set<Binary>(col, BinaryData(str));
@@ -496,7 +496,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             int64_t value = get_int64(s);
                             if (add_int) {
                                 if (log) {
-                                    *log << "try { obj.add_int(" << col << ", " << value
+                                    (*log).get() << "try { obj.add_int(" << col << ", " << value
                                          << "); } catch (const LogicError& le) { CHECK(le.kind() == "
                                             "LogicError::illegal_combination); }\n";
                                 }
@@ -511,7 +511,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                             else {
                                 if (log) {
-                                    *log << "obj.set<Int>(" << col << ", " << value << ");\n";
+                                    (*log).get() << "obj.set<Int>(" << col << ", " << value << ");\n";
                                 }
                                 obj.set<Int>(col, value);
                             }
@@ -520,21 +520,21 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
                             if (log) {
-                                *log << "obj.set<Bool>(" << col << ", " << (value ? "true" : "false") << ");\n";
+                                (*log).get() << "obj.set<Bool>(" << col << ", " << (value ? "true" : "false") << ");\n";
                             }
                             obj.set<Bool>(col, value);
                         }
                         else if (type == type_Float) {
                             float value = get_next(s);
                             if (log) {
-                                *log << "obj.set<Float>(" << col << ", " << value << ");\n";
+                                (*log).get() << "obj.set<Float>(" << col << ", " << value << ");\n";
                             }
                             obj.set<Float>(col, value);
                         }
                         else if (type == type_Double) {
                             double value = get_next(s);
                             if (log) {
-                                *log << "obj.set<double>(" << col << ", " << value << ");\n";
+                                (*log).get() << "obj.set<double>(" << col << ", " << value << ");\n";
                             }
                             obj.set<double>(col, value);
                         }
@@ -543,7 +543,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             if (target->size() > 0) {
                                 ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
                                 if (log) {
-                                    *log << "obj.set<Key>(" << col << ", " << target_key << ");\n";
+                                    (*log).get() << "obj.set<Key>(" << col << ", " << target_key << ");\n";
                                 }
                                 obj.set(col, target_key);
                             }
@@ -557,14 +557,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 if (links.size() > 0 && get_next(s) > 128) {
                                     size_t linklist_row = get_next(s) % links.size();
                                     if (log) {
-                                        *log << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", "
+                                        (*log).get() << "obj.get_linklist(" << col << ")->set(" << linklist_row << ", "
                                              << target_key << ");\n";
                                     }
                                     links.set(linklist_row, target_key);
                                 }
                                 else {
                                     if (log) {
-                                        *log << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
+                                        (*log).get() << "obj.get_linklist(" << col << ")->add(" << target_key << ");\n";
                                     }
                                     links.add(target_key);
                                 }
@@ -574,13 +574,13 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             std::pair<int64_t, int32_t> values = get_timestamp_values(s);
                             Timestamp value{values.first, values.second};
                             if (log) {
-                                *log << "obj.set(" << col << ", " << value << ");\n";
+                                (*log).get() << "obj.set(" << col << ", " << value << ");\n";
                             }
                             obj.set(col, value);
                         }
                     }
                     if (log) {
-                        *log << "}\n";
+                        (*log).get() << "}\n";
                     }
                 }
             }
@@ -590,7 +590,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (t->size() > 0) {
                     ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->remove_object(" << key << ");\n";
+                        (*log).get() << "wt->get_table(" << table_key << ")->remove_object(" << key << ");\n";
                     }
                     t->remove_object(key);
                 }
@@ -601,7 +601,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (t->size() > 0) {
                     ObjKey key = t->get_object(get_next(s) % t->size()).get_key();
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->remove_object_recursive(" << key << ");\n";
+                        (*log).get() << "wt->get_table(" << table_key << ")->remove_object_recursive(" << key << ");\n";
                     }
                     t->remove_object_recursive(key);
                 }
@@ -614,58 +614,58 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     size_t ndx = get_next(s) % all_col_keys.size();
                     ColKey col = all_col_keys[ndx];
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->enumerate_string_column(" << col << ");\n";
+                        (*log).get() << "wt->get_table(" << table_key << ")->enumerate_string_column(" << col << ");\n";
                     }
                     wt->get_table(table_key)->enumerate_string_column(col);
                 }
             }
             else if (instr == COMMIT) {
                 if (log) {
-                    *log << "wt->commit_and_continue_as_read();\n";
+                    (*log).get() << "wt->commit_and_continue_as_read();\n";
                 }
                 wt->commit_and_continue_as_read();
                 REALM_DO_IF_VERIFY(log, wt->verify());
                 if (log) {
-                    *log << "wt->promote_to_write();\n";
+                    (*log).get() << "wt->promote_to_write();\n";
                 }
                 wt->promote_to_write();
                 REALM_DO_IF_VERIFY(log, wt->verify());
             }
             else if (instr == ROLLBACK) {
                 if (log) {
-                    *log << "wt->rollback_and_continue_as_read();\n";
+                    (*log).get() << "wt->rollback_and_continue_as_read();\n";
                 }
                 wt->rollback_and_continue_as_read();
                 REALM_DO_IF_VERIFY(log, wt->verify());
                 if (log) {
-                    *log << "wt->promote_to_write();\n";
+                    (*log).get() << "wt->promote_to_write();\n";
                 }
                 wt->promote_to_write();
                 REALM_DO_IF_VERIFY(log, wt->verify());
             }
             else if (instr == ADVANCE) {
                 if (log) {
-                    *log << "rt->advance_read();\n";
+                    (*log).get() << "rt->advance_read();\n";
                 }
                 rt->advance_read();
                 REALM_DO_IF_VERIFY(log, rt->verify());
             }
             else if (instr == CLOSE_AND_REOPEN) {
                 if (log) {
-                    *log << "wt = nullptr;\n";
-                    *log << "rt = nullptr;\n";
-                    *log << "db->close();\n";
+                    (*log).get() << "wt = nullptr;\n";
+                    (*log).get() << "rt = nullptr;\n";
+                    (*log).get() << "db->close();\n";
                 }
                 wt = nullptr; // transactions must be done/closed before closing the DB.
                 rt = nullptr;
                 db->close();
                 if (log) {
-                    *log << "db = DB::create(*hist, DBOptions(key));\n";
+                    (*log).get() << "db = DB::create(*hist, DBOptions(key));\n";
                 }
                 db = DB::create(*hist, DBOptions(encryption_key));
                 if (log) {
-                    *log << "wt = db_w->start_write();\n";
-                    *log << "rt = db->start_read();\n";
+                    (*log).get() << "wt = db_w->start_write();\n";
+                    (*log).get() << "rt = db->start_read();\n";
                 }
                 rt = db->start_read();
                 wt = db->start_write();
@@ -686,7 +686,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t = wt->get_table(table_key);
                 if (log) {
-                    *log << "table_views.push_back(wt->get_table(" << table_key << ")->where().find_all());\n";
+                    (*log).get() << "table_views.push_back(wt->get_table(" << table_key << ")->where().find_all());\n";
                 }
                 TableView tv = t->where().find_all();
                 table_views.push_back(tv);
@@ -731,7 +731,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     ColKey col = all_col_keys[ndx];
                     ObjKey key = t->get_object(get_int32(s) % t->size()).get_key();
                     if (log) {
-                        *log << "wt->get_table(" << table_key << ")->get_object(" << key << ").is_null(" << col
+                        (*log).get() << "wt->get_table(" << table_key << ")->get_object(" << key << ").is_null(" << col
                              << ");\n";
                     }
                     bool res = t->get_object(key).is_null(col);
@@ -762,7 +762,7 @@ void usage(const char* argv[])
 
 int run_fuzzy(int argc, const char* argv[])
 {
-    util::Optional<std::ostream&> log;
+    std::optional<std::reference_wrapper<std::ostream>> log;
     std::string name = "fuzz-test";
     std::string prefix = "./";
     bool file_names_from_stdin = false;
@@ -771,7 +771,7 @@ int run_fuzzy(int argc, const char* argv[])
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
-            log = util::some<std::ostream&>(std::cout);
+            log = std::make_optional<std::reference_wrapper<std::ostream>>(std::cout);
         }
         else if (arg == "--") {
             file_names_from_stdin = true;

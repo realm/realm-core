@@ -32,6 +32,7 @@
 #include <realm/array_ref.hpp>
 #include <realm/array_object_id.hpp>
 #include <realm/array_decimal128.hpp>
+#include <realm/util/optional.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4250) // Suppress 'inherits ... via dominance' on MSVC
@@ -101,7 +102,7 @@ public:
     // Modifies a vector of indices so that they refer to distinct values.
     // If 'sort_order' is supplied, the indices will refer to values in sort order,
     // otherwise the indices will be in original order.
-    virtual void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const = 0;
+    virtual void distinct(std::vector<size_t>& indices, std::optional<bool> sort_order = std::nullopt) const = 0;
 
     bool is_empty() const
     {
@@ -302,7 +303,7 @@ inline void check_column_type<Int>(ColKey col)
 }
 
 template <>
-inline void check_column_type<util::Optional<Int>>(ColKey col)
+inline void check_column_type<std::optional<Int>>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
         throw LogicError(LogicError::list_type_mismatch);
@@ -353,7 +354,7 @@ public:
     Mixed avg(size_t* return_cnt = nullptr) const final;
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
-    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+    void distinct(std::vector<size_t>& indices, std::optional<bool> sort_order = std::nullopt) const final;
 
     T get(size_t ndx) const
     {

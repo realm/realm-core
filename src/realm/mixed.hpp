@@ -32,6 +32,7 @@
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/utilities.hpp>
 
 namespace realm {
@@ -107,7 +108,7 @@ public:
     {
     }
 
-    Mixed(util::None) noexcept
+    Mixed(std::nullopt_t) noexcept
         : Mixed()
     {
     }
@@ -120,16 +121,16 @@ public:
     Mixed(bool) noexcept;
     Mixed(float) noexcept;
     Mixed(double) noexcept;
-    Mixed(util::Optional<int64_t>) noexcept;
-    Mixed(util::Optional<bool>) noexcept;
-    Mixed(util::Optional<float>) noexcept;
-    Mixed(util::Optional<double>) noexcept;
+    Mixed(std::optional<int64_t>) noexcept;
+    Mixed(std::optional<bool>) noexcept;
+    Mixed(std::optional<float>) noexcept;
+    Mixed(std::optional<double>) noexcept;
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
     Mixed(Timestamp) noexcept;
     Mixed(Decimal128);
     Mixed(ObjectId) noexcept;
-    Mixed(util::Optional<ObjectId>) noexcept;
+    Mixed(std::optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -159,6 +160,10 @@ public:
 
     template <class T>
     T get() const noexcept;
+//    template <class T>
+//    std::optional<T> get() const noexcept;
+//    template <typename T, std::enable_if<util::is_optional<T>::value>>
+//    T get() const noexcept;
 
     // These functions are kept to be backwards compatible
     int64_t get_int() const;
@@ -231,7 +236,7 @@ inline Mixed::Mixed(double v) noexcept
     double_val = v;
 }
 
-inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
+inline Mixed::Mixed(std::optional<int64_t> v) noexcept
 {
     if (v) {
         m_type = type_Int + 1;
@@ -242,7 +247,7 @@ inline Mixed::Mixed(util::Optional<int64_t> v) noexcept
     }
 }
 
-inline Mixed::Mixed(util::Optional<bool> v) noexcept
+inline Mixed::Mixed(std::optional<bool> v) noexcept
 {
     if (v) {
         m_type = type_Bool + 1;
@@ -253,7 +258,7 @@ inline Mixed::Mixed(util::Optional<bool> v) noexcept
     }
 }
 
-inline Mixed::Mixed(util::Optional<float> v) noexcept
+inline Mixed::Mixed(std::optional<float> v) noexcept
 {
     if (v) {
         m_type = type_Float + 1;
@@ -264,7 +269,7 @@ inline Mixed::Mixed(util::Optional<float> v) noexcept
     }
 }
 
-inline Mixed::Mixed(util::Optional<double> v) noexcept
+inline Mixed::Mixed(std::optional<double> v) noexcept
 {
     if (v) {
         m_type = type_Double + 1;
@@ -275,7 +280,7 @@ inline Mixed::Mixed(util::Optional<double> v) noexcept
     }
 }
 
-inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
+inline Mixed::Mixed(std::optional<ObjectId> v) noexcept
 {
     if (v) {
         m_type = type_ObjectId + 1;
@@ -450,6 +455,20 @@ inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Link);
     return ObjKey(int_val);
+}
+
+template <typename T>
+inline T Mixed::get() const noexcept
+{
+    if constexpr(util::is_optional<T>::value) {
+        if (is_null()) {
+            return std::nullopt;
+        }
+
+        return std::make_optional(get<typename util::RemoveOptional<T>::type>());
+    } else {
+        return get<T>();
+    }
 }
 
 inline bool Mixed::is_null() const

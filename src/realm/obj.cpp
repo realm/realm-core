@@ -116,7 +116,7 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
     switch (DataType(col_key.get_type())) {
         case type_Int:
             if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<Int>>(other, col_ndx);
+                return cmp<std::optional<Int>>(other, col_ndx);
             else
                 return cmp<Int>(other, col_ndx);
         case type_Bool:
@@ -137,7 +137,7 @@ int ConstObj::cmp(const ConstObj& other, ColKey col_key) const
             return cmp<Decimal128>(other, col_ndx);
         case type_ObjectId:
             if (attr.test(col_attr_Nullable))
-                return cmp<util::Optional<ObjectId>>(other, col_ndx);
+                return cmp<std::optional<ObjectId>>(other, col_ndx);
             else
                 return cmp<ObjectId>(other, col_ndx);
         case type_Link:
@@ -328,7 +328,7 @@ int64_t ConstObj::get<int64_t>(ColKey col_key) const
     REALM_ASSERT(type == col_type_Int);
 
     if (col_key.get_attrs().test(col_attr_Nullable)) {
-        auto val = _get<util::Optional<int64_t>>(col_key.get_index());
+        auto val = _get<std::optional<int64_t>>(col_key.get_index());
         if (!val) {
             throw std::runtime_error("Cannot return null value");
         }
@@ -347,7 +347,7 @@ bool ConstObj::get<bool>(ColKey col_key) const
     REALM_ASSERT(type == col_type_Bool);
 
     if (col_key.get_attrs().test(col_attr_Nullable)) {
-        auto val = _get<util::Optional<bool>>(col_key.get_index());
+        auto val = _get<std::optional<bool>>(col_key.get_index());
         if (!val) {
             throw std::runtime_error("Cannot return null value");
         }
@@ -404,17 +404,17 @@ Mixed ConstObj::get_any(ColKey col_key) const
     switch (col_key.get_type()) {
         case col_type_Int:
             if (col_key.get_attrs().test(col_attr_Nullable)) {
-                return Mixed{_get<util::Optional<int64_t>>(col_ndx)};
+                return Mixed{_get<std::optional<int64_t>>(col_ndx)};
             }
             else {
                 return Mixed{_get<int64_t>(col_ndx)};
             }
         case col_type_Bool:
-            return Mixed{_get<util::Optional<bool>>(col_ndx)};
+            return Mixed{_get<std::optional<bool>>(col_ndx)};
         case col_type_Float:
-            return Mixed{_get<util::Optional<float>>(col_ndx)};
+            return Mixed{_get<std::optional<float>>(col_ndx)};
         case col_type_Double:
-            return Mixed{_get<util::Optional<double>>(col_ndx)};
+            return Mixed{_get<std::optional<double>>(col_ndx)};
         case col_type_String:
             return Mixed{_get<String>(col_ndx)};
         case col_type_Binary:
@@ -426,7 +426,7 @@ Mixed ConstObj::get_any(ColKey col_key) const
         case col_type_Decimal:
             return Mixed{_get<Decimal128>(col_ndx)};
         case col_type_ObjectId:
-            return Mixed{_get<util::Optional<ObjectId>>(col_ndx)};
+            return Mixed{_get<std::optional<ObjectId>>(col_ndx)};
         case col_type_Link:
             return Mixed{_get<ObjKey>(col_ndx)};
         default:
@@ -904,7 +904,7 @@ Obj& Obj::set(ColKey col_key, Mixed value)
         switch (col_key.get_type()) {
             case col_type_Int:
                 if (col_key.get_attrs().test(col_attr_Nullable)) {
-                    set(col_key, util::Optional<Int>(value.get_int()));
+                    set(col_key, std::optional<Int>(value.get_int()));
                 }
                 else {
                     set(col_key, value.get_int());
@@ -1016,7 +1016,7 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         ArrayIntNull values(alloc);
         values.set_parent(&fields, col_ndx.val + 1);
         values.init_from_parent();
-        util::Optional<int64_t> old = values.get(m_row_ndx);
+        std::optional<int64_t> old = values.get(m_row_ndx);
         if (old) {
             auto new_val = add_wrap(*old, value);
             if (StringIndex* index = m_table->get_search_index(col_key)) {
@@ -1468,17 +1468,17 @@ void Obj::assign_pk_and_backlinks(const ConstObj& other)
     m_table->for_each_backlink_column(copy_links);
 }
 
-template util::Optional<int64_t> ConstObj::get<util::Optional<int64_t>>(ColKey col_key) const;
-template util::Optional<Bool> ConstObj::get<util::Optional<Bool>>(ColKey col_key) const;
+template std::optional<int64_t> ConstObj::get<std::optional<int64_t>>(ColKey col_key) const;
+template std::optional<Bool> ConstObj::get<std::optional<Bool>>(ColKey col_key) const;
 template float ConstObj::get<float>(ColKey col_key) const;
-template util::Optional<float> ConstObj::get<util::Optional<float>>(ColKey col_key) const;
+template std::optional<float> ConstObj::get<std::optional<float>>(ColKey col_key) const;
 template double ConstObj::get<double>(ColKey col_key) const;
-template util::Optional<double> ConstObj::get<util::Optional<double>>(ColKey col_key) const;
+template std::optional<double> ConstObj::get<std::optional<double>>(ColKey col_key) const;
 template StringData ConstObj::get<StringData>(ColKey col_key) const;
 template BinaryData ConstObj::get<BinaryData>(ColKey col_key) const;
 template Timestamp ConstObj::get<Timestamp>(ColKey col_key) const;
 template ObjectId ConstObj::get<ObjectId>(ColKey col_key) const;
-template util::Optional<ObjectId> ConstObj::get<util::Optional<ObjectId>>(ColKey col_key) const;
+template std::optional<ObjectId> ConstObj::get<std::optional<ObjectId>>(ColKey col_key) const;
 template ObjKey ConstObj::get<ObjKey>(ColKey col_key) const;
 template Decimal128 ConstObj::get<Decimal128>(ColKey col_key) const;
 

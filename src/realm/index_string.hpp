@@ -189,12 +189,12 @@ public:
     template <class T>
     void insert(ObjKey key, T value);
     template <class T>
-    void insert(ObjKey key, util::Optional<T> value);
+    void insert(ObjKey key, std::optional<T> value);
 
     template <class T>
     void set(ObjKey key, T new_value);
     template <class T>
-    void set(ObjKey key, util::Optional<T> new_value);
+    void set(ObjKey key, std::optional<T> new_value);
 
     void erase(ObjKey key);
 
@@ -379,8 +379,8 @@ struct GetIndexData<null> {
 };
 
 template <class T>
-struct GetIndexData<util::Optional<T>> {
-    static StringData get_index_data(const util::Optional<T>& value, StringConversionBuffer& buffer)
+struct GetIndexData<std::optional<T>> {
+    static StringData get_index_data(const std::optional<T>& value, StringConversionBuffer& buffer)
     {
         if (value)
             return GetIndexData<T>::get_index_data(*value, buffer);
@@ -500,7 +500,7 @@ void StringIndex::insert(ObjKey key, T value)
 }
 
 template <class T>
-void StringIndex::insert(ObjKey key, util::Optional<T> value)
+void StringIndex::insert(ObjKey key, std::optional<T> value)
 {
     if (value) {
         insert(key, *value);
@@ -531,7 +531,7 @@ void StringIndex::set(ObjKey key, T new_value)
 }
 
 template <class T>
-void StringIndex::set(ObjKey key, util::Optional<T> new_value)
+void StringIndex::set(ObjKey key, std::optional<T> new_value)
 {
     if (new_value) {
         set(key, *new_value);

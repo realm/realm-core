@@ -21,9 +21,9 @@
 
 #include <cmath>
 #include <cstring>
+#include <optional>
 
 #include <realm/util/features.h>
-#include <realm/util/optional.hpp>
 #include <realm/utilities.hpp>
 #include <realm/exceptions.hpp>
 
@@ -64,11 +64,11 @@ struct null {
     {
         throw(LogicError::type_mismatch);
     }
-    template <class T>
-    operator util::Optional<T>()
-    {
-        return util::none;
-    }
+//    template <class T>
+//    operator std::optional<T>()
+//    {
+//        return std::nullopt;
+//    }
 
     template <class T>
     bool operator==(const T&) const
