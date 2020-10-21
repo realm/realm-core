@@ -2074,4 +2074,48 @@ TEST(Transform_ArrayEraseVsArrayErase)
     server->integrate_next_changeset_from(*client_5);
 }
 
+TEST(Transform_RSYNC_143)
+{
+    // Divergence between Create-Set-Erase and Create.
+
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    Associativity assoc{test_context, 2, changeset_dump_dir_gen.get()};
+    assoc.for_each_permutation([&](auto& it) {
+        auto server = &*it.server;
+        auto client_1 = &*it.clients[0];
+        auto client_2 = &*it.clients[1];
+
+        // Create baseline
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+            table->add_column(type_Int, "int");
+        });
+
+        it.sync_all();
+
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj = table->create_object_with_primary_key(123);
+            obj.set("int", 500);
+            obj.remove();
+        });
+
+        client_2->history.advance_time(1);
+        client_2->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            table->create_object_with_primary_key(123);
+        });
+
+        it.sync_all();
+
+        ReadTransaction rt{server->shared_group};
+        auto table = rt.get_table("class_Table");
+        auto obj = table->get_object_with_primary_key(123);
+        CHECK_EQUAL(obj.get<int64_t>("int"), 0);
+    });
+}
+
 } // unnamed namespace
