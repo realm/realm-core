@@ -1438,6 +1438,69 @@ bool Group::operator==(const Group& g) const
     }
     return true;
 }
+void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "[" << std::endl;
+
+    auto keys = get_table_keys();
+    int sz = int(keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto key = keys[i];
+        ConstTableRef table = get_table(key);
+
+        table->schema_to_json(out, renames);
+        if (i < sz - 1)
+            out << ",";
+        out << std::endl;
+    }
+
+    out << "]" << std::endl;
+}
+
+void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
+                    JSONOutputMode output_mode) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "{" << std::endl;
+
+    auto keys = get_table_keys();
+    bool first = true;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        StringData name = get_table_name(key);
+        if (renames[name] != "")
+            name = renames[name];
+
+        ConstTableRef table = get_table(key);
+
+        if (!table->is_embedded()) {
+            if (!first)
+                out << ",";
+            out << "\"" << name << "\"";
+            out << ":";
+            table->to_json(out, link_depth, renames, output_mode);
+            out << std::endl;
+            first = false;
+        }
+    }
+
+    out << "}" << std::endl;
+}
 
 namespace {
 

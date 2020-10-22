@@ -964,13 +964,13 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 }
 
 } // anonymous namespace
-void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                   std::vector<ColKey>& followed, JSONOutputMode output_mode) const
 {
     StringData name = "_key";
     bool prefixComma = false;
-    if (renames[name] != "")
-        name = renames[name];
+    if (renames.count(name))
+        name = renames.at(name);
     out << "{";
     if (output_mode == output_mode_json) {
         prefixComma = true;
@@ -981,8 +981,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
         auto type = ck.get_type();
-        if (renames[name] != "")
-            name = renames[name];
+        if (renames.count(name))
+            name = renames.at(name);
 
         if (prefixComma)
             out << ",";
@@ -1169,13 +1169,13 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
 std::string Obj::to_string() const
 {
     std::ostringstream ostr;
-    to_json(ostr, 0, nullptr);
+    to_json(ostr, 0, {});
     return ostr.str();
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Obj& obj)
 {
-    obj.to_json(ostr, -1, nullptr);
+    obj.to_json(ostr, -1, {});
     return ostr;
 }
 

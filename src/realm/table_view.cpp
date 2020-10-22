@@ -379,8 +379,7 @@ size_t ConstTableView::count_decimal(ColKey column_key, Decimal128 target) const
     return aggregate_count<Decimal128>(column_key, target);
 }
 
-void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames,
-                             JSONOutputMode output_mode) const
+void ConstTableView::to_json(std::ostream& out, size_t link_depth) const
 {
     // Represent table as list of objects
     out << "[";
@@ -395,7 +394,7 @@ void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std:
             else {
                 out << ",";
             }
-            m_table->get_object(key).to_json(out, link_depth, renames, output_mode);
+            m_table->get_object(key).to_json(out, link_depth, {}, output_mode_json);
         }
     }
 

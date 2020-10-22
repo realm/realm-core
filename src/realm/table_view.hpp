@@ -286,8 +286,7 @@ public:
     }
 
     // Conversion
-    void to_json(std::ostream&, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
-                 JSONOutputMode output_mode = output_mode_json) const;
+    void to_json(std::ostream&, size_t link_depth = 0) const;
 
     // Determine if the view is 'in sync' with the underlying table
     // as well as other views used to generate the view. Note that updates
