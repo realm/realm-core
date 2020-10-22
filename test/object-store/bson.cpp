@@ -42,12 +42,9 @@ static inline std::string remove_whitespace(const char* c)
  ======== BSON CORPUS ========
  */
 template <typename T>
-using CorpusCheck = void (*)(T);
-
-template <typename T>
 struct CorpusEntry {
     const char* canonical_extjson;
-    CorpusCheck<T> check;
+    std::function<void(T)> check;
     bool lossy;
 };
 
