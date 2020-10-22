@@ -2533,8 +2533,67 @@ void Table::update_from_parent() noexcept
     m_alloc.bump_storage_version();
 }
 
+void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const
+{
+    out << "{";
+    auto name = get_name();
+    if (renames.count(name))
+        name = renames.at(name);
+    out << "\"name\":\"" << name << "\"";
+    if (this->m_primary_key_col) {
+        out << ",";
+        out << "\"primaryKey\":\"" << this->get_column_name(m_primary_key_col) << "\"";
+    }
+    if (is_embedded()) {
+        out << ",\"isEmbedded\":true";
+    }
+    out << ",\"properties\":[";
+    auto col_keys = get_column_keys();
+    int sz = int(col_keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto col_key = col_keys[i];
+        name = get_column_name(col_key);
+        auto type = col_key.get_type();
+        if (renames.count(name))
+            name = renames.at(name);
+        out << "{";
+        out << "\"name\":\"" << name << "\"";
+        if (this->is_link_type(type)) {
+            out << ",\"type\":\"object\"";
+            name = this->get_opposite_table(col_key)->get_name();
+            if (renames.count(name))
+                name = renames.at(name);
+            out << ",\"objectType\":\"" << name << "\"";
+        }
+        else {
+            out << ",\"type\":\"" << get_data_type_name(DataType(type)) << "\"";
+        }
+        if (col_key.is_list()) {
+            out << ",\"isArray\":true";
+        }
+        else if (col_key.is_set()) {
+            out << ",\"isSet\":true";
+        }
+        else if (col_key.is_dictionary()) {
+            out << ",\"isMap\":true";
+            auto key_type = get_dictionary_key_type(col_key);
+            out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
+        }
+        if (col_key.is_nullable()) {
+            out << ",\"isOptional\":true";
+        }
+        if (has_search_index(col_key)) {
+            out << ",\"isIndexed\":true";
+        }
+        out << "}";
+        if (i < sz - 1) {
+            out << ",";
+        }
+    }
+    out << "]}";
+}
 
-void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames,
+void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                     JSONOutputMode output_mode) const
 {
     // Represent table as list of objects

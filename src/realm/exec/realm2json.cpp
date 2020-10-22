@@ -7,6 +7,7 @@ const char* legend =
     "  realm2json [--link-depth N] [--output-mode N] <.realm file>\n"
     "\n"
     "Options:\n"
+    " --schema: Just output the schema of the realm\n"
     " --link-depth: How deep to traverse linking objects (use -1 for infinite). See test_json.cpp "
     "for more details. Defaults to 0.\n"
     " --output-mode: Optional formatting for the output \n"
@@ -41,6 +42,7 @@ int main(int argc, char const* argv[])
 {
     std::map<std::string, std::string> renames;
     size_t link_depth = 0;
+    bool output_schema = false;
     realm::JSONOutputMode output_mode = realm::output_mode_json;
 
     abort_if(argc <= 1, legend);
@@ -48,7 +50,10 @@ int main(int argc, char const* argv[])
     // Parse from 1'st argument until before source args
     for (int idx = 1; idx < argc - 1; ++idx) {
         realm::StringData arg(argv[idx]);
-        if (arg == "--link-depth") {
+        if (arg == "--schema") {
+            output_schema = true;
+        }
+        else if (arg == "--link-depth") {
             link_depth = strtol(argv[++idx], nullptr, 0);
         }
         else if (arg == "--output-mode") {
@@ -81,7 +86,12 @@ int main(int argc, char const* argv[])
         // First we try to open in read_only mode. In this way we can also open
         // realms with a client history
         realm::Group g(path);
-        g.to_json(std::cout, link_depth, &renames, output_mode);
+        if (output_schema) {
+            g.schema_to_json(std::cout, &renames);
+        }
+        else {
+            g.to_json(std::cout, link_depth, &renames, output_mode);
+        }
     }
     catch (const realm::FileFormatUpgradeRequired& e) {
         // In realm history

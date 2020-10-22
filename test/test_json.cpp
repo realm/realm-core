@@ -202,13 +202,15 @@ bool json_test(std::string json, std::string expected_file, bool generate)
 }
 
 
+std::map<std::string, std::string> no_renames;
+
 TEST(Json_NoLinks)
 {
     Table table;
     setup_multi_table(table, 15);
 
     std::stringstream ss;
-    table.to_json(ss);
+    table.to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expect_json", generate_all));
     return;
 }
@@ -219,7 +221,7 @@ TEST(Xjson_NoLinks)
     setup_multi_table(table, 15);
 
     std::stringstream ss;
-    table.to_json(ss, 0, nullptr, output_mode_xjson);
+    table.to_json(ss, 0, no_renames, output_mode_xjson);
 
     CHECK(json_test(ss.str(), "expect_xjson", generate_all));
     return;
@@ -231,7 +233,7 @@ TEST(Xjson_Plus_NoLinks)
     setup_multi_table(table, 15);
 
     std::stringstream ss;
-    table.to_json(ss, 0, nullptr, output_mode_xjson_plus);
+    table.to_json(ss, 0, no_renames, output_mode_xjson_plus);
 
     CHECK(json_test(ss.str(), "expect_xjson_plus", generate_all));
     return;
@@ -301,23 +303,23 @@ TEST(Json_LinkList1)
     std::stringstream ss;
 
     // Now try different link_depth arguments
-    table1->to_json(ss);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist1_1", generate_all));
 
     ss.str("");
-    table1->to_json(ss, -1);
+    table1->to_json(ss, -1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist1_2", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 0);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist1_3", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 1);
+    table1->to_json(ss, 1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist1_4", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 2);
+    table1->to_json(ss, 2, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist1_5", generate_all));
 
     // Column and table renaming
@@ -326,7 +328,7 @@ TEST(Json_LinkList1)
     m["linkA"] = "LINKA";
     m["table1"] = "TABLE1";
     ss.str("");
-    table1->to_json(ss, 2, &m);
+    table1->to_json(ss, 2, m);
     CHECK(json_test(ss.str(), "expected_json_linklist1_6", generate_all));
 }
 
@@ -362,27 +364,27 @@ TEST(Json_LinkListCycle)
     std::stringstream ss;
 
     // Now try different link_depth arguments
-    table1->to_json(ss);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle1", generate_all));
 
     ss.str("");
-    table1->to_json(ss, -1);
+    table1->to_json(ss, -1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle2", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 0);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle3", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 1);
+    table1->to_json(ss, 1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle4", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 2);
+    table1->to_json(ss, 2, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle5", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 3);
+    table1->to_json(ss, 3, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle6", generate_all));
 }
 
@@ -413,23 +415,23 @@ TEST(Json_LinkCycles)
     std::stringstream ss;
 
     // Now try different link_depth arguments
-    table1->to_json(ss);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_link_cycles1", generate_all));
 
     ss.str("");
-    table1->to_json(ss, -1);
+    table1->to_json(ss, -1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_link_cycles2", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 0);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_link_cycles3", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 1);
+    table1->to_json(ss, 1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_link_cycles4", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 2);
+    table1->to_json(ss, 2, no_renames);
     CHECK(json_test(ss.str(), "expected_json_link_cycles5", generate_all));
 
     // Redo but from a TableView instead of the Table.
@@ -491,11 +493,11 @@ TEST(Xjson_LinkList1)
     std::stringstream ss;
 
     // Now try different link_depth arguments
-    table1->to_json(ss, 0, nullptr, output_mode_xjson);
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_linklist1", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 0, nullptr, output_mode_xjson_plus);
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist1", generate_all));
 
     // Column and table renaming
@@ -504,11 +506,11 @@ TEST(Xjson_LinkList1)
     m["linkA"] = "LINKA";
     m["table1"] = "TABLE1";
     ss.str("");
-    table1->to_json(ss, 2, &m, output_mode_xjson);
+    table1->to_json(ss, 2, m, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_linklist2", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 2, &m, output_mode_xjson_plus);
+    table1->to_json(ss, 2, m, output_mode_xjson_plus);
     CHECK(json_test(ss.str(), "expected_xjson_plus_linklist2", generate_all));
 }
 
@@ -539,22 +541,11 @@ TEST(Xjson_LinkCycles)
     std::stringstream ss;
 
     // Now try different link_depth arguments
-    table1->to_json(ss, 0, nullptr, output_mode_xjson);
+    table1->to_json(ss, 0, no_renames, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_link", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 0, nullptr, output_mode_xjson_plus);
-    CHECK(json_test(ss.str(), "expected_xjson_plus_link", generate_all));
-
-    // Redo but from a TableView instead of the Table.
-    auto tv = table1->where().find_all();
-    // Now try different link_depth arguments
-    ss.str("");
-    tv.to_json(ss, 0, nullptr, output_mode_xjson);
-    CHECK(json_test(ss.str(), "expected_xjson_link", generate_all));
-
-    ss.str("");
-    tv.to_json(ss, 0, nullptr, output_mode_xjson_plus);
+    table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
     CHECK(json_test(ss.str(), "expected_xjson_plus_link", generate_all));
 }
 
@@ -580,8 +571,40 @@ TEST(Json_Nulls)
     table1->create_object();
 
     std::stringstream ss;
-    table1->to_json(ss);
+    table1->to_json(ss, 0, no_renames);
     CHECK(json_test(ss.str(), "expected_json_nulls", generate_all));
+}
+
+TEST(Json_Schema)
+{
+    Group group;
+
+    TableRef persons = group.add_table("person");
+    TableRef dogs = group.add_embedded_table("dog");
+
+    constexpr bool is_nullable = true;
+    persons->add_column(type_String, "name");
+    persons->add_column(type_Bool, "isMarried");
+    persons->add_column(type_Int, "age", is_nullable);
+    persons->add_column_list(type_Timestamp, "dates");
+    persons->add_column_list(*dogs, "pet");
+    dogs->add_column(type_String, "name");
+
+    std::stringstream ss;
+    group.schema_to_json(ss);
+    const std::string json = ss.str();
+    std::string expected =
+        "[\n"
+        "{\"name\":\"person\",\"properties\":["
+        "{\"name\":\"name\",\"type\":\"string\"},"
+        "{\"name\":\"isMarried\",\"type\":\"bool\"},"
+        "{\"name\":\"age\",\"type\":\"int\",\"isOptional\":true},"
+        "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true},"
+        "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true}"
+        "]},\n"
+        "{\"name\":\"dog\",\"isEmbedded\":true,\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
+        "]\n";
+    CHECK_EQUAL(expected, json);
 }
 
 } // anonymous namespace
