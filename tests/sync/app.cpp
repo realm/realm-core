@@ -22,9 +22,9 @@
 #include "sync/app.hpp"
 #include "sync/app_credentials.hpp"
 #include "sync/async_open_task.hpp"
-#include "sync/remote_mongo_client.hpp"
-#include "sync/remote_mongo_database.hpp"
-#include "sync/remote_mongo_collection.hpp"
+#include "sync/mongo_client.hpp"
+#include "sync/mongo_database.hpp"
+#include "sync/mongo_collection.hpp"
 #include "sync/sync_session.hpp"
 
 #include "util/event_loop.hpp"

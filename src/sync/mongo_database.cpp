@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/remote_mongo_database.hpp"
-#include "sync/remote_mongo_collection.hpp"
+#include "sync/mongo_database.hpp"
+#include "sync/mongo_collection.hpp"
 
 namespace realm {
 namespace app {

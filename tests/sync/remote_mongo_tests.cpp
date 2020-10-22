@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/remote_mongo_collection.hpp"
+#include "sync/mongo_collection.hpp"
 
 #include <sstream>
 #include "catch2/catch.hpp"
