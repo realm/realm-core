@@ -21,7 +21,7 @@
 #include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
-#include "sync/remote_mongo_client.hpp"
+#include "sync/mongo_client.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 
