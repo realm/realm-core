@@ -33,7 +33,7 @@ using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const std::string base_path = tmp_dir() + "realm_objectstore_sync_file/";
+static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_file/";
 
 static void prepare_sync_manager_test()
 {

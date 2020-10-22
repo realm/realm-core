@@ -1834,7 +1834,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
                                   "Object Store Platform Version Blah",
                                   "An sdk version"};
 
-    auto base_path = tmp_dir() + app_config.app_id;
+    auto base_path = util::make_temp_dir() + app_config.app_id;
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
     // Heap allocate to control lifecycle.
@@ -3372,7 +3372,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 
         auto config = get_config(generic_factory);
         TestSyncManager::Config cfg(config);
-        cfg.base_path = tmp_dir() + config.app_id;
+        cfg.base_path = util::make_temp_dir() + config.app_id;
         cfg.should_teardown_test_directory = false;
         TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
@@ -3413,7 +3413,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 
         auto config = get_config(generic_factory);
         TestSyncManager::Config cfg(config);
-        cfg.base_path = tmp_dir() + config.app_id;
+        cfg.base_path = util::make_temp_dir() + config.app_id;
         TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
 
@@ -3459,7 +3459,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 
         auto config = get_config(generic_factory);
         TestSyncManager::Config cfg(config);
-        cfg.base_path = tmp_dir() + config.app_id;
+        cfg.base_path = util::make_temp_dir() + config.app_id;
         TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
 
@@ -3550,7 +3550,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]")
 
         auto config = get_config(factory);
         TestSyncManager::Config cfg(config);
-        cfg.base_path = tmp_dir() + config.app_id;
+        cfg.base_path = util::make_temp_dir() + config.app_id;
         TestSyncManager sync_manager(cfg);
         auto app = sync_manager.app();
 

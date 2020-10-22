@@ -180,7 +180,7 @@ TEST_CASE("SharedRealm: get_shared_realm()")
 #ifndef _WIN32
     SECTION("should be able to set a FIFO fallback path")
     {
-        std::string fallback_dir = tmp_dir() + "/fallback/";
+        std::string fallback_dir = util::make_temp_dir() + "/fallback/";
         realm::util::try_make_dir(fallback_dir);
         TestFile config;
         config.fifo_files_fallback_path = fallback_dir;
@@ -200,7 +200,7 @@ TEST_CASE("SharedRealm: get_shared_realm()")
 
     SECTION("automatically append dir separator to end of fallback path")
     {
-        std::string fallback_dir = tmp_dir() + "/fallback";
+        std::string fallback_dir = util::make_temp_dir() + "/fallback";
         realm::util::try_make_dir(fallback_dir);
         TestFile config;
         config.fifo_files_fallback_path = fallback_dir;

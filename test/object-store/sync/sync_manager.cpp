@@ -31,7 +31,7 @@ using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const std::string base_path = tmp_dir() + "realm_objectstore_sync_manager/";
+static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_manager/";
 static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
