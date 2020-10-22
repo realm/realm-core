@@ -22,6 +22,7 @@
 #include <cstdlib> // itoa()
 #include <limits>
 #include <vector>
+#include <chrono>
 
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
@@ -36,6 +37,7 @@
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
+using namespace std::chrono;
 
 
 // Test independence and thread-safety
@@ -5306,6 +5308,27 @@ TEST(Query_AllocatorBug)
     // one in "foo" (that was the error)
     auto cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
     CHECK_EQUAL(cnt, 421);
+}
+
+TEST(Query_StringNodeEqualBaseBug)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_type = table->add_column(type_String, "type");
+    auto col_tags = table->add_column(type_String, "tags");
+    table->add_search_index(col_type);
+
+    // Create 2 clusters
+    for (int i = 0; i < 500; i++) {
+        table->create_object().set(col_type, "project").set(col_tags, "tag001");
+    }
+
+    Query q = table->where().equal(col_type, "test", false).Or().contains(col_tags, "tag005", false);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    table->begin()->set(col_type, "task");
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
 }
 
 #endif // TEST_QUERY
