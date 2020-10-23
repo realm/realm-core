@@ -435,6 +435,91 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool is_nullable)
+{
+    switch (col_type) {
+        case col_type_Int: {
+            if (is_nullable) {
+                BPlusTree<util::Optional<Int>> list(alloc);
+                list.init_from_ref(ref);
+                return list.size();
+            }
+            else {
+                BPlusTree<Int> list(alloc);
+                list.init_from_ref(ref);
+                return list.size();
+            }
+        }
+        case col_type_Bool: {
+            BPlusTree<Bool> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_String: {
+            BPlusTree<String> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Binary: {
+            BPlusTree<Binary> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Mixed: {
+            BPlusTree<Mixed> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Timestamp: {
+            BPlusTree<Timestamp> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Float: {
+            BPlusTree<Float> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Double: {
+            BPlusTree<Double> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Decimal: {
+            BPlusTree<Decimal128> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_ObjectId: {
+            BPlusTree<util::Optional<ObjectId>> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_UUID: {
+            BPlusTree<util::Optional<UUID>> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_LinkList: {
+            BPlusTree<ObjKey> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+
+        case col_type_OldTable:
+            [[fallthrough]];
+        case col_type_TypedLink:
+            [[fallthrough]];
+        case col_type_Link:
+            [[fallthrough]];
+        case col_type_BackLink:
+            [[fallthrough]];
+        case col_type_OldDateTime:
+            REALM_ASSERT(false);
+            return 0;
+    }
+}
+
 } // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)

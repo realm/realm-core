@@ -60,7 +60,6 @@ class BasicArrayNull;
 struct Link;
 template <class>
 class Lst;
-struct SizeOfList;
 
 template <class T>
 struct ColumnTypeTraits;
@@ -255,11 +254,6 @@ struct ColumnTypeTraits<util::Optional<UUID>> {
     using cluster_leaf_type = ArrayFixedBytesNull<UUID, UUID::num_bytes>;
     static const DataType id = type_UUID;
     static const ColumnType column_id = col_type_UUID;
-};
-
-template <>
-struct ColumnTypeTraits<SizeOfList> {
-    static const DataType id = type_Int;
 };
 
 template <>

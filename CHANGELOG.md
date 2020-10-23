@@ -8,6 +8,7 @@
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
 * Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
 * Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, (since v6.0.0).
+* Fix queries for the size of a list of primitive nullable ints returning size + 1. This applies to the `Query::size_*` methods (SizeListNode) and not query expression syntax (SizeOperator). (since v6.0.0).
 
 ### Breaking changes
 * None.
