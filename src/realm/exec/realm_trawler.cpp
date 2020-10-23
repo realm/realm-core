@@ -260,6 +260,15 @@ public:
                 // Must be a Core-6 file.
                 m_opposite_table.init(alloc, get_ref(7));
             }
+            if (size() > 11) {
+                auto pk_col = get_val(11);
+                if (pk_col)
+                    m_pk_col = realm::ColKey(pk_col);
+            }
+            if (size() > 12) {
+                auto flags = get_val(12);
+                m_is_embedded = flags & 0x1;
+            }
         }
     }
     void print_columns(const Group&) const;
@@ -289,6 +298,8 @@ private:
     Array m_column_subspecs;
     Array m_column_colkeys;
     Array m_opposite_table;
+    realm::ColKey m_pk_col;
+    bool m_is_embedded = false;
 };
 
 class Group : public Array {
@@ -441,6 +452,8 @@ std::ostream& operator<<(std::ostream& ostr, const Group& g)
 
 void Table::print_columns(const Group& group) const
 {
+    if (m_is_embedded)
+        std::cout << "        <embedded>" << std::endl;
     for (unsigned i = 0; i < m_column_names.size(); i++) {
         auto type = realm::ColumnType(m_column_types.get_val(i));
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
@@ -477,7 +490,8 @@ void Table::print_columns(const Group& group) const
             if (attr & realm::col_attr_Indexed)
                 type_str += " (indexed)";
         }
-        std::cout << "        " << i << ": " << m_column_names.get_string(i) << ": " << type_str << std::endl;
+        std::string star = (m_pk_col && (m_pk_col == col_key)) ? "*" : "";
+        std::cout << "        " << i << ": " << star << m_column_names.get_string(i) << ": " << type_str << std::endl;
     }
 }
 

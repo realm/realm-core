@@ -2499,30 +2499,24 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
 }
 
 
-void Table::update_from_parent(size_t old_baseline) noexcept
+void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        if (!m_top.update_from_parent(old_baseline))
-            return;
-
-        m_spec.update_from_parent(old_baseline);
-        if (m_top.size() > top_position_for_cluster_tree) {
-            m_clusters.update_from_parent(old_baseline);
-        }
-        if (m_top.size() > top_position_for_search_indexes) {
-            if (m_index_refs.update_from_parent(old_baseline)) {
-                for (auto index : m_index_accessors) {
-                    if (index != nullptr) {
-                        index->update_from_parent(old_baseline);
-                    }
-                }
+        m_top.update_from_parent();
+        m_spec.update_from_parent();
+        m_clusters.update_from_parent();
+        m_index_refs.update_from_parent();
+        for (auto index : m_index_accessors) {
+            if (index != nullptr) {
+                index->update_from_parent();
             }
         }
+        // FIXME: REMOVE CONDITIONAL CHECKS?
         if (m_top.size() > top_position_for_opposite_table)
-            m_opposite_table.update_from_parent(old_baseline);
+            m_opposite_table.update_from_parent();
         if (m_top.size() > top_position_for_opposite_column)
-            m_opposite_column.update_from_parent(old_baseline);
+            m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
@@ -2530,6 +2524,9 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         else {
             m_is_embedded = false;
         }
+        if (m_tombstones)
+            m_tombstones->update_from_parent();
+
         refresh_content_version();
         m_has_any_embedded_objects.reset();
     }
@@ -2653,6 +2650,8 @@ void Table::refresh_accessor_tree()
     else {
         m_is_embedded = false;
     }
+    if (m_tombstones)
+        m_tombstones->init_from_parent();
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
@@ -2717,6 +2716,8 @@ void Table::verify() const
         m_top.verify();
     m_spec.verify();
     m_clusters.verify();
+    if (nb_unresolved())
+        m_tombstones->verify();
 #endif
 }
 
@@ -3215,7 +3216,9 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
 
 void Table::dump_objects()
 {
-    return m_clusters.dump_objects();
+    m_clusters.dump_objects();
+    if (nb_unresolved())
+        m_tombstones->dump_objects();
 }
 
 void Table::remove_object(ObjKey key)
