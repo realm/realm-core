@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REMOTE_MONGO_DATABASE_HPP
-#define REMOTE_MONGO_DATABASE_HPP
+#ifndef MONGO_DATABASE_HPP
+#define MONGO_DATABASE_HPP
 
 #include <external/json/json.hpp>
 #include <string>
@@ -74,4 +74,4 @@ private:
 } // namespace app
 } // namespace realm
 
-#endif /* remote_mongo_database_h */
+#endif /* mongo_database_h */

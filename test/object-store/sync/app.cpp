@@ -22,9 +22,9 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
-#include <realm/object-store/sync/remote_mongo_client.hpp>
-#include <realm/object-store/sync/remote_mongo_database.hpp>
-#include <realm/object-store/sync/remote_mongo_collection.hpp>
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
 #include "util/event_loop.hpp"

@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REMOTE_MONGO_CLIENT_HPP
-#define REMOTE_MONGO_CLIENT_HPP
+#ifndef MONGO_CLIENT_HPP
+#define MONGO_CLIENT_HPP
 
 #include <realm/object-store/sync/app_service_client.hpp>
 #include <string>
@@ -29,7 +29,7 @@ namespace app {
 
 class MongoDatabase;
 
-/// A client responsible for communication with the Stitch API
+/// A client responsible for communication with a remote MongoDB database.
 class MongoClient {
 public:
     ~MongoClient() = default;
@@ -38,11 +38,11 @@ public:
     MongoClient& operator=(const MongoClient&) = default;
     MongoClient& operator=(MongoClient&&) = default;
 
-    /// Gets a `RemoteMongoDatabase` instance for the given database name.
+    /// Gets a `MongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     MongoDatabase operator[](const std::string& name);
 
-    /// Gets a `RemoteMongoDatabase` instance for the given database name.
+    /// Gets a `MongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     MongoDatabase db(const std::string& name);
 
@@ -64,4 +64,4 @@ private:
 } // namespace app
 } // namespace realm
 
-#endif /* remote_mongo_client_hpp */
+#endif /* mongo_client_hpp */

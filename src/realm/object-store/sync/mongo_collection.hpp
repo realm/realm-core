@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REMOTE_MONGO_COLLECTION_HPP
-#define REMOTE_MONGO_COLLECTION_HPP
+#ifndef MONGO_COLLECTION_HPP
+#define MONGO_COLLECTION_HPP
 
 #include <realm/object-store/sync/app_service_client.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
@@ -57,7 +57,7 @@ public:
     };
 
     /// Options to use when executing a `find_one_and_update`, `find_one_and_replace`,
-    /// or `find_one_and_delete` command on a `remote_mongo_collection`.
+    /// or `find_one_and_delete` command on a `mongo_collection`.
     struct FindOneAndModifyOptions {
         /// Limits the fields to return for all matching documents.
         util::Optional<bson::BsonDocument> projection_bson;
@@ -485,4 +485,4 @@ private:
 } // namespace app
 } // namespace realm
 
-#endif /* remote_mongo_collection_h */
+#endif /* mongo_collection_h */
