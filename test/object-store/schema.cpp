@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -80,8 +81,6 @@ struct StringMaker<SchemaChange> {
     }
 };
 } // namespace Catch
-
-#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
 TEST_CASE("ObjectSchema")
 {

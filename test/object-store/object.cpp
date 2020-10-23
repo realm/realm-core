@@ -93,12 +93,13 @@ TEST_CASE("object")
     config.schema = Schema{
         {"table",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value 1", PropertyType::Int},
              {"value 2", PropertyType::Int},
          }},
         {"all types",
          {
-             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"bool", PropertyType::Bool},
              {"int", PropertyType::Int},
              {"float", PropertyType::Float},
@@ -125,7 +126,7 @@ TEST_CASE("object")
          }},
         {"all optional types",
          {
-             {"pk", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
              {"bool", PropertyType::Bool | PropertyType::Nullable},
              {"int", PropertyType::Int | PropertyType::Nullable},
              {"float", PropertyType::Float | PropertyType::Nullable},
@@ -150,6 +151,7 @@ TEST_CASE("object")
          }},
         {"link target",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          },
          {
@@ -157,35 +159,36 @@ TEST_CASE("object")
          }},
         {"array target",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
         {"pk after list",
          {
              {"array 1", PropertyType::Array | PropertyType::Object, "array target"},
              {"int 1", PropertyType::Int},
-             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"int 2", PropertyType::Int},
              {"array 2", PropertyType::Array | PropertyType::Object, "array target"},
          }},
         {"nullable int pk",
          {
-             {"pk", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
          }},
         {"nullable string pk",
          {
-             {"pk", PropertyType::String | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"_id", PropertyType::String | PropertyType::Nullable, Property::IsPrimary{true}},
          }},
         {"nullable object id pk",
          {
-             {"pk", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"_id", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
          }},
         {"nullable uuid pk",
          {
-             {"pk", PropertyType::UUID | PropertyType::Nullable, Property::IsPrimary{true}},
+             {"_id", PropertyType::UUID | PropertyType::Nullable, Property::IsPrimary{true}},
          }},
         {"person",
          {
-             {"name", PropertyType::String, Property::IsPrimary{true}},
+             {"_id", PropertyType::String, Property::IsPrimary{true}},
              {"age", PropertyType::Int},
              {"scores", PropertyType::Array | PropertyType::Int},
              {"assistant", PropertyType::Object | PropertyType::Nullable, "person"},
@@ -200,10 +203,10 @@ TEST_CASE("object")
     {
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
-        ObjKeys object_keys({3, 4, 7, 9, 10, 21, 24, 34, 42, 50});
+        std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
         r->begin_transaction();
         for (int i = 0; i < 10; ++i)
-            table->create_object(object_keys[i]).set_all(i);
+            table->create_object_with_primary_key(pks[i]).set("value 1", i).set("value 2", i);
         r->commit_transaction();
 
         auto r2 = coordinator.get_realm();
@@ -363,7 +366,7 @@ TEST_CASE("object")
     SECTION("create object")
     {
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -371,7 +374,7 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-abba-baba-caca-4136c566a962")},
@@ -383,7 +386,7 @@ TEST_CASE("object")
             {"string array", AnyVec{"a"s, "b"s, "c"s}},
             {"data array", AnyVec{"d"s, "e"s, "f"s}},
             {"date array", AnyVec{Timestamp(10, 20), Timestamp(30, 40)}},
-            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+            {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
             {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
@@ -394,7 +397,7 @@ TEST_CASE("object")
         auto table = row.get_table();
         auto target_table = link_target.get_table();
         auto array_target_table = r->read_group().get_table("class_array target");
-        REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
+        REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
         REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
         REQUIRE(row.get<float>(table->get_column_key("float")) == 2.2f);
@@ -448,7 +451,7 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-1111-2222-3333-4136c566a962")},
@@ -460,20 +463,20 @@ TEST_CASE("object")
             {"string array", AnyVec{"a"s, "b"s, "c"s}},
             {"data array", AnyVec{"d"s, "e"s, "f"s}},
             {"date array", AnyVec{}},
-            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+            {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
             {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
         };
 
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"float", 6.6f},
         });
 
         auto row = obj.obj();
         auto table = row.get_table();
-        REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
+        REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
         REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
         REQUIRE(row.get<float>(table->get_column_key("float")) == 6.6f);
@@ -501,7 +504,7 @@ TEST_CASE("object")
     SECTION("create can use defaults for primary key")
     {
         d.defaults["all types"] = {
-            {"pk", INT64_C(10)},
+            {"_id", INT64_C(10)},
         };
         auto obj = create(AnyDict{
             {"bool", true},
@@ -511,7 +514,7 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
@@ -519,7 +522,7 @@ TEST_CASE("object")
         });
 
         auto row = obj.obj();
-        REQUIRE(row.get<Int>(row.get_table()->get_column_key("pk")) == 10);
+        REQUIRE(row.get<Int>(row.get_table()->get_column_key("_id")) == 10);
     }
 
     SECTION("create does not complain about missing values for nullable fields")
@@ -529,7 +532,7 @@ TEST_CASE("object")
         REQUIRE_NOTHROW(obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{})));
         r->commit_transaction();
 
-        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "pk").has_value());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "_id").has_value());
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "bool").has_value());
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "int").has_value());
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "float").has_value());
@@ -554,7 +557,7 @@ TEST_CASE("object")
     SECTION("create throws for missing values if there is no default")
     {
         REQUIRE_THROWS(create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"float", 6.6f},
         }));
     }
@@ -562,11 +565,11 @@ TEST_CASE("object")
     SECTION("create always sets the PK first")
     {
         AnyDict value{
-            {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
-            {"array 2", AnyVector{AnyDict{{"value", INT64_C(2)}}}},
+            {"array 1", AnyVector{AnyDict{{"_id", INT64_C(1)}, {"value", INT64_C(1)}}}},
+            {"array 2", AnyVector{AnyDict{{"_id", INT64_C(2)}, {"value", INT64_C(2)}}}},
             {"int 1", INT64_C(0)},
             {"int 2", INT64_C(0)},
-            {"pk", INT64_C(7)},
+            {"_id", INT64_C(7)},
         };
         // Core will throw if the list is populated before the PK is set
         r->begin_transaction();
@@ -578,7 +581,7 @@ TEST_CASE("object")
         CollectionChangeSet change;
         bool callback_called;
         Object obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -586,7 +589,7 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
@@ -598,7 +601,7 @@ TEST_CASE("object")
             {"string array", AnyVec{"a"s, "b"s, "c"s}},
             {"data array", AnyVec{"d"s, "e"s, "f"s}},
             {"date array", AnyVec{}},
-            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+            {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
             {"uuid array", AnyVec{UUID(), UUID("3b241101-1234-5678-9012-4136c566a962")}}});
@@ -611,7 +614,7 @@ TEST_CASE("object")
 
         create(
             AnyDict{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"int", INT64_C(6)},
                 {"string", "a"s},
             },
@@ -624,7 +627,7 @@ TEST_CASE("object")
 
         auto row = obj.obj();
         auto table = row.get_table();
-        REQUIRE(row.get<Int>(table->get_column_key("pk")) == 1);
+        REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
         REQUIRE(row.get<Int>(table->get_column_key("int")) == 6);
         REQUIRE(row.get<float>(table->get_column_key("float")) == 2.2f);
@@ -642,26 +645,33 @@ TEST_CASE("object")
         CollectionChangeSet change;
         bool callback_called;
         AnyDict adam{
+            {"_id", "pk0"s},
             {"name", "Adam"s},
             {"age", INT64_C(32)},
             {"scores", AnyVec{INT64_C(1), INT64_C(2)}},
         };
         AnyDict brian{
+            {"_id", "pk1"s},
             {"name", "Brian"s},
             {"age", INT64_C(33)},
         };
-        AnyDict charley{{"name", "Charley"s}, {"age", INT64_C(34)}, {"team", AnyVec{adam, brian}}};
+        AnyDict charley{{"_id", "pk2"s}, {"name", "Charley"s}, {"age", INT64_C(34)}, {"team", AnyVec{adam, brian}}};
         AnyDict donald{
+            {"_id", "pk3"s},
             {"name", "Donald"s},
             {"age", INT64_C(35)},
         };
-        AnyDict eddie{
-            {"name", "Eddie"s}, {"age", INT64_C(36)}, {"assistant", donald}, {"team", AnyVec{donald, charley}}};
+        AnyDict eddie{{"_id", "pk4"s},
+                      {"name", "Eddie"s},
+                      {"age", INT64_C(36)},
+                      {"assistant", donald},
+                      {"team", AnyVec{donald, charley}}};
         Object obj = create_company(eddie, CreatePolicy::UpdateAll);
 
         auto table = r->read_group().get_table("class_person");
         REQUIRE(table->size() == 5);
         Results result(r, table);
+        result = result.sort({{"_id", false}});
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             change = c;
             callback_called = true;
@@ -710,9 +720,9 @@ TEST_CASE("object")
 
     SECTION("create with update - identical sub-object")
     {
-        Object sub_obj = create_sub(AnyDict{{"value", INT64_C(10)}});
+        Object sub_obj = create_sub(AnyDict{{"value", INT64_C(10)}, {"_id", INT64_C(10)}});
         Object obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -744,7 +754,7 @@ TEST_CASE("object")
 
         create(
             AnyDict{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"bool", true},
                 {"int", INT64_C(5)},
                 {"float", 2.2f},
@@ -771,7 +781,7 @@ TEST_CASE("object")
         // Now change sub object
         create(
             AnyDict{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"bool", true},
                 {"int", INT64_C(5)},
                 {"float", 2.2f},
@@ -799,7 +809,7 @@ TEST_CASE("object")
     {
         bool callback_called;
         auto dict = AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -807,7 +817,8 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(21)}}}},
+            {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}},
+                                    AnyDict{{"_id", INT64_C(21)}, {"value", INT64_C(21)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
@@ -827,7 +838,7 @@ TEST_CASE("object")
         REQUIRE(!callback_called);
 
         // Now change list
-        dict["object array"] = AnyVec{AnyDict{{"value", INT64_C(23)}}};
+        dict["object array"] = AnyVec{AnyDict{{"_id", INT64_C(23)}, {"value", INT64_C(23)}}};
         create(dict, CreatePolicy::UpdateModified);
 
         callback_called = false;
@@ -839,7 +850,7 @@ TEST_CASE("object")
         SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)"))
         {
             AnyDict initial_values{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"bool", true},
                 {"int", INT64_C(5)},
                 {"float", 2.2f},
@@ -858,7 +869,7 @@ TEST_CASE("object")
                 {"string array", AnyVec{"a"s, "b"s, "c"s}},
                 {"data array", AnyVec{"d"s, "e"s, "f"s}},
                 {"date array", AnyVec{}},
-                {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+                {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
                 {"object id array", AnyVec{ObjectId("000000000000000000000001")}},
                 {"decimal array", AnyVec{Decimal128("1.23e45")}},
                 {"uuid array", AnyVec{UUID("3b241101-1111-bbbb-cccc-4136c566a962")}},
@@ -867,7 +878,7 @@ TEST_CASE("object")
             auto obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(initial_values));
 
             // Missing fields in dictionary do not update anything
-            Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{{"pk", INT64_C(1)}}),
+            Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{{"_id", INT64_C(1)}}),
                            policy);
 
             REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
@@ -905,7 +916,7 @@ TEST_CASE("object")
 
             // Set all properties to null
             AnyDict null_values{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"bool", util::Any()},
                 {"int", util::Any()},
                 {"float", util::Any()},
@@ -1006,7 +1017,7 @@ TEST_CASE("object")
     SECTION("create throws for duplicate pk if update is not specified")
     {
         create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -1014,14 +1025,14 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
         });
         REQUIRE_THROWS(create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -1029,7 +1040,7 @@ TEST_CASE("object")
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
@@ -1040,10 +1051,10 @@ TEST_CASE("object")
     SECTION("create with explicit null pk does not fall back to default")
     {
         d.defaults["nullable int pk"] = {
-            {"pk", INT64_C(10)},
+            {"_id", INT64_C(10)},
         };
         d.defaults["nullable string pk"] = {
-            {"pk", "value"s},
+            {"_id", "value"s},
         };
         auto create = [&](util::Any&& value, StringData type) {
             r->begin_transaction();
@@ -1052,11 +1063,11 @@ TEST_CASE("object")
             return obj;
         };
 
-        auto obj = create(AnyDict{{"pk", d.null_value()}}, "nullable int pk");
-        auto col_pk_int = r->read_group().get_table("class_nullable int pk")->get_column_key("pk");
-        auto col_pk_str = r->read_group().get_table("class_nullable string pk")->get_column_key("pk");
+        auto obj = create(AnyDict{{"_id", d.null_value()}}, "nullable int pk");
+        auto col_pk_int = r->read_group().get_table("class_nullable int pk")->get_column_key("_id");
+        auto col_pk_str = r->read_group().get_table("class_nullable string pk")->get_column_key("_id");
         REQUIRE(obj.obj().is_null(col_pk_int));
-        obj = create(AnyDict{{"pk", d.null_value()}}, "nullable string pk");
+        obj = create(AnyDict{{"_id", d.null_value()}}, "nullable string pk");
         REQUIRE(obj.obj().is_null(col_pk_str));
 
         obj = create(AnyDict{{}}, "nullable int pk");
@@ -1073,8 +1084,8 @@ TEST_CASE("object")
             r->commit_transaction();
             return obj;
         };
-        create(AnyDict{{"pk", util::Any()}}, "all optional types");
-        create(AnyDict{{"pk", INT64_C(0)}}, "all optional types");
+        create(AnyDict{{"_id", util::Any()}}, "all optional types");
+        create(AnyDict{{"_id", INT64_C(0)}}, "all optional types");
         REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
     }
 
@@ -1086,8 +1097,8 @@ TEST_CASE("object")
             r->commit_transaction();
             return obj;
         };
-        create(AnyDict{{"pk", util::Any()}}, "nullable object id pk");
-        create(AnyDict{{"pk", ObjectId::gen()}}, "nullable object id pk");
+        create(AnyDict{{"_id", util::Any()}}, "nullable object id pk");
+        create(AnyDict{{"_id", ObjectId::gen()}}, "nullable object id pk");
         REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
     }
 
@@ -1100,7 +1111,7 @@ TEST_CASE("object")
         Object obj(r, *r->schema().find("all types"), *table->begin());
 
         auto link_table = r->read_group().get_table("class_link target");
-        link_table->create_object();
+        link_table->create_object_with_primary_key(0);
         Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
 
         obj.set_property_value(d, "bool", util::Any(true));
@@ -1143,7 +1154,7 @@ TEST_CASE("object")
         auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(d, "origin"));
         REQUIRE(linking.size() == 1);
 
-        REQUIRE_THROWS(obj.set_property_value(d, "pk", util::Any(INT64_C(5))));
+        REQUIRE_THROWS(obj.set_property_value(d, "_id", util::Any(INT64_C(5))));
         REQUIRE_THROWS(obj.set_property_value(d, "not a property", util::Any(INT64_C(5))));
 
         r->commit_transaction();
@@ -1155,7 +1166,7 @@ TEST_CASE("object")
     SECTION("list property self-assign is a no-op")
     {
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
             {"float", 2.2f},
@@ -1168,7 +1179,7 @@ TEST_CASE("object")
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
 
             {"bool array", AnyVec{true, false}},
-            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
+            {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
         });
 
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
@@ -1196,13 +1207,15 @@ TEST_CASE("object")
         config2.schema = config.schema;
 
         AnyDict v1{
-            {"pk", INT64_C(7)},
-            {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
-            {"array 2", AnyVector{AnyDict{{"value", INT64_C(2)}}}},
+            {"_id", INT64_C(7)},
+            {"array 1", AnyVector{AnyDict{{"_id", INT64_C(1)}, {"value", INT64_C(1)}}}},
+            {"array 2", AnyVector{AnyDict{{"_id", INT64_C(2)}, {"value", INT64_C(2)}}}},
         };
         auto v2 = v1;
         v1["int 1"] = INT64_C(1);
         v2["int 2"] = INT64_C(2);
+        v2["array 1"] = AnyVector{AnyDict{{"_id", INT64_C(3)}, {"value", INT64_C(1)}}};
+        v2["array 2"] = AnyVector{AnyDict{{"_id", INT64_C(4)}, {"value", INT64_C(2)}}};
 
         auto r1 = Realm::get_shared_realm(config1);
         auto r2 = Realm::get_shared_realm(config2);
@@ -1228,7 +1241,7 @@ TEST_CASE("object")
             [&] { return r1->read_group().get_table("class_array target")->size() == 4; });
 
         Obj obj = object1.obj();
-        REQUIRE(obj.get<Int>("pk") == 7); // pk
+        REQUIRE(obj.get<Int>("_id") == 7); // pk
         REQUIRE(obj.get_linklist("array 1").size() == 2);
         REQUIRE(obj.get<Int>("int 1") == 1); // non-default from r1
         REQUIRE(obj.get<Int>("int 2") == 2); // non-default from r2
@@ -1242,7 +1255,7 @@ TEST_CASE("Embedded Object")
     Schema schema{
         {"all types",
          {
-             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
              {"array", PropertyType::Object | PropertyType::Array, "array target"},
          }},
@@ -1281,12 +1294,12 @@ TEST_CASE("Embedded Object")
     SECTION("Basic object creation")
     {
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
 
-        REQUIRE(obj.obj().get<int64_t>("pk") == 1);
+        REQUIRE(obj.obj().get<int64_t>("_id") == 1);
         auto linked_obj = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj();
         REQUIRE(linked_obj.is_valid());
         REQUIRE(linked_obj.get<int64_t>("value") == 10);
@@ -1299,7 +1312,7 @@ TEST_CASE("Embedded Object")
     SECTION("set_property_value() on link to embedded object")
     {
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
@@ -1352,12 +1365,12 @@ TEST_CASE("Embedded Object")
     SECTION("set_property_value() on list of embedded objects")
     {
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
         });
         List list(realm, obj.obj().get_linklist("array"));
         auto obj2 = create(AnyDict{
-            {"pk", INT64_C(2)},
+            {"_id", INT64_C(2)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
         });
         List list2(realm, obj2.obj().get_linklist("array"));
@@ -1418,7 +1431,7 @@ TEST_CASE("Embedded Object")
     SECTION("create with UpdateModified diffs child objects")
     {
         auto obj = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
@@ -1437,7 +1450,7 @@ TEST_CASE("Embedded Object")
         // Update with identical value
         create(
             AnyDict{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"object", AnyDict{{"value", INT64_C(10)}}},
             },
             CreatePolicy::UpdateModified);
@@ -1451,7 +1464,7 @@ TEST_CASE("Embedded Object")
         // Update with different values
         create(
             AnyDict{
-                {"pk", INT64_C(1)},
+                {"_id", INT64_C(1)},
                 {"array", AnyVector{AnyDict{{"value", INT64_C(40)}}, AnyDict{{"value", INT64_C(50)}}}},
             },
             CreatePolicy::UpdateModified);
@@ -1466,7 +1479,7 @@ TEST_CASE("Embedded Object")
     SECTION("deleting parent object sends change notification")
     {
         auto parent = create(AnyDict{
-            {"pk", INT64_C(1)},
+            {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });

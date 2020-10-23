@@ -1744,6 +1744,74 @@ TEST_CASE("app: push notifications", "[sync][app]")
     }
 }
 
+// MARK: - Token refresh
+
+TEST_CASE("app: token refresh", "[sync][app]")
+{
+
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = [] {
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path),
+                              factory,
+                              base_url,
+                              util::none,
+                              Optional<std::string>("A Local App Version"),
+                              util::none,
+                              "Object Store Platform Tests",
+                              "Object Store Platform Version Blah",
+                              "An sdk version"};
+
+    TestSyncManager sync_manager({.app_config = config});
+    auto app = sync_manager.app();
+
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+
+    app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
+                                                                               [&](Optional<app::AppError> error) {
+                                                                                   CHECK(!error);
+                                                                               });
+
+    std::shared_ptr<SyncUser> sync_user;
+
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                     REQUIRE(user);
+                                     CHECK(!error);
+                                     sync_user = user;
+                                     sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
+                                 });
+
+    auto remote_client = app->current_user()->mongo_client("BackingDB");
+    auto db = remote_client.db("test_data");
+    auto dog_collection = db["Dog"];
+    bson::BsonDocument dog_document{{"name", "fido"}, {"breed", "king charles"}};
+
+    SECTION("access token should refresh")
+    {
+        /*
+         Expected sequence of events:
+         - `find_one` tries to hit the server with a bad access token
+         - Server returns an error because of the bad token, error should be something like:
+            {\"error\":\"json: cannot unmarshal array into Go value of type map[string]interface
+         {}\",\"link\":\"http://localhost:9090/groups/5f84167e776aa0f9dc27081a/apps/5f841686776aa0f9dc270876/logs?co_id=5f844c8c776aa0f9dc273db6\"}
+            http_status_code = 401
+            custom_status_code = 0
+         - App::handle_auth_failure is then called and an attempt to refresh the access token will be peformed.
+         - If the token refresh was successful, the original request will retry and we should expect no error in the
+         callback of `find_one`
+         */
+        dog_collection.find_one(dog_document, [&](Optional<bson::BsonDocument>, Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+    }
+}
+
 // MARK: - Sync Tests
 
 TEST_CASE("app: sync integration", "[sync][app]")
@@ -1753,6 +1821,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
     };
     std::string base_url = get_base_url();
     std::string config_path = get_config_path();
+    const std::string valid_pk_name = "_id";
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
     auto app_config = App::Config{get_runtime_app_id(config_path),
@@ -1788,7 +1857,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
                                      });
         return app;
     };
-    auto setup_and_get_config = [&base_path](std::shared_ptr<App> app) -> realm::Realm::Config {
+    auto setup_and_get_config = [&base_path, &valid_pk_name](std::shared_ptr<App> app) -> realm::Realm::Config {
         realm::Realm::Config config;
         config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -1797,14 +1866,14 @@ TEST_CASE("app: sync integration", "[sync][app]")
         };
         config.schema_version = 1;
         config.path = base_path + "/default.realm";
-        const auto dog_schema =
-            realm::ObjectSchema("Dog", {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
-                                        realm::Property("breed", PropertyType::String | PropertyType::Nullable),
-                                        realm::Property("name", PropertyType::String),
-                                        realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
+        const auto dog_schema = realm::ObjectSchema(
+            "Dog", {realm::Property(valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true),
+                    realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+                    realm::Property("name", PropertyType::String),
+                    realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)});
         const auto person_schema = realm::ObjectSchema(
             "Person",
-            {realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+            {realm::Property(valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true),
              realm::Property("age", PropertyType::Int),
              realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
              realm::Property("firstName", PropertyType::String), realm::Property("lastName", PropertyType::String),
@@ -1855,7 +1924,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
             r->begin_transaction();
             CppContext c;
             Object::create(c, r, "Dog",
-                           util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
                                                     {"breed", std::string("bulldog")},
                                                     {"name", std::string("fido")},
                                                     {"realm_id", std::string("foo")}}),
@@ -1905,7 +1974,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
             r->begin_transaction();
             CppContext c;
             Object::create(c, r, "Dog",
-                           util::Any(realm::AnyDict{{"_id", util::Any(ObjectId::gen())},
+                           util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
                                                     {"breed", std::string("bulldog")},
                                                     {"name", std::string("fido")},
                                                     {"realm_id", std::string("foo")}}),
@@ -1953,6 +2022,42 @@ TEST_CASE("app: sync integration", "[sync][app]")
             return error_did_occur.load();
         });
         REQUIRE(error_did_occur.load());
+    }
+
+    SECTION("invalid pk schema error handling")
+    {
+        const std::string invalid_pk_name = "my_primary_key";
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+        auto it = config.schema->find("Dog");
+        REQUIRE(it != config.schema->end());
+        REQUIRE(it->primary_key_property());
+        REQUIRE(it->primary_key_property()->name == valid_pk_name);
+        it->primary_key_property()->name = invalid_pk_name;
+        it->primary_key = invalid_pk_name;
+        REQUIRE_THROWS_CONTAINING(
+            realm::Realm::get_shared_realm(config),
+            util::format(
+                "The primary key property on a synchronized Realm must be named '%1' but found '%2' for type 'Dog'",
+                valid_pk_name, invalid_pk_name));
+    }
+
+    SECTION("missing pk schema error handling")
+    {
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
+        auto config = setup_and_get_config(app);
+        auto it = config.schema->find("Dog");
+        REQUIRE(it != config.schema->end());
+        REQUIRE(it->primary_key_property());
+        it->primary_key_property()->is_primary = false;
+        it->primary_key = "";
+        REQUIRE(!it->primary_key_property());
+        REQUIRE_THROWS_CONTAINING(realm::Realm::get_shared_realm(config),
+                                  util::format("There must be a primary key property named '%1' on a synchronized "
+                                               "Realm but none was found for type 'Dog'",
+                                               valid_pk_name));
     }
 }
 

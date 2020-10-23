@@ -413,6 +413,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
     auto schema = Schema{
         {"object",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
     };
@@ -431,7 +432,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         auto r = Realm::get_shared_realm(config);
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object");
         r->begin_transaction();
-        table->create_object();
+        table->create_object_with_primary_key(0);
         r->commit_transaction();
 
         return session;
@@ -576,7 +577,10 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         SyncTestFile config1(init_sync_manager.app(), "schema-version-test");
         config1.schema_version = 1;
         config1.schema = Schema{
-            {"object", {{"property1", PropertyType::Int}, {"property2", PropertyType::Int}}},
+            {"object",
+             {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+              {"property1", PropertyType::Int},
+              {"property2", PropertyType::Int}}},
         };
 
         auto realm1 = Realm::get_shared_realm(config1);
@@ -600,7 +604,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         config3.path = config2.path;
         config3.schema_version = 1;
         config3.schema = Schema{
-            {"object", {{"property1", PropertyType::Int}}},
+            {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"property1", PropertyType::Int}}},
         };
 
         auto realm3 = Realm::get_shared_realm(config3);
@@ -621,7 +625,7 @@ TEST_CASE("sync: stable IDs", "[sync]")
         SyncTestFile config(init_sync_manager.app(), "schema-test");
         config.schema_version = 1;
         config.schema = Schema{
-            {"object", {{"value", PropertyType::Int}}},
+            {"object", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
         };
 
         auto realm = Realm::get_shared_realm(config);
@@ -712,20 +716,22 @@ TEST_CASE("sync: client resync")
     config.schema = Schema{
         {"object",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
         {"link target",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
         {"pk link target",
          {
-             {"pk", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
         {"link origin",
          {
-             {"id", PropertyType::Int},
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"link", PropertyType::Object | PropertyType::Nullable, "link target"},
              {"pk link", PropertyType::Object | PropertyType::Nullable, "pk link target"},
              {"list", PropertyType::Object | PropertyType::Array, "link target"},
@@ -740,7 +746,8 @@ TEST_CASE("sync: client resync")
     auto create_object = [&](Realm& realm, StringData object_type) -> Obj {
         auto table = get_table(realm, object_type);
         REQUIRE(table);
-        return table->create_object();
+        static int64_t pk = 0;
+        return table->create_object_with_primary_key(pk++);
     };
 
     auto setup = [&](auto fn) {
@@ -878,6 +885,7 @@ TEST_CASE("sync: client resync")
                     {
                         {"object2",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"value2", PropertyType::Int},
                          }},
                     },
@@ -905,6 +913,7 @@ TEST_CASE("sync: client resync")
                     {
                         {"object",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"value2", PropertyType::Int},
                          }},
                     },
@@ -916,14 +925,14 @@ TEST_CASE("sync: client resync")
         // test local realm that changes were persisted
         REQUIRE_THROWS(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table->get_column_count() == 2);
+        REQUIRE(table->get_column_count() == 3);
         REQUIRE(table->begin()->get<Int>("value2") == 123);
         REQUIRE_THROWS(realm->refresh());
         // test resync'd realm that changes were overwritten
         realm = Realm::get_shared_realm(config);
         table = ObjectStore::table_for_object_type(realm->read_group(), "object");
         REQUIRE(table);
-        REQUIRE(table->get_column_count() == 1);
+        REQUIRE(table->get_column_count() == 2);
         REQUIRE(!bool(table->get_column_key("value2")));
     }
 
@@ -960,7 +969,7 @@ TEST_CASE("sync: client resync")
                     {
                         {"object2",
                          {
-                             {"pk", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+                             {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
                          }},
                     },
                     0, nullptr, nullptr, true);
@@ -973,7 +982,7 @@ TEST_CASE("sync: client resync")
         REQUIRE_NOTHROW(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
         REQUIRE(table);
-        ColKey pk_col_key = table->get_column_key("pk");
+        ColKey pk_col_key = table->get_column_key("_id");
         REQUIRE(bool(pk_col_key));
         REQUIRE(table->get_column_attr(pk_col_key).test(col_attr_Nullable));
         // FIXME: sync has object recovery disabled currently
@@ -988,6 +997,7 @@ TEST_CASE("sync: client resync")
                     {
                         {"object",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"value2", PropertyType::Int},
                              {"array", PropertyType::Int | PropertyType::Array},
                              {"link", PropertyType::Object | PropertyType::Nullable, "object"},
@@ -1001,7 +1011,7 @@ TEST_CASE("sync: client resync")
         wait_for_download(*realm);
         REQUIRE_NOTHROW(realm->refresh());
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table->get_column_count() == 4);
+        REQUIRE(table->get_column_count() == 5);
         REQUIRE(bool(table->get_column_key("value2")));
         // FIXME: sync has object recovery disabled currently
         // REQUIRE(table->begin()->get<Int>(table->get_column_key("value2")) == 123);
@@ -1015,10 +1025,12 @@ TEST_CASE("sync: client resync")
                     {
                         {"object",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"value2", PropertyType::Int},
                          }},
                         {"object2",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"link", PropertyType::Object | PropertyType::Nullable, "object"},
                          }},
                     },
@@ -1029,10 +1041,12 @@ TEST_CASE("sync: client resync")
                     {
                         {"object",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"value2", PropertyType::Int},
                          }},
                         {"object2",
                          {
+                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
                              {"link", PropertyType::Object | PropertyType::Nullable, "object"},
                          }},
                     },

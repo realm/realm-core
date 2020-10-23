@@ -1499,6 +1499,7 @@ TEST_CASE("notifications: sync")
     config.schema = Schema{
         {"object",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
     };
@@ -1517,7 +1518,7 @@ TEST_CASE("notifications: sync")
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->create_object();
+            write_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             write_realm->commit_transaction();
         }
 
