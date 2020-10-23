@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/app_utils.hpp"
+#include <realm/object-store/sync/app_utils.hpp>
 
 namespace realm {
 namespace app {

@@ -1766,7 +1766,7 @@ TEST_CASE("app: token refresh", "[sync][app]")
                               "Object Store Platform Version Blah",
                               "An sdk version"};
 
-    TestSyncManager sync_manager({.app_config = config});
+    TestSyncManager sync_manager(TestSyncManager::Config(config), {});
     auto app = sync_manager.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
@@ -2027,7 +2027,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
     SECTION("invalid pk schema error handling")
     {
         const std::string invalid_pk_name = "my_primary_key";
-        TestSyncManager sync_manager({.app_config = app_config});
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
         auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         auto it = config.schema->find("Dog");
@@ -2045,7 +2045,7 @@ TEST_CASE("app: sync integration", "[sync][app]")
 
     SECTION("missing pk schema error handling")
     {
-        TestSyncManager sync_manager({.app_config = app_config});
+        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
         auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         auto it = config.schema->find("Dog");

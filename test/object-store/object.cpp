@@ -765,7 +765,7 @@ TEST_CASE("object")
                 {"object id", ObjectId("000000000000000000000001")},
                 {"decimal", Decimal128("1.23e45")},
                 {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
-                {"object", AnyDict{{"value", INT64_C(10)}}},
+                {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(10)}}},
             },
             CreatePolicy::UpdateModified);
 
@@ -792,7 +792,7 @@ TEST_CASE("object")
                 {"object id", ObjectId("000000000000000000000001")},
                 {"decimal", Decimal128("1.23e45")},
                 {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
-                {"object", AnyDict{{"value", INT64_C(11)}}},
+                {"object", AnyDict{{"_id", INT64_C(10)}, {"value", INT64_C(11)}}},
             },
             CreatePolicy::UpdateModified);
 
