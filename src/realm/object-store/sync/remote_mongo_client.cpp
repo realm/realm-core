@@ -22,14 +22,14 @@
 namespace realm {
 namespace app {
 
-RemoteMongoDatabase RemoteMongoClient::operator[](const std::string& name)
+MongoDatabase MongoClient::operator[](const std::string& name)
 {
-    return RemoteMongoDatabase(name, m_service, m_service_name);
+    return MongoDatabase(name, m_user, m_service, m_service_name);
 }
 
-RemoteMongoDatabase RemoteMongoClient::db(const std::string& name)
+MongoDatabase MongoClient::db(const std::string& name)
 {
-    return RemoteMongoDatabase(name, m_service, m_service_name);
+    return MongoDatabase(name, m_user, m_service, m_service_name);
 }
 
 } // namespace app

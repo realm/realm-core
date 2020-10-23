@@ -48,14 +48,18 @@ static util::Optional<AppError> check_for_errors(const Response& response)
         if (ct != response.headers.end() && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             auto message = body.find("error");
+            auto link = body.find("link");
+            std::string parsed_link = link == body.end() ? "" : link->get<std::string>();
+
             if (auto error_code = body.find("error_code");
                 error_code != body.end() && !error_code->get<std::string>().empty()) {
                 return AppError(
                     make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
-                    message != body.end() ? message->get<std::string>() : "no error message");
+                    message != body.end() ? message->get<std::string>() : "no error message", std::move(parsed_link));
             }
             else if (message != body.end()) {
-                return AppError(make_error_code(ServiceErrorCode::unknown), message->get<std::string>());
+                return AppError(make_error_code(ServiceErrorCode::unknown), message->get<std::string>(),
+                                std::move(parsed_link));
             }
         }
     }

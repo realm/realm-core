@@ -42,9 +42,12 @@ static inline std::string remove_whitespace(const char* c)
  ======== BSON CORPUS ========
  */
 template <typename T>
+using CorpusCheck = void (*)(T);
+
+template <typename T>
 struct CorpusEntry {
     const char* canonical_extjson;
-    std::function<void(T)> check;
+    CorpusCheck<T> check;
     bool lossy;
 };
 
@@ -387,35 +390,48 @@ TEST_CASE("canonical_extjson_corpus", "[bson]")
         }
         SECTION("+1.0001220703125")
         {
-            run_corpus<double>("d", {"{\"d\" : {\"$numberDouble\": \"1.0001220703125\"}}",
-                                     [](auto val) {
-                                         CHECK(abs(val - 1.0001220703125) < epsilon);
-                                     },
-                                     true});
+            run_corpus<double>("d", {
+                                        "{\"d\" : {\"$numberDouble\": \"1.0001220703125\"}}",
+                                        [](auto val) {
+                                            CHECK(abs(val - 1.0001220703125) < epsilon);
+                                        },
+                                    });
         }
         SECTION("-1.0001220703125")
         {
-            run_corpus<double>("d", {"{\"d\" : {\"$numberDouble\": \"-1.0001220703125\"}}",
-                                     [](auto val) {
-                                         CHECK(abs(val - -1.0001220703125) < epsilon);
-                                     },
-                                     true});
+            run_corpus<double>("d", {
+                                        "{\"d\" : {\"$numberDouble\": \"-1.0001220703125\"}}",
+                                        [](auto val) {
+                                            CHECK(abs(val - -1.0001220703125) < epsilon);
+                                        },
+                                    });
         }
         SECTION("1.2345678921232E+18")
         {
-            run_corpus<double>("d", {"{\"d\" : {\"$numberDouble\": \"1.2345678921232E+18\"}}",
-                                     [](auto val) {
-                                         CHECK(abs(val - 1.2345678921232E+18) < epsilon);
-                                     },
-                                     true});
+            run_corpus<double>("d", {
+                                        "{\"d\" : {\"$numberDouble\": \"1.2345678921232e+18\"}}",
+                                        [](auto val) {
+                                            CHECK(abs(val - 1.2345678921232E+18) < epsilon);
+                                        },
+                                    });
         }
         SECTION("-1.2345678921232E+18")
         {
-            run_corpus<double>("d", {"{\"d\" : {\"$numberDouble\": \"-1.2345678921232E+18\"}}",
-                                     [](auto val) {
-                                         CHECK(abs(val - -1.2345678921232E+18) < epsilon);
-                                     },
-                                     true});
+            run_corpus<double>("d", {
+                                        "{\"d\" : {\"$numberDouble\": \"-1.2345678921232e+18\"}}",
+                                        [](auto val) {
+                                            CHECK(abs(val - -1.2345678921232E+18) < epsilon);
+                                        },
+                                    });
+        }
+        SECTION("1.7976931348623157E+308")
+        {
+            run_corpus<double>("d", {
+                                        "{\"d\" : {\"$numberDouble\": \"1.7976931348623157e+308\"}}",
+                                        [](auto val) {
+                                            CHECK(abs(val - 1.7976931348623157E+308) < epsilon);
+                                        },
+                                    });
         }
         SECTION("0.0")
         {
@@ -723,31 +739,34 @@ TEST_CASE("canonical_extjson_corpus", "[bson]")
     {
         SECTION("Timestamp: (123456789, 42)")
         {
-            run_corpus<MongoTimestamp>("a", {"{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42} } }",
-                                             [](auto val) {
-                                                 CHECK(val.seconds == 123456789);
-                                                 CHECK(val.increment == 42);
-                                             },
-                                             true});
+            run_corpus<MongoTimestamp>("a", {
+                                                "{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42} } }",
+                                                [](auto val) {
+                                                    CHECK(val.seconds == 123456789);
+                                                    CHECK(val.increment == 42);
+                                                },
+                                            });
         }
         SECTION("Timestamp: (123456789, 42) (keys reversed)")
         {
-            run_corpus<MongoTimestamp>("a", {"{\"a\" : {\"$timestamp\" : {\"i\" : 42, \"t\" : 123456789} } }",
-                                             [](auto val) {
-                                                 CHECK(val.seconds == 123456789);
-                                                 CHECK(val.increment == 42);
-                                             },
-                                             true});
+            run_corpus<MongoTimestamp>("a", {
+                                                "{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42 } } }",
+                                                [](auto val) {
+                                                    CHECK(val.seconds == 123456789);
+                                                    CHECK(val.increment == 42);
+                                                },
+                                            });
         }
         SECTION("Timestamp with high-order bit set on both seconds and increment")
         {
             run_corpus<MongoTimestamp>("a",
-                                       {"{\"a\" : {\"$timestamp\" : {\"t\" : 4294967295, \"i\" :  4294967295} } }",
-                                        [](auto val) {
-                                            CHECK(val.seconds == 4294967295);
-                                            CHECK(val.increment == 4294967295);
-                                        },
-                                        true});
+                                       {
+                                           "{\"a\" : {\"$timestamp\" : {\"t\" : 4294967295, \"i\" :  4294967295} } }",
+                                           [](auto val) {
+                                               CHECK(val.seconds == 4294967295);
+                                               CHECK(val.increment == 4294967295);
+                                           },
+                                       });
         }
     }
 }

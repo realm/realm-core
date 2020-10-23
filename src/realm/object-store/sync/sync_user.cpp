@@ -21,6 +21,7 @@
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/remote_mongo_client.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
@@ -398,6 +399,11 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
         case State::Removed:
             break;
     }
+}
+
+app::MongoClient SyncUser::mongo_client(const std::string& service_name)
+{
+    return app::MongoClient(shared_from_this(), m_sync_manager->app().lock(), service_name);
 }
 
 void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
