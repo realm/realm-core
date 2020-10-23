@@ -170,14 +170,15 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     size_t r = start - 1;
     for (;;) {
         if (local_matches == local_limit) {
-            m_dD = double(r - start) / (local_matches + 1.1);
+            st->m_local_match_count += local_matches;
             return r + 1;
         }
 
         // Find first match in this condition node
-        r = find_first_local(r + 1, end);
+        auto pos = r + 1;
+        r = find_first_local(pos, end);
         if (r == not_found) {
-            m_dD = double(r - start) / (local_matches + 1.1);
+            st->m_local_match_count += local_matches;
             return end;
         }
 
@@ -206,7 +207,6 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
 
 void StringNodeEqualBase::init(bool will_query_ranges)
 {
-    m_dD = 10.0;
     StringNodeBase::init(will_query_ranges);
 
     if (m_is_string_enum) {
@@ -528,7 +528,6 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 : m_expression(std::move(expression))
 {
-    m_dD = 100.0;
     m_dT = 50.0;
 }
 

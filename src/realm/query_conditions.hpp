@@ -48,12 +48,19 @@ class ClusterKeyArray;
 class QueryStateBase {
 public:
     size_t m_match_count;
+    size_t m_best_node;
+    size_t m_number_checked;
+    size_t m_local_match_count;
     size_t m_limit;
     int64_t m_minmax_index; // used only for min/max, to save index of current min/max value
     uint64_t m_key_offset;
     const ClusterKeyArray* m_key_values;
+
     QueryStateBase(size_t limit)
         : m_match_count(0)
+        , m_best_node(-1)
+        , m_number_checked(0)
+        , m_local_match_count(0)
         , m_limit(limit)
         , m_minmax_index(-1)
         , m_key_offset(0)
