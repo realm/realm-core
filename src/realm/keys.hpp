@@ -108,6 +108,14 @@ struct ColKey {
                  ((tag & 0xFFFFFFFFUL) << 30))
     {
     }
+    bool is_nullable() const
+    {
+        return get_attrs().test(col_attr_Nullable);
+    }
+    bool is_list() const
+    {
+        return get_attrs().test(col_attr_List);
+    }
     ColKey& operator=(int64_t val) noexcept
     {
         value = val;

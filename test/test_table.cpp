@@ -3125,6 +3125,11 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>,
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
 
+    Query q = table.where().size_equal(col, 3); // SizeListNode
+    CHECK_EQUAL(q.count(), 1);
+    q = table.column<Lst<type>>(col).size() == 3; // SizeOperator expresison
+    CHECK_EQUAL(q.count(), 1);
+
     Lst<type> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
     list2.clear();
