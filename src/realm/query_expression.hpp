@@ -977,52 +977,20 @@ public:
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
         // >=},
         // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col && std::is_same_v<L, R> && !left_col->is_nullable() && !right_col->is_nullable() &&
-            !left_col->links_exist() && !right_col->links_exist()) {
+        if (left_col && right_col && !left_col->links_exist() && !right_col->links_exist()) {
             ConstTableRef t = left_col->get_base_table();
-
-            if (std::numeric_limits<L>::is_integer) {
-                if (std::is_same_v<Cond, Less>)
-                    return Query(t).less_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal_int(left_col->column_key(), right_col->column_key());
-            }
-            else if (std::is_same_v<L, float>) {
-                if (std::is_same_v<Cond, Less>)
-                    return Query(t).less_float(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater_float(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal_float(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal_float(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal_float(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal_float(left_col->column_key(), right_col->column_key());
-            }
-            else if (std::is_same_v<L, double>) {
-                if (std::is_same_v<Cond, Less>)
-                    return Query(t).less_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal_double(left_col->column_key(), right_col->column_key());
-            }
+            if (std::is_same_v<Cond, Less>)
+                return Query(t).less(left_col->column_key(), right_col->column_key());
+            if (std::is_same_v<Cond, Greater>)
+                return Query(t).greater(left_col->column_key(), right_col->column_key());
+            if (std::is_same_v<Cond, Equal>)
+                return Query(t).equal(left_col->column_key(), right_col->column_key());
+            if (std::is_same_v<Cond, NotEqual>)
+                return Query(t).not_equal(left_col->column_key(), right_col->column_key());
+            if (std::is_same_v<Cond, LessEqual>)
+                return Query(t).less_equal(left_col->column_key(), right_col->column_key());
+            if (std::is_same_v<Cond, GreaterEqual>)
+                return Query(t).greater_equal(left_col->column_key(), right_col->column_key());
         }
 #endif
         // Return query_expression.hpp node

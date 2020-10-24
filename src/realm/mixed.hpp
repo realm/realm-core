@@ -169,6 +169,7 @@ public:
     }
 
     static bool types_are_comparable(const Mixed& l, const Mixed& r);
+    static bool data_types_are_comparable(DataType l_type, DataType r_type);
 
     template <class T>
     T get() const noexcept;

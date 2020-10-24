@@ -435,6 +435,90 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,
+                                                                                         const ColKey& col_key)
+{
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            if (col_key.is_nullable()) {
+                return std::make_unique<ArrayIntNull>(alloc);
+            }
+            return std::make_unique<ArrayInteger>(alloc);
+        case col_type_Bool:
+            return std::make_unique<ArrayBool>(alloc);
+        case col_type_String:
+            return std::make_unique<ArrayString>(alloc);
+        case col_type_Binary:
+            return std::make_unique<ArrayBinary>(alloc);
+        case col_type_Mixed:
+            return std::make_unique<ArrayMixed>(alloc);
+        case col_type_Timestamp:
+            return std::make_unique<ArrayTimestamp>(alloc);
+        case col_type_Float:
+            return std::make_unique<ArrayFloat>(alloc);
+        case col_type_Double:
+            return std::make_unique<ArrayDouble>(alloc);
+        case col_type_Decimal:
+            return std::make_unique<ArrayDecimal128>(alloc);
+        case col_type_Link:
+            return std::make_unique<ArrayKey>(alloc);
+        case col_type_ObjectId:
+            return std::make_unique<ArrayObjectIdNull>(alloc);
+        case col_type_UUID:
+            return std::make_unique<ArrayUUIDNull>(alloc);
+        case col_type_TypedLink:
+        case col_type_BackLink:
+        case col_type_LinkList:
+        case col_type_OldDateTime:
+        case col_type_OldTable:
+            break;
+    };
+    REALM_UNREACHABLE();
+    return {};
+}
+
+Mixed TwoColumnsNodeBase::get_value_from_leaf(ArrayPayload* leaf, ColumnType col_type, bool nullable, size_t ndx)
+{
+    switch (col_type) {
+        case col_type_Int:
+            if (nullable) {
+                return (static_cast<ArrayIntNull*>(leaf))->get(ndx);
+            }
+            return (static_cast<ArrayInteger*>(leaf))->get(ndx);
+        case col_type_Bool:
+            return (static_cast<ArrayBool*>(leaf))->get(ndx);
+        case col_type_String:
+            return (static_cast<ArrayString*>(leaf))->get(ndx);
+        case col_type_Binary:
+            return (static_cast<ArrayBinary*>(leaf))->get(ndx);
+        case col_type_Mixed:
+            return (static_cast<ArrayMixed*>(leaf))->get(ndx);
+        case col_type_Timestamp:
+            return (static_cast<ArrayTimestamp*>(leaf))->get(ndx);
+        case col_type_Float:
+            return (static_cast<ArrayFloat*>(leaf))->get(ndx);
+        case col_type_Double:
+            return (static_cast<ArrayDouble*>(leaf))->get(ndx);
+        case col_type_Decimal:
+            return (static_cast<ArrayDecimal128*>(leaf))->get(ndx);
+        case col_type_Link:
+            return (static_cast<ArrayKey*>(leaf))->get(ndx);
+        case col_type_ObjectId:
+            return (static_cast<ArrayObjectIdNull*>(leaf))->get(ndx);
+        case col_type_UUID:
+            return (static_cast<ArrayUUIDNull*>(leaf))->get(ndx);
+        case col_type_TypedLink:
+        case col_type_BackLink:
+        case col_type_LinkList:
+        case col_type_OldDateTime:
+        case col_type_OldTable:
+            break;
+    };
+    REALM_UNREACHABLE();
+    return {};
+}
+
+
 } // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)

@@ -35,6 +35,7 @@ using namespace std::chrono;
 #include <realm/query_expression.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -2012,12 +2013,12 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
             doubles.push_back(key);
     }
 
-    realm::TableView t1 = table.where().equal_int(col_int0, col_int1).find_all();
-    realm::TableView t2 = table.where().equal_int(col_int2, col_int3).find_all();
-    realm::TableView t3 = table.where().equal_int(col_int4, col_int5).find_all();
+    realm::TableView t1 = table.where().equal(col_int0, col_int1).find_all();
+    realm::TableView t2 = table.where().equal(col_int2, col_int3).find_all();
+    realm::TableView t3 = table.where().equal(col_int4, col_int5).find_all();
 
-    realm::TableView t4 = table.where().equal_float(col_float6, col_float7).find_all();
-    realm::TableView t5 = table.where().equal_double(col_double8, col_double9).find_all();
+    realm::TableView t4 = table.where().equal(col_float6, col_float7).find_all();
+    realm::TableView t5 = table.where().equal(col_double8, col_double9).find_all();
 
 
     CHECK_EQUAL(ints1.size(), t1.size());
@@ -2060,26 +2061,26 @@ TEST(Query_TwoColsVaryOperators)
     Obj obj1 = table.create_object().set_all(10, 5, 10.0f, 5.0f, 10.0, 5.0);
     Obj obj2 = table.create_object().set_all(-10, -5, -10.0f, -5.0f, -10.0, -5.0);
 
-    CHECK_EQUAL(null_key, table.where().equal_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().not_equal_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_equal_int(col_int0, col_int1).find());
+    CHECK_EQUAL(null_key, table.where().equal(col_int0, col_int1).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_int0, col_int1).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less(col_int0, col_int1).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater(col_int0, col_int1).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal(col_int0, col_int1).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less_equal(col_int0, col_int1).find());
 
-    CHECK_EQUAL(null_key, table.where().equal_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().not_equal_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_equal_float(col_float2, col_float3).find());
+    CHECK_EQUAL(null_key, table.where().equal(col_float2, col_float3).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_float2, col_float3).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less(col_float2, col_float3).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater(col_float2, col_float3).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal(col_float2, col_float3).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less_equal(col_float2, col_float3).find());
 
-    CHECK_EQUAL(null_key, table.where().equal_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().not_equal_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_equal_double(col_double4, col_double5).find());
+    CHECK_EQUAL(null_key, table.where().equal(col_double4, col_double5).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_double4, col_double5).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less(col_double4, col_double5).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater(col_double4, col_double5).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal(col_double4, col_double5).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less_equal(col_double4, col_double5).find());
 }
 
 
@@ -2094,10 +2095,10 @@ TEST(Query_TwoCols0)
         table.create_object();
     }
 
-    realm::TableView t1 = table.where().equal_int(col0, col1).find_all();
+    realm::TableView t1 = table.where().equal(col0, col1).find_all();
     CHECK_EQUAL(50, t1.size());
 
-    realm::TableView t2 = table.where().less_int(col0, col1).find_all();
+    realm::TableView t2 = table.where().less(col0, col1).find_all();
     CHECK_EQUAL(0, t2.size());
 }
 
@@ -2141,6 +2142,136 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(2, q6.count());
 }
 
+TEST(Query_TwoColumnsCrossTypes)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_Bool, "bool");
+    table.add_column(type_String, "string");
+    table.add_column(type_Binary, "binary");
+    table.add_column(type_Mixed, "mixed");
+    table.add_column(type_Timestamp, "timestamp");
+    table.add_column(type_Float, "float");
+    table.add_column(type_Double, "double");
+    table.add_column(type_Decimal, "decimal128");
+    table.add_column(type_ObjectId, "objectId");
+    table.add_column(type_UUID, "uuid");
+
+    table.add_column(type_Int, "int?", true);
+    table.add_column(type_Bool, "bool?", true);
+    table.add_column(type_String, "string?", true);
+    table.add_column(type_Binary, "binary?", true);
+    table.add_column(type_Mixed, "mixed?", true);
+    table.add_column(type_Timestamp, "timestamp?", true);
+    table.add_column(type_Float, "float?", true);
+    table.add_column(type_Double, "double?", true);
+    table.add_column(type_Decimal, "decimal128?", true);
+    table.add_column(type_ObjectId, "objectId?", true);
+    table.add_column(type_UUID, "uuid?", true);
+
+    TestValueGenerator gen;
+
+    constexpr size_t num_rows = 10;
+    for (size_t i = 0; i < num_rows; ++i) {
+        std::string str = util::format("foo %1", i);
+        Timestamp ts{int64_t(i), 0};
+        BinaryData bd(str.c_str(), str.size() + 1); // include the terminal null so comparison against strings work
+        ObjectId oid(ts, int(i), int(i));
+        UUID uuid = gen.convert_for_test<UUID>(i);
+        table.create_object()
+            .set_all(int64_t(i), i % 2 == 1, StringData(str), bd, Mixed(str), ts, float(i), double(i),
+                     Decimal128(int64_t(i)), oid, uuid, int64_t(i), i % 2 == 1, StringData(str), bd, Mixed(str), ts,
+                     float(i), double(i), Decimal128(int64_t(i)), oid, uuid)
+            .get_key();
+    }
+
+    ColKeys columns = table.get_column_keys();
+    for (size_t i = 0; i < columns.size(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            ColKey lhs = columns[i];
+            ColKey rhs = columns[j];
+            DataType lhs_type = DataType(lhs.get_type());
+            DataType rhs_type = DataType(rhs.get_type());
+            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type);
+            size_t num_expected_matches = are_comparable ? num_rows : 0;
+            bool bool_vs_numeric_comparison = false;
+            if (are_comparable && ((lhs_type == type_Bool && rhs_type != type_Bool) ||
+                                   (lhs_type != type_Bool && rhs_type == type_Bool))) {
+                num_expected_matches = 2; // bool only stores two values so only matches the first two numerics
+                bool_vs_numeric_comparison = true;
+            }
+            else if ((lhs_type == type_Mixed || rhs_type == type_Mixed) &&
+                     ((lhs_type == type_String || rhs_type == type_String) ||
+                      (lhs_type == type_Binary || rhs_type == type_Binary))) {
+                num_expected_matches = num_rows; // mixed was set to the same string/binary value
+            }
+            {
+                size_t actual_matches = table.where().equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " == " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t actual_matches = table.where().not_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_rows - num_expected_matches, actual_matches);
+                if (actual_matches != num_rows - num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " != " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                if (bool_vs_numeric_comparison && rhs_type == type_Bool) {
+                    num_expected_matches = num_rows;
+                }
+                size_t actual_matches = table.where().greater_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " >= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                if (bool_vs_numeric_comparison) {
+                    num_expected_matches = (rhs_type == type_Bool) ? 2 : num_rows;
+                }
+                size_t actual_matches = table.where().less_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " <= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                num_expected_matches = 0;
+                if (bool_vs_numeric_comparison && rhs_type == type_Bool) {
+                    num_expected_matches = num_rows - 2;
+                }
+                size_t actual_matches = table.where().greater(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " > "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                num_expected_matches = 0;
+                if (bool_vs_numeric_comparison) {
+                    num_expected_matches = (lhs_type == type_Bool) ? num_rows - 2 : 0;
+                }
+                size_t actual_matches = table.where().less(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " < "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+
+            //    Query q_int = table.column<Int>(col_int) == table.column<type>(col_test);
+        }
+    }
+}
 
 TEST(Query_DateTest)
 {
@@ -2163,8 +2294,8 @@ TEST(Query_TwoColsNoRows)
     auto col0 = table.add_column(type_Int, "first1");
     auto col1 = table.add_column(type_Int, "second1");
 
-    CHECK_EQUAL(null_key, table.where().equal_int(col0, col1).find());
-    CHECK_EQUAL(null_key, table.where().not_equal_int(col0, col1).find());
+    CHECK_EQUAL(null_key, table.where().equal(col0, col1).find());
+    CHECK_EQUAL(null_key, table.where().not_equal(col0, col1).find());
 }
 
 
