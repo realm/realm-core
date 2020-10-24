@@ -710,7 +710,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
     size_t sz = m_tables.is_attached() ? m_tables.size() : 0;
     while (m_table_accessors.size() > sz) {
         if (Table* t = m_table_accessors.back()) {
-            t->detach();
+            t->detach(Table::cookie_void);
             recycle_table_accessor(t);
         }
         m_table_accessors.pop_back();
@@ -779,7 +779,7 @@ void Group::detach_table_accessors() noexcept
 {
     for (auto& table_accessor : m_table_accessors) {
         if (Table* t = table_accessor) {
-            t->detach();
+            t->detach(Table::cookie_transaction_ended);
             recycle_table_accessor(t);
             table_accessor = nullptr;
         }
@@ -1050,7 +1050,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     m_table_accessors[table_ndx] = nullptr;
     --m_num_tables;
 
-    table->detach();
+    table->detach(Table::cookie_removed);
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
     recycle_table_accessor(table.unchecked_ptr());
@@ -1641,7 +1641,7 @@ void Group::refresh_dirty_accessors()
                 table_accessor->refresh_accessor_tree();
             }
             else {
-                table_accessor->detach();
+                table_accessor->detach(Table::cookie_removed);
                 recycle_table_accessor(table_accessor);
                 m_table_accessors[i] = nullptr;
             }
