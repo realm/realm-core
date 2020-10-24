@@ -2213,6 +2213,15 @@ TEST(Query_TwoColumnsCrossTypes)
                               << " == " << table.get_column_name(rhs) << std::endl;
                 }
             }
+            // select some typed query expressions to test as well
+            if (lhs_type == type_Int && rhs_type == type_Double) {
+                size_t actual_matches = (table.column<Int>(lhs) == table.column<Double>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            if (lhs_type == type_String && rhs_type == type_Binary) {
+                size_t actual_matches = (table.column<String>(lhs) == table.column<Binary>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
             {
                 size_t actual_matches = table.where().not_equal(lhs, rhs).count();
                 CHECK_EQUAL(num_rows - num_expected_matches, actual_matches);
@@ -2267,8 +2276,6 @@ TEST(Query_TwoColumnsCrossTypes)
                               << table.get_column_name(rhs) << std::endl;
                 }
             }
-
-            //    Query q_int = table.column<Int>(col_int) == table.column<type>(col_test);
         }
     }
 }

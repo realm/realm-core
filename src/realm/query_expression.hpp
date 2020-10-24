@@ -971,7 +971,7 @@ public:
     {
 #ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
         // Test if expressions are of type Columns. Other possibilities are Value and Operator.
-        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
+        const Columns<L>* left_col = dynamic_cast<const Columns<L>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
@@ -1810,11 +1810,6 @@ private:
     friend Query compare(const Subexpr2<Link>&, const Obj&);
 };
 
-template <class T, class S, class I>
-Query string_compare(const Subexpr2<StringData>& left, T right, bool case_insensitive);
-template <class S, class I>
-Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData>& right, bool case_insensitive);
-
 template <class T>
 Value<T> make_value_for_link(bool only_unary_links, size_t size)
 {
@@ -2180,7 +2175,15 @@ public:
 };
 
 template <class T, class S, class I>
-Query string_compare(const Subexpr2<StringData>& left, T right, bool case_sensitive)
+inline std::enable_if_t<!realm::is_any_v<T, StringData, realm::null, const char*, std::string>, Query>
+string_compare(const Subexpr2<StringData>& left, T right, bool)
+{
+    return make_expression<Compare<Equal>>(right.clone(), left.clone());
+}
+
+template <class T, class S, class I>
+inline std::enable_if_t<realm::is_any_v<T, StringData, realm::null, const char*, std::string>, Query>
+string_compare(const Subexpr2<StringData>& left, T right, bool case_sensitive)
 {
     StringData sd(right);
     if (case_sensitive)
