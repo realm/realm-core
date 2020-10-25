@@ -696,10 +696,6 @@ void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 {
     auto callback = util::overloaded{
         [&](LstBase& list) {
-            if (instr.prior_size != list.size()) {
-                bad_transaction_log("ArrayClear: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
-                                    instr.prior_size);
-            }
             list.clear();
         },
         [](Dictionary& dict) {
