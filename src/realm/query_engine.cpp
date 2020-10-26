@@ -390,6 +390,68 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool is_nullable)
+{
+    switch (col_type) {
+        case col_type_Int: {
+            if (is_nullable) {
+                BPlusTree<util::Optional<Int>> list(alloc);
+                list.init_from_ref(ref);
+                return list.size();
+            }
+            else {
+                BPlusTree<Int> list(alloc);
+                list.init_from_ref(ref);
+                return list.size();
+            }
+        }
+        case col_type_Bool: {
+            BPlusTree<Bool> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_String: {
+            BPlusTree<String> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Binary: {
+            BPlusTree<Binary> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Timestamp: {
+            BPlusTree<Timestamp> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Float: {
+            BPlusTree<Float> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Double: {
+            BPlusTree<Double> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_LinkList: {
+            BPlusTree<ObjKey> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_OldStringEnum:
+        case col_type_Reserved4:
+        case col_type_OldMixed:
+        case col_type_OldTable:
+        case col_type_Link:
+        case col_type_BackLink:
+        case col_type_OldDateTime:
+            REALM_ASSERT(false);
+    }
+    return 0;
+}
+
 } // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)

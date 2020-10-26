@@ -371,34 +371,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
     ColumnAttrMask attr = column_key.get_attrs();
 
     if (attr.test(col_attr_List)) {
-        switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_OldDateTime: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<int64_t, Cond>(value, column_key)};
-            }
-            case type_Float: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<float, Cond>(value, column_key)};
-            }
-            case type_Double: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<double, Cond>(value, column_key)};
-            }
-            case type_String: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<String, Cond>(value, column_key)};
-            }
-            case type_Binary: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Binary, Cond>(value, column_key)};
-            }
-            case type_Timestamp: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Timestamp, Cond>(value, column_key)};
-            }
-            case type_LinkList: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
-            }
-            default: {
-                throw LogicError{LogicError::type_mismatch};
-            }
-        }
+        return std::unique_ptr<ParentNode>{new SizeListNode<Cond>(value, column_key)};
     }
     switch (type) {
         case type_String: {

@@ -1012,8 +1012,9 @@ private:
     int64_t m_value;
 };
 
+extern size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool nullable);
 
-template <class T, class TConditionFunction>
+template <class TConditionFunction>
 class SizeListNode : public ParentNode {
 public:
     SizeListNode(int64_t v, ColKey column)
@@ -1021,6 +1022,13 @@ public:
     {
         m_condition_column_key = column;
         m_dT = 30.0;
+    }
+
+    void reset_cache()
+    {
+        m_cached_col_type = m_condition_column_key.get_type();
+        m_cached_nullable = m_condition_column_key.is_nullable();
+        REALM_ASSERT_DEBUG(m_condition_column_key.is_list());
     }
 
     void cluster_changed() override
@@ -1033,16 +1041,22 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
+        reset_cache();
+    }
+
+    void init(bool will_query_ranges) override
+    {
+        ParentNode::init(will_query_ranges);
+        reset_cache();
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
+        Allocator& alloc = m_table.unchecked_ptr()->get_alloc();
         for (size_t s = start; s < end; ++s) {
             ref_type ref = m_leaf_ptr->get(s);
             if (ref) {
-                ListType list(m_table.unchecked_ptr()->get_alloc());
-                list.init_from_ref(ref);
-                int64_t sz = list.size();
+                int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);
                 if (TConditionFunction()(sz, m_value))
                     return s;
             }
@@ -1063,7 +1077,6 @@ public:
 
 private:
     // Leaf cache
-    using ListType = BPlusTree<T>;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type;
     using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
@@ -1071,6 +1084,9 @@ private:
     const ArrayList* m_leaf_ptr = nullptr;
 
     int64_t m_value;
+
+    ColumnType m_cached_col_type;
+    bool m_cached_nullable;
 };
 
 
