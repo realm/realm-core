@@ -6050,21 +6050,17 @@ TEST(LangBindHelper_FragmentFile)
     size_t total = free_space + used_space;
     std::vector<unsigned> progress_vector;
     for (int h = 0; h < 10; ++h)  {
-                // if (free_space * 100 / total > 50)
-        size_t evac_start = h * total / 10;
-        if (evac_start < 24) evac_start = 24;
-        size_t evac_end = (h+1) * total / 10;
-        std::cout << " *** Evacuating zone " << evac_start << " : " << evac_end << std::endl;
+        int commits = 0;
         do {
             tr->promote_to_write();
-            tr->touch(evac_start, evac_end, progress_vector, 10);
-            tr->set_evacuation_zone(evac_start, evac_end);
             tr->commit_and_continue_as_read();
+            tr->verify();
+            ++commits;
         } while (!tr->evacuated());
-        std::cout << " *** Evac zone empty" << std::endl;
+        std::cout << " *** Evac zone empty after " << commits << " commits" << std::endl;
         db->get_stats(free_space, used_space);
-        std::cout << free_space << ", " << used_space << std::endl;
         total = free_space + used_space;
+        std::cout << "Total: " << total << ",  Free: " << free_space << ", Used: " << used_space << std::endl;
     }
 
 }

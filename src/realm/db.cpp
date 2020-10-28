@@ -2204,19 +2204,70 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
 #if REALM_METRICS
     transaction.update_num_objects();
 #endif // REALM_METRICS
-
     // info->readers.dump();
+    // Load current defrag parameters.
+    std::vector<unsigned> progress_vector;
+    size_t evac_start, evac_end;
+    // Get a work limit based on the size of the transaction we're about to commit
+    // Assume at least 4K on top of that for the top arrays
+    size_t commit_size = m_alloc.get_commit_size();
+    size_t work_limit = 4*1024 + commit_size;
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
-    out.set_evacuation_zone(transaction.m_evac_start, transaction.m_evac_end);
+    transaction.load_defrag_parameters(evac_start, evac_end, progress_vector);
+    bool evac_done, zone_freed;
+    size_t allocatable;
+    out.set_evacuation_zone(evac_start, evac_end);
+    out.read_in_freelist(evac_done, zone_freed, allocatable);
+    if (evac_start != 0) { // we have a declared evac zone.
+        if (!evac_done) {
+            // Do first part of defrag by COW'ing relevant data (commit will do the rest)
+            std::cout << "COW for defrag, from " << evac_start << " to " << evac_end 
+                << " with a limit of " << work_limit << std::endl << "   progress: [";
+            for (auto e : progress_vector)
+                std::cout << e << ", ";
+            std::cout << "]" << std::endl;
+            transaction.touch(evac_start, evac_end, progress_vector, work_limit);
+        } else {
+            std::cout << "Evac complete" << std::endl;
+        }
+        if (zone_freed) {
+            std::cout << "Zone freed" << std::endl;
+            // we're done freing up the evacuation zone, so clear it.
+            evac_start = evac_end = 0;
+            progress_vector.resize(0);
+        }
+        transaction.m_evacuated = zone_freed;
+    } else {
+        transaction.m_evacuated = true; // if we're not evacuating, then....
+    }
+    // if we don't have a declared evac zone, look for a suitable one
+    if (evac_start == 0) {
+        size_t logical_file_size = out.get_logical_file_size();
+        // 1. We want at least 25% free space. Otherwise it's better to just extend the file to get there
+        if (allocatable > (logical_file_size >> 2)) {
+            std::cout << "<<< Enabling defragmentation >>>" << std::endl;
+            // 2. We'll split the file in 8 equally sized sectors, pick the last.
+            // TODO: instead pick the one with most fragmentation - fragmentation is 1 - (largest_free/total_free)
+            evac_start = 7 * logical_file_size / 8;
+            evac_end = logical_file_size;
+            progress_vector.resize(0);
+        }
+    }
+    // Save updated defrag parameters as part of commit
+    transaction.save_defrag_parameters(evac_start, evac_end, progress_vector);
+/*
+    std::cout << "Evac done: " << evac_done 
+              << "   Zone freed: " << zone_freed 
+              << "   Allocatable: " << allocatable << std::endl;
+*/
     ref_type new_top_ref;
-    // Recursively write all changed arrays to end of file
+    // Recursively write all changed arrays into file
     {
         // protect against race with any other DB trying to attach to the file
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         new_top_ref = out.write_group();                         // Throws
     }
-    transaction.m_evacuated = out.evacuated();
     {
         // protect access to shared variables and m_reader_mapping from here
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);

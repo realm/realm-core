@@ -587,7 +587,8 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
         case 7:
         case 9:
         case 10:
-        case 11: {
+        case 11:
+        case 12: {
             ref_type table_names_ref = arr.get_as_ref_or_tagged(s_table_name_ndx).get_as_ref();
             ref_type tables_ref = arr.get_as_ref_or_tagged(s_table_refs_ndx).get_as_ref();
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
@@ -1189,6 +1190,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
                 top.add(RefOrTagged::make_ref(history_info.ref));
                 top.add(RefOrTagged::make_tagged(history_info.version));
                 top.add(RefOrTagged::make_tagged(history_info.sync_file_id));
+                top.add(RefOrTagged::make_ref(0)); //put empt ydefragmenter metadata in
                 top_size = s_group_max_size;
             }
         }
@@ -1236,13 +1238,25 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
     out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
 
+//#define DEBUG_TOUCH
 bool Group::recursive_touch(size_t level, Array& parent, ref_type first, ref_type last, std::vector<unsigned>& progress_vector, size_t& work_limit)
 {
 #ifdef DEBUG_TOUCH
-    std::cout << parent.get_ref() << ",  sz = " << parent.size() << std::endl;
+    std::cout << parent.get_ref() << ",  sz = " << parent.size();
 #endif
-    if (parent.get_ref() >= first && parent.get_ref() < last)
+    if (parent.get_ref() + parent.get_byte_size() >= first && parent.get_ref() < last) {
         parent.copy_on_write();
+        if (parent.size() < work_limit)
+            work_limit -= parent.size();
+        else
+            work_limit = 0;
+#ifdef DEBUG_TOUCH
+        std::cout << "  [copied]";
+#endif
+    }
+#ifdef DEBUG_TOUCH
+    std::cout << std::endl;
+#endif
     if (parent.has_refs()) {
         if (work_limit == 0)
             return false;
@@ -1318,6 +1332,53 @@ void Group::touch(ref_type first, ref_type last, std::vector<unsigned>& progress
     }
 }
 
+void Group::load_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector) {
+    evac_start = evac_end = 0;
+    progress_vector.resize(0);
+    if (m_top.size() > s_defragment_meta_ndx) {
+        auto rot = m_top.get_as_ref_or_tagged(s_defragment_meta_ndx);
+        if (rot.get_as_ref() != 0) {
+            Array defrag_meta(m_alloc);
+            //defrag_meta.set_parent(&m_top, s_defragment_meta_ndx);
+            defrag_meta.init_from_ref(rot.get_as_ref());
+            auto defrag_size = defrag_meta.size();
+            REALM_ASSERT(defrag_size >= 2);
+            evac_start = defrag_meta.get(0);
+            evac_end = defrag_meta.get(1);
+            for (unsigned k = 2; k < defrag_size; ++k) {
+                progress_vector.emplace_back(defrag_meta.get(k));
+            }
+            REALM_ASSERT(progress_vector.size() < 1000);
+        }
+    }
+}
+
+void Group::save_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector) {
+    REALM_ASSERT(progress_vector.size() < 1000);
+    while (m_top.size() <= s_defragment_meta_ndx) {
+        m_top.add(0);
+    }
+
+    // Create array, if it doesn't exist
+    Array defrag_meta(m_alloc);
+    defrag_meta.set_parent(&m_top, s_defragment_meta_ndx);
+    if (m_top.get(s_defragment_meta_ndx) == 0) {
+        defrag_meta.create(NodeHeader::type_Normal);
+        //defrag_meta.update_parent();
+        m_top.set(s_defragment_meta_ndx, defrag_meta.get_ref());
+    }
+    else {
+        defrag_meta.init_from_parent();
+    }
+    REALM_ASSERT(defrag_meta.is_attached());
+    defrag_meta.clear();
+    defrag_meta.add(evac_start);
+    defrag_meta.add(evac_end);
+    for (auto e : progress_vector)
+        defrag_meta.add(e);
+}
+
+
 void Group::commit()
 {
     if (!is_attached())
@@ -1331,6 +1392,10 @@ void Group::commit()
     // Recursively write all changed arrays to the database file. We
     // postpone the commit until we are sure that no exceptions can be
     // thrown.
+    out.set_evacuation_zone(0,0);
+    bool evac_done, zone_freed;
+    size_t allocatable;
+    out.read_in_freelist(evac_done, zone_freed, allocatable);
     ref_type top_ref = out.write_group(); // Throws
 
     // Since the group is persisiting in single-thread (unshared)
@@ -1743,6 +1808,7 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         m_top.add(RefOrTagged::make_ref(history_ref)); // Throws
         m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
         m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
+        m_top.add(RefOrTagged::make_ref(0));
     }
     else {
         int stored_history_type = int(m_top.get_as_ref_or_tagged(s_hist_type_ndx).get_as_int());
@@ -1924,7 +1990,7 @@ void Group::verify() const
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
         REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 || m_top.size() == 10 ||
-                            m_top.size() == 11,
+                            m_top.size() == 11 || m_top.size() == 12,
                         m_top.size());
         Allocator& alloc = m_top.get_alloc();
         Array pos(alloc), len(alloc), ver(alloc);

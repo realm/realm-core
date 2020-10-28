@@ -60,6 +60,16 @@ public:
     void set_evacuation_zone(size_t evac_start, size_t evac_end) noexcept;
     bool evacuated() noexcept;
 
+    // Read in freelist to internal structures - also determine if any
+    // evacuation zone has been evacuated and if it has been freed.
+    // (evacuation may complete before everything is freed because
+    // older blocks are not fully free until their transaction dies)
+    // The total amount of memory which are ready for allocation is
+    // also computed. This excludes free memory inside any evacuation zone.
+    //
+    // Must be called before write_group()
+    void read_in_freelist(bool& evac_done, bool& zone_freed, size_t& allocatable);
+
     /// Write all changed array nodes into free space.
     ///
     /// Returns the new top ref. When in full durability mode, call
@@ -131,7 +141,6 @@ private:
     std::multimap<size_t, size_t> m_size_map;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 
-    void read_in_freelist();
     size_t recreate_freelist(size_t reserve_pos);
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation

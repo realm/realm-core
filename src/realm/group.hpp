@@ -542,6 +542,8 @@ public:
     /// size of the last snapshot done in that DB. If the snapshots are
     /// identical, the numbers will of course be equal.
     size_t get_used_space() const noexcept;
+    void load_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector);
+    void save_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector);
     void touch(ref_type first, ref_type end, std::vector<unsigned>& progress_vector, size_t work_limit);
     bool recursive_touch(size_t level, Array& parent, ref_type first, ref_type last, std::vector<unsigned>& progress_vector, size_t& work_limit);
     void verify() const;
@@ -591,6 +593,7 @@ private:
     ///    9th   History ref          (optional)             4
     ///   10th   History version      (optional)             7
     ///   11th   Sync File Id         (optional)            10
+    ///   12th   Defragmenter metadata (optional)
     ///
     /// </pre>
     ///
@@ -653,8 +656,9 @@ private:
     static constexpr size_t s_hist_ref_ndx = 8;
     static constexpr size_t s_hist_version_ndx = 9;
     static constexpr size_t s_sync_file_id_ndx = 10;
+    static constexpr size_t s_defragment_meta_ndx = 11;
 
-    static constexpr size_t s_group_max_size = 11;
+    static constexpr size_t s_group_max_size = 12;
 
     // We use the classic approach to construct a FIFO from two LIFO's,
     // insertion is done into recycler_1, removal is done from recycler_2,
@@ -1079,6 +1083,7 @@ inline void Group::init_array_parents() noexcept
     m_table_names.set_parent(&m_top, 0);
     m_tables.set_parent(&m_top, 1);
 }
+
 
 inline void Group::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
