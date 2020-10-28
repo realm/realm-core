@@ -2245,13 +2245,13 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
     if (evac_start == 0) {
         size_t logical_file_size = out.get_logical_file_size();
         // 1. We want at least 25% free space. Otherwise it's better to just extend the file to get there
-        if (allocatable > (logical_file_size >> 2)) {
-            std::cout << "<<< Enabling defragmentation >>>" << std::endl;
+        if (logical_file_size > 64 * 1024 && allocatable > (logical_file_size >> 2)) {
             // 2. We'll split the file in 8 equally sized sectors, pick the last.
             // TODO: instead pick the one with most fragmentation - fragmentation is 1 - (largest_free/total_free)
-            evac_start = 7 * logical_file_size / 8;
+            evac_start = round_up_to_page_size(7 * logical_file_size / 8);
             evac_end = logical_file_size;
             progress_vector.resize(0);
+            std::cout << "<<< Enabling defragmentation, zone [ " << evac_start << " : " << evac_end <<  " ] >>>" << std::endl;
         }
     }
     // Save updated defrag parameters as part of commit

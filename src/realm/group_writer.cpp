@@ -614,16 +614,18 @@ void GroupWriter::read_in_freelist(bool& evac_done, bool& zone_freed, size_t& al
         if (e.ref <= m_evac_start && e.ref + e.size >= m_evac_end) {
             zone_freed = true;
             m_evacuated = true;
-/*
+
                 // if the evac zone ends at the logical file size, reset it to
                 // start of free block and discard the free block.
                 size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
                 if (m_evac_end == logical_file_size) {
-                    std::cout << "*** Reducing logical file size to " << e.ref << std::endl;
-                    m_group.m_top.set(2, 1 + 2 * uint64_t(e.ref)); // Throws
-                    continue; // loses this free block
+                    REALM_ASSERT(m_evac_end == e.ref + e.size); 
+                    size_t new_logical_file_size = round_up_to_page_size(m_evac_start);
+                    std::cout << "*** Reducing logical file size to " << new_logical_file_size << std::endl;
+                    m_group.m_top.set(2, 1 + 2 * uint64_t(new_logical_file_size)); // Throws
+                    e.size = new_logical_file_size - e.ref;
                 }
-*/
+
         }
         // prevent use by moving free block to m_not_free_in_file:
         if (e.size) { // (merging may have left entries with size 0 behind. Must be ignored)
