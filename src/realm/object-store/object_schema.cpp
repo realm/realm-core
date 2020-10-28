@@ -138,13 +138,6 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     for (auto col_key : table->get_column_keys()) {
         StringData column_name = table->get_column_name(col_key);
 
-#if REALM_ENABLE_SYNC
-        // The object ID column is an implementation detail, and is omitted from the schema.
-        // FIXME: this can go away once sync adopts stable ids?
-        if (column_name.begins_with("!"))
-            continue;
-#endif
-
         Property property;
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(col_key);
