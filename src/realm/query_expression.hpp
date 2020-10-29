@@ -3276,7 +3276,7 @@ private:
                 }
             }
         }
-        Value<T> v;
+        Value<typename util::RemoveOptional<T>::type> v;
         v.init(is_from_list, values);
         destination.import(v);
     }
