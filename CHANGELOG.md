@@ -1,10 +1,9 @@
-# NEXT RELEASE
+# 6.2.0 Release notes
 
 ### Enhancements
-* None.
+* In cases where we use an outdated TableRef, we throw InvalidTableRef exception instead of NoSuchTable. NoSuchTable could be misleading as the table is most likely still there.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix crash in case insensitive query on indexed string columns when nothing matches ([#6836](https://github.com/realm/realm-cocoa/issues/6836), since v6.0.0)
 * Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, ([#3987](https://github.com/realm/realm-core/pull/3987), since v6.0.0).
 * Fix queries for the size of a list of primitive nullable ints returning size + 1. This applies to the `Query::size_*` methods (SizeListNode) and not query expression syntax (SizeOperator). ([#4016](https://github.com/realm/realm-core/pull/4016), since v6.0.0).
