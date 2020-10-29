@@ -3015,8 +3015,9 @@ TEST(Table_StableIteration)
 }
 
 TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<String>, Prop<Binary>,
-           Prop<Bool>, Nullable<Int>, Nullable<Float>, Nullable<Double>, Nullable<Timestamp>, Nullable<String>,
-           Nullable<Binary>, Nullable<Bool>)
+           Prop<Bool>, Prop<Decimal>, Prop<ObjectId>, Nullable<Int>, Nullable<Float>, Nullable<Double>,
+           Nullable<Timestamp>, Nullable<String>, Nullable<Binary>, Nullable<Bool>, Nullable<Decimal>,
+           Nullable<ObjectId>)
 {
     using underlying_type = typename TEST_TYPE::underlying_type;
     using type = typename TEST_TYPE::type;
@@ -3047,7 +3048,7 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>,
 
     Query q = table.where().size_equal(col, 3); // SizeListNode
     CHECK_EQUAL(q.count(), 1);
-    q = table.column<Lst<type>>(col).size() == 3; // SizeOperator expresison
+    q = table.column<Lst<underlying_type>>(col).size() == 3; // SizeOperator expresison
     CHECK_EQUAL(q.count(), 1);
 
     Lst<type> list2 = list;

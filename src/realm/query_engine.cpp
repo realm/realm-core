@@ -439,13 +439,22 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
+        case col_type_Decimal: {
+            BPlusTree<Decimal128> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_ObjectId: {
+            BPlusTree<ObjectId> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
         case col_type_LinkList: {
             BPlusTree<ObjKey> list(alloc);
             list.init_from_ref(ref);
             return list.size();
         }
         case col_type_OldStringEnum:
-        case col_type_Reserved4:
         case col_type_OldMixed:
         case col_type_OldTable:
         case col_type_Link:
