@@ -92,6 +92,8 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    const char* get_state() const noexcept;
+
     // Whether or not elements can be null.
     bool is_nullable(ColKey col_key) const;
 
@@ -598,6 +600,15 @@ protected:
     void check_lists_are_empty(size_t row_ndx) const;
 
 private:
+    enum LifeCycleCookie {
+        cookie_created = 0x1234,
+        cookie_transaction_ended = 0xcafe,
+        cookie_initialized = 0xbeef,
+        cookie_removed = 0xbabe,
+        cookie_void = 0x5678,
+        cookie_deleted = 0xdead,
+    };
+
     mutable WrappedAllocator m_alloc;
     Array m_top;
     void update_allocator_wrapper(bool writable)
@@ -709,7 +720,7 @@ private:
 
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.
-    void detach() noexcept;
+    void detach(LifeCycleCookie) noexcept;
     void fully_detach() noexcept;
 
     ColumnType get_real_column_type(ColKey col_key) const noexcept;
@@ -754,6 +765,7 @@ private:
     std::vector<size_t> m_leaf_ndx2spec_ndx;
     bool m_is_embedded = false;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
+    LifeCycleCookie m_cookie;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
@@ -1107,6 +1119,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
     m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_cookie = cookie_created;
 }
 
 inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)

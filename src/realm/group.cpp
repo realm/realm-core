@@ -717,7 +717,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
     size_t sz = m_tables.is_attached() ? m_tables.size() : 0;
     while (m_table_accessors.size() > sz) {
         if (Table* t = m_table_accessors.back()) {
-            t->detach();
+            t->detach(Table::cookie_void);
             recycle_table_accessor(t);
         }
         m_table_accessors.pop_back();
@@ -786,7 +786,7 @@ void Group::detach_table_accessors() noexcept
 {
     for (auto& table_accessor : m_table_accessors) {
         if (Table* t = table_accessor) {
-            t->detach();
+            t->detach(Table::cookie_transaction_ended);
             recycle_table_accessor(t);
             table_accessor = nullptr;
         }
@@ -1037,7 +1037,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     m_table_accessors[table_ndx] = nullptr;
     --m_num_tables;
 
-    table->detach();
+    table->detach(Table::cookie_removed);
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
     recycle_table_accessor(table.unchecked_ptr());
@@ -1618,7 +1618,7 @@ void Group::refresh_dirty_accessors()
                 table_accessor->refresh_accessor_tree();
             }
             else {
-                table_accessor->detach();
+                table_accessor->detach(Table::cookie_removed);
                 recycle_table_accessor(table_accessor);
                 m_table_accessors[i] = nullptr;
             }
@@ -1627,11 +1627,9 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream& in, bool writable)
 {
     REALM_ASSERT(is_attached());
-    // REALM_ASSERT(false); // FIXME: accessor updates need to be handled differently
-
     // Exception safety: If this function throws, the group accessor and all of
     // its subordinate accessors are left in a state that may not be fully
     // consistent. Only minimal consistency is guaranteed (see
@@ -1642,7 +1640,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // such actions will also lead to the detachment of all subordinate
     // accessors. Until then it is an error, and unsafe if the application
     // attempts to access the group one of its subordinate accessors.
-    //
     //
     // The purpose of this function is to refresh all attached accessors after
     // the underlying node structure has undergone arbitrary change, such as
@@ -1664,33 +1661,6 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // into a state where they correctly reflect the underlying structure (or
     // detach them if the underlying object has been removed.)
     //
-    // The consequences of the changes in the transaction logs can be divided
-    // into two types; those that need to be applied to the accessors
-    // immediately (Table::adj_insert_column()), and those that can be "lumped
-    // together" and deduced during a final accessor refresh operation
-    // (Table::refresh_accessor_tree()).
-    //
-    // Most transaction log instructions have consequences of both types. For
-    // example, when an "insert column" instruction is seen, we must immediately
-    // shift the positions of all existing columns accessors after the point of
-    // insertion. For practical reasons, and for efficiency, we will just insert
-    // a null pointer into `Table::m_cols` at this time, and then postpone the
-    // creation of the column accessor to the final per-table accessor refresh
-    // operation.
-    //
-    // The final per-table refresh operation visits each table accessor
-    // recursively starting from the roots (group-level tables). It relies on
-    // the the per-table accessor dirty flags (Table::m_dirty) to prune the
-    // traversal to the set of accessors that were touched by the changes in the
-    // transaction logs.
-    // Update memory mapping if database file has grown
-
-    // FIXME: When called from Transaction::internal_advance_read(), a previous
-    // call has already updated mappings and wrappers to the new state. By aligning
-    // other callers, we could remove the 2 calls below:
-    m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers(writable);
-
     // This is no longer needed in Core, but we need to compute "schema_changed",
     // for the benefit of ObjectStore.
     bool schema_changed = false;

@@ -2557,10 +2557,10 @@ TEST(Table_DetachedAccessor)
     Obj obj1 = table->create_object();
     group.remove_table("table");
 
-    CHECK_THROW(table->clear(), NoSuchTable);
-    CHECK_THROW(table->add_search_index(col_int), NoSuchTable);
-    CHECK_THROW(table->remove_search_index(col_int), NoSuchTable);
-    CHECK_THROW(table->get_object(key0), NoSuchTable);
+    CHECK_THROW(table->clear(), InvalidTableRef);
+    CHECK_THROW(table->add_search_index(col_int), InvalidTableRef);
+    CHECK_THROW(table->remove_search_index(col_int), InvalidTableRef);
+    CHECK_THROW(table->get_object(key0), InvalidTableRef);
     CHECK_THROW_ANY(obj1.set(col_str, "hello"));
 }
 
@@ -3044,6 +3044,11 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>,
     list.add(gen.convert_for_test<underlying_type>(3));
     CHECK_EQUAL(list.size(), 3);
     CHECK_EQUAL(list1.size(), 3);
+
+    Query q = table.where().size_equal(col, 3); // SizeListNode
+    CHECK_EQUAL(q.count(), 1);
+    q = table.column<Lst<type>>(col).size() == 3; // SizeOperator expresison
+    CHECK_EQUAL(q.count(), 1);
 
     Lst<type> list2 = list;
     CHECK_EQUAL(list2.size(), 3);
