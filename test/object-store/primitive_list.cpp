@@ -990,8 +990,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         SECTION("add value to list")
         {
-            // Remove the existing copy of this value so that the sorted list
-            // doesn't have dupes resulting in an unstable order
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                rchange = c;
+            });
             advance_and_notify(*r);
             r->begin_transaction();
             list.remove(0);
@@ -1026,6 +1030,12 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         SECTION("clear list")
         {
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            auto rtoken = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                rchange = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -1060,6 +1070,9 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
 
         SECTION("deleting containing row before first run of notifier")
         {
+            auto token = list.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             r2->begin_transaction();
             table2->begin()->remove();
             r2->commit_transaction();

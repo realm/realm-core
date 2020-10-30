@@ -8,6 +8,7 @@ set(SOURCES
     object_schema.cpp
     object_store.cpp
     results.cpp
+    set.cpp
     schema.cpp
     shared_realm.cpp
     thread_safe_reference.cpp
@@ -37,6 +38,7 @@ set(HEADERS
     object_store.hpp
     property.hpp
     results.hpp
+    set.hpp
     schema.hpp
     shared_realm.hpp
     thread_safe_reference.hpp)

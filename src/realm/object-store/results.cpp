@@ -731,26 +731,34 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
 util::Optional<Mixed> Results::max(ColKey column)
 {
     ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "max", [&](auto&& helper) { return helper.max(column, return_ndx); });
+    auto results = aggregate(column, "max", [&](auto&& helper) {
+        return helper.max(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::min(ColKey column)
 {
     ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "min", [&](auto&& helper) { return helper.min(column, return_ndx); });
+    auto results = aggregate(column, "min", [&](auto&& helper) {
+        return helper.min(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::sum(ColKey column)
 {
-    return aggregate(column, "sum", [&](auto&& helper) { return helper.sum(column); });
+    return aggregate(column, "sum", [&](auto&& helper) {
+        return helper.sum(column);
+    });
 }
 
 util::Optional<Mixed> Results::average(ColKey column)
 {
     size_t value_count = 0;
-    auto results = aggregate(column, "avg", [&](auto&& helper) { return helper.avg(column, &value_count); });
+    auto results = aggregate(column, "avg", [&](auto&& helper) {
+        return helper.avg(column, &value_count);
+    });
     return value_count == 0 ? none : results;
 }
 
@@ -1217,7 +1225,7 @@ Results::IncorrectTableException::IncorrectTableException(StringData e, StringDa
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
-    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
+    const char* column_type = string_for_property_type(type & PropertyType::Collection);
     if (is_array(type))
         return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
     if (is_set(type))
@@ -1231,7 +1239,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
     : std::logic_error(unsupported_operation_msg(column, table, operation))
     , column_key(column)
     , column_name(table.get_column_name(column))
-    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Collection)
+    , property_type(ObjectSchema::from_core_type(column) & PropertyType::Collection)
 {
 }
 
