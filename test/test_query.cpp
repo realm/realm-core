@@ -2142,9 +2142,8 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(2, q6.count());
 }
 
-TEST(Query_TwoColumnsCrossTypes)
+void construct_all_types_table(Table& table)
 {
-    Table table;
     table.add_column(type_Int, "int");
     table.add_column(type_Bool, "bool");
     table.add_column(type_String, "string");
@@ -2168,7 +2167,12 @@ TEST(Query_TwoColumnsCrossTypes)
     table.add_column(type_Decimal, "decimal128?", true);
     table.add_column(type_ObjectId, "objectId?", true);
     table.add_column(type_UUID, "uuid?", true);
+}
 
+TEST(Query_TwoColumnsCrossTypes)
+{
+    Table table;
+    construct_all_types_table(table);
     TestValueGenerator gen;
 
     constexpr size_t num_rows = 10;
@@ -2279,6 +2283,116 @@ TEST(Query_TwoColumnsCrossTypes)
         }
     }
 }
+
+TEST(Query_TwoColumnsCrossTypesNullability)
+{
+    Table table;
+    construct_all_types_table(table);
+    TestValueGenerator gen;
+
+    constexpr size_t num_rows = 1;
+    table.create_object(); // add one row of default values, null or zero
+
+    ColKeys columns = table.get_column_keys();
+    for (size_t i = 0; i < columns.size(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            ColKey lhs = columns[i];
+            ColKey rhs = columns[j];
+            DataType lhs_type = DataType(lhs.get_type());
+            DataType rhs_type = DataType(rhs.get_type());
+            bool both_non_nullable = !lhs.is_nullable() && !rhs.is_nullable();
+            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type);
+            size_t num_expected_matches = 0;
+            if (lhs.is_nullable() && rhs.is_nullable()) {
+                num_expected_matches = 1; // both default to null
+            }
+            else if (!lhs.is_nullable() && !rhs.is_nullable()) {
+                if (are_comparable) {
+                    num_expected_matches = 1; // numerics are 0
+                }
+                if ((lhs_type == type_Binary && rhs_type == type_String) ||
+                    (lhs_type == type_String && rhs_type == type_Binary)) {
+                    num_expected_matches =
+                        0; // although comparable, the defaults differ from String: "\0" and Binary: ""
+                }
+            }
+            {
+                size_t actual_matches = table.where().equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " == " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            // select some typed query expressions to test as well
+            if (lhs_type == type_Int && rhs_type == type_Double) {
+                size_t actual_matches = (table.column<Int>(lhs) == table.column<Double>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            if (lhs_type == type_String && rhs_type == type_Binary) {
+                size_t actual_matches = (table.column<String>(lhs) == table.column<Binary>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            {
+                size_t actual_matches = table.where().not_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_rows - num_expected_matches, actual_matches);
+                if (actual_matches != num_rows - num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " != " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_gte = num_expected_matches;
+                if (both_non_nullable && lhs_type == type_String && rhs_type == type_Binary) {
+                    expected_gte = num_rows;
+                }
+                size_t actual_matches = table.where().greater_equal(lhs, rhs).count();
+                CHECK_EQUAL(expected_gte, actual_matches);
+                if (actual_matches != expected_gte) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " >= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_le = num_expected_matches;
+                if (both_non_nullable && lhs_type == type_Binary && rhs_type == type_String) {
+                    expected_le = num_rows;
+                }
+                size_t actual_matches = table.where().less_equal(lhs, rhs).count();
+                CHECK_EQUAL(expected_le, actual_matches);
+                if (actual_matches != expected_le) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " <= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_greater = 0;
+                if (both_non_nullable && lhs_type == type_String && rhs_type == type_Binary) {
+                    expected_greater = num_rows;
+                }
+                size_t actual_matches = table.where().greater(lhs, rhs).count();
+                CHECK_EQUAL(expected_greater, actual_matches);
+                if (actual_matches != expected_greater) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " > "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_less = 0;
+                if (both_non_nullable && lhs_type == type_Binary && rhs_type == type_String) {
+                    expected_less = num_rows;
+                }
+                size_t actual_matches = table.where().less(lhs, rhs).count();
+                CHECK_EQUAL(expected_less, actual_matches);
+                if (actual_matches != expected_less) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " < "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+        }
+    }
+}
+
 
 TEST(Query_DateTest)
 {

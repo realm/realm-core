@@ -2550,33 +2550,6 @@ public:
         bool col2_nullable = m_condition_column_key2.is_nullable();
 
         while (s < end) {
-            // FIXME: maybe optimize ints
-            //            if (std::is_same<TConditionValue, int64_t>::value) {
-            //                // For int64_t we've created an array intrinsics named compare_leafs which template
-            //                expands bitwidths
-            //                // of boths arrays to make Get faster.
-            //                QueryState<int64_t> qs(act_ReturnFirst);
-            //                bool resume = m_leaf_ptr1->template compare_leafs<TConditionFunction, act_ReturnFirst>(
-            //                    m_leaf_ptr2, start, end, 0, &qs, CallbackDummy());
-            //
-            //                if (resume)
-            //                    s = end;
-            //                else
-            //                    return to_size_t(qs.m_state);
-            //            }
-            // This is for float and double.
-
-#if 0 && defined(REALM_COMPILER_AVX)
-// AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
-//
-// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
-// or movemask_cmp_ps (gcc/clang)
-//
-// See https://github.com/rrrlasse/realm/tree/AVX for an example of utilizing AVX for a two-column search which has
-// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs
-// 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
-#endif
-
             Mixed v1 = get_value_from_leaf(m_leaf_ptr1.get(), col1_type, col1_nullable, s);
             Mixed v2 = get_value_from_leaf(m_leaf_ptr2.get(), col2_type, col2_nullable, s);
             if (TConditionFunction()(v1, v2))

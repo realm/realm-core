@@ -445,7 +445,7 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
             }
             return std::make_unique<ArrayInteger>(alloc);
         case col_type_Bool:
-            return std::make_unique<ArrayBool>(alloc);
+            return std::make_unique<ArrayBoolNull>(alloc);
         case col_type_String:
             return std::make_unique<ArrayString>(alloc);
         case col_type_Binary:
@@ -455,9 +455,9 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
         case col_type_Timestamp:
             return std::make_unique<ArrayTimestamp>(alloc);
         case col_type_Float:
-            return std::make_unique<ArrayFloat>(alloc);
+            return std::make_unique<ArrayFloatNull>(alloc);
         case col_type_Double:
-            return std::make_unique<ArrayDouble>(alloc);
+            return std::make_unique<ArrayDoubleNull>(alloc);
         case col_type_Decimal:
             return std::make_unique<ArrayDecimal128>(alloc);
         case col_type_Link:
@@ -486,7 +486,7 @@ Mixed TwoColumnsNodeBase::get_value_from_leaf(ArrayPayload* leaf, ColumnType col
             }
             return (static_cast<ArrayInteger*>(leaf))->get(ndx);
         case col_type_Bool:
-            return (static_cast<ArrayBool*>(leaf))->get(ndx);
+            return (static_cast<ArrayBoolNull*>(leaf))->get(ndx);
         case col_type_String:
             return (static_cast<ArrayString*>(leaf))->get(ndx);
         case col_type_Binary:
@@ -496,9 +496,9 @@ Mixed TwoColumnsNodeBase::get_value_from_leaf(ArrayPayload* leaf, ColumnType col
         case col_type_Timestamp:
             return (static_cast<ArrayTimestamp*>(leaf))->get(ndx);
         case col_type_Float:
-            return (static_cast<ArrayFloat*>(leaf))->get(ndx);
+            return (static_cast<ArrayFloatNull*>(leaf))->get(ndx);
         case col_type_Double:
-            return (static_cast<ArrayDouble*>(leaf))->get(ndx);
+            return (static_cast<ArrayDoubleNull*>(leaf))->get(ndx);
         case col_type_Decimal:
             return (static_cast<ArrayDecimal128*>(leaf))->get(ndx);
         case col_type_Link:
