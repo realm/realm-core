@@ -25,6 +25,7 @@ set(SOURCES
 
 set(HEADERS
     binding_callback_thread_observer.hpp
+    binding_context.hpp
     collection_notifications.hpp
     feature_checks.hpp
     index_set.hpp
@@ -94,7 +95,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp)
-    
+
     set(BSON_HEADERS
         util/bson/bson.hpp
         util/bson/min_key.hpp
