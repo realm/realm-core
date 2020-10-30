@@ -1,9 +1,9 @@
 #ifndef REALM_OS_LIST_HPP
 #define REALM_OS_LIST_HPP
 
-#include "object.hpp"
-#include "property.hpp"
-#include "results.hpp"
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
 
 namespace realm::object_store {
 
