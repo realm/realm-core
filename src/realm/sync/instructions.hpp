@@ -17,7 +17,7 @@
 #include <realm/sync/object_id.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/util/overloaded.hpp>
+#include <realm/util/overload.hpp>
 
 namespace realm {
 
@@ -1041,7 +1041,7 @@ inline T* Instruction::get_if() noexcept
     }
     else if constexpr (std::is_same_v<ObjectInstruction, T>) {
         // This should compile to nothing but a comparison of the type.
-        return visit(util::overloaded{
+        return visit(util::overload{
             [](AddTable&) -> ObjectInstruction* {
                 return nullptr;
             },
@@ -1061,7 +1061,7 @@ inline T* Instruction::get_if() noexcept
     }
     else if constexpr (std::is_same_v<PathInstruction, T>) {
         // This should compile to nothing but a comparison of the type.
-        return visit(util::overloaded{
+        return visit(util::overload{
             [](AddTable&) -> PathInstruction* {
                 return nullptr;
             },

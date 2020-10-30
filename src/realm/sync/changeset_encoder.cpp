@@ -118,7 +118,7 @@ void ChangesetEncoder::append_value(const Instruction::Payload::Link& link)
 void ChangesetEncoder::append_value(const Instruction::PrimaryKey& pk)
 {
     using Type = Instruction::Payload::Type;
-    auto append = util::overloaded{
+    auto append = util::overload{
         [&](mpark::monostate) {
             append_value(Type::Null);
         },
