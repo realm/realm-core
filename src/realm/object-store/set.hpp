@@ -1,5 +1,5 @@
-#ifndef REALM_OS_LIST_HPP
-#define REALM_OS_LIST_HPP
+#ifndef REALM_OS_SET_HPP
+#define REALM_OS_SET_HPP
 
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/property.hpp>
@@ -107,4 +107,4 @@ private:
 
 } // namespace realm::object_store
 
-#endif // REALM_OS_LIST_HPP
+#endif // REALM_OS_SET_HPP
