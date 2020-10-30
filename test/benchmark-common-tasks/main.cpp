@@ -807,6 +807,40 @@ struct BenchmarkIntVsDoubleColumns : Benchmark {
 };
 
 
+struct BenchmarkQueryIntListSize : Benchmark {
+    ColKey int_list_col_ndx;
+    constexpr static size_t num_rows = BASE_SIZE * 4;
+    void before_all(DBRef group)
+    {
+        WrtTrans tr(group);
+        TableRef t = tr.add_table(name());
+        int_list_col_ndx = t->add_column_list(type_Int, "ints");
+        for (size_t i = 0; i < num_rows; ++i) {
+            auto obj = t->create_object().set_list_values<Int>(int_list_col_ndx, {0, 1, 2});
+        }
+        tr.commit();
+    }
+    const char* name() const
+    {
+        return "QueryListOfPrimitiveIntsSize";
+    }
+    void operator()(DBRef)
+    {
+        TableRef table = m_table;
+        Query q = table->where().size_equal(int_list_col_ndx, 3);
+        size_t count = q.count();
+        REALM_ASSERT_3(count, ==, (num_rows));
+    }
+
+    void after_all(DBRef group)
+    {
+        WrtTrans tr(group);
+        tr.get_group().remove_table(name());
+        tr.commit();
+    }
+};
+
+
 struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
     const char* name() const
     {
@@ -1930,6 +1964,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryTimestampNotEqual);
     BENCH(BenchmarkQueryTimestampNotNull);
     BENCH(BenchmarkQueryTimestampEqualNull);
+    BENCH(BenchmarkQueryIntListSize);
 
     BENCH(BenchmarkWithIntUIDsRandomOrderSeqAccess);
     BENCH(BenchmarkWithIntUIDsRandomOrderRandomAccess);

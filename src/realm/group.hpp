@@ -746,7 +746,9 @@ private:
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&, bool writable);
+    /// Memory mappings must have been updated to reflect any growth in filesize before
+    /// calling advance_transact()
+    void advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream&, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 

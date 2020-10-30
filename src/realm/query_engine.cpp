@@ -179,9 +179,10 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
         }
 
         // Find first match in this condition node
-        r = find_first_local(r + 1, end);
+        auto pos = r + 1;
+        r = find_first_local(pos, end);
         if (r == not_found) {
-            m_dD = double(r - start) / (local_matches + 1.1);
+            m_dD = double(pos - start) / (local_matches + 1.1);
             return end;
         }
 
@@ -210,7 +211,6 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
 
 void StringNodeEqualBase::init(bool will_query_ranges)
 {
-    m_dD = 10.0;
     StringNodeBase::init(will_query_ranges);
 
     if (m_is_string_enum) {
@@ -240,7 +240,7 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
                 // We are not advancing through the clusters. We basically don't know where we are,
                 // so just start over from the beginning.
                 m_results_ndx = m_results_start;
-                m_actual_key = get_key(m_results_ndx);
+                m_actual_key = (m_results_start != m_results_end) ? get_key(m_results_start) : ObjKey();
             }
             m_last_start_key = first_key;
 
@@ -394,6 +394,77 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool is_nullable)
+{
+    switch (col_type) {
+        case col_type_Int: {
+            if (is_nullable) {
+                BPlusTree<util::Optional<Int>> list(alloc);
+                list.init_from_ref(ref);
+                return list.size();
+            }
+            else {
+                BPlusTree<Int> list(alloc);
+                list.init_from_ref(ref);
+                return list.size();
+            }
+        }
+        case col_type_Bool: {
+            BPlusTree<Bool> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_String: {
+            BPlusTree<String> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Binary: {
+            BPlusTree<Binary> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Timestamp: {
+            BPlusTree<Timestamp> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Float: {
+            BPlusTree<Float> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Double: {
+            BPlusTree<Double> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Decimal: {
+            BPlusTree<Decimal128> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_ObjectId: {
+            BPlusTree<ObjectId> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_LinkList: {
+            BPlusTree<ObjKey> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_OldStringEnum:
+        case col_type_OldMixed:
+        case col_type_OldTable:
+        case col_type_Link:
+        case col_type_BackLink:
+        case col_type_OldDateTime:
+            REALM_ASSERT(false);
+    }
+    return 0;
+}
+
 } // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)
@@ -532,7 +603,6 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
 : m_expression(std::move(expression))
 {
-    m_dD = 100.0;
     m_dT = 50.0;
 }
 

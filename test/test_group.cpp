@@ -564,7 +564,7 @@ TEST(Group_ObjUseAfterTableDetach)
         obj.set(col, 42);
         CHECK_EQUAL(obj.get<int64_t>(col), 42);
     }
-    CHECK_THROW(obj.get<int64_t>(col), realm::NoSuchTable);
+    CHECK_THROW(obj.get<int64_t>(col), realm::InvalidTableRef);
 }
 
 TEST(Group_RemoveTableWithColumns)
