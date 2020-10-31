@@ -5434,6 +5434,7 @@ TEST(Query_OptimalNode)
     }
 
     auto q1 = table->where().equal(col_type, "todo0", false);
+    q1.count(); // Warm up
     auto t1 = steady_clock::now();
     auto cnt = q1.count();
     auto t2 = steady_clock::now();
@@ -5442,6 +5443,7 @@ TEST(Query_OptimalNode)
     // std::cout << "cnt: " << cnt << " dur1: " << dur1 << " us" << std::endl;
 
     auto q2 = table->where().contains(col_tags, "tag0", false);
+    q2.count(); // Warm up
     t1 = steady_clock::now();
     cnt = q2.count();
     t2 = steady_clock::now();
@@ -5450,6 +5452,7 @@ TEST(Query_OptimalNode)
     // std::cout << "cnt: " << cnt << " dur2: " << dur2 << " us" << std::endl;
 
     Query q = q1.and_query(q2);
+    q.count(); // Warm up
     t1 = steady_clock::now();
     cnt = q.count();
     t2 = steady_clock::now();
