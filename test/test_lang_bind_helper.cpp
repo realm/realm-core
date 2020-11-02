@@ -6049,15 +6049,9 @@ TEST(LangBindHelper_FragmentFile)
     std::cout << free_space << ", " << used_space << std::endl;
     size_t total = free_space + used_space;
     std::vector<unsigned> progress_vector;
-    for (int h = 0; h < 10; ++h)  {
-        int commits = 0;
-        do {
-            tr->promote_to_write();
-            tr->commit_and_continue_as_read();
-            tr->verify();
-            ++commits;
-        } while (!tr->evacuated());
-        std::cout << " *** Evac zone empty after " << commits << " commits" << std::endl;
+    for (int h = 0; h < 1000; ++h)  {
+        tr->promote_to_write();
+        tr->commit_and_continue_as_read();
         db->get_stats(free_space, used_space);
         total = free_space + used_space;
         std::cout << "Total: " << total << ",  Free: " << free_space << ", Used: " << used_space << std::endl;

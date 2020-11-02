@@ -542,8 +542,8 @@ public:
     /// size of the last snapshot done in that DB. If the snapshots are
     /// identical, the numbers will of course be equal.
     size_t get_used_space() const noexcept;
-    void load_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector);
-    void save_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector);
+    void load_defrag_parameters(size_t& evac_start, size_t& evac_end, size_t& lfs, std::vector<unsigned>& progress_vector);
+    void save_defrag_parameters(size_t& evac_start, size_t& evac_end, size_t& lfs, std::vector<unsigned>& progress_vector);
     void touch(ref_type first, ref_type end, std::vector<unsigned>& progress_vector, size_t work_limit);
     bool recursive_touch(size_t level, Array& parent, ref_type first, ref_type last, std::vector<unsigned>& progress_vector, size_t& work_limit);
     void verify() const;

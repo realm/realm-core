@@ -308,7 +308,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     return m_map_windows[0].get();
 }
 
-#define REALM_ALLOC_DEBUG 1
+#define REALM_ALLOC_DEBUG 0
 
 ref_type GroupWriter::write_group()
 {
@@ -534,13 +534,20 @@ ref_type GroupWriter::write_group()
 }
 
 
-void GroupWriter::read_in_freelist(bool& evac_done, bool& zone_freed, size_t& allocatable)
+void GroupWriter::read_in_freelist(bool& evac_done, bool& zone_freed, size_t& allocatable, Zones& zones)
 {
     FreeList free_in_file;
     FreeList eventually_free_in_file;
     zone_freed = evac_done = false;
     allocatable = 0;
     bool is_shared = m_group.m_is_shared;
+    size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
+    zones.resize(8);
+    for (int j = 0; j < 8; ++j) {
+        zones[j].ref_end = round_up_to_page_size(((j + 1) * logical_file_size) / 8);
+        zones[j].total_free = 0;
+        zones[j].largest_free = 0;
+    }
     size_t limit = m_free_lengths.size();
     REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
     REALM_ASSERT_RELEASE_EX(!is_shared || m_free_versions.size() == limit, limit, m_free_versions.size());
@@ -583,59 +590,87 @@ void GroupWriter::read_in_freelist(bool& evac_done, bool& zone_freed, size_t& al
             m_free_versions.copy_on_write();
     }
 
-    // determine if we're done evacuating an evac zone
-    // TODO: Handle no evac zone better
     // std::cout << "Eventually free: " << eventually_free_in_file.size() << " / ";
     eventually_free_in_file.merge_adjacent_entries_in_freelist();
     // std::cout << eventually_free_in_file.size() << std::endl;
+    int current_zone = 0;
     for (auto& e: eventually_free_in_file) {
+        size_t ref = e.ref;
+        size_t size = e.size;
+        while (size) {
+            while (ref >= zones[current_zone].ref_end) {
+                ++current_zone;
+            }
+            if (ref + size < zones[current_zone].ref_end) {
+                zones[current_zone].total_free += size;
+                if (size > zones[current_zone].largest_free)
+                    zones[current_zone].largest_free = size;
+                size = 0;
+            } else {
+                size_t in_zone = zones[current_zone].ref_end - ref;
+                zones[current_zone].total_free += in_zone;
+                if (in_zone > zones[current_zone].largest_free)
+                    zones[current_zone].largest_free = in_zone;
+                ref = zones[current_zone].ref_end;
+                size -= in_zone;
+            }
+        }
         if (e.ref >= m_evac_end)
             continue;
         if (e.ref + e.size <= m_evac_start)
             continue;
-        //std::cout << "    [ " << e.ref << " : " << e.ref + e.size << " ]" << std::endl;
         if (e.ref <= m_evac_start && e.ref + e.size >= m_evac_end) {
             evac_done = true;
         }
     }
-
     free_in_file.merge_adjacent_entries_in_freelist();
     // After merge, we can pick out free blocks which are in the evac zone and prevent
     // their use. We can also detect if the entire evac zone is empty.
     for (auto& e: free_in_file) {
-        if (e.ref >= m_evac_end) {
-            allocatable += e.size;
+        if (e.size == 0) {
             continue;
         }
-        if (e.ref + e.size <= m_evac_start) {
+        if (e.ref >= m_evac_end || e.ref + e.size <= m_evac_start) {
+            // whole block is outside evac zone
             allocatable += e.size;
+            m_size_map.emplace(e.size, e.ref);
             continue;
         }
-        if (e.ref <= m_evac_start && e.ref + e.size >= m_evac_end) {
+        size_t ref = e.ref;
+        size_t size = e.size;
+        if (ref < m_evac_start) { // part before evac zone is usable
+            size_t before = m_evac_start - ref;
+            m_size_map.emplace(before, ref);
+            allocatable += before;
+            ref = m_evac_start;
+            REALM_ASSERT(size > before);
+            size -= before;
+        }
+        if (ref + size > m_evac_end) { // part after evac zone is usable
+            size_t after = ref + size - m_evac_end;
+            m_size_map.emplace(after, m_evac_end);
+            allocatable += after;
+            REALM_ASSERT(size > after);
+            size -= after;
+        }
+        if (ref == m_evac_start && ref + size == m_evac_end) {
+            // evac zone is free!
             zone_freed = true;
             m_evacuated = true;
 
-                // if the evac zone ends at the logical file size, reset it to
-                // start of free block and discard the free block.
-                size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
-                if (m_evac_end == logical_file_size) {
-                    REALM_ASSERT(m_evac_end == e.ref + e.size); 
-                    size_t new_logical_file_size = round_up_to_page_size(m_evac_start);
-                    std::cout << "*** Reducing logical file size to " << new_logical_file_size << std::endl;
-                    m_group.m_top.set(2, 1 + 2 * uint64_t(new_logical_file_size)); // Throws
-                    e.size = new_logical_file_size - e.ref;
-                }
-
+            // if the evac zone ends at the logical file size, reset it to
+            // start of free block and discard the free block.
+            if (m_evac_end == logical_file_size) {
+                REALM_ASSERT(m_evac_end == ref + size); 
+                size_t new_logical_file_size = m_evac_start;
+                std::cout << "*** Reducing logical file size to " << new_logical_file_size << std::endl;
+                m_group.m_top.set(2, 1 + 2 * uint64_t(new_logical_file_size)); // Throws
+                continue;
+            }
         }
-        // prevent use by moving free block to m_not_free_in_file:
-        if (e.size) { // (merging may have left entries with size 0 behind. Must be ignored)
-            m_not_free_in_file.emplace_back(e.ref, e.size, e.released_at_version);
-            e.size = 0; // <-- setting to zero will cause this entry to be dropped below
-        }
+        // final case: block is entirely inside evac zone
+        m_not_free_in_file.emplace_back(ref, size, e.released_at_version);
     }
-    // Previous step produces - potentially - some entries with size of zero. These
-    // entries will be skipped in the next step.
-    free_in_file.move_free_in_file_to_size_map(m_size_map);
 }
 
 size_t GroupWriter::recreate_freelist(size_t reserve_pos)
@@ -822,6 +857,16 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_free_list_element
 
 GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(size_t size)
 {
+/*
+    auto it = m_size_map.end();
+    if (m_size_map.size() == 0)
+        return it;
+    --it;
+    if (it->first >= size) {
+        auto ret = search_free_space_in_free_list_element(it, size);
+        return ret;
+    }
+*/
     auto it = m_size_map.lower_bound(size);
     while (it != m_size_map.end()) {
         // Accept either a perfect match or a block that is twice the size. Tests have shown
@@ -838,6 +883,7 @@ GroupWriter::FreeListElement GroupWriter::search_free_space_in_part_of_freelist(
             it = m_size_map.lower_bound(2 * size);
         }
     }
+
     // No match
     return m_size_map.end();
 }

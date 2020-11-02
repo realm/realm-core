@@ -2207,60 +2207,79 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
     // info->readers.dump();
     // Load current defrag parameters.
     std::vector<unsigned> progress_vector;
-    size_t evac_start, evac_end;
+    size_t evac_start, evac_end, old_lfs;
     // Get a work limit based on the size of the transaction we're about to commit
     // Assume at least 4K on top of that for the top arrays
     size_t commit_size = m_alloc.get_commit_size();
     size_t work_limit = 4*1024 + commit_size;
     GroupWriter out(transaction, Durability(info->durability)); // Throws
+    size_t logical_file_size = out.get_logical_file_size();
     out.set_versions(new_version, oldest_version);
-    transaction.load_defrag_parameters(evac_start, evac_end, progress_vector);
+    transaction.load_defrag_parameters(evac_start, evac_end, old_lfs, progress_vector);
+    if (evac_start && old_lfs < logical_file_size) {
+        // abort any ongoing defragmentation, since previous commit had to extend the file
+        std::cout << "Evac aborted" << std::endl;
+        evac_start = evac_end = 0;
+    }
     bool evac_done, zone_freed;
     size_t allocatable;
     out.set_evacuation_zone(evac_start, evac_end);
-    out.read_in_freelist(evac_done, zone_freed, allocatable);
+    GroupWriter::Zones zones;
+    out.read_in_freelist(evac_done, zone_freed, allocatable, zones);
     if (evac_start != 0) { // we have a declared evac zone.
         if (!evac_done) {
             // Do first part of defrag by COW'ing relevant data (commit will do the rest)
-            std::cout << "COW for defrag, from " << evac_start << " to " << evac_end 
-                << " with a limit of " << work_limit << std::endl << "   progress: [";
-            for (auto e : progress_vector)
-                std::cout << e << ", ";
-            std::cout << "]" << std::endl;
             transaction.touch(evac_start, evac_end, progress_vector, work_limit);
-        } else {
-            std::cout << "Evac complete" << std::endl;
         }
         if (zone_freed) {
-            std::cout << "Zone freed" << std::endl;
             // we're done freing up the evacuation zone, so clear it.
-            evac_start = evac_end = 0;
+            // this is done by zeroing evac_end, but not evac_start until later
+            // to prevent setting a new evac zone based on zoning that may have
+            // changed due to reduction in logical file size.
+            evac_end = 0;
             progress_vector.resize(0);
         }
-        transaction.m_evacuated = zone_freed;
-    } else {
-        transaction.m_evacuated = true; // if we're not evacuating, then....
     }
     // if we don't have a declared evac zone, look for a suitable one
     if (evac_start == 0) {
-        size_t logical_file_size = out.get_logical_file_size();
-        // 1. We want at least 25% free space. Otherwise it's better to just extend the file to get there
-        if (logical_file_size > 64 * 1024 && allocatable > (logical_file_size >> 2)) {
-            // 2. We'll split the file in 8 equally sized sectors, pick the last.
-            // TODO: instead pick the one with most fragmentation - fragmentation is 1 - (largest_free/total_free)
-            evac_start = round_up_to_page_size(7 * logical_file_size / 8);
-            evac_end = logical_file_size;
+        // We want at least 20% free space. Otherwise it's better to just extend the file to get there
+        if (logical_file_size > 64 * 1024 && allocatable > (logical_file_size * 0.2)) {
+            for (auto& e : zones) {
+                std::cout << "    zone ending " << e.ref_end << " :   total free " << e.total_free
+                          << "    largest free " << e.largest_free << std::endl;
+            }
+            // If we have at least 30% free space, reducing file size is the priority
+            int best_choice = zones.size() - 1;
+            // If between 30% and 20% make choice based on fragmentation.
+            if (allocatable <= (logical_file_size * 0.3)) {
+                // Pick sector with most fragmentation
+                float max_frag = 0.0;
+                int j;
+                for (j = zones.size() -1; j >= 0 ; --j) {
+                    if (zones[j].total_free == 0) continue;
+                    float frag = 1.0 - 1.0 * zones[j].largest_free / zones[j].total_free;
+                    if (frag > max_frag) {
+                        max_frag = frag;
+                        best_choice = j;
+                    }
+                }
+            }
+            std::cout << "Picking zone nr " << best_choice << std::endl;
+            if (best_choice == 0) {
+                evac_start = 24;
+                evac_end = zones[best_choice].ref_end;
+            }
+            else {
+                evac_start = zones[best_choice-1].ref_end;
+                evac_end = zones[best_choice].ref_end;
+            }
             progress_vector.resize(0);
             std::cout << "<<< Enabling defragmentation, zone [ " << evac_start << " : " << evac_end <<  " ] >>>" << std::endl;
         }
     }
+    if (evac_end == 0) evac_start = 0;
     // Save updated defrag parameters as part of commit
-    transaction.save_defrag_parameters(evac_start, evac_end, progress_vector);
-/*
-    std::cout << "Evac done: " << evac_done 
-              << "   Zone freed: " << zone_freed 
-              << "   Allocatable: " << allocatable << std::endl;
-*/
+    transaction.save_defrag_parameters(evac_start, evac_end, logical_file_size, progress_vector);
     ref_type new_top_ref;
     // Recursively write all changed arrays into file
     {
@@ -2273,7 +2292,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
-        m_used_space = out.get_physical_file_size() - m_free_space;
+        // m_used_space = out.get_physical_file_size() - m_free_space;
+        m_used_space = out.get_logical_file_size() - m_free_space;
         // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
         //     << " Read lock at version " << oldest_version << std::endl;
         switch (Durability(info->durability)) {

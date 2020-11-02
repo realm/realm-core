@@ -1332,8 +1332,8 @@ void Group::touch(ref_type first, ref_type last, std::vector<unsigned>& progress
     }
 }
 
-void Group::load_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector) {
-    evac_start = evac_end = 0;
+void Group::load_defrag_parameters(size_t& evac_start, size_t& evac_end, size_t& lfs, std::vector<unsigned>& progress_vector) {
+    evac_start = evac_end = lfs = 0;
     progress_vector.resize(0);
     if (m_top.size() > s_defragment_meta_ndx) {
         auto rot = m_top.get_as_ref_or_tagged(s_defragment_meta_ndx);
@@ -1345,7 +1345,8 @@ void Group::load_defrag_parameters(size_t& evac_start, size_t& evac_end, std::ve
             REALM_ASSERT(defrag_size >= 2);
             evac_start = defrag_meta.get(0);
             evac_end = defrag_meta.get(1);
-            for (unsigned k = 2; k < defrag_size; ++k) {
+            lfs = defrag_meta.get(2);
+            for (unsigned k = 3; k < defrag_size; ++k) {
                 progress_vector.emplace_back(defrag_meta.get(k));
             }
             REALM_ASSERT(progress_vector.size() < 1000);
@@ -1353,7 +1354,7 @@ void Group::load_defrag_parameters(size_t& evac_start, size_t& evac_end, std::ve
     }
 }
 
-void Group::save_defrag_parameters(size_t& evac_start, size_t& evac_end, std::vector<unsigned>& progress_vector) {
+void Group::save_defrag_parameters(size_t& evac_start, size_t& evac_end, size_t& lfs, std::vector<unsigned>& progress_vector) {
     REALM_ASSERT(progress_vector.size() < 1000);
     while (m_top.size() <= s_defragment_meta_ndx) {
         m_top.add(0);
@@ -1374,6 +1375,7 @@ void Group::save_defrag_parameters(size_t& evac_start, size_t& evac_end, std::ve
     defrag_meta.clear();
     defrag_meta.add(evac_start);
     defrag_meta.add(evac_end);
+    defrag_meta.add(lfs);
     for (auto e : progress_vector)
         defrag_meta.add(e);
 }
@@ -1395,7 +1397,8 @@ void Group::commit()
     out.set_evacuation_zone(0,0);
     bool evac_done, zone_freed;
     size_t allocatable;
-    out.read_in_freelist(evac_done, zone_freed, allocatable);
+    GroupWriter::Zones zones;
+    out.read_in_freelist(evac_done, zone_freed, allocatable, zones);
     ref_type top_ref = out.write_group(); // Throws
 
     // Since the group is persisiting in single-thread (unshared)
@@ -1507,6 +1510,7 @@ size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noex
         MemStats stats;
         m_table_names.stats(stats);
         m_tables.stats(stats);
+        // TODO: Correct size calculation
         used = stats.allocated + m_top.get_byte_size();
         used += sizeof(SlabAlloc::Header);
     }

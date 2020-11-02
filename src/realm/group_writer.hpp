@@ -64,11 +64,17 @@ public:
     // evacuation zone has been evacuated and if it has been freed.
     // (evacuation may complete before everything is freed because
     // older blocks are not fully free until their transaction dies)
-    // The total amount of memory which are ready for allocation is
+    // The total amount of memory which bis ready for allocation is
     // also computed. This excludes free memory inside any evacuation zone.
     //
     // Must be called before write_group()
-    void read_in_freelist(bool& evac_done, bool& zone_freed, size_t& allocatable);
+    struct ZoneStat {
+        size_t ref_end; // end of zone
+        size_t total_free; // includes locked memory
+        size_t largest_free; // includes locked memory
+    };
+    using Zones = std::vector<ZoneStat>;
+    void read_in_freelist(bool& evac_done, bool& zone_freed, size_t& allocatable, Zones& zones);
 
     /// Write all changed array nodes into free space.
     ///
