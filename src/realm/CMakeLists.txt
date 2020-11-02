@@ -101,7 +101,7 @@ set(UTIL_SOURCES
     util/websocket.cpp
 )
 
-set(REALM_INSTALL_GENERAL_HEADERS
+set(REALM_INSTALL_HEADERS
     alloc.hpp
     alloc_slab.hpp
     array.hpp
@@ -117,46 +117,48 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_direct.hpp
     array_fixed_bytes.hpp
     array_integer.hpp
-    array_mixed.hpp
     array_key.hpp
     array_list.hpp
+    array_mixed.hpp
     array_ref.hpp
     array_string.hpp
     array_string_short.hpp
     array_timestamp.hpp
+    array_typed_link.hpp
     array_unsigned.hpp
     binary_data.hpp
     bplustree.hpp
     chunked_binary.hpp
     cluster.hpp
     cluster_tree.hpp
-    table_cluster_tree.hpp
     collection.hpp
     column_binary.hpp
-    column_integer.hpp
     column_fwd.hpp
+    column_integer.hpp
     column_type.hpp
     column_type_traits.hpp
     data_type.hpp
+    db.hpp
+    db_options.hpp
     decimal128.hpp
     dictionary.hpp
     disable_sync_to_disk.hpp
     exceptions.hpp
+    global_key.hpp
     group.hpp
-    db.hpp
-    db_options.hpp
     group_writer.hpp
     handover_defs.hpp
     history.hpp
     index_string.hpp
     keys.hpp
-    mixed.hpp
-    null.hpp
     list.hpp
+    mixed.hpp
     node.hpp
     node_header.hpp
+    null.hpp
     obj.hpp
-    global_key.hpp
+    obj_list.hpp
+    object_id.hpp
     owned_data.hpp
     query.hpp
     query_conditions.hpp
@@ -165,13 +167,12 @@ set(REALM_INSTALL_GENERAL_HEADERS
     realm_nmmintrin.h
     replication.hpp
     set.hpp
+    sort_descriptor.hpp
     spec.hpp
     string_data.hpp
     table.hpp
+    table_cluster_tree.hpp
     table_ref.hpp
-    sort_descriptor.hpp
-    obj_list.hpp
-    object_id.hpp
     table_view.hpp
     timestamp.hpp
     unicode.hpp
@@ -179,9 +180,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     uuid.hpp
     version.hpp
     version_id.hpp
-) # REALM_INSTALL_GENERAL_HEADERS
 
-set(REALM_INSTALL_IMPL_HEADERS
     impl/array_writer.hpp
     impl/cont_transact_hist.hpp
     impl/destroy_guard.hpp
@@ -189,9 +188,9 @@ set(REALM_INSTALL_IMPL_HEADERS
     impl/output_stream.hpp
     impl/simulated_failure.hpp
     impl/transact_log.hpp
-)
 
-set(REALM_INSTALL_UTIL_HEADERS
+    util/aes_cryptor.hpp
+    util/allocation_metrics.hpp
     util/allocator.hpp
     util/any.hpp
     util/assert.hpp
@@ -202,13 +201,14 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/buffer.hpp
     util/buffer_stream.hpp
     util/call_with_tuple.hpp
-    util/fixed_size_buffer.hpp
     util/cf_ptr.hpp
     util/encrypted_file_mapping.hpp
+    util/errno.hpp
     util/features.h
     util/fifo_helper.hpp
     util/file.hpp
     util/file_mapper.hpp
+    util/fixed_size_buffer.hpp
     util/function_ref.hpp
     util/hex_dump.hpp
     util/inspect.hpp
@@ -217,43 +217,39 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/logger.hpp
     util/memory_stream.hpp
     util/misc_errors.hpp
+    util/misc_ext_errors.hpp
     util/miscellaneous.hpp
+    util/network.hpp
     util/optional.hpp
     util/overload.hpp
     util/priority_queue.hpp
     util/safe_int_ops.hpp
-    util/serializer.hpp
     util/scope_exit.hpp
+    util/serializer.hpp
+    util/sha_crypto.hpp
     util/shared_ptr.hpp
     util/string_buffer.hpp
+    util/string_view.hpp
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp
     util/type_list.hpp
     util/type_traits.hpp
     util/utf8.hpp
-) # REALM_INSTALL_UTIL_HEADERS
 
-set(REALM_METRICS_HEADERS
+    util/metered/unordered_map.hpp
+    util/metered/vector.hpp
+    util/metered/map.hpp
+    util/metered/set.hpp
+    util/metered/string.hpp
+    util/metered/deque.hpp
+    util/metered/unordered_set.hpp
+
     metrics/metrics.hpp
     metrics/metric_timer.hpp
     metrics/query_info.hpp
     metrics/transaction_info.hpp
-) # REALM_METRICS_HEADERS
-
-set(REALM_OTHER_UTIL_HEADERS
-    util/sha_crypto.hpp
-    util/aes_cryptor.hpp
-    util/errno.hpp
-) # REALM_OTHER_UTIL_HEADERS
-
-set(REALM_INSTALL_ALL_HEADERS
-    ${REALM_INSTALL_GENERAL_HEADERS}
-    ${REALM_INSTALL_UTIL_HEADERS}
-    ${REALM_INSTALL_IMPL_HEADERS}
-    ${REALM_OTHER_UTIL_HEADERS}
-    ${REALM_METRICS_HEADERS}
-)
+) # REALM_INSTALL_HEADERS
 
 list(APPEND REALM_SOURCES
     metrics/metrics.cpp
@@ -268,7 +264,7 @@ endif()
 add_library(Storage STATIC
     ${REALM_SOURCES}
     ${UTIL_SOURCES}
-    ${REALM_INSTALL_ALL_HEADERS}
+    ${REALM_INSTALL_HEADERS}
     ${REALM_OBJECT_FILES}
     $<TARGET_OBJECTS:Bid>
 )
@@ -317,21 +313,12 @@ install(TARGETS Storage EXPORT realm
         ARCHIVE DESTINATION lib
         COMPONENT devel)
 
-install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
-        DESTINATION include/realm
-        COMPONENT devel)
-install(FILES ${REALM_INSTALL_IMPL_HEADERS}
-        DESTINATION include/realm/impl
-        COMPONENT devel)
-install(FILES ${REALM_INSTALL_UTIL_HEADERS}
-        DESTINATION include/realm/util
-        COMPONENT devel)
-install(FILES ${REALM_OTHER_UTIL_HEADERS}
-        DESTINATION include/realm/util
-        COMPONENT devel)
-install(FILES ${REALM_METRICS_HEADERS}
-        DESTINATION include/realm/metrics
-        COMPONENT devel)
+foreach(FILE ${REALM_INSTALL_HEADERS})
+    get_filename_component(DIR ${FILE} DIRECTORY)
+    INSTALL(FILES ${FILE}
+            DESTINATION include/realm/${DIR}
+            COMPONENT devel)
+endforeach()
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/version_numbers.hpp
         DESTINATION include/realm
         COMPONENT devel)

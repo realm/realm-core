@@ -21,10 +21,16 @@ set(SOURCES
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
     util/scheduler.cpp
-    util/uuid.cpp)
+    util/uuid.cpp
+
+    util/android/scheduler.hpp
+    util/apple/scheduler.hpp
+    util/generic/scheduler.hpp
+    util/uv/scheduler.hpp)
 
 set(HEADERS
     binding_callback_thread_observer.hpp
+    binding_context.hpp
     collection_notifications.hpp
     feature_checks.hpp
     index_set.hpp
@@ -39,9 +45,8 @@ set(HEADERS
     results.hpp
     schema.hpp
     shared_realm.hpp
-    thread_safe_reference.hpp)
+    thread_safe_reference.hpp
 
-set(IMPL_HEADERS
     impl/apple/external_commit_helper.hpp
     impl/apple/keychain_helper.hpp
     impl/epoll/external_commit_helper.hpp
@@ -57,13 +62,7 @@ set(IMPL_HEADERS
     impl/realm_coordinator.hpp
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp
-    impl/weak_realm_notifier.hpp)
-
-set(UTIL_HEADERS
-    util/android/scheduler.hpp
-    util/apple/scheduler.hpp
-    util/generic/scheduler.hpp
-    util/uv/scheduler.hpp
+    impl/weak_realm_notifier.hpp
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
@@ -75,7 +74,7 @@ set(UTIL_HEADERS
     util/uuid.hpp)
 
 if(REALM_ENABLE_SYNC)
-    set(SYNC_HEADERS
+    list(APPEND HEADERS
         sync/app.hpp
         sync/app_utils.hpp
         sync/app_credentials.hpp
@@ -89,19 +88,19 @@ if(REALM_ENABLE_SYNC)
         sync/mongo_client.hpp
         sync/mongo_collection.hpp
         sync/mongo_database.hpp
-        sync/push_client.hpp)
-    set(SYNC_IMPL_HEADERS
+        sync/push_client.hpp
+
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
-        sync/impl/sync_metadata.hpp)
-    
-    set(BSON_HEADERS
+        sync/impl/sync_metadata.hpp
+
         util/bson/bson.hpp
         util/bson/min_key.hpp
         util/bson/max_key.hpp
         util/bson/regular_expression.hpp
         util/bson/indexed_map.hpp
         util/bson/mongo_timestamp.hpp)
+
     list(APPEND SOURCES
         sync/app.cpp
         sync/app_utils.cpp
@@ -158,32 +157,18 @@ endif()
 target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
 
 if(REALM_ENABLE_SYNC)
-    # Add the sync libraries separately to reduce merge conflicts.
     target_link_libraries(ObjectStore PUBLIC Sync)
     target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
+endif()
 
-    set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
-    install(FILES ${HEADERS}
-            DESTINATION include/realm/object-store
+set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
+
+foreach(FILE ${HEADERS})
+    get_filename_component(DIR ${FILE} DIRECTORY)
+    INSTALL(FILES ${FILE}
+            DESTINATION include/realm/object-store/${DIR}
             COMPONENT devel)
-    install(FILES ${IMPL_HEADERS}
-            DESTINATION include/realm/object-store/impl
-            COMPONENT devel)
-    install(FILES ${UTIL_HEADERS}
-            DESTINATION include/realm/object-store/util
-            COMPONENT devel)
-    if(REALM_ENABLE_SYNC)
-        install(FILES ${SYNC_HEADERS}
-                DESTINATION include/realm/object-store/sync
-                COMPONENT devel)
-        install(FILES ${SYNC_IMPL_HEADERS}
-                DESTINATION include/realm/object-store/sync/impl
-                COMPONENT devel)
-        install(FILES ${BSON_HEADERS}
-                DESTINATION include/realm/object-store/util/bson
-                COMPONENT devel)
-    endif()
-    install(TARGETS ObjectStore EXPORT realm
+endforeach()
+install(TARGETS ObjectStore EXPORT realm
         ARCHIVE DESTINATION lib
         COMPONENT devel)
-endif()

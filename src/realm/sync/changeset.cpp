@@ -60,7 +60,7 @@ InternString Changeset::find_string(StringData string) const noexcept
 
 PrimaryKey Changeset::get_key(const Instruction::PrimaryKey& key) const noexcept
 {
-    auto get = overloaded{
+    auto get = overload{
         [&](InternString str) -> PrimaryKey {
             return get_string(str);
         },
@@ -144,7 +144,7 @@ std::ostream& Changeset::print_path(std::ostream& os, const Instruction::Path& p
             os << '.';
         }
         first = false;
-        auto print = overloaded{
+        auto print = overload{
             [&](uint32_t index) {
                 os << index;
             },
@@ -209,10 +209,10 @@ void Changeset::verify() const
     };
 
     auto verify_key = [&](const Instruction::PrimaryKey& key) {
-        mpark::visit(util::overloaded{[&](InternString str) {
-                                          verify_intern_string(str);
-                                      },
-                                      [](auto&&) {}},
+        mpark::visit(util::overload{[&](InternString str) {
+                                        verify_intern_string(str);
+                                    },
+                                    [](auto&&) {}},
                      key);
     };
 
@@ -236,10 +236,10 @@ void Changeset::verify() const
 
     auto verify_path = [&](const Instruction::Path& path) {
         for (auto& element : path.m_path) {
-            mpark::visit(util::overloaded{[&](InternString str) {
-                                              verify_intern_string(str);
-                                          },
-                                          [](auto&&) {}},
+            mpark::visit(util::overload{[&](InternString str) {
+                                            verify_intern_string(str);
+                                        },
+                                        [](auto&&) {}},
                          element);
         }
     };
@@ -265,7 +265,7 @@ void Changeset::verify() const
                 }
             }
             else if (auto add_table_instr = instr->get_if<Instruction::AddTable>()) {
-                mpark::visit(util::overloaded{
+                mpark::visit(util::overload{
                                  [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
                                      REALM_ASSERT(is_valid_key_type(spec.type));
                                      verify_intern_string(spec.field);
@@ -294,7 +294,7 @@ void Changeset::Reflector::operator()(const Instruction::AddTable& p) const
 {
     m_tracer.name("AddTable");
     table_instr(p);
-    auto trace = util::overloaded{
+    auto trace = util::overload{
         [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
             m_tracer.field("pk_field", spec.field);
             m_tracer.field("pk_type", spec.type);
@@ -487,7 +487,7 @@ void Changeset::Printer::field(StringData n, Instruction::AddColumn::CollectionT
 
 std::string Changeset::Printer::primary_key_to_string(const Instruction::PrimaryKey& key)
 {
-    auto convert = overloaded{
+    auto convert = overload{
         [&](const mpark::monostate&) {
             return std::string("NULL");
         },
@@ -543,7 +543,7 @@ void Changeset::Printer::field(StringData n, const Instruction::Path& path)
         }
         first = false;
 
-        auto print = util::overloaded{
+        auto print = util::overload{
             [&](InternString field) {
                 ss << m_changeset->get_string(field);
             },

@@ -287,13 +287,6 @@ if [[ -n $COPY ]]; then
     rm -rf "${DESTINATION}/core"
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
-
-    if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
-        rm -rf "${DESTINATION}/realm-monorepo.xcframework"
-        cp -Rc realm-monorepo.xcframework "${DESTINATION}"
-        rm -rf "${DESTINATION}/realm-monorepo-dbg.xcframework"
-        cp -Rc realm-monorepo-dbg.xcframework "${DESTINATION}"
-    fi
 else
     rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"
     # .tar.gz package is used by realm-js, which uses the parser
