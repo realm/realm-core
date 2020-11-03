@@ -2393,6 +2393,42 @@ TEST(Query_TwoColumnsCrossTypesNullability)
     }
 }
 
+TEST(Query_TwoColumnsCrossTypesNaN)
+{
+    // across double/float nullable/non-nullable combinations
+    // verify query comparisons for: NaN == NaN, null == null, NaN != null
+    Table table;
+    table.add_column(type_Float, "float");
+    table.add_column(type_Double, "double");
+    table.add_column(type_Float, "float?", true);
+    table.add_column(type_Double, "double?", true);
+
+    CHECK(std::numeric_limits<double>::has_quiet_NaN);
+    CHECK(std::numeric_limits<float>::has_quiet_NaN);
+    double nan_d = std::numeric_limits<double>::quiet_NaN();
+    float nan_f = std::numeric_limits<float>::quiet_NaN();
+    util::Optional<double> null_d;
+    util::Optional<float> null_f;
+    table.create_object().set_all(nan_f, nan_d, null_f, null_d);
+    table.create_object().set_all(nan_f, nan_d, nan_f, nan_d);
+    ColKeys columns = table.get_column_keys();
+    for (size_t i = 0; i < columns.size(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            ColKey lhs = columns[i];
+            ColKey rhs = columns[j];
+            bool same_nullablity = lhs.is_nullable() == rhs.is_nullable();
+            size_t num_expected_matches = same_nullablity ? 2 : 1;
+            {
+                size_t actual_matches = table.where().equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " == " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+        }
+    }
+}
 
 TEST(Query_DateTest)
 {
