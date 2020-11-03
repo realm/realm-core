@@ -385,6 +385,14 @@ public:
             m_name = n;
         }
 
+        void path(StringData n, InternString table, const Instruction::PrimaryKey& pk,
+                  util::Optional<InternString> field, const Instruction::Path* path) override
+        {
+            std::stringstream ss;
+            m_changeset->print_path(ss, table, pk, field, path);
+            m_fields.emplace(n, ss.str());
+        }
+
         void field(StringData n, InternString str) override
         {
             m_fields.emplace(n, get_string(str));
@@ -455,6 +463,14 @@ public:
         void name(StringData n) override
         {
             m_os << std::left << std::setw(16) << std::string(n);
+        }
+
+        void path(StringData n, InternString table, const Instruction::PrimaryKey& pk,
+                  util::Optional<InternString> field, const Instruction::Path* path) override
+        {
+            std::stringstream ss;
+            m_changeset->print_path(ss, table, pk, field, path);
+            diff_field(n, ss.str());
         }
 
         void field(StringData n, InternString str) override
@@ -837,6 +853,8 @@ struct TransformerImpl::Transformer {
             if (m_trace) {
                 MergeTracer tracer{m_minor_side, m_major_side};
                 merge_instructions(m_major_side, m_minor_side);
+                if (new_major)
+                    std::cerr << TERM_CYAN << "\n(new major round)\n" << TERM_RESET;
                 tracer.print_diff(std::cerr, new_major || print_noop_merges);
                 new_major = false;
             }

@@ -54,6 +54,9 @@ struct Changeset {
     PrimaryKey get_key(const Instruction::PrimaryKey& value) const noexcept;
     std::ostream& print_value(std::ostream& os, const Instruction::Payload& value) const noexcept;
     std::ostream& print_path(std::ostream& os, const Instruction::Path& value) const noexcept;
+    std::ostream& print_path(std::ostream& os, InternString table, const Instruction::PrimaryKey& pk,
+                             util::Optional<InternString> field = util::none,
+                             const Instruction::Path* path = nullptr) const;
 
     /// Mark the changeset as "dirty" (i.e. modified by the merge algorithm).
     void set_dirty(bool dirty = true) noexcept;
@@ -335,6 +338,8 @@ struct Changeset::Range {
 struct Changeset::Reflector {
     struct Tracer {
         virtual void name(StringData) = 0;
+        virtual void path(StringData, InternString table, const Instruction::PrimaryKey& object_key,
+                          util::Optional<InternString> field, const Instruction::Path* path) = 0;
         virtual void field(StringData, InternString) = 0;
         virtual void field(StringData, Instruction::Payload::Type) = 0;
         virtual void field(StringData, Instruction::AddColumn::CollectionType) = 0;
@@ -378,6 +383,8 @@ struct Changeset::Printer : Changeset::Reflector::Tracer {
 
     // ChangesetReflector::Tracer interface:
     void name(StringData) final;
+    void path(StringData, InternString table, const Instruction::PrimaryKey&, util::Optional<InternString> field,
+              const Instruction::Path* path) final;
     void field(StringData, InternString) final;
     void field(StringData, Instruction::Payload::Type) final;
     void field(StringData, Instruction::AddColumn::CollectionType) final;
