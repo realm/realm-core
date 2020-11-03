@@ -482,6 +482,10 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         return;
     }
 
+    if (col == table->get_primary_key_column()) {
+        return;
+    }
+
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
         if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
