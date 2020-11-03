@@ -434,6 +434,24 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
+ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key_type)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+    if (target.is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_Dictionary);
+    ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
+    return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
+}
+
 void Table::remove_recursive(CascadeState& cascade_state)
 {
     Group* group = get_parent_group();

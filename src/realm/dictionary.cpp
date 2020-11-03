@@ -286,19 +286,32 @@ void Dictionary::create()
 
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
-    REALM_ASSERT(value.get_type() != type_Link);
-
     if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
-    if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
+    if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
+        if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
+            throw std::runtime_error("Dictionary::insert: Wrong object type");
+        }
+    }
+    else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
     ObjLink new_link;
     if (value.get_type() == type_TypedLink) {
-        new_link = value.template get<ObjLink>();
+        new_link = value.get<ObjLink>();
         m_obj.get_table()->get_parent_group()->validate(new_link);
+    }
+    else if (value.get_type() == type_Link) {
+        auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
+        auto key = value.get<ObjKey>();
+        if (!target_table->is_valid(key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
+        }
+
+        new_link = ObjLink(target_table->get_key(), key);
+        value = Mixed(new_link);
     }
 
     create();
@@ -311,9 +324,9 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 
     m_obj.bump_content_version();
     try {
-        auto state = m_clusters->insert(k, key, value);
+        ClusterNode::State state = m_clusters->insert(k, key, value);
 
-        if (value.get_type() == type_TypedLink) {
+        if (new_link) {
             CascadeState cascade_state;
             m_obj.replace_backlink(m_col_key, ObjLink(), new_link, cascade_state);
         }
@@ -327,16 +340,15 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         values.set_parent(&fields, 2);
         values.init_from_parent();
 
-        if (value.get_type() == type_TypedLink) {
-            Mixed old_value = values.get(state.index);
-            ObjLink old_link;
-            if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
-                old_link = old_value.get<ObjLink>();
-            }
-            if (new_link != old_link) {
-                CascadeState cascade_state;
-                m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
-            }
+        Mixed old_value = values.get(state.index);
+        ObjLink old_link;
+        if (!old_value.is_null() && old_value.get_type() == type_TypedLink) {
+            old_link = old_value.get<ObjLink>();
+        }
+
+        if (new_link != old_link) {
+            CascadeState cascade_state;
+            m_obj.replace_backlink(m_col_key, old_link, new_link, cascade_state);
         }
 
         values.set(state.index, value);
@@ -459,8 +471,12 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
     // Filter out potential unresolved links
     if (!val.is_null() && val.get_type() == type_TypedLink) {
         auto link = val.get<ObjLink>();
-        if (link.get_obj_key().is_unresolved()) {
+        auto key = link.get_obj_key();
+        if (key.is_unresolved()) {
             return {};
+        }
+        if (m_col_key.get_type() == col_type_Link) {
+            return key;
         }
     }
     return val;
