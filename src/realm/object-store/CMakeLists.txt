@@ -3,6 +3,7 @@ set(SOURCES
     collection_notifications.cpp
     index_set.cpp
     collection.cpp
+    dictionary.cpp
     list.cpp
     object.cpp
     object_changeset.cpp
@@ -37,6 +38,7 @@ set(HEADERS
     index_set.hpp
     keypath_helpers.hpp
     collection.hpp
+    dictionary.hpp
     list.hpp
     object.hpp
     object_accessor.hpp
