@@ -497,6 +497,21 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
     }
 
     if (select_table(*table)) {
+        // Elide emission of Update(NULL, default=true) for embedded object /
+        // dictionary columns if the value is already NULL. This is a workaround
+        // for the fact that erase always wins for nested structures, but we
+        // don't want default values to win over later embedded object creation.
+        if (variant == _impl::instr_SetDefault && value.is_null()) {
+            if (col.get_type() == col_type_Link && table->get_object(key).is_null(col)) {
+                return;
+            }
+            if (col.is_dictionary() && table->get_object(key).is_null(col)) {
+                // Dictionary columns cannot currently be NULL, but this is
+                // likely to change.
+                return;
+            }
+        }
+
         Instruction::Update instr;
         populate_path_instr(instr, *table, key, col);
         instr.value = as_payload(*table, col, value);

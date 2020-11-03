@@ -1539,13 +1539,8 @@ DEFINE_MERGE(Instruction::EraseObject, Instruction::CreateObject)
     if (same_object(left, right)) {
         // CONFLICT: Create and Erase of the same object.
         //
-        // RESOLUTION: Let the instruction with the higher timestamp survive.
-        if (right_side.timestamp() < left_side.timestamp()) {
-            right_side.discard();
-        }
-        else {
-            left_side.discard();
-        }
+        // RESOLUTION: Erase always wins.
+        right_side.discard();
     }
 }
 
@@ -1567,20 +1562,31 @@ DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::CreateObject);
 DEFINE_NESTED_MERGE(Instruction::EraseObject)
 {
     if (is_prefix_of(outer, inner)) {
+        // Erase always wins.
         inner_side.discard();
     }
 }
 
-// EraseObject is idempotent.
-DEFINE_MERGE_NOOP(Instruction::EraseObject, Instruction::EraseObject);
+DEFINE_MERGE(Instruction::EraseObject, Instruction::EraseObject)
+{
+    if (same_object(left, right)) {
+        // We keep the most recent erase. This prevents the situation where a
+        // high number of EraseObject instructions in the past trumps a
+        // Erase-Create pair in the future.
+        if (right_side.timestamp() < left_side.timestamp()) {
+            right_side.discard();
+        }
+        else {
+            left_side.discard();
+        }
+    }
+}
 
 // Handled by nested merge.
 DEFINE_MERGE_NOOP(Instruction::Update, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::AddInteger, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::AddColumn, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::EraseObject);
-
-// Handled by nested merge.
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseObject);
@@ -1594,11 +1600,17 @@ DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseObject);
 
 DEFINE_NESTED_MERGE(Instruction::Update)
 {
-    // Setting a value higher up in the hierarchy overwrites any modification to
-    // the inner value.
-    if (is_prefix_of(outer, inner)) {
-        // FIXME: Should Set(ObjectValue) be idempotent, same as CreateObject?
+    using Type = Instruction::Payload::Type;
 
+    if (outer.value.type == Type::ObjectValue || outer.value.type == Type::Dictionary) {
+        // Creating an embedded object or a dictionary is an idempotent
+        // operation, and should not eliminate updates to the subtree.
+        return;
+    }
+
+    // Setting a value higher up in the hierarchy overwrites any modification to
+    // the inner value, regardless of when this happened.
+    if (is_prefix_of(outer, inner)) {
         inner_side.discard();
     }
 }
@@ -1606,6 +1618,8 @@ DEFINE_NESTED_MERGE(Instruction::Update)
 DEFINE_MERGE(Instruction::Update, Instruction::Update)
 {
     // The two instructions are at the same level of nesting.
+
+    using Type = Instruction::Payload::Type;
 
     if (same_path(left, right)) {
         bool left_is_default = false;
@@ -1619,6 +1633,20 @@ DEFINE_MERGE(Instruction::Update, Instruction::Update)
         }
         else {
             REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
+        }
+
+        if (left.value.type != right.value.type) {
+            // Embedded object / dictionary creation should always lose to an
+            // Update(NULL), because these structures are nested, and we need to
+            // discard any update inside the structure.
+            if (left.value.type == Type::Dictionary || left.value.type == Type::ObjectValue) {
+                left_side.discard();
+                return;
+            }
+            else if (right.value.type == Type::Dictionary || right.value.type == Type::ObjectValue) {
+                right_side.discard();
+                return;
+            }
         }
 
         // CONFLICT: Two updates of the same element.
