@@ -14,7 +14,8 @@
 * Added workaround for a case where upgrading an old file with illegal string would crash ([#7111](https://github.com/realm/realm-cocoa/issues/7111))
 * Fix segmentation fault which could occur when querying over a link after creating objects in the destination table.
 * Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
-
+* `Obj::set_list_values` inappropriately resizes list for LinkList causing LogicError to be thrown. ([#4028](https://github.com/realm/realm-core/issues/4028), since v6.0.0)
+ 
 ### Breaking changes
 * None.
 

@@ -474,12 +474,11 @@ TEST(Links_LinkList_Construction)
     table1->create_objects(target_keys);
 
     auto links0 = origin->create_object().get_linklist(col_link);
-    auto links1 = origin->create_object().get_linklist(col_link);
+    auto obj1 = origin->create_object();
+    auto links1 = obj1.get_linklist(col_link);
 
     // add several links to a single linklist
-    links1.add(target_keys[0]);
-    links1.add(target_keys[1]);
-    links1.add(target_keys[2]);
+    obj1.set_list_values(col_link, target_keys);
 
     CHECK_EQUAL(0, links0.size());
     CHECK_EQUAL(3, links1.size());
@@ -496,9 +495,7 @@ TEST(Links_LinkList_Construction)
     CHECK_EQUAL(3, list1.size());
     list1.clear();
     CHECK_EQUAL(0, list1.size());
-    list1.add(target_keys[0]);
-    list1.add(target_keys[1]);
-    list1.add(target_keys[2]);
+    obj1.set_list_values(col_link, target_keys);
 
     LnkLst list2 = default_list; // Constructed from default object
     CHECK_EQUAL(0, list2.size());
