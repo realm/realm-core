@@ -20,6 +20,7 @@
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
 
 namespace realm {
 namespace object_store {
@@ -145,6 +146,14 @@ bool Collection::is_frozen() const noexcept
     return m_realm->is_frozen();
 }
 
+Results Collection::as_results() const
+{
+    verify_attached();
+    if (auto link_list = std::dynamic_pointer_cast<LnkLst>(m_coll_base)) {
+        return Results(m_realm, link_list);
+    }
+    return Results(m_realm, m_coll_base);
+}
 
 } // namespace object_store
 } // namespace realm

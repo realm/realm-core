@@ -83,7 +83,7 @@ public:
 
     void nullify(Mixed);
 
-    void clear();
+    void clear() override;
 
     template <class T>
     void for_all_values(T&& f)

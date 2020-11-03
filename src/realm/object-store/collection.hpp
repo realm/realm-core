@@ -25,6 +25,7 @@
 
 namespace realm {
 class Realm;
+class Results;
 class ObjectSchema;
 
 namespace object_store {
@@ -72,6 +73,9 @@ public:
 
     // Returns whether or not this Collection is frozen.
     bool is_frozen() const noexcept;
+
+    // Return a Results representing a live view of this Collection.
+    Results as_results() const;
 
 protected:
     std::shared_ptr<Realm> m_realm;

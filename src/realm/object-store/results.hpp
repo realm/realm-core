@@ -47,8 +47,8 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
@@ -74,10 +74,10 @@ public:
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
 
-    // Get the Lst this Results is derived from, if any
-    std::shared_ptr<LstBase> const& get_list() const
+    // Get the Collection this Results is derived from, if any
+    const std::shared_ptr<CollectionBase>& get_collection() const
     {
-        return m_list;
+        return m_collection;
     }
 
     // Get the list of sort and distinct operations applied for this Results.
@@ -295,7 +295,7 @@ private:
     ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<LnkLst> m_link_list;
-    std::shared_ptr<LstBase> m_list;
+    std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> m_notifier;

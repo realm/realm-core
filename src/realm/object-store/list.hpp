@@ -35,7 +35,6 @@
 namespace realm {
 class Obj;
 class Query;
-class Results;
 class SortDescriptor;
 class ThreadSafeReference;
 struct ColKey;
@@ -50,7 +49,7 @@ public:
     List() noexcept;
     List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     List(std::shared_ptr<Realm> r, const LstBase& list);
-    ~List();
+    ~List() override;
 
     List(const List&);
     List& operator=(const List&);
@@ -84,9 +83,6 @@ public:
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
     Results filter(Query q) const;
-
-    // Return a Results representing a live view of this List.
-    Results as_results() const;
 
     // Return a Results representing a snapshot of this List.
     Results snapshot() const;

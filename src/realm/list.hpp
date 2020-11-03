@@ -72,7 +72,6 @@ public:
     virtual void remove(size_t from, size_t to) = 0;
     virtual void move(size_t from, size_t to) = 0;
     virtual void swap(size_t ndx1, size_t ndx2) = 0;
-    virtual void clear() = 0;
 
 protected:
     void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;

@@ -134,6 +134,7 @@ public:
     virtual size_t size() const = 0;
     virtual bool is_null(size_t ndx) const = 0;
     virtual Mixed get_any(size_t ndx) const = 0;
+    virtual void clear() = 0;
 
     virtual Mixed min(size_t* return_ndx = nullptr) const = 0;
     virtual Mixed max(size_t* return_ndx = nullptr) const = 0;
