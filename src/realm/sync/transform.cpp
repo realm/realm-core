@@ -786,6 +786,7 @@ struct TransformerImpl::Transformer {
     void transform_prepended_major(size_t num_prepended)
     {
         auto orig_major_was_discarded = m_major_side.was_discarded;
+        auto orig_major_path_len = m_major_side.m_path_len;
 
         // Reset 'was_discarded', as it should refer to the prepended
         // instructions in the below, not the instruction that instigated the
@@ -804,6 +805,8 @@ struct TransformerImpl::Transformer {
         for (size_t i = 0; i < num_prepended; ++i) {
             auto orig_minor_index = m_minor_side.m_position;
             auto orig_minor_was_discarded = m_minor_side.was_discarded;
+            auto orig_minor_was_replaced = m_minor_side.was_replaced;
+            auto orig_minor_path_len = m_minor_side.m_path_len;
 
             // Skip the instruction that initiated this prepend.
             if (!m_minor_side.was_discarded) {
@@ -824,17 +827,19 @@ struct TransformerImpl::Transformer {
 
             m_minor_side.m_position = orig_minor_index;
             m_minor_side.was_discarded = orig_minor_was_discarded;
+            m_minor_side.was_replaced = orig_minor_was_replaced;
+            m_minor_side.m_path_len = orig_minor_path_len;
             m_minor_side.update_changeset_pointer();
         }
 
 #if defined(REALM_DEBUG) // LCOV_EXCL_START
         if (m_trace) {
-            std::cerr << std::setw(80) << " "
-                      << "(end transform of prepended major)\n";
+            std::cerr << TERM_CYAN << "(end transform of prepended major)\n" << TERM_RESET;
         }
 #endif // REALM_DEBUG LCOV_EXCL_STOP
 
         m_major_side.was_discarded = orig_major_was_discarded;
+        m_major_side.m_path_len = orig_major_path_len;
     }
 
     void transform_major()
@@ -2360,6 +2365,19 @@ void merge_nested_2(Outer& outer, Inner& inner, OuterSide& outer_side, InnerSide
 void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, MinorSide& our_side)
 {
     report_merge(false); // Throws
+
+    if (their_side.get().get_if<Instruction::Update>()) {
+        REALM_ASSERT(their_side.m_path_len > 2);
+    }
+    if (our_side.get().get_if<Instruction::Update>()) {
+        REALM_ASSERT(our_side.m_path_len > 2);
+    }
+    if (their_side.get().get_if<Instruction::EraseObject>()) {
+        REALM_ASSERT(their_side.m_path_len == 2);
+    }
+    if (our_side.get().get_if<Instruction::EraseObject>()) {
+        REALM_ASSERT(our_side.m_path_len == 2);
+    }
 
     // Update selections on the major side (outer loop) according to events on
     // the minor side (inner loop). The selection may only be impacted if the
