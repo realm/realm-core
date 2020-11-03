@@ -2,6 +2,7 @@ set(SOURCES
     binding_callback_thread_observer.cpp
     collection_notifications.cpp
     index_set.cpp
+    collection.cpp
     list.cpp
     object.cpp
     object_changeset.cpp
@@ -35,6 +36,7 @@ set(HEADERS
     feature_checks.hpp
     index_set.hpp
     keypath_helpers.hpp
+    collection.hpp
     list.hpp
     object.hpp
     object_accessor.hpp

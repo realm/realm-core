@@ -140,6 +140,17 @@ public:
     virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
     virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
 
+
+    std::unique_ptr<CollectionBase> clone() const
+    {
+        return m_obj.get_collection_ptr(m_col_key);
+    }
+
+    TableRef get_target_table() const
+    {
+        return m_obj.get_target_table(m_col_key);
+    }
+
     // Modifies a vector of indices so that they refer to values sorted according
     // to the specified sort order
     virtual void sort(std::vector<size_t>& indices, bool ascending = true) const = 0;

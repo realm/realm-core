@@ -19,11 +19,10 @@
 #ifndef REALM_OS_LIST_HPP
 #define REALM_OS_LIST_HPP
 
+#include <realm/object-store/collection.hpp>
 #include <realm/object-store/collection_notifications.hpp>
 #include <realm/object-store/impl/collection_notifier.hpp>
 #include <realm/object-store/object.hpp>
-#include <realm/object-store/property.hpp>
-#include <realm/object-store/util/copyable_atomic.hpp>
 
 #include <realm/decimal128.hpp>
 #include <realm/list.hpp>
@@ -35,9 +34,7 @@
 
 namespace realm {
 class Obj;
-class ObjectSchema;
 class Query;
-class Realm;
 class Results;
 class SortDescriptor;
 class ThreadSafeReference;
@@ -48,7 +45,7 @@ namespace _impl {
 class ListNotifier;
 }
 
-class List {
+class List : public object_store::Collection {
 public:
     List() noexcept;
     List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
@@ -60,31 +57,7 @@ public:
     List(List&&);
     List& operator=(List&&);
 
-    const std::shared_ptr<Realm>& get_realm() const
-    {
-        return m_realm;
-    }
     Query get_query() const;
-
-    ColKey get_parent_column_key() const;
-    ObjKey get_parent_object_key() const;
-    TableKey get_parent_table_key() const;
-
-    // Get the type of the values contained in this List
-    PropertyType get_type() const
-    {
-        return m_type;
-    }
-
-    // Get the ObjectSchema of the values in this List
-    // Only valid if get_type() returns PropertyType::Object
-    ObjectSchema const& get_object_schema() const;
-
-    bool is_valid() const;
-    void verify_attached() const;
-    void verify_in_transaction() const;
-
-    size_t size() const;
 
     void move(size_t source_ndx, size_t dest_ndx);
     void remove(size_t list_ndx);
@@ -121,9 +94,6 @@ public:
     // Returns a frozen copy of this result
     List freeze(std::shared_ptr<Realm> const& realm) const;
 
-    // Returns whether or not this List is frozen.
-    bool is_frozen() const noexcept;
-
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
     // sum() returns 0,
@@ -158,23 +128,6 @@ public:
     template <typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
-    // The List object has been invalidated (due to the Realm being invalidated,
-    // or the containing object being deleted)
-    // All non-noexcept functions can throw this
-    struct InvalidatedException : public std::logic_error {
-        InvalidatedException()
-            : std::logic_error("Access to invalidated List object")
-        {
-        }
-    };
-
-    // The input index parameter was out of bounds
-    struct OutOfBoundsIndexException : public std::out_of_range {
-        OutOfBoundsIndexException(size_t r, size_t c);
-        size_t requested;
-        size_t valid_count;
-    };
-
     // The object being added to the list is already a managed embedded object
     struct InvalidEmbeddedOperationException : public std::logic_error {
         InvalidEmbeddedOperationException()
@@ -184,15 +137,9 @@ public:
     };
 
 private:
-    std::shared_ptr<Realm> m_realm;
-    PropertyType m_type;
-    mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<LstBase> m_list_base;
     bool m_is_embedded = false;
-
-    void verify_valid_row(size_t row_ndx, bool insertion = false) const;
-    void validate(const Obj&) const;
 
     template <typename T, typename Context>
     void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
@@ -230,7 +177,9 @@ auto List::dispatch(Fn&& fn) const
 template <typename Context>
 auto List::get(Context& ctx, size_t row_ndx) const
 {
-    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) {
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+    });
 }
 
 template <typename T, typename Context>
@@ -257,7 +206,9 @@ void List::add(Context& ctx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) { this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
+    dispatch([&](auto t) {
+        this->add(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
 }
 
 template <typename T, typename Context>
@@ -269,7 +220,9 @@ void List::insert(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) { this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
+    dispatch([&](auto t) {
+        this->insert(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
 }
 
 template <typename T, typename Context>
@@ -283,7 +236,9 @@ void List::set(Context& ctx, size_t list_ndx, T&& value, CreatePolicy policy)
         ctx.template unbox<Obj>(value, policy, key);
         return;
     }
-    dispatch([&](auto t) { this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy)); });
+    dispatch([&](auto t) {
+        this->set(list_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
 }
 
 template <typename T, typename Context>
