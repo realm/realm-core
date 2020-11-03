@@ -69,12 +69,16 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
 {
     auto flags = PropertyType::Required;
     auto attr = col.get_attrs();
+
     if (attr.test(col_attr_Nullable))
         flags |= PropertyType::Nullable;
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
     else if (attr.test(col_attr_Set))
         flags |= PropertyType::Set;
+    else if (attr.test(col_attr_Dictionary))
+        flags |= PropertyType::Dictionary;
+
     switch (col.get_type()) {
         case col_type_Int:
             return PropertyType::Int | flags;
@@ -99,7 +103,7 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
         case col_type_UUID:
             return PropertyType::UUID | flags;
         case col_type_Link: {
-            if (attr.test(col_attr_Set)) {
+            if (attr.test(col_attr_Set) || attr.test(col_attr_Dictionary)) {
                 return PropertyType::Object | flags;
             }
             else {

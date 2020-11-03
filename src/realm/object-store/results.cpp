@@ -1222,6 +1222,8 @@ static std::string unsupported_operation_msg(ColKey column, Table const& table, 
         return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
     if (is_set(type))
         return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
+    if (is_dictionary(type))
+        return util::format("Cannot %1 '%2' dictionary: operation not supported", operation, column_type);
     return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
                         table.get_column_name(column), column_type);
 }

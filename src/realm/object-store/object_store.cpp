@@ -120,6 +120,9 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         else if (is_set(property.type)) {
             return table.add_column_set(*link_table, property.name);
         }
+        else if (is_dictionary(property.type)) {
+            return table.add_column_dictionary(*link_table, property.name);
+        }
         else {
             return table.add_column(*link_table, property.name);
         }
@@ -131,6 +134,9 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     else if (is_set(property.type)) {
         return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                     is_nullable(property.type));
+    }
+    else if (is_dictionary(property.type)) {
+        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name);
     }
     else {
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
