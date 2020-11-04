@@ -87,6 +87,11 @@ const char* type_to_str<UUID>()
 {
     return "UUID";
 }
+template <>
+const char* type_to_str<Mixed>()
+{
+    return "Mixed";
+}
 
 const char* data_type_to_str(DataType type)
 {

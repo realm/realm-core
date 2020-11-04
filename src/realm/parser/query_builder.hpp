@@ -88,6 +88,7 @@ public:
     virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
+    virtual Mixed mixed_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
 
     // dynamic conversion space with lifetime tied to this
@@ -127,6 +128,10 @@ public:
     {
         return get<ObjKey>(i);
     }
+    Mixed mixed_for_argument(size_t i) override
+    {
+        return get<Mixed>(i);
+    }
     bool is_argument_null(size_t i) override
     {
         return m_ctx.is_null(at(i));
@@ -158,6 +163,106 @@ private:
     {
         return m_ctx.template unbox<T>(at(index));
     }
+};
+
+class MixedArguments : public Arguments {
+public:
+    MixedArguments(const std::vector<Mixed>& args)
+        : m_args(args)
+    {
+    }
+    bool bool_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Bool);
+        return m_args.at(n).get<bool>();
+    }
+    long long long_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Int);
+        return m_args.at(n).get<int64_t>();
+    }
+    float float_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Float);
+        return m_args.at(n).get<float>();
+    }
+    double double_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Double);
+        return m_args.at(n).get<double>();
+    }
+    StringData string_for_argument(size_t n) final
+    {
+        type_check_at(n, type_String);
+        return m_args.at(n).get<StringData>();
+    }
+    BinaryData binary_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Binary);
+        return m_args.at(n).get<BinaryData>();
+    }
+    Timestamp timestamp_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Timestamp);
+        return m_args.at(n).get<Timestamp>();
+    }
+    ObjectId objectid_for_argument(size_t n) final
+    {
+        type_check_at(n, type_ObjectId);
+        return m_args.at(n).get<ObjectId>();
+    }
+    UUID uuid_for_argument(size_t n) final
+    {
+        type_check_at(n, type_UUID);
+        return m_args.at(n).get<UUID>();
+    }
+    Decimal128 decimal128_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Decimal);
+        return m_args.at(n).get<Decimal128>();
+    }
+    ObjKey object_index_for_argument(size_t n) final
+    {
+        type_check_at(n, type_Link);
+        return m_args.at(n).get<ObjKey>();
+    }
+    Mixed mixed_for_argument(size_t n) final
+    {
+        verify_index(n);
+        return m_args.at(n);
+    }
+    bool is_argument_null(size_t n) final
+    {
+        verify_index(n);
+        return m_args.at(n).is_null();
+    }
+    void type_check_at(size_t n, DataType type)
+    {
+        verify_index(n);
+        if (m_args.at(n).get_type() != type) {
+            throw std::runtime_error(
+                util::format("Error converting argument from mixed to type %1 at position %2", type, n));
+        }
+    }
+
+private:
+    void verify_index(size_t ndx)
+    {
+        size_t count = m_args.size();
+        if (ndx >= count) {
+            std::string error_message;
+            if (count) {
+                error_message = util::format("Request for argument at index %1 but only %2 argument%3 provided", ndx,
+                                             count, count == 1 ? " is" : "s are");
+            }
+            else {
+                error_message = util::format("Request for argument at index %1 but no arguments are provided", ndx);
+            }
+            throw std::out_of_range(error_message);
+        }
+    }
+
+    const std::vector<Mixed>& m_args;
 };
 
 class NoArgsError : public std::runtime_error {
@@ -211,6 +316,10 @@ public:
         throw NoArgsError();
     }
     ObjKey object_index_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    Mixed mixed_for_argument(size_t)
     {
         throw NoArgsError();
     }

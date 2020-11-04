@@ -1131,6 +1131,39 @@ public:
     }
 };
 
+template <>
+class Subexpr2<Mixed> : public Subexpr,
+                        public Overloads<Mixed, Mixed>,
+                        public Overloads<Mixed, const char*>,
+                        public Overloads<Mixed, int>,
+                        public Overloads<Mixed, float>,
+                        public Overloads<Mixed, double>,
+                        public Overloads<Mixed, int64_t>,
+                        public Overloads<Mixed, StringData>,
+                        public Overloads<Mixed, bool>,
+                        public Overloads<Mixed, Timestamp>,
+                        public Overloads<Mixed, ObjectId>,
+                        public Overloads<Mixed, Decimal128>,
+                        public Overloads<Mixed, UUID>,
+                        public Overloads<Mixed, null> {
+public:
+    Query equal(Mixed sd, bool case_sensitive = true);
+    Query equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query not_equal(Mixed sd, bool case_sensitive = true);
+    Query not_equal(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query begins_with(Mixed sd, bool case_sensitive = true);
+    Query begins_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query ends_with(Mixed sd, bool case_sensitive = true);
+    Query ends_with(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query contains(Mixed sd, bool case_sensitive = true);
+    Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    Query like(Mixed sd, bool case_sensitive = true);
+    Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true);
+    DataType get_type() const final
+    {
+        return type_Mixed;
+    }
+};
 
 struct TrueExpression : Expression {
     size_t find_first(size_t start, size_t end) const override
@@ -1296,6 +1329,11 @@ Query operator>(Decimal128 left, const Subexpr2<R>& right)
 {
     return create<Greater>(left, right);
 }
+template <class R>
+Query operator>(Mixed left, const Subexpr2<R>& right)
+{
+    return create<Greater>(left, right);
+}
 
 template <class R>
 Query operator<(double left, const Subexpr2<R>& right)
@@ -1329,6 +1367,11 @@ Query operator<(ObjectId left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator<(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<Less>(left, right);
+}
+template <class R>
+Query operator<(Mixed left, const Subexpr2<R>& right)
 {
     return create<Less>(left, right);
 }
@@ -1378,7 +1421,11 @@ Query operator==(UUID left, const Subexpr2<R>& right)
 {
     return create<Equal>(left, right);
 }
-
+template <class R>
+Query operator==(Mixed left, const Subexpr2<R>& right)
+{
+    return create<Equal>(left, right);
+}
 
 template <class R>
 Query operator>=(double left, const Subexpr2<R>& right)
@@ -1415,6 +1462,11 @@ Query operator>=(Decimal128 left, const Subexpr2<R>& right)
 {
     return create<GreaterEqual>(left, right);
 }
+template <class R>
+Query operator>=(Mixed left, const Subexpr2<R>& right)
+{
+    return create<GreaterEqual>(left, right);
+}
 
 template <class R>
 Query operator<=(double left, const Subexpr2<R>& right)
@@ -1448,6 +1500,11 @@ Query operator<=(ObjectId left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator<=(Decimal128 left, const Subexpr2<R>& right)
+{
+    return create<LessEqual>(left, right);
+}
+template <class R>
+Query operator<=(Mixed left, const Subexpr2<R>& right)
 {
     return create<LessEqual>(left, right);
 }
@@ -1494,6 +1551,11 @@ Query operator!=(bool left, const Subexpr2<R>& right)
 }
 template <class R>
 Query operator!=(UUID left, const Subexpr2<R>& right)
+{
+    return create<NotEqual>(left, right);
+}
+template <class R>
+Query operator!=(Mixed left, const Subexpr2<R>& right)
 {
     return create<NotEqual>(left, right);
 }
@@ -2225,6 +2287,25 @@ Query binary_compare(const Subexpr2<BinaryData>& left, T right, bool case_sensit
 
 template <class S, class I>
 Query binary_compare(const Subexpr2<BinaryData>& left, const Subexpr2<BinaryData>& right, bool case_sensitive)
+{
+    if (case_sensitive)
+        return make_expression<Compare<S>>(right.clone(), left.clone());
+    else
+        return make_expression<Compare<I>>(right.clone(), left.clone());
+}
+
+template <class T, class S, class I>
+Query mixed_compare(const Subexpr2<Mixed>& left, T right, bool case_sensitive)
+{
+    Mixed data(right);
+    if (case_sensitive)
+        return create<S>(data, left);
+    else
+        return create<I>(data, left);
+}
+
+template <class S, class I>
+Query mixed_compare(const Subexpr2<Mixed>& left, const Subexpr2<Mixed>& right, bool case_sensitive)
 {
     if (case_sensitive)
         return make_expression<Compare<S>>(right.clone(), left.clone());

@@ -272,6 +272,40 @@ UUID ValueExpression::value_of_type_for_query<UUID>()
     throw std::logic_error("UUID properties must be compared against an UUID argument.");
 }
 
+template <>
+Mixed ValueExpression::value_of_type_for_query<Mixed>()
+{
+    switch (value->type) {
+        case Expression::Type::Number:
+            return value_of_type_for_query<Decimal128>();
+        case Expression::Type::String:
+            return value_of_type_for_query<String>();
+        case Expression::Type::Argument: {
+            int argument_ndx = string_to<int>(value->s);
+            return arguments->mixed_for_argument(argument_ndx);
+        }
+        case Expression::Type::True:
+            return Mixed(true);
+        case Expression::Type::False:
+            return Mixed(false);
+        case Expression::Type::Null:
+            return Mixed{};
+        case Expression::Type::Timestamp:
+            return value_of_type_for_query<Timestamp>();
+        case Expression::Type::Base64:
+            return value_of_type_for_query<String>();
+        case Expression::Type::ObjectId:
+            return value_of_type_for_query<ObjectId>();
+        case Expression::Type::UUID:
+            return value_of_type_for_query<UUID>();
+        case Expression::Type::SubQuery:
+        case Expression::Type::KeyPath:
+        case Expression::Type::None:
+            throw std::runtime_error(util::format("Error converting value for mixed comparison with type %1 (%2)",
+                                                  int(value->type), value->s));
+    }
+}
+
 
 } // namespace parser
 } // namespace realm

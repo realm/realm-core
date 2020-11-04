@@ -1267,6 +1267,26 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     }
 }
 
+void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                      const std::vector<Mixed>& args, size_t /*num_args*/, size_t num_results)
+{
+    query_builder::MixedArguments arguments(args);
+    std::string empty_string;
+    Query q = t->query(query_string, arguments, {});
+
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
+    std::string description = q.get_description();
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    Query q2 = t->query(description, arguments, {});
+
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
+}
+
 TEST(Parser_substitution)
 {
     Group g;
@@ -1313,8 +1333,9 @@ TEST(Parser_substitution)
     LnkLst list_1 = t->get_object(obj_keys[1]).get_linklist(list_col);
     list_1.add(obj_keys[0]);
 
-    util::Any args[] = {Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
-                        bd0,    Float(2.33),  Int(1),       Int(3),        Int(4),     Bool(false)};
+    std::vector<Mixed> args = {
+        Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
+        bd0,    Float(2.33),  Int(1),       Int(3),        Int(4),     Bool(false)};
     size_t num_args = 12;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
     verify_query_sub(test_context, t, "age > $0 || fees == $1", args, num_args, 3);
@@ -1362,11 +1383,12 @@ TEST(Parser_substitution)
 
     std::string message;
     // referencing a parameter outside of the list size throws
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $0", args, /*num_args*/ 0, 0), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $0", {}, /*num_args*/ 0, 0), message);
     CHECK_EQUAL(message, "Request for argument at index 0 but no arguments are provided");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $1", args, /*num_args*/ 1, 0), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $1", {{1}}, /*num_args*/ 1, 0), message);
     CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", {{1}, {2}}, /*num_args*/ 2, 0),
+                                message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
     // invalid types
@@ -4423,5 +4445,83 @@ TEST(Parser_Decimal128)
     verify_query(test_context, table, "dec != nullable_dec", num_different_rows);
 }
 
+
+TEST(Parser_Mixed)
+{
+    Group g;
+    auto table = g.add_table("Foo");
+    auto origin = g.add_table("Origin");
+    auto col_any = table->add_column(type_Mixed, "mixed");
+    auto col_int = table->add_column(type_Int, "int");
+    auto col_link = origin->add_column(*table, "link");
+    auto col_links = origin->add_column_list(*table, "links");
+    size_t int_over_50 = 0;
+    size_t nb_strings = 0;
+    for (int64_t i = 0; i < 100; i++) {
+        if (i % 4) {
+            if (i > 50)
+                int_over_50++;
+            table->create_object().set(col_any, Mixed(i)).set(col_int, i);
+        }
+        else {
+            std::string str = "String" + util::to_string(i);
+            table->create_object().set(col_any, Mixed(str)).set(col_int, i);
+            nb_strings++;
+        }
+    }
+
+    table->get_object(15).set(col_any, Mixed());
+    table->get_object(75).set(col_any, Mixed(75.));
+    table->get_object(28).set(col_any, Mixed(BinaryData("String2Binary")));
+    table->get_object(25).set(col_any, Mixed(3.));
+    table->get_object(35).set(col_any, Mixed(Decimal128("3")));
+
+    auto it = table->begin();
+    for (int64_t i = 0; i < 10; i++) {
+        auto obj = origin->create_object();
+        auto ll = obj.get_linklist(col_links);
+
+        obj.set(col_link, it->get_key());
+        for (int64_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    verify_query(test_context, table, "mixed > 50", int_over_50);
+    verify_query(test_context, table, "mixed >= 50", int_over_50 + 1);
+    verify_query(test_context, table, "mixed <= 50", 100 - int_over_50 - nb_strings - 1);
+    verify_query(test_context, table, "mixed < 50", 100 - int_over_50 - nb_strings - 2);
+    verify_query(test_context, table, "mixed < 50 || mixed > 50", 100 - nb_strings - 2);
+    verify_query(test_context, table, "mixed != 50", 99);
+    verify_query(test_context, table, "mixed == null", 1);
+    verify_query(test_context, table, "mixed != null", 99);
+    verify_query(test_context, table, "mixed beginswith 'String2'", 3); // 20, 24, 28
+    verify_query(test_context, table, "mixed beginswith B64\"U3RyaW5nMg==\"",
+                 3); // 20, 24, 28, this string literal is base64 for 'String2'
+    verify_query(test_context, table, "mixed contains \"trin\"", 25);
+    verify_query(test_context, table, "mixed like \"Strin*\"", 25);
+    verify_query(test_context, table, "mixed endswith \"4\"", 5); // 4, 24, 44, 64, 84
+
+    char bin[1] = {0x34};
+    std::vector<Mixed> args = {BinaryData(bin)};
+    verify_query_sub(test_context, table, "mixed endswith $0", args, 1, 5); // 4, 24, 44, 64, 84
+
+    verify_query(test_context, table, "mixed == \"String2Binary\"", 1);
+    verify_query(test_context, table, "mixed ==[c] \"string2binary\"", 1);
+    verify_query(test_context, table, "mixed !=[c] \"string2binary\"", 99);
+    verify_query(test_context, table, "mixed == \"String48\"", 1);
+    verify_query(test_context, table, "mixed == 3.0", 3);
+    verify_query(test_context, table, "mixed == NULL", 1);
+    verify_query(test_context, origin, "links.mixed > 50", 5);
+    verify_query(test_context, origin, "links.mixed beginswith[c] \"string\"", 10);
+    verify_query(test_context, origin, "link.mixed > 50", 2);
+    verify_query(test_context, origin, "link.mixed beginswith[c] \"string\"", 5);
+    verify_query(test_context, origin, "link.mixed == NULL", 0);
+    verify_query(test_context, origin, "links.mixed == NULL", 1);
+
+    // FIXME: support non-uniform type cross column comparisons not yet implemented
+    // verify_query(test_context, table, "mixed == int", 72);
+}
 
 #endif // TEST_PARSER

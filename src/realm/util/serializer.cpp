@@ -31,6 +31,8 @@
 #include <cctype>
 #include <cmath>
 
+constexpr const char* null_string = "NULL";
+
 namespace realm {
 namespace util {
 namespace serializer {
@@ -39,7 +41,7 @@ template <>
 std::string print_value<>(BinaryData data)
 {
     if (data.is_null()) {
-        return "NULL";
+        return null_string;
     }
     return print_value<StringData>(StringData(data.data(), data.size()));
 }
@@ -85,7 +87,7 @@ std::string print_value<>(double val)
 template <>
 std::string print_value<>(realm::null)
 {
-    return "NULL";
+    return null_string;
 }
 
 bool contains_invalids(StringData data)
@@ -107,7 +109,7 @@ template <>
 std::string print_value<>(StringData data)
 {
     if (data.is_null()) {
-        return "NULL";
+        return null_string;
     }
     std::string out;
     const char* start = data.data();
@@ -134,15 +136,10 @@ template <>
 std::string print_value<>(realm::Timestamp t)
 {
     if (t.is_null()) {
-        return "NULL";
+        return null_string;
     }
     std::stringstream ss;
-    if (t.is_null()) {
-        ss << "null";
-    }
-    else {
-        ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
-    }
+    ss << "T" << t.get_seconds() << ":" << t.get_nanoseconds();
     return ss.str();
 }
 
@@ -155,20 +152,66 @@ std::string print_value<>(realm::ObjectId oid)
 template <>
 std::string print_value<>(realm::ObjKey k)
 {
-    std::stringstream ss;
     if (!k) {
-        ss << "NULL";
+        return null_string;
     }
-    else {
-        ss << "O" << k.value;
-    }
+    std::stringstream ss;
+    ss << "O" << k.value;
     return ss.str();
+}
+
+template <>
+std::string print_value<>(realm::ObjLink link)
+{
+    if (link.is_null()) {
+        return null_string;
+    }
+    return util::format("{%1, %2}", link.get_table_key().value, link.get_obj_key().value);
 }
 
 template <>
 std::string print_value<>(realm::UUID uuid)
 {
     return "uuid(" + uuid.to_string() + ")";
+}
+
+template <>
+std::string print_value<>(realm::Mixed mixed)
+{
+    if (mixed.is_null()) {
+        return null_string;
+    }
+    switch (mixed.get_type()) {
+        case type_Int:
+            return print_value(mixed.get<Int>());
+        case type_Bool:
+            return print_value(mixed.get<Bool>());
+        case type_String:
+            return print_value(mixed.get<StringData>());
+        case type_Binary:
+            return print_value(mixed.get<BinaryData>());
+        case type_Timestamp:
+            return print_value(mixed.get<Timestamp>());
+        case type_Float:
+            return print_value(mixed.get<Float>());
+        case type_Double:
+            return print_value(mixed.get<Double>());
+        case type_Decimal:
+            return print_value(mixed.get<Decimal128>());
+        case type_Link:
+            return print_value(mixed.get<ObjKey>());
+        case type_TypedLink:
+            return print_value(mixed.get<ObjLink>());
+        case type_ObjectId:
+            return print_value(mixed.get<ObjectId>());
+        case type_UUID:
+            return print_value(mixed.get<UUID>());
+        case type_LinkList:
+        case type_Mixed:
+        case type_OldDateTime:
+        case type_OldTable:
+            throw std::logic_error(util::format("unsupported type serializeation from mixed: %1", mixed.get_type()));
+    }
 }
 
 // The variable name must be unique with respect to the already chosen variables at

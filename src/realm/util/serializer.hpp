@@ -33,9 +33,11 @@ struct ColKey;
 struct null;
 class ObjectId;
 struct ObjKey;
+struct ObjLink;
 class StringData;
 class Timestamp;
 class LinkMap;
+class Mixed;
 class UUID;
 enum class ExpressionComparisonType : unsigned char;
 
@@ -67,7 +69,11 @@ std::string print_value<>(realm::ObjectId);
 template <>
 std::string print_value<>(realm::ObjKey);
 template <>
+std::string print_value<>(realm::ObjLink);
+template <>
 std::string print_value<>(realm::UUID);
+template <>
+std::string print_value<>(realm::Mixed);
 
 // General implementation for most types
 template <typename T>

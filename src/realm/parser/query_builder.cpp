@@ -54,6 +54,38 @@ REALM_NOINLINE REALM_COLD REALM_NORETURN void throw_runtime_error(std::string ms
     throw std::runtime_error(std::move(msg));
 }
 
+const char* operator_description(const Predicate::Operator& op)
+{
+    switch (op) {
+        case Predicate::Operator::None:
+            return "NONE";
+        case realm::parser::Predicate::Operator::Equal:
+            return "==";
+        case realm::parser::Predicate::Operator::NotEqual:
+            return "!=";
+        case realm::parser::Predicate::Operator::LessThan:
+            return "<";
+        case realm::parser::Predicate::Operator::LessThanOrEqual:
+            return "<=";
+        case realm::parser::Predicate::Operator::GreaterThan:
+            return ">";
+        case realm::parser::Predicate::Operator::GreaterThanOrEqual:
+            return ">=";
+        case realm::parser::Predicate::Operator::BeginsWith:
+            return "BEGINSWITH";
+        case realm::parser::Predicate::Operator::EndsWith:
+            return "ENDSWITH";
+        case realm::parser::Predicate::Operator::Contains:
+            return "CONTAINS";
+        case realm::parser::Predicate::Operator::Like:
+            return "LIKE";
+        case realm::parser::Predicate::Operator::In:
+            return "IN";
+    }
+    REALM_ASSERT_DEBUG(false);
+    return "";
+}
+
 template <typename T, parser::Expression::KeyPathOp OpType, typename ExpressionType>
 REALM_FORCEINLINE Query do_make_null_comparison_query(Predicate::Operator,
                                                       const CollectionOperatorExpression<OpType, ExpressionType>&)
@@ -145,36 +177,78 @@ Query make_numeric_constraint_query(Predicate::Operator operatorType, A lhs, B r
     }
 }
 
-const char* operator_description(const Predicate::Operator& op)
+// (mixed column OR list of primitive mixed) vs (mixed literal OR mixed column)
+template <typename LHS, typename RHS>
+std::enable_if_t<realm::is_any<LHS, Columns<Mixed>, Columns<Lst<Mixed>>>::value &&
+                     realm::is_any<RHS, Mixed, Columns<Mixed>>::value,
+                 Query>
+make_mixed_constraint_query(const Predicate::Comparison& cmp, LHS&& lhs, RHS&& rhs)
 {
-    switch (op) {
-        case Predicate::Operator::None:
-            return "NONE";
-        case realm::parser::Predicate::Operator::Equal:
-            return "==";
-        case realm::parser::Predicate::Operator::NotEqual:
-            return "!=";
-        case realm::parser::Predicate::Operator::LessThan:
-            return "<";
-        case realm::parser::Predicate::Operator::LessThanOrEqual:
-            return "<=";
-        case realm::parser::Predicate::Operator::GreaterThan:
-            return ">";
-        case realm::parser::Predicate::Operator::GreaterThanOrEqual:
-            return ">=";
-        case realm::parser::Predicate::Operator::BeginsWith:
-            return "BEGINSWITH";
-        case realm::parser::Predicate::Operator::EndsWith:
-            return "ENDSWITH";
-        case realm::parser::Predicate::Operator::Contains:
-            return "CONTAINS";
-        case realm::parser::Predicate::Operator::Like:
-            return "LIKE";
-        case realm::parser::Predicate::Operator::In:
-            return "IN";
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
+        case Predicate::Operator::BeginsWith:
+            return lhs.begins_with(rhs, case_sensitive);
+        case Predicate::Operator::EndsWith:
+            return lhs.ends_with(rhs, case_sensitive);
+        case Predicate::Operator::Contains:
+            return lhs.contains(rhs, case_sensitive);
+        case Predicate::Operator::Equal:
+            return lhs.equal(rhs, case_sensitive);
+        case Predicate::Operator::NotEqual:
+            return lhs.not_equal(rhs, case_sensitive);
+        case Predicate::Operator::Like:
+            return lhs.like(rhs, case_sensitive);
+        case Predicate::Operator::LessThan:
+            return lhs < rhs;
+        case Predicate::Operator::LessThanOrEqual:
+            return lhs <= rhs;
+        case Predicate::Operator::GreaterThan:
+            return lhs > rhs;
+        case Predicate::Operator::GreaterThanOrEqual:
+            return lhs >= rhs;
+        default:
+            throw_logic_error(
+                util::format("Unsupported operator '%1' for string queries.", operator_description(cmp.op)));
     }
-    REALM_ASSERT_DEBUG(false);
-    return "";
+}
+
+// ((mixed literal) vs (mixed column OR list of primitive mixed)) OR ((mixed column) vs (list of primitive
+// mixed column))
+template <typename LHS, typename RHS>
+std::enable_if_t<(realm::is_any<LHS, Mixed>::value &&
+                  realm::is_any<RHS, Columns<Mixed>, Columns<Lst<Mixed>>>::value) ||
+                     (std::is_same_v<LHS, Columns<Mixed>> && std::is_same_v<RHS, Columns<Lst<Mixed>>>),
+                 Query>
+make_mixed_constraint_query(const Predicate::Comparison& cmp, LHS&& lhs, RHS&& rhs)
+{
+    bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
+    switch (cmp.op) {
+        case Predicate::Operator::In:
+        case Predicate::Operator::Equal:
+            return rhs.equal(lhs, case_sensitive);
+        case Predicate::Operator::NotEqual:
+            return rhs.not_equal(lhs, case_sensitive);
+        case Predicate::Operator::LessThan:
+            return lhs < rhs;
+        case Predicate::Operator::LessThanOrEqual:
+            return lhs <= rhs;
+        case Predicate::Operator::GreaterThan:
+            return lhs > rhs;
+        case Predicate::Operator::GreaterThanOrEqual:
+            return lhs >= rhs;
+            // operators CONTAINS, BEGINSWITH, ENDSWITH, LIKE are not supported in this direction
+            // These queries are not the same: "'asdf' CONTAINS string_property" vs "string_property CONTAINS 'asdf'"
+        default:
+            throw_logic_error(
+                util::format("Unsupported query comparison '%1' for a single string vs a string property.",
+                             operator_description(cmp.op)));
+    }
+}
+
+REALM_FORCEINLINE Query make_mixed_constraint_query(const Predicate::Comparison&, Columns<Lst<Mixed>>&&,
+                                                    Columns<Lst<Mixed>>&&)
+{
+    throw_logic_error("Comparing two primitive lists of type Mixed against each other is not implemented yet.");
 }
 
 template <typename A, typename B>
@@ -394,6 +468,9 @@ Query do_make_comparison_query(const Predicate::Comparison& cmp, A& lhs, B& rhs,
         case type_UUID:
             return make_bool_constraint_query(cmp.op, lhs.template value_of_type_for_query<UUID>(),
                                               rhs.template value_of_type_for_query<UUID>());
+        case type_Mixed:
+            return make_mixed_constraint_query(cmp, lhs.template value_of_type_for_query<Mixed>(),
+                                               rhs.template value_of_type_for_query<Mixed>());
         default:
             throw_logic_error(util::format("Object type '%1' not supported", data_type_to_str(type)));
     }
@@ -462,6 +539,8 @@ Query do_make_null_comparison_query(const Predicate::Comparison& cmp, const T& e
             return do_make_null_comparison_query<Link>(cmp.op, expr);
         case realm::type_UUID:
             return do_make_null_comparison_query<UUID>(cmp.op, expr);
+        case realm::type_Mixed:
+            return do_make_null_comparison_query<Mixed>(cmp.op, expr);
         default:
             throw_logic_error(util::format("Object type '%1' not supported", util::data_type_to_str(type)));
     }
@@ -893,68 +972,6 @@ void apply_ordering(DescriptorOrdering& ordering, ConstTableRef target, const pa
 
 } // namespace query_builder
 
-namespace {
-
-class MixedArguments : public Arguments {
-public:
-    MixedArguments(const std::vector<Mixed>& args)
-        : m_args(args)
-    {
-    }
-    bool bool_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<bool>();
-    }
-    long long long_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<int64_t>();
-    }
-    float float_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<float>();
-    }
-    double double_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<double>();
-    }
-    StringData string_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<StringData>();
-    }
-    BinaryData binary_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<BinaryData>();
-    }
-    Timestamp timestamp_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<Timestamp>();
-    }
-    ObjectId objectid_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<ObjectId>();
-    }
-    UUID uuid_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<UUID>();
-    }
-    Decimal128 decimal128_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<Decimal128>();
-    }
-    ObjKey object_index_for_argument(size_t n) final
-    {
-        return m_args.at(n).get<ObjKey>();
-    }
-    bool is_argument_null(size_t n) final
-    {
-        return m_args.at(n).is_null();
-    }
-
-private:
-    const std::vector<Mixed>& m_args;
-};
-
-} // namespace
 
 // Functions placed here in order not to require the Parser Library if this function is not used.
 Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const
