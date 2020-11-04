@@ -107,34 +107,30 @@ void Spec::update_internals() noexcept
     }
 }
 
-bool Spec::update_from_parent(size_t old_baseline) noexcept
+void Spec::update_from_parent() noexcept
 {
-    if (!m_top.update_from_parent(old_baseline))
-        return false;
-
-    m_types.update_from_parent(old_baseline);
-    m_names.update_from_parent(old_baseline);
-    m_attr.update_from_parent(old_baseline);
+    m_top.update_from_parent();
+    m_types.update_from_parent();
+    m_names.update_from_parent();
+    m_attr.update_from_parent();
 
     if (m_top.get_as_ref(3) != 0) {
-        m_oldsubspecs.update_from_parent(old_baseline);
+        m_oldsubspecs.update_from_parent();
     }
     else {
         m_oldsubspecs.detach();
     }
 
     if (m_top.get_as_ref(4) != 0) {
-        m_enumkeys.update_from_parent(old_baseline);
+        m_enumkeys.update_from_parent();
     }
     else {
         m_enumkeys.detach();
     }
 
-    m_keys.update_from_parent(old_baseline);
+    m_keys.update_from_parent();
 
     update_internals();
-
-    return true;
 }
 
 
@@ -535,6 +531,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Decimal:
             case col_type_BackLink:
             case col_type_ObjectId:
+            case col_type_UUID:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;

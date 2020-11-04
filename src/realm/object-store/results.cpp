@@ -889,7 +889,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
         }
     };
     auto is_sortable_type = [](PropertyType type) {
-        return !is_array(type) && type != PropertyType::LinkingObjects && type != PropertyType::Data;
+        return !is_collection(type) && type != PropertyType::LinkingObjects && type != PropertyType::Data;
     };
 
     const char* begin = keypath.data();
@@ -1151,11 +1151,13 @@ REALM_RESULTS_TYPE(BinaryData)
 REALM_RESULTS_TYPE(Timestamp)
 REALM_RESULTS_TYPE(ObjectId)
 REALM_RESULTS_TYPE(Decimal)
+REALM_RESULTS_TYPE(UUID)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)
 REALM_RESULTS_TYPE(util::Optional<double>)
 REALM_RESULTS_TYPE(util::Optional<ObjectId>)
+REALM_RESULTS_TYPE(util::Optional<UUID>)
 
 #undef REALM_RESULTS_TYPE
 
@@ -1215,11 +1217,13 @@ Results::IncorrectTableException::IncorrectTableException(StringData e, StringDa
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
-    const char* column_type = string_for_property_type(type & ~PropertyType::Array);
-    if (!is_array(type))
-        return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
-                            table.get_column_name(column), column_type);
-    return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
+    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
+    if (is_array(type))
+        return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
+    if (is_set(type))
+        return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
+    return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
+                        table.get_column_name(column), column_type);
 }
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
@@ -1227,7 +1231,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
     : std::logic_error(unsupported_operation_msg(column, table, operation))
     , column_key(column)
     , column_name(table.get_column_name(column))
-    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Array)
+    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Collection)
 {
 }
 

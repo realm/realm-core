@@ -54,6 +54,21 @@ inline bool TestValueGenerator::convert_for_test<bool>(int64_t v)
 }
 
 template <>
+inline UUID TestValueGenerator::convert_for_test<UUID>(int64_t v)
+{
+    union {
+        struct {
+            int64_t upper;
+            int64_t lower;
+        } ints;
+        UUID::UUIDBytes bytes;
+    } u;
+    u.ints.upper = v;
+    u.ints.lower = 0;
+    return UUID{u.bytes};
+}
+
+template <>
 inline Timestamp TestValueGenerator::convert_for_test<Timestamp>(int64_t v)
 {
     return Timestamp{v, 0};

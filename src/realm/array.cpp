@@ -224,25 +224,13 @@ void Array::init_from_mem(MemRef mem) noexcept
     update_width_cache_from_header();
 }
 
-bool Array::update_from_parent(size_t old_baseline) noexcept
+void Array::update_from_parent() noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     ArrayParent* parent = get_parent();
     REALM_ASSERT_DEBUG(parent);
-
-    // Array nodes that are part of the previous version of the
-    // database will not be overwritten by Group::commit(). This is
-    // necessary for robustness in the face of abrupt termination of
-    // the process. It also means that we can be sure that an array
-    // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous baseline.
-
     ref_type new_ref = get_ref_from_parent();
-    if (new_ref == m_ref && new_ref < old_baseline)
-        return false; // Has not changed
-
     init_from_ref(new_ref);
-    return true; // Might have changed
 }
 
 void Array::set_type(Type type)

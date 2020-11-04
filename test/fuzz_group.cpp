@@ -213,6 +213,9 @@ std::string create_column_name(DataType t)
         case type_LinkList:
             str = "link_list_";
             break;
+        case type_UUID:
+            str = "uuid_";
+            break;
         case type_Mixed:
             str = "any_";
             break;

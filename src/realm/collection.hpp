@@ -36,8 +36,11 @@ inline void check_column_type<util::Optional<Int>>(ColKey col)
 template <>
 inline void check_column_type<ObjKey>(ColKey col)
 {
-    if (col && col.get_type() != col_type_LinkList) {
-        throw LogicError(LogicError::collection_type_mismatch);
+    if (col) {
+        bool is_link_list = (col.get_type() == col_type_LinkList);
+        bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
+        if (!(is_link_list || is_link_set))
+            throw LogicError(LogicError::collection_type_mismatch);
     }
 }
 
@@ -210,7 +213,7 @@ public:
     }
     bool is_null(size_t ndx) const final
     {
-        return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
+        return m_nullable && value_is_null(get(ndx));
     }
     Mixed get_any(size_t ndx) const final
     {
@@ -218,12 +221,12 @@ public:
     }
 
     // Ensure that `Interface` implements `CollectionBase`.
+    // We do not need to import size() from Interface because we've implemented it above.
     using Interface::avg;
     using Interface::distinct;
     using Interface::is_attached;
     using Interface::max;
     using Interface::min;
-    using Interface::size;
     using Interface::sort;
     using Interface::sum;
     using Interface::update_content_version;
@@ -231,7 +234,8 @@ public:
 
     T get(size_t ndx) const
     {
-        if (ndx >= Collection::size()) {
+        const auto current_size = Collection::size();
+        if (ndx >= current_size) {
             throw std::out_of_range("Index out of range");
         }
         return m_tree->get(ndx);
@@ -398,6 +402,11 @@ struct Collection<T, Interface>::iterator {
     bool operator==(const iterator& rhs) const
     {
         return m_ndx == rhs.m_ndx;
+    }
+
+    size_t index() const noexcept
+    {
+        return m_ndx;
     }
 
 private:

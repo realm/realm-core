@@ -27,7 +27,7 @@ namespace realm {
 
 namespace _impl {
 
-static const int sorting_rank[18] = {
+static const int sorting_rank[19] = {
     0, // null
     0, // type_Int = 0,
     0, // type_Bool = 1,
@@ -46,6 +46,7 @@ static const int sorting_rank[18] = {
     -1,
     5, // type_ObjectId = 15,
     6, // type_TypedLink = 16
+    7, // type_UUID = 17
 };
 
 inline int compare_string(StringData a, StringData b)
@@ -320,6 +321,11 @@ int Mixed::compare(const Mixed& b) const
                 return _impl::compare_generic(link_val, b.link_val);
             }
             break;
+        case type_UUID:
+            if (b.get_type() == type_UUID) {
+                return _impl::compare_generic(uuid_val, b.uuid_val);
+            }
+            break;
         default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
@@ -396,6 +402,10 @@ size_t Mixed::hash() const
             hash = h(decimal_val);
             break;
         }
+        case type_UUID: {
+            hash = get<UUID>().hash();
+            break;
+        }
         case type_TypedLink: {
             auto unsigned_data = reinterpret_cast<const unsigned char*>(&link_val);
             hash = murmur2_or_cityhash(unsigned_data, 12);
@@ -455,6 +465,9 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 break;
             case type_TypedLink:
                 out << m.link_val;
+                break;
+            case type_UUID:
+                out << m.get<UUID>();
                 break;
             case type_OldDateTime:
             case type_OldTable:

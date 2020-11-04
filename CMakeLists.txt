@@ -180,6 +180,7 @@ endif()
 option(REALM_ENABLE_SYNC "Enable synchronized realms." ON)
 option(REALM_BUILD_TEST_CLIENT "Build the test client" OFF)
 option(REALM_BUILD_DOGLESS "Build server with support for emitting statsd" OFF)
+option(REALM_BUILD_INSPECTOR "Build inspector" OFF)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
@@ -213,13 +214,13 @@ if(REALM_NEEDS_OPENSSL)
         if(NOT OpenSSL_DIR)
             if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
                 if(ANDROID)
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tgz")
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tar.gz")
                 else()
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tgz")
+                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tar.gz")
                 endif()
 
                 message(STATUS "Getting ${OPENSSL_URL}...")
-                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
+                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tar.gz" STATUS download_status)
 
                 list(GET download_status 0 status_code)
                 if (NOT "${status_code}" STREQUAL "0")
@@ -228,7 +229,7 @@ if(REALM_NEEDS_OPENSSL)
 
                 message(STATUS "Uncompressing OpenSSL...")
                 execute_process(
-                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
+                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tar.gz"
                     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
                 )
             endif()
@@ -243,7 +244,11 @@ if(REALM_NEEDS_OPENSSL)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
 endif()
 
-if(REALM_ENABLE_SYNC)
+# Use Zlib for Sync, but allow integrators to override it
+# Don't use find_library(ZLIB) on Apple platforms - it hardcodes the path per platform,
+# so for an iOS build it'll use the path from the Device plaform, which is an error on Simulator.
+# Just use -lz and let Xcode figure it out
+if(REALM_ENABLE_SYNC AND NOT APPLE AND NOT TARGET ZLIB::ZLIB)
     find_package(ZLIB REQUIRED)
 endif()
 
@@ -286,6 +291,11 @@ endif()
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
+# Only prepare install/package targets if we're not a submodule
+if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    return()
+endif()
+
 # Make the project importable from the build directory
 set(REALM_EXPORTED_TARGETS
     Storage
@@ -294,7 +304,7 @@ set(REALM_EXPORTED_TARGETS
     RealmFFI
     RealmFFIStatic
 )
-if(${REALM_ENABLE_SYNC})
+if(REALM_ENABLE_SYNC)
     list(APPEND REALM_EXPORTED_TARGETS Sync)
 endif()
 export(TARGETS ${REALM_EXPORTED_TARGETS} NAMESPACE Realm:: FILE RealmTargets.cmake)
@@ -321,4 +331,3 @@ set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)
 cpack_add_component(devel DEPENDS devel)
-

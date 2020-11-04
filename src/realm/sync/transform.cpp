@@ -170,7 +170,7 @@ struct TransformerImpl::Side {
         instr.path.m_path.clear();
         instr.path.m_path.reserve(other.path.size());
         for (auto& element : other.path.m_path) {
-            auto push = util::overloaded{
+            auto push = util::overload{
                 [&](uint32_t index) {
                     instr.path.m_path.push_back(index);
                 },
@@ -890,9 +890,7 @@ void TransformerImpl::MinorSide::prepend(InputIterator begin, InputIterator end)
 {
     m_transformer.prepend_minor(std::move(begin), std::move(end));
 }
-
 } // namespace _impl
-
 
 namespace {
 
@@ -928,10 +926,61 @@ struct MergeUtils {
         return left_key == right_key;
     }
 
+    bool same_payload(const Instruction::Payload& left, const Instruction::Payload& right)
+    {
+        using Type = Instruction::Payload::Type;
+
+        if (left.type != right.type)
+            return false;
+
+        switch (left.type) {
+            case Type::Null:
+                return true;
+            case Type::Erased:
+                return true;
+            case Type::Dictionary:
+                return true;
+            case Type::ObjectValue:
+                return true;
+            case Type::GlobalKey:
+                return left.data.key == right.data.key;
+            case Type::Int:
+                return left.data.integer == right.data.integer;
+            case Type::Bool:
+                return left.data.boolean == right.data.boolean;
+            case Type::String:
+                return m_left_side.get_string(left.data.str) == m_right_side.get_string(right.data.str);
+            case Type::Binary:
+                return m_left_side.get_string(left.data.binary) == m_right_side.get_string(right.data.binary);
+            case Type::Timestamp:
+                return left.data.timestamp == right.data.timestamp;
+            case Type::Float:
+                return left.data.fnum == right.data.fnum;
+            case Type::Double:
+                return left.data.dnum == right.data.dnum;
+            case Type::Decimal:
+                return left.data.decimal == right.data.decimal;
+            case Type::Link: {
+                if (!same_key(left.data.link.target, right.data.link.target)) {
+                    return false;
+                }
+                auto left_target = m_left_side.get_string(left.data.link.target_table);
+                auto right_target = m_right_side.get_string(right.data.link.target_table);
+                return left_target == right_target;
+            }
+            case Type::ObjectId:
+                return left.data.object_id == right.data.object_id;
+            case Type::UUID:
+                return left.data.uuid == right.data.uuid;
+        }
+
+        REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");
+    }
+
     bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
         noexcept
     {
-        auto pred = util::overloaded{
+        auto pred = util::overload{
             [&](uint32_t lhs, uint32_t rhs) {
                 return lhs == rhs;
             },
@@ -1401,6 +1450,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddTable);
 
 /// EraseTable rules
 
@@ -1445,6 +1497,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseTable);
 
 
 /// CreateObject rules
@@ -1478,6 +1533,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::CreateObject);
 
 
 /// Erase rules
@@ -1503,6 +1561,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseObject);
 
 
 /// Set rules
@@ -1608,7 +1669,6 @@ DEFINE_MERGE(Instruction::ArrayInsert, Instruction::Update)
 {
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
-
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() <= left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
@@ -1636,11 +1696,13 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 {
     if (same_container(left, right)) {
         REALM_ASSERT(right.is_array_update());
-
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
 
+        // CONFLICT: Update of a removed element.
+        //
+        // RESOLUTION: Discard the UPDATE operation received on the right side.
         right.prior_size -= 1;
 
         if (left.index() == right.index()) {
@@ -1657,6 +1719,10 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 
 // Handled by nested rule
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::Update);
+
 
 /// AddInteger rules
 
@@ -1668,6 +1734,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddInteger);
 
 
 /// AddColumn rules
@@ -1746,6 +1815,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddColumn);
 
 
 /// EraseColumn rules
@@ -1764,6 +1836,9 @@ DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseColumn);
 
 /// ArrayInsert rules
 
@@ -1858,6 +1933,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayInsert)
 
 // Handled by nested rules
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayInsert);
 
 
 /// ArrayMove rules
@@ -1996,6 +2074,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
 
 // Handled by nested rule.
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayMove);
 
 
 /// ArrayErase rules
@@ -2020,7 +2101,7 @@ DEFINE_NESTED_MERGE(Instruction::ArrayErase)
 
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 {
-    if (same_path(left, right)) {
+    if (same_container(left, right)) {
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
@@ -2046,6 +2127,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 
 // Handled by nested rules.
 DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayErase);
 
 
 /// ArrayClear rules
@@ -2077,14 +2161,126 @@ DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayClear)
     }
 }
 
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayClear);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayClear);
+DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayClear);
+
+
+/// SetInsert rules
+
+DEFINE_NESTED_MERGE_NOOP(Instruction::SetInsert);
+
+DEFINE_MERGE(Instruction::SetInsert, Instruction::SetInsert)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Two inserts into the same set.
+        //
+        // RESOLUTION: If the values are the same, discard the insertion with the lower timestamp. Otherwise,
+        // do nothing.
+        //
+        // NOTE: Set insertion is idempotent. Keeping the instruction with the higher timestamp is necessary
+        // because we want to maintain associativity in the case where intermittent erases (as ordered by
+        // timestamp) arrive at a later point in time.
+        if (same_payload(left.value, right.value)) {
+            if (left_side.timestamp() < right_side.timestamp()) {
+                left_side.discard();
+            }
+            else {
+                right_side.discard();
+            }
+        }
+    }
+}
+
+DEFINE_MERGE(Instruction::SetErase, Instruction::SetInsert)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Insertion and erase in the same set.
+        //
+        // RESOLUTION: If the inserted/erased values are the same, discard the instruction with the lower
+        // timestamp. Otherwise, do nothing.
+        //
+        // Note: Set insertion and erase are both idempotent. Keeping the instruction with the higher
+        // timestamp is necessary because we want to maintain associativity.
+        if (same_payload(left.value, right.value)) {
+            if (left_side.timestamp() < right_side.timestamp()) {
+                left_side.discard();
+            }
+            else {
+                right_side.discard();
+            }
+        }
+    }
+}
+
+DEFINE_MERGE(Instruction::SetClear, Instruction::SetInsert)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Insertion and clear in the same set.
+        //
+        // RESOLUTION: Always discard the insertion. This mirrors the behavior of `ArrayClear`, although the
+        // mechanics there are based on nested rules.
+        right_side.discard();
+    }
+}
+
+
+/// SetErase rules.
+
+DEFINE_NESTED_MERGE_NOOP(Instruction::SetErase);
+
+DEFINE_MERGE(Instruction::SetErase, Instruction::SetErase)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Two erases in the same set.
+        //
+        // RESOLUTION: If the values are the same, discard the instruction with the lower timestamp.
+        // Otherwise, do nothing.
+        if (left.value == right.value) {
+            if (left_side.timestamp() < right_side.timestamp()) {
+                left_side.discard();
+            }
+            else {
+                right_side.discard();
+            }
+        }
+    }
+}
+
+DEFINE_MERGE(Instruction::SetClear, Instruction::SetErase)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Erase and clear of the same set.
+        //
+        // RESOLUTION: Always let the clear instruction win.
+        right_side.discard();
+    }
+}
+
+
+/// SetClear rules.
+
+DEFINE_NESTED_MERGE_NOOP(Instruction::SetClear);
+
+DEFINE_MERGE(Instruction::SetClear, Instruction::SetClear)
+{
+    if (same_path(left, right)) {
+        // CONFLICT: Both sides cleared the set.
+        //
+        // RESOLUTION: The clear instructions cancel each other out.
+        left_side.discard();
+        right_side.discard();
+    }
+}
+
+
 ///
 /// END OF MERGE RULES!
 ///
 
-} // unnamed namespace
+} // namespace
 
 namespace _impl {
-
 template <class Left, class Right>
 void merge_instructions_2(Left& left, Right& right, TransformerImpl::MajorSide& left_side,
                           TransformerImpl::MinorSide& right_side)
@@ -2141,7 +2337,6 @@ void merge_nested_2(Outer& outer, Inner& inner, OuterSide& outer_side, InnerSide
         }
     }
 }
-
 
 void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, MinorSide& our_side)
 {
@@ -2462,9 +2657,7 @@ size_t TransformerImpl::emit_changesets(const Changeset* changesets, size_t num_
 
 } // namespace _impl
 
-
 namespace sync {
-
 std::unique_ptr<Transformer> make_transformer()
 {
     return std::make_unique<_impl::TransformerImpl>(); // Throws

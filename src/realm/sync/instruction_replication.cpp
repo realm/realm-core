@@ -76,6 +76,9 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         case type_ObjectId: {
             return Instruction::Payload{value.get<ObjectId>()};
         }
+        case type_UUID: {
+            return Instruction::Payload{value.get<UUID>()};
+        }
         case type_TypedLink:
             [[fallthrough]];
         case type_Link: {
@@ -177,6 +180,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::Link;
         case type_ObjectId:
             return Type::ObjectId;
+        case type_UUID:
+            return Type::UUID;
         case type_Mixed:
             return Type::Null;
         case type_OldTable:
@@ -266,6 +271,9 @@ Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
     else if (value.get_type() == type_ObjectId) {
         return value.get<ObjectId>();
     }
+    else if (value.get_type() == type_UUID) {
+        return value.get<UUID>();
+    }
     else {
         // Unsupported primary key type.
         unsupported_instruction();
@@ -352,6 +360,13 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
             auto key_type = table->get_dictionary_key_type(col_key);
             REALM_ASSERT(key_type == type_String);
             instr.key_type = get_payload_type(key_type);
+        }
+        else if (col_key.is_set()) {
+            instr.collection_type = CollectionType::Set;
+            auto value_type = table->get_column_type(col_key);
+            REALM_ASSERT(value_type != type_LinkList);
+            instr.type = get_payload_type(value_type);
+            instr.key_type = Instruction::Payload::Type::Null;
         }
         else {
             REALM_ASSERT(!col_key.is_collection());
@@ -543,6 +558,40 @@ void SyncReplication::list_clear(const CollectionBase& view)
     }
 }
 
+void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed value)
+{
+    TrivialReplication::set_insert(set, set_ndx, value);
+
+    if (select_collection(set)) {
+        Instruction::SetInsert instr;
+        populate_path_instr(instr, set);
+        instr.value = as_payload(set, value);
+        emit(instr);
+    }
+}
+
+void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
+{
+    TrivialReplication::set_erase(set, set_ndx, value);
+
+    if (select_collection(set)) {
+        Instruction::SetErase instr;
+        populate_path_instr(instr, set);
+        instr.value = as_payload(set, value);
+        emit(instr);
+    }
+}
+
+void SyncReplication::set_clear(const CollectionBase& set)
+{
+    TrivialReplication::set_clear(set);
+
+    if (select_collection(set)) {
+        Instruction::SetClear instr;
+        populate_path_instr(instr, set);
+        emit(instr);
+    }
+}
 
 void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
 {
@@ -570,7 +619,6 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
     }
 }
 
-
 void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
 {
     TrivialReplication::dictionary_erase(dict, key);
@@ -586,7 +634,6 @@ void SyncReplication::dictionary_erase(const CollectionBase& dict, Mixed key)
         emit(instr);
     }
 }
-
 
 void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
 {
@@ -676,6 +723,11 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 
         if (pk_type == type_ObjectId) {
             ObjectId id = obj.get<ObjectId>(pk_col);
+            return id;
+        }
+
+        if (pk_type == type_UUID) {
+            UUID id = obj.get<UUID>(pk_col);
             return id;
         }
 

@@ -3,7 +3,50 @@
 #include <string>
 #include <iostream>
 
-#include "util.hpp"
+#include <realm/util/load_file.hpp>
+#include <realm/sync/changeset.hpp>
+#include <realm/sync/changeset_parser.hpp>
+
+using namespace realm;
+
+sync::Changeset changeset_binary_to_sync_changeset(const std::string& changeset_binary)
+{
+    _impl::SimpleInputStream input_stream{changeset_binary.data(), changeset_binary.size()};
+    sync::Changeset changeset;
+    sync::parse_changeset(input_stream, changeset);
+
+    return changeset;
+}
+
+std::string changeset_hex_to_binary(const std::string& changeset_hex)
+{
+    std::vector<char> changeset_vec;
+
+    std::istringstream in{changeset_hex};
+    int n;
+    in >> std::hex >> n;
+    while (in) {
+        REALM_ASSERT(n >= 0 && n <= 255);
+        changeset_vec.push_back(n);
+        in >> std::hex >> n;
+    }
+
+    return std::string{changeset_vec.data(), changeset_vec.size()};
+}
+
+void print_changeset(const std::string& path, bool hex)
+{
+    std::string file_contents = util::load_file(path);
+    std::string changeset_binary;
+    if (hex) {
+        changeset_binary = changeset_hex_to_binary(file_contents);
+    }
+    else {
+        changeset_binary = file_contents;
+    }
+    sync::Changeset changeset = changeset_binary_to_sync_changeset(changeset_binary);
+    changeset.print(std::cout);
+}
 
 int main(int argc, char* argv[])
 {
@@ -76,5 +119,5 @@ int main(int argc, char* argv[])
         }
     }
 
-    realm::inspector::print_changeset(changeset_path, hex);
+    print_changeset(changeset_path, hex);
 }

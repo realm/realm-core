@@ -168,6 +168,9 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::Decimal:
             return ctx.box(m_obj.get<Decimal>(column));
             //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
+        case PropertyType::UUID:
+            return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
+                                              : ctx.box(m_obj.get<UUID>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             return ctx.box(Object(m_realm, *linkObjectSchema, const_cast<Obj&>(m_obj).get_linked_object(column)));
@@ -353,7 +356,17 @@ ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& t
         return table.find_first(primary_prop.column_key, ctx.template unbox<StringData>(primary_value));
     }
     if (primary_prop.type == PropertyType::ObjectId) {
+        if (is_nullable(primary_prop.type)) {
+            return table.find_first(primary_prop.column_key,
+                                    ctx.template unbox<util::Optional<ObjectId>>(primary_value));
+        }
         return table.find_first(primary_prop.column_key, ctx.template unbox<ObjectId>(primary_value));
+    }
+    else if (primary_prop.type == PropertyType::UUID) {
+        if (is_nullable(primary_prop.type)) {
+            return table.find_primary_key(ctx.template unbox<util::Optional<UUID>>(primary_value));
+        }
+        return table.find_primary_key(ctx.template unbox<UUID>(primary_value));
     }
     if (is_nullable(primary_prop.type))
         return table.find_first(primary_prop.column_key, ctx.template unbox<util::Optional<int64_t>>(primary_value));

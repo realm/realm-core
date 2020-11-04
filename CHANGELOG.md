@@ -1,13 +1,14 @@
 # NEXT RELEASE
 
 ### Enhancements
-* New data types: Mixed and TypedLink.
+* New data types: Mixed, UUID and TypedLink.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
 * Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
- 
+* Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, (since v6.0.0).
+
 ### Breaking changes
 * None.
 
@@ -15,6 +16,21 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 10.0.0 Release notes
+
+### Fixed
+* Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+* Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
+* If objects with incoming links are deleted on the server side and then later re-created it may lead to a crash. (Since v10.0.0-alpha.1)
+* Upgrading from file format version 11 would crash with an assertion. ([#6847](https://github.com/realm/realm-cocoa/issues/6847). since v10.0.0-beta.0)
+ 
+-----------
+
+### Internals
+* Uses OpenSSL version 1.1.1g. The prebuilt openssl libraries now have .tar.gz extension instead of .tgz.
 
 ----------------------------------------------
 

@@ -31,6 +31,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
+#include <realm/uuid.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
@@ -138,6 +139,8 @@ public:
     Mixed(util::Optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
     Mixed(ObjLink) noexcept;
+    Mixed(UUID) noexcept;
+    Mixed(util::Optional<UUID>) noexcept;
     Mixed(const Obj&) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
@@ -227,6 +230,7 @@ private:
         ObjectId id_val;
         Decimal128 decimal_val;
         ObjLink link_val;
+        UUID uuid_val;
     };
 };
 
@@ -311,6 +315,17 @@ inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
     }
 }
 
+inline Mixed::Mixed(util::Optional<UUID> v) noexcept
+{
+    if (v) {
+        m_type = type_UUID + 1;
+        uuid_val = *v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
@@ -359,6 +374,12 @@ inline Mixed::Mixed(ObjectId v) noexcept
 {
     m_type = type_ObjectId + 1;
     id_val = v;
+}
+
+inline Mixed::Mixed(UUID v) noexcept
+{
+    m_type = type_UUID + 1;
+    uuid_val = v;
 }
 
 inline Mixed::Mixed(ObjKey v) noexcept
@@ -500,6 +521,13 @@ inline ObjectId Mixed::get<ObjectId>() const noexcept
 {
     REALM_ASSERT(get_type() == type_ObjectId);
     return id_val;
+}
+
+template <>
+inline UUID Mixed::get<UUID>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_UUID);
+    return uuid_val;
 }
 
 template <>

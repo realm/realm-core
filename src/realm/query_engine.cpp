@@ -281,6 +281,39 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 
 namespace realm {
 
+size_t do_search_index(ObjKey& last_start_key, size_t& result_get, std::vector<ObjKey>& results,
+                       const Cluster* cluster, size_t start, size_t end)
+{
+    ObjKey first_key = cluster->get_real_key(start);
+    if (first_key < last_start_key) {
+        // We are not advancing through the clusters. We basically don't know where we are,
+        // so just start over from the beginning.
+        auto it = std::lower_bound(results.begin(), results.end(), first_key);
+        result_get = (it == results.end()) ? realm::npos : (it - results.begin());
+    }
+    last_start_key = first_key;
+
+    if (result_get < results.size()) {
+        auto actual_key = results[result_get];
+        // skip through keys which are in "earlier" leafs than the one selected by start..end:
+        while (first_key > actual_key) {
+            result_get++;
+            if (result_get == results.size())
+                return not_found;
+            actual_key = results[result_get];
+        }
+
+        // if actual key is bigger than last key, it is not in this leaf
+        ObjKey last_key = cluster->get_real_key(end - 1);
+        if (actual_key > last_key)
+            return not_found;
+
+        // key is known to be in this leaf, so find key whithin leaf keys
+        return cluster->lower_bound_key(ObjKey(actual_key.value - cluster->get_offset()));
+    }
+    return not_found;
+}
+
 void StringNode<Equal>::_search_index_init()
 {
     FindRes fr;

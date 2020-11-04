@@ -41,7 +41,8 @@ enum ColumnType {
     col_type_LinkList = 13,
     col_type_BackLink = 14,
     col_type_ObjectId = 15,
-    col_type_TypedLink = 16
+    col_type_TypedLink = 16,
+    col_type_UUID = 17
 };
 
 
@@ -70,8 +71,11 @@ enum ColumnAttr {
     /// Each element is a dictionary
     col_attr_Dictionary = 64,
 
-    // Either list or dictionary
-    col_attr_Collection = 64 + 32
+    /// Each element is a set of values
+    col_attr_Set = 128,
+
+    /// Either list, dictionary, or set
+    col_attr_Collection = 128 + 64 + 32
 };
 
 class ColumnAttrMask {

@@ -35,6 +35,7 @@ class TableView;
 class CollectionBase;
 class CascadeState;
 class LstBase;
+class SetBase;
 struct GlobalKey;
 
 template <class>
@@ -42,11 +43,20 @@ class Lst;
 template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
 using LstBasePtr = std::unique_ptr<LstBase>;
+using SetBasePtr = std::unique_ptr<SetBase>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
 
+template <class>
+class Set;
 class Dictionary;
+
+enum JSONOutputMode {
+    output_mode_json,       // default / existing implementation for outputting realm to json
+    output_mode_xjson,      // extended json as described in the spec
+    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
+};
 
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
@@ -131,16 +141,13 @@ public:
     template <class T>
     bool evaluate(T func) const;
 
-    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-                 std::vector<ColKey>& followed) const;
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                 std::vector<ColKey>& followed, JSONOutputMode output_mode) const;
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                 JSONOutputMode output_mode = output_mode_json) const
     {
-        std::map<std::string, std::string> renames2;
-        renames = renames ? renames : &renames2;
-
         std::vector<ColKey> followed;
-        to_json(out, link_depth, *renames, followed);
+        to_json(out, link_depth, renames, followed, output_mode);
     }
 
     std::string to_string() const;
@@ -238,6 +245,14 @@ public:
 
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
+    template <typename U>
+    Set<U> get_set(StringData col_name) const
+    {
+        return get_set<U>(get_column_key(col_name));
+    }
+    template <typename U>
+    Set<U> get_set(ColKey col_key) const;
+    SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
 
@@ -257,6 +272,8 @@ private:
     friend class LnkLst;
     friend class Dictionary;
     friend class LinkMap;
+    template <class>
+    friend class Set;
     friend class Table;
     friend class Transaction;
 
@@ -417,6 +434,12 @@ inline Obj& Obj::set(ColKey col_key, util::Optional<double> value, bool is_defau
 
 template <>
 inline Obj& Obj::set(ColKey col_key, util::Optional<ObjectId> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, util::Optional<UUID> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }

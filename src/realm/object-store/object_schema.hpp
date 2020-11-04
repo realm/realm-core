@@ -31,7 +31,7 @@ namespace realm {
 class Group;
 class Schema;
 class Table;
-enum class PropertyType : unsigned char;
+enum class PropertyType : unsigned short;
 struct ObjectSchemaValidationException;
 struct Property;
 
@@ -78,7 +78,8 @@ public:
     }
     bool property_is_computed(Property const& property) const noexcept;
 
-    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const;
+    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
+                  bool for_sync) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 

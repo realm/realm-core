@@ -872,6 +872,55 @@ TEST_CASE("migration: Automatic")
             std::swap(properties[0], properties[1]);
             VERIFY_SCHEMA_IN_MIGRATION(schema2);
         }
+        SECTION("change linklist to set")
+        {
+            auto schema2 = schema;
+            auto prop = schema2.find("link origin")->property_for_name("array");
+            prop->type = PropertyType::Set | PropertyType::Object;
+            VERIFY_SCHEMA_IN_MIGRATION(schema2);
+        }
+    }
+
+    SECTION("change nullability and primary key")
+    {
+        using namespace std::string_literals;
+        Schema schema{{"EmpDetails",
+                       {
+                           {"UId", PropertyType::String, Property::IsPrimary{true}},
+                           {"EmployeeId", PropertyType::String | PropertyType::Nullable},
+                           {"Name", PropertyType::String},
+                       }}};
+        Schema schema2{{"EmpDetails",
+                        {
+                            {"UId", PropertyType::String},
+                            {"EmployeeId", PropertyType::String, Property::IsPrimary{true}},
+                            {"Name", PropertyType::String},
+                        }}};
+        InMemoryTestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext ctx(realm);
+        util::Any values = AnyDict{
+            {"UId", "ID_001"s},
+            {"EmployeeId", "XHGR"s},
+            {"Name", "John Doe"s},
+        };
+        realm->begin_transaction();
+        Object::create(ctx, realm, *realm->schema().find("EmpDetails"), values);
+        realm->commit_transaction();
+
+        realm->update_schema(schema2, 2, [](auto old_realm, auto new_realm, auto&) {
+            // ObjectStore::delete_data_for_object(realm->read_group(), "DetailStudentStatus");
+            Object old_obj(old_realm, "EmpDetails", 0);
+            Object new_obj(new_realm, "EmpDetails", 0);
+
+            CppContext ctx1(old_realm);
+            CppContext ctx2(new_realm);
+            auto val = old_obj.get_property_value<util::Any>(ctx1, "EmployeeId");
+            new_obj.set_property_value(ctx2, "EmployeeId", val);
+        });
     }
 
     SECTION("object accessors inside migrations")
@@ -1459,6 +1508,26 @@ TEST_CASE("migration: Automatic")
             FAILED_RENAME(schema, schema2,
                           "Cannot rename property 'origin.link' to 'new' because it would change from type "
                           "'array<target>' to 'array<origin>'.",
+                          {"origin", "link", "new"});
+        }
+
+        SECTION("different object set targets")
+        {
+            Schema schema = {
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"origin",
+                 {
+                     {"link", PropertyType::Set | PropertyType::Object, "target"},
+                 }},
+            };
+            auto schema2 = set_target(schema, "origin", "link", "origin");
+            schema2.find("origin")->property_for_name("link")->name = "new";
+            FAILED_RENAME(schema, schema2,
+                          "Cannot rename property 'origin.link' to 'new' because it would change from type "
+                          "'set<target>' to 'set<origin>'.",
                           {"origin", "link", "new"});
         }
 

@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -81,8 +82,6 @@ struct StringMaker<SchemaChange> {
 };
 } // namespace Catch
 
-#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
-
 TEST_CASE("ObjectSchema")
 {
     SECTION("Aliases are still present in schema returned from the Realm")
@@ -128,9 +127,11 @@ TEST_CASE("ObjectSchema")
         table->add_column(type_Timestamp, "date");
         table->add_column(type_ObjectId, "object id");
         table->add_column(type_Decimal, "decimal");
+        table->add_column(type_UUID, "uuid");
 
         table->add_column(*target, "object");
         table->add_column_list(*target, "array");
+        table->add_column_set(*target, "set");
 
         table->add_column(type_Int, "int?", true);
         table->add_column(type_Bool, "bool?", true);
@@ -141,6 +142,7 @@ TEST_CASE("ObjectSchema")
         table->add_column(type_Timestamp, "date?", true);
         table->add_column(type_ObjectId, "object id?", true);
         table->add_column(type_Decimal, "decimal?", true);
+        table->add_column(type_UUID, "uuid?", true);
 
         auto add_list = [](TableRef table, DataType type, StringData name, bool nullable) {
             table->add_column_list(type, name, nullable);
@@ -155,6 +157,7 @@ TEST_CASE("ObjectSchema")
         add_list(table, type_Timestamp, "date array", false);
         add_list(table, type_ObjectId, "object id array", false);
         add_list(table, type_Decimal, "decimal array", false);
+        add_list(table, type_UUID, "uuid array", false);
         add_list(table, type_Int, "int? array", true);
         add_list(table, type_Bool, "bool? array", true);
         add_list(table, type_Float, "float? array", true);
@@ -164,6 +167,32 @@ TEST_CASE("ObjectSchema")
         add_list(table, type_Timestamp, "date? array", true);
         add_list(table, type_ObjectId, "object id? array", true);
         add_list(table, type_Decimal, "decimal? array", true);
+        add_list(table, type_UUID, "uuid? array", true);
+
+        auto add_set = [](TableRef table, DataType type, StringData name, bool nullable) {
+            table->add_column_set(type, name, nullable);
+        };
+
+        add_set(table, type_Int, "int set", false);
+        add_set(table, type_Bool, "bool set", false);
+        add_set(table, type_Float, "float set", false);
+        add_set(table, type_Double, "double set", false);
+        add_set(table, type_String, "string set", false);
+        add_set(table, type_Binary, "data set", false);
+        add_set(table, type_Timestamp, "date set", false);
+        add_set(table, type_ObjectId, "object id set", false);
+        add_set(table, type_Decimal, "decimal set", false);
+        add_set(table, type_UUID, "uuid set", false);
+        add_set(table, type_Int, "int? set", true);
+        add_set(table, type_Bool, "bool? set", true);
+        add_set(table, type_Float, "float? set", true);
+        add_set(table, type_Double, "double? set", true);
+        add_set(table, type_String, "string? set", true);
+        add_set(table, type_Binary, "data? set", true);
+        add_set(table, type_Timestamp, "date? set", true);
+        add_set(table, type_ObjectId, "object id? set", true);
+        add_set(table, type_Decimal, "decimal? set", true);
+        add_set(table, type_UUID, "uuid? set", true);
 
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
@@ -171,12 +200,14 @@ TEST_CASE("ObjectSchema")
         indexed_cols.push_back(table->add_column(type_String, "indexed string"));
         indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date"));
         indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id"));
+        indexed_cols.push_back(table->add_column(type_UUID, "indexed uuid"));
 
         indexed_cols.push_back(table->add_column(type_Int, "indexed int?", true));
         indexed_cols.push_back(table->add_column(type_Bool, "indexed bool?", true));
         indexed_cols.push_back(table->add_column(type_String, "indexed string?", true));
         indexed_cols.push_back(table->add_column(type_Timestamp, "indexed date?", true));
         indexed_cols.push_back(table->add_column(type_ObjectId, "indexed object id?", true));
+        indexed_cols.push_back(table->add_column(type_UUID, "indexed uuid?", true));
 
         for (auto col : indexed_cols)
             table->add_search_index(col);
@@ -211,9 +242,11 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date", Date);
         REQUIRE_PROPERTY("object id", ObjectId);
         REQUIRE_PROPERTY("decimal", Decimal);
+        REQUIRE_PROPERTY("uuid", UUID);
 
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
+        REQUIRE_PROPERTY("set", Set | PropertyType::Object, "target");
 
         REQUIRE_PROPERTY("int?", Int | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool?", Bool | PropertyType::Nullable);
@@ -224,6 +257,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date?", Date | PropertyType::Nullable);
         REQUIRE_PROPERTY("object id?", ObjectId | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal?", Decimal | PropertyType::Nullable);
+        REQUIRE_PROPERTY("uuid?", UUID | PropertyType::Nullable);
 
         REQUIRE_PROPERTY("int array", Int | PropertyType::Array);
         REQUIRE_PROPERTY("bool array", Bool | PropertyType::Array);
@@ -234,6 +268,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date array", Date | PropertyType::Array);
         REQUIRE_PROPERTY("object id array", ObjectId | PropertyType::Array);
         REQUIRE_PROPERTY("decimal array", Decimal | PropertyType::Array);
+        REQUIRE_PROPERTY("uuid array", UUID | PropertyType::Array);
         REQUIRE_PROPERTY("int? array", Int | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool? array", Bool | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("float? array", Float | PropertyType::Array | PropertyType::Nullable);
@@ -243,12 +278,35 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("date? array", Date | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("object id? array", ObjectId | PropertyType::Array | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal? array", Decimal | PropertyType::Array | PropertyType::Nullable);
+        REQUIRE_PROPERTY("uuid? array", UUID | PropertyType::Array | PropertyType::Nullable);
+
+        REQUIRE_PROPERTY("int set", Int | PropertyType::Set);
+        REQUIRE_PROPERTY("bool set", Bool | PropertyType::Set);
+        REQUIRE_PROPERTY("float set", Float | PropertyType::Set);
+        REQUIRE_PROPERTY("double set", Double | PropertyType::Set);
+        REQUIRE_PROPERTY("string set", String | PropertyType::Set);
+        REQUIRE_PROPERTY("data set", Data | PropertyType::Set);
+        REQUIRE_PROPERTY("date set", Date | PropertyType::Set);
+        REQUIRE_PROPERTY("object id set", ObjectId | PropertyType::Set);
+        REQUIRE_PROPERTY("decimal set", Decimal | PropertyType::Set);
+        REQUIRE_PROPERTY("uuid set", UUID | PropertyType::Set);
+        REQUIRE_PROPERTY("int? set", Int | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("bool? set", Bool | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("float? set", Float | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("double? set", Double | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("string? set", String | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("data? set", Data | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("date? set", Date | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("object id? set", ObjectId | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
+        REQUIRE_PROPERTY("uuid? set", UUID | PropertyType::Set | PropertyType::Nullable);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string", String, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed date", Date, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed object id", ObjectId, Property::IsPrimary{false}, Property::IsIndexed{true});
+        REQUIRE_PROPERTY("indexed uuid", UUID, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed int?", Int | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool?", Bool | PropertyType::Nullable, Property::IsPrimary{false},
@@ -258,6 +316,8 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("indexed date?", Date | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed object id?", ObjectId | PropertyType::Nullable, Property::IsPrimary{false},
+                         Property::IsIndexed{true});
+        REQUIRE_PROPERTY("indexed uuid?", UUID | PropertyType::Nullable, Property::IsPrimary{false},
                          Property::IsIndexed{true});
     }
 }
@@ -325,6 +385,95 @@ TEST_CASE("Schema")
                               {{"value", PropertyType::Int}},
                               {{"incoming", PropertyType::Array | PropertyType::LinkingObjects, "origin", "array"}}},
                              {"origin", {{"array", PropertyType::Array | PropertyType::Object, "target"}}}};
+            REQUIRE_NOTHROW(schema.validate());
+        }
+
+        SECTION("rejects embedded objects self loop via top level object")
+        {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
+                {"EmbeddedObject",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_top_level_object", PropertyType::Object | PropertyType::Nullable, "TopLevelObject"}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                                      "Cycles containing embedded objects are not currently supported: "
+                                      "'EmbeddedObject.link_to_top_level_object.link_to_embedded_object'");
+        }
+
+        SECTION("rejects embedded objects loop to itself")
+        {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
+                {"EmbeddedObject",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_self", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}}};
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(),
+                "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
+        }
+
+        SECTION("rejects embedded objects self loop via different embedded object")
+        {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
+                {"EmbeddedObjectA",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_b", PropertyType::Object | PropertyType::Array, "EmbeddedObjectB"}}},
+                {"EmbeddedObjectB",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Cycles containing embedded objects are not currently "
+                                                         "supported: 'EmbeddedObjectA.link_to_b.link_to_a'");
+        }
+
+        SECTION("rejects with descriptions of all embedded object loops")
+        {
+            Schema schema = {
+                {"TopLevelObject",
+                 {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
+                {"EmbeddedObjectA",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_c", PropertyType::Object | PropertyType::Array, "EmbeddedObjectC"},
+                  {"link_to_b", PropertyType::Object | PropertyType::Array, "EmbeddedObjectB"}}},
+                {"EmbeddedObjectB",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
+                {"EmbeddedObjectC",
+                 ObjectSchema::IsEmbedded{true},
+                 {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
+            std::string message;
+            try {
+                schema.validate();
+            }
+            catch (const std::exception& e) {
+                message = e.what();
+            }
+            bool found_loop_on_a = message.find("Cycles containing embedded objects are not currently supported: "
+                                                "'EmbeddedObjectA.link_to_c.link_to_a'") != std::string::npos ||
+                                   message.find("Cycles containing embedded objects are not currently supported: "
+                                                "'EmbeddedObjectA.link_to_b.link_to_a'") != std::string::npos;
+            REQUIRE(found_loop_on_a);
+            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: "
+                                 "'EmbeddedObjectB.link_to_a.link_to_b'") != std::string::npos);
+            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: "
+                                 "'EmbeddedObjectC.link_to_a.link_to_c'") != std::string::npos);
+        }
+
+        SECTION("allows top level loops")
+        {
+            Schema schema = {{"TopLevelObjectA",
+                              {{"link_to_top_b", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectB"}}},
+                             {"TopLevelObjectB",
+                              {{"link_to_top_a", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectA"}}},
+                             {"EmbeddedObjectA",
+                              ObjectSchema::IsEmbedded{true},
+                              {{"link_to_b", PropertyType::Object | PropertyType::Array, "TopLevelObjectB"}}},
+                             {"EmbeddedObjectB",
+                              ObjectSchema::IsEmbedded{true},
+                              {{"link_to_a", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}}};
             REQUIRE_NOTHROW(schema.validate());
         }
 
@@ -435,6 +584,7 @@ TEST_CASE("Schema")
                                   {"date", PropertyType::Date},
                                   {"object id", PropertyType::ObjectId},
                                   {"decimal", PropertyType::Decimal},
+                                  {"uuid", PropertyType::UUID},
                                   {"object", PropertyType::Object | PropertyType::Nullable, "object"},
                                   {"array", PropertyType::Object | PropertyType::Array, "object"},
                               }}};
@@ -563,6 +713,10 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
             schema.begin()->primary_key_property()->type = PropertyType::ObjectId | PropertyType::Nullable;
             REQUIRE_NOTHROW(schema.validate());
+            schema.begin()->primary_key_property()->type = PropertyType::UUID;
+            REQUIRE_NOTHROW(schema.validate());
+            schema.begin()->primary_key_property()->type = PropertyType::UUID | PropertyType::Nullable;
+            REQUIRE_NOTHROW(schema.validate());
         }
 
         SECTION("rejects nonexistent primary key")
@@ -585,6 +739,7 @@ TEST_CASE("Schema")
                                   {"data", PropertyType::Data},
                                   {"object", PropertyType::Object | PropertyType::Nullable, "object"},
                                   {"array", PropertyType::Array | PropertyType::Object, "object"},
+                                  {"set", PropertyType::Set | PropertyType::Int},
                                   {"decimal", PropertyType::Decimal},
                               }}};
             for (auto& prop : schema.begin()->persisted_properties) {
@@ -605,7 +760,8 @@ TEST_CASE("Schema")
                      {"bool", PropertyType::Bool, Property::IsPrimary{false}, Property::IsIndexed{true}},
                      {"string", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{true}},
                      {"date", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{true}},
-                     {"object id", PropertyType::Date, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                     {"object id", PropertyType::ObjectId, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                     {"uuid", PropertyType::UUID, Property::IsPrimary{false}, Property::IsIndexed{true}},
                  }}};
             REQUIRE_NOTHROW(schema.validate());
         }

@@ -73,6 +73,8 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
         flags |= PropertyType::Nullable;
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
+    else if (attr.test(col_attr_Set))
+        flags |= PropertyType::Set;
     switch (col.get_type()) {
         case col_type_Int:
             return PropertyType::Int | flags;
@@ -94,8 +96,16 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
             return PropertyType::ObjectId | flags;
         case col_type_Decimal:
             return PropertyType::Decimal | flags;
-        case col_type_Link:
-            return PropertyType::Object | PropertyType::Nullable;
+        case col_type_UUID:
+            return PropertyType::UUID | flags;
+        case col_type_Link: {
+            if (attr.test(col_attr_Set)) {
+                return PropertyType::Object | flags;
+            }
+            else {
+                return PropertyType::Object | PropertyType::Nullable;
+            }
+        }
         case col_type_LinkList:
             return PropertyType::Object | PropertyType::Array;
         default:
@@ -221,14 +231,14 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
         exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.", object_name, prop.name,
                                 string_for_property_type(prop.type));
     }
-    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_array(prop.type)) {
+    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
 
     // check primary keys
     if (prop.is_primary) {
         if (prop.type != PropertyType::Int && prop.type != PropertyType::String &&
-            prop.type != PropertyType::ObjectId) {
+            prop.type != PropertyType::ObjectId && prop.type != PropertyType::UUID) {
             exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.", object_name,
                                     prop.name, string_for_property_type(prop.type));
         }
@@ -292,7 +302,8 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     }
 }
 
-void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const
+void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
+                            bool for_sync) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
@@ -372,6 +383,19 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     }
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
+    }
+
+    if (for_sync && !is_embedded) {
+        if (primary_key.empty()) {
+            exceptions.emplace_back(util::format("There must be a primary key property named '_id' on a synchronized "
+                                                 "Realm but none was found for type '%1'",
+                                                 name));
+        }
+        else if (primary_key != "_id") {
+            exceptions.emplace_back(util::format(
+                "The primary key property on a synchronized Realm must be named '_id' but found '%1' for type '%2'",
+                primary_key, name));
+        }
     }
 }
 

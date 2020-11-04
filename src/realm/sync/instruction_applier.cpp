@@ -1,5 +1,6 @@
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/object.hpp>
+#include <realm/set.hpp>
 
 #include <realm/group.hpp>
 
@@ -41,7 +42,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
 
-    auto add_table = util::overloaded{
+    auto add_table = util::overload{
         [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
             if (spec.type == Instruction::Payload::Type::GlobalKey) {
                 log("sync::create_table(group, \"%1\");", table_name);
@@ -95,7 +96,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
     ColKey pk_col = table->get_primary_key_column();
 
     mpark::visit(
-        util::overloaded{
+        util::overload{
             [&](mpark::monostate) {
                 if (!pk_col) {
                     bad_transaction_log("CreateObject(NULL) on table without a primary key");
@@ -137,6 +138,17 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 }
                 if (table->get_column_type(pk_col) != type_ObjectId) {
                     bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
+                                        table->get_column_type(pk_col));
+                }
+                log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
+                table->create_object_with_primary_key(id);
+            },
+            [&](const UUID& id) {
+                if (!pk_col) {
+                    bad_transaction_log("CreateObject(UUID) on table without a primary key");
+                }
+                if (table->get_column_type(pk_col) != type_UUID) {
+                    bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
                 log("sync::create_object_with_primary_key(group, get_table(\"%1\"), %2);", table->get_name(), id);
@@ -219,13 +231,15 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
         }
         case Type::ObjectId:
             return visitor(data.object_id);
+        case Type::UUID:
+            return visitor(data.uuid);
     }
 }
 
 
 void InstructionApplier::operator()(const Instruction::Update& instr)
 {
-    auto setter = util::overloaded{
+    auto setter = util::overload{
         [&](Obj& obj, ColKey col) {
             // Update of object field.
 
@@ -234,7 +248,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto field_name = table->get_column_name(col);
             auto data_type = DataType(col.get_type());
 
-            auto visitor = util::overloaded{
+            auto visitor = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_Mixed || data_type == type_TypedLink) {
                         obj.set_any(col, link, instr.is_default);
@@ -292,7 +306,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
-            auto visitor = util::overloaded{
+            auto visitor = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
@@ -351,7 +365,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
         [&](Dictionary& dict, Mixed key) {
             // Update (insert) of dictionary element.
 
-            auto visitor = util::overloaded{
+            auto visitor = util::overload{
                 [&](Mixed value) {
                     if (value.is_null()) {
                         // FIXME: Separate handling of NULL is needed because
@@ -385,7 +399,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
 void InstructionApplier::operator()(const Instruction::AddInteger& instr)
 {
-    auto setter = util::overloaded{
+    auto setter = util::overload{
         [&](Obj& obj, ColKey col) {
             // Increment of object field.
 
@@ -472,7 +486,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 break;
             }
             case CollectionType::Set: {
-                REALM_ASSERT(false); // TODO: implement
+                table->add_column_set(type, col_name, instr.nullable);
                 break;
             }
         }
@@ -521,7 +535,7 @@ void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             auto col = list.get_col_key();
             auto data_type = DataType(col.get_type());
@@ -543,7 +557,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                                     instr.prior_size);
             }
 
-            auto inserter = util::overloaded{
+            auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
@@ -573,7 +587,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                 [&](Mixed value) {
                     if (value.is_null()) {
                         if (col.is_nullable()) {
-                            list.set_null(index);
+                            list.insert_null(index);
                         }
                         else {
                             bad_transaction_log("ArrayInsert: NULL in non-nullable list '%2.%1'", field_name,
@@ -627,7 +641,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             if (index >= list.size()) {
                 bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", instr.index(), list.size());
@@ -655,7 +669,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             if (index >= instr.prior_size) {
                 bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
@@ -680,12 +694,8 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list) {
-            if (instr.prior_size != list.size()) {
-                bad_transaction_log("ArrayClear: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
-                                    instr.prior_size);
-            }
             list.clear();
         },
         [](Dictionary& dict) {
@@ -697,6 +707,158 @@ void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
     };
 
     resolve_path(instr, "ArrayClear", callback);
+}
+
+void InstructionApplier::operator()(const Instruction::SetInsert& instr)
+{
+    auto callback = util::overload{
+        [&](SetBase& set) {
+            auto col = set.get_col_key();
+            auto data_type = DataType(col.get_type());
+            auto table = set.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
+
+            auto inserter = util::overload{
+                [&](const ObjLink& link) {
+                    if (data_type == type_TypedLink) {
+                        auto& link_set = static_cast<Set<ObjLink>&>(set);
+                        link_set.insert(link);
+                    }
+                    else if (data_type == type_Mixed) {
+                        auto& mixed_set = static_cast<Set<Mixed>&>(set);
+                        mixed_set.insert(link);
+                    }
+                    else if (data_type == type_Link) {
+                        auto& link_set = static_cast<Set<ObjKey>&>(set);
+                        // Validate the target.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("SetInsert: Target table mismatch (expected '%1', got '%2')",
+                                                target_table->get_name(), table_name);
+                        }
+                        link_set.insert(link.get_obj_key());
+                    }
+                    else {
+                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected link type, was %3)",
+                                            field_name, table_name, data_type);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null() && !col.is_nullable()) {
+                        bad_transaction_log("SetInsert: NULL in non-nullable set '%2.%1'", field_name, table_name);
+                    }
+
+                    if (data_type == type_Mixed || value.get_type() == data_type) {
+                        set.insert_any(value);
+                    }
+                    else {
+                        bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected %3, got %4)",
+                                            field_name, table_name, data_type, value.get_type());
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    bad_transaction_log("SetInsert: Sets of embedded objects are not supported.");
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    bad_transaction_log("SetInsert: Sets of dictionaries are not supported.");
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("SetInsert: Dictionary erase payload in SetInsert");
+                },
+            };
+
+            visit_payload(instr.value, inserter);
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for SetInsert");
+        },
+    };
+
+    resolve_path(instr, "SetInsert", callback);
+}
+
+void InstructionApplier::operator()(const Instruction::SetErase& instr)
+{
+    auto callback = util::overload{
+        [&](SetBase& set) {
+            auto col = set.get_col_key();
+            auto data_type = DataType(col.get_type());
+            auto table = set.get_table();
+            auto table_name = table->get_name();
+            auto field_name = table->get_column_name(col);
+
+            auto inserter = util::overload{
+                [&](const ObjLink& link) {
+                    if (data_type == type_TypedLink) {
+                        auto& link_set = static_cast<Set<ObjLink>&>(set);
+                        link_set.erase(link);
+                    }
+                    else if (data_type == type_Mixed) {
+                        auto& mixed_set = static_cast<Set<Mixed>&>(set);
+                        mixed_set.erase(link);
+                    }
+                    else if (data_type == type_Link) {
+                        auto& link_set = static_cast<Set<ObjKey>&>(set);
+                        // Validate the target.
+                        auto target_table = table->get_link_target(col);
+                        if (target_table->get_key() != link.get_table_key()) {
+                            bad_transaction_log("SetErase: Target table mismatch (expected '%1', got '%2')",
+                                                target_table->get_name(), table_name);
+                        }
+                        link_set.erase(link.get_obj_key());
+                    }
+                    else {
+                        bad_transaction_log("SetErase: Type mismatch in set at '%2.%1' (expected link type, was %3)",
+                                            field_name, table_name, data_type);
+                    }
+                },
+                [&](Mixed value) {
+                    if (value.is_null() && !col.is_nullable()) {
+                        bad_transaction_log("SetErase: NULL in non-nullable set '%2.%1'", field_name, table_name);
+                    }
+
+                    if (data_type == type_Mixed || value.get_type() == data_type) {
+                        set.erase_any(value);
+                    }
+                    else {
+                        bad_transaction_log("SetErase: Type mismatch in set at '%2.%1' (expected %3, got %4)",
+                                            field_name, table_name, data_type, value.get_type());
+                    }
+                },
+                [&](const Instruction::Payload::ObjectValue&) {
+                    bad_transaction_log("SetErase: Sets of embedded objects are not supported.");
+                },
+                [&](const Instruction::Payload::Dictionary&) {
+                    bad_transaction_log("SetErase: Sets of dictionaries are not supported.");
+                },
+                [&](const Instruction::Payload::Erased&) {
+                    bad_transaction_log("SetErase: Dictionary erase payload in SetErase");
+                },
+            };
+
+            visit_payload(instr.value, inserter);
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for SetErase");
+        },
+    };
+
+    resolve_path(instr, "SetErase", callback);
+}
+
+void InstructionApplier::operator()(const Instruction::SetClear& instr)
+{
+    auto callback = util::overload{
+        [&](SetBase& set) {
+            set.clear();
+        },
+        [&](auto&&...) {
+            bad_transaction_log("Invalid path for SetClear");
+        },
+    };
+
+    resolve_path(instr, "SetClear", callback);
 }
 
 StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
@@ -789,6 +951,10 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
         else if (col.is_dictionary()) {
             auto dict = obj.get_dictionary(col);
             return callback(dict);
+        }
+        else if (col.is_set()) {
+            auto set = obj.get_setbase_ptr(col);
+            return callback(*set);
         }
         return callback(obj, col);
     }
@@ -926,7 +1092,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
         pk_type = table.get_column_type(pk_col);
     }
     return mpark::visit(
-        util::overloaded{
+        util::overload{
             [&](mpark::monostate) {
                 if (!pk_col) {
                     bad_transaction_log(
@@ -989,6 +1155,20 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                     bad_transaction_log(
                         "%1 instruction with ObjectId primary key (%2), but '%3.%4' has primary keys of type '%5'",
                         name, pk, table_name, pk_name, pk_type);
+                }
+                ObjKey key = table.get_objkey_from_primary_key(pk);
+                return key;
+            },
+            [&](UUID pk) {
+                if (!pk_col) {
+                    bad_transaction_log("%1 instruction with UUID primary key (\"%2\"), but table '%3' does not "
+                                        "have a primary key column",
+                                        name, pk, table_name);
+                }
+                if (pk_type != type_UUID) {
+                    bad_transaction_log(
+                        "%1 instruction with UUID primary key (%2), but '%3.%4' has primary keys of type '%5'", name,
+                        pk, table_name, pk_name, pk_type);
                 }
                 ObjKey key = table.get_objkey_from_primary_key(pk);
                 return key;

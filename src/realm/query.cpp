@@ -364,6 +364,9 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         case type_Mixed: {
             return MakeConditionNode<MixedNode<Cond>>::make(column_key, value);
         }
+        case type_UUID: {
+            return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
+        }
         default: {
             throw_type_mismatch_error();
         }
@@ -402,7 +405,23 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
             case type_LinkList: {
                 return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
             }
-            default: {
+            case type_ObjectId: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<ObjectId, Cond>(value, column_key)};
+            }
+            case type_Mixed: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Mixed, Cond>(value, column_key)};
+            }
+            case type_Decimal: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<Decimal128, Cond>(value, column_key)};
+            }
+            case type_UUID: {
+                return std::unique_ptr<ParentNode>{new SizeListNode<UUID, Cond>(value, column_key)};
+            }
+            case type_TypedLink:
+                [[fallthrough]];
+            case type_Link:
+                [[fallthrough]];
+            case type_OldTable: {
                 throw_type_mismatch_error();
             }
         }
@@ -806,6 +825,32 @@ Query& Query::less_equal(ColKey column_key, ObjectId value)
     return add_condition<LessEqual>(column_key, value);
 }
 Query& Query::less(ColKey column_key, ObjectId value)
+{
+    return add_condition<Less>(column_key, value);
+}
+
+// ------------- UUID
+Query& Query::equal(ColKey column_key, UUID value)
+{
+    return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, UUID value)
+{
+    return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater(ColKey column_key, UUID value)
+{
+    return add_condition<Greater>(column_key, value);
+}
+Query& Query::greater_equal(ColKey column_key, UUID value)
+{
+    return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey column_key, UUID value)
+{
+    return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey column_key, UUID value)
 {
     return add_condition<Less>(column_key, value);
 }

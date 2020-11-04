@@ -53,6 +53,11 @@ bool ValueExpression::is_type()
                 return true;
             }
         }
+        if constexpr (std::is_same_v<T, UUID>) {
+            if (value->type == parser::Expression::Type::UUID) {
+                return true;
+            }
+        }
         if constexpr (realm::is_any_v<T, Float, Int, Double, Decimal128>) {
             if (value->type == parser::Expression::Type::Number) {
                 return true;

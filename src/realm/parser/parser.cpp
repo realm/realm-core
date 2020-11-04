@@ -93,6 +93,20 @@ struct oid_allowed : disable< xdigit > {};
 struct oid_content : until< at< one< ')' > >, must< oid_allowed > > {};
 struct oid : seq< TAOCPP_PEGTL_ISTRING("oid("), must< oid_content >, any > {};
 
+struct uuid_allowed : disable< xdigit > {};
+struct uuid_sep : one< '-' > {};
+struct uuid_content : seq< rep<8, uuid_allowed >,
+                           uuid_sep,
+                           rep<4, uuid_allowed>,
+                           uuid_sep,
+                           rep<4, uuid_allowed>,
+                           uuid_sep,
+                           rep<4, uuid_allowed>,
+                           uuid_sep,
+                           rep<12, uuid_allowed>
+                       > {};
+struct uuid : seq< TAOCPP_PEGTL_ISTRING("uuid("), must< uuid_content >, one< ')' > > {};
+
 struct true_value : string_token_t("true") {};
 struct false_value : string_token_t("false") {};
 struct null_value : seq<sor<string_token_t("null"), string_token_t("nil")>> {};
@@ -166,7 +180,7 @@ struct agg_expr : seq< sor<agg_any, agg_all, agg_none>, plus<blank>, key_path> {
 };
 
 // expressions and operators
-struct expr : sor<dq_string, sq_string, timestamp, oid, number, argument, true_value, false_value, null_value, base64,
+struct expr : sor<dq_string, sq_string, timestamp, oid, uuid, number, argument, true_value, false_value, null_value, base64,
                   collection_operator_match, subquery, agg_expr, key_path> {
 };
 struct case_insensitive : TAOCPP_PEGTL_ISTRING("[c]") {};
@@ -414,6 +428,7 @@ EXPRESSION_ACTION(null_value, Expression::Type::Null)
 EXPRESSION_ACTION(argument_index, Expression::Type::Argument)
 EXPRESSION_ACTION(base64, Expression::Type::Base64)
 EXPRESSION_ACTION(oid, Expression::Type::ObjectId)
+EXPRESSION_ACTION(uuid, Expression::Type::UUID)
 
 template<> struct action< timestamp >
 {

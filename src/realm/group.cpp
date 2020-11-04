@@ -634,19 +634,15 @@ void Group::remap(size_t new_file_size)
 
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
-    size_t old_baseline = m_alloc.get_baseline();
-
     m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
     auto mapping_version = m_alloc.get_mapping_version();
     if (mapping_version != m_last_seen_mapping_version) {
-        // force re-translation of all refs
-        old_baseline = 0;
         m_last_seen_mapping_version = mapping_version;
     }
-    update_refs(new_top_ref, old_baseline);
+    update_refs(new_top_ref);
 }
 
 void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
@@ -1363,8 +1359,6 @@ void Group::commit()
     // Mark all managed space (beyond the attached file) as free.
     reset_free_space_tracking(); // Throws
 
-    size_t old_baseline = m_alloc.get_baseline();
-
     // Update view of the file
     size_t new_file_size = out.get_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -1376,44 +1370,28 @@ void Group::commit()
     auto mapping_version = m_alloc.get_mapping_version();
     if (mapping_version != m_last_seen_mapping_version) {
         // force re-translation of all refs
-        old_baseline = 0;
         m_last_seen_mapping_version = mapping_version;
     }
-    update_refs(top_ref, old_baseline);
+    update_refs(top_ref);
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
+void Group::update_refs(ref_type top_ref) noexcept
 {
-    old_baseline = 0; // force update of all accessors
     // After Group::commit() we will always have free space tracking
     // info.
     REALM_ASSERT_3(m_top.size(), >=, 5);
 
-    // Array nodes that are part of the previous version of the
-    // database will not be overwritten by Group::commit(). This is
-    // necessary for robustness in the face of abrupt termination of
-    // the process. It also means that we can be sure that an array
-    // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous baseline.
-
-    if (top_ref < old_baseline && m_top.get_ref() == top_ref)
-        return;
-
     m_top.init_from_ref(top_ref);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent(old_baseline);
-
-    // If m_tables has not been modfied we don't
-    // need to update attached table accessors
-    if (!m_tables.update_from_parent(old_baseline))
-        return;
+    m_table_names.update_from_parent();
+    m_tables.update_from_parent();
 
     // Update all attached table accessors.
     for (auto& table_accessor : m_table_accessors) {
         if (table_accessor) {
-            table_accessor->update_from_parent(old_baseline);
+            table_accessor->update_from_parent();
         }
     }
 }
@@ -1437,6 +1415,69 @@ bool Group::operator==(const Group& g) const
             return false;
     }
     return true;
+}
+void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "[" << std::endl;
+
+    auto keys = get_table_keys();
+    int sz = int(keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto key = keys[i];
+        ConstTableRef table = get_table(key);
+
+        table->schema_to_json(out, renames);
+        if (i < sz - 1)
+            out << ",";
+        out << std::endl;
+    }
+
+    out << "]" << std::endl;
+}
+
+void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
+                    JSONOutputMode output_mode) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "{" << std::endl;
+
+    auto keys = get_table_keys();
+    bool first = true;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        StringData name = get_table_name(key);
+        if (renames[name] != "")
+            name = renames[name];
+
+        ConstTableRef table = get_table(key);
+
+        if (!table->is_embedded()) {
+            if (!first)
+                out << ",";
+            out << "\"" << name << "\"";
+            out << ":";
+            table->to_json(out, link_depth, renames, output_mode);
+            out << std::endl;
+            first = false;
+        }
+    }
+
+    out << "}" << std::endl;
 }
 
 namespace {
@@ -1616,6 +1657,19 @@ public:
         return true; // No-op
     }
     bool dictionary_clear(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool set_insert(size_t)
+    {
+        return true; // No-op
+    }
+    bool set_erase(size_t)
+    {
+        return true; // No-op
+    }
+    bool set_clear(size_t)
     {
         return true; // No-op
     }

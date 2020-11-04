@@ -39,7 +39,7 @@
 #include <realm/array_string.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_decimal128.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/table_tpl.hpp>
 
 /// \page AccessorConsistencyLevels
@@ -295,14 +295,24 @@ const char* get_data_type_name(DataType type) noexcept
             return "timestamp";
         case type_ObjectId:
             return "ObjectId";
+        case type_Decimal:
+            return "decimal128";
+        case type_UUID:
+            return "uuid";
+        case type_Mixed:
+            return "mixed";
         case type_Link:
             return "link";
         case type_LinkList:
             return "linklist";
-        default:
-            return "unknown";
+        case type_OldTable:
+            return "oldTable";
+        case type_OldDateTime:
+            return "oldDateTime";
+        case type_TypedLink:
+            return "typedLink";
     }
-    return "";
+    return "unknown";
 }
 } // namespace realm
 
@@ -353,6 +363,17 @@ ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
+ColKey Table::add_column_set(DataType type, StringData name, bool nullable)
+{
+    Table* invalid_link = nullptr;
+    ColumnAttrMask attr;
+    attr.set(col_attr_Set);
+    if (nullable || type == type_Mixed)
+        attr.set(col_attr_Nullable);
+    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    return do_insert_column(col_key, type, name, invalid_link); // Throws
+}
+
 ColKey Table::add_column_list(Table& target, StringData name)
 {
     // Both origin and target must be group-level tables, and in the same group.
@@ -370,6 +391,24 @@ ColKey Table::add_column_list(Table& target, StringData name)
     ColKey col_key = generate_col_key(col_type_LinkList, attr);
 
     return do_insert_column(col_key, type_LinkList, name, &target); // Throws
+}
+
+ColKey Table::add_column_set(Table& target, StringData name)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+    if (target.is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_Set);
+    ColKey col_key = generate_col_key(col_type_Link, attr);
+    return do_insert_column(col_key, type_Link, name, &target); // Throws
 }
 
 ColKey Table::add_column_link(DataType type, StringData name, Table& target)
@@ -393,6 +432,24 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key
     attr.set(col_attr_Dictionary);
     ColKey col_key = generate_col_key(ColumnType(type), attr);
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
+}
+
+ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key_type)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+    if (target.is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_Dictionary);
+    ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
+    return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -639,6 +696,16 @@ void Table::populate_search_index(ColKey col_key)
                 index->insert(key, value); // Throws
             }
         }
+        else if (type == type_UUID) {
+            if (is_nullable(col_key)) {
+                Optional<UUID> value = o.get<Optional<UUID>>(col_key);
+                index->insert(key, value); // Throws
+            }
+            else {
+                UUID value = o.get<UUID>(col_key);
+                index->insert(key, value); // Throws
+            }
+        }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
         }
@@ -725,6 +792,14 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
                     break;
                 case col_type_Mixed:
                     index->insert(key, init_value);
+                    break;
+                case col_type_UUID:
+                    if (init_value.is_null()) {
+                        index->insert(key, ArrayUUIDNull::default_value(nullable));
+                    }
+                    else {
+                        index->insert(key, init_value.get<UUID>());
+                    }
                     break;
                 default:
                     REALM_UNREACHABLE();
@@ -2253,7 +2328,9 @@ template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 template ObjKey Table::find_first(ColKey col_key, Mixed) const;
+template ObjKey Table::find_first(ColKey col_key, UUID) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<UUID>) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -2309,6 +2386,11 @@ ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
 ObjKey Table::find_first_null(ColKey col_key) const
 {
     return where().equal(col_key, null{}).find();
+}
+
+ObjKey Table::find_first_uuid(ColKey col_key, UUID value) const
+{
+    return find_first(col_key, value);
 }
 
 template <class T>
@@ -2435,30 +2517,24 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
 }
 
 
-void Table::update_from_parent(size_t old_baseline) noexcept
+void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        if (!m_top.update_from_parent(old_baseline))
-            return;
-
-        m_spec.update_from_parent(old_baseline);
-        if (m_top.size() > top_position_for_cluster_tree) {
-            m_clusters.update_from_parent(old_baseline);
-        }
-        if (m_top.size() > top_position_for_search_indexes) {
-            if (m_index_refs.update_from_parent(old_baseline)) {
-                for (auto index : m_index_accessors) {
-                    if (index != nullptr) {
-                        index->update_from_parent(old_baseline);
-                    }
-                }
+        m_top.update_from_parent();
+        m_spec.update_from_parent();
+        m_clusters.update_from_parent();
+        m_index_refs.update_from_parent();
+        for (auto index : m_index_accessors) {
+            if (index != nullptr) {
+                index->update_from_parent();
             }
         }
+        // FIXME: REMOVE CONDITIONAL CHECKS?
         if (m_top.size() > top_position_for_opposite_table)
-            m_opposite_table.update_from_parent(old_baseline);
+            m_opposite_table.update_from_parent();
         if (m_top.size() > top_position_for_opposite_column)
-            m_opposite_column.update_from_parent(old_baseline);
+            m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
@@ -2466,14 +2542,77 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         else {
             m_is_embedded = false;
         }
+        if (m_tombstones)
+            m_tombstones->update_from_parent();
+
         refresh_content_version();
         m_has_any_embedded_objects.reset();
     }
     m_alloc.bump_storage_version();
 }
 
+void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const
+{
+    out << "{";
+    auto name = get_name();
+    if (renames.count(name))
+        name = renames.at(name);
+    out << "\"name\":\"" << name << "\"";
+    if (this->m_primary_key_col) {
+        out << ",";
+        out << "\"primaryKey\":\"" << this->get_column_name(m_primary_key_col) << "\"";
+    }
+    if (is_embedded()) {
+        out << ",\"isEmbedded\":true";
+    }
+    out << ",\"properties\":[";
+    auto col_keys = get_column_keys();
+    int sz = int(col_keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto col_key = col_keys[i];
+        name = get_column_name(col_key);
+        auto type = col_key.get_type();
+        if (renames.count(name))
+            name = renames.at(name);
+        out << "{";
+        out << "\"name\":\"" << name << "\"";
+        if (this->is_link_type(type)) {
+            out << ",\"type\":\"object\"";
+            name = this->get_opposite_table(col_key)->get_name();
+            if (renames.count(name))
+                name = renames.at(name);
+            out << ",\"objectType\":\"" << name << "\"";
+        }
+        else {
+            out << ",\"type\":\"" << get_data_type_name(DataType(type)) << "\"";
+        }
+        if (col_key.is_list()) {
+            out << ",\"isArray\":true";
+        }
+        else if (col_key.is_set()) {
+            out << ",\"isSet\":true";
+        }
+        else if (col_key.is_dictionary()) {
+            out << ",\"isMap\":true";
+            auto key_type = get_dictionary_key_type(col_key);
+            out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
+        }
+        if (col_key.is_nullable()) {
+            out << ",\"isOptional\":true";
+        }
+        if (has_search_index(col_key)) {
+            out << ",\"isIndexed\":true";
+        }
+        out << "}";
+        if (i < sz - 1) {
+            out << ",";
+        }
+    }
+    out << "]}";
+}
 
-void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                    JSONOutputMode output_mode) const
 {
     // Represent table as list of objects
     out << "[";
@@ -2486,7 +2625,7 @@ void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, 
         else {
             out << ",";
         }
-        obj.to_json(out, link_depth, renames);
+        obj.to_json(out, link_depth, renames, output_mode);
     }
 
     out << "]";
@@ -2588,6 +2727,8 @@ void Table::refresh_accessor_tree()
     else {
         m_is_embedded = false;
     }
+    if (m_tombstones)
+        m_tombstones->init_from_parent();
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
@@ -2652,6 +2793,8 @@ void Table::verify() const
         m_top.verify();
     m_spec.verify();
     m_clusters.verify();
+    if (nb_unresolved())
+        m_tombstones->verify();
 #endif
 }
 
@@ -2746,7 +2889,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int);
+    REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int || type == type_UUID);
 
     if (did_create)
         *did_create = false;
@@ -3150,7 +3293,9 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
 
 void Table::dump_objects()
 {
-    return m_clusters.dump_objects();
+    m_clusters.dump_objects();
+    if (nb_unresolved())
+        m_tombstones->dump_objects();
 }
 
 void Table::remove_object(ObjKey key)
@@ -3461,6 +3606,11 @@ ObjectId remove_optional<Optional<ObjectId>>(Optional<ObjectId> val)
 {
     return val.value();
 }
+template <>
+UUID remove_optional<Optional<UUID>>(Optional<UUID> val)
+{
+    return val.value();
+}
 } // namespace
 
 template <class F, class T>
@@ -3584,6 +3734,14 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
             case type_Decimal:
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
+            case type_UUID:
+                if (is_nullable(from)) {
+                    change_nullability_list<Optional<UUID>, UUID>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability_list<UUID, Optional<UUID>>(from, to, throw_on_null);
+                }
+                break;
             case type_Link:
             case type_TypedLink:
             case type_LinkList:
@@ -3634,6 +3792,14 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                 break;
             case type_Decimal:
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
+                break;
+            case type_UUID:
+                if (is_nullable(from)) {
+                    change_nullability<Optional<UUID>, UUID>(from, to, throw_on_null);
+                }
+                else {
+                    change_nullability<UUID, Optional<UUID>>(from, to, throw_on_null);
+                }
                 break;
             case type_TypedLink:
             case type_Link:

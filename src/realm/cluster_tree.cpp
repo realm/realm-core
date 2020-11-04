@@ -23,7 +23,7 @@
 #include "realm/array_timestamp.hpp"
 #include "realm/array_bool.hpp"
 #include "realm/array_string.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 
 /*
  * Node-splitting is done in the way that if the new element comes after all the
@@ -51,7 +51,7 @@ public:
 
     void create(int sub_tree_depth);
     void init(MemRef mem) override;
-    bool update_from_parent(size_t old_baseline) noexcept override;
+    void update_from_parent() noexcept override;
     MemRef ensure_writeable(ObjKey k) override;
 
     bool is_leaf() const override
@@ -217,17 +217,14 @@ void ClusterNodeInner::init(MemRef mem)
     m_shift_factor = m_sub_tree_depth * node_shift_factor;
 }
 
-bool ClusterNodeInner::update_from_parent(size_t old_baseline) noexcept
+void ClusterNodeInner::update_from_parent() noexcept
 {
-    if (Array::update_from_parent(old_baseline)) {
-        ref_type ref = Array::get_as_ref(s_key_ref_index);
-        if (ref) {
-            m_keys.update_from_parent(old_baseline);
-        }
-        m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
-        return true;
+    Array::update_from_parent();
+    ref_type ref = Array::get_as_ref(s_key_ref_index);
+    if (ref) {
+        m_keys.update_from_parent();
     }
-    return false;
+    m_sub_tree_depth = int(Array::get(s_sub_tree_depth_index)) >> 1;
 }
 
 template <class T, class F>
@@ -801,13 +798,10 @@ void ClusterTree::init_from_parent()
     m_size = m_root->get_tree_size();
 }
 
-bool ClusterTree::update_from_parent(size_t old_baseline) noexcept
+void ClusterTree::update_from_parent() noexcept
 {
-    bool was_updated = m_root->update_from_parent(old_baseline);
-    if (was_updated) {
-        m_size = m_root->get_tree_size();
-    }
-    return was_updated;
+    m_root->update_from_parent();
+    m_size = m_root->get_tree_size();
 }
 
 void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterNode::State& state)

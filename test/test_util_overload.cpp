@@ -57,9 +57,15 @@ namespace {
 
 TEST(Util_Overload_Basics)
 {
-    auto f = util::overload([](int i) { return i; },
-                            [](std::string s) { return s; },
-                            [](double d1, double d2) { return d1 + d2; });
+    auto f = util::overload{[](int i) {
+                                return i;
+                            },
+                            [](std::string s) {
+                                return s;
+                            },
+                            [](double d1, double d2) {
+                                return d1 + d2;
+                            }};
 
     CHECK_EQUAL(1, f(1));
     CHECK_EQUAL("hello", f("hello"));

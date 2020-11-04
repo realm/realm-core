@@ -143,6 +143,9 @@ Mixed ArrayMixed::get(size_t ndx) const
                 raw.w[1] = m_int_pairs.get(payload_ndx + 1);
                 return Mixed(Decimal128(raw));
             }
+            case type_Link:
+                ensure_int_array();
+                return Mixed(ObjKey(m_ints.get(payload_ndx)));
             case type_TypedLink: {
                 ensure_int_pair_array();
                 payload_ndx <<= 1;
@@ -150,6 +153,14 @@ Mixed ArrayMixed::get(size_t ndx) const
                 ObjLink ret{TableKey(uint32_t(m_int_pairs.get(payload_ndx))),
                             ObjKey(m_int_pairs.get(payload_ndx + 1))};
                 return Mixed(ret);
+            }
+            case type_UUID: {
+                ensure_string_array();
+                REALM_ASSERT(size_t(int_val) < m_strings.size());
+                auto s = m_strings.get(payload_ndx);
+                UUID::UUIDBytes bytes{};
+                std::copy_n(s.data(), bytes.size(), bytes.begin());
+                return Mixed(UUID(bytes));
             }
             default:
                 break;
@@ -403,6 +414,13 @@ int64_t ArrayMixed::store(const Mixed& value)
             val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
             break;
         }
+        case type_Link: {
+            ensure_int_array();
+            size_t ndx = m_ints.size();
+            m_ints.add(value.get<ObjKey>().value);
+            val = int64_t(ndx << s_data_shift) | (payload_idx_int << s_payload_idx_shift);
+            break;
+        }
         case type_TypedLink: {
             ensure_int_pair_array();
             size_t ndx = m_int_pairs.size() / 2;
@@ -410,6 +428,15 @@ int64_t ArrayMixed::store(const Mixed& value)
             m_int_pairs.add(int64_t(t.get_table_key().value));
             m_int_pairs.add(t.get_obj_key().value);
             val = int64_t(ndx << s_data_shift) | (payload_idx_pair << s_payload_idx_shift);
+            break;
+        }
+        case type_UUID: {
+            ensure_string_array();
+            size_t ndx = m_strings.size();
+            auto id = value.get<UUID>();
+            const auto uuid_bytes = id.to_bytes();
+            m_strings.add(StringData(reinterpret_cast<const char*>(uuid_bytes.data()), uuid_bytes.size()));
+            val = int64_t(ndx << s_data_shift) | (payload_idx_str << s_payload_idx_shift);
             break;
         }
         default:

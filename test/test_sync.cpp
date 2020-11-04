@@ -30,6 +30,7 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
+#include <realm/list.hpp>
 
 #include "sync_fixtures.hpp"
 
@@ -7653,8 +7654,57 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     CHECK(failed_twice);
 }
 
-TEST(Sync_NonLinkObjectId)
+template <typename T>
+T sequence_next()
 {
+    REALM_UNREACHABLE();
+}
+
+template <>
+ObjectId sequence_next()
+{
+    return ObjectId::gen();
+}
+
+template <>
+UUID sequence_next()
+{
+    union {
+        struct {
+            uint64_t upper;
+            uint64_t lower;
+        } ints;
+        UUID::UUIDBytes bytes;
+    } u;
+    static uint64_t counter = test_util::random_int(0, 1000);
+    u.ints.upper = ++counter;
+    u.ints.lower = ++counter;
+    return UUID{u.bytes};
+}
+
+template <>
+Int sequence_next()
+{
+    static Int count = test_util::random_int(-1000, 1000);
+    return ++count;
+}
+
+template <>
+String sequence_next()
+{
+    static std::string str;
+    static Int sequence = test_util::random_int(-1000, 1000);
+    str = util::format("string sequence %1", ++sequence);
+    return String(str);
+}
+
+TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int>, util::Optional<ObjectId>,
+           util::Optional<UUID>)
+{
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same_v<underlying_type, TEST_TYPE>;
+    DataType type = ColumnTypeTraits<TEST_TYPE>::id;
+
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
@@ -7673,20 +7723,35 @@ TEST(Sync_NonLinkObjectId)
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
-    ObjectId obj_2_id;
+    TEST_TYPE obj_1_id;
+    TEST_TYPE obj_2_id;
+
+    TEST_TYPE default_or_null{};
+    if constexpr (std::is_same_v<TEST_TYPE, String>) {
+        default_or_null = "";
+    }
+    if constexpr (is_optional) {
+        CHECK(!default_or_null);
+    }
 
     {
         WriteTransaction tr{sg_1};
-        auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type_ObjectId, "id");
-        auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type_ObjectId, "id");
-        table_1->add_column_list(type_ObjectId, "oids");
+        auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type, "id", is_optional);
+        auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type, "id", is_optional);
+        table_1->add_column_list(type, "oids", is_optional);
 
-        auto obj_1 = table_1->create_object_with_primary_key(ObjectId::gen());
-        auto obj_2 = table_2->create_object_with_primary_key(ObjectId::gen());
+        auto obj_1 = table_1->create_object_with_primary_key(sequence_next<underlying_type>());
+        auto obj_2 = table_2->create_object_with_primary_key(sequence_next<underlying_type>());
+        if constexpr (is_optional) {
+            auto obj_3 = table_2->create_object_with_primary_key(default_or_null);
+        }
 
-        auto list = obj_1.get_list<ObjectId>("oids");
-        obj_2_id = obj_2.get<ObjectId>("id");
+        auto list = obj_1.template get_list<TEST_TYPE>("oids");
+        obj_1_id = obj_1.template get<TEST_TYPE>("id");
+        obj_2_id = obj_2.template get<TEST_TYPE>("id");
         list.insert(0, obj_2_id);
+        list.insert(1, default_or_null);
+        list.add(default_or_null);
         session_1.nonsync_transact_notify(tr.commit());
     }
 
@@ -7696,10 +7761,23 @@ TEST(Sync_NonLinkObjectId)
     {
         ReadTransaction tr{sg_2};
         auto table_1 = tr.get_table("class_Table1");
+        auto table_2 = tr.get_table("class_Table2");
         auto obj_1 = *table_1->begin();
-        auto list = obj_1.get_list<ObjectId>("oids");
-        CHECK_EQUAL(list.size(), 1);
+        auto obj_2 = table_2->find_first(table_2->get_column_key("id"), obj_2_id);
+        CHECK(obj_2);
+        auto list = obj_1.get_list<TEST_TYPE>("oids");
+        CHECK_EQUAL(obj_1.template get<TEST_TYPE>("id"), obj_1_id);
+        CHECK_EQUAL(list.size(), 3);
+        CHECK_NOT(list.is_null(0));
         CHECK_EQUAL(list.get(0), obj_2_id);
+        CHECK_EQUAL(list.get(1), default_or_null);
+        CHECK_EQUAL(list.get(2), default_or_null);
+        if constexpr (is_optional) {
+            auto obj_3 = table_2->find_first_null(table_2->get_column_key("id"));
+            CHECK(obj_3);
+            CHECK(list.is_null(1));
+            CHECK(list.is_null(2));
+        }
     }
 }
 
@@ -8077,6 +8155,138 @@ TEST(Sync_Dictionary_Links)
 
         CHECK(dict.find("b") != dict.end());
         CHECK((*dict.find("b")).second == Mixed{b.get_link()});
+    }
+}
+
+TEST(Sync_Set)
+{
+    // Test replication and synchronization of Set values.
+
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    ColKey col_ints, col_strings, col_mixeds;
+    {
+        WriteTransaction wt{db_1};
+        auto t = sync::create_table_with_primary_key(wt, "class_Foo", type_Int, "pk");
+        col_ints = t->add_column_set(type_Int, "ints");
+        col_strings = t->add_column_set(type_String, "strings");
+        col_mixeds = t->add_column_set(type_Mixed, "mixeds");
+
+        auto obj = t->create_object_with_primary_key(0);
+
+        auto ints = obj.get_set<int64_t>(col_ints);
+        auto strings = obj.get_set<StringData>(col_strings);
+        auto mixeds = obj.get_set<Mixed>(col_mixeds);
+
+        ints.insert(123);
+        ints.insert(456);
+        ints.insert(789);
+        ints.insert(123);
+        ints.insert(456);
+        ints.insert(789);
+
+        CHECK_EQUAL(ints.size(), 3);
+        CHECK_EQUAL(ints.find(123), 0);
+        CHECK_EQUAL(ints.find(456), 1);
+        CHECK_EQUAL(ints.find(789), 2);
+
+        strings.insert("a");
+        strings.insert("b");
+        strings.insert("c");
+        strings.insert("a");
+        strings.insert("b");
+        strings.insert("c");
+
+        CHECK_EQUAL(strings.size(), 3);
+        CHECK_EQUAL(strings.find("a"), 0);
+        CHECK_EQUAL(strings.find("b"), 1);
+        CHECK_EQUAL(strings.find("c"), 2);
+
+        mixeds.insert(Mixed{123});
+        mixeds.insert(Mixed{"a"});
+        mixeds.insert(Mixed{456.0});
+        mixeds.insert(Mixed{123});
+        mixeds.insert(Mixed{"a"});
+        mixeds.insert(Mixed{456.0});
+
+        CHECK_EQUAL(mixeds.size(), 3);
+        CHECK_EQUAL(mixeds.find(123), 0);
+        CHECK_EQUAL(mixeds.find("a"), 1);
+        CHECK_EQUAL(mixeds.find(456.0), 2);
+
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    // Create a conflict. Session 1 should lose, because it has a lower peer ID.
+    {
+        WriteTransaction wt{db_1};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.insert(999);
+
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    {
+        WriteTransaction wt{db_2};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.insert(999);
+        ints.erase(999);
+
+        session_2.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+        CHECK(compare_groups(read_1, read_2));
+    }
+
+    {
+        WriteTransaction wt{db_1};
+        auto t = wt.get_table("class_Foo");
+        auto obj = t->get_object_with_primary_key(0);
+        auto ints = obj.get_set<int64_t>(col_ints);
+        ints.clear();
+        session_1.nonsync_transact_notify(wt.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction read_1{db_1};
+        ReadTransaction read_2{db_2};
+        CHECK(compare_groups(read_1, read_2));
     }
 }
 

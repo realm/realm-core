@@ -182,10 +182,7 @@ public:
     /// accessors stay valid across a commit. Please note that this works only
     /// for non-transactional commits. Accessors obtained during a transaction
     /// are always detached when the transaction ends.
-    ///
-    /// Returns true if, and only if the array has changed. If the array has not
-    /// changed, then its children are guaranteed to also not have changed.
-    bool update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     /// Change the type of an already attached array node.
     ///

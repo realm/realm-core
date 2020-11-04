@@ -17,7 +17,7 @@
 #include <realm/sync/object_id.hpp>
 #include <realm/impl/input_stream.hpp>
 #include <realm/table_ref.hpp>
-#include <realm/util/overloaded.hpp>
+#include <realm/util/overload.hpp>
 
 namespace realm {
 
@@ -35,7 +35,10 @@ namespace sync {
     X(ArrayInsert)                                                                                                   \
     X(ArrayMove)                                                                                                     \
     X(ArrayErase)                                                                                                    \
-    X(ArrayClear)
+    X(ArrayClear)                                                                                                    \
+    X(SetInsert)                                                                                                     \
+    X(SetErase)                                                                                                      \
+    X(SetClear)
 
 struct StringBufferRange {
     uint32_t offset, size;
@@ -78,7 +81,7 @@ struct Instruction;
 
 namespace instr {
 
-using PrimaryKey = mpark::variant<mpark::monostate, int64_t, GlobalKey, InternString, ObjectId>;
+using PrimaryKey = mpark::variant<mpark::monostate, int64_t, GlobalKey, InternString, ObjectId, UUID>;
 
 struct Path {
     using Element = mpark::variant<InternString, uint32_t>;
@@ -205,6 +208,7 @@ struct Payload {
         Decimal = 8,
         Link = 9,
         ObjectId = 10,
+        UUID = 11,
     };
 
     struct Link {
@@ -228,6 +232,7 @@ struct Payload {
         double dnum;
         Decimal128 decimal;
         ObjectId object_id;
+        UUID uuid;
         Link link;
         ObjLink typed_link;
 
@@ -322,6 +327,12 @@ struct Payload {
         }
     }
 
+    explicit Payload(UUID value) noexcept
+        : type(Type::UUID)
+    {
+        data.uuid = value;
+    }
+
     Payload(const Payload&) noexcept = default;
     Payload& operator=(const Payload&) noexcept = default;
 
@@ -364,6 +375,8 @@ struct Payload {
                     return lhs.data.link == rhs.data.link;
                 case Type::ObjectId:
                     return lhs.data.object_id == rhs.data.object_id;
+                case Type::UUID:
+                    return lhs.data.uuid == rhs.data.uuid;
             }
         }
         return false;
@@ -466,9 +479,9 @@ struct AddColumn : TableInstruction {
 
     InternString field;
 
-    // `none` for Mixed columns. Mixed columns are always nullable.
+    // `Type::Null` for Mixed columns. Mixed columns are always nullable.
     Payload::Type type;
-    // `none` for other than dictionary columns
+    // `Type::Null` for other than dictionary columns
     Payload::Type key_type;
 
     bool nullable;
@@ -598,6 +611,36 @@ struct ArrayClear : PathInstruction {
     }
 };
 
+struct SetInsert : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+
+    bool operator==(const SetInsert& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value;
+    }
+};
+
+struct SetErase : PathInstruction {
+    using PathInstruction::PathInstruction;
+    Payload value;
+
+    bool operator==(const SetErase& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs) && value == rhs.value;
+    }
+};
+
+struct SetClear : PathInstruction {
+    using PathInstruction::PathInstruction;
+
+    bool operator==(const SetClear& rhs) const noexcept
+    {
+        return PathInstruction::operator==(rhs);
+    }
+};
+
+
 } // namespace instr
 
 struct Instruction {
@@ -628,6 +671,9 @@ struct Instruction {
         ArrayMove = 9,
         ArrayErase = 10,
         ArrayClear = 11,
+        SetInsert = 12,
+        SetErase = 13,
+        SetClear = 14,
     };
 
     template <Type t>
@@ -754,6 +800,8 @@ inline const char* get_type_name(Instruction::Payload::Type type)
             return "Link";
         case Type::ObjectId:
             return "ObjectId";
+        case Type::UUID:
+            return "UUID";
     }
     return "(unknown)";
 }
@@ -801,6 +849,8 @@ inline bool is_valid_key_type(Instruction::Payload::Type type) noexcept
             [[fallthrough]];
         case Type::ObjectId:
             [[fallthrough]];
+        case Type::UUID:
+            [[fallthrough]];
         case Type::GlobalKey:
             return true;
         default:
@@ -832,6 +882,8 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
             return type_Link;
         case Type::ObjectId:
             return type_ObjectId;
+        case Type::UUID:
+            return type_UUID;
         case Type::Erased:
             [[fallthrough]];
         case Type::Dictionary:
@@ -989,7 +1041,7 @@ inline T* Instruction::get_if() noexcept
     }
     else if constexpr (std::is_same_v<ObjectInstruction, T>) {
         // This should compile to nothing but a comparison of the type.
-        return visit(util::overloaded{
+        return visit(util::overload{
             [](AddTable&) -> ObjectInstruction* {
                 return nullptr;
             },
@@ -1009,7 +1061,7 @@ inline T* Instruction::get_if() noexcept
     }
     else if constexpr (std::is_same_v<PathInstruction, T>) {
         // This should compile to nothing but a comparison of the type.
-        return visit(util::overloaded{
+        return visit(util::overload{
             [](AddTable&) -> PathInstruction* {
                 return nullptr;
             },

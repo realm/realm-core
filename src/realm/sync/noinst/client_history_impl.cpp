@@ -1399,10 +1399,10 @@ void ClientHistoryImpl::fix_up_client_file_ident_in_stored_changesets(Transactio
     };
 
     auto promote_primary_key = [&](Instruction::PrimaryKey& pk) {
-        mpark::visit(util::overloaded{[&](GlobalKey& key) {
-                                          promote_global_key(key);
-                                      },
-                                      [](auto&&) {}},
+        mpark::visit(util::overload{[&](GlobalKey& key) {
+                                        promote_global_key(key);
+                                    },
+                                    [](auto&&) {}},
                      pk);
     };
 

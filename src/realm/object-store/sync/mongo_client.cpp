@@ -16,19 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/object-store/sync/remote_mongo_database.hpp>
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
 
 namespace realm {
 namespace app {
 
-RemoteMongoCollection RemoteMongoDatabase::collection(const std::string& collection_name)
+MongoDatabase MongoClient::operator[](const std::string& name)
 {
-    return RemoteMongoCollection(collection_name, m_name, m_service, m_service_name);
+    return MongoDatabase(name, m_user, m_service, m_service_name);
 }
 
-RemoteMongoCollection RemoteMongoDatabase::operator[](const std::string& collection_name)
+MongoDatabase MongoClient::db(const std::string& name)
 {
-    return RemoteMongoCollection(collection_name, m_name, m_service, m_service_name);
+    return MongoDatabase(name, m_user, m_service, m_service_name);
 }
 
 } // namespace app

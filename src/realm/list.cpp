@@ -26,7 +26,7 @@
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 #include "realm/array_typed_link.hpp"
 #include "realm/array_mixed.hpp"
 #include "realm/column_type_traits.hpp"
@@ -38,6 +38,7 @@
 
 namespace realm {
 
+// FIXME: This method belongs in obj.cpp.
 LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 {
     auto attr = get_table()->get_column_attr(col_key);
@@ -86,6 +87,12 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
                 return std::make_unique<Lst<util::Optional<ObjectId>>>(*this, col_key);
             else
                 return std::make_unique<Lst<ObjectId>>(*this, col_key);
+        }
+        case type_UUID: {
+            if (nullable)
+                return std::make_unique<Lst<util::Optional<UUID>>>(*this, col_key);
+            else
+                return std::make_unique<Lst<UUID>>(*this, col_key);
         }
         case type_TypedLink: {
             return std::make_unique<Lst<ObjLink>>(*this, col_key);

@@ -110,6 +110,7 @@ TEST(Unresolved_Basic)
 
     rt->advance_read();
     rt->verify();
+    CHECK_EQUAL(cars->nb_unresolved(), 0);
     CHECK_EQUAL(cars->get_object_with_primary_key("Tesla 10").get_backlink_count(), 3);
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
@@ -127,6 +128,7 @@ TEST(Unresolved_Basic)
 
     rt->advance_read();
     rt->verify();
+    CHECK(finn.is_unresolved(col_owns));
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), cars->get_object_with_primary_key("Skoda Fabia").get_key());
     CHECK_EQUAL(cars->size(), 1);

@@ -146,6 +146,10 @@ public:
     {
         return v;
     }
+    util::Any box(UUID v) const
+    {
+        return v;
+    }
     util::Any box(util::Optional<bool> v) const
     {
         return v;
@@ -163,6 +167,10 @@ public:
         return v;
     }
     util::Any box(util::Optional<ObjectId> v) const
+    {
+        return v;
+    }
+    util::Any box(util::Optional<UUID> v) const
     {
         return v;
     }
@@ -303,6 +311,12 @@ template <>
 inline util::Optional<ObjectId> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     return v.has_value() ? util::make_optional(unbox<ObjectId>(v)) : util::none;
+}
+
+template <>
+inline util::Optional<UUID> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
+{
+    return v.has_value() ? util::make_optional(unbox<UUID>(v)) : util::none;
 }
 
 template <>

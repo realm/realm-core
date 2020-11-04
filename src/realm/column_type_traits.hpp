@@ -33,6 +33,7 @@ class Decimal128;
 class ObjectId;
 class Mixed;
 class Timestamp;
+class UUID;
 class ArraySmallBlobs;
 class ArrayString;
 class ArrayStringShort;
@@ -47,8 +48,10 @@ class ArrayBoolNull;
 class ArrayKey;
 class ArrayKeyNonNullable;
 class ArrayDecimal128;
-class ArrayObjectId;
-class ArrayObjectIdNull;
+template <typename, int>
+class ArrayFixedBytes;
+template <typename, int>
+class ArrayFixedBytesNull;
 class ArrayTypedLink;
 template <class>
 class BasicArray;
@@ -202,14 +205,14 @@ struct ColumnTypeTraits<Timestamp> {
 
 template <>
 struct ColumnTypeTraits<ObjectId> {
-    using cluster_leaf_type = ArrayObjectId;
+    using cluster_leaf_type = ArrayFixedBytes<ObjectId, ObjectId::num_bytes>;
     static const DataType id = type_ObjectId;
     static const ColumnType column_id = col_type_ObjectId;
 };
 
 template <>
 struct ColumnTypeTraits<util::Optional<ObjectId>> {
-    using cluster_leaf_type = ArrayObjectIdNull;
+    using cluster_leaf_type = ArrayFixedBytesNull<ObjectId, ObjectId::num_bytes>;
     static const DataType id = type_ObjectId;
     static const ColumnType column_id = col_type_ObjectId;
 };
@@ -238,6 +241,20 @@ struct ColumnTypeTraits<Decimal128> {
     using average_type = Decimal128;
     static const DataType id = type_Decimal;
     static const ColumnType column_id = col_type_Decimal;
+};
+
+template <>
+struct ColumnTypeTraits<UUID> {
+    using cluster_leaf_type = ArrayFixedBytes<UUID, UUID::num_bytes>;
+    static const DataType id = type_UUID;
+    static const ColumnType column_id = col_type_UUID;
+};
+
+template <>
+struct ColumnTypeTraits<util::Optional<UUID>> {
+    using cluster_leaf_type = ArrayFixedBytesNull<UUID, UUID::num_bytes>;
+    static const DataType id = type_UUID;
+    static const ColumnType column_id = col_type_UUID;
 };
 
 template <>
@@ -325,6 +342,10 @@ inline bool value_is_null(const bool&)
     return false;
 }
 inline bool value_is_null(const ObjectId&)
+{
+    return false;
+}
+inline bool value_is_null(const UUID&)
 {
     return false;
 }

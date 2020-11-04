@@ -68,6 +68,10 @@ enum Instruction {
 
     instr_DictionaryInsert = 37,
     instr_DictionaryErase = 38,
+
+    instr_SetInsert = 39, // Insert value into set
+    instr_SetErase = 40,  // Erase value from set
+    instr_SetClear = 41,  // Remove all values in a set
 };
 
 class TransactLogStream {
@@ -206,6 +210,19 @@ public:
         return true;
     }
 
+    bool set_insert(size_t)
+    {
+        return true;
+    }
+    bool set_erase(size_t)
+    {
+        return true;
+    }
+    bool set_clear(size_t)
+    {
+        return true;
+    }
+
     void parse_complete() {}
 };
 // LCOV_EXCL_STOP (NullInstructionObserver)
@@ -251,6 +268,11 @@ public:
     bool list_move(size_t from_link_ndx, size_t to_link_ndx);
     bool list_erase(size_t list_ndx);
     bool list_clear(size_t old_list_size);
+
+    // Must have set selected:
+    bool set_insert(size_t set_ndx);
+    bool set_erase(size_t set_ndx);
+    bool set_clear(size_t set_ndx);
 
     bool dictionary_insert(Mixed key);
     bool dictionary_erase(Mixed key);
@@ -348,6 +370,10 @@ public:
     virtual void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx);
     virtual void list_erase(const CollectionBase&, size_t link_ndx);
     virtual void list_clear(const CollectionBase&);
+
+    virtual void set_insert(const CollectionBase& set, size_t list_ndx, Mixed value);
+    virtual void set_erase(const CollectionBase& set, size_t list_ndx, Mixed value);
+    virtual void set_clear(const CollectionBase& set);
 
     virtual void dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value);
     virtual void dictionary_erase(const CollectionBase& dict, Mixed key);
@@ -844,6 +870,44 @@ inline void TransactLogConvenientEncoder::list_insert(const CollectionBase& list
 }
 
 
+/************************************ Set ************************************/
+
+inline bool TransactLogEncoder::set_insert(size_t set_ndx)
+{
+    append_simple_instr(instr_SetInsert, set_ndx); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
+{
+    select_collection(set);        // Throws
+    m_encoder.set_insert(set_ndx); // Throws
+}
+
+inline bool TransactLogEncoder::set_erase(size_t set_ndx)
+{
+    append_simple_instr(instr_SetErase, set_ndx); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
+{
+    select_collection(set);       // Throws
+    m_encoder.set_erase(set_ndx); // Throws
+}
+
+inline bool TransactLogEncoder::set_clear(size_t set_size)
+{
+    append_simple_instr(instr_SetClear, set_size); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::set_clear(const CollectionBase& set)
+{
+    select_collection(set);          // Throws
+    m_encoder.set_clear(set.size()); // Throws
+}
+
 inline void TransactLogConvenientEncoder::remove_object(const Table* t, ObjKey key)
 {
     select_table(t);              // Throws
@@ -995,6 +1059,24 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             REALM_ASSERT(type == type_String);
             Mixed key = Mixed(read_string(m_string_buffer));
             if (!handler.dictionary_erase(key)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetInsert: {
+            size_t set_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_insert(set_ndx))    // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetErase: {
+            size_t set_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_erase(set_ndx))     // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetClear: {
+            size_t set_size = read_int<size_t>(); // Throws
+            if (!handler.set_clear(set_size))     // Throws
                 parser_error();
             return;
         }
@@ -1289,6 +1371,29 @@ public:
         // all front-insertions
         for (size_t i = old_list_size; i > 0; --i) {
             m_encoder.list_insert(i - 1);
+            append_instruction();
+        }
+        return true;
+    }
+
+    bool set_insert(size_t ndx)
+    {
+        m_encoder.set_erase(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_erase(size_t ndx)
+    {
+        m_encoder.set_insert(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_clear(size_t old_set_size)
+    {
+        for (size_t i = old_set_size; i > 0; --i) {
+            m_encoder.set_insert(i - 1);
             append_instruction();
         }
         return true;

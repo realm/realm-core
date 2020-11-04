@@ -16,6 +16,7 @@
 #include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/object.hpp>
 
@@ -26,6 +27,8 @@
 #include "fuzz_tester.hpp" // Transform_Randomized
 #include "util/compare_groups.hpp"
 #include "util/dump_changesets.hpp"
+
+extern unsigned int unit_test_random_seed;
 
 namespace {
 
@@ -981,7 +984,7 @@ TEST(Transform_Randomized)
     int num_major_rounds = 1;
     int num_minor_rounds = 1;
 
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    Random random(unit_test_random_seed); // Seed from slow global generator
     FuzzTester<Random> randomized(random, trace);
 
     for (int major_round = 0; major_round < num_major_rounds; ++major_round) {
@@ -1946,6 +1949,129 @@ TEST(Transform_Dictionary)
         CHECK_EQUAL(dict1.get("a"), 456);
         CHECK_EQUAL(dict1.get("b"), 789.f);
     });
+}
+
+TEST(Transform_Set)
+{
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    Associativity assoc{test_context, 2, changeset_dump_dir_gen.get()};
+    assoc.for_each_permutation([&](auto& it) {
+        auto server = &*it.server;
+        auto client_1 = &*it.clients[0];
+        auto client_2 = &*it.clients[1];
+
+        // Create baseline
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.add_table_with_primary_key("class_Table", type_Int, "id");
+            table->add_column_set(type_Mixed, "set");
+            table->create_object_with_primary_key(0);
+        });
+
+        it.sync_all();
+
+        // Populate set on both sides.
+        client_1->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj = table->get_object_with_primary_key(0);
+            auto set = obj.get_set<Mixed>("set");
+            set.insert(999);
+            set.insert("Hello");
+            set.insert(123.f);
+        });
+        client_2->transaction([&](Peer& c) {
+            auto& tr = *c.group;
+            auto table = tr.get_table("class_Table");
+            auto obj = table->get_object_with_primary_key(0);
+            auto set = obj.get_set<Mixed>("set");
+            set.insert(999);
+            set.insert("World");
+            set.insert(456.f);
+
+            // Erase an element from the set. Since client_2 has higher peer ID,
+            // it should win the conflict.
+            set.erase(999);
+            set.insert(999);
+            set.erase(999);
+        });
+
+        it.sync_all();
+
+        ReadTransaction rt{server->shared_group};
+        auto table = rt.get_table("class_Table");
+        auto obj = table->get_object_with_primary_key(0);
+        auto set = obj.get_set<Mixed>("set");
+        CHECK_EQUAL(set.size(), 4);
+        CHECK_NOT_EQUAL(set.find("Hello"), realm::npos);
+        CHECK_NOT_EQUAL(set.find(123.f), realm::npos);
+        CHECK_NOT_EQUAL(set.find("World"), realm::npos);
+        CHECK_NOT_EQUAL(set.find(456.f), realm::npos);
+        CHECK_EQUAL(set.find(999), realm::npos);
+    });
+}
+
+TEST(Transform_ArrayEraseVsArrayErase)
+{
+    // This test case recreates the problem that the above test exposes
+    auto changeset_dump_dir_gen = get_changeset_dump_dir_generator(test_context);
+    auto server = Peer::create_server(test_context, changeset_dump_dir_gen.get());
+    auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
+    auto client_4 = Peer::create_client(test_context, 4, changeset_dump_dir_gen.get());
+    auto client_5 = Peer::create_client(test_context, 5, changeset_dump_dir_gen.get());
+
+    client_3->create_schema([](WriteTransaction& tr) {
+        auto t = tr.get_group().add_table_with_primary_key("class_A", type_Int, "pk");
+        t->add_column_list(type_String, "h");
+        t->create_object_with_primary_key(5);
+    });
+
+    synchronize(server.get(), {client_3.get(), client_4.get(), client_5.get()});
+
+    client_5->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "5abc");
+    });
+
+    client_4->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "4abc");
+    });
+
+    server->integrate_next_changeset_from(*client_5);
+    server->integrate_next_changeset_from(*client_4);
+
+    client_3->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "3abc");
+    });
+
+    client_5->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.insert(0, "5def");
+    });
+
+    server->integrate_next_changeset_from(*client_3);
+    server->integrate_next_changeset_from(*client_5);
+
+    client_4->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.remove(0);
+    });
+
+    client_5->transaction([](Peer& p) {
+        Obj obj = *p.table("class_A")->begin();
+        auto ll = p.table("class_A")->begin()->get_list<String>("h");
+        ll.remove(0);
+    });
+
+    server->integrate_next_changeset_from(*client_4);
+    server->integrate_next_changeset_from(*client_5);
 }
 
 } // unnamed namespace

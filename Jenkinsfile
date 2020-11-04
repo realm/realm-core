@@ -219,7 +219,6 @@ jobWrapper {
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
                         }
-                        sh 'tools/build-cocoa.sh'
                         sh 'tools/build-cocoa.sh -x'
                         archiveArtifacts('realm-*-cocoa*.tar.gz')
                         archiveArtifacts('realm-*-cocoa*.tar.xz')
@@ -671,7 +670,7 @@ def doBuildMacOs(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('osx_pro') {
+        node('osx') {
             getArchive()
 
             dir("build-macosx-${buildType}") {

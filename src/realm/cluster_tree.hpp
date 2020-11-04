@@ -52,7 +52,7 @@ public:
     }
 
     void init_from_parent();
-    bool update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     size_t size() const noexcept
     {
