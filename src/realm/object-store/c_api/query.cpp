@@ -111,6 +111,15 @@ struct QueryArgumentsAdapter : query_builder::Arguments {
         throw LogicError{LogicError::type_mismatch};
     }
 
+    UUID uuid_for_argument(size_t i) final
+    {
+        check_index(i);
+        if (m_args[i].type == RLM_TYPE_UUID) {
+            return from_capi(m_args[i].uuid);
+        }
+        throw LogicError{LogicError::type_mismatch};
+    }
+
     bool is_argument_null(size_t i) final
     {
         check_index(i);

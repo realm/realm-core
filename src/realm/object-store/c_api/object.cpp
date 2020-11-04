@@ -468,6 +468,11 @@ auto value_or_object(const std::shared_ptr<Realm>& realm, PropertyType val_type,
             auto obj = target_table->get_object(link.get_obj_key());
             return f(std::move(obj));
         }
+        case type_UUID: {
+            if (base_type != PropertyType::UUID && base_type != PropertyType::Any)
+                throw std::invalid_argument{"Type mismatch"};
+            return f(val.get<UUID>());
+        }
 
         case type_Link:
             // Note: from_capi(realm_value_t) never produces an untyped link.

@@ -14,6 +14,7 @@
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <realm/mixed.hpp>
+#include <realm/uuid.hpp>
 
 #include <string>
 
@@ -123,6 +124,22 @@ static inline realm_link_t to_capi(ObjLink link)
     return realm_link_t{to_capi(link.get_table_key()), to_capi(link.get_obj_key())};
 }
 
+static inline UUID from_capi(realm_uuid_t val)
+{
+    static_assert(sizeof(val.bytes) == UUID::num_bytes);
+    UUID::UUIDBytes bytes;
+    std::copy(val.bytes, val.bytes + UUID::num_bytes, bytes.data());
+    return UUID{bytes};
+}
+
+static inline realm_uuid_t to_capi(UUID val)
+{
+    realm_uuid_t uuid;
+    auto bytes = val.to_bytes();
+    std::copy(bytes.data(), bytes.data() + UUID::num_bytes, uuid.bytes);
+    return uuid;
+}
+
 static inline Mixed from_capi(realm_value_t val)
 {
     switch (val.type) {
@@ -148,6 +165,8 @@ static inline Mixed from_capi(realm_value_t val)
             return Mixed{from_capi(val.object_id)};
         case RLM_TYPE_LINK:
             return Mixed{ObjLink{from_capi(val.link.target_table), from_capi(val.link.target)}};
+        case RLM_TYPE_UUID:
+            return Mixed{UUID{from_capi(val.uuid)}};
     }
     REALM_TERMINATE("Invalid realm_value_t");
 }
@@ -213,6 +232,12 @@ static inline realm_value_t to_capi(Mixed value)
                 auto link = value.get<ObjLink>();
                 val.link.target_table = to_capi(link.get_table_key());
                 val.link.target = to_capi(link.get_obj_key());
+                break;
+            }
+            case type_UUID: {
+                val.type = RLM_TYPE_UUID;
+                auto uuid = value.get<UUID>();
+                val.uuid = to_capi(uuid);
                 break;
             }
 
@@ -286,9 +311,15 @@ static inline realm_property_type_e to_capi(PropertyType type) noexcept
             return RLM_PROPERTY_TYPE_LINKING_OBJECTS;
         case PropertyType::ObjectId:
             return RLM_PROPERTY_TYPE_OBJECT_ID;
+        case PropertyType::UUID:
+            return RLM_PROPERTY_TYPE_UUID;
         case PropertyType::Nullable:
             [[fallthrough]];
         case PropertyType::Flags:
+            [[fallthrough]];
+        case PropertyType::Set:
+            [[fallthrough]];
+        case PropertyType::Collection:
             [[fallthrough]];
         case PropertyType::Array:
             REALM_UNREACHABLE();
@@ -323,6 +354,8 @@ static inline PropertyType from_capi(realm_property_type_e type) noexcept
             return PropertyType::LinkingObjects;
         case RLM_PROPERTY_TYPE_OBJECT_ID:
             return PropertyType::ObjectId;
+        case RLM_PROPERTY_TYPE_UUID:
+            return PropertyType::UUID;
     }
     REALM_TERMINATE("Unsupported property type");
 }

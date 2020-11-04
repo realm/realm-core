@@ -102,6 +102,7 @@ typedef enum realm_value_type {
     RLM_TYPE_DECIMAL128,
     RLM_TYPE_OBJECT_ID,
     RLM_TYPE_LINK,
+    RLM_TYPE_UUID,
 } realm_value_type_e;
 
 typedef struct realm_string {
@@ -132,6 +133,10 @@ typedef struct realm_object_id {
     uint8_t bytes[12];
 } realm_object_id_t;
 
+typedef struct realm_uuid {
+    uint8_t bytes[16];
+} realm_uuid_t;
+
 typedef struct realm_value {
     union {
         int64_t integer;
@@ -143,6 +148,7 @@ typedef struct realm_value {
         double dnum;
         realm_decimal128_t decimal128;
         realm_object_id_t object_id;
+        realm_uuid_t uuid;
 
         realm_link_t link;
 
@@ -241,6 +247,7 @@ typedef enum realm_property_type {
     RLM_PROPERTY_TYPE_OBJECT = 12,
     RLM_PROPERTY_TYPE_LINKING_OBJECTS = 14,
     RLM_PROPERTY_TYPE_OBJECT_ID = 15,
+    RLM_PROPERTY_TYPE_UUID = 17,
 } realm_property_type_e;
 
 typedef enum realm_collection_type {
