@@ -2207,6 +2207,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
 {
     Group g;
     TableRef t = g.add_table("table");
+    TestValueGenerator gen;
 
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
@@ -2214,12 +2215,11 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<TEST_TYPE> values =
-        values_from_int<TEST_TYPE, underlying_type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<TEST_TYPE> values = gen.values_from_int<TEST_TYPE>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     auto obj2 = t->create_object(); // empty list
     auto obj3 = t->create_object(); // {1}
-    underlying_type value_1 = convert_for_test<underlying_type>(1);
+    underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
     obj3.get_list<TEST_TYPE>(col).add(value_1);
     auto obj4 = t->create_object(); // {1, 1}
     obj4.get_list<TEST_TYPE>(col).add(value_1);
@@ -2229,7 +2229,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         obj5.get_list<TEST_TYPE>(col).add(none);
     }
     else {
-        obj5.get_list<TEST_TYPE>(col).add(convert_for_test<underlying_type>(0));
+        obj5.get_list<TEST_TYPE>(col).add(gen.convert_for_test<underlying_type>(0));
     }
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
@@ -3963,7 +3963,7 @@ TEST(Parser_ObjectIdTimestamp)
     // add one object with default values, we assume time > now, and null
     auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
-    CHECK_EQUAL(generated_pk.get_timestamp().get_seconds(), ts_now.get_seconds());
+    CHECK(std::abs(generated_pk.get_timestamp().get_seconds() - ts_now.get_seconds()) <= 1);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);

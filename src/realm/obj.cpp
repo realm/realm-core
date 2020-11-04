@@ -450,6 +450,30 @@ Mixed Obj::get_any(ColKey col_key) const
     return {};
 }
 
+Mixed Obj::get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const
+{
+    if (auto col = get_table()->get_column_key(*path_start)) {
+        auto val = get_any(col);
+        ++path_start;
+        if (path_start == path_end)
+            return val;
+        if (!val.is_null()) {
+            if (val.get_type() == type_Link || val.get_type() == type_TypedLink) {
+                Obj obj;
+                if (val.get_type() == type_Link) {
+                    obj = get_target_table(col)->get_object(val.get<ObjKey>());
+                }
+                else {
+                    auto obj_link = val.get<ObjLink>();
+                    obj = get_target_table(obj_link)->get_object(obj_link.get_obj_key());
+                }
+                return obj.get_any(path_start, path_end);
+            }
+        }
+    }
+    return {};
+}
+
 Mixed Obj::get_primary_key() const
 {
     auto col = m_table->get_primary_key_column();
@@ -877,7 +901,25 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
                 first = false;
                 out_mixed(out, it.first);
                 out << ":";
-                out_mixed(out, it.second);
+                if (it.second.is_null()) {
+                    out << "null";
+                }
+                else if (it.second.get_type() == type_TypedLink) {
+                    auto obj_link = it.second.get<ObjLink>();
+                    auto target_table = m_table->get_parent_group()->get_table(obj_link.get_table_key());
+                    if (link_depth == 0 || link_depth == not_found) {
+                        out << "{\"table\": \"" << target_table->get_name()
+                            << "\", \"key\": " << obj_link.get_obj_key().value << "}";
+                    }
+                    else {
+                        auto obj = target_table->get_object(obj_link.get_obj_key());
+                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
+                        obj.to_json(out, new_depth, renames, followed);
+                    }
+                }
+                else {
+                    out_mixed(out, it.second);
+                }
             }
             out << "}";
         }
@@ -916,6 +958,12 @@ std::string Obj::to_string() const
     std::ostringstream ostr;
     to_json(ostr, 0, nullptr);
     return ostr.str();
+}
+
+std::ostream& operator<<(std::ostream& ostr, const Obj& obj)
+{
+    obj.to_json(ostr, -1, nullptr);
+    return ostr;
 }
 
 /*********************************** Obj *************************************/
@@ -1097,6 +1145,8 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
         values.set(m_row_ndx, value);
     }
 
+    REALM_ASSERT(!fields.has_missing_parent_update());
+
     if (Replication* repl = get_replication()) {
         repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
                   is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -1152,6 +1202,8 @@ Obj& Obj::add_int(ColKey col_key, int64_t value)
         }
         values.set(m_row_ndx, new_val);
     }
+
+    REALM_ASSERT(!fields.has_missing_parent_update());
 
     if (Replication* repl = get_replication()) {
         repl->add_int(m_table.unchecked_ptr(), col_key, m_key, value); // Throws
@@ -1288,6 +1340,8 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 
         values.set(m_row_ndx, target_key);
 
+        REALM_ASSERT(!fields.has_missing_parent_update());
+
         if (Replication* repl = get_replication()) {
             repl->set(m_table.unchecked_ptr(), col_key, m_key, target_key,
                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -1366,6 +1420,8 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     values.init_from_parent();
     values.set(m_row_ndx, value);
 
+    REALM_ASSERT(!fields.has_missing_parent_update());
+
     if (Replication* repl = get_replication())
         repl->set(m_table.unchecked_ptr(), col_key, m_key, value,
                   is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -1388,6 +1444,8 @@ void Obj::set_int(ColKey col_key, int64_t value)
     values.set_parent(&fields, col_ndx.val + 1);
     values.init_from_parent();
     values.set(m_row_ndx, value);
+
+    REALM_ASSERT(!fields.has_missing_parent_update());
 }
 
 void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
@@ -1405,6 +1463,8 @@ void Obj::add_backlink(ColKey backlink_col_key, ObjKey origin_key)
     backlinks.init_from_parent();
 
     backlinks.add(m_row_ndx, origin_key);
+
+    REALM_ASSERT(!fields.has_missing_parent_update());
 }
 
 bool Obj::remove_one_backlink(ColKey backlink_col_key, ObjKey origin_key)
@@ -1522,7 +1582,7 @@ void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
     alloc.bump_content_version();
 }
 
-void Obj::set_backlink(ColKey col_key, ObjLink new_link)
+void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {
         auto target_obj = m_table->get_parent_group()->get_object(new_link);
@@ -1538,7 +1598,7 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link)
     }
 }
 
-bool Obj::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state)
+bool Obj::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const
 {
     bool recurse = remove_backlink(col_key, old_link, state);
     set_backlink(col_key, new_link);
@@ -1546,7 +1606,7 @@ bool Obj::replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, C
     return recurse;
 }
 
-bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state)
+bool Obj::remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const
 {
     if (old_link && old_link.get_obj_key()) {
         REALM_ASSERT(m_table->valid_column(col_key));

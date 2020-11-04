@@ -138,6 +138,7 @@ public:
     Mixed(util::Optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
     Mixed(ObjLink) noexcept;
+    Mixed(const Obj&) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.

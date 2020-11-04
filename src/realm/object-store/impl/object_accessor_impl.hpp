@@ -20,6 +20,7 @@
 #define REALM_OS_OBJECT_ACCESSOR_IMPL_HPP
 
 #include <realm/object-store/object_accessor.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <realm/util/any.hpp>
 

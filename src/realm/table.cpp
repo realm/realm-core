@@ -442,6 +442,10 @@ void Table::remove_column(ColKey col_key)
     if (col_key == m_primary_key_col) {
         do_set_primary_key_column(ColKey());
     }
+    else {
+        REALM_ASSERT_RELEASE(m_primary_key_col.get_index().val != col_key.get_index().val);
+    }
+
     erase_root_column(col_key); // Throws
     m_has_any_embedded_objects.reset();
 }
@@ -626,8 +630,14 @@ void Table::populate_search_index(ColKey col_key)
             index->insert(key, value); // Throws
         }
         else if (type == type_ObjectId) {
-            ObjectId value = o.get<ObjectId>(col_key);
-            index->insert(key, value); // Throws
+            if (is_nullable(col_key)) {
+                Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
+                index->insert(key, value); // Throws
+            }
+            else {
+                ObjectId value = o.get<ObjectId>(col_key);
+                index->insert(key, value); // Throws
+            }
         }
         else {
             REALM_ASSERT_RELEASE(false && "Data type does not support search index");
@@ -1518,30 +1528,17 @@ bool Table::migrate_objects(ColKey pk_col_key)
         return !has_link_columns;
     }
 
-    /******************** Optionally create !OID accessor ********************/
-
-    ColKey oid_col;
-    BPlusTree<Int>* oid_column = nullptr;
-    std::unique_ptr<BPlusTreeBase> oid_column_store;
-    if (nb_public_columns > 0 && m_spec.get_column_name(0) == "!OID") {
-        // The !OID column should not be migrated, but we need an accessor
-        // to the old column
-        oid_col = m_spec.get_key(0);
-        oid_column_store = std::move(column_accessors[oid_col]);
-
-        column_accessors.erase(oid_col);
-        oid_column = dynamic_cast<BPlusTree<Int>*>(oid_column_store.get());
-        REALM_ASSERT(oid_column);
-    }
+    // !OID column must not be present. Such columns are only present in syncked
+    // realms, which we cannot upgrade.
+    REALM_ASSERT(nb_public_columns == 0 || m_spec.get_column_name(0) != "!OID");
 
     /*************************** Create objects ******************************/
 
-    bool use_row_ndx_as_key = !(oid_column || pk_col_key);
     int64_t max_key_value = -1;
     // Store old row ndx in a temporary column. Use this in next steps to find
     // the right target for links
     ColKey orig_row_ndx_col;
-    if (!use_row_ndx_as_key) {
+    if (pk_col_key) {
         orig_row_ndx_col = add_column(type_Int, "!ROW_INDEX");
         add_search_index(orig_row_ndx_col);
     }
@@ -1565,19 +1562,14 @@ bool Table::migrate_objects(ColKey pk_col_key)
         }
 
         ObjKey obj_key;
-        if (use_row_ndx_as_key) {
-            obj_key = ObjKey(row_ndx);
+        if (pk_col_key) {
+            init_values.emplace_back(orig_row_ndx_col, Mixed(int64_t(row_ndx)));
+            // Generate key from pk value
+            GlobalKey object_id{pk_val};
+            obj_key = global_to_local_object_id_hashed(object_id);
         }
         else {
-            init_values.emplace_back(orig_row_ndx_col, Mixed(int64_t(row_ndx)));
-            if (oid_column) {
-                obj_key = oid_column->get(row_ndx);
-            }
-            else {
-                // Generate key from pk value
-                GlobalKey object_id{pk_val};
-                obj_key = global_to_local_object_id_hashed(object_id);
-            }
+            obj_key = ObjKey(row_ndx);
         }
 
         if (obj_key.value > max_key_value) {
@@ -1740,6 +1732,7 @@ void Table::finalize_migration(ColKey pk_col_key)
         remove_column(oid_col);
     }
 
+    REALM_ASSERT_RELEASE(!pk_col_key || valid_column(pk_col_key));
     do_set_primary_key_column(pk_col_key);
 }
 
@@ -2260,6 +2253,7 @@ template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 template ObjKey Table::find_first(ColKey col_key, Mixed) const;
+template ObjKey Table::find_first(ColKey col_key, util::Optional<ObjectId>) const;
 
 ObjKey Table::find_first_int(ColKey col_key, int64_t value) const
 {
@@ -3336,6 +3330,8 @@ void Table::set_primary_key_column(ColKey col_key)
         }
     }
 
+    REALM_ASSERT_RELEASE(col_key.value >= 0); // Just to be sure. We have an issue where value seems to be -1
+
     if (col_key) {
         check_column(col_key);
         validate_column_is_unique(col_key);
@@ -3660,10 +3656,13 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
     if (col_key.is_nullable() == nullable)
         return col_key;
 
+    check_column(col_key);
+
     bool si = has_search_index(col_key);
     std::string column_name(get_column_name(col_key));
     auto type = col_key.get_type();
     auto attr = col_key.get_attrs();
+    bool is_pk_col = (col_key == m_primary_key_col);
     if (nullable) {
         attr.set(col_attr_Nullable);
     }
@@ -3688,6 +3687,13 @@ ColKey Table::set_nullability(ColKey col_key, bool nullable, bool throw_on_null)
 
     if (si)
         add_search_index(new_col);
+
+    if (is_pk_col) {
+        // If we go from non nullable to nullable, no values change,
+        // so it is safe to preserve the pk column. Otherwise it is not
+        // safe as a null entry might have been converted to default value.
+        do_set_primary_key_column(nullable ? new_col : ColKey{});
+    }
 
     return new_col;
 }

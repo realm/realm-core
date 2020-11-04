@@ -55,6 +55,11 @@ private:
     class PayloadImpl;
     std::unique_ptr<Payload> m_payload;
 };
+
+template <>
+ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const&);
+template <>
+std::shared_ptr<Realm> ThreadSafeReference::resolve(std::shared_ptr<Realm> const&);
 } // namespace realm
 
 #endif /* REALM_OS_THREAD_SAFE_REFERENCE_HPP */

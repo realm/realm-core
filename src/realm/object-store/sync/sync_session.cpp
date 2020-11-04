@@ -301,8 +301,8 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
             if (session->m_config.error_handler) {
-                session->m_config.error_handler(
-                    session, SyncError(SyncError::ProtocolError::bad_authentication, "expired refresh token", true));
+                session->m_config.error_handler(session, SyncError(realm::sync::ProtocolError::bad_authentication,
+                                                                   "expired refresh token", true));
             }
         }
         else if (error) {
@@ -335,8 +335,9 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 
 std::string SyncSession::get_recovery_file_path()
 {
-    return util::reserve_unique_file_name(SyncManager::shared().recovery_directory_path(m_config.recovery_directory),
-                                          util::create_timestamped_template("recovered_realm"));
+    return util::reserve_unique_file_name(
+        m_config.user->sync_manager()->recovery_directory_path(m_config.recovery_directory),
+        util::create_timestamped_template("recovered_realm"));
 }
 
 void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, ShouldBackup should_backup)
@@ -351,12 +352,13 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    SyncManager::shared().perform_metadata_update([this, action, original_path = std::move(original_path),
-                                                   recovery_path = std::move(recovery_path)](const auto& manager) {
-        auto realm_identifier = m_config.partition_value;
-        manager.make_file_action_metadata(original_path, realm_identifier, m_config.user->identity(), action,
-                                          recovery_path);
-    });
+    m_config.user->sync_manager()->perform_metadata_update(
+        [this, action, original_path = std::move(original_path),
+         recovery_path = std::move(recovery_path)](const auto& manager) {
+            std::string partition_value = m_config.partition_value;
+            manager.make_file_action_metadata(original_path, partition_value, m_config.user->identity(), action,
+                                              recovery_path);
+        });
 }
 
 // This method should only be called from within the error handler callback registered upon the underlying
@@ -593,8 +595,7 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 void SyncSession::create_sync_session()
 {
-    auto app = SyncManager::shared().app();
-    if (m_session || !app)
+    if (m_session)
         return;
 
     sync::Session::Config session_config;
@@ -607,9 +608,8 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
     session_config.multiplex_ident = m_multiplex_identity;
-
     {
-        std::string sync_route(app::App::Internal::sync_route(*app));
+        std::string sync_route = m_config.user->sync_manager()->sync_route();
 
         if (!m_client.decompose_server_url(sync_route, session_config.protocol_envelope,
                                            session_config.server_address, session_config.server_port,
@@ -754,7 +754,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    SyncManager::shared().unregister_session(m_realm_path);
+    m_config.user->sync_manager()->unregister_session(m_realm_path);
 }
 
 void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction)
@@ -842,6 +842,8 @@ SyncSession::PublicState SyncSession::get_public_state() const
     }
     REALM_UNREACHABLE();
 }
+
+SyncSession::~SyncSession() {}
 
 SyncSession::PublicState SyncSession::state() const
 {

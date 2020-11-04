@@ -812,10 +812,15 @@ private:
     ///
     ///   9 Replication instruction values shuffled, instr_MoveRow added.
     ///
-    ///  10 Memory mapping changes which require special treatment of large files
-    ///     of preceeding versions.
+    ///  10 Cluster based table layout. Memory mapping changes which require
+    ///     special treatment of large files of preceding versions.
     ///
-    ///  11 New data types: Decimal128 and ObjectId. Embedded tables.
+    ///  11 Same as 10, but version 11 files will have search index added on
+    ///     string primary key columns.
+    ///
+    ///  12 - 19 Room for new file formats in legacy code.
+    ///
+    ///  20 New data types: Decimal128 and ObjectId. Embedded tables.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file

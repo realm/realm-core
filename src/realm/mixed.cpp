@@ -20,6 +20,8 @@
 #include <realm/decimal128.hpp>
 #include <realm/unicode.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/obj.hpp>
+#include <realm/table.hpp>
 
 namespace realm {
 
@@ -157,6 +159,12 @@ inline int compare_long_to_double(int64_t lhs, double rhs)
     return compare_generic(lhs, int64_t(rhs));
 }
 } // namespace _impl
+
+Mixed::Mixed(const Obj& obj) noexcept
+    : Mixed(ObjLink(obj.get_table()->get_key(), obj.get_key()))
+{
+}
+
 
 bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 {

@@ -57,6 +57,7 @@ class BasicArrayNull;
 struct Link;
 template <class>
 class Lst;
+struct SizeOfList;
 
 template <class T>
 struct ColumnTypeTraits;
@@ -237,6 +238,27 @@ struct ColumnTypeTraits<Decimal128> {
     using average_type = Decimal128;
     static const DataType id = type_Decimal;
     static const ColumnType column_id = col_type_Decimal;
+};
+
+template <>
+struct ColumnTypeTraits<SizeOfList> {
+    static const DataType id = type_Int;
+};
+
+template <>
+struct ColumnTypeTraits<int> {
+    static const DataType id = type_Int;
+};
+
+template <>
+struct ColumnTypeTraits<null> {
+    static const DataType id = DataType(-1);
+};
+
+template <typename T>
+struct ObjectTypeTraits {
+    constexpr static bool self_contained_null =
+        realm::is_any_v<T, StringData, BinaryData, Decimal128, Timestamp, Mixed>;
 };
 
 template <typename T>

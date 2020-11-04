@@ -221,10 +221,10 @@ jobWrapper {
                         }
                         sh 'tools/build-cocoa.sh'
                         sh 'tools/build-cocoa.sh -x'
-                        archiveArtifacts('realm-core-cocoa*.tar.gz')
-                        archiveArtifacts('realm-core-cocoa*.tar.xz')
-                        stash includes: 'realm-core-cocoa*.tar.xz', name: "cocoa-xz"
-                        stash includes: 'realm-core-cocoa*.tar.gz', name: "cocoa-gz"
+                        archiveArtifacts('realm-*-cocoa*.tar.gz')
+                        archiveArtifacts('realm-*-cocoa*.tar.xz')
+                        stash includes: 'realm-*-cocoa*.tar.xz', name: "cocoa-xz"
+                        stash includes: 'realm-*-cocoa*.tar.gz', name: "cocoa-gz"
                         publishingStashes << "cocoa-xz"
                         publishingStashes << "cocoa-gz"
                     }

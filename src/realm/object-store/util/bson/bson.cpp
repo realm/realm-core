@@ -18,6 +18,7 @@
 
 #include <realm/object-store/util/bson/bson.hpp>
 #include <external/json/json.hpp>
+#include <sstream>
 #include <stack>
 #include <algorithm>
 #include <sstream>
@@ -188,6 +189,13 @@ Bson& Bson::operator=(const Bson& v)
 Bson::Type Bson::type() const noexcept
 {
     return m_type;
+}
+
+std::string Bson::to_string() const
+{
+    std::stringstream ss;
+    ss << *this;
+    return ss.str();
 }
 
 bool Bson::operator==(const Bson& other) const

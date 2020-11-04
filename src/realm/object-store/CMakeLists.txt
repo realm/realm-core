@@ -85,7 +85,6 @@ if(REALM_ENABLE_SYNC)
         sync/app_credentials.hpp
         sync/generic_network_transport.hpp
         sync/async_open_task.hpp
-        sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp

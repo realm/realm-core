@@ -60,14 +60,9 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table()
+    TableRef get_table() const
     {
         return m_table.cast_away_const();
-    }
-
-    ConstTableRef get_table() const
-    {
-        return m_table;
     }
 
     Allocator& get_alloc() const;
@@ -106,6 +101,7 @@ public:
     U get(ColKey col_key) const;
 
     Mixed get_any(ColKey col_key) const;
+    Mixed get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const;
     Mixed get_primary_key() const;
 
     template <typename U>
@@ -323,14 +319,16 @@ private:
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key);
     // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link);
+    void set_backlink(ColKey col_key, ObjLink new_link) const;
     // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state);
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
     // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state);
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
 };
+
+std::ostream& operator<<(std::ostream&, const Obj& obj);
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
