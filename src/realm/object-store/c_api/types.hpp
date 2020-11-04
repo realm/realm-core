@@ -145,7 +145,12 @@ struct realm_scheduler : WrapC, std::shared_ptr<util::Scheduler> {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_scheduler_t*>(&other)) {
-            return get() == ptr->get();
+            if (get() == ptr->get()) {
+                return true;
+            }
+            if (get()->is_same_as(ptr->get())) {
+                return true;
+            }
         }
         return false;
     }

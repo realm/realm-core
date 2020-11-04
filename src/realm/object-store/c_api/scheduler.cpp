@@ -69,8 +69,10 @@ struct CAPIScheduler : Scheduler {
     realm_free_userdata_func_t m_free = nullptr;
     realm_scheduler_notify_func_t m_notify = nullptr;
     realm_scheduler_is_on_thread_func_t m_is_on_thread = nullptr;
+    realm_scheduler_is_same_as_func_t m_is_same_as = nullptr;
     realm_scheduler_can_deliver_notifications_func_t m_can_deliver_notifications = nullptr;
     realm_scheduler_set_notify_callback_func_t m_set_notify_callback = nullptr;
+
 
     CAPIScheduler() = default;
     CAPIScheduler(CAPIScheduler&& other)
@@ -99,6 +101,23 @@ struct CAPIScheduler : Scheduler {
     {
         if (m_is_on_thread)
             return m_is_on_thread(m_userdata);
+        return false;
+    }
+
+    bool is_same_as(const Scheduler* other) const noexcept
+    {
+        if (auto rhs = dynamic_cast<const CAPIScheduler*>(other)) {
+            bool same_callbacks = m_free == rhs->m_free && m_notify == rhs->m_notify &&
+                                  m_is_same_as == rhs->m_is_same_as && m_is_on_thread == rhs->m_is_on_thread &&
+                                  m_can_deliver_notifications == rhs->m_can_deliver_notifications &&
+                                  m_set_notify_callback == rhs->m_set_notify_callback;
+            if (same_callbacks && m_userdata == rhs->m_userdata) {
+                return true;
+            }
+            if (same_callbacks && m_is_same_as) {
+                return m_is_same_as(m_userdata, rhs->m_userdata);
+            }
+        }
         return false;
     }
 
@@ -161,6 +180,7 @@ struct DefaultFactory {
 RLM_API realm_scheduler_t*
 realm_scheduler_new(void* userdata, realm_free_userdata_func_t free_func, realm_scheduler_notify_func_t notify_func,
                     realm_scheduler_is_on_thread_func_t is_on_thread_func,
+                    realm_scheduler_is_same_as_func_t is_same_as,
                     realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications_func,
                     realm_scheduler_set_notify_callback_func_t set_notify_callback_func)
 {
@@ -170,6 +190,7 @@ realm_scheduler_new(void* userdata, realm_free_userdata_func_t free_func, realm_
         capi_scheduler->m_free = free_func;
         capi_scheduler->m_notify = notify_func;
         capi_scheduler->m_is_on_thread = is_on_thread_func;
+        capi_scheduler->m_is_same_as = is_same_as;
         capi_scheduler->m_can_deliver_notifications = can_deliver_notifications_func;
         capi_scheduler->m_set_notify_callback = set_notify_callback_func;
         return new realm_scheduler_t(std::move(capi_scheduler));
@@ -186,8 +207,10 @@ RLM_API realm_scheduler_t* realm_scheduler_make_default()
 RLM_API const realm_scheduler_t* realm_scheduler_get_frozen()
 {
     return wrap_err([&]() {
-        static const realm_scheduler_t* frozen = new realm_scheduler_t{Scheduler::get_frozen()};
-        return frozen;
+        // FIXME: Provide a `realm_version_id_t`.
+        return static_cast<realm_scheduler_t*>(nullptr);
+        // static const realm_scheduler_t* frozen = new realm_scheduler_t{Scheduler::get_frozen()};
+        // return frozen;
     });
 }
 

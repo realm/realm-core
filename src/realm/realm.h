@@ -295,6 +295,7 @@ typedef void (*realm_callback_error_func_t)(void* userdata, const realm_async_er
 /* Scheduler types */
 typedef void (*realm_scheduler_notify_func_t)(void* userdata);
 typedef bool (*realm_scheduler_is_on_thread_func_t)(void* userdata);
+typedef bool (*realm_scheduler_is_same_as_func_t)(const void* userdata1, const void* userdata2);
 typedef bool (*realm_scheduler_can_deliver_notifications_func_t)(void* userdata);
 typedef void (*realm_scheduler_set_notify_callback_func_t)(void* userdata, void* callback_userdata,
                                                            realm_free_userdata_func_t, realm_scheduler_notify_func_t);
@@ -606,7 +607,7 @@ RLM_API bool realm_config_set_max_number_of_active_versions(realm_config_t*, siz
  */
 RLM_API realm_scheduler_t*
 realm_scheduler_new(void* userdata, realm_free_userdata_func_t, realm_scheduler_notify_func_t notify,
-                    realm_scheduler_is_on_thread_func_t is_on_thread,
+                    realm_scheduler_is_on_thread_func_t is_on_thread, realm_scheduler_is_same_as_func_t is_same_as,
                     realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications,
                     realm_scheduler_set_notify_callback_func_t set_notify_callback);
 
