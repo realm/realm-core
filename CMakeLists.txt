@@ -154,14 +154,6 @@ if(MSVC)
     add_link_options($<$<CONFIG:Debug>:/ignore:4099>)
 endif()
 
-# Platform-specific build configuration
-if(APPLE)
-    find_library(FOUNDATION_FRAMEWORK Foundation)
-    find_library(SECURITY_FRAMEWORK Security)
-elseif(ANDROID)
-    list(APPEND PLATFORM_LIBRARIES log android)
-endif()
-
 if(UNIX)
     # Enable access to large file APIs, but don't make them the default.
     add_compile_definitions("_LARGEFILE_SOURCE" "_LARGEFILE64_SOURCE")
