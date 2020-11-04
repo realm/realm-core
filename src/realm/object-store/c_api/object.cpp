@@ -1,7 +1,7 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
 
-#include <realm/util/overloaded.hpp>
+#include <realm/util/overload.hpp>
 
 RLM_API bool realm_get_num_objects(const realm_t* realm, realm_table_key_t key, size_t* out_count)
 {
@@ -359,7 +359,7 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
         list->verify_attached();
         realm_value_t result;
 
-        auto getter = util::overloaded{
+        auto getter = util::overload{
             [&](Obj*) {
                 Obj o = list->get<Obj>(index);
                 result.type = RLM_TYPE_LINK;
