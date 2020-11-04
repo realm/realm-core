@@ -235,9 +235,8 @@ TEST(Set_Links)
 
 // FIXME: Set::erase_null() doesn't work for nullable float/double
 TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>, Prop<ObjectId>,
-           Prop<Decimal128>, Prop<BinaryData>, Nullable<Int>, Nullable<String>,
-           /*Nullable<Float>, Nullable<Double>,*/ Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>,
-           Nullable<Decimal128>, Nullable<BinaryData>)
+           Prop<Decimal128>, Prop<BinaryData>, Nullable<Int>, Nullable<String>, Nullable<Float>, Nullable<Double>,
+           Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>, Nullable<Decimal128>, Nullable<BinaryData>)
 {
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
