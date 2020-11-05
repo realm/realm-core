@@ -94,6 +94,13 @@ size_t Set::find(const T& value) const
     return as<T>().find(value);
 }
 
+template <typename T>
+T Set::get(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    return as<T>().get(row_ndx);
+}
+
 template <class T>
 std::pair<size_t, bool> Set::insert(T value)
 {

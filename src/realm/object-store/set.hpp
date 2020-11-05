@@ -55,6 +55,11 @@ public:
     template <class T, class Context>
     std::pair<size_t, bool> remove(Context&, const T&);
 
+    template <typename Context>
+    auto get(Context&, size_t row_ndx) const;
+    template <typename T = Obj>
+    T get(size_t row_ndx) const;
+
     Results sort(SortDescriptor order) const;
     Results sort(const std::vector<std::pair<std::string, bool>>& keypaths) const;
     Results filter(Query q) const;
@@ -96,6 +101,8 @@ private:
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     // _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<realm::SetBase> m_set_base;
+    
+    void verify_valid_row(size_t row_ndx, bool insertion = false) const;
 
     template <class Fn>
     auto dispatch(Fn&&) const;
@@ -125,6 +132,12 @@ size_t Set::find(Context& ctx, const T& value) const
     return dispatch([&](auto t) {
         return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip));
     });
+}
+
+template <typename Context>
+auto Set::get(Context& ctx, size_t row_ndx) const
+{
+    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
 }
 
 template <class T, class Context>
