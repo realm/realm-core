@@ -106,6 +106,10 @@ public:
     {
         return v;
     }
+    util::Any box(object_store::Set v) const
+    {
+        return v;
+    }
     util::Any box(Object v) const
     {
         return v;

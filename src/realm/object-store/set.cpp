@@ -134,6 +134,8 @@ T Set::get(size_t row_ndx) const
     return as<T>().get(row_ndx);
 }
 
+void Set::verify_valid_row(size_t, bool) const { }
+
 template <class T>
 std::pair<size_t, bool> Set::insert(T value)
 {
@@ -258,6 +260,7 @@ NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
+    template T Set::get<T>(size_t) const;                                                                           \
     template size_t Set::find<T>(const T&) const;                                                                    \
     template std::pair<size_t, bool> Set::remove<T>(T const&);                                                       \
     template std::pair<size_t, bool> Set::insert<T>(T);

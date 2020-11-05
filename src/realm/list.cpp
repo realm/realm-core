@@ -182,7 +182,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     auto origin_table = m_obj.get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    ObjKey old_key = this->get(ndx);
+    ObjKey old_key = m_tree->get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
     bool recurse =
         m_obj.replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
@@ -239,7 +239,7 @@ template <>
 void Lst<ObjKey>::clear()
 {
     update_if_needed();
-    auto sz = Lst<ObjKey>::size();
+    auto sz = m_tree->size();
 
     if (sz > 0) {
         auto origin_table = m_obj.get_table();

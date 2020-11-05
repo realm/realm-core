@@ -23,6 +23,7 @@
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
@@ -145,6 +146,8 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         return ctx.null_value();
     if (is_array(property.type) && property.type != PropertyType::LinkingObjects)
         return ctx.box(List(m_realm, m_obj, column));
+    if (is_set(property.type) && property.type != PropertyType::LinkingObjects)
+        return ctx.box(object_store::Set(m_realm, m_obj, column));
 
     switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:
