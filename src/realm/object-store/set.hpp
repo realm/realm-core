@@ -39,6 +39,11 @@ public:
     void verify_attached() const;
     void verify_in_transaction() const;
 
+    /// Number of entries in the set.
+    ///
+    /// CAUTION: For sets of objects, tombstones are included in this number.
+    ///          Use `as_results()` to get the number of objects that are alive.
+    ///
     size_t size() const;
 
     template <class T>
@@ -96,6 +101,9 @@ private:
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     // _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
     std::shared_ptr<realm::SetBase> m_set_base;
+
+    void validate(const Obj&) const;
+    ConstTableRef get_target_table() const;
 
     template <class Fn>
     auto dispatch(Fn&&) const;

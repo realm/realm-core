@@ -58,6 +58,39 @@ realm::TableKey Set::get_parent_table_key() const noexcept
     return m_set_base->get_table()->get_key();
 }
 
+ConstTableRef Set::get_target_table() const
+{
+    auto table = m_set_base->get_table();
+    auto col = m_set_base->get_col_key();
+    if (col.get_type() != col_type_Link)
+        return nullptr;
+    return table->get_link_target(col);
+}
+
+void Set::validate(const Obj& obj) const
+{
+    if (!obj.is_valid()) {
+        throw std::invalid_argument{"Object has been deleted or invalidated"};
+    }
+    auto col_type = m_set_base->get_col_key().get_type();
+    if (col_type == col_type_Link) {
+        auto target = get_target_table();
+        if (obj.get_table() != target) {
+            throw std::invalid_argument{
+                util::format("Object of type (%1) does not match Set type (%2)",
+                             ObjectStore::object_type_for_table_name(obj.get_table()->get_name()),
+                             ObjectStore::object_type_for_table_name(target->get_name()))};
+        }
+    }
+    else if (col_type == col_type_Mixed || col_type == col_type_TypedLink) {
+        REALM_TERMINATE("Set of Mixed or TypedLink not supported yet");
+        return;
+    }
+    else {
+        throw std::invalid_argument{"Tried to insert object into set of primitive values"};
+    }
+}
+
 bool Set::is_valid() const
 {
     if (!m_realm)
@@ -212,6 +245,33 @@ template <>
 size_t Set::find<int>(const int& value) const
 {
     return find(int64_t(value));
+}
+
+template <>
+size_t Set::find<Obj>(const Obj& obj) const
+{
+    verify_attached();
+    validate(obj);
+    // FIXME: Handle Mixed / ObjLink
+    return as<ObjKey>().find(obj.get_key());
+}
+
+template <>
+std::pair<size_t, bool> Set::remove<Obj>(const Obj& obj)
+{
+    verify_in_transaction();
+    validate(obj);
+    // FIXME: Handle Mixed / ObjLink
+    return as<ObjKey>().erase(obj.get_key());
+}
+
+template <>
+std::pair<size_t, bool> Set::insert<Obj>(Obj obj)
+{
+    verify_in_transaction();
+    validate(obj);
+    // FIXME: Handle Mixed / ObjLink
+    return as<ObjKey>().insert(obj.get_key());
 }
 
 } // namespace realm::object_store
