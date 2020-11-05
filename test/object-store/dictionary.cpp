@@ -64,9 +64,13 @@ TEST_CASE("dictionary")
         REQUIRE(results.get_realm() == r);
     }
 
-    dict.insert("name", "John");
-    dict.insert("address", "East Street 11");
-    dict.insert("title", "teacher");
+    std::vector<std::string> keys = {"a", "b", "c"};
+    std::vector<std::string> values = {"apple", "banana", "clementine"};
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        dict.insert(keys[i], values[i]);
+    }
+
 
     SECTION("clear()")
     {
@@ -74,5 +78,27 @@ TEST_CASE("dictionary")
         results.clear();
         REQUIRE(dict.size() == 0);
         REQUIRE(results.size() == 0);
+    }
+
+    SECTION("get()")
+    {
+        for (size_t i = 0; i < values.size(); ++i) {
+            REQUIRE(dict.get<String>(keys[i]) == values[i]);
+            auto val = dict.get(ctx, util::Any(keys[i]));
+            REQUIRE(any_cast<std::string>(val) == values[i]);
+        }
+    }
+
+    SECTION("insert()")
+    {
+        for (size_t i = 0; i < values.size(); ++i) {
+            auto rev = values.size() - i - 1;
+            dict.insert(keys[i], values[rev]);
+            REQUIRE(dict.get<StringData>(keys[i]) == values[rev]);
+        }
+        for (size_t i = 0; i < values.size(); ++i) {
+            dict.insert(ctx, util::Any(keys[i]), util::Any(values[i]));
+            REQUIRE(dict.get<StringData>(keys[i]) == values[i]);
+        }
     }
 }

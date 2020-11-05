@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/dictionary.hpp>
+#include <realm/table.hpp>
 
 namespace realm {
 namespace object_store {
@@ -34,6 +35,12 @@ Dictionary::Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& dict)
 }
 
 Dictionary::~Dictionary() {}
+
+Obj Dictionary::get_object(StringData key) const
+{
+    auto k = m_dict->get(key).get<ObjKey>();
+    return m_dict->get_target_table()->get_object(k);
+}
 
 } // namespace object_store
 } // namespace realm
