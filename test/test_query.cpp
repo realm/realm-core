@@ -2442,6 +2442,7 @@ TEST(Query_TwoColumnsDifferentTables)
     table_b->create_object();
 
     CHECK_THROW_ANY(table_a->where().equal(col_a, col_b).count());
+    CHECK_THROW_ANY((table_a->column<Float>(col_a) == table_b->column<Float>(col_b)).count());
 }
 
 TEST(Query_DateTest)
