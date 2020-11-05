@@ -33,7 +33,7 @@ using namespace realm::util;
 using File = realm::util::File;
 using SyncAction = SyncFileActionMetadata::Action;
 
-static const std::string base_path = tmp_dir() + "realm_objectstore_sync_metadata";
+static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
 TEST_CASE("sync_metadata: migration", "[sync]")
@@ -379,7 +379,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]")
 
     SECTION("can be properly constructed")
     {
-        const auto original_name = tmp_dir() + "foobar/test1";
+        const auto original_name = util::make_temp_dir() + "foobar/test1";
         manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm);
         auto metadata = *manager.get_file_action_metadata(original_name);
         REQUIRE(metadata.original_name() == original_name);
@@ -391,9 +391,9 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]")
 
     SECTION("properly reflects updating state, across multiple instances")
     {
-        const auto original_name = tmp_dir() + "foobar/test2a";
-        const std::string new_name_1 = tmp_dir() + "foobar/test2b";
-        const std::string new_name_2 = tmp_dir() + "foobar/test2c";
+        const auto original_name = util::make_temp_dir() + "foobar/test2a";
+        const std::string new_name_1 = util::make_temp_dir() + "foobar/test2b";
+        const std::string new_name_2 = util::make_temp_dir() + "foobar/test2c";
 
         manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm,
                                           new_name_1);
@@ -427,9 +427,9 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]")
     SyncMetadataManager manager(metadata_path, false);
     SECTION("properly list all pending actions, reflecting their deletion")
     {
-        const auto filename1 = tmp_dir() + "foobar/file1";
-        const auto filename2 = tmp_dir() + "foobar/file2";
-        const auto filename3 = tmp_dir() + "foobar/file3";
+        const auto filename1 = util::make_temp_dir() + "foobar/file1";
+        const auto filename2 = util::make_temp_dir() + "foobar/file2";
+        const auto filename3 = util::make_temp_dir() + "foobar/file3";
         manager.make_file_action_metadata(filename1, "asdf", "realm://realm.example.com/1",
                                           SyncAction::BackUpThenDeleteRealm);
         manager.make_file_action_metadata(filename2, "asdf", "realm://realm.example.com/2",
