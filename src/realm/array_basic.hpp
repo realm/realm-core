@@ -91,7 +91,7 @@ public:
     /// you need to get multiple values, then this method will be
     /// slower.
     static T get(const char* header, size_t ndx) noexcept;
-    Mixed get_as_mixed(size_t ndx) const override
+    Mixed get_any(size_t ndx) const override
     {
         return Mixed(get(ndx));
     }
@@ -178,7 +178,7 @@ public:
         T val = BasicArray<T>::get(ndx);
         return null::is_null_float(val) ? util::none : util::make_optional(val);
     }
-    Mixed get_as_mixed(size_t ndx) const override
+    Mixed get_any(size_t ndx) const override
     {
         return Mixed(get(ndx));
     }

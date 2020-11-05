@@ -2559,8 +2559,8 @@ public:
     {
         size_t s = start;
         while (s < end) {
-            Mixed v1 = m_leaf_ptr1->get_as_mixed(s);
-            Mixed v2 = m_leaf_ptr2->get_as_mixed(s);
+            Mixed v1 = m_leaf_ptr1->get_any(s);
+            Mixed v2 = m_leaf_ptr2->get_any(s);
             if (TConditionFunction()(v1, v2, v1.is_null(), v2.is_null()))
                 return s;
             else

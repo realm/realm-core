@@ -61,7 +61,7 @@ public:
     {
         Array::create(type_Normal, false, 0, 0);
     }
-    Mixed get_as_mixed(size_t ndx) const override;
+    Mixed get_any(size_t ndx) const override;
 
     bool is_null(size_t) const
     {
@@ -107,7 +107,7 @@ public:
     void add(value_type value);
     void set(size_t ndx, value_type value);
     value_type get(size_t ndx) const noexcept;
-    Mixed get_as_mixed(size_t ndx) const override;
+    Mixed get_any(size_t ndx) const override;
     static value_type get(const char* header, size_t ndx) noexcept;
     void get_chunk(size_t ndx, value_type res[8]) const noexcept;
     void set_null(size_t ndx);

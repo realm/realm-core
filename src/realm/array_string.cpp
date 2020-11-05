@@ -210,7 +210,7 @@ StringData ArrayString::get_legacy(size_t ndx) const
     return {};
 }
 
-Mixed ArrayString::get_as_mixed(size_t ndx) const
+Mixed ArrayString::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
 }

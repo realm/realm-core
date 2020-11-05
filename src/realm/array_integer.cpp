@@ -24,12 +24,12 @@
 
 using namespace realm;
 
-Mixed ArrayInteger::get_as_mixed(size_t ndx) const
+Mixed ArrayInteger::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
 }
 
-Mixed ArrayIntNull::get_as_mixed(size_t ndx) const
+Mixed ArrayIntNull::get_any(size_t ndx) const
 {
     return Mixed(get(ndx));
 }

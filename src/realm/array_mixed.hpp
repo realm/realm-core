@@ -79,7 +79,7 @@ public:
     void set_null(size_t ndx);
     void insert(size_t ndx, Mixed value);
     Mixed get(size_t ndx) const;
-    Mixed get_as_mixed(size_t ndx) const override
+    Mixed get_any(size_t ndx) const override
     {
         return get(ndx);
     }

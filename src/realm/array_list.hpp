@@ -75,7 +75,7 @@ public:
     {
         return Array::get_as_ref(ndx);
     }
-    Mixed get_as_mixed(size_t) const override
+    Mixed get_any(size_t) const override
     {
         REALM_ASSERT_DEBUG(false);
         return {};

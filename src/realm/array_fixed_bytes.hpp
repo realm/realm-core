@@ -79,7 +79,7 @@ public:
         return get_pos(ndx).get_value(this);
     }
 
-    Mixed get_as_mixed(size_t ndx) const override
+    Mixed get_any(size_t ndx) const override
     {
         return Mixed(get(ndx));
     }
@@ -209,7 +209,7 @@ public:
         }
         return pos.get_value(this);
     }
-    Mixed get_as_mixed(size_t ndx) const override
+    Mixed get_any(size_t ndx) const override
     {
         return Mixed(get(ndx));
     }
