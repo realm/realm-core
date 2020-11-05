@@ -25,28 +25,52 @@ TEST_CASE("set")
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
-        {"table", {{"int_set", PropertyType::Set | PropertyType::Int}}},
+        {
+            "table",
+            {
+                {"int_set", PropertyType::Set | PropertyType::Int},
+                {"link_set", PropertyType::Set | PropertyType::Object, "table2"},
+            },
+
+        },
+        {
+            "table2",
+            {
+                {"id", PropertyType::Int, Property::IsPrimary{true}},
+            },
+        },
     });
 
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
     static_cast<void>(coordinator);
 
     auto table = r->read_group().get_table("class_table");
+    auto table2 = r->read_group().get_table("class_table2");
     ColKey col_int_set = table->get_column_key("int_set");
+    ColKey col_link_set = table->get_column_key("link_set");
 
-    r->begin_transaction();
-    Obj obj = table->create_object();
-    r->commit_transaction();
+    auto write = [&](auto&& f) {
+        r->begin_transaction();
+        if constexpr (std::is_void_v<decltype(f())>) {
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        }
+        else {
+            auto result = f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            return result;
+        }
+    };
+
+    auto obj = write([&] {
+        return table->create_object();
+    });
 
     SECTION("basics")
     {
         object_store::Set set{r, obj, col_int_set};
-        auto write = [&](auto&& f) {
-            r->begin_transaction();
-            f();
-            r->commit_transaction();
-            advance_and_notify(*r);
-        };
 
         write([&]() {
             CHECK(set.insert(123).second);
@@ -76,5 +100,47 @@ TEST_CASE("set")
             obj.remove();
         });
         CHECK(!set.is_valid());
+    }
+
+    SECTION("objects / links")
+    {
+        object_store::Set set{r, obj, col_link_set};
+
+        Obj target1, target2, target3;
+        write([&]() {
+            target1 = table2->create_object_with_primary_key(123);
+            target2 = table2->create_object_with_primary_key(456);
+            target3 = table2->create_object_with_primary_key(789);
+        });
+
+        write([&]() {
+            CHECK(set.insert(target1).second);
+            CHECK(!set.insert(target1).second);
+            CHECK(set.insert(target2).second);
+            CHECK(set.insert(target3).second);
+        });
+
+        REQUIRE(set.is_valid());
+        CHECK(set.size() == 3);
+
+        CHECK(set.find(target1) != size_t(-1));
+        CHECK(set.find(target2) != size_t(-1));
+        CHECK(set.find(target3) != size_t(-1));
+
+        write([&]() {
+            target2.invalidate();
+        });
+
+        // Invalidating the object does not change the size of the set, because
+        // Set<Obj> does not hide tombstones.
+        CHECK(set.size() == 3);
+
+        CHECK_THROWS(set.find(target2));
+
+        // Resurrect the tombstone of target2.
+        write([&]() {
+            target2 = table2->create_object_with_primary_key(456);
+        });
+        CHECK(set.find(target2));
     }
 }

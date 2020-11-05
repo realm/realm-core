@@ -39,6 +39,11 @@ public:
     void verify_attached() const;
     void verify_in_transaction() const;
 
+    /// Number of entries in the set.
+    ///
+    /// CAUTION: For sets of objects, tombstones are included in this number.
+    ///          Use `as_results()` to get the number of objects that are alive.
+    ///
     size_t size() const;
 
     template <class T>
@@ -103,6 +108,9 @@ private:
     std::shared_ptr<realm::SetBase> m_set_base;
     
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
+
+    void validate(const Obj&) const;
+    ConstTableRef get_target_table() const;
 
     template <class Fn>
     auto dispatch(Fn&&) const;
