@@ -49,6 +49,8 @@ public:
     Results(std::shared_ptr<Realm> r, ConstTableRef table);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<SetBase> set);
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<SetBase> set, DescriptorOrdering o);
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
@@ -182,11 +184,13 @@ public:
     }
 
     enum class Mode {
-        Empty,     // Backed by nothing (for missing tables)
-        Table,     // Backed directly by a Table
-        List,      // Backed by a list-of-primitives that is not a link list.
-        Query,     // Backed by a query that has not yet been turned into a TableView
-        LinkList,  // Backed directly by a LinkList
+        Empty, // Backed by nothing (for missing tables)
+        Table, // Backed directly by a Table
+        List,  // Backed by a list-of-primitives that is not a link list.
+        // Set,       // Backed by a set-of-primitives that is not a link set.
+        Query,    // Backed by a query that has not yet been turned into a TableView
+        LinkList, // Backed directly by a LinkList
+        // LinkSet,   // Backed directly by a LnkSet
         TableView, // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
@@ -365,7 +369,9 @@ auto Results::dispatch(Fn&& fn) const
 template <typename Context>
 auto Results::get(Context& ctx, size_t row_ndx)
 {
-    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) {
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+    });
 }
 
 template <typename Context>

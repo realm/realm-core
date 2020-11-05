@@ -67,6 +67,23 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, Descri
 {
 }
 
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<SetBase> set)
+    : Results(std::move(r), std::move(set), DescriptorOrdering{})
+{
+}
+
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<SetBase> set, DescriptorOrdering o)
+    : m_realm(std::move(r))
+    , m_descriptor_ordering(std::move(o))
+    // , m_set(set)
+    // , m_mode(Mode::Set)
+    , m_mutex(m_realm && m_realm->is_frozen())
+{
+    static_cast<void>(set);
+    static_cast<void>(o);
+    REALM_TERMINATE("Not implemented yet");
+}
+
 Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
     : m_realm(std::move(r))
     , m_table_view(std::move(tv))

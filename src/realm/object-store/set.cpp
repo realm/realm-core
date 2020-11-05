@@ -209,37 +209,46 @@ bool Set::operator==(const Set& rhs) const noexcept
 
 Results Set::as_results() const
 {
-    return {};
+    verify_attached();
+    return Results{m_realm, m_set_base};
 }
+
 Results Set::snapshot() const
 {
-    return {};
+    return as_results().snapshot();
 }
 
 Results Set::sort(SortDescriptor order) const
 {
     static_cast<void>(order);
+    REALM_TERMINATE("Not implemented yet");
     return {};
 }
+
 Results Set::sort(const std::vector<std::pair<std::string, bool>>& keypaths) const
 {
     static_cast<void>(keypaths);
+    REALM_TERMINATE("Not implemented yet");
     return {};
 }
+
 Results Set::filter(Query q) const
 {
     static_cast<void>(q);
+    REALM_TERMINATE("Not implemented yet");
     return {};
 }
 
 Set Set::freeze(const std::shared_ptr<Realm>& realm) const
 {
     static_cast<void>(realm);
+    REALM_TERMINATE("Not implemented yet");
     return *this;
 }
+
 bool Set::is_frozen() const noexcept
 {
-    return true;
+    return m_realm->is_frozen();
 }
 
 NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &

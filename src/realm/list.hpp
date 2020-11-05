@@ -537,8 +537,11 @@ inline void Lst<T>::do_remove(size_t ndx)
 
 // Translate from userfacing index to internal index.
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx);
+size_t real2virtual(const std::vector<size_t>& vec, size_t ndx);
 // Scan through the list to find unresolved links
 void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
+// Clear the context flag on the tree if there are no more unresolved links.
+void check_for_last_unresolved(BPlusTree<ObjKey>& tree);
 
 
 template <typename U>

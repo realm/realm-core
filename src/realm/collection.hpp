@@ -232,7 +232,7 @@ public:
     using Interface::update_content_version;
     using Interface::update_if_needed;
 
-    T get(size_t ndx) const
+    virtual T get(size_t ndx) const
     {
         const auto current_size = Collection::size();
         if (ndx >= current_size) {
@@ -252,7 +252,7 @@ public:
     {
         return iterator(this, Collection::size() + m_deleted.size());
     }
-    size_t find_first(T value) const
+    virtual size_t find_first(T value) const
     {
         if (!m_valid && !init_from_parent())
             return not_found;

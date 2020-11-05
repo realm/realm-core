@@ -30,6 +30,9 @@
 #include "realm/array_mixed.hpp"
 #include "realm/replication.hpp"
 
+// Handling of unresolved links:
+#include "realm/list.hpp"
+
 namespace realm {
 
 // FIXME: This method belongs in obj.cpp.
@@ -95,7 +98,7 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
             return std::make_unique<Set<Mixed>>(*this, col_key);
         }
         case type_Link: {
-            return std::make_unique<Set<ObjKey>>(*this, col_key);
+            return std::make_unique<LnkSet>(*this, col_key);
         }
         case type_LinkList:
             [[fallthrough]];
@@ -130,6 +133,9 @@ void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     m_obj.set_backlink(m_col_key, {target_table_key, target_key});
     m_tree->insert(ndx, target_key);
+    if (target_key.is_unresolved()) {
+        m_tree->set_context_flag(true);
+    }
 }
 
 template <>
@@ -143,6 +149,10 @@ void Set<ObjKey>::do_erase(size_t ndx)
     bool recurse = m_obj.remove_backlink(m_col_key, {target_table_key, old_key}, state);
 
     m_tree->erase(ndx);
+
+    if (old_key.is_unresolved()) {
+        check_for_last_unresolved(*m_tree);
+    }
 
     if (recurse) {
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
@@ -201,6 +211,118 @@ void Set<Mixed>::do_erase(size_t ndx)
     else {
         m_tree->erase(ndx);
     }
+}
+
+LnkSet::LnkSet(const Obj& owner, ColKey col_key)
+    : Set<ObjKey>(owner, col_key)
+{
+    update_unresolved(m_unresolved, *m_tree);
+}
+
+bool LnkSet::init_from_parent() const
+{
+    Set<ObjKey>::init_from_parent();
+    update_unresolved(m_unresolved, *m_tree);
+    return m_valid;
+}
+
+TableRef LnkSet::get_target_table() const
+{
+    return m_obj.get_table()->get_link_target(m_col_key);
+}
+
+Obj LnkSet::get_object(size_t ndx) const
+{
+    ObjKey k = get(ndx);
+    return get_target_table()->get_object(k);
+}
+
+void LnkSet::get_dependencies(TableVersions& versions) const
+{
+    if (is_attached()) {
+        auto table = get_table();
+        versions.emplace_back(table->get_key(), table->get_content_version());
+    }
+}
+
+void LnkSet::sync_if_needed() const
+{
+    if (is_attached()) {
+        const_cast<LnkSet*>(this)->update_if_needed();
+    }
+}
+
+ObjKey LnkSet::get(size_t ndx) const
+{
+    auto real_ndx = virtual2real(m_unresolved, ndx);
+    return Set<ObjKey>::get(real_ndx);
+}
+
+size_t LnkSet::find(ObjKey key) const
+{
+    auto ndx = Set<ObjKey>::find(key);
+    if (ndx != npos) {
+        ndx = real2virtual(m_unresolved, ndx);
+    }
+    return ndx;
+}
+
+std::pair<size_t, bool> LnkSet::insert(ObjKey key)
+{
+    auto [ndx, inserted] = Set<ObjKey>::insert(key);
+    ndx = real2virtual(m_unresolved, ndx);
+    return {ndx, inserted};
+}
+
+std::pair<size_t, bool> LnkSet::erase(ObjKey key)
+{
+    auto [ndx, erased] = Set<ObjKey>::erase(key);
+    if (ndx != npos) {
+        ndx = real2virtual(m_unresolved, ndx);
+    }
+    return {ndx, erased};
+}
+
+void LnkSet::clear()
+{
+    Set<ObjKey>::clear();
+    m_unresolved.clear();
+}
+
+std::pair<size_t, bool> LnkSet::insert_null()
+{
+    auto [ndx, x] = Set<ObjKey>::insert_null();
+    if (ndx != npos) {
+        ndx = real2virtual(m_unresolved, ndx);
+    }
+    return {ndx, x};
+}
+
+std::pair<size_t, bool> LnkSet::erase_null()
+{
+    auto [ndx, x] = Set<ObjKey>::erase_null();
+    if (ndx != npos) {
+        ndx = real2virtual(m_unresolved, ndx);
+    }
+    return {ndx, x};
+}
+
+std::pair<size_t, bool> LnkSet::insert_any(Mixed value)
+{
+    auto [ndx, x] = Set<ObjKey>::insert_any(value);
+    if (ndx != npos) {
+        ndx = real2virtual(m_unresolved, ndx);
+    }
+    return {ndx, x};
+}
+
+std::pair<size_t, bool> LnkSet::erase_any(Mixed value)
+{
+    auto [ndx, x] = Set<ObjKey>::erase_any(value);
+    if (ndx != npos) {
+        ndx = real2virtual(m_unresolved, ndx);
+    }
+    return {ndx, x};
 }
 
 
