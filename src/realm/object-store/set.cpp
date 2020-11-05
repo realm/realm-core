@@ -304,6 +304,13 @@ size_t Set::find<int>(const int& value) const
 }
 
 template <>
+Obj Set::get<Obj>(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    return get_target_table()->get_object(row_ndx);
+}
+
+template <>
 size_t Set::find<Obj>(const Obj& obj) const
 {
     verify_attached();
