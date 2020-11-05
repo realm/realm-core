@@ -42,18 +42,16 @@ public:
     size_t size() const;
 
     template <class T>
-    size_t find(const T&);
+    size_t find(T const&) const;
     template <class T>
-    bool insert(T);
+    std::pair<size_t, bool> insert(T);
     template <class T>
-    bool remove(const T&);
+    bool remove(T const&);
 
-    template <class T, class Context>
-    size_t find(Context&, const T&);
-    template <class T, class Context>
-    bool insert(Context&, T value);
-    template <class T, class Context>
-    bool remove(Context&, const T&);
+    template <typename T, typename Context>
+    std::pair<size_t, bool> insert(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
+    template <typename T, typename Context>
+    void remove(Context&, T&& value);
 
     Results sort(SortDescriptor order) const;
     Results sort(const std::vector<std::pair<std::string, bool>>& keypaths) const;
@@ -64,6 +62,9 @@ public:
 
     Set freeze(const std::shared_ptr<Realm>& realm) const;
     bool is_frozen() const noexcept;
+
+    template <typename T, typename Context>
+    size_t find(Context&, T&& value) const;
 
     util::Optional<Mixed> max(ColKey column = {}) const;
     util::Optional<Mixed> min(ColKey column = {}) const;
@@ -104,6 +105,49 @@ private:
 
     friend struct std::hash<Set>;
 };
+
+template <typename Fn>
+auto Set::dispatch(Fn&& fn) const
+{
+    verify_attached();
+    return switch_on_type(get_type(), std::forward<Fn>(fn));
+}
+
+template <typename T, typename Context>
+size_t Set::find(Context& ctx, T&& value) const
+{
+    return 1;
+//    return dispatch([&](auto t) {
+//        return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip));
+//    });
+}
+
+template <typename T, typename Context>
+std::pair<size_t, bool> Set::insert(Context& ctx, T&& value, CreatePolicy policy)
+{
+    dispatch([&](auto t) {
+        this->insert(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
+}
+
+template <typename T, typename Context>
+void Set::remove(Context& ctx, T&& value)
+{
+
+}
+
+template <typename T>
+auto& Set::as() const
+{
+    return static_cast<realm::Set<T>&>(*m_set_base);
+}
+
+//template <>
+//inline auto& Set::as<Obj>() const
+//{
+//    return static_cast<realm::Set&>(*m_set_base);
+//}
+
 
 } // namespace realm::object_store
 
