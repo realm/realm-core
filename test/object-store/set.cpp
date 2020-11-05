@@ -131,9 +131,8 @@ TEST_CASE("set")
             target2.invalidate();
         });
 
-        // Invalidating the object does not change the size of the set, because
-        // Set<Obj> does not hide tombstones.
-        CHECK(set.size() == 3);
+        // Invalidating the object changes the reported size of the set.
+        CHECK(set.size() == 2);
 
         CHECK_THROWS(set.find(target2));
 
@@ -142,5 +141,6 @@ TEST_CASE("set")
             target2 = table2->create_object_with_primary_key(456);
         });
         CHECK(set.find(target2));
+        CHECK(set.size() == 3);
     }
 }

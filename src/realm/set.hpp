@@ -20,10 +20,13 @@
 #define REALM_SET_HPP
 
 #include <realm/collection.hpp>
+#include <realm/obj_list.hpp>
 
 #include <numeric> // std::iota
 
 namespace realm {
+
+class SortDescriptor;
 
 class SetBase : public CollectionBase {
 public:
@@ -61,21 +64,21 @@ public:
 
     /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
     /// or the index of the already-existing value.
-    std::pair<size_t, bool> insert(T value);
+    virtual std::pair<size_t, bool> insert(T value);
 
     /// Find the index of a value in the set, or `size_t(-1)` if it is not in the set.
-    size_t find(T value) const;
+    virtual size_t find(T value) const;
 
     /// Erase an element from the set, returning true if the set contained the element.
-    std::pair<size_t, bool> erase(T value);
+    virtual std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
     Mixed min(size_t* return_ndx = nullptr) const final;
     Mixed max(size_t* return_ndx = nullptr) const final;
     Mixed sum(size_t* return_cnt = nullptr) const final;
     Mixed avg(size_t* return_cnt = nullptr) const final;
-    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
-    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+    void sort(std::vector<size_t>& indices, bool ascending = true) const override;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const override;
 
     // Overriding members of SetBase:
     std::pair<size_t, bool> insert_null() override;
@@ -84,9 +87,10 @@ public:
     std::pair<size_t, bool> erase_any(Mixed value) override;
     void clear() override;
 
-private:
+protected:
     using Collection<T, SetBase>::m_valid;
     using Collection<T, SetBase>::m_obj;
+    using Collection<T, SetBase>::m_col_key;
 
     void create()
     {
@@ -109,6 +113,91 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+};
+
+class LnkSet : public Set<ObjKey>, public ObjList {
+public:
+    LnkSet() = default;
+
+    LnkSet(const Obj& owned, ColKey col_key);
+    LnkSet(const LnkSet& other)
+        : Set<ObjKey>(other)
+        , m_unresolved(other.m_unresolved)
+    {
+    }
+    LnkSet& operator=(const LnkSet& other)
+    {
+        Set<ObjKey>::operator=(other);
+        m_unresolved = other.m_unresolved;
+        return *this;
+    }
+
+    std::unique_ptr<LnkSet> clone() const
+    {
+        if (m_obj.is_valid()) {
+            return std::make_unique<LnkSet>(m_obj, m_col_key);
+        }
+        else {
+            return std::make_unique<LnkSet>();
+        }
+    }
+
+    bool has_unresolved() const noexcept
+    {
+        return !m_unresolved.empty();
+    }
+
+    // Overriding members in ObjList:
+    TableRef get_target_table() const override;
+    bool is_in_sync() const override
+    {
+        return true;
+    }
+    size_t size() const override
+    {
+        auto full_sz = Set<ObjKey>::size();
+        return full_sz - m_unresolved.size();
+    }
+    bool is_obj_valid(size_t) const noexcept override
+    {
+        // FIXME: LnkSet cannot contain NULLs?
+        return true;
+    }
+    Obj get_object(size_t ndx) const override;
+    ObjKey get_key(size_t ndx) const override
+    {
+        return get(ndx);
+    }
+
+    void remove_at(size_t ndx);
+
+    // Overriding members of Set<ObjKey>:
+    ObjKey get(size_t ndx) const override;
+    size_t find(ObjKey) const override;
+    std::pair<size_t, bool> insert(ObjKey) override;
+    std::pair<size_t, bool> erase(ObjKey) override;
+    void clear() override;
+
+    // Overriding members of SetBase:
+    std::pair<size_t, bool> insert_null() override;
+    std::pair<size_t, bool> erase_null() override;
+    std::pair<size_t, bool> insert_any(Mixed value) override;
+    std::pair<size_t, bool> erase_any(Mixed value) override;
+
+    TableView get_sorted_view(SortDescriptor order) const;
+    TableView get_sorted_view(ColKey column_key, bool ascending = true) const;
+    void remove_all_target_rows();
+
+private:
+    friend class ConstTableView;
+    friend class Query;
+
+    mutable std::vector<size_t> m_unresolved;
+
+    // Overriding members of ObjList:
+    void get_dependencies(TableVersions&) const override;
+    void sync_if_needed() const override;
+    bool init_from_parent() const override;
 };
 
 template <>

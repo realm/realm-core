@@ -163,7 +163,6 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 
 /********************************* Lst<Key> *********************************/
 
-namespace {
 void check_for_last_unresolved(BPlusTree<ObjKey>& tree)
 {
     bool no_more_unresolved = true;
@@ -177,7 +176,6 @@ void check_for_last_unresolved(BPlusTree<ObjKey>& tree)
     if (no_more_unresolved)
         tree.set_context_flag(true);
 }
-} // namespace
 
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
@@ -404,6 +402,14 @@ size_t virtual2real(const std::vector<size_t>& vec, size_t ndx)
         ndx++;
     }
     return ndx;
+}
+
+size_t real2virtual(const std::vector<size_t>& vec, size_t ndx)
+{
+    // Subtract the number of tombstones below ndx from ndx.
+    auto it = std::lower_bound(vec.begin(), vec.end(), ndx);
+    auto adjust = it - vec.begin();
+    return ndx - adjust;
 }
 
 void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree)
