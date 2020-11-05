@@ -210,6 +210,11 @@ StringData ArrayString::get_legacy(size_t ndx) const
     return {};
 }
 
+Mixed ArrayString::get_as_mixed(size_t ndx) const
+{
+    return Mixed(get(ndx));
+}
+
 bool ArrayString::is_null(size_t ndx) const
 {
     switch (m_type) {

@@ -477,48 +477,6 @@ std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_fo
     return {};
 }
 
-Mixed TwoColumnsNodeBase::get_value_from_leaf(ArrayPayload* leaf, ColumnType col_type, bool nullable, size_t ndx)
-{
-    switch (col_type) {
-        case col_type_Int:
-            if (nullable) {
-                return (static_cast<ArrayIntNull*>(leaf))->get(ndx);
-            }
-            return (static_cast<ArrayInteger*>(leaf))->get(ndx);
-        case col_type_Bool:
-            return (static_cast<ArrayBoolNull*>(leaf))->get(ndx);
-        case col_type_String:
-            return (static_cast<ArrayString*>(leaf))->get(ndx);
-        case col_type_Binary:
-            return (static_cast<ArrayBinary*>(leaf))->get(ndx);
-        case col_type_Mixed:
-            return (static_cast<ArrayMixed*>(leaf))->get(ndx);
-        case col_type_Timestamp:
-            return (static_cast<ArrayTimestamp*>(leaf))->get(ndx);
-        case col_type_Float:
-            return (static_cast<ArrayFloatNull*>(leaf))->get(ndx);
-        case col_type_Double:
-            return (static_cast<ArrayDoubleNull*>(leaf))->get(ndx);
-        case col_type_Decimal:
-            return (static_cast<ArrayDecimal128*>(leaf))->get(ndx);
-        case col_type_Link:
-            return (static_cast<ArrayKey*>(leaf))->get(ndx);
-        case col_type_ObjectId:
-            return (static_cast<ArrayObjectIdNull*>(leaf))->get(ndx);
-        case col_type_UUID:
-            return (static_cast<ArrayUUIDNull*>(leaf))->get(ndx);
-        case col_type_TypedLink:
-        case col_type_BackLink:
-        case col_type_LinkList:
-        case col_type_OldDateTime:
-        case col_type_OldTable:
-            break;
-    };
-    REALM_UNREACHABLE();
-    return {};
-}
-
-
 } // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)

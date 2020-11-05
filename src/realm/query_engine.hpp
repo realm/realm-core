@@ -2483,28 +2483,42 @@ public:
         m_dT = 100.0;
         m_condition_column_key1 = column1;
         m_condition_column_key2 = column2;
-
-        if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
-            throw std::runtime_error(util::format("queries comparing two properties are not yet supported for "
-                                                  "collections (list/set/dictionary) ($1 and $2)",
-                                                  ParentNode::m_table->get_column_name(m_condition_column_key1),
-                                                  ParentNode::m_table->get_column_name(m_condition_column_key2)));
-        }
     }
 
     ~TwoColumnsNodeBase() noexcept override {}
+    void table_changed() override
+    {
+        if (this->m_table) {
+            if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
+                throw std::runtime_error(util::format("queries comparing two properties are not yet supported for "
+                                                      "collections (list/set/dictionary) (%1 and %2)",
+                                                      ParentNode::m_table->get_column_name(m_condition_column_key1),
+                                                      ParentNode::m_table->get_column_name(m_condition_column_key2)));
+            }
+            if (!ParentNode::m_table->valid_column(m_condition_column_key1) ||
+                !ParentNode::m_table->valid_column(m_condition_column_key2)) {
+                throw std::runtime_error(util::format(
+                    "Comparison between two properties must be linked with a relationship or exist on the same "
+                    "Table. For query applied on %1 with properties: %2 and %3)",
+                    ParentNode::m_table->get_name(), ParentNode::m_table->get_column_name(m_condition_column_key1),
+                    ParentNode::m_table->get_column_name(m_condition_column_key2)));
+            }
+        }
+    }
 
     static std::unique_ptr<ArrayPayload> update_cached_leaf_pointers_for_column(Allocator& alloc,
                                                                                 const ColKey& col_key);
-    static Mixed get_value_from_leaf(ArrayPayload* leaf, ColumnType col_type, bool nullable, size_t ndx);
-
     void cluster_changed() override
     {
-        m_leaf_ptr1 =
-            update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key1);
+        if (!m_leaf_ptr1) {
+            m_leaf_ptr1 =
+                update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key1);
+        }
+        if (!m_leaf_ptr2) {
+            m_leaf_ptr2 =
+                update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key2);
+        }
         this->m_cluster->init_leaf(m_condition_column_key1, m_leaf_ptr1.get());
-        m_leaf_ptr2 =
-            update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key2);
         this->m_cluster->init_leaf(m_condition_column_key2, m_leaf_ptr2.get());
     }
 
@@ -2544,15 +2558,10 @@ public:
     size_t find_first_local(size_t start, size_t end) override
     {
         size_t s = start;
-        ColumnType col1_type = m_condition_column_key1.get_type();
-        ColumnType col2_type = m_condition_column_key2.get_type();
-        bool col1_nullable = m_condition_column_key1.is_nullable();
-        bool col2_nullable = m_condition_column_key2.is_nullable();
-
         while (s < end) {
-            Mixed v1 = get_value_from_leaf(m_leaf_ptr1.get(), col1_type, col1_nullable, s);
-            Mixed v2 = get_value_from_leaf(m_leaf_ptr2.get(), col2_type, col2_nullable, s);
-            if (TConditionFunction()(v1, v2))
+            Mixed v1 = m_leaf_ptr1->get_as_mixed(s);
+            Mixed v2 = m_leaf_ptr2->get_as_mixed(s);
+            if (TConditionFunction()(v1, v2, v1.is_null(), v2.is_null()))
                 return s;
             else
                 s++;

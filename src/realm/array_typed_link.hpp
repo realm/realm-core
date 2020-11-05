@@ -112,6 +112,10 @@ public:
         uint32_t tk = uint32_t(Array::get(ndx) - 1) & 0x7FFFFFFF;
         return {TableKey(tk), ObjKey(Array::get(ndx + 1) - 1)};
     }
+    Mixed get_as_mixed(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
+    }
     bool is_null(size_t ndx) const
     {
         return Array::get(ndx << 1) == 0;

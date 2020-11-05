@@ -24,6 +24,15 @@
 
 using namespace realm;
 
+Mixed ArrayInteger::get_as_mixed(size_t ndx) const
+{
+    return Mixed(get(ndx));
+}
+
+Mixed ArrayIntNull::get_as_mixed(size_t ndx) const
+{
+    return Mixed(get(ndx));
+}
 
 MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, Allocator& alloc)
 {
