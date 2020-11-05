@@ -94,9 +94,10 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
         case type_Mixed: {
             return std::make_unique<Set<Mixed>>(*this, col_key);
         }
+        case type_Link: {
+            return std::make_unique<Set<ObjKey>>(*this, col_key);
+        }
         case type_LinkList:
-            [[fallthrough]];
-        case type_Link:
             [[fallthrough]];
         case type_OldDateTime:
             [[fallthrough]];
