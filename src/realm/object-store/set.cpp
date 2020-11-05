@@ -148,20 +148,57 @@ std::pair<size_t, bool> Set::remove(const T& value)
     return as<T>().erase(value);
 }
 
-util::Optional<Mixed> Set::max(ColKey column) const
+util::Optional<Mixed> Set::max(ColKey col) const
 {
-    static_cast<void>(column);
-    return util::none;
+    if (get_type() == PropertyType::Object)
+        return as_results().max(col);
+    size_t out_ndx = not_found;
+    auto result = m_set_base->max(&out_ndx);
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_set_base->get_col_key(), m_set_base->get_table(),
+                                                             "max");
+    }
+    return out_ndx == not_found ? none : util::make_optional(result);
 }
-util::Optional<Mixed> Set::min(ColKey column) const
+
+util::Optional<Mixed> Set::min(ColKey col) const
 {
-    static_cast<void>(column);
-    return util::none;
+    if (get_type() == PropertyType::Object)
+        return as_results().min(col);
+
+    size_t out_ndx = not_found;
+    auto result = m_set_base->min(&out_ndx);
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_set_base->get_col_key(), m_set_base->get_table(),
+                                                             "min");
+    }
+    return out_ndx == not_found ? none : util::make_optional(result);
 }
-util::Optional<Mixed> Set::average(ColKey column) const
+
+Mixed Set::sum(ColKey col) const
 {
-    static_cast<void>(column);
-    return util::none;
+    if (get_type() == PropertyType::Object)
+        return *as_results().sum(col);
+
+    auto result = m_set_base->sum();
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_set_base->get_col_key(), m_set_base->get_table(),
+                                                             "sum");
+    }
+    return result;
+}
+
+util::Optional<Mixed> Set::average(ColKey col) const
+{
+    if (get_type() == PropertyType::Object)
+        return as_results().average(col);
+    size_t count = 0;
+    auto result = m_set_base->avg(&count);
+    if (result.is_null()) {
+        throw realm::Results::UnsupportedColumnTypeException(m_set_base->get_col_key(), m_set_base->get_table(),
+                                                             "average");
+    }
+    return count == 0 ? none : util::make_optional(result);
 }
 
 bool Set::operator==(const Set& rhs) const noexcept

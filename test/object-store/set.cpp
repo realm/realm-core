@@ -143,4 +143,23 @@ TEST_CASE("set")
         });
         CHECK(set.find(target2));
     }
+
+    SECTION("max / min / sum / avg") {
+        object_store::Set set{r, obj, col_int_set};
+
+        write([&]() {
+            CHECK(set.insert(123).second);
+            CHECK(set.insert(456).second);
+            CHECK(set.insert(0).second);
+            CHECK(set.insert(-1).second);
+        });
+
+        auto x = set.min();
+
+        REQUIRE(set.is_valid());
+        CHECK(set.sum(col_int_set) == 578);
+        CHECK(set.min(col_int_set) == -1);
+        CHECK(set.max(col_int_set) == 456);
+        CHECK(set.average(col_int_set) == 144.5);
+    }
 }
