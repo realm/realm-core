@@ -92,19 +92,23 @@ std::pair<size_t, bool> Set::remove(const T& value)
 
 util::Optional<Mixed> Set::max(ColKey column) const
 {
+    static_cast<void>(column);
     return util::none;
 }
 util::Optional<Mixed> Set::min(ColKey column) const
 {
+    static_cast<void>(column);
     return util::none;
 }
 util::Optional<Mixed> Set::average(ColKey column) const
 {
+    static_cast<void>(column);
     return util::none;
 }
 
 bool Set::operator==(const Set& rhs) const noexcept
 {
+    static_cast<void>(rhs);
     return true;
 }
 
@@ -119,19 +123,23 @@ Results Set::snapshot() const
 
 Results Set::sort(SortDescriptor order) const
 {
+    static_cast<void>(order);
     return {};
 }
 Results Set::sort(const std::vector<std::pair<std::string, bool>>& keypaths) const
 {
+    static_cast<void>(keypaths);
     return {};
 }
 Results Set::filter(Query q) const
 {
+    static_cast<void>(q);
     return {};
 }
 
 Set Set::freeze(const std::shared_ptr<Realm>& realm) const
 {
+    static_cast<void>(realm);
     return *this;
 }
 bool Set::is_frozen() const noexcept
@@ -139,7 +147,11 @@ bool Set::is_frozen() const noexcept
     return true;
 }
 
-NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) & {}
+NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
+{
+    static_cast<void>(cb);
+    return {};
+}
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
     template size_t Set::find<T>(const T&) const;                                                                    \
