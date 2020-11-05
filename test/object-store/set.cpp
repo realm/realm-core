@@ -3,16 +3,16 @@
 #include "util/test_file.hpp"
 #include "util/index_helpers.hpp"
 
-#include "binding_context.hpp"
-#include "set.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/set.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
 
-#include "impl/realm_coordinator.hpp"
-// #include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/version.hpp>
 #include <realm/db.hpp>
