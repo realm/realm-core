@@ -2,6 +2,7 @@
 
 ### Enhancements
 * New data types: Mixed, UUID and TypedLink.
+* New collection types: Set and Dictionary 
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -15,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Set::erase_null() would not properly erase a potential null value ([#4001](https://github.com/realm/realm-core/issues/4001), (not in any release))
 
 ----------------------------------------------
 
