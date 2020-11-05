@@ -1,9 +1,9 @@
 #ifndef REALM_OS_SET_HPP
 #define REALM_OS_SET_HPP
 
-#include "object.hpp"
-#include "property.hpp"
-#include "results.hpp"
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
 
 namespace realm::object_store {
 
@@ -51,7 +51,7 @@ public:
     template <class T, class Context>
     size_t find(Context&, const T&);
     template <class T, class Context>
-    std::pair<size_t, bool> insert(Context&, T value);
+    std::pair<size_t, bool> insert(Context&, T value, CreatePolicy = CreatePolicy::SetLink);
     template <class T, class Context>
     std::pair<size_t, bool> remove(Context&, const T&);
 
@@ -64,6 +64,9 @@ public:
 
     Set freeze(const std::shared_ptr<Realm>& realm) const;
     bool is_frozen() const noexcept;
+
+    template <typename T, typename Context>
+    size_t find(Context&, T&& value) const;
 
     util::Optional<Mixed> max(ColKey column = {}) const;
     util::Optional<Mixed> min(ColKey column = {}) const;

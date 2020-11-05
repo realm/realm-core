@@ -1,4 +1,11 @@
 #include <realm/object-store/set.hpp>
+#include <realm/object-store/impl/list_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/set.hpp>
 
@@ -16,6 +23,21 @@ Set::Set(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
     , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Set)
     , m_set_base(parent_obj.get_setbase_ptr(col))
 {
+}
+
+realm::ObjKey Set::get_parent_object_key() const noexcept
+{
+    return m_set_base->get_key();
+}
+
+realm::ColKey Set::get_parent_column_key() const noexcept
+{
+    return m_set_base->get_col_key();
+}
+
+realm::TableKey Set::get_parent_table_key() const noexcept
+{
+    return m_set_base->get_table()->get_key();
 }
 
 bool Set::is_valid() const
@@ -68,28 +90,61 @@ std::pair<size_t, bool> Set::remove(const T& value)
     return as<T>().erase(value);
 }
 
-template <>
-std::pair<size_t, bool> Set::insert<int>(int value)
+util::Optional<Mixed> Set::max(ColKey column) const
 {
-    return insert(int64_t(value));
+    return util::none;
+}
+util::Optional<Mixed> Set::min(ColKey column) const
+{
+    return util::none;
+}
+util::Optional<Mixed> Set::average(ColKey column) const
+{
+    return util::none;
 }
 
-template <>
-std::pair<size_t, bool> Set::remove<int>(const int& value)
+bool Set::operator==(const Set& rhs) const noexcept
 {
-    return remove(int64_t(value));
+    return true;
 }
 
-template <>
-size_t Set::find<int>(const int& value) const
+Results Set::as_results() const
 {
-    return find(int64_t(value));
+    return {};
 }
+Results Set::snapshot() const
+{
+    return {};
+}
+
+Results Set::sort(SortDescriptor order) const
+{
+    return {};
+}
+Results Set::sort(const std::vector<std::pair<std::string, bool>>& keypaths) const
+{
+    return {};
+}
+Results Set::filter(Query q) const
+{
+    return {};
+}
+
+Set Set::freeze(const std::shared_ptr<Realm>& realm) const
+{
+    return *this;
+}
+bool Set::is_frozen() const noexcept
+{
+    return true;
+}
+
+NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) & {}
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
     template size_t Set::find<T>(const T&) const;                                                                    \
-    template std::pair<size_t, bool> Set::insert<T>(T);                                                              \
-    template std::pair<size_t, bool> Set::remove<T>(const T&);
+    template std::pair<size_t, bool> Set::remove<T>(T const&);                                                       \
+    template std::pair<size_t, bool> Set::insert<T>(T);
 
 REALM_PRIMITIVE_SET_TYPE(bool)
 REALM_PRIMITIVE_SET_TYPE(int64_t)
@@ -110,5 +165,23 @@ REALM_PRIMITIVE_SET_TYPE(util::Optional<ObjectId>)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<UUID>)
 
 #undef REALM_PRIMITIVE_SET_TYPE
+
+template <>
+std::pair<size_t, bool> Set::insert<int>(int value)
+{
+    return insert(int64_t(value));
+}
+
+template <>
+std::pair<size_t, bool> Set::remove<int>(const int& value)
+{
+    return remove(int64_t(value));
+}
+
+template <>
+size_t Set::find<int>(const int& value) const
+{
+    return find(int64_t(value));
+}
 
 } // namespace realm::object_store

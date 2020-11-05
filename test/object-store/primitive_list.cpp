@@ -1066,47 +1066,47 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             advance_and_notify(*r);
             REQUIRE(change.deletions.count() == values.size());
         }
-    }
 
 #if REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
-    SECTION("sync compatibility")
-    {
-        if (!util::EventLoop::has_implementation())
-            return;
-
-        SyncServer server;
-        SyncTestFile sync_config(server, "shared");
-        sync_config.schema = config.schema;
-        sync_config.schema_version = 0;
-
+        SECTION("sync compatibility")
         {
-            auto r = Realm::get_shared_realm(sync_config);
-            r->begin_transaction();
+            if (!util::EventLoop::has_implementation())
+                return;
 
-            CppContext ctx(r);
-            auto obj = Object::create(ctx, r, *r->schema().find("object"), util::Any(AnyDict{}));
-            auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
-            list.add(static_cast<T>(values[0]));
+            SyncServer server;
+            SyncTestFile sync_config(server, "shared");
+            sync_config.schema = config.schema;
+            sync_config.schema_version = 0;
 
-            r->commit_transaction();
-            wait_for_upload(*r);
+            {
+                auto r = Realm::get_shared_realm(sync_config);
+                r->begin_transaction();
+
+                CppContext ctx(r);
+                auto obj = Object::create(ctx, r, *r->schema().find("object"), util::Any(AnyDict{}));
+                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
+                list.add(static_cast<T>(values[0]));
+
+                r->commit_transaction();
+                wait_for_upload(*r);
+            }
+
+            util::File::remove(sync_config.path);
+
+            {
+                auto r = Realm::get_shared_realm(sync_config);
+                auto table = r->read_group().get_table("class_object");
+
+                util::EventLoop::main().run_until([&] {
+                    return table->size() == 1;
+                });
+
+                CppContext ctx(r);
+                Object obj(r, "object", 0);
+                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
+                REQUIRE(list.get<T>(0) == values[0]);
+            }
         }
-
-        util::File::remove(sync_config.path);
-
-        {
-            auto r = Realm::get_shared_realm(sync_config);
-            auto table = r->read_group().get_table("class_object");
-
-            util::EventLoop::main().run_until([&] {
-                return table->size() == 1;
-            });
-
-            CppContext ctx(r);
-            Object obj(r, "object", 0);
-            auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
-            REQUIRE(list.get<T>(0) == values[0]);
-        }
-    }
 #endif
+    }
 }
