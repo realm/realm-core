@@ -35,25 +35,25 @@ public:
 
     const ObjectSchema& get_object_schema() const noexcept;
 
-    bool is_valid() const noexcept;
+    bool is_valid() const;
     void verify_attached() const;
     void verify_in_transaction() const;
 
     size_t size() const;
 
     template <class T>
-    size_t find(const T&);
+    size_t find(const T&) const;
     template <class T>
-    bool insert(T);
+    std::pair<size_t, bool> insert(T);
     template <class T>
-    bool remove(const T&);
+    std::pair<size_t, bool> remove(const T&);
 
     template <class T, class Context>
     size_t find(Context&, const T&);
     template <class T, class Context>
-    bool insert(Context&, T value);
+    std::pair<size_t, bool> insert(Context&, T value);
     template <class T, class Context>
-    bool remove(Context&, const T&);
+    std::pair<size_t, bool> remove(Context&, const T&);
 
     Results sort(SortDescriptor order) const;
     Results sort(const std::vector<std::pair<std::string, bool>>& keypaths) const;
@@ -104,6 +104,20 @@ private:
 
     friend struct std::hash<Set>;
 };
+
+template <class Fn>
+auto Set::dispatch(Fn&& fn) const
+{
+    verify_attached();
+    return switch_on_type(get_type(), std::forward<Fn>(fn));
+}
+
+template <class T>
+auto& Set::as() const
+{
+    REALM_ASSERT(dynamic_cast<realm::Set<T>*>(m_set_base.get()));
+    return static_cast<realm::Set<T>&>(*m_set_base);
+}
 
 } // namespace realm::object_store
 
