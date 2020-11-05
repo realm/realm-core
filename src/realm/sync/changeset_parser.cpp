@@ -62,6 +62,7 @@ struct ChangesetParser::State {
     Timestamp read_timestamp();               // Throws
     ObjectId read_object_id();                // Throws
     Decimal128 read_decimal();                // Throws
+    UUID read_uuid();                         // Throws
 
     void read_path_instr(Instruction::PathInstruction& instr);
 
@@ -126,6 +127,8 @@ Instruction::Payload::Type ChangesetParser::State::read_payload_type()
         case Type::Link:
             [[fallthrough]];
         case Type::ObjectId:
+            [[fallthrough]];
+        case Type::UUID:
             return type;
     }
     parser_error("Unsupported data type");
@@ -198,6 +201,10 @@ Instruction::Payload ChangesetParser::State::read_payload()
             data.decimal = read_decimal();
             return payload;
         }
+        case Type::UUID: {
+            data.uuid = read_uuid();
+            return payload;
+        }
         case Type::Link: {
             data.link = read_link();
             return payload;
@@ -231,6 +238,8 @@ Instruction::PrimaryKey ChangesetParser::State::read_object_key()
             return read_global_key();
         case Type::ObjectId:
             return read_object_id();
+        case Type::UUID:
+            return read_uuid();
         default:
             break;
     }
@@ -543,6 +552,13 @@ ObjectId ChangesetParser::State::read_object_id()
     ObjectId id;
     read_bytes(reinterpret_cast<char*>(&id), sizeof(id));
     return id;
+}
+
+UUID ChangesetParser::State::read_uuid()
+{
+    UUID::UUIDBytes bytes{};
+    read_bytes(reinterpret_cast<char*>(bytes.data()), bytes.size());
+    return UUID(bytes);
 }
 
 Decimal128 ChangesetParser::State::read_decimal()

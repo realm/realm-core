@@ -52,6 +52,12 @@ template <class>
 class Set;
 class Dictionary;
 
+enum JSONOutputMode {
+    output_mode_json,       // default / existing implementation for outputting realm to json
+    output_mode_xjson,      // extended json as described in the spec
+    output_mode_xjson_plus, // extended json as described in the spec with additional modifier used for sync
+};
+
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
@@ -64,14 +70,9 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table()
+    TableRef get_table() const
     {
         return m_table.cast_away_const();
-    }
-
-    ConstTableRef get_table() const
-    {
-        return m_table;
     }
 
     Allocator& get_alloc() const;
@@ -110,6 +111,7 @@ public:
     U get(ColKey col_key) const;
 
     Mixed get_any(ColKey col_key) const;
+    Mixed get_any(std::vector<std::string>::iterator path_start, std::vector<std::string>::iterator path_end) const;
     Mixed get_primary_key() const;
 
     template <typename U>
@@ -139,16 +141,13 @@ public:
     template <class T>
     bool evaluate(T func) const;
 
-    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
-                 std::vector<ColKey>& followed) const;
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                 std::vector<ColKey>& followed, JSONOutputMode output_mode) const;
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                 JSONOutputMode output_mode = output_mode_json) const
     {
-        std::map<std::string, std::string> renames2;
-        renames = renames ? renames : &renames2;
-
         std::vector<ColKey> followed;
-        to_json(out, link_depth, *renames, followed);
+        to_json(out, link_depth, renames, followed, output_mode);
     }
 
     std::string to_string() const;
@@ -337,14 +336,16 @@ private:
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
     void nullify_link(ColKey origin_col, ObjLink target_key);
     // Used when inserting a new link. You will not remove existing links in this process
-    void set_backlink(ColKey col_key, ObjLink new_link);
+    void set_backlink(ColKey col_key, ObjLink new_link) const;
     // Used when replacing a link, return true if CascadeState contains objects to remove
-    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state);
+    bool replace_backlink(ColKey col_key, ObjLink old_link, ObjLink new_link, CascadeState& state) const;
     // Used when removing a backlink, return true if CascadeState contains objects to remove
-    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state);
+    bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
 };
+
+std::ostream& operator<<(std::ostream&, const Obj& obj);
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
@@ -433,6 +434,12 @@ inline Obj& Obj::set(ColKey col_key, util::Optional<double> value, bool is_defau
 
 template <>
 inline Obj& Obj::set(ColKey col_key, util::Optional<ObjectId> value, bool is_default)
+{
+    return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
+}
+
+template <>
+inline Obj& Obj::set(ColKey col_key, util::Optional<UUID> value, bool is_default)
 {
     return value ? set(col_key, *value, is_default) : set_null(col_key, is_default);
 }

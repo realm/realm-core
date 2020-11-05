@@ -1,6 +1,6 @@
 #include <realm/sync/object_id.hpp>
 #include <realm/util/backtrace.hpp>
-#include <realm/util/overloaded.hpp>
+#include <realm/util/overload.hpp>
 
 #include <sstream>
 #include <iomanip>
@@ -14,7 +14,7 @@ using namespace realm::sync;
 std::ostream& realm::sync::operator<<(std::ostream& os, format_pk fmt)
 {
     const auto& key = fmt.pk;
-    auto formatter = util::overloaded{
+    auto formatter = util::overload{
         [&](mpark::monostate) {
             os << "NULL";
         },
@@ -29,6 +29,9 @@ std::ostream& realm::sync::operator<<(std::ostream& os, format_pk fmt)
         },
         [&](ObjectId x) {
             os << "ObjectId{" << x << "}";
+        },
+        [&](UUID x) {
+            os << "UUID{" << x << "}";
         },
     };
     mpark::visit(formatter, key);

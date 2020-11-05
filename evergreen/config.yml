@@ -1,0 +1,227 @@
+functions:
+  "fetch cmake binaries":
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        script: |-
+          set -o errexit
+          set -o verbose
+
+          if [ "$OS" = "Windows_NT" ]; then
+            curl -L -o cmake_binaries.zip ${cmake_url}
+            unzip -q cmake_binaries.zip
+          else
+            mkdir cmake_binaries && cd cmake_binaries
+            curl -L ${cmake_url} | tar -xz --strip-components=1
+            cd ..
+          fi
+
+  "fetch source":
+    - command: git.get_project
+      params: {directory: realm-core}
+    - command: shell.exec
+      params:
+        working_dir: realm-core
+        script: |-
+          set -o errexit
+          git submodule update --init --recursive
+
+tasks:
+- name: compile
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [ -d cmake_vars ]; then
+            rm cmake_vars/*.txt
+        fi
+        export CMAKE_VARS_DIR=$(./evergreen/realpath.sh cmake_vars)
+        source evergreen/cmake_vars_utils.sh
+        export CMAKE=$(./evergreen/realpath.sh ${cmake_bindir}/cmake)
+        
+        if [ -n "${c_compiler}" ]; then
+            [ -n "${cxx_compiler}" ] || (echo "C compiler defined as  but C++ compiler is undefined"; exit 1)
+            set_cmake_var compiler_vars CMAKE_C_COMPILER PATH ${c_compiler}
+            set_cmake_var compiler_vars CMAKE_CXX_COMPILER PATH ${cxx_compiler}
+        fi
+
+        if [ -n "${build_libuv|}" ]; then
+            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
+                ./evergreen/build_libuv.sh \
+                    -p libuv_prefix \
+                    -b v1.40.0 \
+                    -e "${extra_flags}" \
+                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+        fi
+       
+        if [ -n "${build_zlib|}" ]; then
+            CC="${c_compiler|}" GENERATOR="${cmake_generator|}" \
+                ./evergreen/build_zlib.sh \
+                    -p zlib_prefix \
+                    -b v1.2.11 \
+                    -e "${extra_flags}" \
+                    -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+        fi
+
+        set_cmake_var realm_vars REALM_BUILD_COMMANDLINE_TOOLS BOOL On
+        set_cmake_var realm_vars REALM_ENABLE_SYNC BOOL On
+        set_cmake_var realm_vars REALM_ENABLE_ENCRYPTION BOOL On
+
+        cat cmake_vars/*.txt | tee cmake_vars.txt
+        
+        mkdir build
+        $CMAKE \
+          -B build \
+          -C cmake_vars.txt ${extra_flags} \
+          -G "${cmake_generator|Unix Makefiles}"
+
+        ${cmake_bindir}/cmake --build build -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
+- name: package
+  depends_on:
+  - "compile"
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        set -o errexit
+        cpack=$(pwd)/${cmake_bindir}/cpack
+
+        cd build
+        $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-core-artifacts-devel.tar.gz'
+      bucket: mciuploads
+      permissions: public-read
+      local_file: 'realm-core/build/realm-core-artifacts-devel.tar.gz'
+      content_type: '${content_type|application/x-gzip}'
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/realm-core-artifacts-runtime.tar.gz'
+      bucket: mciuploads
+      permissions: public-read
+      local_file: 'realm-core/build/realm-core-artifacts-runtime.tar.gz'
+      content_type: '${content_type|application/x-gzip}'
+
+- name: test
+  depends_on:
+  - "compile"
+  commands:
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        set -o errexit
+        ctest=$(pwd)/${cmake_bindir}/ctest
+
+        cd build
+        $ctest -V ${test_flags|}
+
+- name: lint
+  commands:
+  - func: "fetch source"
+  - func: "fetch cmake binaries"
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      script: |-
+        readonly out=$(git clang-format -v --diff)
+
+        if [[ "$out" == *"no modified files to format"* ]]; then exit 0; fi
+        if [[ "$out" == *"clang-format did not modify any files"* ]]; then exit 0; fi
+
+        echo "ERROR: you need to run git clang-format on your commit"
+        echo $out
+        exit 1
+
+task_groups:
+- name: compile_test_and_package
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch cmake binaries"
+  tasks:
+  - compile
+  - test
+  - package
+ 
+# NOTE: When adding a new variant, update the "upload-all" task.
+buildvariants:
+- name: ubuntu2004
+  display_name: "Ubuntu 20.04"
+  run_on: ubuntu2004-small
+  expansions:
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    build_libuv: On
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - ubuntu2004-large
+
+- name: rhel70
+  display_name: "RHEL 7"
+  run_on: rhel70-small
+  expansions:
+    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
+    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    build_libuv: On
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - rhel70-large
+
+- name: ubuntu2004-arm64
+  display_name: "Ubuntu 20.04 ARM64"
+  run_on: ubuntu2004-arm64-small
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/boxes.10gen.com/build/cmake/cmake-3.18.2-Linux-aarch64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - ubuntu2004-arm64-large
+
+- name: macos-1014
+  display_name: "MacOS 10.14"
+  run_on: macos-1014-test
+  expansions:
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Darwin-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - macos-1014
+
+- name: windows-64-vs2019
+  display_name: "Windows x86_64 VS 2019"
+  run_on: windows-64-vs2019-test 
+  expansions:
+    cmake_url: "https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-win64-x64.zip"
+    cmake_bindir: "./cmake-3.18.2-win64-x64/bin"
+    cmake_generator: "Visual Studio 16 2019"
+    extra_flags: "-A x64"
+    test_flags: "-C Debug"
+    package_flags: "-C Debug"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    build_libuv: On
+    build_zlib: On
+  tasks:
+  - name: compile_test_and_package
+    distros:
+    - windows-64-vs2019-large
+

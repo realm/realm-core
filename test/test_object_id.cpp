@@ -17,13 +17,21 @@
  **************************************************************************/
 
 #include <realm.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <chrono>
 
 #include "test.hpp"
 
 
 using namespace realm;
+
+struct WithIndex {
+    constexpr static bool do_add_index = true;
+};
+
+struct WithoutIndex {
+    constexpr static bool do_add_index = false;
+};
 
 TEST(ObjectId_Basics)
 {
@@ -37,6 +45,10 @@ TEST(ObjectId_Basics)
     ObjectId id2(Timestamp(0x54321, 0), 0, 0);
     CHECK_GREATER(id2, id1);
     CHECK_LESS(id1, id2);
+
+    const auto id1_bytes = id1.to_bytes();
+    ObjectId id3(id1_bytes);
+    CHECK_EQUAL(id1, id3);
 
     ObjectId id_zeros;
     CHECK(id_zeros == ObjectId("000000000000000000000000"));
@@ -124,6 +136,50 @@ TEST(ObjectId_ArrayNull)
     arr1.destroy();
 }
 
+TEST(ObjectId_ArrayNullMove)
+{
+    const char str0[] = "0000012300000000009218a4";
+    const char str1[] = "0000078900000000002999f3";
+
+    ArrayObjectIdNull arr(Allocator::get_default());
+    arr.create();
+
+    auto get_value_for_ndx = [&](size_t ndx) -> util::Optional<ObjectId> {
+        if (ndx % 3 == 0) {
+            return {str0};
+        }
+        else if (ndx % 3 == 1) {
+            return {str1};
+        }
+        else {
+            return util::none;
+        }
+    };
+
+    for (size_t i = 0; i < 3; ++i) {
+        arr.add(get_value_for_ndx(i));
+    }
+
+    ArrayObjectIdNull arr1(Allocator::get_default());
+    arr1.create();
+    arr1.add({str0});
+    arr1.add({str1});
+    arr1.add(util::none);
+    arr.move(arr1, 0);
+
+    CHECK_EQUAL(arr1.size(), 6);
+
+    for (size_t i = 0; i < arr1.size(); ++i) {
+        auto expected = get_value_for_ndx(i);
+        auto actual = arr1.get(i);
+        CHECK_EQUAL(actual, expected);
+    }
+
+    arr.destroy();
+    arr1.destroy();
+}
+
+
 // This should exhaustively test all cases of ArrayObjectIdNull::find_first_null.
 TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
 {
@@ -162,30 +218,45 @@ TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
     }
 }
 
-TEST(ObjectId_Table)
+TEST_TYPES(ObjectId_Table, WithIndex, WithoutIndex)
 {
     const char str0[] = "0000012300000000009218a4";
-    const char str1[] = "000004560000000000170232";
+    const char str1[] = "deaddeaddeaddeaddeaddead";
 
     Table t;
     auto col_id = t.add_column(type_ObjectId, "id");
     auto col_id_null = t.add_column(type_ObjectId, "id_null", true);
-    auto obj0 = t.create_object().set(col_id, ObjectId(str0));
+    auto obj0 = t.create_object().set(col_id, ObjectId(str0)).set(col_id_null, ObjectId(str0));
     auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
     auto obj2 = t.create_object();
+
+    if constexpr (TEST_TYPE::do_add_index) {
+        t.add_search_index(col_id);
+        t.add_search_index(col_id_null);
+    }
+
     CHECK_EQUAL(obj0.get<ObjectId>(col_id), ObjectId(str0));
     CHECK_EQUAL(obj1.get<ObjectId>(col_id), ObjectId(str1));
     CHECK_NOT(obj2.is_null(col_id));
+    CHECK_EQUAL(obj0.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str0));
+    CHECK_EQUAL(obj1.get<util::Optional<ObjectId>>(col_id_null), ObjectId(str1));
     CHECK(obj2.is_null(col_id_null));
     auto id = obj1.get<util::Optional<ObjectId>>(col_id_null);
     CHECK(id);
     id = obj2.get<util::Optional<ObjectId>>(col_id_null);
     CHECK_NOT(id);
-    auto key = t.find_first(col_id, ObjectId(str1));
-    CHECK_EQUAL(key, obj1.get_key());
-    t.add_search_index(col_id);
+    auto key = t.find_first(col_id, ObjectId(str0));
+    CHECK_EQUAL(key, obj0.get_key());
     key = t.find_first(col_id, ObjectId(str1));
     CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str0}));
+    CHECK_EQUAL(key, obj0.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>(ObjectId{str1}));
+    CHECK_EQUAL(key, obj1.get_key());
+    key = t.find_first_null(col_id_null);
+    CHECK_EQUAL(key, obj2.get_key());
+    key = t.find_first(col_id_null, util::Optional<ObjectId>{});
+    CHECK_EQUAL(key, obj2.get_key());
 }
 
 TEST(ObjectId_PrimaryKey)
@@ -238,7 +309,7 @@ TEST(ObjectId_Commit)
     }
 }
 
-TEST(ObjectId_Query)
+TEST_TYPES(ObjectId_Query, WithIndex, WithoutIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
@@ -262,6 +333,10 @@ TEST(ObjectId_Query)
         col_int = table->add_column(type_Int, "int");
         col_has = table->add_column(*target, "Has");
         col_owns = origin->add_column(*table, "Owns");
+
+        if constexpr (TEST_TYPE::do_add_index) {
+            table->add_search_index(col_id);
+        }
 
         ObjKeys target_keys;
         target->create_objects(16, target_keys);

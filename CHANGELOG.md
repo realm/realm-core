@@ -1,20 +1,94 @@
 # NEXT RELEASE
 
 ### Enhancements
-* New data types: Mixed and TypedLink.
+* New data types: Mixed, UUID and TypedLink.
+* New collection types: Set and Dictionary 
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+* Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
+* Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, (since v6.0.0).
+
 ### Breaking changes
 * None.
 
 -----------
 
 ### Internals
-* None.
+* Set::erase_null() would not properly erase a potential null value ([#4001](https://github.com/realm/realm-core/issues/4001), (not in any release))
 
+----------------------------------------------
+
+# 10.0.0 Release notes
+
+### Fixed
+* Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+* Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
+* If objects with incoming links are deleted on the server side and then later re-created it may lead to a crash. (Since v10.0.0-alpha.1)
+* Upgrading from file format version 11 would crash with an assertion. ([#6847](https://github.com/realm/realm-cocoa/issues/6847). since v10.0.0-beta.0)
+ 
+-----------
+
+### Internals
+* Uses OpenSSL version 1.1.1g. The prebuilt openssl libraries now have .tar.gz extension instead of .tgz.
+
+----------------------------------------------
+
+# 10.0.0-beta.9 Release notes
+
+### Enhancements
+* Features added by release v6.1.0 to 6.1.2:
+  * Slightly improve performance of most operations which read data from the Realm file.
+  * Allocating one extra entry in ref translation tables. May help finding memory mapping problems.
+  * Greatly improve performance of NOT IN queries on indexed string or int columns.
+
+### Fixed
+* Fixed a ObjectId sometimes changing from null to ObjectId("deaddeaddeaddeaddeaddead") after erasing rows which triggers a BPNode merge, this can happen when there are > 1000 objects. (Since v10).
+* Fixed an assertion failure when adding an index to a nullable ObjectId property that contains nulls. (since v10).
+* Added missing `Table::find_first(ColKey, util::Optional<ObjectId>)`. ([#3919](https://github.com/realm/realm-core/issues/3919), since v10).
+* Issues fixed by releases v6.1.0 to v6.1.2:
+  * Rerunning an equals query on an indexed string column which previously had more than one match and now has one match would sometimes throw a "key not found" exception ([Cocoa #6536](https://github.com/realm/realm-cocoa/issues/6536), since 6.1.0-alpha.4),
+  * When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([Java #7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
+  * Possibly fix issues related to changing the primary key property from nullable to required. ([PR #3917](https://github.com/realm/realm-core/pull/3918)).
+
+----------------------------------------------
+
+# 10.0.0-beta.8 Release notes
+
+### Enhancements
+* Features added by release v6.0.26:
+  * Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
+
+### Fixed
+* Issues fixed by release v6.0.26:
+  * Fix deadlocks when opening a Realm file in both the iOS simulator and Realm Studio ([Cocoa #6743](https://github.com/realm/realm-cocoa/issues/6743), since 10.0.0-beta.5).
+  * Fix Springboard deadlocking when an app is unsuspended while it has an open Realm file which is stored in an app group ([Cocoa #6749](https://github.com/realm/realm-cocoa/issues/6749), since 10.0.0-beta.5).
+
+----------------------------------------------
+
+# 10.0.0-beta.7 Release notes
+
+### Enhancements
+* Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
+* Add Decimal128 subtraction and multiplication arithmetic operators.
+
+### Fixed
+* Issues fixed by releases v6.0.24 to v6.0.25:
+  * If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "Key not found" exception when updating an object. If asserts are enabled at the binding level, you may get an "assert(m_has_refs)" instead. ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
+  * In cases where you have more than 32 columns in a table, you may get a currrupted file resulting in various crashes ([#7057](https://github.com/realm/realm-java/issues/7057), since v6.0.0)
+  * Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 10.0.0-beta.2)
+
+### Breaking changes
+* File format bumped to 20. Automatic upgrade of non syncked realms. Syncked realms produced by pre v10 application cannot be upgraded.
+
+----------------------------------------------
+
+# 10.0.0-beta.6 Release notes
+
+### Fixed
+* Issues fixed by releases v6.0.22 to v6.0.23
+ 
 ----------------------------------------------
 
 # 10.0.0-beta.5 Release notes
@@ -282,7 +356,88 @@ This release also contains the changes introduced by v6.0.4
 
 ### Internals
 * File format bumped to 11.
+
+----------------------------------------------
  
+# 6.1.4 Release notes
+
+### Fixed
+* If you make a case insignificant query on an indexed string column, it may fail in a way that results in a "No such key" exception. ([#6830](https://github.com/realm/realm-cocoa/issues/6830), since v6.0.0)
+
+----------------------------------------------
+
+# 6.1.3 Release notes
+
+### Fixed
+* Making a query in an indexed property may give a "Key not found" exception. ([#2025](https://github.com/realm/realm-dotnet/issues/2025), since v6.0.0)
+* Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+----------------------------------------------
+
+# 6.1.2 Release notes
+
+### Enhancements
+* Slightly improve performance of most operations which read data from the Realm file.
+
+### Fixed
+* Rerunning an equals query on an indexed string column which previously had more than one match and now has one match would sometimes throw a "key not found" exception ([Cocoa #6536](https://github.com/realm/realm-cocoa/issues/6536), since 6.0.2),
+
+----------------------------------------------
+
+# 6.1.1 Release notes
+
+### Enhancements
+* Allocating one extra entry in ref translation tables. May help finding memory mapping problems.
+
+### Fixed
+* None.
+-----------
+
+### Internals
+* Fix assertion failure related to Table::clear found by Cocoa SDK in V6.1.0. That release is not expected to be used in SDK releases, so no customers are affected.
+
+----------------------------------------------
+
+# 6.1.0 Release notes
+
+### Enhancements
+* Greatly improve performance of NOT IN queries on indexed string or int columns.
+
+### Fixed
+* When querying a table where links are part of the condition, the application may crash if objects has recently been added to the target table. ([Java #7118](https://github.com/realm/realm-java/issues/7118), since v6.0.0)
+* Possibly fix issues related to changing the primary key property from nullable to required. ([PR #3917](https://github.com/realm/realm-core/pull/3918)).
+
+----------------------------------------------
+
+# 6.0.26 Release notes
+
+### Enhancements
+* Added ability to replace last sort descriptor on DescriptorOrdering in addition to append/prepending to it [#3884]
+
+### Fixed
+* Fix deadlocks when opening a Realm file in both the iOS simulator and Realm Studio ([Cocoa #6743](https://github.com/realm/realm-cocoa/issues/6743), since 6.0.21).
+* Fix Springboard deadlocking when an app is unsuspended while it has an open Realm file which is stored in an app group ([Cocoa #6749](https://github.com/realm/realm-cocoa/issues/6749), since 6.0.21).
+* If you use encryption your application cound crash with a message like "Opening Realm files of format version 0 is not supported by this version of Realm". ([#6889](https://github.com/realm/realm-java/issues/6889) among others, since v6.0.0)
+
+----------------------------------------------
+
+# 6.0.25 Release notes
+
+### Fixed
+* If you have a realm file growing towards 2Gb and have a table with more than 16 columns, then you may get a "Key not found" exception when updating an object. If asserts are enabled at the binding level, you may get an "assert(m_has_refs)" instead. ([#3194](https://github.com/realm/realm-js/issues/3194), since v6.0.0)
+* In cases where you have more than 32 columns in a table, you may get a currrupted file resulting in various crashes ([#7057](https://github.com/realm/realm-java/issues/7057), since v6.0.0)
+ 
+----------------------------------------------
+
+# 6.0.24 Release notes
+
+### Fixed
+* Upgrading files with string primary keys would result in a file where it was not possible to find the objects by primary key ([#6716](https://github.com/realm/realm-cocoa/issues/6716), since 6.0.7)
+
+-----------
+
+### Internals
+* File format version bumped to 11.
+
 ----------------------------------------------
 
 # 6.0.23 Release notes

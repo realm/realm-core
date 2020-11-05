@@ -316,10 +316,12 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
-    if (requested_history_type == Replication::hist_None && current_file_format_version == 10)
-        return 10;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 11) {
+        // We are able to open file format 11 in RO mode
+        return 11;
+    }
 
-    return 11;
+    return 20;
 }
 
 void Group::get_version_and_history_info(const Array& top, _impl::History::version_type& version, int& history_type,
@@ -377,7 +379,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 11, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 20, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -385,7 +387,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // DB::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when DB::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 10,
+    REALM_ASSERT_EX(current_file_format_version >= 5 && current_file_format_version <= 11,
                     current_file_format_version);
 
 
@@ -507,21 +509,22 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         }
         remove_table(progress_info->get_key());
     }
+
     // If we come from a file format version lower than 10, all objects with primary keys
-    // will be upgraded correctly by the above process
-    if (current_file_format_version == 10 && target_file_format_version >= 11) {
+    // will be upgraded correctly by the above process. In file format 20 we don't have
+    // search index on primary key columns. We need to rebuild the tables to ensure that
+    // the ObjKeys matches the primary key value.
+    if (current_file_format_version > 9 && current_file_format_version < 20 && target_file_format_version >= 20) {
         auto table_keys = get_table_keys();
         for (auto k : table_keys) {
             auto t = get_table(k);
             if (auto col = t->get_primary_key_column()) {
-                if (col.get_type() == col_type_Int) {
-                    // Tables with integer primary keys have to be rebuilt
-                    t->remove_search_index(col);
-                    t->rebuild_table_with_pk_column();
-                }
+                t->remove_search_index(col);
+                t->rebuild_table_with_pk_column();
             }
         }
     }
+
     // NOTE: Additional future upgrade steps go here.
 }
 
@@ -542,8 +545,8 @@ void Group::open(ref_type top_ref, const std::string& file_path)
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 10:
         case 11:
+        case 20:
             file_format_ok = true;
             break;
     }
@@ -631,19 +634,15 @@ void Group::remap(size_t new_file_size)
 
 void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable)
 {
-    size_t old_baseline = m_alloc.get_baseline();
-
     m_alloc.update_reader_view(new_file_size); // Throws
     update_allocator_wrappers(writable);
 
     // force update of all ref->ptr translations if the mapping has changed
     auto mapping_version = m_alloc.get_mapping_version();
     if (mapping_version != m_last_seen_mapping_version) {
-        // force re-translation of all refs
-        old_baseline = 0;
         m_last_seen_mapping_version = mapping_version;
     }
-    update_refs(new_top_ref, old_baseline);
+    update_refs(new_top_ref);
 }
 
 void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
@@ -1360,8 +1359,6 @@ void Group::commit()
     // Mark all managed space (beyond the attached file) as free.
     reset_free_space_tracking(); // Throws
 
-    size_t old_baseline = m_alloc.get_baseline();
-
     // Update view of the file
     size_t new_file_size = out.get_file_size();
     m_alloc.update_reader_view(new_file_size); // Throws
@@ -1373,44 +1370,28 @@ void Group::commit()
     auto mapping_version = m_alloc.get_mapping_version();
     if (mapping_version != m_last_seen_mapping_version) {
         // force re-translation of all refs
-        old_baseline = 0;
         m_last_seen_mapping_version = mapping_version;
     }
-    update_refs(top_ref, old_baseline);
+    update_refs(top_ref);
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline) noexcept
+void Group::update_refs(ref_type top_ref) noexcept
 {
-    old_baseline = 0; // force update of all accessors
     // After Group::commit() we will always have free space tracking
     // info.
     REALM_ASSERT_3(m_top.size(), >=, 5);
 
-    // Array nodes that are part of the previous version of the
-    // database will not be overwritten by Group::commit(). This is
-    // necessary for robustness in the face of abrupt termination of
-    // the process. It also means that we can be sure that an array
-    // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous baseline.
-
-    if (top_ref < old_baseline && m_top.get_ref() == top_ref)
-        return;
-
     m_top.init_from_ref(top_ref);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent(old_baseline);
-
-    // If m_tables has not been modfied we don't
-    // need to update attached table accessors
-    if (!m_tables.update_from_parent(old_baseline))
-        return;
+    m_table_names.update_from_parent();
+    m_tables.update_from_parent();
 
     // Update all attached table accessors.
     for (auto& table_accessor : m_table_accessors) {
         if (table_accessor) {
-            table_accessor->update_from_parent(old_baseline);
+            table_accessor->update_from_parent();
         }
     }
 }
@@ -1434,6 +1415,69 @@ bool Group::operator==(const Group& g) const
             return false;
     }
     return true;
+}
+void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "[" << std::endl;
+
+    auto keys = get_table_keys();
+    int sz = int(keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto key = keys[i];
+        ConstTableRef table = get_table(key);
+
+        table->schema_to_json(out, renames);
+        if (i < sz - 1)
+            out << ",";
+        out << std::endl;
+    }
+
+    out << "]" << std::endl;
+}
+
+void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
+                    JSONOutputMode output_mode) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "{" << std::endl;
+
+    auto keys = get_table_keys();
+    bool first = true;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        StringData name = get_table_name(key);
+        if (renames[name] != "")
+            name = renames[name];
+
+        ConstTableRef table = get_table(key);
+
+        if (!table->is_embedded()) {
+            if (!first)
+                out << ",";
+            out << "\"" << name << "\"";
+            out << ":";
+            table->to_json(out, link_depth, renames, output_mode);
+            out << std::endl;
+            first = false;
+        }
+    }
+
+    out << "}" << std::endl;
 }
 
 namespace {

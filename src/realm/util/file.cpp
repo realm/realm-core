@@ -957,7 +957,7 @@ void File::sync()
 
 #ifndef _WIN32
 // little helper
-void _unlock(int m_fd)
+static void _unlock(int m_fd)
 {
     int r;
     do {
@@ -1000,8 +1000,9 @@ bool File::lock(bool exclusive, bool non_blocking)
 #else
 #ifdef REALM_FILELOCK_EMULATION
     // If we already have any form of lock, release it before trying to acquire a new
-    if (m_has_exclusive_lock || m_has_shared_lock)
+    if (m_has_exclusive_lock || has_shared_lock())
         unlock();
+
     // First obtain an exclusive lock on the file proper
     int operation = LOCK_EX;
     if (non_blocking)
@@ -1014,6 +1015,8 @@ bool File::lock(bool exclusive, bool non_blocking)
         return false;
     if (status != 0)
         throw std::system_error(errno, std::system_category(), "flock() failed");
+    m_has_exclusive_lock = true;
+
     // now use a named pipe to emulate locking in conjunction with using exclusive lock
     // on the file proper.
     // exclusively locked: we can't sucessfully write to the pipe.
@@ -1032,7 +1035,6 @@ bool File::lock(bool exclusive, bool non_blocking)
         if (exclusive && err == ENOENT) {
             // The management directory doesn't exist, so there's clearly no
             // readers. This can happen when calling DB::call_with_lock().
-            m_has_exclusive_lock = true;
             return true;
         }
         REALM_ASSERT_EX(err == EEXIST, err);
@@ -1048,13 +1050,12 @@ bool File::lock(bool exclusive, bool non_blocking)
             throw std::system_error(errno, std::system_category(), "opening lock fifo for writing failed");
         if (fd == -1) {
             // No reader was present so we have the exclusive lock!
-            m_has_exclusive_lock = true;
             return true;
         }
         else {
             ::close(fd);
             // shared locks exist. Back out. Release exclusive lock on file
-            _unlock(m_fd);
+            unlock();
             return false;
         }
     }
@@ -1062,12 +1063,13 @@ bool File::lock(bool exclusive, bool non_blocking)
         // lock shared. We need to release the real exclusive lock on the file,
         // but first we must mark the lock as shared by opening the pipe for reading
         // Open pipe for reading!
-        int fd = ::open(m_fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
+        // Due to a bug in iOS 10-12 we need to open in read-write mode or the OS
+        // will deadlock when un-suspending the app.
+        int fd = ::open(m_fifo_path.c_str(), O_RDWR | O_NONBLOCK);
         if (fd == -1)
             throw std::system_error(errno, std::system_category(), "opening lock fifo for reading failed");
+        unlock();
         m_pipe_fd = fd;
-        m_has_shared_lock = true;
-        _unlock(m_fd);
         return true;
     }
 
@@ -1132,7 +1134,7 @@ void File::unlock() noexcept
     // Coming here with a shared lock, we must close the pipe that we have opened for reading.
     //   - we have to do that under the protection of a proper exclusive lock to serialize
     //     with anybody trying to obtain a lock concurrently.
-    if (m_has_shared_lock) {
+    if (has_shared_lock()) {
         // shared lock. We need to reacquire the exclusive lock on the file
         int status;
         do {
@@ -1142,13 +1144,9 @@ void File::unlock() noexcept
         // close the pipe (== release the shared lock)
         ::close(m_pipe_fd);
         m_pipe_fd = -1;
-        m_has_shared_lock = false;
-        _unlock(m_fd);
     }
-    if (m_has_exclusive_lock) {
-        m_has_exclusive_lock = false;
-        _unlock(m_fd);
-    }
+    _unlock(m_fd);
+    m_has_exclusive_lock = false;
 
 #else // BSD / Linux flock()
 
@@ -1654,7 +1652,7 @@ bool DirScanner::next(std::string& name)
 
 // Use readdir64 if it is available. This is necessary to support filesystems that return dirent fields that don't fit
 // in 32-bits.
-#ifdef REALM_HAVE_READDIR64
+#if REALM_HAVE_READDIR64
 #define REALM_READDIR(...) readdir64(__VA_ARGS__)
 #else
 #define REALM_READDIR(...) readdir(__VA_ARGS__)

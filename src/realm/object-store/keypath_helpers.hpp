@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/parser/keypath_mapping.hpp>
 
@@ -93,11 +93,10 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
             else {
                 cur_table = element.table; // advance through backlink
             }
-            ConstTableRef tr;
-            if (element.operation == parser::KeyPathElement::KeyPathOperation::BacklinkTraversal) {
-                tr = element.table;
-            }
-            links.emplace_back(element.col_key, tr);
+            LinkPathPart link = element.operation == parser::KeyPathElement::KeyPathOperation::BacklinkTraversal
+                                    ? LinkPathPart(element.col_key, element.table)
+                                    : LinkPathPart(element.col_key);
+            links.emplace_back(std::move(link));
         }
         properties.push_back(std::move(links));
     }

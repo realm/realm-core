@@ -19,11 +19,11 @@
 #ifndef REALM_OS_LIST_HPP
 #define REALM_OS_LIST_HPP
 
-#include "collection_notifications.hpp"
-#include "impl/collection_notifier.hpp"
-#include "object.hpp"
-#include "property.hpp"
-#include "util/copyable_atomic.hpp"
+#include <realm/object-store/collection_notifications.hpp>
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/util/copyable_atomic.hpp>
 
 #include <realm/decimal128.hpp>
 #include <realm/list.hpp>
@@ -149,6 +149,10 @@ public:
     void insert(Context&, size_t list_ndx, T&& value, CreatePolicy = CreatePolicy::SetLink);
     template <typename T, typename Context>
     void set(Context&, size_t row_ndx, T&& value, CreatePolicy = CreatePolicy::SetLink);
+
+    Obj add_embedded();
+    Obj set_embedded(size_t list_ndx);
+    Obj insert_embedded(size_t list_ndx);
 
     // Replace the values in this list with the values from an enumerable object
     template <typename T, typename Context>

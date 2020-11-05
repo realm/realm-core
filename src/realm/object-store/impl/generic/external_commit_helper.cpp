@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/external_commit_helper.hpp"
+#include <realm/object-store/impl/external_commit_helper.hpp>
 
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/history.hpp>
 #include <realm/replication.hpp>

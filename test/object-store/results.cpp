@@ -16,21 +16,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
-#include "impl/object_accessor_impl.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "binding_context.hpp"
-#include "keypath_helpers.hpp"
-#include "object_schema.hpp"
-#include "property.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "util/scheduler.hpp"
+#include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/keypath_helpers.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
 #include <realm/group.hpp>
@@ -38,8 +38,8 @@
 #include <realm/query_expression.hpp>
 
 #if REALM_ENABLE_SYNC
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 #endif
 
 namespace realm {
@@ -137,7 +137,7 @@ TEST_CASE("notifications: async delivery")
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -834,6 +834,7 @@ TEST_CASE("notifications: skip")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -868,7 +869,7 @@ TEST_CASE("notifications: skip")
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1065,6 +1066,28 @@ TEST_CASE("notifications: skip")
         advance_and_notify(*r);
         REQUIRE(calls1 == 2);
     }
+
+    SECTION("skipping every write in a loop with spurious background runs works")
+    {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        std::atomic<bool> exit{false};
+        JoiningThread t([&] {
+            while (!exit)
+                on_change_but_no_notify(*r);
+        });
+
+        for (int i = 0; i < 10; ++i) {
+            r->begin_transaction();
+            table->create_object();
+            token1.suppress_next();
+            r->commit_transaction();
+        }
+
+        exit = true;
+        REQUIRE(calls1 == 1);
+    }
 }
 
 TEST_CASE("notifications: TableView delivery")
@@ -1073,6 +1096,7 @@ TEST_CASE("notifications: TableView delivery")
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.max_number_of_active_versions = 5;
 
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
@@ -1111,7 +1135,7 @@ TEST_CASE("notifications: TableView delivery")
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1183,13 +1207,57 @@ TEST_CASE("notifications: TableView delivery")
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("TV can be delivered in a write transaction")
+    SECTION("TV can't be delivered in a write transaction")
     {
-        make_remote_change();
-        advance_and_notify(*r);
-        r->begin_transaction();
-        REQUIRE(results.size() == 11);
-        r->cancel_transaction();
+        SECTION("no changes")
+        {
+            make_remote_change();
+            advance_and_notify(*r);
+            r->begin_transaction();
+            REQUIRE(results.size() == 0);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates disabled")
+        {
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 10);
+            r->cancel_transaction();
+        }
+
+        SECTION("local change with automatic updates enabled")
+        {
+            // Use a new Results because AsyncOnly leaves the Results in a
+            // weird state and switching back to Auto doesn't work.
+            Results results(r, table->where());
+            results.evaluate_query_if_needed();
+            static_cast<void>(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+            advance_and_notify(*r);
+            REQUIRE(results.size() == 10);
+            make_remote_change();
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            r->read_group().get_table("class_object")->create_object();
+            REQUIRE(results.size() == 12);
+            r->cancel_transaction();
+        }
+    }
+
+    SECTION("unused background TVs do not pin old versions forever")
+    {
+        // This will exceed the maximum active version count (5) if any
+        // transactions are being pinned, resulting in make_remote_change() throwing
+        for (int i = 0; i < 10; ++i) {
+            REQUIRE_NOTHROW(make_remote_change());
+            advance_and_notify(*r);
+        }
     }
 }
 
@@ -1200,6 +1268,7 @@ TEST_CASE("notifications: async error handling")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -1422,12 +1491,15 @@ TEST_CASE("notifications: sync")
 {
     _impl::RealmCoordinator::assert_no_open_realms();
 
-    SyncServer server(false);
-    TestSyncManager init_sync_manager(server);
-    SyncTestFile config(init_sync_manager.app());
+    TestSyncManager init_sync_manager({}, {false});
+    auto& server = init_sync_manager.sync_server();
+
+    SyncTestFile config(init_sync_manager.app(), "test");
+    config.cache = false;
     config.schema = Schema{
         {"object",
          {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
     };
@@ -1446,7 +1518,7 @@ TEST_CASE("notifications: sync")
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->create_object();
+            write_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             write_realm->commit_transaction();
         }
 
@@ -1471,6 +1543,7 @@ TEST_CASE("notifications: results")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2102,6 +2175,7 @@ TEST_CASE("results: notifier with no callbacks")
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -2124,7 +2198,7 @@ TEST_CASE("results: notifier with no callbacks")
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2211,6 +2285,7 @@ TEST_CASE("results: error messages")
 TEST_CASE("results: snapshots")
 {
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"object",
@@ -2501,6 +2576,7 @@ TEST_CASE("results: distinct")
 {
     const int N = 10;
     InMemoryTestFile config;
+    config.cache = false;
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
@@ -2723,6 +2799,7 @@ TEST_CASE("results: distinct")
 TEST_CASE("results: sort")
 {
     InMemoryTestFile config;
+    config.cache = false;
     config.schema = Schema{
         {"object",
          {
@@ -3201,6 +3278,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
                                 {"date", PropertyType::Date},
                                 {"object id", PropertyType::ObjectId},
                                 {"decimal", PropertyType::Decimal},
+                                {"uuid", PropertyType::UUID},
                                 {"object", PropertyType::Object | PropertyType::Nullable, "AllTypes"},
                                 {"list", PropertyType::Array | PropertyType::Object, "AllTypes"},
 
@@ -3213,6 +3291,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
                                 {"date array", PropertyType::Array | PropertyType::Date},
                                 {"object id array", PropertyType::Array | PropertyType::ObjectId},
                                 {"decimal array", PropertyType::Array | PropertyType::Decimal},
+                                {"uuid array", PropertyType::Array | PropertyType::UUID},
                                 {"object array", PropertyType::Array | PropertyType::Object, "AllTypes"},
                             },
                             {
@@ -3313,6 +3392,12 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
             CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
         }
 
+        util::Any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
+        r.set_property_value(ctx, "uuid", uuid);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get<UUID>("uuid") == any_cast<UUID>(uuid));
+        }
+
         ObjKey object_key = table->create_object_with_primary_key(3).get_key();
         Object linked_obj(realm, "AllTypes", object_key);
         r.set_property_value(ctx, "object", util::Any(linked_obj));
@@ -3378,6 +3463,12 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]")
         r.set_property_value(ctx, "decimal array",
                              util::Any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
         check_array(table->get_column_key("decimal array"), Decimal128("123.45e67"), Decimal128("876.54e32"));
+
+        r.set_property_value(ctx, "uuid array",
+                             util::Any(AnyVec{UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                                              UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")}));
+        check_array(table->get_column_key("uuid array"), UUID("3b241101-e2bb-4255-8caf-4136c566a962"),
+                    UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
     }
 }
 

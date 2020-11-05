@@ -638,12 +638,12 @@ public:
         remote.get_next_changesets_for_remote(local_file_ident, last_remote_version, changesets.get(),
                                               num_changesets);
         /*
-                std::cerr << "integrate_remote_changeset: remote_version="<<changeset.remote_version<<", "
-                    "last_intgerated_local_version="<<changeset.last_integrated_local_version<<", "
-                    "origin_timestamp="<<changeset.origin_timestamp<<", "
-                    "origin_file_ident="<<changeset.origin_file_ident<<"\n";
+        std::cerr << "\nintegrate_remote_changeset: local_file_ident=" << local_file_ident
+                  << " remote_version=" << changesets.get()->remote_version
+                  << " last_intgerated_local_version=" << changesets.get()->last_integrated_local_version
+                  << " origin_timestamp=" << changesets.get()->origin_timestamp
+                  << " origin_file_ident=" << changesets.get()->origin_file_ident << std::endl;
         */
-
         file_ident_type remote_file_ident = remote.local_file_ident;
         util::Logger* replay_logger = &logger;
         version_type new_version =

@@ -131,9 +131,9 @@ class BasicArrayNull : public BasicArray<T> {
 public:
     using BasicArray<T>::BasicArray;
 
-    static T default_value(bool nullable)
+    static util::Optional<T> default_value(bool nullable)
     {
-        return nullable ? null::get_null_float<T>() : T(0.0);
+        return nullable ? util::Optional<T>() : util::Optional<T>(0.0);
     }
     void set(size_t ndx, util::Optional<T> value)
     {

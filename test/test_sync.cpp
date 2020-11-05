@@ -4062,7 +4062,7 @@ TEST(Sync_MultiplexIdent)
 
     Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     client_config.tcp_no_delay = true;
     Client client(client_config);
@@ -4441,7 +4441,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     util::PrefixLogger client_logger("Client: ", logger);
     Client::Config config;
     config.logger = &client_logger;
-    config.reconnect_mode = Client::ReconnectMode::testing;
+    config.reconnect_mode = ReconnectMode::testing;
     config.tcp_no_delay = true;
     Client client(config);
 
@@ -4661,7 +4661,7 @@ TEST(Sync_UploadDownloadProgress_1)
         util::PrefixLogger client_logger("Client: ", logger);
         Client::Config config;
         config.logger = &client_logger;
-        config.reconnect_mode = Client::ReconnectMode::testing;
+        config.reconnect_mode = ReconnectMode::testing;
         config.tcp_no_delay = true;
         Client client(config);
 
@@ -4965,7 +4965,7 @@ TEST(Sync_UploadDownloadProgress_3)
 
     Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.tcp_no_delay = true;
     Client client(client_config);
 
@@ -5277,7 +5277,7 @@ TEST(Sync_UploadDownloadProgress_6)
 
     Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
     client_config.tcp_no_delay = true;
     Client client(client_config);
@@ -5338,7 +5338,7 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     SHARED_GROUP_TEST_PATH(path);
     Client::Config config;
     config.logger = &test_context.logger;
-    config.reconnect_mode = Client::ReconnectMode::testing;
+    config.reconnect_mode = ReconnectMode::testing;
     config.tcp_no_delay = true;
     Client client{config};
     Session session_1{client, path};
@@ -6309,7 +6309,7 @@ TEST(Sync_ServerHasMoved)
 
     sync::Client::Config client_config;
     client_config.logger = &client_logger;
-    client_config.reconnect_mode = sync::Client::ReconnectMode::testing;
+    client_config.reconnect_mode = ReconnectMode::testing;
     client_config.tcp_no_delay = true;
     sync::Client client(client_config);
 
@@ -6810,7 +6810,7 @@ TEST_IF(Sync_SSL_Certificates, false)
     for (size_t i = 0; i < num_servers; ++i) {
         Client::Config client_config;
         client_config.logger = &client_logger;
-        client_config.reconnect_mode = Client::ReconnectMode::testing;
+        client_config.reconnect_mode = ReconnectMode::testing;
         Client client(client_config);
 
         ThreadWrapper client_thread;
@@ -7654,8 +7654,57 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     CHECK(failed_twice);
 }
 
-TEST(Sync_NonLinkObjectId)
+template <typename T>
+T sequence_next()
 {
+    REALM_UNREACHABLE();
+}
+
+template <>
+ObjectId sequence_next()
+{
+    return ObjectId::gen();
+}
+
+template <>
+UUID sequence_next()
+{
+    union {
+        struct {
+            uint64_t upper;
+            uint64_t lower;
+        } ints;
+        UUID::UUIDBytes bytes;
+    } u;
+    static uint64_t counter = test_util::random_int(0, 1000);
+    u.ints.upper = ++counter;
+    u.ints.lower = ++counter;
+    return UUID{u.bytes};
+}
+
+template <>
+Int sequence_next()
+{
+    static Int count = test_util::random_int(-1000, 1000);
+    return ++count;
+}
+
+template <>
+String sequence_next()
+{
+    static std::string str;
+    static Int sequence = test_util::random_int(-1000, 1000);
+    str = util::format("string sequence %1", ++sequence);
+    return String(str);
+}
+
+TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int>, util::Optional<ObjectId>,
+           util::Optional<UUID>)
+{
+    using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
+    constexpr bool is_optional = !std::is_same_v<underlying_type, TEST_TYPE>;
+    DataType type = ColumnTypeTraits<TEST_TYPE>::id;
+
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
@@ -7674,20 +7723,35 @@ TEST(Sync_NonLinkObjectId)
     fixture.bind_session(session_1, "/test");
     fixture.bind_session(session_2, "/test");
 
-    ObjectId obj_2_id;
+    TEST_TYPE obj_1_id;
+    TEST_TYPE obj_2_id;
+
+    TEST_TYPE default_or_null{};
+    if constexpr (std::is_same_v<TEST_TYPE, String>) {
+        default_or_null = "";
+    }
+    if constexpr (is_optional) {
+        CHECK(!default_or_null);
+    }
 
     {
         WriteTransaction tr{sg_1};
-        auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type_ObjectId, "id");
-        auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type_ObjectId, "id");
-        table_1->add_column_list(type_ObjectId, "oids");
+        auto table_1 = sync::create_table_with_primary_key(tr, "class_Table1", type, "id", is_optional);
+        auto table_2 = sync::create_table_with_primary_key(tr, "class_Table2", type, "id", is_optional);
+        table_1->add_column_list(type, "oids", is_optional);
 
-        auto obj_1 = table_1->create_object_with_primary_key(ObjectId::gen());
-        auto obj_2 = table_2->create_object_with_primary_key(ObjectId::gen());
+        auto obj_1 = table_1->create_object_with_primary_key(sequence_next<underlying_type>());
+        auto obj_2 = table_2->create_object_with_primary_key(sequence_next<underlying_type>());
+        if constexpr (is_optional) {
+            auto obj_3 = table_2->create_object_with_primary_key(default_or_null);
+        }
 
-        auto list = obj_1.get_list<ObjectId>("oids");
-        obj_2_id = obj_2.get<ObjectId>("id");
+        auto list = obj_1.template get_list<TEST_TYPE>("oids");
+        obj_1_id = obj_1.template get<TEST_TYPE>("id");
+        obj_2_id = obj_2.template get<TEST_TYPE>("id");
         list.insert(0, obj_2_id);
+        list.insert(1, default_or_null);
+        list.add(default_or_null);
         session_1.nonsync_transact_notify(tr.commit());
     }
 
@@ -7697,10 +7761,23 @@ TEST(Sync_NonLinkObjectId)
     {
         ReadTransaction tr{sg_2};
         auto table_1 = tr.get_table("class_Table1");
+        auto table_2 = tr.get_table("class_Table2");
         auto obj_1 = *table_1->begin();
-        auto list = obj_1.get_list<ObjectId>("oids");
-        CHECK_EQUAL(list.size(), 1);
+        auto obj_2 = table_2->find_first(table_2->get_column_key("id"), obj_2_id);
+        CHECK(obj_2);
+        auto list = obj_1.get_list<TEST_TYPE>("oids");
+        CHECK_EQUAL(obj_1.template get<TEST_TYPE>("id"), obj_1_id);
+        CHECK_EQUAL(list.size(), 3);
+        CHECK_NOT(list.is_null(0));
         CHECK_EQUAL(list.get(0), obj_2_id);
+        CHECK_EQUAL(list.get(1), default_or_null);
+        CHECK_EQUAL(list.get(2), default_or_null);
+        if constexpr (is_optional) {
+            auto obj_3 = table_2->find_first_null(table_2->get_column_key("id"));
+            CHECK(obj_3);
+            CHECK(list.is_null(1));
+            CHECK(list.is_null(2));
+        }
     }
 }
 
@@ -7964,6 +8041,120 @@ TEST(Sync_Dictionary)
         auto it = foos->begin();
         auto dict = it->get_dictionary(foos->get_column_key("dict"));
         CHECK_EQUAL(dict.size(), 0);
+    }
+}
+
+TEST(Sync_Dictionary_Links)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    auto history_1 = make_client_replication(path_1);
+    auto history_2 = make_client_replication(path_2);
+
+    auto db_1 = DB::create(*history_1);
+    auto db_2 = DB::create(*history_2);
+
+    Session session_1 = fixture.make_session(path_1);
+    Session session_2 = fixture.make_session(path_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    // Test that we can transmit links.
+
+    ColKey col_dict;
+
+    {
+        WriteTransaction tr{db_1};
+        auto& g = tr.get_group();
+        auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+        auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+        col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+
+        auto foo = foos->create_object_with_primary_key(123);
+        auto a = bars->create_object_with_primary_key("a");
+        auto b = bars->create_object_with_primary_key("b");
+
+        auto dict = foo.get_dictionary(col_dict);
+        dict.insert("a", a);
+        dict.insert("b", b);
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+
+        auto foos = tr.get_table("class_Foo");
+        auto bars = tr.get_table("class_Bar");
+
+        CHECK_EQUAL(foos->size(), 1);
+        CHECK_EQUAL(bars->size(), 2);
+
+        auto foo = foos->get_object_with_primary_key(123);
+        auto a = bars->get_object_with_primary_key("a");
+        auto b = bars->get_object_with_primary_key("b");
+
+        auto dict = foo.get_dictionary(foos->get_column_key("dict"));
+        CHECK_EQUAL(dict.size(), 2);
+
+        auto dict_a = dict.get("a");
+        auto dict_b = dict.get("b");
+        CHECK(dict_a == Mixed{a.get_link()});
+        CHECK(dict_b == Mixed{b.get_link()});
+    }
+
+    // Test that we can create tombstones for objects in dictionaries.
+
+    {
+        WriteTransaction tr{db_1};
+        auto& g = tr.get_group();
+
+        auto bars = g.get_table("class_Bar");
+        auto a = bars->get_object_with_primary_key("a");
+        a.invalidate();
+
+        auto foos = g.get_table("class_Foo");
+        auto foo = foos->get_object_with_primary_key(123);
+        auto dict = foo.get_dictionary(col_dict);
+
+        CHECK_EQUAL(dict.size(), 2);
+        CHECK((*dict.find("a")).second.is_unresolved_link());
+
+        CHECK(dict.find("b") != dict.end());
+
+        session_1.nonsync_transact_notify(tr.commit());
+    }
+
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    {
+        ReadTransaction tr{db_2};
+
+        auto foos = tr.get_table("class_Foo");
+        auto bars = tr.get_table("class_Bar");
+
+        CHECK_EQUAL(foos->size(), 1);
+        CHECK_EQUAL(bars->size(), 1);
+
+        auto b = bars->get_object_with_primary_key("b");
+
+        auto foo = foos->get_object_with_primary_key(123);
+        auto dict = foo.get_dictionary(col_dict);
+
+        CHECK_EQUAL(dict.size(), 2);
+        CHECK((*dict.find("a")).second.is_unresolved_link());
+
+        CHECK(dict.find("b") != dict.end());
+        CHECK((*dict.find("b")).second == Mixed{b.get_link()});
     }
 }
 

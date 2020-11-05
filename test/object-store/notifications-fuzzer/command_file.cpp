@@ -18,8 +18,8 @@
 
 #include "command_file.hpp"
 
-#include "impl/realm_coordinator.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/link_view.hpp>
 #include <realm/table.hpp>

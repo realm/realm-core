@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/external_commit_helper.hpp"
-#include "impl/realm_coordinator.hpp"
+#include <realm/object-store/impl/external_commit_helper.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/db_options.hpp>
 #include <realm/util/fifo_helper.hpp>

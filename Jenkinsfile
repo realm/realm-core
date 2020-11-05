@@ -219,12 +219,11 @@ jobWrapper {
                         for (cocoaStash in cocoaStashes) {
                             unstash name: cocoaStash
                         }
-                        sh 'tools/build-cocoa.sh'
                         sh 'tools/build-cocoa.sh -x'
-                        archiveArtifacts('realm-core-cocoa*.tar.gz')
-                        archiveArtifacts('realm-core-cocoa*.tar.xz')
-                        stash includes: 'realm-core-cocoa*.tar.xz', name: "cocoa-xz"
-                        stash includes: 'realm-core-cocoa*.tar.gz', name: "cocoa-gz"
+                        archiveArtifacts('realm-*-cocoa*.tar.gz')
+                        archiveArtifacts('realm-*-cocoa*.tar.xz')
+                        stash includes: 'realm-*-cocoa*.tar.xz', name: "cocoa-xz"
+                        stash includes: 'realm-*-cocoa*.tar.gz', name: "cocoa-gz"
                         publishingStashes << "cocoa-xz"
                         publishingStashes << "cocoa-gz"
                     }
@@ -671,7 +670,7 @@ def doBuildMacOs(Map options = [:]) {
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
-        node('osx_pro') {
+        node('osx') {
             getArchive()
 
             dir("build-macosx-${buildType}") {
@@ -691,8 +690,9 @@ def doBuildMacOs(Map options = [:]) {
                     runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-clang-${buildType}")
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
                 runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build', name: "osx-clang-xcrun-swift-${buildType}")
+                sh 'xcrun swift run ObjectStoreTests'
             }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")

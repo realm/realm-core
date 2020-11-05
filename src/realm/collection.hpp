@@ -9,30 +9,6 @@
 
 namespace realm {
 
-// To be used in query for size. Adds nullability to size so that
-// it can be put in a NullableVector
-struct SizeOfList {
-    static constexpr size_t null_value = size_t(-1);
-
-    SizeOfList(size_t s = null_value)
-        : sz(s)
-    {
-    }
-    bool is_null()
-    {
-        return sz == null_value;
-    }
-    void set_null()
-    {
-        sz = null_value;
-    }
-    size_t size() const
-    {
-        return sz;
-    }
-    size_t sz = null_value;
-};
-
 template <class T>
 inline void check_column_type(ColKey col)
 {
@@ -146,17 +122,6 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
     }
 };
 
-inline std::ostream& operator<<(std::ostream& ostr, SizeOfList size_of_list)
-{
-    if (size_of_list.is_null()) {
-        ostr << "null";
-    }
-    else {
-        ostr << size_of_list.sz;
-    }
-    return ostr;
-}
-
 class CollectionBase : public ArrayParent {
 public:
     virtual ~CollectionBase();
@@ -248,7 +213,7 @@ public:
     }
     bool is_null(size_t ndx) const final
     {
-        return m_nullable && get(ndx) == BPlusTree<T>::default_value(true);
+        return m_nullable && value_is_null(get(ndx));
     }
     Mixed get_any(size_t ndx) const final
     {
@@ -256,12 +221,12 @@ public:
     }
 
     // Ensure that `Interface` implements `CollectionBase`.
+    // We do not need to import size() from Interface because we've implemented it above.
     using Interface::avg;
     using Interface::distinct;
     using Interface::is_attached;
     using Interface::max;
     using Interface::min;
-    using Interface::size;
     using Interface::sort;
     using Interface::sum;
     using Interface::update_content_version;
@@ -269,7 +234,8 @@ public:
 
     T get(size_t ndx) const
     {
-        if (ndx >= Collection::size()) {
+        const auto current_size = Collection::size();
+        if (ndx >= current_size) {
             throw std::out_of_range("Index out of range");
         }
         return m_tree->get(ndx);

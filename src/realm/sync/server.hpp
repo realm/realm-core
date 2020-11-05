@@ -53,8 +53,6 @@ private:
 /// sync server is running.
 class Server {
 public:
-    using ReconnectMode = Client::ReconnectMode;
-
     /// A list of client file identifiers. See ClientFileBlacklists.
     using ClientFileBlacklist = std::vector<file_ident_type>;
 

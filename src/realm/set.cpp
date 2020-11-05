@@ -25,7 +25,7 @@
 #include "realm/array_binary.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 #include "realm/array_typed_link.hpp"
 #include "realm/array_mixed.hpp"
 #include "realm/replication.hpp"
@@ -82,6 +82,12 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
             else
                 return std::make_unique<Set<ObjectId>>(*this, col_key);
         }
+        case type_UUID: {
+            if (nullable)
+                return std::make_unique<Set<util::Optional<UUID>>>(*this, col_key);
+            else
+                return std::make_unique<Set<UUID>>(*this, col_key);
+        }
         case type_TypedLink: {
             return std::make_unique<Set<ObjLink>>(*this, col_key);
         }
@@ -115,5 +121,86 @@ void SetBase::clear_repl(Replication* repl) const
 {
     repl->set_clear(*this);
 }
+
+template <>
+void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
+{
+    auto origin_table = m_obj.get_table();
+    auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
+    m_obj.set_backlink(m_col_key, {target_table_key, target_key});
+    m_tree->insert(ndx, target_key);
+}
+
+template <>
+void Set<ObjKey>::do_erase(size_t ndx)
+{
+    auto origin_table = m_obj.get_table();
+    auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
+    ObjKey old_key = get(ndx);
+    CascadeState state(old_key.is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
+
+    bool recurse = m_obj.remove_backlink(m_col_key, {target_table_key, old_key}, state);
+
+    m_tree->erase(ndx);
+
+    if (recurse) {
+        _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
+    }
+}
+
+template <>
+void Set<ObjLink>::do_insert(size_t ndx, ObjLink target_link)
+{
+    m_obj.set_backlink(m_col_key, target_link);
+    m_tree->insert(ndx, target_link);
+}
+
+template <>
+void Set<ObjLink>::do_erase(size_t ndx)
+{
+    ObjLink old_link = get(ndx);
+    CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
+
+    bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+
+    m_tree->erase(ndx);
+
+    if (recurse) {
+        auto table = m_obj.get_table();
+        _impl::TableFriend::remove_recursive(*table, state); // Throws
+    }
+}
+
+template <>
+void Set<Mixed>::do_insert(size_t ndx, Mixed value)
+{
+    if (!value.is_null() && value.get_type() == type_TypedLink) {
+        m_obj.set_backlink(m_col_key, value.get<ObjLink>());
+    }
+    m_tree->insert(ndx, value);
+}
+
+template <>
+void Set<Mixed>::do_erase(size_t ndx)
+{
+    if (Mixed old_value = get(ndx); old_value.get_type() == type_TypedLink) {
+        auto old_link = old_value.get<ObjLink>();
+
+        CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All
+                                                                  : CascadeState::Mode::Strong);
+        bool recurse = m_obj.remove_backlink(m_col_key, old_link, state);
+
+        m_tree->erase(ndx);
+
+        if (recurse) {
+            auto table = m_obj.get_table();
+            _impl::TableFriend::remove_recursive(*table, state); // Throws
+        }
+    }
+    else {
+        m_tree->erase(ndx);
+    }
+}
+
 
 } // namespace realm

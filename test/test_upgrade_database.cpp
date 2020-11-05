@@ -1298,66 +1298,6 @@ TEST(Upgrade_Database_9_10_with_pk_table)
     CHECK(pk_col);
 }
 
-TEST(Upgrade_Database_9_10_with_oid)
-{
-    /* File has this content:
-    "pk":[
-        {"_key":0,"pk_table":"bar","pk_property":"ident"},
-        {"_key":1,"pk_table":"origin","pk_property":"num"}
-    ]
-    ,"metadata":[
-        {"_key":0,"version":0}
-    ]
-    ,"class_bar":[
-        {"_key":717911018529132092,"ident":"goodbye","value":800,"optional":-87},
-        {"_key":2515477941069477034,"ident":"hello","value":7,"optional":null},
-        {"_key":6444968757765087612,"ident":"world","value":35,"optional":null}
-    ]
-    ,"class_foo":[
-        {"_key":512,"name":"Tom","age":5},
-        {"_key":513,"name":"Pluto","age":10},
-        {"_key":514,"name":"Jerry","age":7}
-    ]
-    ,"class_origin":[
-        {"_key":0,"num":1,"object":null,"array":{"table": "class_foo", "keys": []}},
-        {"_key":1,"num":2,"object":{"table": "class_bar", "key": 2515477941069477034},
-            "array":{"table": "class_foo","keys": []}},
-        {"_key":2,"num":3,"object":null,"array":{"table": "class_foo", "keys": [512,514]}}
-    ]
-    }
-    */
-    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_9_to_10_oid.realm";
-    SHARED_GROUP_TEST_PATH(temp_copy);
-
-    // Make a copy of the version 9 database so that we keep the
-    // original file intact and unmodified
-    File::copy(path, temp_copy);
-    ReplSyncClient repl(temp_copy, 10, 2);
-    auto sg = DB::create(repl);
-    ReadTransaction rt(sg);
-    rt.get_group().verify();
-    // rt.get_group().to_json(std::cout);
-
-    ConstTableRef t_bar = rt.get_table("class_bar");
-    ConstTableRef t_origin = rt.get_table("class_origin");
-
-    auto pk_col = t_bar->get_primary_key_column();
-    CHECK(pk_col);
-    CHECK_EQUAL(t_bar->get_column_name(pk_col), "ident");
-    auto hello_key = t_bar->find_first_string(pk_col, "hello");
-    auto obj1 = t_bar->get_object(hello_key);
-    CHECK_EQUAL(obj1.get<Int>("value"), 7);
-
-    pk_col = t_origin->get_primary_key_column();
-    CHECK(pk_col);
-    CHECK_EQUAL(t_origin->get_column_name(pk_col), "num");
-    auto key_3 = t_origin->find_first_int(pk_col, 3);
-    auto obj2 = t_origin->get_object(key_3);
-    auto ll = obj2.get_linklist(t_origin->get_column_key("array"));
-    CHECK_EQUAL(ll.get_object(0).get<String>("name"), "Tom");
-    CHECK_EQUAL(ll.get_object(1).get<String>("name"), "Jerry");
-}
-
 TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     size_t nb_rows = (REALM_MAX_BPNODE_SIZE == 4) ? 50 : 500;
@@ -1770,8 +1710,19 @@ TEST(Upgrade_FixColumnKeys)
 /*
 TEST(Upgrade_bug)
 {
+    // ReplSyncClient repl_sync_client("/home/joergen/default.realm", 10, 16);
     auto hist = make_in_realm_history("/home/joergen/default.realm");
-    DB::create(*hist)->start_read()->verify();
+    auto db = DB::create(*hist);
+    auto rt = db->start_read();
+    rt->verify();
+    for (TableKey&& k : rt->get_table_keys()) {
+        auto table = rt->get_table(k);
+        std::cout << table->get_name() << std::endl;
+        if (auto col = table->get_primary_key_column()) {
+            StringData column_name = table->get_column_name(col);
+            std::cout << "   pk: " << column_name << std::endl;
+        }
+    }
 }
 */
 

@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object_schema.hpp"
+#include <realm/object-store/object_schema.hpp>
 
-#include "feature_checks.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <realm/data_type.hpp>
 #include <realm/group.hpp>
@@ -96,6 +96,8 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
             return PropertyType::ObjectId | flags;
         case col_type_Decimal:
             return PropertyType::Decimal | flags;
+        case col_type_UUID:
+            return PropertyType::UUID | flags;
         case col_type_Link: {
             if (attr.test(col_attr_Set)) {
                 return PropertyType::Object | flags;
@@ -125,6 +127,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     is_embedded = table->is_embedded();
 
     size_t count = table->get_column_count();
+    ColKey pk_col = table->get_primary_key_column();
     persisted_properties.reserve(count);
 
     for (auto col_key : table->get_column_keys()) {
@@ -140,7 +143,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         Property property;
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(col_key);
-        property.is_indexed = table->has_search_index(col_key);
+        property.is_indexed = table->has_search_index(col_key) || pk_col == col_key;
         property.column_key = col_key;
 
         if (property.type == PropertyType::Object) {
@@ -151,7 +154,8 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         persisted_properties.push_back(std::move(property));
     }
 
-    primary_key = ObjectStore::get_primary_key_for_object(group, name);
+    if (pk_col)
+        primary_key = table->get_column_name(pk_col);
     set_primary_key_property();
 }
 
@@ -227,14 +231,14 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
         exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be nullable.", object_name, prop.name,
                                 string_for_property_type(prop.type));
     }
-    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_array(prop.type)) {
+    else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
 
     // check primary keys
     if (prop.is_primary) {
         if (prop.type != PropertyType::Int && prop.type != PropertyType::String &&
-            prop.type != PropertyType::ObjectId) {
+            prop.type != PropertyType::ObjectId && prop.type != PropertyType::UUID) {
             exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.", object_name,
                                     prop.name, string_for_property_type(prop.type));
         }
@@ -298,7 +302,8 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     }
 }
 
-void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const
+void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
+                            bool for_sync) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
@@ -378,6 +383,19 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     }
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
+    }
+
+    if (for_sync && !is_embedded) {
+        if (primary_key.empty()) {
+            exceptions.emplace_back(util::format("There must be a primary key property named '_id' on a synchronized "
+                                                 "Realm but none was found for type '%1'",
+                                                 name));
+        }
+        else if (primary_key != "_id") {
+            exceptions.emplace_back(util::format(
+                "The primary key property on a synchronized Realm must be named '_id' but found '%1' for type '%2'",
+                primary_key, name));
+        }
     }
 }
 

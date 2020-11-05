@@ -35,10 +35,10 @@ public:
         return m_obj.get_setbase_ptr(m_col_key);
     }
 
-    virtual void insert_null() = 0;
-    virtual void erase_null() = 0;
-    virtual void insert_any(Mixed value) = 0;
-    virtual void erase_any(Mixed value) = 0;
+    virtual std::pair<size_t, bool> insert_null() = 0;
+    virtual std::pair<size_t, bool> erase_null() = 0;
+    virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
+    virtual std::pair<size_t, bool> erase_any(Mixed value) = 0;
     virtual void clear() = 0;
 
 protected:
@@ -61,14 +61,13 @@ public:
 
     /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
     /// or the index of the already-existing value.
-    size_t insert(T value);
+    std::pair<size_t, bool> insert(T value);
 
     /// Find the index of a value in the set, or `size_t(-1)` if it is not in the set.
     size_t find(T value) const;
 
-    /// Erase an element from the set, returning the index at which it was removed, or `size_t(-1)` if it did
-    /// not exist.
-    size_t erase(T value);
+    /// Erase an element from the set, returning true if the set contained the element.
+    std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
     Mixed min(size_t* return_ndx = nullptr) const final;
@@ -79,10 +78,10 @@ public:
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
     // Overriding members of SetBase:
-    void insert_null() override;
-    void erase_null() override;
-    void insert_any(Mixed value) override;
-    void erase_any(Mixed value) override;
+    std::pair<size_t, bool> insert_null() override;
+    std::pair<size_t, bool> erase_null() override;
+    std::pair<size_t, bool> insert_any(Mixed value) override;
+    std::pair<size_t, bool> erase_any(Mixed value) override;
     void clear() override;
 
 private:
@@ -108,7 +107,24 @@ private:
             create();
         }
     }
+    void do_insert(size_t ndx, T value);
+    void do_erase(size_t ndx);
 };
+
+template <>
+void Set<ObjKey>::do_insert(size_t, ObjKey);
+template <>
+void Set<ObjKey>::do_erase(size_t);
+
+template <>
+void Set<ObjLink>::do_insert(size_t, ObjLink);
+template <>
+void Set<ObjLink>::do_erase(size_t);
+
+template <>
+void Set<Mixed>::do_insert(size_t, Mixed);
+template <>
+void Set<Mixed>::do_erase(size_t);
 
 /// Compare set elements.
 ///
@@ -175,6 +191,8 @@ struct SetElementLessThan<Mixed> {
                 return a.get<Decimal128>() < b.get<Decimal128>();
             case type_ObjectId:
                 return a.get<ObjectId>() < b.get<ObjectId>();
+            case type_UUID:
+                return a.get<UUID>() < b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() < b.get<ObjLink>();
             case type_OldTable:
@@ -229,6 +247,8 @@ struct SetElementEquals<Mixed> {
                 return a.get<Decimal128>() == b.get<Decimal128>();
             case type_ObjectId:
                 return a.get<ObjectId>() == b.get<ObjectId>();
+            case type_UUID:
+                return a.get<UUID>() == b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() == b.get<ObjLink>();
             case type_OldTable:
@@ -274,7 +294,7 @@ size_t Set<T>::find(T value) const
 }
 
 template <class T>
-size_t Set<T>::insert(T value)
+std::pair<size_t, bool> Set<T>::insert(T value)
 {
     REALM_ASSERT_DEBUG(!update_if_needed());
 
@@ -285,7 +305,7 @@ size_t Set<T>::insert(T value)
     auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
 
     if (it != e && SetElementEquals<T>{}(*it, value)) {
-        return it.index();
+        return {it.index(), false};
     }
 
     if (Replication* repl = m_obj.get_replication()) {
@@ -295,29 +315,29 @@ size_t Set<T>::insert(T value)
         this->insert_repl(repl, it.index(), value);
     }
 
-    m_tree->insert(it.index(), value);
+    do_insert(it.index(), value);
     CollectionBase::m_obj.bump_content_version();
-    return it.index();
+    return {it.index(), true};
 }
 
 template <class T>
-void Set<T>::insert_any(Mixed value)
+std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 {
     if constexpr (std::is_same_v<T, Mixed>) {
-        insert(value);
+        return insert(value);
     }
     else {
         if (value.is_null()) {
-            insert_null();
+            return insert_null();
         }
         else {
-            insert(value.get<typename util::RemoveOptional<T>::type>());
+            return insert(value.get<typename util::RemoveOptional<T>::type>());
         }
     }
 }
 
 template <class T>
-size_t Set<T>::erase(T value)
+std::pair<size_t, bool> Set<T>::erase(T value)
 {
     REALM_ASSERT_DEBUG(!update_if_needed());
     this->ensure_writeable();
@@ -327,43 +347,43 @@ size_t Set<T>::erase(T value)
     auto it = std::lower_bound(b, e, value, SetElementLessThan<T>{});
 
     if (it == e || !SetElementEquals<T>{}(*it, value)) {
-        return not_found;
+        return {npos, false};
     }
 
     if (Replication* repl = m_obj.get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
-    m_tree->erase(it.index());
+    do_erase(it.index());
     CollectionBase::m_obj.bump_content_version();
-    return it.index();
+    return {it.index(), true};
 }
 
 template <class T>
-void Set<T>::erase_any(Mixed value)
+std::pair<size_t, bool> Set<T>::erase_any(Mixed value)
 {
     if constexpr (std::is_same_v<T, Mixed>) {
-        erase(value);
+        return erase(value);
     }
     else {
         if (value.is_null()) {
-            erase_null();
+            return erase_null();
         }
         else {
-            erase(value.get<typename util::RemoveOptional<T>::type>());
+            return erase(value.get<typename util::RemoveOptional<T>::type>());
         }
     }
 }
 
 template <class T>
-inline void Set<T>::insert_null()
+inline std::pair<size_t, bool> Set<T>::insert_null()
 {
-    insert(BPlusTree<T>::default_value(this->m_nullable));
+    return insert(BPlusTree<T>::default_value(this->m_nullable));
 }
 
 template <class T>
-inline void Set<T>::erase_null()
+std::pair<size_t, bool> Set<T>::erase_null()
 {
-    erase(BPlusTree<T>::default_value(this->m_nullable));
+    return erase(BPlusTree<T>::default_value(this->m_nullable));
 }
 
 template <class T>
@@ -448,6 +468,18 @@ inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 {
     auto ascending = !sort_order || *sort_order;
     sort(indices, ascending);
+}
+
+template <class T>
+void Set<T>::do_insert(size_t ndx, T value)
+{
+    m_tree->insert(ndx, value);
+}
+
+template <class T>
+void Set<T>::do_erase(size_t ndx)
+{
+    m_tree->erase(ndx);
 }
 
 } // namespace realm

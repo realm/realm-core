@@ -19,8 +19,8 @@
 #ifndef REALM_RESULTS_NOTIFIER_HPP
 #define REALM_RESULTS_NOTIFIER_HPP
 
-#include "collection_notifier.hpp"
-#include "results.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/results.hpp>
 
 #include <realm/db.hpp>
 

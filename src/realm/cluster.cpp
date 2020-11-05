@@ -26,7 +26,7 @@
 #include "realm/array_mixed.hpp"
 #include "realm/array_timestamp.hpp"
 #include "realm/array_decimal128.hpp"
-#include "realm/array_object_id.hpp"
+#include "realm/array_fixed_bytes.hpp"
 #include "realm/array_key.hpp"
 #include "realm/array_ref.hpp"
 #include "realm/array_typed_link.hpp"
@@ -58,7 +58,7 @@ void ClusterNode::IteratorState::init(State& s, ObjKey key)
 void ClusterNode::get(ObjKey k, ClusterNode::State& state) const
 {
     if (!k || !try_get(k, state)) {
-        throw KeyNotFound("When getting");
+        throw KeyNotFound("No such object");
     }
 }
 
@@ -88,7 +88,8 @@ inline void Cluster::do_create(ColKey col)
 void Cluster::create()
 {
     Array::create(type_HasRefs, false, s_first_col_index);
-    Array::set(0, RefOrTagged::make_tagged(0));
+    Array::set(0, RefOrTagged::make_tagged(0)); // Size = 0
+
     auto column_initialize = [this](ColKey col_key) {
         auto col_ndx = col_key.get_index();
         while (size() <= col_ndx.val + 1)
@@ -144,6 +145,9 @@ void Cluster::create()
             case col_type_ObjectId:
                 do_create<ArrayObjectIdNull>(col_key);
                 break;
+            case col_type_UUID:
+                do_create<ArrayUUIDNull>(col_key);
+                break;
             case col_type_Link:
                 do_create<ArrayKey>(col_key);
                 break;
@@ -159,6 +163,13 @@ void Cluster::create()
         return false;
     };
     m_tree_top.for_each_and_every_column(column_initialize);
+
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    ensure_size(m_size * 8);
+    // "ensure_size" may COW, but as array is just created, it has no parents, so
+    // failing to update parent is not an error.
+    clear_missing_parent_update();
 }
 
 void Cluster::init(MemRef mem)
@@ -173,21 +184,21 @@ void Cluster::init(MemRef mem)
     }
 }
 
-bool Cluster::update_from_parent(size_t old_baseline) noexcept
+void Cluster::update_from_parent() noexcept
 {
-    if (Array::update_from_parent(old_baseline)) {
-        auto rot = Array::get_as_ref_or_tagged(0);
-        if (!rot.is_tagged()) {
-            m_keys.update_from_parent(old_baseline);
-        }
-        return true;
+    Array::update_from_parent();
+    auto rot = Array::get_as_ref_or_tagged(0);
+    if (!rot.is_tagged()) {
+        m_keys.update_from_parent();
     }
-    return false;
 }
 
 MemRef Cluster::ensure_writeable(ObjKey)
 {
-    copy_on_write();
+    // By specifying the minimum size, we ensure that the array has a capacity
+    // to hold m_size 64 bit refs.
+    copy_on_write(8 * m_size);
+
     return get_mem();
 }
 
@@ -271,6 +282,9 @@ inline void Cluster::do_insert_link(size_t ndx, ColKey col_key, Mixed init_val, 
 
 void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
 {
+    // Ensure the cluster array is big enough to hold 64 bit values.
+    copy_on_write(m_size * 8);
+
     if (m_keys.is_attached()) {
         m_keys.insert(ndx, k.value);
     }
@@ -339,6 +353,9 @@ void Cluster::insert_row(size_t ndx, ObjKey k, const FieldValues& init_values)
                 break;
             case col_type_ObjectId:
                 do_insert_row<ArrayObjectIdNull>(ndx, col_key, init_value, nullable);
+                break;
+            case col_type_UUID:
+                do_insert_row<ArrayUUIDNull>(ndx, col_key, init_value, nullable);
                 break;
             case col_type_Link:
                 do_insert_key(ndx, col_key, init_value, ObjKey(k.value + get_offset()));
@@ -429,6 +446,9 @@ void Cluster::move(size_t ndx, ClusterNode* new_node, int64_t offset)
                 break;
             case col_type_ObjectId:
                 do_move<ArrayObjectIdNull>(ndx, col_key, new_leaf);
+                break;
+            case col_type_UUID:
+                do_move<ArrayUUIDNull>(ndx, col_key, new_leaf);
                 break;
             case col_type_Link:
                 do_move<ArrayKey>(ndx, col_key, new_leaf);
@@ -556,6 +576,9 @@ void Cluster::insert_column(ColKey col_key)
             break;
         case col_type_ObjectId:
             do_insert_column<ArrayObjectIdNull>(col_key, nullable);
+            break;
+        case col_type_UUID:
+            do_insert_column<ArrayUUIDNull>(col_key, nullable);
             break;
         case col_type_Link:
             do_insert_column<ArrayKey>(col_key, nullable);
@@ -725,13 +748,13 @@ size_t Cluster::get_ndx(ObjKey k, size_t ndx) const
     if (m_keys.is_attached()) {
         index = m_keys.lower_bound(uint64_t(k.value));
         if (index == m_keys.size() || m_keys.get(index) != uint64_t(k.value)) {
-            throw KeyNotFound("Get index");
+            throw KeyNotFound("Key not found in get_ndx");
         }
     }
     else {
         index = size_t(k.value);
         if (index >= get_as_ref_or_tagged(s_key_ref_or_size_index).get_as_int()) {
-            throw KeyNotFound("Get index");
+            throw KeyNotFound("Key not found in get_ndx (compact)");
         }
     }
     return index + ndx;
@@ -830,6 +853,9 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                 break;
             case col_type_ObjectId:
                 do_erase<ArrayObjectIdNull>(ndx, col_key);
+                break;
+            case col_type_UUID:
+                do_erase<ArrayUUIDNull>(ndx, col_key);
                 break;
             case col_type_Link:
                 do_erase_key(ndx, col_key, state);
@@ -1063,6 +1089,9 @@ void Cluster::verify() const
                 case col_type_ObjectId:
                     verify_list<ObjectId>(arr, *sz);
                     break;
+                case col_type_UUID:
+                    verify_list<UUID>(arr, *sz);
+                    break;
                 case col_type_LinkList:
                     verify_list<ObjKey>(arr, *sz);
                     break;
@@ -1137,6 +1166,9 @@ void Cluster::verify() const
                 case col_type_ObjectId:
                     verify_set<ObjectId>(arr, *sz);
                     break;
+                case col_type_UUID:
+                    verify_set<UUID>(arr, *sz);
+                    break;
                 case col_type_Link:
                     verify_set<ObjKey>(arr, *sz);
                     break;
@@ -1182,6 +1214,9 @@ void Cluster::verify() const
                 break;
             case col_type_ObjectId:
                 verify<ArrayObjectIdNull>(ref, col, sz);
+                break;
+            case col_type_UUID:
+                verify<ArrayUUIDNull>(ref, col, sz);
                 break;
             case col_type_Link:
                 verify<ArrayKey>(ref, col, sz);
@@ -1302,8 +1337,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
                     }
                     else {
                         std::cout << ", " << arr.get(i);
@@ -1315,8 +1349,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
                     }
                     else {
                         std::cout << ", " << arr.get(i);
@@ -1328,8 +1361,19 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
+                    }
+                    else {
+                        std::cout << ", " << *arr.get(i);
+                    }
+                    break;
+                }
+                case col_type_UUID: {
+                    ArrayUUIDNull arr(m_alloc);
+                    ref_type ref = Array::get_as_ref(j);
+                    arr.init_from_ref(ref);
+                    if (arr.is_null(i)) {
+                        std::cout << ", null";
                     }
                     else {
                         std::cout << ", " << arr.get(i);

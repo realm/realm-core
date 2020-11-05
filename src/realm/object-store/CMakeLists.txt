@@ -22,10 +22,16 @@ set(SOURCES
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
     util/scheduler.cpp
-    util/uuid.cpp)
+    util/uuid.cpp
+
+    util/android/scheduler.hpp
+    util/apple/scheduler.hpp
+    util/generic/scheduler.hpp
+    util/uv/scheduler.hpp)
 
 set(HEADERS
     binding_callback_thread_observer.hpp
+    binding_context.hpp
     collection_notifications.hpp
     feature_checks.hpp
     index_set.hpp
@@ -60,11 +66,6 @@ set(HEADERS
     impl/transact_log_handler.hpp
     impl/weak_realm_notifier.hpp
 
-    util/android/scheduler.hpp
-    util/apple/scheduler.hpp
-    util/generic/scheduler.hpp
-    util/uv/scheduler.hpp
-
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/checked_mutex.hpp
@@ -74,20 +75,6 @@ set(HEADERS
     util/tagged_bool.hpp
     util/uuid.hpp)
 
-if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
-elseif(REALM_HAVE_EPOLL)
-    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
-elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
-else()
-    list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
-endif()
-
-set(INCLUDE_DIRS
-    ${UV_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR})
-
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/app.hpp
@@ -95,36 +82,39 @@ if(REALM_ENABLE_SYNC)
         sync/app_credentials.hpp
         sync/generic_network_transport.hpp
         sync/async_open_task.hpp
-        sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
         sync/app_service_client.hpp
         sync/auth_request_client.hpp
-        sync/remote_mongo_client.hpp
-        sync/remote_mongo_collection.hpp
-        sync/remote_mongo_database.hpp
+        sync/mongo_client.hpp
+        sync/mongo_collection.hpp
+        sync/mongo_database.hpp
         sync/push_client.hpp
+
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
+
         util/bson/bson.hpp
         util/bson/min_key.hpp
         util/bson/max_key.hpp
         util/bson/regular_expression.hpp
         util/bson/indexed_map.hpp
         util/bson/mongo_timestamp.hpp)
+
     list(APPEND SOURCES
         sync/app.cpp
+        sync/app_utils.cpp
         sync/app_credentials.cpp
         sync/generic_network_transport.cpp
         sync/async_open_task.cpp
         sync/sync_manager.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
-        sync/remote_mongo_client.cpp
-        sync/remote_mongo_collection.cpp
-        sync/remote_mongo_database.cpp
+        sync/mongo_client.cpp
+        sync/mongo_collection.cpp
+        sync/mongo_database.cpp
         sync/push_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
@@ -135,25 +125,52 @@ if(REALM_ENABLE_SYNC)
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)
     endif()
-    find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+endif()
+
+add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
+add_library(Realm::ObjectStore ALIAS ObjectStore)
+
+set_target_properties(ObjectStore PROPERTIES
+    OUTPUT_NAME realm-object-store
+)
+
+check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
+
+if(APPLE)
+    target_sources(ObjectStore PRIVATE impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+elseif(REALM_HAVE_EPOLL)
+    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_EPOLL=1)
+    target_sources(ObjectStore PRIVATE impl/epoll/external_commit_helper.cpp)
+elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    target_sources(ObjectStore PRIVATE impl/windows/external_commit_helper.cpp)
+else()
+    target_sources(ObjectStore PRIVATE impl/generic/external_commit_helper.cpp)
 endif()
 
 if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
-    list(APPEND INCLUDE_DIRS ../external/json)
+    # needed to disable assertions in external/json
+    target_compile_definitions(ObjectStore PUBLIC
+        $<$<CONFIG:Release>:NDEBUG>
+        $<$<CONFIG:RelWithDebInfo>:NDEBUG>
+    )
+    target_include_directories(ObjectStore PRIVATE ${JSON_INCLUDE_DIR})
 endif()
 
-add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
-set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
-target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
-target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
-
-if (APPLE)
-    target_link_libraries(realm-object-store PUBLIC ${Foundation} ${Security})
-endif()
+target_link_libraries(ObjectStore PUBLIC Storage QueryParser)
 
 if(REALM_ENABLE_SYNC)
-    # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(realm-object-store PUBLIC Sync ${ZLIB_LIBRARIES})
+    target_link_libraries(ObjectStore PUBLIC Sync)
+    target_compile_definitions(ObjectStore PUBLIC REALM_ENABLE_SYNC=1)
 endif()
+
+set_target_properties(ObjectStore PROPERTIES OUTPUT_NAME "realm-object-store")
+
+foreach(FILE ${HEADERS})
+    get_filename_component(DIR ${FILE} DIRECTORY)
+    INSTALL(FILES ${FILE}
+            DESTINATION include/realm/object-store/${DIR}
+            COMPONENT devel)
+endforeach()
+install(TARGETS ObjectStore EXPORT realm
+        ARCHIVE DESTINATION lib
+        COMPONENT devel)

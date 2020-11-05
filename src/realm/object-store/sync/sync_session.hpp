@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
 //
 // Copyright 2016 Realm Inc.
 //
@@ -19,14 +19,16 @@
 #ifndef REALM_OS_SYNC_SESSION_HPP
 #define REALM_OS_SYNC_SESSION_HPP
 
-#include "feature_checks.hpp"
-#include "sync/sync_config.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/sync/config.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>
 #include <unordered_map>
+#include <map>
 
 namespace realm {
 
@@ -124,6 +126,7 @@ public:
     using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
     using ConnectionStateCallback = void(ConnectionState old_state, ConnectionState new_state);
 
+    ~SyncSession();
     PublicState state() const;
     ConnectionState connection_state() const;
 
@@ -275,6 +278,8 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
+    using CompletionCallbacks =
+        std::map<int64_t, std::pair<_impl::SyncProgressNotifier::NotifierType, std::function<void(std::error_code)>>>;
 
     struct State;
     friend struct _impl::sync_session_states::Active;
@@ -333,14 +338,15 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
-    static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
+    // static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
 
-    void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
+    void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
+                                 _impl::SyncProgressNotifier::NotifierType direction);
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
@@ -360,11 +366,8 @@ private:
     std::string m_realm_path;
     _impl::SyncClient& m_client;
 
-    std::vector<std::function<void(std::error_code)>> m_download_completion_callbacks;
-    std::vector<std::function<void(std::error_code)>> m_upload_completion_callbacks;
-    // How many times a client resync has occurred. Used to discard session
-    // completion notifications from before the most recent client resync.
-    int m_client_resync_counter = 0;
+    int64_t m_completion_request_counter = 0;
+    CompletionCallbacks m_completion_callbacks;
 
     // The underlying `Session` object that is owned and managed by this `SyncSession`.
     // The session is first created when the `SyncSession` is moved out of its initial `inactive` state.

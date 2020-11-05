@@ -1,26 +1,20 @@
 
-if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows" AND NOT REALM_BUILD_LIB_ONLY)
-    add_executable(RealmConfig config_tool.cpp)
-    set_target_properties(RealmConfig PROPERTIES
-        OUTPUT_NAME "realm-config"
-        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-
+if(NOT APPLE AND NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # FIXME add_executable(RealmImporter importer_tool.cpp importer.cpp importer.hpp)
     # set_target_properties(RealmImporter PROPERTIES
     #     OUTPUT_NAME "realm-importer"
     #     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
     # target_link_libraries(RealmImporter realm)
 
-    install(TARGETS RealmConfig # RealmImporter
-            COMPONENT runtime
-            DESTINATION ${CMAKE_INSTALL_BINDIR})
+    add_executable(RealmDaemon realmd.cpp)
+    set_target_properties(RealmDaemon PROPERTIES
+        OUTPUT_NAME "realmd"
+        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+    target_link_libraries(RealmDaemon Storage)
 
-    add_executable(realmd realmd.cpp)
-    set_target_properties(realmd PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
-    target_link_libraries(realmd Storage)
-    install(TARGETS realmd
+    install(TARGETS RealmDaemon #RealmImporter
             COMPONENT runtime
-            DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+            DESTINATION bin)
 endif()
 
 add_executable(RealmTrawler EXCLUDE_FROM_ALL realm_trawler.cpp )
@@ -48,7 +42,4 @@ add_executable(RealmDump EXCLUDE_FROM_ALL realm_dump.c)
 set_target_properties(RealmDump PROPERTIES
     OUTPUT_NAME "realm-dump"
     DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
-)
-target_compile_definitions(RealmDump PRIVATE
-    "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
 )

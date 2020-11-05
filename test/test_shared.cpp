@@ -4146,4 +4146,141 @@ TEST(Shared_TimestampQuery)
 }
 */
 
+TEST_IF(Shared_LargeFile, TEST_DURATION > 0 && !REALM_ANDROID)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.durability = DBOptions::Durability::MemOnly;
+    DBRef db = DB::create(path, false, options);
+
+    auto tr = db->start_write();
+
+    auto foo = tr->add_table("foo");
+    // Create more than 16 columns. The cluster array will always have a minimum
+    // size of 128, so if number of columns is lower than 17, then the array will
+    // always be able to hold 64 bit values.
+    for (size_t i = 0; i < 20; i++) {
+        std::string name = "Prop" + util::to_string(i);
+        foo->add_column(type_Int, name);
+    }
+    auto bar = tr->add_table("bar");
+    auto col_str = bar->add_column(type_String, "str");
+
+    // Create enough objects to have a multi level cluster
+    for (size_t i = 0; i < 400; i++) {
+        foo->create_object();
+    }
+
+    // Add a lot of data (nearly 2 Gb)
+    std::string string_1M(1024 * 1024, 'A');
+    for (size_t i = 0; i < 1900; i++) {
+        bar->create_object().set(col_str, string_1M);
+    }
+    tr->commit();
+    tr = db->start_write();
+    foo = tr->get_table("foo");
+    bar = tr->get_table("bar");
+
+    std::vector<ObjKey> keys;
+    foo->create_objects(10000, keys);
+
+    // By assigning 500 to the properties, we provoke a resize of the
+    // arrays. At some point an array will have a ref larger than
+    // 0x80000000 which will require a resize of the cluster array.
+    // If the cluster array does not have the capacity to accommodate
+    // this resize, then it must be reallocated, which will require
+    // the parent to be updated with the new ref. But as the array
+    // used as accessor to the cluster array in Obj::set does not
+    // have a parent this will cause a subsequent crash. To fix this
+    // we have ensured that the cluster array will always have the
+    // required capacity.
+    for (size_t i = 0; i < 10000; i++) {
+        auto obj = foo->get_object(keys[i]);
+        for (auto col : foo->get_column_keys()) {
+            obj.set(col, 500);
+        }
+    }
+    auto obj = foo->begin();
+    for (auto col : foo->get_column_keys()) {
+        obj->set(col, 500);
+    }
+}
+
+TEST(Shared_EncryptionBug)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.encryption_key = crypt_key(true);
+    {
+        DBRef db = DB::create(path, false, options);
+        {
+            WriteTransaction wt(db);
+            auto foo = wt.add_table("foo");
+            auto col_str = foo->add_column(type_String, "str");
+            std::string string_1M(1024 * 1024, 'A');
+            for (int i = 0; i < 64; i++) {
+                foo->create_object().set(col_str, string_1M);
+            }
+            wt.commit();
+        }
+        for (int i = 0; i < 2; i++) {
+            WriteTransaction wt(db);
+            auto foo = wt.get_table("foo");
+            auto col_str = foo->get_column_key("str");
+            foo->create_object().set(col_str, "boobar");
+            wt.commit();
+        }
+    }
+
+    {
+        DBRef db = DB::create(path, false, options);
+        db->start_read()->verify();
+    }
+}
+
+TEST(Shared_ManyColumns)
+{
+    // We had a bug where cluster array has to expand, but the new ref
+    // was not updated in the parent.
+
+    SHARED_GROUP_TEST_PATH(path);
+    auto hist = make_in_realm_history(path);
+    DBRef db = DB::create(*hist);
+
+    auto tr = db->start_write();
+
+    auto foo = tr->add_table("foo");
+    // Create many columns. The cluster array will not be able to
+    // expand from 16 to 32 bits within the minimum allocation of 128 bytes.
+    for (size_t i = 0; i < 50; i++) {
+        std::string name = "Prop" + util::to_string(i);
+        foo->add_column(type_Int, name);
+    }
+    auto bar = tr->add_table("bar");
+
+    tr->commit();
+    tr = db->start_write();
+    foo = tr->get_table("foo");
+    bar = tr->get_table("bar");
+
+    std::vector<ObjKey> keys;
+    foo->create_objects(10000, keys);
+
+    tr->commit_and_continue_as_read();
+    tr->promote_to_write();
+
+    auto first = foo->begin();
+    for (auto col : foo->get_column_keys()) {
+        // 32 bit values will be inserted in the cluster array, so it needs expansion
+        first->set(col, 500);
+    }
+
+    tr->commit_and_continue_as_read();
+    tr->verify();
+
+    tr->promote_to_write();
+    foo->clear();
+    foo->create_object().set("Prop0", 500);
+}
+
 #endif // TEST_SHARED

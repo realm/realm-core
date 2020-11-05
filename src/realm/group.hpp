@@ -508,8 +508,9 @@ public:
     //@}
 
     // Conversion
-    template <class S>
-    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
+    void schema_to_json(std::ostream& out, std::map<std::string, std::string>* renames = nullptr) const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+                 JSONOutputMode output_mode = output_mode_json) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
     /// only if, they contain the same tables in the same order, that
@@ -714,7 +715,7 @@ private:
     /// that exists across Group::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
-    void update_refs(ref_type top_ref, size_t old_baseline) noexcept;
+    void update_refs(ref_type top_ref) noexcept;
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
@@ -812,10 +813,15 @@ private:
     ///
     ///   9 Replication instruction values shuffled, instr_MoveRow added.
     ///
-    ///  10 Memory mapping changes which require special treatment of large files
-    ///     of preceeding versions.
+    ///  10 Cluster based table layout. Memory mapping changes which require
+    ///     special treatment of large files of preceding versions.
     ///
-    ///  11 New data types: Decimal128 and ObjectId. Embedded tables.
+    ///  11 Same as 10, but version 11 files will have search index added on
+    ///     string primary key columns.
+    ///
+    ///  12 - 19 Room for new file formats in legacy code.
+    ///
+    ///  20 New data types: Decimal128 and ObjectId. Embedded tables.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
@@ -1038,42 +1044,6 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
         table = do_add_table(name, false);
     }
     return TableRef(table, table->m_alloc.get_instance_version());
-}
-
-template <class S>
-void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-
-    std::map<std::string, std::string> renames2;
-    renames = renames ? renames : &renames2;
-
-    out << "{" << std::endl;
-
-    auto keys = get_table_keys();
-    bool first = true;
-    for (size_t i = 0; i < keys.size(); ++i) {
-        auto key = keys[i];
-        StringData name = get_table_name(key);
-        std::map<std::string, std::string>& m = *renames;
-        if (m[name] != "")
-            name = m[name];
-
-        ConstTableRef table = get_table(key);
-
-        if (!table->is_embedded()) {
-            if (!first)
-                out << ",";
-            out << "\"" << name << "\"";
-            out << ":";
-            table->to_json(out, link_depth, renames);
-            out << std::endl;
-            first = false;
-        }
-    }
-
-    out << "}" << std::endl;
 }
 
 inline void Group::init_array_parents() noexcept

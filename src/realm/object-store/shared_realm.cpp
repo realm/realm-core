@@ -16,33 +16,33 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "shared_realm.hpp"
+#include <realm/object-store/shared_realm.hpp>
 
-#include "impl/collection_notifier.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "impl/transact_log_handler.hpp"
+#include <realm/object-store/impl/collection_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/transact_log_handler.hpp>
 
-#include "audit.hpp"
-#include "binding_context.hpp"
-#include "list.hpp"
-#include "object.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "thread_safe_reference.hpp"
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/binding_context.hpp>
+#include <realm/object-store/list.hpp>
+#include <realm/object-store/object.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
 
-#include "util/scheduler.hpp"
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <realm/db.hpp>
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/fifo_helper.hpp>
 
 #if REALM_ENABLE_SYNC
-#include "sync/impl/sync_file.hpp"
-#include "sync/sync_config.hpp"
-#include "sync/sync_manager.hpp"
+#include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
 
+#include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/version.hpp>
 #endif
@@ -145,6 +145,8 @@ SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, std::shared_ptr<uti
     REALM_ASSERT(realm);
     auto& config = realm->config();
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    if (auto realm = coordinator->get_cached_realm(config, scheduler))
+        return realm;
     realm->m_scheduler = scheduler;
     coordinator->bind_to_context(*realm);
     return realm;
@@ -325,7 +327,7 @@ void Realm::set_schema_subset(Schema schema)
 void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
                           DataInitializationFunction initialization_function, bool in_transaction)
 {
-    schema.validate();
+    schema.validate(bool(m_config.sync_config));
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
@@ -871,8 +873,9 @@ bool Realm::is_frozen() const
 SharedRealm Realm::freeze()
 {
     auto config = m_config;
-    config.scheduler = util::Scheduler::get_frozen();
-    return Realm::get_frozen_realm(std::move(config), read_transaction_version());
+    auto version = read_transaction_version();
+    config.scheduler = util::Scheduler::get_frozen(version);
+    return Realm::get_frozen_realm(std::move(config), version);
 }
 
 void Realm::close()

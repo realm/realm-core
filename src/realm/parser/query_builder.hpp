@@ -87,6 +87,7 @@ public:
     virtual ObjKey object_index_for_argument(size_t argument_index) = 0;
     virtual ObjectId objectid_for_argument(size_t argument_index) = 0;
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
+    virtual UUID uuid_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
 
     // dynamic conversion space with lifetime tied to this
@@ -113,6 +114,10 @@ public:
     ObjectId objectid_for_argument(size_t i) override
     {
         return get<ObjectId>(i);
+    }
+    UUID uuid_for_argument(size_t i) override
+    {
+        return get<UUID>(i);
     }
     Decimal128 decimal128_for_argument(size_t i) override
     {
@@ -198,6 +203,10 @@ public:
         throw NoArgsError();
     }
     Decimal128 decimal128_for_argument(size_t)
+    {
+        throw NoArgsError();
+    }
+    UUID uuid_for_argument(size_t)
     {
         throw NoArgsError();
     }

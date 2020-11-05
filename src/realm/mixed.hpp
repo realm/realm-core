@@ -31,6 +31,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
+#include <realm/uuid.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/utilities.hpp>
 
@@ -138,6 +139,9 @@ public:
     Mixed(util::Optional<ObjectId>) noexcept;
     Mixed(ObjKey) noexcept;
     Mixed(ObjLink) noexcept;
+    Mixed(UUID) noexcept;
+    Mixed(util::Optional<UUID>) noexcept;
+    Mixed(const Obj&) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
@@ -169,6 +173,9 @@ public:
     template <class T>
     T get() const noexcept;
 
+    template <class T>
+    T export_to_type() const noexcept;
+
     // These functions are kept to be backwards compatible
     int64_t get_int() const;
     bool get_bool() const;
@@ -180,6 +187,7 @@ public:
     ObjLink get_link() const;
 
     bool is_null() const;
+    bool is_unresolved_link() const;
     int compare(const Mixed& b) const;
     bool operator==(const Mixed& other) const
     {
@@ -222,6 +230,7 @@ private:
         ObjectId id_val;
         Decimal128 decimal_val;
         ObjLink link_val;
+        UUID uuid_val;
     };
 };
 
@@ -306,6 +315,17 @@ inline Mixed::Mixed(util::Optional<ObjectId> v) noexcept
     }
 }
 
+inline Mixed::Mixed(util::Optional<UUID> v) noexcept
+{
+    if (v) {
+        m_type = type_UUID + 1;
+        uuid_val = *v;
+    }
+    else {
+        m_type = 0;
+    }
+}
+
 inline Mixed::Mixed(StringData v) noexcept
 {
     if (!v.is_null()) {
@@ -356,6 +376,12 @@ inline Mixed::Mixed(ObjectId v) noexcept
     id_val = v;
 }
 
+inline Mixed::Mixed(UUID v) noexcept
+{
+    m_type = type_UUID + 1;
+    uuid_val = v;
+}
+
 inline Mixed::Mixed(ObjKey v) noexcept
 {
     if (v) {
@@ -379,10 +405,24 @@ inline Mixed::Mixed(ObjLink v) noexcept
 }
 
 template <>
+inline null Mixed::get<null>() const noexcept
+{
+    REALM_ASSERT(m_type == 0);
+    return {};
+}
+
+template <>
 inline int64_t Mixed::get<int64_t>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Int);
     return int_val;
+}
+
+template <>
+inline int Mixed::get<int>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Int);
+    return int(int_val);
 }
 
 inline int64_t Mixed::get_int() const
@@ -484,6 +524,13 @@ inline ObjectId Mixed::get<ObjectId>() const noexcept
 }
 
 template <>
+inline UUID Mixed::get<UUID>() const noexcept
+{
+    REALM_ASSERT(get_type() == type_UUID);
+    return uuid_val;
+}
+
+template <>
 inline ObjKey Mixed::get<ObjKey>() const noexcept
 {
     REALM_ASSERT(get_type() == type_Link);
@@ -511,6 +558,20 @@ inline ObjLink Mixed::get_link() const
 inline bool Mixed::is_null() const
 {
     return (m_type == 0);
+}
+
+inline bool Mixed::is_unresolved_link() const
+{
+    if (is_null()) {
+        return false;
+    }
+    else if (get_type() == type_TypedLink) {
+        return get<ObjLink>().is_unresolved();
+    }
+    else if (get_type() == type_Link) {
+        return get<ObjKey>().is_unresolved();
+    }
+    return false;
 }
 
 std::ostream& operator<<(std::ostream& out, const Mixed& m);

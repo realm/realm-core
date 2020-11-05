@@ -1,0 +1,13 @@
+{
+    "name": "default",
+    "security": {},
+    "hosting": {
+        "enabled": false
+    },
+    "custom_user_data_config": {
+        "enabled": false
+    },
+    "sync": {
+        "development_mode_enabled": true
+    }
+}

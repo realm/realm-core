@@ -44,7 +44,8 @@ struct Expression
         Timestamp,
         Base64,
         SubQuery,
-        ObjectId
+        ObjectId,
+        UUID
     } type;
     enum class KeyPathOp { None, Min, Max, Avg, Sum, Count, SizeString, SizeBinary, BacklinkCount } collection_op;
     std::string s;

@@ -22,6 +22,7 @@
 #include <realm/array_mixed.hpp>
 
 #include "test.hpp"
+#include "test_types_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -50,8 +51,9 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find(5);
         CHECK_NOT_EQUAL(ndx, realm::npos);
-        auto erased = s.erase(5);
-        CHECK_EQUAL(ndx, erased);
+        auto [erased_ndx, erased] = s.erase(5);
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 0);
         CHECK_EQUAL(s.size(), 1);
     }
 
@@ -65,8 +67,9 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find("Hello");
         CHECK_NOT_EQUAL(ndx, realm::npos);
-        auto erased = s.erase("Hello");
-        CHECK_EQUAL(ndx, erased);
+        auto [erased_ndx, erased] = s.erase("Hello");
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 0);
         CHECK_EQUAL(s.size(), 1);
     }
     {
@@ -79,8 +82,9 @@ TEST(Set_Basics)
         CHECK_EQUAL(s.size(), 2);
         auto ndx = s.find(Mixed("Hello"));
         CHECK_NOT_EQUAL(ndx, realm::npos);
-        auto erased = s.erase(Mixed("Hello"));
-        CHECK_EQUAL(ndx, erased);
+        auto [erased_ndx, erased] = s.erase(Mixed("Hello"));
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 1);
         CHECK_EQUAL(s.size(), 1);
     }
 }
@@ -161,6 +165,7 @@ TEST(Set_Links)
     set_links.insert(bar3.get_key());
 
     CHECK_EQUAL(set_links.size(), 3);
+    CHECK_EQUAL(bar1.get_backlink_count(), 1);
     CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);
     CHECK_NOT_EQUAL(set_links.find(bar3.get_key()), realm::npos);
@@ -181,6 +186,7 @@ TEST(Set_Links)
     set_typed_links.insert(cab2.get_link());
     CHECK_EQUAL(set_typed_links.size(), 4);
 
+    CHECK_EQUAL(bar1.get_backlink_count(), 2);
     CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_typed_links.find(bar2.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_typed_links.find(cab1.get_link()), realm::npos);
@@ -197,19 +203,79 @@ TEST(Set_Links)
     set_mixeds.insert(cab2.get_link());
 
     CHECK_EQUAL(set_mixeds.size(), 4);
+    CHECK_EQUAL(bar1.get_backlink_count(), 3);
     CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(bar2.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(cab1.get_link()), realm::npos);
     CHECK_NOT_EQUAL(set_mixeds.find(cab2.get_link()), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar3.get_link()), realm::npos);
 
-    bar1.invalidate();
+    bar1.remove();
 
-    CHECK_EQUAL(set_links.size(), 3);
-    CHECK_EQUAL(set_typed_links.size(), 4);
-    CHECK_EQUAL(set_mixeds.size(), 4);
+    CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(set_typed_links.size(), 3);
+    CHECK_EQUAL(set_mixeds.size(), 3);
 
-    CHECK_NOT_EQUAL(set_links.find(bar1.get_key()), realm::npos);
-    CHECK_NOT_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
-    CHECK_NOT_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
+    CHECK_EQUAL(set_links.find(bar1.get_key()), realm::npos);
+    CHECK_EQUAL(set_typed_links.find(bar1.get_link()), realm::npos);
+    CHECK_EQUAL(set_mixeds.find(bar1.get_link()), realm::npos);
+
+    auto bar2_key = bar2.get_key();
+    auto bar2_link = bar2.get_link();
+    bar2.invalidate();
+
+    CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(set_typed_links.size(), 3);
+    CHECK_EQUAL(set_mixeds.size(), 3);
+
+    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);
+    CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
+    CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
+}
+
+TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<UUID>, Prop<ObjectId>,
+           Prop<Decimal128>, Prop<BinaryData>, Nullable<Int>, Nullable<String>, Nullable<Float>, Nullable<Double>,
+           Nullable<Timestamp>, Nullable<UUID>, Nullable<ObjectId>, Nullable<Decimal128>, Nullable<BinaryData>)
+{
+    using type = typename TEST_TYPE::type;
+    TestValueGenerator gen;
+    Group g;
+
+    auto t = g.add_table("foo");
+    auto col = t->add_column_set(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    CHECK(col.is_set());
+
+    auto obj = t->create_object();
+    {
+        auto s = obj.get_set<type>(col);
+        auto values = gen.values_from_int<type>({0, 1, 2, 3});
+        for (auto v : values) {
+            s.insert(v);
+        }
+        CHECK_EQUAL(s.size(), values.size());
+        for (auto v : values) {
+            auto ndx = s.find(v);
+            CHECK_NOT_EQUAL(ndx, realm::npos);
+        }
+        auto [erased_ndx, erased] = s.erase(values[0]);
+        CHECK(erased);
+        CHECK_EQUAL(erased_ndx, 0);
+        CHECK_EQUAL(s.size(), values.size() - 1);
+
+        s.clear();
+        CHECK_EQUAL(s.size(), 0);
+
+        if (TEST_TYPE::is_nullable) {
+            s.insert_null();
+            CHECK_EQUAL(s.size(), 1);
+            auto null_value = TEST_TYPE::default_value();
+            CHECK(value_is_null(null_value));
+            auto ndx = s.find(null_value);
+            CHECK_NOT_EQUAL(ndx, realm::npos);
+            s.erase_null();
+            CHECK_EQUAL(s.size(), 0);
+            ndx = s.find(null_value);
+            CHECK_EQUAL(ndx, realm::npos);
+        }
+    }
 }

@@ -16,15 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "sync/session/session_util.hpp"
 
-#include "feature_checks.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
@@ -52,11 +52,13 @@ TEST_CASE("sync: Connection state changes", "[sync]")
     if (!EventLoop::has_implementation())
         return;
 
-    SyncServer server;
-    TestSyncManager init_sync_manager(server, base_path);
+    TestSyncManager::Config config;
+    config.base_path = base_path;
+    TestSyncManager init_sync_manager(config);
+    auto app = init_sync_manager.app();
     auto user =
-        SyncManager::shared().get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
-                                       ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_auth_url, dummy_device_id);
+        app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
+                                      ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_auth_url, dummy_device_id);
 
     SECTION("register connection change listener")
     {

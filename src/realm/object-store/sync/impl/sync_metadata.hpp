@@ -19,9 +19,9 @@
 #ifndef REALM_OS_SYNC_METADATA_HPP
 #define REALM_OS_SYNC_METADATA_HPP
 
-#include "results.hpp"
-#include "shared_realm.hpp"
-#include "sync/sync_user.hpp"
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include <realm/obj.hpp>
 #include <realm/table.hpp>
@@ -239,7 +239,7 @@ public:
     util::Optional<SyncFileActionMetadata> get_file_action_metadata(StringData path) const;
 
     // Create file action metadata.
-    void make_file_action_metadata(StringData original_name, StringData url, StringData local_uuid,
+    void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
                                    SyncFileActionMetadata::Action action, StringData new_name = {}) const;
 
     // Get the unique identifier of this client.

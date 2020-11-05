@@ -52,51 +52,59 @@ if(REALM_ENABLE_SYNC)
 
 endif()
 
-add_executable(tests ${SOURCES} ${HEADERS})
+add_executable(ObjectStoreTests ${SOURCES} ${HEADERS})
+set_target_properties(ObjectStoreTests PROPERTIES
+    OUTPUT_NAME realm-object-store-tests
+)
 
-set(REALM_ENABLE_AUTH_TESTS OFF CACHE BOOL "")
+target_link_libraries(ObjectStoreTests ObjectStore)
 
-if(REALM_ENABLE_AUTH_TESTS AND NOT REALM_MONGODB_ENDPOINT)
-    message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
+create_coverage_target(generate-coverage ObjectStoreTests)
+
+if (NOT REALM_TSAN)
+    add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
 endif()
 
-if(REALM_ENABLE_AUTH_TESTS AND NOT REALM_STITCH_CONFIG)
-    message(FATAL_ERROR "REALM_STITCH_CONFIG must be set when specifying REALM_ENABLE_AUTH_TESTS.")
+if(REALM_ENABLE_SYNC)
+    target_link_libraries(ObjectStoreTests SyncServer)
+
+    option(REALM_ENABLE_AUTH_TESTS "" OFF)
+    if(REALM_ENABLE_AUTH_TESTS)
+        if(NOT REALM_MONGODB_ENDPOINT)
+            message(FATAL_ERROR "REALM_MONGODB_ENDPOINT must be set when specifying REALM_ENABLE_AUTH_TESTS.")
+        endif()
+
+        if(NOT REALM_STITCH_CONFIG)
+            message(FATAL_ERROR "REALM_STITCH_CONFIG must be set when specifying REALM_ENABLE_AUTH_TESTS.")
+        endif()
+
+        target_compile_definitions(ObjectStoreTests PRIVATE
+            REALM_ENABLE_AUTH_TESTS=1
+            REALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}"
+            REALM_STITCH_CONFIG="${REALM_STITCH_CONFIG}"
+        )
+
+        find_package(CURL REQUIRED)
+        target_link_libraries(ObjectStoreTests CURL::libcurl)
+    endif()
 endif()
 
-set(EXTRA_LIBRARIES "")
-
-if (REALM_ENABLE_AUTH_TESTS)
-    add_definitions(-DREALM_ENABLE_AUTH_TESTS=1)
-    add_definitions(-DREALM_MONGODB_ENDPOINT="${REALM_MONGODB_ENDPOINT}")
-    add_definitions(-DREALM_STITCH_CONFIG="${REALM_STITCH_CONFIG}")
-    SET(EXTRA_LIBRARIES curl)
-endif()
-
-target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
-target_include_directories(tests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} .)
+target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(VSCODE_TEST_RUNNER)
     # Increase the Catch2 virtual console width so that the Visual Studio Code
     # Test Explorer extension can parse long test names
-    target_compile_definitions(tests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
+    target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
 endif()
 
-if(REALM_ENABLE_SYNC)
-    # It's necessary to explicitly link to realm-sync here to control the order in which libraries are
-    # linked to avoid link errors when using GNU ld.
-    target_link_libraries(tests Sync SyncServer QueryParser)
-endif()
+add_custom_command(TARGET ObjectStoreTests POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:ObjectStoreTests>)
 
-target_link_libraries(tests realm-object-store ${EXTRA_LIBRARIES} ${PLATFORM_LIBRARIES} realm-parser)
-
-add_custom_command(TARGET tests POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
-
-create_coverage_target(generate-coverage tests)
-
-if (NOT REALM_TSAN)
-    add_test(NAME OSTests COMMAND tests)
+if(NOT APPLE)
+    find_package(LibUV REQUIRED)
+    # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
+    target_link_libraries(ObjectStore PUBLIC LibUV::LibUV)
+    target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
 endif()
 
 add_subdirectory(notifications-fuzzer)

@@ -19,7 +19,7 @@
 #ifndef REALM_OS_UTIL_EVENT_LOOP_DISPATCHER_HPP
 #define REALM_OS_UTIL_EVENT_LOOP_DISPATCHER_HPP
 
-#include "util/scheduler.hpp"
+#include <realm/object-store/util/scheduler.hpp>
 
 #include <mutex>
 #include <queue>

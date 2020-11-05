@@ -42,8 +42,10 @@ Obj TableClusterTree::insert(ObjKey k, const FieldValues& values)
 
     // Replicate setting of values
     if (Replication* repl = m_owner->get_repl()) {
+        auto pk_col = m_owner->get_primary_key_column();
         for (const auto& v : values) {
-            repl->set(m_owner, v.col_key, k, v.value, _impl::instr_Set);
+            if (v.col_key != pk_col)
+                repl->set(m_owner, v.col_key, k, v.value, _impl::instr_Set);
         }
     }
 

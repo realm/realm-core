@@ -16,8 +16,9 @@
  *
  **************************************************************************/
 
-#include "util/bson/bson.hpp"
+#include <realm/object-store/util/bson/bson.hpp>
 #include <external/json/json.hpp>
+#include <sstream>
 #include <stack>
 #include <algorithm>
 #include <sstream>
@@ -190,6 +191,13 @@ Bson::Type Bson::type() const noexcept
     return m_type;
 }
 
+std::string Bson::to_string() const
+{
+    std::stringstream ss;
+    ss << *this;
+    return ss.str();
+}
+
 bool Bson::operator==(const Bson& other) const
 {
     if (m_type != other.m_type) {
@@ -335,6 +343,22 @@ bool holds_alternative<MongoTimestamp>(const Bson& bson)
     return bson.m_type == Bson::Type::Timestamp;
 }
 
+struct PrecisionGuard {
+    PrecisionGuard(std::ostream& stream, std::streamsize new_precision)
+        : stream(stream)
+        , old_precision(stream.precision(new_precision))
+    {
+    }
+
+    ~PrecisionGuard()
+    {
+        stream.precision(old_precision);
+    }
+
+    std::ostream& stream;
+    std::streamsize old_precision;
+};
+
 std::ostream& operator<<(std::ostream& out, const Bson& b)
 {
     switch (b.type()) {
@@ -369,6 +393,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
                 out << "-Infinity";
             }
             else {
+                PrecisionGuard precision_guard(out, std::numeric_limits<double>::max_digits10);
                 out << d;
             }
             out << '"' << "}";

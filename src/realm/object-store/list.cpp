@@ -16,15 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "list.hpp"
+#include <realm/object-store/list.hpp>
 
-#include "impl/list_notifier.hpp"
-#include "impl/realm_coordinator.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "results.hpp"
-#include "schema.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/impl/list_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/results.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 namespace {
 using namespace realm;
@@ -284,6 +284,39 @@ void List::set(size_t row_ndx, Obj o)
     as<Obj>().set(row_ndx, o.get_key());
 }
 
+Obj List::add_embedded()
+{
+    verify_in_transaction();
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_insert_linked_object(size());
+}
+
+Obj List::set_embedded(size_t list_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(list_ndx);
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_set_linked_object(list_ndx);
+}
+
+Obj List::insert_embedded(size_t list_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(list_ndx, true);
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_insert_linked_object(list_ndx);
+}
+
+
 void List::swap(size_t ndx1, size_t ndx2)
 {
     verify_in_transaction();
@@ -507,11 +540,13 @@ REALM_PRIMITIVE_LIST_TYPE(Timestamp)
 REALM_PRIMITIVE_LIST_TYPE(ObjKey)
 REALM_PRIMITIVE_LIST_TYPE(ObjectId)
 REALM_PRIMITIVE_LIST_TYPE(Decimal)
+REALM_PRIMITIVE_LIST_TYPE(UUID)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<ObjectId>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<UUID>)
 
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm

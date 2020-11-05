@@ -72,6 +72,12 @@ class TableFriend;
 namespace metrics {
 class QueryInfo;
 }
+namespace query_builder {
+class Arguments;
+}
+namespace parser {
+class KeyPathMapping;
+}
 
 class Table {
 public:
@@ -101,9 +107,6 @@ public:
 
     // Whether or not the column is a list.
     bool is_list(ColKey col_key) const;
-
-    // Whether or not the column is a set.
-    bool is_set(ColKey col_key) const;
 
     //@{
     /// Conventience functions for inspecting the dynamic table type.
@@ -138,6 +141,7 @@ public:
     ColKey add_column_set(DataType type, StringData name, bool nullable = false);
     ColKey add_column_set(Table& target, StringData name);
     ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
+    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
     ColKey
@@ -388,6 +392,7 @@ public:
     ObjKey find_first_string(ColKey col_key, StringData value) const;
     ObjKey find_first_binary(ColKey col_key, BinaryData value) const;
     ObjKey find_first_null(ColKey col_key) const;
+    ObjKey find_first_uuid(ColKey col_key, UUID value) const;
 
     //    TableView find_all_link(Key target_key);
     //    ConstTableView find_all_link(Key target_key) const;
@@ -521,6 +526,10 @@ public:
         return Query(m_own_ref, list);
     }
 
+    Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
+    Query query(const std::string& query_string, query_builder::Arguments& arguments,
+                const parser::KeyPathMapping&) const;
+
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference
     /// to itself. Be aware if assigning the return value of link() to a variable; this might be an error!
@@ -549,8 +558,9 @@ public:
     LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
-    void to_json(std::ostream& out, size_t link_depth = 0,
-                 std::map<std::string, std::string>* renames = nullptr) const;
+    void schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const;
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                 JSONOutputMode output_mode = output_mode_json) const;
 
     /// \brief Compare two tables for equality.
     ///
@@ -716,7 +726,7 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.

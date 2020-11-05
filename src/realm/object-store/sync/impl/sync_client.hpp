@@ -19,27 +19,26 @@
 #ifndef REALM_OS_SYNC_CLIENT_HPP
 #define REALM_OS_SYNC_CLIENT_HPP
 
-#include "binding_callback_thread_observer.hpp"
+#include <realm/object-store/binding_callback_thread_observer.hpp>
 
 #include <realm/sync/client.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #include <thread>
 
-#include "sync/sync_manager.hpp"
-#include "sync/impl/network_reachability.hpp"
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/impl/network_reachability.hpp>
 
 #if NETWORK_REACHABILITY_AVAILABLE
-#include "sync/impl/apple/network_reachability_observer.hpp"
+#include <realm/object-store/sync/impl/apple/network_reachability_observer.hpp>
 #endif
 
 namespace realm {
 namespace _impl {
 
-using ReconnectMode = sync::Client::ReconnectMode;
-
 struct SyncClient {
-    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config)
+    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config,
+               std::shared_ptr<const SyncManager> sync_manager)
         : m_client([&] {
             sync::Client::Config c;
             c.logger = logger.get();
@@ -80,9 +79,9 @@ struct SyncClient {
             }
         }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
-        , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
+        , m_reachability_observer(none, [sync_manager](const NetworkReachabilityStatus status) {
             if (status != NotReachable)
-                SyncManager::shared().reconnect();
+                sync_manager->reconnect();
         })
     {
         if (!m_reachability_observer.start_observing())
@@ -90,6 +89,7 @@ struct SyncClient {
     }
 #else
     {
+        static_cast<void>(sync_manager);
     }
 #endif
 

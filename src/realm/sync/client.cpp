@@ -12,6 +12,7 @@
 #include <realm/version.hpp>
 #include <realm/sync/version.hpp>
 #include <realm/sync/client.hpp>
+#include <realm/sync/config.hpp>
 
 using namespace realm;
 using namespace realm::sync;
@@ -22,17 +23,15 @@ using namespace realm::util;
 using ClientImplBase                  = _impl::ClientImplBase;
 using ClientFileAccessCache           = _impl::ClientFileAccessCache;
 using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
-using ChangesetCooker                 = ClientReplication::ChangesetCooker;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
 using WaitOperCompletionHandler       = Session::WaitOperCompletionHandler;
-using SSLVerifyCallback               = Session::SSLVerifyCallback;
 using ConnectionState                 = Session::ConnectionState;
 using ErrorInfo                       = Session::ErrorInfo;
 using ConnectionStateChangeListener   = Session::ConnectionStateChangeListener;
 using port_type                       = Session::port_type;
 using connection_ident_type           = std::int_fast64_t;
-using ProxyConfig                     = Session::Config::ProxyConfig;
+using ProxyConfig                     = SyncConfig::ProxyConfig;
 // clang-format on
 
 
@@ -169,8 +168,9 @@ private:
     ConnectionImpl& get_connection(ServerEndpoint, const std::string& authorization_header_name,
                                    const std::map<std::string, std::string>& custom_http_headers,
                                    bool verify_servers_ssl_certificate,
-                                   Optional<std::string> ssl_trust_certificate_path, std::function<SSLVerifyCallback>,
-                                   Optional<ProxyConfig>, bool& was_created);
+                                   Optional<std::string> ssl_trust_certificate_path,
+                                   std::function<SyncConfig::SSLVerifyCallback>, Optional<ProxyConfig>,
+                                   bool& was_created);
 
     // Destroys the specified connection.
     void remove_connection(ConnectionImpl&) noexcept;
@@ -341,7 +341,7 @@ private:
     const bool m_verify_servers_ssl_certificate;
     const bool m_simulate_integration_error;
     const Optional<std::string> m_ssl_trust_certificate_path;
-    const std::function<SSLVerifyCallback> m_ssl_verify_callback;
+    const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
     const ClientImplBase::Session::Config m_session_impl_config;
 
     // This one is different from null when, and only when the session wrapper
@@ -825,7 +825,7 @@ ConnectionImpl& ClientImpl::get_connection(ServerEndpoint endpoint, const std::s
                                            const std::map<std::string, std::string>& custom_http_headers,
                                            bool verify_servers_ssl_certificate,
                                            Optional<std::string> ssl_trust_certificate_path,
-                                           std::function<SSLVerifyCallback> ssl_verify_callback,
+                                           std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
                                            Optional<ProxyConfig> proxy_config, bool& was_created)
 {
     ServerSlot& server_slot = m_server_slots[endpoint]; // Throws

@@ -16,16 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
 
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/property.hpp>
+#include <realm/object-store/schema.hpp>
 
-#include "impl/object_accessor_impl.hpp"
+#include <realm/object-store/impl/object_accessor_impl.hpp>
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -872,6 +872,55 @@ TEST_CASE("migration: Automatic")
             std::swap(properties[0], properties[1]);
             VERIFY_SCHEMA_IN_MIGRATION(schema2);
         }
+        SECTION("change linklist to set")
+        {
+            auto schema2 = schema;
+            auto prop = schema2.find("link origin")->property_for_name("array");
+            prop->type = PropertyType::Set | PropertyType::Object;
+            VERIFY_SCHEMA_IN_MIGRATION(schema2);
+        }
+    }
+
+    SECTION("change nullability and primary key")
+    {
+        using namespace std::string_literals;
+        Schema schema{{"EmpDetails",
+                       {
+                           {"UId", PropertyType::String, Property::IsPrimary{true}},
+                           {"EmployeeId", PropertyType::String | PropertyType::Nullable},
+                           {"Name", PropertyType::String},
+                       }}};
+        Schema schema2{{"EmpDetails",
+                        {
+                            {"UId", PropertyType::String},
+                            {"EmployeeId", PropertyType::String, Property::IsPrimary{true}},
+                            {"Name", PropertyType::String},
+                        }}};
+        InMemoryTestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext ctx(realm);
+        util::Any values = AnyDict{
+            {"UId", "ID_001"s},
+            {"EmployeeId", "XHGR"s},
+            {"Name", "John Doe"s},
+        };
+        realm->begin_transaction();
+        Object::create(ctx, realm, *realm->schema().find("EmpDetails"), values);
+        realm->commit_transaction();
+
+        realm->update_schema(schema2, 2, [](auto old_realm, auto new_realm, auto&) {
+            // ObjectStore::delete_data_for_object(realm->read_group(), "DetailStudentStatus");
+            Object old_obj(old_realm, "EmpDetails", 0);
+            Object new_obj(new_realm, "EmpDetails", 0);
+
+            CppContext ctx1(old_realm);
+            CppContext ctx2(new_realm);
+            auto val = old_obj.get_property_value<util::Any>(ctx1, "EmployeeId");
+            new_obj.set_property_value(ctx2, "EmployeeId", val);
+        });
     }
 
     SECTION("object accessors inside migrations")
@@ -903,6 +952,16 @@ TEST_CASE("migration: Automatic")
              }},
             {"array target",
              {
+                 {"value", PropertyType::Int},
+             }},
+            {"int pk",
+             {
+                 {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                 {"value", PropertyType::Int},
+             }},
+            {"string pk",
+             {
+                 {"pk", PropertyType::String, Property::IsPrimary{true}},
                  {"value", PropertyType::Int},
              }},
         };
@@ -1119,6 +1178,21 @@ TEST_CASE("migration: Automatic")
             });
         }
 
+        SECTION("upsert in new realm after modifying primary key")
+        {
+            realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
+                get_table(new_realm, "all types")->set_primary_key_column(ColKey());
+                REQUIRE(new_realm->is_in_transaction());
+                CppContext ctx(new_realm);
+                any_cast<AnyDict&>(values)["bool"] = false;
+                Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
+                REQUIRE(get_table(new_realm, "all types")->size() == 1);
+                REQUIRE(get_table(new_realm, "link target")->size() == 2);
+                REQUIRE(get_table(new_realm, "array target")->size() == 2);
+                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+            });
+        }
+
         SECTION("change primary key property type")
         {
             schema = set_type(schema, "all types", "pk", PropertyType::String);
@@ -1149,6 +1223,165 @@ TEST_CASE("migration: Automatic")
             };
             REQUIRE_NOTHROW(realm->update_schema(schema, 2, good_migration));
             REQUIRE(get_table(realm, "all types")->size() == 2);
+        }
+
+        SECTION("modify existing int primary key values in migration")
+        {
+            // Create several more objects to increase the chance of things
+            // actually breaking if we're doing invalid things
+            CppContext ctx(realm);
+            auto object_schema = realm->schema().find("all types");
+            realm->begin_transaction();
+            for (int i = 1; i < 10; ++i) {
+                any_cast<AnyDict&>(values)["pk"] = INT64_C(1) + i;
+                any_cast<AnyDict&>(values)["int"] = INT64_C(5) + i;
+                Object::create(ctx, realm, *object_schema, values);
+            }
+            realm->commit_transaction();
+
+            // Increase the PK of each object by one in a migration
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                Results results(new_realm, get_table(new_realm, "all types"));
+                for (size_t i = 0, count = results.size(); i < count; ++i) {
+                    Object obj(new_realm, results.get<Obj>(i));
+                    util::Any v = 1 + any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk"));
+                    obj.set_property_value(ctx, "pk", v);
+                }
+            });
+
+            // Create a new object with the no-longer-used pk of 1
+            realm->begin_transaction();
+            any_cast<AnyDict&>(values)["pk"] = INT64_C(1);
+            any_cast<AnyDict&>(values)["int"] = INT64_C(4);
+            object_schema = realm->schema().find("all types");
+            Object::create(ctx, realm, *object_schema, values);
+            realm->commit_transaction();
+
+            // Verify results
+            auto table = get_table(realm, "all types");
+            REQUIRE(table->size() == 11);
+            REQUIRE(table->get_primary_key_column() == table->get_column_key("pk"));
+            for (int i = 0; i < 11; ++i) {
+                auto obj = table->get_object(i);
+                REQUIRE(obj.get<int64_t>("pk") == i + 1);
+                REQUIRE(obj.get<int64_t>("int") == i + 4);
+            }
+        }
+
+        SECTION("modify existing string primary key values in migration")
+        {
+            // Create several objects to increase the chance of things
+            // actually breaking if we're doing invalid things
+            CppContext ctx(realm);
+            auto object_schema = realm->schema().find("string pk");
+            realm->begin_transaction();
+            for (int64_t i = 0; i < 10; ++i) {
+                util::Any values = AnyDict{
+                    {"pk", util::to_string(i)},
+                    {"value", i + 1},
+                };
+                Object::create(ctx, realm, *object_schema, values);
+            }
+            realm->commit_transaction();
+
+            // Increase the PK of each object by one in a migration
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                Results results(new_realm, get_table(new_realm, "string pk"));
+                for (size_t i = 0, count = results.size(); i < count; ++i) {
+                    Object obj(new_realm, results.get<Obj>(i));
+                    util::Any v = util::to_string(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "value")));
+                    obj.set_property_value(ctx, "pk", v);
+                }
+            });
+
+            // Create a new object with the no-longer-used pk of 0
+            realm->begin_transaction();
+            util::Any values = AnyDict{
+                {"pk", "0"s},
+                {"value", INT64_C(0)},
+            };
+            object_schema = realm->schema().find("string pk");
+            Object::create(ctx, realm, *object_schema, values);
+            realm->commit_transaction();
+
+            // Verify results
+            auto table = get_table(realm, "string pk");
+            REQUIRE(table->size() == 11);
+            REQUIRE(table->get_primary_key_column() == table->get_column_key("pk"));
+            for (auto& obj : *table) {
+                REQUIRE(util::to_string(obj.get<int64_t>("value")).c_str() == obj.get<StringData>("pk"));
+            }
+        }
+
+        SECTION("create and modify int primary key inside migration")
+        {
+            SECTION("with index")
+            {
+                realm->begin_transaction();
+                auto table = get_table(realm, "int pk");
+                table->add_search_index(table->get_column_key("pk"));
+                realm->commit_transaction();
+            }
+            SECTION("no index") {}
+
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                for (int64_t i = 0; i < 10; ++i) {
+                    auto obj = Object::create(ctx, new_realm, *new_realm->schema().find("int pk"),
+                                              util::Any(AnyDict{{"pk", INT64_C(0)}, {"value", i}}));
+                    obj.set_property_value(ctx, "pk", util::Any(i));
+                }
+            });
+
+            auto table = get_table(realm, "int pk");
+            REQUIRE(table->size() == 10);
+            REQUIRE(table->get_primary_key_column() == table->get_column_key("pk"));
+            for (int i = 0; i < 10; ++i) {
+                auto obj = table->get_object(i);
+                REQUIRE(obj.get<int64_t>("pk") == i);
+                REQUIRE(obj.get<int64_t>("value") == i);
+            }
+        }
+
+        SECTION("create and modify string primary key inside migration")
+        {
+            SECTION("with index")
+            {
+                realm->begin_transaction();
+                auto table = get_table(realm, "string pk");
+                table->add_search_index(table->get_column_key("pk"));
+                realm->commit_transaction();
+            }
+            SECTION("no index") {}
+
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                for (int64_t i = 0; i < 10; ++i) {
+                    auto obj = Object::create(ctx, new_realm, *new_realm->schema().find("string pk"),
+                                              util::Any(AnyDict{{"pk", ""s}, {"value", i}}));
+                    obj.set_property_value(ctx, "pk", util::Any(util::to_string(i)));
+                }
+            });
+
+            auto table = get_table(realm, "string pk");
+            REQUIRE(table->size() == 10);
+            REQUIRE(table->get_primary_key_column() == table->get_column_key("pk"));
+            for (auto& obj : *table)
+                REQUIRE(obj.get<StringData>("pk") == util::to_string(obj.get<int64_t>("value")).c_str());
+        }
+
+        SECTION("create object after adding primary key")
+        {
+            schema = set_primary_key(schema, "all types", "");
+            realm->update_schema(schema, 2);
+            schema = set_primary_key(schema, "all types", "pk");
+            REQUIRE_NOTHROW(realm->update_schema(schema, 3, [&](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
+                Object::create(ctx, realm, "all types", values);
+            }));
         }
     }
 
@@ -1278,6 +1511,26 @@ TEST_CASE("migration: Automatic")
                           {"origin", "link", "new"});
         }
 
+        SECTION("different object set targets")
+        {
+            Schema schema = {
+                {"target",
+                 {
+                     {"value", PropertyType::Int},
+                 }},
+                {"origin",
+                 {
+                     {"link", PropertyType::Set | PropertyType::Object, "target"},
+                 }},
+            };
+            auto schema2 = set_target(schema, "origin", "link", "origin");
+            schema2.find("origin")->property_for_name("link")->name = "new";
+            FAILED_RENAME(schema, schema2,
+                          "Cannot rename property 'origin.link' to 'new' because it would change from type "
+                          "'set<target>' to 'set<origin>'.",
+                          {"origin", "link", "new"});
+        }
+
         SECTION("make required")
         {
             schema = set_optional(schema, "object", "value", true);
@@ -1365,6 +1618,27 @@ TEST_CASE("migration: Automatic")
             auto schema2 = rename_value(schema);
             schema = set_indexed(schema, "object", "value", true);
             SUCCESSFUL_RENAME(schema, schema2, {"object", "value", "new"});
+        }
+
+        SECTION("create object inside migration after renaming pk")
+        {
+            schema = set_primary_key(schema, "object", "value");
+            auto new_schema = set_primary_key(rename_value(schema), "object", "new");
+            init(schema);
+            REQUIRE_NOTHROW(realm->update_schema(new_schema, 2, [](auto, auto realm, Schema& schema) {
+                ObjectStore::rename_property(realm->read_group(), schema, "object", "value", "new");
+
+                CppContext ctx(realm);
+                util::Any values = AnyDict{{"new", INT64_C(11)}};
+                Object::create(ctx, realm, "object", values);
+            }));
+            REQUIRE(realm->schema() == new_schema);
+            VERIFY_SCHEMA(*realm, false);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+            auto key = table->get_column_keys()[0];
+            auto it = table->begin();
+            REQUIRE(it->get<int64_t>(key) == 10);
+            REQUIRE((++it)->get<int64_t>(key) == 11);
         }
     }
 }
@@ -1778,6 +2052,7 @@ TEST_CASE("migration: Additive")
 
     TestFile config;
     config.schema_mode = SchemaMode::Additive;
+    config.cache = false;
     config.schema = schema;
     auto realm = Realm::get_shared_realm(config);
     realm->update_schema(schema);

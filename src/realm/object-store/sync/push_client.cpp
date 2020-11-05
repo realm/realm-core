@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/push_client.hpp"
-#include "sync/app_utils.hpp"
+#include <realm/object-store/sync/push_client.hpp>
+#include <realm/object-store/sync/app_utils.hpp>
 
 namespace realm {
 namespace app {
@@ -26,7 +26,7 @@ void PushClient::register_device(const std::string& registration_token, std::sha
                                  std::function<void(util::Optional<AppError>)> completion_block)
 {
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
         else {
@@ -49,7 +49,7 @@ void PushClient::deregister_device(std::shared_ptr<SyncUser> sync_user,
                                    std::function<void(util::Optional<AppError>)> completion_block)
 {
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
         else {

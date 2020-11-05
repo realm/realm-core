@@ -16,10 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/remote_mongo_collection.hpp"
+#include <realm/object-store/sync/mongo_collection.hpp>
 
 #include <sstream>
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
 #ifndef REALM_ENABLE_MONGO_CLIENT_TESTS
 #define REALM_ENABLE_MONGO_CLIENT_TESTS 1

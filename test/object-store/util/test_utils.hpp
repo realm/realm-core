@@ -19,7 +19,7 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 #include <realm/util/file.hpp>
 
 #include <functional>
@@ -72,6 +72,8 @@ static inline std::string random_string(std::string::size_type length)
         REQUIRE(!util::File::exists((macro_path) + ".lock"));                                                        \
         REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management");                                                    \
     } while (0)
+
+#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 

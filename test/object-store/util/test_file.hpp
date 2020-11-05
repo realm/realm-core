@@ -19,8 +19,8 @@
 #ifndef REALM_TEST_UTIL_TEST_FILE_HPP
 #define REALM_TEST_UTIL_TEST_FILE_HPP
 
-#include "shared_realm.hpp"
-#include "util/tagged_bool.hpp"
+#include <realm/object-store/shared_realm.hpp>
+#include <realm/object-store/util/tagged_bool.hpp>
 
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
@@ -28,8 +28,9 @@
 #include <thread>
 
 #if REALM_ENABLE_SYNC
-#include "sync/sync_config.hpp"
-#include "sync/app.hpp"
+#include <realm/sync/config.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/app.hpp>
 #include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
@@ -111,7 +112,11 @@ using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
-    SyncServer(StartImmediately start_immediately = true, std::string local_dir = "");
+    struct Config {
+        bool start_immediately = true;
+        std::string local_dir;
+    };
+
     ~SyncServer();
 
     void start();
@@ -134,6 +139,8 @@ public:
     }
 
 private:
+    friend struct TestSyncManager;
+    SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::unique_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
@@ -163,25 +170,64 @@ struct SyncTestFile : TestFile {
 };
 
 struct TestSyncManager {
-    TestSyncManager(const realm::app::App::Config& config, bool should_teardown_test_directory = true,
-                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-    TestSyncManager(const std::string& base_url, std::string const& base_path = "",
-                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption,
-                    bool should_teardown_test_directory = true);
-    TestSyncManager(const SyncServer& server, std::string const& base_path = "",
-                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption,
-                    bool should_teardown_test_directory = true)
-        : TestSyncManager(server.base_url(), base_path, metadataMode, should_teardown_test_directory)
-    {
-    }
+    struct Config {
+        Config();
+        Config(std::string, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+        Config(std::string, std::string,
+               realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+        Config(const realm::app::App::Config&);
+        realm::app::App::Config app_config;
+        std::string base_path;
+        std::string base_url;
+        realm::SyncManager::MetadataMode metadata_mode;
+        bool should_teardown_test_directory;
+    };
+
+    TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const;
+    SyncServer& sync_server()
+    {
+        return m_sync_server;
+    }
 
 private:
+    std::shared_ptr<realm::app::App> m_app;
+    SyncServer m_sync_server;
     std::string m_base_file_path;
     bool m_should_teardown_test_directory = true;
 };
+
+inline TestSyncManager::Config::Config()
+    : metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
+    , should_teardown_test_directory(true)
+{
+}
+
+inline TestSyncManager::Config::Config(std::string bp, realm::SyncManager::MetadataMode mdm)
+    : base_path(bp)
+    , metadata_mode(mdm)
+    , should_teardown_test_directory(true)
+{
+}
+
+inline TestSyncManager::Config::Config(std::string app_id, std::string bp, realm::SyncManager::MetadataMode mdm)
+    : base_path(bp)
+    , metadata_mode(mdm)
+    , should_teardown_test_directory(true)
+{
+    realm::app::App::Config app_cfg;
+    app_cfg.app_id = app_id;
+    app_config = app_cfg;
+}
+
+inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg)
+    : app_config(app_cfg)
+    , metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
+    , should_teardown_test_directory(true)
+{
+}
 
 std::error_code wait_for_upload(realm::Realm& realm);
 std::error_code wait_for_download(realm::Realm& realm);

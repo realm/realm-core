@@ -21,6 +21,7 @@
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
 #include <realm/util/to_string.hpp>
+#include <realm/util/optional.hpp>
 
 #include <functional>
 #include <iosfwd>
@@ -35,7 +36,7 @@
 namespace realm {
 namespace app {
 
-enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2 };
+enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2, app_deallocated = 3 };
 
 enum class JSONErrorCode { bad_token = 1, malformed_json = 2, missing_json_key = 3, bad_bson_parse = 4 };
 
@@ -114,11 +115,17 @@ std::error_code make_client_error_code(ClientErrorCode) noexcept;
 struct AppError {
 
     std::error_code error_code;
-    std::string message;
+    util::Optional<int> http_status_code;
 
-    AppError(std::error_code error_code, std::string message)
+    std::string message;
+    std::string link_to_server_logs;
+
+    AppError(std::error_code error_code, std::string message, std::string link = "",
+             util::Optional<int> http_error_code = util::none)
         : error_code(error_code)
+        , http_status_code(http_error_code)
         , message(message)
+        , link_to_server_logs(link)
     {
     }
 

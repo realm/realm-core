@@ -109,7 +109,7 @@ public:
     }
 
     template <typename C = std::chrono::system_clock, typename D = typename C::duration>
-    std::chrono::time_point<C, D> get_time_point()
+    std::chrono::time_point<C, D> get_time_point() const
     {
         REALM_ASSERT(!m_is_null);
 
@@ -117,6 +117,12 @@ public:
         auto duration = std::chrono::duration_cast<D>(std::chrono::duration<int64_t, std::nano>{native_nano});
 
         return std::chrono::time_point<C, D>(duration);
+    }
+
+    template <typename C = std::chrono::system_clock, typename D = typename C::duration>
+    explicit operator std::chrono::time_point<C, D>() const
+    {
+        return get_time_point();
     }
 
     bool operator==(const Timestamp& rhs) const

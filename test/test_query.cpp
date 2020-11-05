@@ -22,6 +22,9 @@
 #include <cstdlib> // itoa()
 #include <limits>
 #include <vector>
+#include <chrono>
+
+using namespace std::chrono;
 
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
@@ -37,6 +40,17 @@ using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
+
+// valgrind --tool=callgrind --instr-atstart=no realm-tests
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -124,29 +138,23 @@ TEST(Query_Count)
     }
 }
 
-TEST(Query_NextGenSyntaxTypedString)
+TEST(Query_Parser)
 {
     Table books;
-    books.add_column(type_String, "1");
-    auto c1 = books.add_column(type_String, "2");
-    auto c2 = books.add_column(type_Int, "3");
+    books.add_column(type_String, "title");
+    books.add_column(type_String, "author");
+    books.add_column(type_Int, "pages");
 
     Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
     Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
     Obj obj3 = books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
-    Query q = books.column<Int>(c2) >= 200 && books.column<String>(c1) == "David Griffiths";
+    Query q = books.query("pages >= $0 && author == $1", {{200, "David Griffiths"}});
     auto match = q.find();
     CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:
-    match = (books.column<Int>(c2) >= 200 && books.column<String>(c1) == "David Griffiths").find();
-    CHECK_EQUAL(obj2.get_key(), match);
-
-    // You can also create column objects and use them in expressions:
-    Columns<Int> pages = books.column<Int>(c2);
-    Columns<String> author = books.column<String>(c1);
-    match = (pages >= 200 && author == "David Griffiths").find();
+    match = books.query("pages >= 200 && author == \"David Griffiths\"").find();
     CHECK_EQUAL(obj2.get_key(), match);
 }
 
@@ -1437,18 +1445,15 @@ TEST(Query_Expressions0)
     match = (power(second) < 9.001 && power(second) > 8.999).find();
     CHECK_EQUAL(key0, match);
 
-    // For `float < int_column` we had a bug where the float truncated to int, and the int_column remained int
-    // (correct behaviour would be that the float remained float and int_column converted to float). This test
-    // exposes such a bug because 1000000001 should convert to the nearest float value which is `1000000000.`
-    // (gap between floats is bigger than 1 and cannot represent 1000000001).
+    // For `float < int_column` we had a bug where int was promoted to float instead of double.
     table.clear();
-    table.create_object().set(col_int, 1000000001);
+    auto k = table.create_object().set(col_int, 1000000001).get_key();
 
     match = (1000000000.f < first).find();
-    CHECK_EQUAL(match, null_key);
+    CHECK_EQUAL(match, k);
 
     match = (first > 1000000000.f).find();
-    CHECK_EQUAL(match, null_key);
+    CHECK_EQUAL(match, k);
 }
 
 TEST(Query_StrIndexCrash)
@@ -1483,6 +1488,88 @@ TEST(Query_StrIndexCrash)
         v = table->where().equal(col, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
     }
+}
+
+TEST(Query_IntIndex)
+{
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    Group group;
+    TableRef table = group.add_table("test");
+    auto col = table->add_column(type_Int, "first", true);
+    table->add_search_index(col);
+
+    size_t eights = 0;
+    size_t nulls = 0;
+
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
+        int v = random.draw_int_mod(10);
+        if (v == 8) {
+            eights++;
+        }
+        auto obj = table->create_object();
+        if (v == 5) {
+            nulls++;
+        }
+        else {
+            obj.set(col, v);
+        }
+    }
+
+    // This will use IntegerNode
+    auto q = table->column<Int>(col) == 8;
+    auto cnt = q.count();
+    CHECK_EQUAL(cnt, eights);
+
+    // Uses Compare expression
+    q = table->column<Int>(col) == 8.0;
+    cnt = q.count();
+    CHECK_EQUAL(cnt, eights);
+
+    TableRef origin = group.add_table("origin");
+    auto col_link = origin->add_column(*table, "link");
+    for (auto&& o : *table) {
+        origin->create_object().set(col_link, o.get_key());
+    }
+    // Querying over links makes sure we will not use IntegerNode
+    q = origin->link(col_link).column<Int>(col) == 8;
+    cnt = q.count();
+    CHECK_EQUAL(cnt, eights);
+
+    q = origin->link(col_link).column<Int>(col) == realm::null();
+    cnt = q.count();
+    CHECK_EQUAL(cnt, nulls);
+}
+
+TEST(Query_StringIndexNull)
+{
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    Group group;
+    TableRef table = group.add_table("test");
+    auto col = table->add_column(type_String, "first", true);
+    table->add_search_index(col);
+
+    size_t nulls = 0;
+
+    for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
+        int v = random.draw_int_mod(10);
+        auto obj = table->create_object();
+        if (v == 8) {
+            nulls++;
+        }
+        else {
+            obj.set(col, util::to_string(v));
+        }
+    }
+
+    TableRef origin = group.add_table("origin");
+    auto col_link = origin->add_column(*table, "link");
+    for (auto&& o : *table) {
+        origin->create_object().set(col_link, o.get_key());
+    }
+
+    auto q = origin->link(col_link).column<String>(col) == realm::null();
+    auto cnt = q.count();
+    CHECK_EQUAL(cnt, nulls);
 }
 
 TEST(Query_Links)
@@ -2543,6 +2630,87 @@ TEST(Query_StrIndex)
         s = ttt.where().equal(str_col, "AA").count();
         CHECK_EQUAL(aa, s);
     }
+}
+
+TEST(Query_StrIndexUpdating)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    auto group = sg->start_write();
+
+    auto t = group->add_table("table");
+    auto col = t->add_column(type_String, "value");
+    t->add_search_index(col);
+    TableView tv = t->where().equal(col, "").find_all();
+    TableView tv_ins = t->where().equal(col, "", false).find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv_ins.size(), 0);
+    group->commit_and_continue_as_read();
+
+    // Queries on indexes have different codepaths for 0, 1, and multiple results,
+    // so check each of the 6 possible transitions. The write transactions are
+    // required here because otherwise the Query will be using the StringIndex
+    // being mutated and will happen to give correct results even if it fails
+    // to update all of its internal state.
+
+    // 0 -> 1 result
+    group->promote_to_write();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    tv_ins.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv_ins.size(), 1);
+
+    // 1 -> multiple results
+    group->promote_to_write();
+    t->create_object();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    tv_ins.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 3);
+    CHECK_EQUAL(tv_ins.size(), 3);
+
+    // multiple -> 1
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    t->remove_object(tv.get_key(1));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    tv_ins.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv_ins.size(), 1);
+
+    // 1 -> 0
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    tv_ins.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv_ins.size(), 0);
+
+    // 0 -> multiple
+    group->promote_to_write();
+    t->create_object();
+    t->create_object();
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    tv_ins.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv_ins.size(), 2);
+
+    // multiple -> 0
+    group->promote_to_write();
+    t->remove_object(tv.get_key(0));
+    t->remove_object(tv.get_key(1));
+    group->commit_and_continue_as_read();
+    tv.sync_if_needed();
+    tv_ins.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+    CHECK_EQUAL(tv_ins.size(), 0);
 }
 
 TEST(Query_GA_Crash)
@@ -3804,6 +3972,23 @@ TEST(Query_FindWithDescriptorOrdering)
         ordering.append_sort(SortDescriptor({{t1_int_col}}, {true}), SortDescriptor::MergeMode::append);
         TableView tv = t1->where().find_all(ordering);
         ResultList expected = {{1, k0}, {1, k1}, {2, k4}, {2, k5}, {1, k2}, {2, k3}};
+        CHECK_EQUAL(tv.size(), expected.size());
+        CHECK_EQUAL(t1->where().count(ordering), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv[i].get<Int>(t1_int_col), expected[i].first);
+            CHECK_EQUAL(tv.get_key(i), expected[i].second);
+        }
+    }
+    {
+        // applying string sort, then a limit, and then a descending integer sort, then replace the last sort with
+        // an ascending integer sort - the end result should reflect the limit and the first and last sort descriptors
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor({{t1_str_col}}, {false}));
+        ordering.append_limit(LimitDescriptor(4));
+        ordering.append_sort(SortDescriptor({{t1_int_col}}, {false}));
+        ordering.append_sort(SortDescriptor({{t1_int_col}}, {true}), SortDescriptor::MergeMode::replace);
+        TableView tv = t1->where().find_all(ordering);
+        ResultList expected = {{1, k2}, {1, k0}, {1, k1}, {2, k3}};
         CHECK_EQUAL(tv.size(), expected.size());
         CHECK_EQUAL(t1->where().count(ordering), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
@@ -5169,6 +5354,109 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
             foreignindex = foreignindex2;
         }
     }
+}
+
+TEST(Query_Performance)
+{
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column(type_Double, "doubles");
+    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
+
+    for (int i = 0; i < 10000; i++) {
+        auto obj = foo->create_object();
+        obj.set(col_double, double(i % 19));
+        obj.set(col_int, 30 - (i % 19));
+    }
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    auto t1 = steady_clock::now();
+
+    size_t cnt = (foo->column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 4208);
+
+    auto t2 = steady_clock::now();
+    CHECK(t2 > t1);
+
+    cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
+
+    auto t3 = steady_clock::now();
+    CHECK(t3 > t2);
+    CALLGRIND_START_INSTRUMENTATION;
+
+    cnt = (bar->link(col_linklist).column<double>(col_double) > 15).count();
+    CHECK_EQUAL(cnt, 630);
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto t4 = steady_clock::now();
+    CHECK(t4 > t3);
+
+    cnt = (foo->column<double>(col_double) > foo->column<Int>(col_int)).count();
+    CHECK_EQUAL(cnt, 1578);
+
+    auto t5 = steady_clock::now();
+    CHECK(t5 > t4);
+
+    /*
+    std::cout << "Row against constant: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    std::cout << "Linked row against constant: " << duration_cast<microseconds>(t3 - t2).count() << " us"
+              << std::endl;
+    std::cout << "List row against constant: " << duration_cast<microseconds>(t4 - t3).count() << " us" << std::endl;
+    std::cout << "Row against row: " << duration_cast<microseconds>(t5 - t4).count() << " us" << std::endl;
+    */
+}
+
+TEST(Query_AllocatorBug)
+{
+    // At some point this test failed when cluster node size was 4.
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column(type_Double, "doubles");
+    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
+
+    for (int i = 0; i < 10000; i++) {
+        auto obj = foo->create_object();
+        obj.set(col_double, double(i % 19));
+        obj.set(col_int, 30 - (i % 19));
+    }
+
+    // At this point the WrappedAllocator in "foo" points to a translation table with 6 elements
+
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        // During this a new slab is needed, so the translation table in "bar" contains 7 elements.
+        // Some clusters if "bar" will use this last element for translation
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    // When traversion clusters in "bar" wee should use the "bar" wrapped allocator and not the
+    // one in "foo" (that was the error)
+    auto cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
 }
 
 #endif // TEST_QUERY

@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch2/catch.hpp"
+#include <catch2/catch.hpp>
 
-#include "util/uuid.hpp"
+#include <realm/object-store/util/uuid.hpp>
 
 #include <algorithm>
 #include <cctype>

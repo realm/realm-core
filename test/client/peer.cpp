@@ -2,16 +2,18 @@
 #include <vector>
 
 #include <realm/util/features.h>
+#include <realm/util/safe_int_ops.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/network.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/websocket.hpp>
+#include <realm/list.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/changeset_cooker.hpp>
 
 #include "statistics.hpp"
-#include "row_observer.hpp"
+#include "object_observer.hpp"
 #include "peer.hpp"
 
 using namespace realm;
@@ -305,8 +307,6 @@ void Peer::prepare_receive_ptime_requests()
 {
     open_realm_for_receive();
     std::string buffer;
-    const std::string& table_name = class_to_table_name(g_ptime_class_name, buffer);
-    m_ptime_table_ndx = m_receive_group->find_table(table_name);
     auto callback = [this](VersionID, VersionID new_version) {
         if (m_receive_enabled.load(std::memory_order_acquire))
             receive(new_version);
@@ -342,22 +342,31 @@ void Peer::perform_transaction(BinaryData blob, TransactSpec& spec)
             ColKey col_key_label = table->get_column_key("label");
             ColKey col_key_kind = table->get_column_key("kind");
             ColKey col_key_level = table->get_column_key("level");
-            int num_add = 0;
-            if (!!spec.replace_blobs) {
-                num_add = spec.num_blobs;
+            std::size_t num_blobs = 0;
+            if (spec.num_blobs >= 0) {
+                if (util::int_cast_with_overflow_detect(spec.num_blobs, num_blobs))
+                    throw std::overflow_error("Number of blobs");
             }
-            else if (table->size() < std::size_t(spec.num_blobs)) {
-                num_add = spec.num_blobs - int(table->size());
+            std::vector<Obj> objects;
+            if (spec.replace_blobs) {
+                std::size_t n = table->size();
+                if (num_blobs < n)
+                    n = num_blobs;
+                for (std::size_t i = 0; i < n; ++i) {
+                    Obj obj = table->get_object(i);
+                    objects.push_back(std::move(obj));
+                }
             }
-            for (int i = 0; i < num_add; ++i)
-                table->create_object();
-            std::size_t num_rows = table->size();
+            std::size_t n = num_blobs - objects.size();
+            for (std::size_t i = 0; i < n; ++i) {
+                ObjectId pkey = ObjectId::gen(); // Globally unique ???
+                Obj obj = table->create_object_with_primary_key(Mixed(pkey));
+                objects.push_back(std::move(obj));
+            }
             BinaryData blob_2 = blob;
             if (blob_2.is_null())
                 blob_2 = BinaryData("", 0); // Due to quirky behavior of Table::set_binary()
-            for (int i = 0; i < spec.num_blobs; ++i) {
-                std::size_t row_ndx = num_rows - spec.num_blobs + i;
-                auto obj = table->get_object(row_ndx);
+            for (Obj obj : objects) {
                 obj.set(col_key_blob, blob_2);
                 obj.set(col_key_label, spec.blob_label);
                 obj.set(col_key_kind, spec.blob_kind);
@@ -695,29 +704,34 @@ void Peer::open_realm_for_receive()
 
 void Peer::receive(VersionID)
 {
-    std::set<ObjKey> new_rows;
+    std::map<TableKey, std::set<ObjKey>> new_objects;
+    ObjectObserver observer{new_objects};
+    m_receive_group->advance_read(&observer);
     std::string buffer;
     const std::string& table_name = class_to_table_name(g_ptime_class_name, buffer);
-    RowObserver observer(table_name, m_ptime_table_ndx, new_rows);
-    m_receive_group->advance_read(&observer);
-    if (!new_rows.empty()) {
-        m_logger.debug("Processing changeset_propagation_time_measurement_request_received");
-        ConstTableRef table = m_receive_group->get_table(table_name);
-        ColKey col_client_id = table->get_column_key("client_id");
-        ColKey col_timestamp = table->get_column_key("timestamp");
-        for (ObjKey row_key : new_rows) {
-            const Obj obj = table->get_object(row_key);
-            std::int_fast64_t originator_ident = obj.get<int64_t>(col_client_id);
-            if (originator_ident != m_originator_ident)
-                continue;
-            milliseconds_type timestamp = milliseconds_type(obj.get<int64_t>(col_timestamp));
-            if (timestamp < m_start_time)
-                continue;
-            milliseconds_type now = _impl::realtime_clock_now();
-            milliseconds_type propagation_time = now - timestamp;
-            m_logger.detail("Propagation time was %1 milliseconds", propagation_time);
-            m_context.add_propagation_time(propagation_time);
-            m_context.metrics.increment("client.ptime_request_received");
+    for (const auto& table_entry : new_objects) {
+        const TableKey& table_key = table_entry.first;
+        StringData table_name_2 = m_receive_group->get_table_name(table_key);
+        if (table_name_2 == table_name) {
+            m_logger.debug("Processing changeset_propagation_time_measurement_request_received");
+            ConstTableRef table = m_receive_group->get_table(table_name);
+            ColKey col_originator = table->get_column_key("originator");
+            ColKey col_timestamp = table->get_column_key("timestamp");
+            const std::set<ObjKey>& objects = table_entry.second;
+            for (ObjKey obj_key : objects) {
+                Obj obj = table->get_object(obj_key);
+                std::int_fast64_t originator_ident = obj.get<int64_t>(col_originator);
+                if (originator_ident != m_originator_ident)
+                    continue;
+                milliseconds_type timestamp = milliseconds_type(obj.get<int64_t>(col_timestamp));
+                if (timestamp < m_start_time)
+                    continue;
+                milliseconds_type now = _impl::realtime_clock_now();
+                milliseconds_type propagation_time = now - timestamp;
+                m_logger.detail("Propagation time was %1 milliseconds", propagation_time);
+                m_context.add_propagation_time(propagation_time);
+                m_context.metrics.increment("client.ptime_request_received");
+            }
         }
     }
 }
@@ -771,7 +785,10 @@ void Peer::do_send_ptime_request(WriteTransaction& wt)
 {
     TableRef table = do_ensure_ptime_class(wt);
     milliseconds_type timestamp = _impl::realtime_clock_now();
-    table->create_object().set("originator", m_originator_ident).set("timestamp", std::int64_t(timestamp));
+    ObjectId pkey = ObjectId::gen(); // Globally unique ???
+    Obj obj = table->create_object_with_primary_key(Mixed(pkey));
+    obj.set("originator", m_originator_ident);
+    obj.set("timestamp", std::int64_t(timestamp));
 }
 
 
@@ -779,7 +796,9 @@ TableRef Peer::do_ensure_blob_class(WriteTransaction& wt, StringData table_name)
 {
     TableRef table = wt.get_table(table_name);
     if (!table) {
-        table = sync::create_table(wt, table_name);
+        DataType pk_type = type_ObjectId;
+        StringData pk_column_name = "_id";
+        table = sync::create_table_with_primary_key(wt, table_name, pk_type, pk_column_name);
         table->add_column(type_Binary, "blob");
         table->add_column(type_String, "label");
         table->add_column(type_Int, "kind");
@@ -795,7 +814,9 @@ TableRef Peer::do_ensure_ptime_class(WriteTransaction& wt)
     const std::string& table_name = class_to_table_name(g_ptime_class_name, buffer);
     TableRef table = wt.get_table(table_name);
     if (!table) {
-        table = sync::create_table(wt, table_name);
+        DataType pk_type = type_ObjectId;
+        StringData pk_column_name = "_id";
+        table = sync::create_table_with_primary_key(wt, table_name, pk_type, pk_column_name);
         table->add_column(type_Int, "originator");
         table->add_column(type_Int, "timestamp");
     }

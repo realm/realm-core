@@ -16,13 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/sync_user.hpp"
+#include <realm/object-store/sync/sync_user.hpp>
 
-#include "sync/app_credentials.hpp"
-#include "sync/generic_network_transport.hpp"
-#include "sync/impl/sync_metadata.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
+#include <realm/object-store/sync/app_credentials.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/util/base64.hpp>
 
@@ -101,13 +102,15 @@ SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
 SyncUser::SyncUser(std::string refresh_token, const std::string identity, const std::string provider_type,
-                   std::string access_token, SyncUser::State state, const std::string device_id)
+                   std::string access_token, SyncUser::State state, const std::string device_id,
+                   std::shared_ptr<SyncManager> sync_manager)
     : m_state(state)
     , m_provider_type(provider_type)
     , m_refresh_token(RealmJWT(std::move(refresh_token)))
     , m_identity(std::move(identity))
     , m_access_token(RealmJWT(std::move(access_token)))
     , m_device_id(device_id)
+    , m_sync_manager(sync_manager)
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -116,7 +119,7 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
         }
     }
 
-    bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    bool updated = m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_refresh_token(m_refresh_token.token);
         metadata->set_access_token(m_access_token.token);
@@ -190,7 +193,7 @@ void SyncUser::update_refresh_token(std::string&& token)
             }
         }
 
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_refresh_token(m_refresh_token.token);
         });
@@ -229,7 +232,7 @@ void SyncUser::update_access_token(std::string&& token)
             }
         }
 
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_access_token(m_access_token.token);
         });
@@ -256,7 +259,7 @@ void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
 
     m_user_identities = identities;
 
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_identities(identities);
     });
@@ -270,9 +273,14 @@ void SyncUser::log_out()
             return;
         }
         m_state = State::LoggedOut;
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_access_token.token = "";
+        m_refresh_token.token = "";
+
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
             metadata->set_state(State::LoggedOut);
+            metadata->set_access_token("");
+            metadata->set_refresh_token("");
         });
         // Move all active sessions into the waiting sessions pool. If the user is
         // logged back in, they will automatically be reactivated.
@@ -285,14 +293,13 @@ void SyncUser::log_out()
         m_sessions.clear();
     }
 
-    SyncManager::shared().log_out_user(m_identity);
-    m_access_token.token = "";
+    m_sync_manager->log_out_user(m_identity);
 
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {
         invalidate();
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        m_sync_manager->perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type, false);
             if (metadata)
                 metadata->remove();
@@ -303,7 +310,7 @@ void SyncUser::log_out()
 bool SyncUser::is_logged_in() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return !m_access_token.token.empty() && !m_refresh_token.token.empty();
+    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && m_state == State::LoggedIn;
 }
 
 void SyncUser::invalidate()
@@ -345,7 +352,7 @@ void SyncUser::set_state(SyncUser::State state)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_state = state;
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_state(state);
     });
@@ -369,7 +376,7 @@ void SyncUser::update_user_profile(const SyncUserProfile& profile)
 
     m_user_profile = profile;
 
-    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_user_profile(profile);
     });
@@ -394,6 +401,11 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
     }
 }
 
+app::MongoClient SyncUser::mongo_client(const std::string& service_name)
+{
+    return app::MongoClient(shared_from_this(), m_sync_manager->app().lock(), service_name);
+}
+
 void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 {
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -402,10 +414,13 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
-    SyncManager::shared().app()->refresh_custom_data(shared_from_this(),
-                                                     [completion_block](util::Optional<app::AppError> error) {
-                                                         completion_block(error);
-                                                     });
+    if (auto app = m_sync_manager->app().lock()) {
+        app->refresh_custom_data(shared_from_this(), completion_block);
+    }
+    else {
+        completion_block(app::AppError(app::make_client_error_code(app::ClientErrorCode::app_deallocated),
+                                       "App has been deallocated"));
+    }
 }
 } // namespace realm
 

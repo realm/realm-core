@@ -19,12 +19,15 @@
 #include <realm/mixed.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/unicode.hpp>
+#include <realm/column_type_traits.hpp>
+#include <realm/obj.hpp>
+#include <realm/table.hpp>
 
 namespace realm {
 
 namespace _impl {
 
-static const int sorting_rank[18] = {
+static const int sorting_rank[19] = {
     0, // null
     0, // type_Int = 0,
     0, // type_Bool = 1,
@@ -43,6 +46,7 @@ static const int sorting_rank[18] = {
     -1,
     5, // type_ObjectId = 15,
     6, // type_TypedLink = 16
+    7, // type_UUID = 17
 };
 
 inline int compare_string(StringData a, StringData b)
@@ -157,10 +161,16 @@ inline int compare_long_to_double(int64_t lhs, double rhs)
 }
 } // namespace _impl
 
+Mixed::Mixed(const Obj& obj) noexcept
+    : Mixed(ObjLink(obj.get_table()->get_key(), obj.get_key()))
+{
+}
+
+
 bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 {
     if (lhs.m_type == rhs.m_type)
-        return true;
+        return lhs.m_type != 0;
 
     if (lhs.is_null() || rhs.is_null())
         return false;
@@ -175,6 +185,10 @@ bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
         return true;
     }
     if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
+        return true;
+    }
+    if ((l_type == type_ObjectId && r_type == type_Timestamp) ||
+        (r_type == type_ObjectId && l_type == type_Timestamp)) {
         return true;
     }
     return false;
@@ -269,10 +283,16 @@ int Mixed::compare(const Mixed& b) const
             if (b.get_type() == type_Timestamp) {
                 return _impl::compare_generic(date_val, b.date_val);
             }
+            else if (b.get_type() == type_ObjectId) {
+                return _impl::compare_generic(date_val, b.id_val.get_timestamp());
+            }
             break;
         case type_ObjectId:
             if (b.get_type() == type_ObjectId) {
                 return _impl::compare_generic(id_val, b.id_val);
+            }
+            else if (b.get_type() == type_Timestamp) {
+                return _impl::compare_generic(id_val.get_timestamp(), b.date_val);
             }
             break;
         case type_Decimal:
@@ -301,6 +321,11 @@ int Mixed::compare(const Mixed& b) const
                 return _impl::compare_generic(link_val, b.link_val);
             }
             break;
+        case type_UUID:
+            if (b.get_type() == type_UUID) {
+                return _impl::compare_generic(uuid_val, b.uuid_val);
+            }
+            break;
         default:
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
@@ -312,6 +337,28 @@ int Mixed::compare(const Mixed& b) const
     // Using rank table will ensure that all numeric values comes first
     return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
 }
+
+template <class T>
+T Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    switch (get_type()) {
+        case type_Int:
+            return T(int_val);
+        case type_Float:
+            return T(float_val);
+        case type_Double:
+            return T(double_val);
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+    return T();
+}
+
+template int64_t Mixed::export_to_type<int64_t>() const noexcept;
+template float Mixed::export_to_type<float>() const noexcept;
+template double Mixed::export_to_type<double>() const noexcept;
 
 size_t Mixed::hash() const
 {
@@ -353,6 +400,10 @@ size_t Mixed::hash() const
         case type_Decimal: {
             std::hash<realm::Decimal128> h;
             hash = h(decimal_val);
+            break;
+        }
+        case type_UUID: {
+            hash = get<UUID>().hash();
             break;
         }
         case type_TypedLink: {
@@ -414,6 +465,9 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
                 break;
             case type_TypedLink:
                 out << m.link_val;
+                break;
+            case type_UUID:
+                out << m.get<UUID>();
                 break;
             case type_OldDateTime:
             case type_OldTable:

@@ -155,7 +155,7 @@ class DistinctDescriptor : public ColumnsDescriptor {
 public:
     DistinctDescriptor() = default;
     DistinctDescriptor(std::vector<std::vector<ColKey>> column_keys)
-        : ColumnsDescriptor(column_keys)
+        : ColumnsDescriptor(std::move(column_keys))
     {
     }
 
@@ -205,7 +205,9 @@ public:
         /// If another sort has just been applied, merge after it to take secondary precedence
         /// this is used to construct sorts in a builder pattern where the first applied sort remains the most
         /// important
-        prepend
+        prepend,
+        /// Replace this sort descriptor with another
+        replace
     };
 
     void merge(SortDescriptor&& other, MergeMode mode);

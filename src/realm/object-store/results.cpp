@@ -16,14 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "results.hpp"
+#include <realm/object-store/results.hpp>
 
-#include "impl/realm_coordinator.hpp"
-#include "impl/results_notifier.hpp"
-#include "audit.hpp"
-#include "object_schema.hpp"
-#include "object_store.hpp"
-#include "schema.hpp"
+#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/impl/results_notifier.hpp>
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/object_store.hpp>
+#include <realm/object-store/schema.hpp>
 
 #include <stdexcept>
 
@@ -897,7 +897,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
         }
     };
     auto is_sortable_type = [](PropertyType type) {
-        return !is_array(type) && type != PropertyType::LinkingObjects && type != PropertyType::Data;
+        return !is_collection(type) && type != PropertyType::LinkingObjects && type != PropertyType::Data;
     };
 
     const char* begin = keypath.data();
@@ -1159,11 +1159,13 @@ REALM_RESULTS_TYPE(BinaryData)
 REALM_RESULTS_TYPE(Timestamp)
 REALM_RESULTS_TYPE(ObjectId)
 REALM_RESULTS_TYPE(Decimal)
+REALM_RESULTS_TYPE(UUID)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)
 REALM_RESULTS_TYPE(util::Optional<double>)
 REALM_RESULTS_TYPE(util::Optional<ObjectId>)
+REALM_RESULTS_TYPE(util::Optional<UUID>)
 
 #undef REALM_RESULTS_TYPE
 
@@ -1223,7 +1225,7 @@ Results::IncorrectTableException::IncorrectTableException(StringData e, StringDa
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
     auto type = ObjectSchema::from_core_type(column);
-    const char* column_type = string_for_property_type(type & PropertyType::Collection);
+    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
     if (is_array(type))
         return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
     if (is_set(type))
@@ -1237,7 +1239,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
     : std::logic_error(unsupported_operation_msg(column, table, operation))
     , column_key(column)
     , column_name(table.get_column_name(column))
-    , property_type(ObjectSchema::from_core_type(column) & PropertyType::Collection)
+    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Collection)
 {
 }
 

@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/uuid.hpp"
+#include <realm/object-store/util/uuid.hpp>
 
 #include <algorithm>
 #include <array>

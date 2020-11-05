@@ -19,7 +19,7 @@
 #ifndef REALM_PROPERTY_HPP
 #define REALM_PROPERTY_HPP
 
-#include "util/tagged_bool.hpp"
+#include <realm/object-store/util/tagged_bool.hpp>
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
@@ -40,6 +40,7 @@ class ObjectId;
 class StringData;
 class Table;
 class Timestamp;
+class UUID;
 
 enum class PropertyType : unsigned short {
     Int = 0,
@@ -57,6 +58,7 @@ enum class PropertyType : unsigned short {
 
     ObjectId = 10,
     Decimal = 11,
+    UUID = 12,
 
     // Flags which can be combined with any of the above types except as noted
     Required = 0,
@@ -187,10 +189,28 @@ inline constexpr bool is_set(PropertyType a)
     return to_underlying(a & PropertyType::Set) == to_underlying(PropertyType::Set);
 }
 
+inline constexpr bool is_collection(PropertyType a)
+{
+    return to_underlying(a & PropertyType::Collection) != 0;
+}
+
 inline constexpr bool is_nullable(PropertyType a)
 {
     return to_underlying(a & PropertyType::Nullable) == to_underlying(PropertyType::Nullable);
 }
+
+// Some of the places we use switch_on_type() the Obj version isn't instantiatable
+// or reachable, so we want to map it to a valid type to let the unreachable code compile
+template <typename T>
+struct NonObjType {
+    using type = std::remove_reference_t<T>;
+};
+template <>
+struct NonObjType<Obj&> {
+    using type = int64_t;
+};
+template <typename T>
+using NonObjTypeT = typename NonObjType<T>::type;
 
 template <typename ObjType = Obj, typename Fn>
 static auto switch_on_type(PropertyType type, Fn&& fn)
@@ -218,6 +238,8 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
             return is_optional ? fn((util::Optional<ObjectId>*)0) : fn((ObjectId*)0);
         case PT::Decimal:
             return fn((Decimal128*)0);
+        case PT::UUID:
+            return is_optional ? fn((util::Optional<UUID>*)0) : fn((UUID*)0);
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -252,6 +274,8 @@ static const char* string_for_property_type(PropertyType type)
             return "object";
         case PropertyType::Any:
             return "any";
+        case PropertyType::UUID:
+            return "uuid";
         case PropertyType::LinkingObjects:
             return "linking objects";
         case PropertyType::ObjectId:
@@ -285,8 +309,9 @@ inline Property::Property(std::string name, PropertyType type, std::string objec
 
 inline bool Property::type_is_indexable() const noexcept
 {
-    return type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
-           type == PropertyType::String || type == PropertyType::ObjectId;
+    return !is_collection(type) &&
+           (type == PropertyType::Int || type == PropertyType::Bool || type == PropertyType::Date ||
+            type == PropertyType::String || type == PropertyType::ObjectId || type == PropertyType::UUID);
 }
 
 inline bool Property::type_is_nullable() const noexcept

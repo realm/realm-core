@@ -16,12 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "object_store.hpp"
+#include <realm/object-store/object_store.hpp>
 
-#include "feature_checks.hpp"
-#include "object_schema.hpp"
-#include "schema.hpp"
-#include "shared_realm.hpp"
+#include <realm/object-store/feature_checks.hpp>
+#include <realm/object-store/object_schema.hpp>
+#include <realm/object-store/schema.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -89,6 +89,8 @@ DataType to_core_type(PropertyType type)
             return type_ObjectId;
         case PropertyType::Decimal:
             return type_Decimal;
+        case PropertyType::UUID:
+            return type_UUID;
         case PropertyType::Any:
             return type_Mixed;
         default:
@@ -195,6 +197,16 @@ void make_property_required(Group& group, Table& table, Property property)
     property.type &= ~PropertyType::Nullable;
     table.remove_column(property.column_key);
     property.column_key = add_column(group, table, property).value;
+}
+
+void add_search_index(Table& table, Property property)
+{
+    table.add_search_index(table.get_column_key(property.name));
+}
+
+void remove_search_index(Table& table, Property property)
+{
+    table.remove_search_index(table.get_column_key(property.name));
 }
 
 } // anonymous namespace
@@ -628,11 +640,11 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         }
         void operator()(AddIndex op)
         {
-            table(op.object).add_search_index(op.property->column_key);
+            add_search_index(table(op.object), *op.property);
         }
         void operator()(RemoveIndex op)
         {
-            table(op.object).remove_search_index(op.property->column_key);
+            remove_search_index(table(op.object), *op.property);
         }
 
         void operator()(ChangePropertyType op)
@@ -748,11 +760,11 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(AddIndex op)
         {
-            table(op.object).add_search_index(op.property->column_key);
+            add_search_index(table(op.object), *op.property);
         }
         void operator()(RemoveIndex op)
         {
-            table(op.object).remove_search_index(op.property->column_key);
+            remove_search_index(table(op.object), *op.property);
         }
     } applier{group};
 
@@ -957,7 +969,6 @@ void ObjectStore::set_schema_keys(Group const& group, Schema& schema)
 void ObjectStore::delete_data_for_object(Group& group, StringData object_type)
 {
     if (TableRef table = table_for_object_type(group, object_type)) {
-        ObjectStore::set_primary_key_for_object(group, object_type, "");
         group.remove_table(table->get_key());
     }
 }

@@ -92,6 +92,10 @@ PrimaryKey primary_key_for_row(const Obj& obj)
             return obj.get<ObjectId>(pk_col);
         }
 
+        if (pk_type == col_type_UUID) {
+            return obj.get<UUID>(pk_col);
+        }
+
         REALM_TERMINATE("Missing primary key type support");
     }
 
@@ -155,6 +159,15 @@ ObjKey row_for_primary_key(const Table& table, PrimaryKey key)
             }
             else {
                 REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected ObjectId)");
+            }
+        }
+
+        if (pk_type == col_type_UUID) {
+            if (auto pk = mpark::get_if<UUID>(&key)) {
+                return table.find_primary_key(*pk);
+            }
+            else {
+                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected UUID)");
             }
         }
 

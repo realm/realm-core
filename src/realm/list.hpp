@@ -32,7 +32,7 @@
 #include <realm/array_binary.hpp>
 #include <realm/array_timestamp.hpp>
 #include <realm/array_ref.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <realm/array_decimal128.hpp>
 #include <realm/array_mixed.hpp>
 #include <realm/array_typed_link.hpp>

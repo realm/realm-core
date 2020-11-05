@@ -81,6 +81,7 @@ set(CORE_TEST_SOURCES
     test_util_to_string.cpp
     test_util_type_list.cpp
     test_util_fixed_size_buffer.cpp
+    test_uuid.cpp
     test_version.cpp)
 
 if (REALM_ENABLE_ENCRYPTION)
@@ -105,12 +106,6 @@ set(REALM_TEST_HEADERS
 set(FUZZY_TEST_SOURCES fuzz_group.cpp)
 
 set(CORE_TESTS ${CORE_TEST_SOURCES} ${LARGE_TEST_SOURCES} ${FUZZY_TEST_SOURCES})
-
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
-    include(Findprocps)
-    set(EXTRA_TEST_LIBS ${PROCPS_LIBRARY} rt)
-    set(EXTRA_TEST_CFLAGS ${PROCPS_INCLUDE_DIR})
-endif()
 
 # FIXME: Benchmarks
 
@@ -148,7 +143,7 @@ else()
 endif()
 
 target_link_libraries(CoreTests
-                      TestUtil QueryParser ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}
+                      TestUtil QueryParser
 )
 
 if(WINDOWS_STORE)
@@ -177,7 +172,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(CoreTests "-rdynamic")
 endif()
 
-target_include_directories(CoreTests PRIVATE ${EXTRA_TEST_CFLAGS} .)
+target_include_directories(CoreTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_test(NAME StorageTests COMMAND realm-tests)
 
@@ -191,7 +186,6 @@ if(REALM_ENABLE_SYNC)
 	    util/demangle.cpp
 	    util/dump_changesets.cpp
 	    util/jsmn.cpp
-	    util/mem.cpp
 	    util/misc.cpp
 	    util/mock_metrics.cpp
 	    util/quote.cpp
@@ -213,7 +207,6 @@ if(REALM_ENABLE_SYNC)
 	    util/crypt_key.hpp
 	    util/demangle.hpp
 	    util/jsmn.hpp
-	    util/mem.hpp
 	    util/misc.hpp
 	    util/mock_metrics.hpp
 	    util/number_names.hpp
@@ -287,7 +280,7 @@ if(REALM_ENABLE_SYNC)
 	set(TEST_CLIENT_HEADERS
 	    client/metrics.hpp
 	    client/peer.hpp
-	    client/row_observer.hpp
+	    client/object_observer.hpp
 	    client/statistics.hpp
 	)
 
@@ -297,13 +290,7 @@ if(REALM_ENABLE_SYNC)
 	)
 
 	add_library(TestUtils STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
-	target_link_libraries(TestUtils Storage)
-
-	if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ANDROID)
-	    include(Findprocps)
-	    target_link_libraries(TestUtils rt ${PROCPS_LIBRARY})
-	    target_include_directories(TestUtils PRIVATE ${PROCPS_INCLUDE_DIR})
-	endif()
+	target_link_libraries(TestUtils PUBLIC Storage)
 
 	if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 	    # Embed the manifest on Windows. The manifest allows very long paths (>255).

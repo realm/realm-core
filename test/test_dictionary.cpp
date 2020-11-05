@@ -133,6 +133,52 @@ TEST(Dictionary_Links)
     };
 
     auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
+    auto cats = g.add_table_with_primary_key("cat", type_String, "name");
+    auto persons = g.add_table_with_primary_key("person", type_String, "name");
+    auto col_dict = persons->add_column_dictionary(*dogs, "dictionaries");
+
+    Obj adam = persons->create_object_with_primary_key("adam");
+    Obj pluto = dogs->create_object_with_primary_key("pluto");
+    Obj lady = dogs->create_object_with_primary_key("lady");
+    Obj garfield = cats->create_object_with_primary_key("garfield");
+
+    {
+        Dictionary dict = adam.get_dictionary(col_dict);
+        CHECK(dict.insert("Pet", pluto).second);
+        CHECK_EQUAL(pluto.get_backlink_count(), 1);
+        CHECK_NOT(dict.insert("Pet", lady).second);
+        CHECK_EQUAL(pluto.get_backlink_count(), 0);
+        CHECK_EQUAL(lady.get_backlink_count(*persons, col_dict), 1);
+        CHECK_EQUAL(lady.get_backlink(*persons, col_dict, 0), adam.get_key());
+        CHECK_EQUAL(lady.get_backlink_count(), 1);
+        CHECK_EQUAL(dict.get("Pet").get<ObjKey>(), lady.get_key());
+        lady.remove();
+        cmp(dict["Pet"], Mixed());
+        CHECK_THROW_ANY(dict.insert("Pet", garfield));
+        CHECK_THROW_ANY(dict.insert("Pet", garfield.get_key()));
+
+        // Reinsert lady
+        lady = dogs->create_object_with_primary_key("lady");
+        dict.insert("Pet", lady);
+        lady.invalidate(); // Make lady a tombstone :-(
+        cmp(dict["Pet"], Mixed());
+        lady = dogs->create_object_with_primary_key("lady");
+        cmp(dict["Pet"], Mixed(lady.get_key()));
+
+        auto invalid_link = pluto.get_link();
+        pluto.remove();
+        CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+    }
+}
+
+TEST(Dictionary_TypedLinks)
+{
+    Group g;
+    auto cmp = [this](Mixed x, Mixed y) {
+        CHECK_EQUAL(x, y);
+    };
+
+    auto dogs = g.add_table_with_primary_key("dog", type_String, "name");
     auto persons = g.add_table_with_primary_key("person", type_String, "name");
     auto col_dict = persons->add_column_dictionary(type_TypedLink, "dictionaries");
 
@@ -302,4 +348,27 @@ TEST(Dictionary_Performance)
     std::cout << nb_reps << " values in dictionary" << std::endl;
     std::cout << "    insertion: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/val" << std::endl;
     std::cout << "    lookup: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/val" << std::endl;
+}
+
+TEST(Dictionary_Tombstones)
+{
+    Group g;
+    auto foos = g.add_table_with_primary_key("class_Foo", type_Int, "id");
+    auto bars = g.add_table_with_primary_key("class_Bar", type_String, "id");
+    ColKey col_dict = foos->add_column_dictionary(type_Mixed, "dict", type_String);
+
+    auto foo = foos->create_object_with_primary_key(123);
+    auto a = bars->create_object_with_primary_key("a");
+    auto b = bars->create_object_with_primary_key("b");
+
+    auto dict = foo.get_dictionary(col_dict);
+    dict.insert("a", a);
+    dict.insert("b", b);
+
+    a.invalidate();
+
+    CHECK_EQUAL(dict.size(), 2);
+    CHECK((*dict.find("a")).second.is_unresolved_link());
+
+    CHECK(dict.find("b") != dict.end());
 }

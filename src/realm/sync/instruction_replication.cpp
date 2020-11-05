@@ -76,6 +76,9 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         case type_ObjectId: {
             return Instruction::Payload{value.get<ObjectId>()};
         }
+        case type_UUID: {
+            return Instruction::Payload{value.get<UUID>()};
+        }
         case type_TypedLink:
             [[fallthrough]];
         case type_Link: {
@@ -177,6 +180,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::Link;
         case type_ObjectId:
             return Type::ObjectId;
+        case type_UUID:
+            return Type::UUID;
         case type_Mixed:
             return Type::Null;
         case type_OldTable:
@@ -265,6 +270,9 @@ Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
     }
     else if (value.get_type() == type_ObjectId) {
         return value.get<ObjectId>();
+    }
+    else if (value.get_type() == type_UUID) {
+        return value.get<UUID>();
     }
     else {
         // Unsupported primary key type.
@@ -408,9 +416,14 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 {
     TrivialReplication::list_set(list, ndx, value);
 
-    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+    if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
-        return;
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
     }
 
     if (select_collection(list)) {
@@ -426,6 +439,16 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value)
 {
     TrivialReplication::list_insert(list, ndx, value);
+
+    if (!value.is_null()) {
+        // If link is unresolved, it should not be communicated.
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
+    }
 
     if (select_collection(list)) {
         auto sz = uint32_t(list.size());
@@ -455,9 +478,18 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 {
     TrivialReplication::set(table, col, key, value, variant);
 
-    if (!value.is_null() && value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
-        // If link is unresolved, it should not be communicated.
+    if (key.is_unresolved()) {
         return;
+    }
+
+    if (!value.is_null()) {
+        // If link is unresolved, it should not be communicated.
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
     }
 
     if (select_table(*table)) {
@@ -561,9 +593,19 @@ void SyncReplication::set_clear(const CollectionBase& set)
     }
 }
 
-void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed val)
+void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_insert(dict, key, val);
+    TrivialReplication::dictionary_insert(dict, key, value);
+
+    if (!value.is_null()) {
+        // If link is unresolved, it should not be communicated.
+        if (value.get_type() == type_Link && value.get<ObjKey>().is_unresolved()) {
+            return;
+        }
+        if (value.get_type() == type_TypedLink && value.get<ObjLink>().get_obj_key().is_unresolved()) {
+            return;
+        }
+    }
 
     if (select_collection(dict)) {
         Instruction::Update instr;
@@ -571,7 +613,7 @@ void SyncReplication::dictionary_insert(const CollectionBase& dict, Mixed key, M
         populate_path_instr(instr, dict);
         StringData key_value = key.get_string();
         instr.path.push_back(m_encoder.intern_string(key_value));
-        instr.value = as_payload(dict, val);
+        instr.value = as_payload(dict, value);
         instr.is_default = false;
         emit(instr);
     }
@@ -649,6 +691,10 @@ bool SyncReplication::select_table(const Table& table)
 
 bool SyncReplication::select_collection(const CollectionBase& view)
 {
+    if (view.get_key().is_unresolved()) {
+        return false;
+    }
+
     return select_table(*view.get_table());
 }
 
@@ -677,6 +723,11 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
 
         if (pk_type == type_ObjectId) {
             ObjectId id = obj.get<ObjectId>(pk_col);
+            return id;
+        }
+
+        if (pk_type == type_UUID) {
+            UUID id = obj.get<UUID>(pk_col);
             return id;
         }
 

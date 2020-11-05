@@ -27,7 +27,7 @@ using namespace realm::util::network::ssl;
 
 namespace {
 
-#ifdef REALM_INCLUDE_CERTS
+#if REALM_INCLUDE_CERTS
 
 const char* root_certs[] = {
 #include <realm/sync/noinst/root_certs.hpp>
@@ -636,7 +636,7 @@ void Stream::ssl_use_verify_callback(const std::function<SSLVerifyCallback>& cal
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
 
-#ifdef REALM_INCLUDE_CERTS
+#if REALM_INCLUDE_CERTS
 void Stream::ssl_use_included_certificates(std::error_code&)
 {
     REALM_ASSERT(!m_ssl_verify_callback);

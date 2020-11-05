@@ -384,14 +384,19 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     parser::ParserResult res = realm::parser::parse(query_string);
     realm::query_builder::apply_predicate(q, res.predicate, args, mapping);
 
-    CHECK_EQUAL(q.count(), num_results);
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
     // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
 
     parser::ParserResult res2 = realm::parser::parse(description);
     realm::query_builder::apply_predicate(q2, res2.predicate, args, mapping);
-    CHECK_EQUAL(q2.count(), num_results);
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
     return q2;
 }
 
@@ -1246,7 +1251,8 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     realm::parser::Predicate p = realm::parser::parse(query_string).predicate;
     realm::query_builder::apply_predicate(q, p, args);
 
-    CHECK_EQUAL(q.count(), num_results);
+    size_t q_count = q.count();
+    CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
     // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->where();
@@ -1254,7 +1260,11 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     realm::parser::Predicate p2 = realm::parser::parse(description).predicate;
     realm::query_builder::apply_predicate(q2, p2, args);
 
-    CHECK_EQUAL(q2.count(), num_results);
+    size_t q2_count = q2.count();
+    CHECK_EQUAL(q2_count, num_results);
+    if (q_count != num_results || q2_count != num_results) {
+        std::cout << "the query for the above failure is: '" << description << "'" << std::endl;
+    }
 }
 
 TEST(Parser_substitution)
@@ -2203,10 +2213,11 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 }
 
 TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
-           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>)
+           Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
 {
     Group g;
     TableRef t = g.add_table("table");
+    TestValueGenerator gen;
 
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same<underlying_type, TEST_TYPE>::value;
@@ -2214,12 +2225,11 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     auto col_link = t->add_column(*t, "link");
 
     auto obj1 = t->create_object();
-    std::vector<TEST_TYPE> values =
-        values_from_int<TEST_TYPE, underlying_type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
+    std::vector<TEST_TYPE> values = gen.values_from_int<TEST_TYPE>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
     auto obj2 = t->create_object(); // empty list
     auto obj3 = t->create_object(); // {1}
-    underlying_type value_1 = convert_for_test<underlying_type>(1);
+    underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
     obj3.get_list<TEST_TYPE>(col).add(value_1);
     auto obj4 = t->create_object(); // {1, 1}
     obj4.get_list<TEST_TYPE>(col).add(value_1);
@@ -2229,7 +2239,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         obj5.get_list<TEST_TYPE>(col).add(none);
     }
     else {
-        obj5.get_list<TEST_TYPE>(col).add(convert_for_test<underlying_type>(0));
+        obj5.get_list<TEST_TYPE>(col).add(gen.convert_for_test<underlying_type>(0));
     }
     for (auto it = t->begin(); it != t->end(); ++it) {
         it->set<ObjKey>(col_link, it->get_key()); // self links
@@ -3963,7 +3973,7 @@ TEST(Parser_ObjectIdTimestamp)
     // add one object with default values, we assume time > now, and null
     auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
     ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
-    CHECK_EQUAL(generated_pk.get_timestamp().get_seconds(), ts_now.get_seconds());
+    CHECK(std::abs(generated_pk.get_timestamp().get_seconds() - ts_now.get_seconds()) <= 1);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
     CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);
@@ -4258,6 +4268,66 @@ TEST(Parser_ObjectIdTimestamp)
     verify_query(test_context, table, util::format("nts <= %1", print_value(ids[2])), 3);
     verify_query(test_context, table, util::format("nts <= %1", print_value(ids[3])), 1);
 }
+
+TEST(Parser_UUID)
+{
+    Group g;
+    auto table = g.add_table_with_primary_key("table", type_UUID, "id");
+    auto pk_col_key = table->get_primary_key_column();
+    auto nullable_id_col_key = table->add_column(type_UUID, "nid", true);
+
+    UUID u1("3b241101-e2bb-4255-8caf-4136c566a961");
+    UUID u2("3b241101-e2bb-4255-8caf-294299afdce2");
+    UUID u3("3b241101-e2bb-4255-8caf-000000000003");
+    std::vector<UUID> ids = {u1, u2, u3};
+
+    for (auto id : ids) {
+        auto obj = table->create_object_with_primary_key({id});
+        obj.set(nullable_id_col_key, id);
+    }
+    // add one object with default values, it should be null for the nullable column
+    auto obj_generated = table->create_object_with_primary_key(UUID("3b241101-0000-0000-0000-4136c566a964"));
+    UUID generated_pk = obj_generated.get<UUID>(pk_col_key);
+    auto generated_nullable = obj_generated.get<util::Optional<UUID>>(nullable_id_col_key);
+    CHECK_NOT(generated_nullable);
+    size_t num_rows = table->size();
+    verify_query(test_context, table, "id == uuid(" + generated_pk.to_string() + ")", 1);
+    verify_query(test_context, table, "nid == uuid(" + generated_pk.to_string() + ")", 0);
+
+    // checks for NULL
+    verify_query(test_context, table, "id == NULL", 0);
+    verify_query(test_context, table, "nid == NULL", 1);
+    verify_query(test_context, table, "id != NULL", num_rows);
+    verify_query(test_context, table, "nid != NULL", num_rows - 1);
+
+    for (auto id : ids) {
+        verify_query(test_context, table, "id == uuid(" + id.to_string() + ")", 1);
+        verify_query(test_context, table, "nid == uuid(" + id.to_string() + ")", 1);
+        verify_query(test_context, table, "id != uuid(" + id.to_string() + ")", num_rows - 1);
+        verify_query(test_context, table, "nid != uuid(" + id.to_string() + ")", num_rows - 1);
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid > uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid >= uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid < uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid <= uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid BEGINSWITH uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid ENDSWITH uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid CONTAINS uuid(" + id.to_string() + ")", 0));
+        CHECK_THROW_ANY(verify_query(test_context, table, "nid LIKE uuid(" + id.to_string() + ")", 0));
+    }
+
+    // argument substitution checks
+    util::Any args[] = {u1, u2, u3, realm::null()};
+    size_t num_args = 4;
+    verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "id == $3", args, num_args, 0);
+    verify_query_sub(test_context, table, "nid == $0", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $1", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $2", args, num_args, 1);
+    verify_query_sub(test_context, table, "nid == $3", args, num_args, 1);
+}
+
 
 TEST(Parser_Decimal128)
 {

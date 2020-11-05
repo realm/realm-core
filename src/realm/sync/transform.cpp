@@ -170,7 +170,7 @@ struct TransformerImpl::Side {
         instr.path.m_path.clear();
         instr.path.m_path.reserve(other.path.size());
         for (auto& element : other.path.m_path) {
-            auto push = util::overloaded{
+            auto push = util::overload{
                 [&](uint32_t index) {
                     instr.path.m_path.push_back(index);
                 },
@@ -970,6 +970,8 @@ struct MergeUtils {
             }
             case Type::ObjectId:
                 return left.data.object_id == right.data.object_id;
+            case Type::UUID:
+                return left.data.uuid == right.data.uuid;
         }
 
         REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");
@@ -978,7 +980,7 @@ struct MergeUtils {
     bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
         noexcept
     {
-        auto pred = util::overloaded{
+        auto pred = util::overload{
             [&](uint32_t lhs, uint32_t rhs) {
                 return lhs == rhs;
             },
@@ -2099,7 +2101,7 @@ DEFINE_NESTED_MERGE(Instruction::ArrayErase)
 
 DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 {
-    if (same_path(left, right)) {
+    if (same_container(left, right)) {
         REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
         REALM_MERGE_ASSERT(left.index() < left.prior_size);
         REALM_MERGE_ASSERT(right.index() < right.prior_size);
