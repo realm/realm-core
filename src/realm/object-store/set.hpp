@@ -49,9 +49,9 @@ public:
     std::pair<size_t, bool> remove(const T&);
 
     template <class T, class Context>
-    size_t find(Context&, const T&);
+    size_t find(Context&, const T&) const;
     template <class T, class Context>
-    std::pair<size_t, bool> insert(Context&, T value, CreatePolicy = CreatePolicy::SetLink);
+    std::pair<size_t, bool> insert(Context&, const T& value, CreatePolicy = CreatePolicy::SetLink);
     template <class T, class Context>
     std::pair<size_t, bool> remove(Context&, const T&);
 
@@ -64,9 +64,6 @@ public:
 
     Set freeze(const std::shared_ptr<Realm>& realm) const;
     bool is_frozen() const noexcept;
-
-    template <typename T, typename Context>
-    size_t find(Context&, T&& value) const;
 
     util::Optional<Mixed> max(ColKey column = {}) const;
     util::Optional<Mixed> min(ColKey column = {}) const;
@@ -120,6 +117,30 @@ auto& Set::as() const
 {
     REALM_ASSERT(dynamic_cast<realm::Set<T>*>(m_set_base.get()));
     return static_cast<realm::Set<T>&>(*m_set_base);
+}
+
+template <class T, class Context>
+size_t Set::find(Context& ctx, const T& value) const
+{
+    return dispatch([&](auto t) {
+        return this->find(ctx.template unbox<std::decay_t<decltype(*t)>>(value, CreatePolicy::Skip));
+    });
+}
+
+template <class T, class Context>
+std::pair<size_t, bool> Set::insert(Context& ctx, const T& value, CreatePolicy policy)
+{
+    return dispatch([&](auto t) {
+        return this->insert(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+    });
+}
+
+template <class T, class Context>
+std::pair<size_t, bool> Set::remove(Context& ctx, const T& value)
+{
+    return dispatch([&](auto t) {
+        return this->remove(ctx.template unbox<std::decay_t<decltype(*t)>>(value));
+    });
 }
 
 } // namespace realm::object_store
