@@ -25,6 +25,24 @@ Set::Set(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
 {
 }
 
+const ObjectSchema& Set::get_object_schema() const
+{
+    verify_attached();
+
+    REALM_ASSERT(get_type() == PropertyType::Object);
+    auto object_schema = m_object_schema.load();
+    if (!object_schema) {
+        auto table = m_set_base->get_table();
+        auto col = m_set_base->get_col_key();
+        auto target_table = table->get_link_target(col);
+        auto object_type = ObjectStore::object_type_for_table_name(target_table->get_name());
+        auto it = m_realm->schema().find(object_type);
+        REALM_ASSERT(it != m_realm->schema().end());
+        m_object_schema = object_schema = &*it;
+    }
+    return *m_object_schema;
+}
+
 realm::ObjKey Set::get_parent_object_key() const noexcept
 {
     return m_set_base->get_key();

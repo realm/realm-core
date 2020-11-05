@@ -33,7 +33,7 @@ public:
         return m_type;
     }
 
-    const ObjectSchema& get_object_schema() const noexcept;
+    const ObjectSchema& get_object_schema() const;
 
     bool is_valid() const;
     void verify_attached() const;
