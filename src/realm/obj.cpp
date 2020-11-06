@@ -1962,9 +1962,28 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
+DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
+{
+    return std::make_unique<Dictionary>(Obj(*this), col_key);
+}
+
 Dictionary Obj::get_dictionary(StringData col_name) const
 {
     return get_dictionary(get_column_key(col_name));
+}
+
+CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
+{
+    if (col_key.is_list()) {
+        return get_listbase_ptr(col_key);
+    }
+    else if (col_key.is_set()) {
+        return get_setbase_ptr(col_key);
+    }
+    else if (col_key.is_dictionary()) {
+        return get_dictionary_ptr(col_key);
+    }
+    return {};
 }
 
 void Obj::assign_pk_and_backlinks(const Obj& other)

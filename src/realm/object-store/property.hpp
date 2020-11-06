@@ -65,9 +65,10 @@ enum class PropertyType : unsigned short {
     Nullable = 64,
     Array = 128,
     Set = 256,
+    Dictionary = 512,
 
-    Collection = Array | Set,
-    Flags = Nullable | Array | Set
+    Collection = Array | Set | Dictionary,
+    Flags = Nullable | Collection
 };
 
 struct Property {
@@ -189,6 +190,11 @@ inline constexpr bool is_set(PropertyType a)
     return to_underlying(a & PropertyType::Set) == to_underlying(PropertyType::Set);
 }
 
+inline constexpr bool is_dictionary(PropertyType a)
+{
+    return to_underlying(a & PropertyType::Dictionary) == to_underlying(PropertyType::Dictionary);
+}
+
 inline constexpr bool is_collection(PropertyType a)
 {
     return to_underlying(a & PropertyType::Collection) != 0;
@@ -254,6 +260,9 @@ static const char* string_for_property_type(PropertyType type)
     }
     if (is_set(type)) {
         return "set";
+    }
+    if (is_dictionary(type)) {
+        return "dictionary";
     }
     switch (type & ~PropertyType::Flags) {
         case PropertyType::String:
@@ -333,6 +342,12 @@ inline std::string Property::type_string() const
         if (type == PropertyType::Object)
             return "set<" + object_type + ">";
         return std::string("set<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+    }
+    if (is_dictionary(type)) {
+        REALM_ASSERT(type != PropertyType::LinkingObjects);
+        if (type == PropertyType::Object)
+            return "dictionary<string, " + object_type + ">";
+        return std::string("dictionary<string, ") + string_for_property_type(type & ~PropertyType::Flags) + ">";
     }
     switch (auto base_type = (type & ~PropertyType::Flags)) {
         case PropertyType::Object:

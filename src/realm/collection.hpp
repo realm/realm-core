@@ -134,11 +134,23 @@ public:
     virtual size_t size() const = 0;
     virtual bool is_null(size_t ndx) const = 0;
     virtual Mixed get_any(size_t ndx) const = 0;
+    virtual void clear() = 0;
 
     virtual Mixed min(size_t* return_ndx = nullptr) const = 0;
     virtual Mixed max(size_t* return_ndx = nullptr) const = 0;
     virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
     virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
+
+
+    std::unique_ptr<CollectionBase> clone() const
+    {
+        return m_obj.get_collection_ptr(m_col_key);
+    }
+
+    TableRef get_target_table() const
+    {
+        return m_obj.get_target_table(m_col_key);
+    }
 
     // Modifies a vector of indices so that they refer to values sorted according
     // to the specified sort order

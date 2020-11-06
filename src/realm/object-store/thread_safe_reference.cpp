@@ -116,7 +116,7 @@ public:
         : Payload(*r.get_realm())
         , m_ordering(r.get_descriptor_ordering())
     {
-        if (auto list = r.get_list()) {
+        if (auto list = r.get_collection()) {
             m_key = list->get_key();
             m_table_key = list->get_table()->get_key();
             m_col_key = list->get_col_key();

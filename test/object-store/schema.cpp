@@ -132,6 +132,7 @@ TEST_CASE("ObjectSchema")
         table->add_column(*target, "object");
         table->add_column_list(*target, "array");
         table->add_column_set(*target, "set");
+        table->add_column_dictionary(*target, "dictionary");
 
         table->add_column(type_Int, "int?", true);
         table->add_column(type_Bool, "bool?", true);
@@ -194,6 +195,21 @@ TEST_CASE("ObjectSchema")
         add_set(table, type_Decimal, "decimal? set", true);
         add_set(table, type_UUID, "uuid? set", true);
 
+        auto add_dictionary = [](TableRef table, DataType type, StringData name) {
+            table->add_column_dictionary(type, name);
+        };
+
+        add_dictionary(table, type_Int, "int dictionary");
+        add_dictionary(table, type_Bool, "bool dictionary");
+        add_dictionary(table, type_Float, "float dictionary");
+        add_dictionary(table, type_Double, "double dictionary");
+        add_dictionary(table, type_String, "string dictionary");
+        add_dictionary(table, type_Binary, "data dictionary");
+        add_dictionary(table, type_Timestamp, "date dictionary");
+        add_dictionary(table, type_ObjectId, "object id dictionary");
+        add_dictionary(table, type_Decimal, "decimal dictionary");
+        add_dictionary(table, type_UUID, "uuid dictionary");
+
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
         indexed_cols.push_back(table->add_column(type_Bool, "indexed bool"));
@@ -247,6 +263,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
         REQUIRE_PROPERTY("set", Set | PropertyType::Object, "target");
+        REQUIRE_PROPERTY("dictionary", Dictionary | PropertyType::Object, "target");
 
         REQUIRE_PROPERTY("int?", Int | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool?", Bool | PropertyType::Nullable);
@@ -300,6 +317,17 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("object id? set", ObjectId | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("uuid? set", UUID | PropertyType::Set | PropertyType::Nullable);
+
+        REQUIRE_PROPERTY("int dictionary", Int | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("bool dictionary", Bool | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("float dictionary", Float | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("double dictionary", Double | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("string dictionary", String | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("data dictionary", Data | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("date dictionary", Date | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("object id dictionary", ObjectId | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("decimal dictionary", Decimal | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("uuid dictionary", UUID | PropertyType::Dictionary);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});

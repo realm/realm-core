@@ -598,6 +598,7 @@ public:
     TableRef import_copy_of(const ConstTableRef original);
     LnkLst import_copy_of(const LnkLst& original);
     LstBasePtr import_copy_of(const LstBase& original);
+    CollectionBasePtr import_copy_of(const CollectionBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
 
     // handover of the heavier Query and TableView

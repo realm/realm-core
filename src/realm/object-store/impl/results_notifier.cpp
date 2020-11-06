@@ -222,7 +222,7 @@ void ResultsNotifier::do_attach_to(Transaction& sg)
 
 ListResultsNotifier::ListResultsNotifier(Results& target)
     : ResultsNotifierBase(target.get_realm())
-    , m_list(target.get_list())
+    , m_list(target.get_collection())
 {
     auto& ordering = target.get_descriptor_ordering();
     for (size_t i = 0, sz = ordering.size(); i < sz; i++) {
