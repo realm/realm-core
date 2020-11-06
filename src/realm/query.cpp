@@ -458,142 +458,42 @@ Query& Query::add_size_condition(ColKey column_key, int64_t value)
     return *this;
 }
 
-
-template <class ColumnType>
+// Two column methods, any type
 Query& Query::equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Equal>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-
-// Two column methods, any type
-template <class ColumnType>
 Query& Query::less(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Less>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::less_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<LessEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::greater(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Greater>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::greater_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<GreaterEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::not_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<NotEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
-}
-
-// column vs column, integer
-Query& Query::equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::not_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::less_int(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::greater_int(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayInteger>(column_key1, column_key2);
-}
-
-
-// column vs column, float
-Query& Query::not_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::less_float(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::greater_float(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayFloat>(column_key1, column_key2);
-}
-
-// column vs column, double
-Query& Query::equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayDouble>(column_key1, column_key2);
-}
-Query& Query::greater_double(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayDouble>(column_key1, column_key2);
-}
-Query& Query::less_double(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::not_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayDouble>(column_key1, column_key2);
 }
 
 // null vs column

@@ -1614,6 +1614,15 @@ public:
         m_dD = 100.0;
     }
 
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + this->describe_condition() +
+               " " +
+               (m_value_is_null ? util::serializer::print_value(realm::null())
+                                : util::serializer::print_value(m_value));
+    }
+
 protected:
     MixedNodeBase(const MixedNodeBase& from)
         : ParentNode(from)
@@ -1655,13 +1664,9 @@ public:
         return realm::npos;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    virtual std::string describe_condition() const override
     {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " +
-               (m_value_is_null ? util::serializer::print_value(realm::null())
-                                : util::serializer::print_value(MixedNode::m_value));
+        return TConditionFunction::description();
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -2470,35 +2475,45 @@ private:
     size_t find_first_no_overlap(size_t start, size_t end);
 };
 
-
 // Compare two columns with eachother row-by-row
-template <class LeafType, class TConditionFunction>
-class TwoColumnsNode : public ParentNode {
+class TwoColumnsNodeBase : public ParentNode {
 public:
-    using TConditionValue = typename LeafType::value_type;
-
-    TwoColumnsNode(ColKey column1, ColKey column2)
+    TwoColumnsNodeBase(ColKey column1, ColKey column2)
     {
         m_dT = 100.0;
         m_condition_column_key1 = column1;
         m_condition_column_key2 = column2;
     }
 
-    ~TwoColumnsNode() noexcept override
+    ~TwoColumnsNodeBase() noexcept override {}
+    void table_changed() override
     {
+        if (this->m_table) {
+            if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
+                throw std::runtime_error(util::format("queries comparing two properties are not yet supported for "
+                                                      "collections (list/set/dictionary) (%1 and %2)",
+                                                      ParentNode::m_table->get_column_name(m_condition_column_key1),
+                                                      ParentNode::m_table->get_column_name(m_condition_column_key2)));
+            }
+            ParentNode::m_table->check_column(m_condition_column_key1);
+            ParentNode::m_table->check_column(m_condition_column_key2);
+        }
     }
 
+    static std::unique_ptr<ArrayPayload> update_cached_leaf_pointers_for_column(Allocator& alloc,
+                                                                                const ColKey& col_key);
     void cluster_changed() override
     {
-        m_array_ptr1 = nullptr;
-        m_array_ptr1 = LeafPtr(new (&m_leaf_cache_storage1) LeafType(m_table.unchecked_ptr()->get_alloc()));
-        this->m_cluster->init_leaf(this->m_condition_column_key1, m_array_ptr1.get());
-        m_leaf_ptr1 = m_array_ptr1.get();
-
-        m_array_ptr2 = nullptr;
-        m_array_ptr2 = LeafPtr(new (&m_leaf_cache_storage2) LeafType(m_table.unchecked_ptr()->get_alloc()));
-        this->m_cluster->init_leaf(this->m_condition_column_key2, m_array_ptr2.get());
-        m_leaf_ptr2 = m_array_ptr2.get();
+        if (!m_leaf_ptr1) {
+            m_leaf_ptr1 =
+                update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key1);
+        }
+        if (!m_leaf_ptr2) {
+            m_leaf_ptr2 =
+                update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key2);
+        }
+        this->m_cluster->init_leaf(m_condition_column_key1, m_leaf_ptr1.get());
+        this->m_cluster->init_leaf(m_condition_column_key2, m_leaf_ptr2.get());
     }
 
     virtual std::string describe(util::serializer::SerialisationState& state) const override
@@ -2508,86 +2523,61 @@ public:
                " " + state.describe_column(ParentNode::m_table, m_condition_column_key2);
     }
 
-    virtual std::string describe_condition() const override
-    {
-        return TConditionFunction::description();
-    }
-
     void init(bool will_query_ranges) override
     {
         ParentNode::init(will_query_ranges);
         m_dD = 100.0;
     }
 
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        size_t s = start;
-
-        while (s < end) {
-            if (std::is_same<TConditionValue, int64_t>::value) {
-                // For int64_t we've created an array intrinsics named compare_leafs which template expands bitwidths
-                // of boths arrays to make Get faster.
-                QueryState<int64_t> qs(act_ReturnFirst);
-                bool resume = m_leaf_ptr1->template compare_leafs<TConditionFunction, act_ReturnFirst>(
-                    m_leaf_ptr2, start, end, 0, &qs, CallbackDummy());
-
-                if (resume)
-                    s = end;
-                else
-                    return to_size_t(qs.m_state);
-            }
-            else {
-// This is for float and double.
-
-#if 0 && defined(REALM_COMPILER_AVX)
-// AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
-//
-// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
-// or movemask_cmp_ps (gcc/clang)
-//
-// See https://github.com/rrrlasse/realm/tree/AVX for an example of utilizing AVX for a two-column search which has
-// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs
-// 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
-#endif
-
-                TConditionValue v1 = m_leaf_ptr1->get(s);
-                TConditionValue v2 = m_leaf_ptr2->get(s);
-                TConditionFunction C;
-
-                if (C(v1, v2))
-                    return s;
-                else
-                    s++;
-            }
-        }
-        return not_found;
-    }
-
-    std::unique_ptr<ParentNode> clone() const override
-    {
-        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this));
-    }
-
-    TwoColumnsNode(const TwoColumnsNode& from)
+    TwoColumnsNodeBase(const TwoColumnsNodeBase& from)
         : ParentNode(from)
         , m_condition_column_key1(from.m_condition_column_key1)
         , m_condition_column_key2(from.m_condition_column_key2)
     {
     }
 
-private:
+protected:
     mutable ColKey m_condition_column_key1;
     mutable ColKey m_condition_column_key2;
+    std::unique_ptr<ArrayPayload> m_leaf_ptr1 = nullptr;
+    std::unique_ptr<ArrayPayload> m_leaf_ptr2 = nullptr;
+};
 
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
 
-    LeafCacheStorage m_leaf_cache_storage1;
-    LeafPtr m_array_ptr1;
-    const LeafType* m_leaf_ptr1 = nullptr;
-    LeafCacheStorage m_leaf_cache_storage2;
-    LeafPtr m_array_ptr2;
-    const LeafType* m_leaf_ptr2 = nullptr;
+template <class TConditionFunction>
+class TwoColumnsNode : public TwoColumnsNodeBase {
+public:
+    using TwoColumnsNodeBase::TwoColumnsNodeBase;
+    ~TwoColumnsNode() noexcept override {}
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        size_t s = start;
+        while (s < end) {
+            Mixed v1 = m_leaf_ptr1->get_any(s);
+            Mixed v2 = m_leaf_ptr2->get_any(s);
+            if (TConditionFunction()(v1, v2, v1.is_null(), v2.is_null()))
+                return s;
+            else
+                s++;
+        }
+        return not_found;
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<TConditionFunction>(*this));
+    }
+
+protected:
+    TwoColumnsNode(const TwoColumnsNode& from, Transaction* tr)
+        : TwoColumnsNode(from, tr)
+    {
+    }
 };
 
 

@@ -435,6 +435,48 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,
+                                                                                         const ColKey& col_key)
+{
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            if (col_key.is_nullable()) {
+                return std::make_unique<ArrayIntNull>(alloc);
+            }
+            return std::make_unique<ArrayInteger>(alloc);
+        case col_type_Bool:
+            return std::make_unique<ArrayBoolNull>(alloc);
+        case col_type_String:
+            return std::make_unique<ArrayString>(alloc);
+        case col_type_Binary:
+            return std::make_unique<ArrayBinary>(alloc);
+        case col_type_Mixed:
+            return std::make_unique<ArrayMixed>(alloc);
+        case col_type_Timestamp:
+            return std::make_unique<ArrayTimestamp>(alloc);
+        case col_type_Float:
+            return std::make_unique<ArrayFloatNull>(alloc);
+        case col_type_Double:
+            return std::make_unique<ArrayDoubleNull>(alloc);
+        case col_type_Decimal:
+            return std::make_unique<ArrayDecimal128>(alloc);
+        case col_type_Link:
+            return std::make_unique<ArrayKey>(alloc);
+        case col_type_ObjectId:
+            return std::make_unique<ArrayObjectIdNull>(alloc);
+        case col_type_UUID:
+            return std::make_unique<ArrayUUIDNull>(alloc);
+        case col_type_TypedLink:
+        case col_type_BackLink:
+        case col_type_LinkList:
+        case col_type_OldDateTime:
+        case col_type_OldTable:
+            break;
+    };
+    REALM_UNREACHABLE();
+    return {};
+}
+
 } // namespace realm
 
 size_t NotNode::find_first_local(size_t start, size_t end)
