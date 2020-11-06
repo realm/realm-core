@@ -58,9 +58,11 @@ public:
         return m_type;
     }
 
+    virtual ~Collection();
+
     // Get the ObjectSchema of the values in this List
     // Only valid if get_type() returns PropertyType::Object
-    ObjectSchema const& get_object_schema() const;
+    const ObjectSchema& get_object_schema() const;
 
     ColKey get_parent_column_key() const;
     ObjKey get_parent_object_key() const;
@@ -87,8 +89,6 @@ protected:
     Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
 
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
-
-    virtual ~Collection();
 
     Collection(const Collection&);
     Collection& operator=(const Collection&);

@@ -56,6 +56,10 @@ private:
 template <typename Fn>
 auto Dictionary::dispatch(Fn&& fn) const
 {
+    // Similar to "switch_on_type", but without the util::Optional
+    // cases. These cases are not supported by Mixed and are not
+    // relevant for Dictionary
+    // FIXME: use switch_on_type
     verify_attached();
     using PT = PropertyType;
     auto type = get_type();

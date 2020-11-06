@@ -22,8 +22,7 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
 
-namespace realm {
-namespace object_store {
+namespace realm::object_store {
 
 Collection::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
     : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
@@ -93,6 +92,7 @@ void Collection::validate(const Obj& obj) const
 {
     if (!obj.is_valid())
         throw std::invalid_argument("Object has been deleted or invalidated");
+    // FIXME: This does not work for TypedLink.
     auto target = m_coll_base->get_target_table();
     if (obj.get_table() != target)
         throw std::invalid_argument(util::format("Object of type (%1) does not match List type (%2)",
@@ -155,5 +155,4 @@ Results Collection::as_results() const
     return Results(m_realm, m_coll_base);
 }
 
-} // namespace object_store
-} // namespace realm
+} // namespace realm::object_store

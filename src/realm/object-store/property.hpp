@@ -262,7 +262,7 @@ static const char* string_for_property_type(PropertyType type)
         return "set";
     }
     if (is_dictionary(type)) {
-        return "dictionary string->";
+        return "dictionary";
     }
     switch (type & ~PropertyType::Flags) {
         case PropertyType::String:
