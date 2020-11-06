@@ -7,6 +7,7 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * `Obj::set_list_values` inappropriately resizes list for LinkList causing LogicError to be thrown. ([#4028](https://github.com/realm/realm-core/issues/4028), since v6.0.0)
 * Set the supported deployment targets for the Swift package, which fixes errors when archiving an iOS app which depends on it.
+* Reenable filelock emulation on watchOS so that the OS does not kill the app when it is suspended while a Realm is open on watchOS 7 ([Cocoa #6861](https://github.com/realm/realm-cocoa/issues/6861), since v6.1.4).
 
 ### Breaking changes
 * None.
