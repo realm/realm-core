@@ -62,7 +62,7 @@ public:
 
     void remove_all();
 
-    // Replace the values in this list with the values from an enumerable object
+    // Replace the values in this set with the values from an enumerable object
     template <typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
@@ -187,22 +187,9 @@ void Set::assign(Context& ctx, T&& values, CreatePolicy policy)
     if (!policy.diff)
         remove_all();
 
-    size_t sz = size();
-    size_t index = 0;
     ctx.enumerate_collection(values, [&](auto&& element) {
         this->insert(ctx, element, policy);
     });
-    ctx.enumerate_collection(values, [&](auto&& element) {
-//        if (index >= sz)
-            this->insert(ctx, element, policy);
-//        else if (policy.diff)
-//            this->set_if_different(ctx, index, element, policy);
-//        else
-//            this->set(ctx, index, element, policy);
-        index++;
-    });
-//    while (index < sz)
-//        remove(--sz);
 }
 
 } // namespace realm::object_store
