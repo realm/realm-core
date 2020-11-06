@@ -297,6 +297,12 @@ std::pair<size_t, bool> Set::remove<int>(const int& value)
     return remove(int64_t(value));
 }
 
+void Set::remove_all()
+{
+    verify_in_transaction();
+    m_set_base->clear();
+}
+
 template <>
 size_t Set::find<int>(const int& value) const
 {

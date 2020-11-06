@@ -230,7 +230,7 @@ public:
     }
     void set(size_t ndx, ObjKey value);
     void insert(size_t ndx, ObjKey value);
-    ObjKey get(size_t ndx) const;
+    ObjKey get(size_t ndx) const override;
     ObjKey get_key(size_t ndx) const override;
     void remove(size_t ndx);
     void remove(size_t from, size_t to) override;

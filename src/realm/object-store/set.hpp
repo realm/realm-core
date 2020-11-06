@@ -56,9 +56,15 @@ public:
     template <class T, class Context>
     size_t find(Context&, const T&) const;
     template <class T, class Context>
-    std::pair<size_t, bool> insert(Context&, const T& value, CreatePolicy = CreatePolicy::SetLink);
+    std::pair<size_t, bool> insert(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
     template <class T, class Context>
     std::pair<size_t, bool> remove(Context&, const T&);
+
+    void remove_all();
+
+    // Replace the values in this list with the values from an enumerable object
+    template <typename T, typename Context>
+    void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
 
     template <typename Context>
     auto get(Context&, size_t row_ndx) const;
@@ -88,9 +94,6 @@ public:
     bool operator==(const Set& rhs) const noexcept;
 
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
-
-    template <class T, class Context>
-    void assign(Context&, T value, CreatePolicy = CreatePolicy::SetLink);
 
     struct InvalidatedException : public std::logic_error {
         InvalidatedException()
@@ -155,7 +158,7 @@ auto Set::get(Context& ctx, size_t row_ndx) const
 }
 
 template <class T, class Context>
-std::pair<size_t, bool> Set::insert(Context& ctx, const T& value, CreatePolicy policy)
+std::pair<size_t, bool> Set::insert(Context& ctx, T&& value, CreatePolicy policy)
 {
     return dispatch([&](auto t) {
         return this->insert(ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
@@ -168,6 +171,38 @@ std::pair<size_t, bool> Set::remove(Context& ctx, const T& value)
     return dispatch([&](auto t) {
         return this->remove(ctx.template unbox<std::decay_t<decltype(*t)>>(value));
     });
+}
+
+template <typename T, typename Context>
+void Set::assign(Context& ctx, T&& values, CreatePolicy policy)
+{
+    if (ctx.is_same_set(*this, values))
+        return;
+
+    if (ctx.is_null(values)) {
+        remove_all();
+        return;
+    }
+
+    if (!policy.diff)
+        remove_all();
+
+    size_t sz = size();
+    size_t index = 0;
+    ctx.enumerate_collection(values, [&](auto&& element) {
+        this->insert(ctx, element, policy);
+    });
+    ctx.enumerate_collection(values, [&](auto&& element) {
+//        if (index >= sz)
+            this->insert(ctx, element, policy);
+//        else if (policy.diff)
+//            this->set_if_different(ctx, index, element, policy);
+//        else
+//            this->set(ctx, index, element, policy);
+        index++;
+    });
+//    while (index < sz)
+//        remove(--sz);
 }
 
 } // namespace realm::object_store

@@ -83,7 +83,7 @@ public:
 
     // Invoke `fn` with each of the values from an enumerable type
     template <typename Func>
-    void enumerate_list(util::Any& value, Func&& fn)
+    void enumerate_collection(util::Any& value, Func&& fn)
     {
         for (auto&& v : util::any_cast<AnyVector&>(value))
             fn(v);
@@ -94,6 +94,14 @@ public:
     {
         if (auto list2 = util::any_cast<List>(&value))
             return list == *list2;
+        return false;
+    }
+
+    // Determine if `value` boxes the same Set as `set`
+    bool is_same_set(object_store::Set const& set, util::Any const& value)
+    {
+        if (auto set2 = util::any_cast<object_store::Set>(&value))
+            return set == *set2;
         return false;
     }
 
