@@ -202,6 +202,7 @@ void Obj::remove()
 void Obj::invalidate()
 {
     m_table.cast_away_const()->invalidate_object(m_key);
+    m_key = m_key.get_unresolved();
 }
 
 ColKey Obj::get_column_key(StringData col_name) const
