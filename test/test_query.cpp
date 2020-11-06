@@ -2437,11 +2437,13 @@ TEST(Query_TwoColumnsDifferentTables)
     auto table_b = g.add_table("table b");
     ColKey col_a = table_a->add_column(type_Float, "float");
     ColKey col_b = table_b->add_column(type_Float, "float");
+    ColKey col_c = table_b->add_column(type_Float, "another float");
     table_a->create_object();
     table_a->create_object();
     table_b->create_object();
 
     CHECK_THROW_ANY(table_a->where().equal(col_a, col_b).count());
+    CHECK_THROW_ANY(table_a->where().equal(col_b, col_c).count());
     CHECK_THROW_ANY((table_a->column<Float>(col_a) == table_b->column<Float>(col_b)).count());
 }
 

@@ -2495,14 +2495,8 @@ public:
                                                       ParentNode::m_table->get_column_name(m_condition_column_key1),
                                                       ParentNode::m_table->get_column_name(m_condition_column_key2)));
             }
-            if (!ParentNode::m_table->valid_column(m_condition_column_key1) ||
-                !ParentNode::m_table->valid_column(m_condition_column_key2)) {
-                throw std::runtime_error(util::format(
-                    "Comparison between two properties must be linked with a relationship or exist on the same "
-                    "Table. For query applied on %1 with properties: %2 and %3)",
-                    ParentNode::m_table->get_name(), ParentNode::m_table->get_column_name(m_condition_column_key1),
-                    ParentNode::m_table->get_column_name(m_condition_column_key2)));
-            }
+            ParentNode::m_table->check_column(m_condition_column_key1);
+            ParentNode::m_table->check_column(m_condition_column_key2);
         }
     }
 

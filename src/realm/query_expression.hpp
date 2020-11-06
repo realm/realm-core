@@ -982,16 +982,12 @@ public:
             ConstTableRef t_right = right_col->get_base_table();
             REALM_ASSERT_DEBUG(t);
             REALM_ASSERT_DEBUG(t_right);
-            ColKey left_base_col_key =
-                left_col->links_exist() ? left_col->get_link_map().get_column_at(0) : left_col->column_key();
-            ColKey right_base_col_key =
-                right_col->links_exist() ? right_col->get_link_map().get_column_at(0) : right_col->column_key();
             // we only support multi column comparisons if they stem from the same table
-            if (!t->valid_column(left_base_col_key) || !t->valid_column(right_base_col_key)) {
+            if (t->get_key() != t_right->get_key()) {
                 throw std::runtime_error(util::format(
                     "Comparison between two properties must be linked with a relationship or exist on the same "
                     "Table (%1 and %2)",
-                    t->get_name(), right_col->get_base_table()->get_name()));
+                    t->get_name(), t_right->get_name()));
             }
             if (!left_col->links_exist() && !right_col->links_exist()) {
                 if (std::is_same_v<Cond, Less>)
@@ -1790,12 +1786,6 @@ public:
     {
         REALM_ASSERT(!m_tables.empty());
         return m_tables.back();
-    }
-
-    ColKey get_column_at(size_t ndx)
-    {
-        REALM_ASSERT_EX(ndx < m_link_column_keys.size(), ndx, m_link_column_keys.size());
-        return m_link_column_keys[ndx];
     }
 
     bool links_exist() const
