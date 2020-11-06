@@ -451,6 +451,24 @@ TEST(Unresolved_CondensedIndices)
     CHECK_EQUAL(list1.get_object(0).get_key(), obj456.get_key());
     list2 = list1;
     CHECK_EQUAL(list2.size(), 1);
+
+
+    // Check that find methods return condensed indices.
+
+    CHECK_EQUAL(list1.find_first(obj123.get_key()), not_found);
+    CHECK_EQUAL(list1.find_first(obj456.get_key()), 0);
+
+    std::vector<size_t> found_indices;
+    list1.find_all(obj123.get_key(), [&](size_t index) {
+        found_indices.push_back(index);
+    });
+    CHECK_EQUAL(found_indices.size(), 0);
+    found_indices.clear();
+    list1.find_all(obj456.get_key(), [&](size_t index) {
+        found_indices.push_back(index);
+    });
+    CHECK_EQUAL(found_indices.size(), 1);
+    CHECK_EQUAL(found_indices[0], 0);
 }
 
 #endif
