@@ -98,7 +98,7 @@ Results& Results::operator=(Results&&) = default;
 
 Results::Mode Results::get_mode() const noexcept
 {
-    CheckedUniqueLock lock(m_mutex);
+    util::CheckedUniqueLock lock(m_mutex);
     return m_mode;
 }
 
@@ -407,9 +407,7 @@ size_t Results::index_of(Obj const& row)
     if (m_table && row.get_table() != m_table) {
         throw IncorrectTableException(
             ObjectStore::object_type_for_table_name(m_table->get_name()),
-            ObjectStore::object_type_for_table_name(row.get_table()->get_name()),
-            "Attempting to get the index of a Row of the wrong type"
-        );
+            ObjectStore::object_type_for_table_name(row.get_table()->get_name()));
     }
 
     switch (m_mode) {
@@ -486,7 +484,7 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
             REALM_COMPILER_HINT_UNREACHABLE();
     }
     switch (type) {
-        case type_Timestamp: case type_Double: case type_Float: case type_Int: break;
+        case type_Timestamp: case type_Double: case type_Float: case type_Int: case type_Decimal: break;
         default: throw UnsupportedColumnTypeException{column, *m_table, name};
     }
     return type;
@@ -532,6 +530,15 @@ struct AggregateHelper<Timestamp, Table> {
     Mixed avg(ColKey col, size_t*) { throw Results::UnsupportedColumnTypeException{col, table, "avg"}; }
 };
 
+template<typename Table>
+struct AggregateHelper<Decimal128, Table> {
+    Table& table;
+    Mixed min(ColKey col, ObjKey* obj)   { return table.minimum_decimal(col, obj);   }
+    Mixed max(ColKey col, ObjKey* obj)   { return table.maximum_decimal(col, obj);   }
+    Mixed sum(ColKey col)                { return table.sum_decimal(col);            }
+    Mixed avg(ColKey col, size_t* count) { return table.average_decimal(col, count); }
+};
+
 struct ListAggregateHelper {
     LstBase& list;
     Mixed min(ColKey, size_t* ndx)   { return list.min(ndx);   }
@@ -545,6 +552,8 @@ template<> struct AggregateHelper<int64_t, LstBase&> : ListAggregateHelper
 template<> struct AggregateHelper<double,  LstBase&> : ListAggregateHelper
 { AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
 template<> struct AggregateHelper<float,   LstBase&> : ListAggregateHelper
+{ AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
+template<> struct AggregateHelper<Decimal128,   LstBase&> : ListAggregateHelper
 { AggregateHelper(LstBase& l) : ListAggregateHelper{l} {} };
 
 template<>
@@ -562,6 +571,7 @@ Mixed call_with_helper(Func&& func, Table&& table, DataType type)
         case type_Double:    return func(AggregateHelper<double, Table>{table});
         case type_Float:     return func(AggregateHelper<Float, Table>{table});
         case type_Int:       return func(AggregateHelper<Int, Table>{table});
+        case type_Decimal:   return func(AggregateHelper<Decimal128, Table>{table});
         default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
@@ -618,13 +628,13 @@ util::Optional<Mixed> Results::sum(ColKey column)
     return aggregate(column, "sum", [&](auto&& helper) { return helper.sum(column); });
 }
 
-util::Optional<double> Results::average(ColKey column)
+util::Optional<Mixed> Results::average(ColKey column)
 {
     size_t value_count = 0;
     auto results = aggregate(column, "avg", [&](auto&& helper) {
         return helper.avg(column, &value_count);
     });
-    return value_count == 0 ? none : util::make_optional(results->get_double());
+    return value_count == 0 ? none : results;
 }
 
 void Results::clear()
@@ -635,10 +645,7 @@ void Results::clear()
             return;
         case Mode::Table:
             validate_write();
-            if (m_realm->is_partial())
-                m_table->where().find_all().clear();
-            else
-                const_cast<Table&>(*m_table).clear();
+            const_cast<Table&>(*m_table).clear();
             break;
         case Mode::Query:
             // Not using Query:remove() because building the tableview and
@@ -689,7 +696,7 @@ PropertyType Results::do_get_type() const
         case Mode::Table:
             return PropertyType::Object;
         case Mode::List:
-            return ObjectSchema::from_core_type(*m_list->get_table(), m_list->get_col_key());
+            return ObjectSchema::from_core_type(m_list->get_col_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
@@ -1028,10 +1035,13 @@ REALM_RESULTS_TYPE(double)
 REALM_RESULTS_TYPE(StringData)
 REALM_RESULTS_TYPE(BinaryData)
 REALM_RESULTS_TYPE(Timestamp)
+REALM_RESULTS_TYPE(ObjectId)
+REALM_RESULTS_TYPE(Decimal)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)
 REALM_RESULTS_TYPE(util::Optional<double>)
+REALM_RESULTS_TYPE(util::Optional<ObjectId>)
 
 #undef REALM_RESULTS_TYPE
 
@@ -1071,12 +1081,17 @@ bool Results::is_frozen()
 }
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
+: std::out_of_range(c == 0 ? util::format("Requested index %1 in empty Results", r)
+                           : util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
+
+Results::IncorrectTableException::IncorrectTableException(StringData e, StringData a)
+: std::logic_error(util::format("Object of type '%1' does not match Results type '%2'", a, e))
+, expected(e), actual(a) {}
 
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
-    auto type = ObjectSchema::from_core_type(table, column);
+    auto type = ObjectSchema::from_core_type(column);
     const char* column_type = string_for_property_type(type & ~PropertyType::Array);
     if (!is_array(type))
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
@@ -1090,13 +1105,13 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 : std::logic_error(unsupported_operation_msg(column, table, operation))
 , column_key(column)
 , column_name(table.get_column_name(column))
-, property_type(ObjectSchema::from_core_type(table, ColKey(column)) & ~PropertyType::Array)
+, property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Array)
 {
 }
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
                                                                         const char* operation)
-: UnsupportedColumnTypeException(column, tv.ObjList::get_parent(), operation)
+: UnsupportedColumnTypeException(column, *tv.get_target_table(), operation)
 {
 }
 

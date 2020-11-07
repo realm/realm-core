@@ -41,19 +41,24 @@ using namespace realm;
 using namespace realm::util;
 
 static const std::string dummy_auth_url = "https://realm.example.org";
+static const std::string dummy_device_id = "123400000000000000000000";
+
+static const std::string base_path = tmp_dir() + "realm_objectstore_sync_connection_state_changes";
 
 TEST_CASE("sync: Connection state changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    SyncServer server;
-    TestSyncManager init_sync_manager;
-    const std::string realm_base_url = server.base_url();
-    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
+    TestSyncManager init_sync_manager({ .base_path = base_path });
+    auto app = init_sync_manager.app();
+    auto user = app->sync_manager()->get_user("user",
+                                               ENCODE_FAKE_JWT("not_a_real_token"),
+                                               ENCODE_FAKE_JWT("also_not_a_real_token"),
+                                               dummy_auth_url,
+                                               dummy_device_id);
 
     SECTION("register connection change listener") {
-        auto session = sync_session(server, user, "/connection-state-changes-1",
-                                    [](const auto &, const auto &) { return s_test_token; },
+        auto session = sync_session(user, "/connection-state-changes-1",
                                     [](auto, auto) {},
                                     SyncSessionStopPolicy::AfterChangesUploaded);
 
@@ -71,8 +76,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     }
 
     SECTION("unregister connection change listener") {
-        auto session = sync_session(server, user, "/connection-state-changes-2",
-                                    [](const auto &, const auto &) { return s_test_token; },
+        auto session = sync_session(user, "/connection-state-changes-2",
                                     [](auto, auto) {},
                                     SyncSessionStopPolicy::AfterChangesUploaded);
 
@@ -90,7 +94,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
         });
 
         user->log_out();
-        EventLoop::main().run_until([&] { return sessions_are_disconnected(*session); });
+        REQUIRE(sessions_are_disconnected(*session));
         REQUIRE(listener1_called == false);
         REQUIRE(listener2_called == true);
     }

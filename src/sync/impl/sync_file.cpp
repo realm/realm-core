@@ -19,6 +19,8 @@
 #include "sync/impl/sync_file.hpp"
 
 #include <realm/util/file.hpp>
+#include <realm/util/hex_dump.hpp>
+#include <realm/util/sha_crypto.hpp>
 #include <realm/util/time.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -198,68 +200,56 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     return path_buffer;
 }
 
+static std::string validate_and_clean_path(const std::string& path)
+{
+    REALM_ASSERT(path.length() > 0);
+    std::string escaped_path = util::make_percent_encoded_string(path);
+    if (filename_is_reserved(escaped_path))
+        throw std::invalid_argument(util::format("A path can't have an identifier reserved by the filesystem: '%1'", escaped_path));
+    return escaped_path;
+}
+
 } // util
 
-constexpr const char SyncFileManager::c_sync_directory[];
-constexpr const char SyncFileManager::c_utility_directory[];
-constexpr const char SyncFileManager::c_recovery_directory[];
-constexpr const char SyncFileManager::c_metadata_directory[];
-constexpr const char SyncFileManager::c_metadata_realm[];
+SyncFileManager::SyncFileManager(const std::string& base_path, const std::string& app_id)
+: m_base_path(util::file_path_by_appending_component(base_path,
+                                                     c_sync_directory,
+                                                     util::FilePathType::Directory))
+, m_app_path(util::file_path_by_appending_component(m_base_path,
+                                                    util::validate_and_clean_path(app_id),
+                                                    util::FilePathType::Directory))
+{
+    util::try_make_dir(m_base_path);
+    util::try_make_dir(m_app_path);
+}
 
 std::string SyncFileManager::get_special_directory(std::string directory_name) const
 {
-    auto dir_path = file_path_by_appending_component(get_base_sync_directory(),
+    auto dir_path = file_path_by_appending_component(m_app_path,
                                                      directory_name,
                                                      util::FilePathType::Directory);
     util::try_make_dir(dir_path);
     return dir_path;
 }
 
-std::string SyncFileManager::get_base_sync_directory() const
+std::string SyncFileManager::user_directory(const std::string& user_identity) const
 {
-    auto sync_path = file_path_by_appending_component(m_base_path,
-                                                      c_sync_directory,
-                                                      util::FilePathType::Directory);
-    util::try_make_dir(sync_path);
-    return sync_path;
-}
-
-std::string SyncFileManager::user_directory(const std::string& local_identity) const
-{
-    REALM_ASSERT(local_identity.length() > 0);
-    std::string escaped = util::make_percent_encoded_string(local_identity);
-    if (filename_is_reserved(escaped))
-        throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
-
-    auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      escaped,
-                                                      util::FilePathType::Directory);
+    std::string user_path = get_user_directory_path(user_identity);
     util::try_make_dir(user_path);
     return user_path;
 }
 
-void SyncFileManager::remove_user_directory(const std::string& local_identity) const
+void SyncFileManager::remove_user_directory(const std::string& user_identity) const
 {
-    REALM_ASSERT(local_identity.length() > 0);
-    const auto& escaped = util::make_percent_encoded_string(local_identity);
-    if (filename_is_reserved(escaped))
-        throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
-
-    auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      escaped,
-                                                      util::FilePathType::Directory);
+    std::string user_path = get_user_directory_path(user_identity);
     util::try_remove_dir_recursive(user_path);
 }
 
 bool SyncFileManager::try_rename_user_directory(const std::string& old_name, const std::string& new_name) const
 {
-    REALM_ASSERT_DEBUG(old_name.length() > 0 && new_name.length() > 0);
-    const auto& old_name_escaped = util::make_percent_encoded_string(old_name);
-    const auto& new_name_escaped = util::make_percent_encoded_string(new_name);
-    const std::string& base = get_base_sync_directory();
-    if (filename_is_reserved(old_name_escaped) || filename_is_reserved(new_name_escaped))
-        throw std::invalid_argument("A user directory can't be renamed using a reserved identifier.");
-
+    const auto& old_name_escaped = util::validate_and_clean_path(old_name);
+    const auto& new_name_escaped = util::validate_and_clean_path(new_name);
+    const std::string& base = m_app_path;
     const auto& old_path = file_path_by_appending_component(base, old_name_escaped, util::FilePathType::Directory);
     const auto& new_path = file_path_by_appending_component(base, new_name_escaped, util::FilePathType::Directory);
 
@@ -309,27 +299,95 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
     return true;
 }
 
-bool SyncFileManager::remove_realm(const std::string& local_identity, const std::string& raw_realm_path) const
+bool SyncFileManager::remove_realm(const std::string& user_identity, const std::string& raw_realm_path) const
 {
-    REALM_ASSERT(local_identity.length() > 0);
-    REALM_ASSERT(raw_realm_path.length() > 0);
-    if (filename_is_reserved(local_identity) || filename_is_reserved(raw_realm_path))
-        throw std::invalid_argument("A user or Realm can't have an identifier reserved by the filesystem.");
-
-    auto escaped = util::make_percent_encoded_string(raw_realm_path);
-    auto realm_path = util::file_path_by_appending_component(user_directory(local_identity), escaped);
+    auto escaped = util::validate_and_clean_path(raw_realm_path);
+    auto realm_path = util::file_path_by_appending_component(user_directory(user_identity), escaped);
     return remove_realm(realm_path);
 }
 
-std::string SyncFileManager::path(const std::string& local_identity, const std::string& raw_realm_path) const
+bool SyncFileManager::try_file_exists(const std::string& path) noexcept
 {
-    REALM_ASSERT(local_identity.length() > 0);
-    REALM_ASSERT(raw_realm_path.length() > 0);
-    if (filename_is_reserved(local_identity) || filename_is_reserved(raw_realm_path))
-        throw std::invalid_argument("A user or Realm can't have an identifier reserved by the filesystem.");
+    try {
+        // May throw; for example when the path is too long
+        return util::File::exists(path);
+    }
+    catch (const std::exception&) {
+        return false;
+    }
+}
 
-    auto escaped = util::make_percent_encoded_string(raw_realm_path);
-    return util::file_path_by_appending_component(user_directory(local_identity), escaped);
+static bool try_file_remove(const std::string& path) noexcept
+{
+    try {
+        return util::File::try_remove(path);
+    }
+    catch (const std::exception&) {
+        return false;
+    }
+}
+
+std::string SyncFileManager::realm_file_path(const std::string& user_identity, const std::string& local_user_identity, const std::string& realm_file_name) const
+{
+    auto escaped_file_name = util::validate_and_clean_path(realm_file_name);
+    std::string preferred_name = util::file_path_by_appending_component(user_directory(user_identity), escaped_file_name);
+    std::string preferred_path = preferred_name + c_realm_file_suffix;
+
+    if (!try_file_exists(preferred_path)) {
+        // Shorten the Realm path to just `<rootDir>/<hashedAbsolutePath>.realm`
+        // If that also fails, give up and report error to user.
+        std::string hashed_name = fallback_hashed_realm_file_path(preferred_name);
+        std::string hashed_path = hashed_name + c_realm_file_suffix;
+        if (try_file_exists(hashed_path)) {
+            // detected that the hashed fallback has been used previously
+            // it was created for a reason so keep using it
+            return hashed_path;
+        }
+
+        // retain support for legacy paths
+        std::string old_path = legacy_realm_file_path(local_user_identity, realm_file_name);
+        if (try_file_exists(old_path)) {
+            return old_path;
+        }
+
+        // retain support for legacy local identity paths
+        std::string old_local_identity_path = legacy_local_identity_path(local_user_identity, realm_file_name);
+        if (try_file_exists(old_local_identity_path)) {
+            return old_local_identity_path;
+        }
+
+        // since this appears to be a new file, test the normal location
+        // we use a test file with the same name and a suffix of the
+        // same length so we can catch "filename too long" errors on windows
+        try {
+            std::string test_path = preferred_name + c_realm_file_test_suffix;
+            auto defer = util::make_scope_exit([test_path]() noexcept {
+                try_file_remove(test_path);
+            });
+            util::File f(test_path, util::File::Mode::mode_Write);
+            // if the test file succeeds, delete it and return the preferred location
+        }
+        catch (const File::AccessError& e_absolute) {
+            // the preferred test failed, test the hashed path
+            try {
+                std::string test_hashed_path = hashed_name + c_realm_file_test_suffix;
+                auto defer = util::make_scope_exit([test_hashed_path]() noexcept {
+                    try_file_remove(test_hashed_path);
+                });
+                util::File f(test_hashed_path, util::File::Mode::mode_Write);
+                // at this point the create succeeded, clean up the test file and return the hashed path
+                return hashed_path;
+            }
+            catch (const File::AccessError& e_hashed) {
+                // hashed test path also failed, give up and report error to user.
+                throw std::logic_error(util::format("A valid realm path cannot be created for the "
+                                                    "Realm identity '%1' at neither '%2' nor '%3'. %4",
+                                                    realm_file_name, preferred_path, hashed_path, e_hashed.what()));
+            }
+        }
+    }
+
+    return preferred_path;
 }
 
 std::string SyncFileManager::metadata_path() const
@@ -353,6 +411,38 @@ bool SyncFileManager::remove_metadata_realm() const
     catch (File::AccessError const&) {
         return false;
     }
+}
+
+std::string SyncFileManager::fallback_hashed_realm_file_path(const std::string& preferred_path) const
+{
+    std::array<unsigned char, 32> hash;
+    util::sha256(preferred_path.data(), preferred_path.size(), hash.data());
+    std::string hashed_name = util::file_path_by_appending_component(m_app_path, util::hex_dump(hash.data(), hash.size(), ""));
+    return hashed_name;
+}
+
+std::string SyncFileManager::legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const
+{
+    auto path = util::file_path_by_appending_component(m_app_path, c_legacy_sync_directory, util::FilePathType::Directory);
+    path = util::file_path_by_appending_component(path, util::validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
+    path = util::file_path_by_appending_component(path, util::validate_and_clean_path(realm_file_name));
+    return path;
+}
+
+std::string SyncFileManager::legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const
+{
+    auto escaped_file_name = util::validate_and_clean_path(realm_file_name);
+    std::string user_path = get_user_directory_path(local_user_identity);
+    std::string path_name = util::file_path_by_appending_component(user_path, escaped_file_name);
+    std::string path = path_name + c_realm_file_suffix;
+
+    return path;
+}
+
+std::string SyncFileManager::get_user_directory_path(const std::string& user_identity) const {
+    return file_path_by_appending_component(m_app_path,
+                                            util::validate_and_clean_path(user_identity),
+                                            util::FilePathType::Directory);
 }
 
 } // realm

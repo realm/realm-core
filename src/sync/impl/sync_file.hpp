@@ -21,7 +21,7 @@
 
 #include <string>
 
-#include "sync/sync_user.hpp"
+#include "sync/app.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -58,26 +58,30 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
 
 } // util
 
+// This class manages how Synced Realms are stored on the filesystem.
 class SyncFileManager {
 public:
-    SyncFileManager(std::string base_path) : m_base_path(std::move(base_path)) { }
+    SyncFileManager(const std::string& base_path, const std::string& app_id);
 
     /// Return the user directory for a given user, creating it if it does not already exist.
-    std::string user_directory(const std::string& local_identity) const;
+    std::string user_directory(const std::string& identity) const;
 
     /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& local_identity) const;       // throws
+    void remove_user_directory(const std::string& identity) const;       // throws
 
     /// Rename a user directory. Returns true if a directory at `old_name` existed
     /// and was successfully renamed to `new_name`. Returns false if no directory
     /// exists at `old_name`.
     bool try_rename_user_directory(const std::string& old_name, const std::string& new_name) const;
 
+    /// A non throw version of File::exists(),  returning false if any exceptions are thrown when attempting to access this file.
+    static bool try_file_exists(const std::string& path) noexcept;
+
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string path(const std::string&, const std::string&) const;
+    std::string realm_file_path(const std::string& user_identity, const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& local_identity, const std::string& raw_realm_path) const;
+    bool remove_realm(const std::string& user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -97,19 +101,32 @@ public:
         return m_base_path;
     }
 
+    const std::string& app_path() const
+    {
+        return m_app_path;
+    }
+
     std::string recovery_directory_path(util::Optional<std::string> const& directory=none) const
     {
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
 
 private:
+    // Denotes the base path for the mongodb-realm app associated with this sync manager.
+    // Expected to be `base_path` + "mongodb-realm/" + `app_id` + "/".
     const std::string m_base_path;
+    // Denotes the root path for any mongodb-realm app for the passed in `base_path`.
+    // Expected to be `base_path` + "mongodb-realm/".
+    const std::string m_app_path;
 
-    static constexpr const char c_sync_directory[] = "realm-object-server";
-    static constexpr const char c_utility_directory[] = "io.realm.object-server-utility";
-    static constexpr const char c_recovery_directory[] = "io.realm.object-server-recovered-realms";
+    static constexpr const char c_sync_directory[] = "mongodb-realm";
+    static constexpr const char c_utility_directory[] = "server-utility";
+    static constexpr const char c_recovery_directory[] = "recovered-realms";
     static constexpr const char c_metadata_directory[] = "metadata";
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";
+    static constexpr const char c_realm_file_suffix[] = ".realm";
+    static constexpr const char c_realm_file_test_suffix[] = ".rtest"; // Must have same length as c_realm_file_suffix.
+    static constexpr const char c_legacy_sync_directory[] = "realm-object-server";
 
     std::string get_special_directory(std::string directory_name) const;
 
@@ -118,7 +135,11 @@ private:
         return get_special_directory(c_utility_directory);
     }
 
-    std::string get_base_sync_directory() const;
+    // Construct the absolute path to the users directory
+    std::string get_user_directory_path(const std::string& user_identity) const;
+    std::string legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string legacy_local_identity_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };
 
 } // realm

@@ -33,6 +33,20 @@ std::string tmp_dir();
 std::vector<char> make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name, std::function<void()> func);
 
+std::string encode_fake_jwt(const std::string &in);
+static inline std::string random_string(std::string::size_type length)
+{
+    static auto& chrs =
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thread_local static std::mt19937 rg{std::random_device{}()};
+    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+    std::string s;
+    s.reserve(length);
+    while(length--)
+        s += chrs[pick(rg)];
+    return s;
+}
 } // namespace realm
 
 #define REQUIRE_DIR_EXISTS(macro_path) do { \
@@ -54,5 +68,10 @@ void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string se
 	REQUIRE(!util::File::exists((macro_path) + ".lock")); \
 	REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management"); \
 } while (0)
+
+#define REQUIRE_THROWS_CONTAINING(expr, msg) \
+    REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
+
+#define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 
 #endif // REALM_TEST_UTILS_HPP

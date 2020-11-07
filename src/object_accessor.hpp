@@ -73,11 +73,21 @@ struct ValueUpdater {
 
     void operator()(Obj*)
     {
-        ContextType child_ctx(ctx, property);
-        auto curr_link = obj.get<ObjKey>(col);
-        auto link = child_ctx.template unbox<Obj>(value, policy, curr_link);
-        if (policy != CreatePolicy::UpdateModified || curr_link != link.get_key()) {
-            obj.set(col, link.get_key());
+        ContextType child_ctx(ctx, obj, property);
+        auto policy2 = policy;
+        policy2.create = false;
+        auto link = child_ctx.template unbox<Obj>(value, policy2);
+        if (!policy.copy && link && link.get_table()->is_embedded())
+            throw std::logic_error("Cannot set a link to an existing managed embedded object");
+
+        ObjKey curr_link;
+        if (policy.diff)
+            curr_link = obj.get<ObjKey>(col);
+        if (!link || link.get_table()->is_embedded())
+            link = child_ctx.template unbox<Obj>(value, policy, curr_link);
+        if (!policy.diff || curr_link != link.get_key()) {
+            if (!link || !link.get_table()->is_embedded())
+                obj.set(col, link.get_key());
         }
     }
 
@@ -85,7 +95,7 @@ struct ValueUpdater {
     void operator()(T*)
     {
         auto new_val = ctx.template unbox<T>(value);
-        if (policy != CreatePolicy::UpdateModified || obj.get<T>(col) != new_val) {
+        if (!policy.diff || obj.get<T>(col) != new_val) {
             obj.set(col, new_val, is_default);
         }
     }
@@ -100,7 +110,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
 
     ColKey col{property.column_key};
     if (is_nullable(property.type) && ctx.is_null(value)) {
-        if (policy != CreatePolicy::UpdateModified || !m_obj.is_null(col)) {
+        if (!policy.diff || !m_obj.is_null(col)) {
             if (property.type == PropertyType::Object) {
                 if (!is_default)
                     m_obj.set_null(col);
@@ -118,7 +128,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         if (property.type == PropertyType::LinkingObjects)
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
 
-        ContextType child_ctx(ctx, property);
+        ContextType child_ctx(ctx, m_obj, property);
         List list(m_realm, m_obj, col);
         list.assign(child_ctx, value, policy);
         ctx.did_change();
@@ -150,6 +160,8 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         case PropertyType::String: return ctx.box(m_obj.get<StringData>(column));
         case PropertyType::Data:   return ctx.box(m_obj.get<BinaryData>(column));
         case PropertyType::Date:   return ctx.box(m_obj.get<Timestamp>(column));
+        case PropertyType::ObjectId: return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<ObjectId>>(column)) : ctx.box(m_obj.get<ObjectId>(column));
+        case PropertyType::Decimal:  return ctx.box(m_obj.get<Decimal>(column));
 //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
@@ -224,8 +236,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         // long as they're unique by the end of the migration.
         if (table->get_primary_key_column() == ColKey{}) {
             REALM_ASSERT(realm->is_in_migration());
-            if (policy != CreatePolicy::ForceCreate) {
-                if (auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, *primary_value))
+            if (policy.update) {
+                if (auto key = get_for_primary_key_in_migration(ctx, *table, *primary_prop, *primary_value))
                     obj = table->get_object(key);
             }
             if (!obj)
@@ -233,7 +245,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
         else {
             obj = table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
-            if (!created && policy == CreatePolicy::ForceCreate) {
+            if (!created && !policy.update) {
                 if (!realm->is_in_migration()) {
                     throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
                                                         object_schema.name, ctx.print(*primary_value)));
@@ -250,13 +262,13 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     // an object key was passed in that we need to look up, and otherwise we
     // need to create the new object.
     if (!obj) {
-        if (policy == CreatePolicy::UpdateModified && current_obj) {
+        if (current_obj)
             obj = table->get_object(current_obj);
-        }
-        else {
+        else if (object_schema.is_embedded)
+            obj = ctx.create_embedded_object();
+        else
             obj = table->create_object();
-            created = true;
-        }
+        created = !policy.diff || !current_obj;
     }
 
     Object object(realm, object_schema, obj);
@@ -267,7 +279,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         *out_row = obj;
     for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
         auto& prop = object_schema.persisted_properties[i];
-        if (skip_primary && prop.is_primary)
+        // If table has primary key, it must have been set during object creation
+        if (prop.is_primary && skip_primary)
             continue;
 
         auto v = ctx.value_for_property(value, prop, i);
@@ -289,12 +302,6 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (v)
             object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
-#if REALM_ENABLE_SYNC
-    if (realm->is_partial() && object_schema.name == "__User") {
-        object.ensure_user_in_everyone_role();
-        object.ensure_private_role_exists_for_user();
-    }
-#endif
     return object;
 }
 
@@ -322,20 +329,30 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
         table = realm->read_group().get_table(object_schema.table_key);
     if (!table)
         return Object(realm, object_schema, Obj());
-    auto key = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
+    if (ctx.is_null(primary_value) && !is_nullable(primary_prop->type))
+        throw std::logic_error("Invalid null value for non-nullable primary key.");
+
+    auto primary_key_value = switch_on_type(primary_prop->type, [&](auto* t) {
+        return Mixed(ctx.template unbox<NonObjTypeT<decltype(*t)>>(primary_value));
+    });
+    auto key = table->find_primary_key(primary_key_value);
     return Object(realm, object_schema, key ? table->get_object(key) : Obj{});
 }
 
 template<typename ValueType, typename ContextType>
-ObjKey Object::get_for_primary_key_impl(ContextType& ctx, Table const& table,
-                                        const Property &primary_prop,
-                                        ValueType primary_value) {
+ObjKey Object::get_for_primary_key_in_migration(ContextType& ctx, Table const& table,
+                                                const Property& primary_prop,
+                                                ValueType&& primary_value) {
     bool is_null = ctx.is_null(primary_value);
     if (is_null && !is_nullable(primary_prop.type))
         throw std::logic_error("Invalid null value for non-nullable primary key.");
     if (primary_prop.type == PropertyType::String) {
         return table.find_first(primary_prop.column_key,
                                 ctx.template unbox<StringData>(primary_value));
+    }
+    if (primary_prop.type == PropertyType::ObjectId) {
+        return table.find_first(primary_prop.column_key,
+                                ctx.template unbox<ObjectId>(primary_value));
     }
     if (is_nullable(primary_prop.type))
         return table.find_first(primary_prop.column_key,

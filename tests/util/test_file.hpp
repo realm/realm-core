@@ -29,13 +29,14 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
+#include "sync/app.hpp"
+#include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
-// {"identity":"test", "access": ["download", "upload"]}
-static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
 #endif // REALM_ENABLE_SYNC
+
 
 namespace realm {
 class Schema;
@@ -93,7 +94,11 @@ using StartImmediately = realm::util::TaggedBool<class StartImmediatelyTag>;
 
 class SyncServer : private realm::sync::Clock {
 public:
-    SyncServer(StartImmediately start_immediately=true, std::string local_dir = "");
+    struct Config {
+        bool start_immediately = true;
+        std::string local_dir;
+    };
+
     ~SyncServer();
 
     void start();
@@ -110,6 +115,8 @@ public:
     }
 
 private:
+    friend struct TestSyncManager;
+    SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::unique_ptr<realm::util::Logger> m_logger;
     realm::sync::Server m_server;
@@ -124,31 +131,47 @@ private:
 };
 
 struct SyncTestFile : TestFile {
-    template<typename BindHandler, typename ErrorHandler>
-    SyncTestFile(const realm::SyncConfig& sync_config, 
-        realm::SyncSessionStopPolicy stop_policy, 
-        BindHandler&& bind_handler, 
+    template<typename ErrorHandler>
+    SyncTestFile(const realm::SyncConfig& sync_config,
+        realm::SyncSessionStopPolicy stop_policy,
         ErrorHandler&& error_handler)
     {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
         this->sync_config->stop_policy = stop_policy;
-        this->sync_config->bind_session_handler = std::forward<BindHandler>(bind_handler);
         this->sync_config->error_handler = std::forward<ErrorHandler>(error_handler);
         schema_mode = realm::SchemaMode::Additive;
     }
 
-    SyncTestFile(SyncServer& server, std::string name="", bool is_partial=false,
-                 std::string user_name="test");
+    SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name="", std::string user_name="test");
 };
 
 struct TestSyncManager {
-    TestSyncManager(std::string const& base_path="", realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoMetadata);
+    struct Config {
+        realm::app::App::Config app_config;
+        std::string base_path;
+        std::string base_url;
+        realm::SyncManager::MetadataMode metadata_mode;
+        bool should_teardown_test_directory = true;
+    };
+
+    TestSyncManager(const Config& = { .should_teardown_test_directory = true },
+                    const SyncServer::Config& = { });
     ~TestSyncManager();
-    static void configure(std::string const& base_path, realm::SyncManager::MetadataMode);
+
+    std::shared_ptr<realm::app::App> app() const;
+    SyncServer& sync_server()
+    {
+        return m_sync_server;
+    }
+private:
+    std::shared_ptr<realm::app::App> m_app;
+    SyncServer m_sync_server;
+    std::string m_base_file_path;
+    bool m_should_teardown_test_directory = true;
 };
 
-void wait_for_upload(realm::Realm& realm);
-void wait_for_download(realm::Realm& realm);
+std::error_code wait_for_upload(realm::Realm& realm);
+std::error_code wait_for_download(realm::Realm& realm);
 
 #endif // REALM_ENABLE_SYNC
 

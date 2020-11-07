@@ -88,27 +88,48 @@ set(INCLUDE_DIRS
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        sync/app.hpp
+        sync/app_utils.hpp
+        sync/app_credentials.hpp
+        sync/generic_network_transport.hpp
         sync/async_open_task.hpp
-        sync/partial_sync.hpp
-        sync/subscription_state.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
+        sync/app_service_client.hpp
+        sync/auth_request_client.hpp
+        sync/mongo_client.hpp
+        sync/mongo_collection.hpp
+        sync/mongo_database.hpp
+        sync/push_client.hpp
+
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
-        sync/impl/work_queue.hpp)
+        util/bson/bson.hpp
+        util/bson/min_key.hpp
+        util/bson/max_key.hpp
+        util/bson/regular_expression.hpp
+        util/bson/indexed_map.hpp
+        util/bson/mongo_timestamp.hpp)
     list(APPEND SOURCES
+        sync/app.cpp
+        sync/app_utils.cpp
+        sync/app_credentials.cpp
+        sync/generic_network_transport.cpp
         sync/async_open_task.cpp
-        sync/partial_sync.cpp
-        sync/sync_config.cpp
         sync/sync_manager.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
+        sync/mongo_client.cpp
+        sync/mongo_collection.cpp
+        sync/mongo_database.cpp
+        sync/push_client.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
-        sync/impl/work_queue.cpp)
+        util/bson/bson.cpp
+        util/bson/regular_expression.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
@@ -118,15 +139,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
-if(REALM_ENABLE_SERVER)
-    list(APPEND HEADERS
-        server/adapter.hpp
-        server/admin_realm.hpp
-        server/global_notifier.hpp)
-    list(APPEND SOURCES
-        server/adapter.cpp
-        server/admin_realm.cpp
-        server/global_notifier.cpp)
+if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
     list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 

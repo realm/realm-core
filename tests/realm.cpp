@@ -38,6 +38,7 @@
 #include "sync/async_open_task.hpp"
 #endif
 
+#include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm {
@@ -178,7 +179,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::make_dir(config.path + ".note");
         auto realm = Realm::get_shared_realm(config);
         auto fallback_file = util::format("%1realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
-        REQUIRE(File::exists(fallback_file));
+        REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
         realm::util::remove_dir_recursive(fallback_dir);
     }
@@ -198,7 +199,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::make_dir(config.path + ".note");
         auto realm = Realm::get_shared_realm(config);
         auto fallback_file = util::format("%1/realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
-        REQUIRE(File::exists(fallback_file));
+        REQUIRE(util::File::exists(fallback_file));
         realm::util::remove_dir(config.path + ".note");
         realm::util::remove_dir_recursive(fallback_dir);
     }
@@ -322,7 +323,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         SECTION("uncached") { config.cache = false; }
 
         // create an empty file
-        File(config.path, File::mode_Write);
+        util::File(config.path, util::File::mode_Write);
 
         // open the empty file, but don't initialize the schema
         Realm::Config config_without_schema = config;
@@ -392,9 +393,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 // The ExternalCommitHelper implementation on Windows doesn't rely on files
 #ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
-        util::try_make_dir(config.path + ".note");
-        auto sys_fallback_file = util::format("%1realm_%2.note", DBOptions::get_sys_tmp_dir(), std::hash<std::string>()(config.path)); // Mirror internal implementation
-        util::try_make_dir(sys_fallback_file);
+        REQUIRE(util::try_make_dir(config.path + ".note"));
+        auto sys_fallback_file = util::format("%1realm_%2.note", util::normalize_dir(DBOptions::get_sys_tmp_dir()), std::hash<std::string>()(config.path)); // Mirror internal implementation
+        REQUIRE(util::try_make_dir(sys_fallback_file));
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
         util::remove_dir(sys_fallback_file);
@@ -417,7 +418,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
 // Our test scheduler uses a simple integer identifier to allow cross thread scheduling
-class SimpleScheduler : public Scheduler {
+    class SimpleScheduler : public util::Scheduler {
 public:
     SimpleScheduler(size_t id)
     : Scheduler()
@@ -507,7 +508,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     local_config.schema_version = 1;
     local_config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int}
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
+            {"value", PropertyType::Int},
         }},
     };
 
@@ -515,16 +517,15 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         return;
 
     TestSyncManager init_sync_manager;
-
-    SyncServer server;
-    SyncTestFile config(server, "default");
+    SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.schema = Schema{
         {"object", {
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
             {"value", PropertyType::Int},
         }},
     };
-    SyncTestFile config2(server, "default");
+    SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = config.schema;
     config2.cache = false;
 
@@ -548,7 +549,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         {
             auto realm = Realm::get_shared_realm(config2);
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
         }
@@ -573,7 +574,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         {
             auto realm = Realm::get_shared_realm(config2);
             realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             realm->commit_transaction();
             wait_for_upload(*realm);
         }
@@ -592,37 +593,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(called);
     }
 
-    SECTION("can download partial Realms") {
-        config.sync_config->is_partial = true;
-        config2.sync_config->is_partial = true;
-        {
-            auto realm = Realm::get_shared_realm(config2);
-            realm->begin_transaction();
-            realm->read_group().get_table("class_object")->create_object();
-            realm->commit_transaction();
-            wait_for_upload(*realm);
-        }
-
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-        });
-        util::EventLoop::main().run_until([&]{ return called.load(); });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
-
-        // No subscriptions, so no objects
-        REQUIRE(Realm::get_shared_realm(config)->read_group().get_table("class_object")->size() == 0);
-    }
-
     SECTION("can download multiple Realms at a time") {
-        SyncTestFile config1(server, "realm1");
-        SyncTestFile config2(server, "realm2");
-        SyncTestFile config3(server, "realm3");
-        SyncTestFile config4(server, "realm4");
+        SyncTestFile config1(init_sync_manager.app(), "realm1");
+        SyncTestFile config2(init_sync_manager.app(), "realm2");
+        SyncTestFile config3(init_sync_manager.app(), "realm3");
+        SyncTestFile config4(init_sync_manager.app(), "realm4");
 
         std::vector<std::shared_ptr<AsyncOpenTask>> tasks = {
             Realm::get_synchronized_realm(config1),
@@ -1387,6 +1362,25 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
     REQUIRE(object_schema == &*r2->schema().find("object"));
 }
 
+TEST_CASE("SharedRealm: declaring an object as embedded results in creating an embedded table") {
+    TestFile config;
+
+    // Prepopulate the Realm with the schema.
+    config.schema = Schema{
+        {"object1", ObjectSchema::IsEmbedded{true}, {
+            {"value", PropertyType::Int},
+        }},
+        {"object2", {
+            {"value", PropertyType::Object | PropertyType::Nullable, "object1"},
+        }}
+    };
+    auto r1 = Realm::get_shared_realm(config);
+
+    Group& g = r1->read_group();
+    auto t = g.get_table("class_object1");
+    REQUIRE(t->is_embedded());
+}
+
 TEST_CASE("SharedRealm: SchemaChangedFunction") {
     struct Context : BindingContext {
         size_t* change_count;
@@ -1532,14 +1526,14 @@ TEST_CASE("SharedRealm: compact on launch") {
 
     SECTION("compact reduces the file size") {
         // Confirm expected sizes before and after opening the Realm
-        size_t size_before = size_t(File(config.path).get_size());
+        size_t size_before = size_t(util::File(config.path).get_size());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         r->close();
-        REQUIRE(size_t(File(config.path).get_size()) == size_before); // File size after returning false
+        REQUIRE(size_t(util::File(config.path).get_size()) == size_before); // File size after returning false
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 3);
-        REQUIRE(size_t(File(config.path).get_size()) < size_before); // File size after returning true
+        REQUIRE(size_t(util::File(config.path).get_size()) < size_before); // File size after returning true
 
         // Validate that the file still contains what it should
         REQUIRE(r->read_group().get_table("class_object")->size() == count);

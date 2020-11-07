@@ -41,10 +41,6 @@ class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
 
-namespace partial_sync {
-class WorkQueue;
-}
-
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
 class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator> {
@@ -71,8 +67,6 @@ public:
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config)
         REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-    // Used by GlobalNotifier to bypass the normal initialization path
-    void open_with_config(Realm::Config config) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
 
     // Creates the underlying sync session if it doesn't already exists.
     // This is also created as part of opening a Realm, so only use this
@@ -81,7 +75,7 @@ public:
 #endif
 
     // Get the existing cached Realm if it exists for the specified scheduler or config.scheduler
-    std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler = nullptr) REQUIRES(!m_realm_mutex);
+    std::shared_ptr<Realm> get_cached_realm(Realm::Config const& config, std::shared_ptr<util::Scheduler> scheduler = nullptr) REQUIRES(!m_realm_mutex);
     // Get a Realm which is not bound to the current execution context
     ThreadSafeReference get_unbound_realm() REQUIRES(!m_realm_mutex);
 
@@ -185,11 +179,6 @@ public:
     template<typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-#if REALM_ENABLE_SYNC
-    // A work queue that can be used to perform background work related to partial sync.
-    _impl::partial_sync::WorkQueue& partial_sync_work_queue();
-#endif
-
     AuditInterface* audit_context() const noexcept { return m_audit_context.get(); }
 
 private:
@@ -230,7 +219,6 @@ private:
 
 #if REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
-    std::unique_ptr<partial_sync::WorkQueue> m_partial_sync_work_queue;
 #endif
 
     std::shared_ptr<AuditInterface> m_audit_context;
@@ -241,7 +229,7 @@ private:
 
     void set_config(const Realm::Config&) REQUIRES(m_realm_mutex, !m_schema_cache_mutex);
     void create_sync_session(bool force_client_resync);
-    std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler = nullptr) REQUIRES(m_realm_mutex);
+    std::shared_ptr<Realm> do_get_cached_realm(Realm::Config const& config, std::shared_ptr<util::Scheduler> scheduler = nullptr) REQUIRES(m_realm_mutex);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                       util::Optional<VersionID> version,
                       util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);

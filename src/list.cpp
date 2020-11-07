@@ -54,15 +54,17 @@ List& List::operator=(List&&) = default;
 
 List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
 : m_realm(std::move(r))
-, m_type(ObjectSchema::from_core_type(*parent_obj.get_table(), col) & ~PropertyType::Array)
+, m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Array)
 , m_list_base(parent_obj.get_listbase_ptr(col))
+, m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
 List::List(std::shared_ptr<Realm> r, const LstBase& list)
 : m_realm(std::move(r))
-, m_type(ObjectSchema::from_core_type(*list.get_table(), list.get_col_key()) & ~PropertyType::Array)
+, m_type(ObjectSchema::from_core_type(list.get_col_key()) & ~PropertyType::Array)
 , m_list_base(list.clone())
+, m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
@@ -214,6 +216,8 @@ template<>
 void List::add(Obj o)
 {
     verify_in_transaction();
+    if (m_is_embedded)
+        throw InvalidEmbeddedOperationException();
     validate(o);
     as<Obj>().add(o.get_key());
 }
@@ -232,6 +236,8 @@ void List::insert(size_t row_ndx, Obj o)
     verify_in_transaction();
     verify_valid_row(row_ndx, true);
     validate(o);
+    if (m_is_embedded)
+        throw InvalidEmbeddedOperationException();
     as<Obj>().insert(row_ndx, o.get_key());
 }
 
@@ -274,8 +280,43 @@ void List::set(size_t row_ndx, Obj o)
     verify_in_transaction();
     verify_valid_row(row_ndx);
     validate(o);
+    if (m_is_embedded)
+        throw InvalidEmbeddedOperationException();
     as<Obj>().set(row_ndx, o.get_key());
 }
+
+Obj List::add_embedded()
+{
+    verify_in_transaction();
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_insert_linked_object(size());
+}
+
+Obj List::set_embedded(size_t list_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(list_ndx);
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_set_linked_object(list_ndx);
+}
+
+Obj List::insert_embedded(size_t list_ndx)
+{
+    verify_in_transaction();
+    verify_valid_row(list_ndx, true);
+
+    if (!m_is_embedded)
+        throw InvalidEmbeddedOperationException();
+
+    return as<Obj>().create_and_insert_linked_object(list_ndx);
+}
+
 
 void List::swap(size_t ndx1, size_t ndx2)
 {
@@ -383,7 +424,7 @@ util::Optional<Mixed> List::max(ColKey col) const
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "max");
     }
-    return out_ndx == not_found ? none : make_optional(result);
+    return out_ndx == not_found ? none : util::make_optional(result);
 }
 
 util::Optional<Mixed> List::min(ColKey col) const
@@ -396,7 +437,7 @@ util::Optional<Mixed> List::min(ColKey col) const
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "min");
     }
-    return out_ndx == not_found ? none : make_optional(result);
+    return out_ndx == not_found ? none : util::make_optional(result);
 }
 
 Mixed List::sum(ColKey col) const
@@ -411,7 +452,7 @@ Mixed List::sum(ColKey col) const
     return result;
 }
 
-util::Optional<double> List::average(ColKey col) const
+util::Optional<Mixed> List::average(ColKey col) const
 {
     if (get_type() == PropertyType::Object)
         return as_results().average(col);
@@ -420,7 +461,7 @@ util::Optional<double> List::average(ColKey col) const
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "average");
     }
-    return count == 0 ? none : make_optional(result.get_double());
+    return count == 0 ? none : util::make_optional(result);
 }
 
 bool List::operator==(List const& rgt) const noexcept
@@ -478,10 +519,13 @@ REALM_PRIMITIVE_LIST_TYPE(StringData)
 REALM_PRIMITIVE_LIST_TYPE(BinaryData)
 REALM_PRIMITIVE_LIST_TYPE(Timestamp)
 REALM_PRIMITIVE_LIST_TYPE(ObjKey)
+REALM_PRIMITIVE_LIST_TYPE(ObjectId)
+REALM_PRIMITIVE_LIST_TYPE(Decimal)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<ObjectId>)
 
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm

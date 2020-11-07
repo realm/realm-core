@@ -86,10 +86,10 @@ private:
     // The listener thread
     std::future<void> m_thread;
 
-    win32::SharedMemory<InterprocessCondVar::SharedPart, InterprocessCondVar::init_shared_part> m_condvar_shared;
+    win32::SharedMemory<util::InterprocessCondVar::SharedPart, util::InterprocessCondVar::init_shared_part> m_condvar_shared;
 
-    InterprocessCondVar m_commit_available;
-    InterprocessMutex m_mutex;
+    util::InterprocessCondVar m_commit_available;
+    util::InterprocessMutex m_mutex;
     bool m_keep_listening = true;
 };
 

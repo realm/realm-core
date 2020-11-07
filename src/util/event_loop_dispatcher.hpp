@@ -27,18 +27,6 @@
 #include <thread>
 
 namespace realm {
-// FIXME: remove once we switch to C++ 17 where we can use std::apply
-namespace _apply_polyfill {
-template <class Tuple, class F, size_t... Is>
-constexpr auto apply_impl(Tuple&& t, F f, std::index_sequence<Is...>) {
-    return f(std::get<Is>(std::forward<Tuple>(t))...);
-}
-
-template <class Tuple, class F>
-constexpr auto apply(Tuple&& t, F f) {
-    return apply_impl(std::forward<Tuple>(t), f, std::make_index_sequence<std::tuple_size<Tuple>{}>{});
-}
-}
 
 namespace util {
 template <class F>
@@ -70,7 +58,7 @@ public:
             std::unique_lock<std::mutex> lock(state->mutex);
             while (!state->invocations.empty()) {
                 auto& tuple = state->invocations.front();
-                _apply_polyfill::apply(std::move(tuple), state->func);
+                std::apply(state->func, std::move(tuple));
                 state->invocations.pop();
             }
 
@@ -97,6 +85,59 @@ public:
         m_scheduler->notify();
     }
 };
+
+namespace _impl::ForEventLoopDispatcher {
+template <typename Sig>
+struct ExtractSignatureImpl {};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...)> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) &> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const &> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) & noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const & noexcept> {
+    using signature = void(Args...);
+};
+// Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
+// from something with that anyway.
+
+template <typename T>
+using ExtractSignature = typename ExtractSignatureImpl<T>::signature;
+} // namespace _impl::ForEventLoopDispatcher
+
+// Deduction guide for function pointers.
+template<typename... Args>
+EventLoopDispatcher(void(*)(Args...)) -> EventLoopDispatcher<void(Args...)>;
+
+// Deduction guide for callable objects, such as lambdas. Only supports types with a non-overloaded, non-templated
+// call operator, so no polymorphic (auto argument) lambdas.
+template<typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
+EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
+
+
 } // namespace util
 } // namespace realm
 

@@ -25,6 +25,7 @@
 #include "impl/object_accessor_impl.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "binding_context.hpp"
+#include "keypath_helpers.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "results.hpp"
@@ -51,8 +52,26 @@ public:
 };
 }
 
+namespace Catch {
+template<>
+struct StringMaker<realm::util::Any> {
+    static std::string convert(realm::util::Any const& any)
+    {
+        return realm::util::format("Any<%1>", any.type().name());
+    }
+};
+template<>
+struct StringMaker<realm::util::Optional<realm::util::Any>> {
+    static std::string convert(realm::util::Optional<realm::util::Any> any)
+    {
+        return any ? "none" : realm::util::format("some(Any<%1>)", any->type().name());
+    }
+};
+} // namespace Catch
+
 using namespace realm;
 using namespace std::string_literals;
+using util::any_cast;
 
 namespace {
     using AnyDict = std::map<std::string, util::Any>;
@@ -63,9 +82,9 @@ struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
 
     using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Property const& prop)
-            : CppContext(parent, prop)
-            , defaults(parent.defaults)
+    TestContext(TestContext& parent, realm::Obj& obj, realm::Property const& prop)
+    : CppContext(parent, obj, prop)
+    , defaults(parent.defaults)
     { }
 
     void will_change(Object const&, Property const&) {}
@@ -1367,11 +1386,14 @@ TEST_CASE("notifications: async error handling") {
 TEST_CASE("notifications: sync") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
-    SyncServer server(false);
-    SyncTestFile config(server);
+    TestSyncManager init_sync_manager({}, {false});
+    auto& server = init_sync_manager.sync_server();
+
+    SyncTestFile config(init_sync_manager.app(), "test");
     config.cache = false;
     config.schema = Schema{
         {"object", {
+            {"_id", PropertyType::Int, Property::IsPrimary{true}},
             {"value", PropertyType::Int},
         }},
     };
@@ -1389,7 +1411,7 @@ TEST_CASE("notifications: sync") {
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->create_object();
+            write_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
             write_realm->commit_transaction();
         }
 
@@ -2844,7 +2866,7 @@ struct ResultsFromLinkView {
     }
 };
 
-TEMPLATE_TEST_CASE("results: get()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView, ResultsFromLinkView) {
+TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView, ResultsFromLinkView) {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -2889,6 +2911,87 @@ TEMPLATE_TEST_CASE("results: get()", "", ResultsFromTable, ResultsFromQuery, Res
         std::shuffle(std::begin(indexes), std::end(indexes), std::mt19937(rd()));
         for (auto index : indexes)
             CHECK(results.get<Obj>(index).get<int64_t>(col_value) == index);
+    }
+}
+
+TEMPLATE_TEST_CASE("results: accessor interface", "",
+                   ResultsFromTable, ResultsFromQuery, ResultsFromTableView, ResultsFromLinkView) {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+        {"different type", {
+            {"value", PropertyType::Int},
+        }},
+        {"linking_object", {
+            {"link", PropertyType::Array|PropertyType::Object, "object"}
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+
+    Results empty_results = TestType::call(r, table);
+    CppContext ctx(r, &empty_results.get_object_schema());
+
+    SECTION("no objects") {
+        SECTION("get()") {
+            CHECK_THROWS_WITH(empty_results.get(ctx, 0), "Requested index 0 in empty Results");
+        }
+        SECTION("first()") {
+            CHECK_FALSE(empty_results.first(ctx));
+        }
+        SECTION("last()") {
+            CHECK_FALSE(empty_results.last(ctx));
+        }
+    }
+
+    r->begin_transaction();
+    auto other_obj = r->read_group().get_table("class_different type")->create_object();
+    for (int i = 0; i < 10; ++i)
+        table->create_object().set_all(i);
+    r->commit_transaction();
+
+    Results results = TestType::call(r, table);
+    auto r2 = Realm::get_shared_realm(config);
+
+    SECTION("get()") {
+        for (int i = 0; i < 10; ++i)
+            CHECK(any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
+        CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 greater than max 9");
+    }
+
+    SECTION("first()") {
+        CHECK(any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
+    }
+
+    SECTION("last()") {
+        CHECK(any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
+    }
+
+    SECTION("index_of()") {
+        SECTION("valid") {
+            for (size_t i = 0; i < 10; ++i)
+                REQUIRE(results.index_of(ctx, util::Any(results.get<Obj>(i))) == i);
+        }
+        SECTION("wrong object type") {
+            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(other_obj)),
+                              "Object of type 'different type' does not match Results type 'object'");
+        }
+        SECTION("wrong realm") {
+            auto obj = r2->read_group().get_table("class_object")->get_object(0);
+            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(obj)),
+                              "Object of type 'object' does not match Results type 'object'");
+
+        }
+        SECTION("detached object") {
+            Obj detached_obj;
+            CHECK_THROWS_WITH(results.index_of(ctx, util::Any(detached_obj)),
+                              "Attempting to access an invalid object");
+        }
     }
 }
 
@@ -3033,10 +3136,8 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
 }
 
 TEST_CASE("results: set property value on all objects", "[batch_updates]") {
-
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
-    // config.cache = false;
     config.schema = Schema{
         {"AllTypes", {
             {"pk", PropertyType::Int, Property::IsPrimary{true}},
@@ -3047,6 +3148,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             {"string", PropertyType::String},
             {"data", PropertyType::Data},
             {"date", PropertyType::Date},
+            {"object id", PropertyType::ObjectId},
+            {"decimal", PropertyType::Decimal},
             {"object", PropertyType::Object|PropertyType::Nullable, "AllTypes"},
             {"list", PropertyType::Array|PropertyType::Object, "AllTypes"},
 
@@ -3057,6 +3160,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             {"string array", PropertyType::Array|PropertyType::String},
             {"data array", PropertyType::Array|PropertyType::Data},
             {"date array", PropertyType::Array|PropertyType::Date},
+            {"object id array", PropertyType::Array|PropertyType::ObjectId},
+            {"decimal array", PropertyType::Array|PropertyType::Decimal},
             {"object array", PropertyType::Array|PropertyType::Object, "AllTypes"},
         }, {
            {"parents", PropertyType::LinkingObjects|PropertyType::Array, "AllTypes", "object"},
@@ -3066,8 +3171,8 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_AllTypes");
     realm->begin_transaction();
-    table->create_object();
-    table->create_object();
+    table->create_object_with_primary_key(1);
+    table->create_object_with_primary_key(2);
     realm->commit_transaction();
     Results r(realm, table);
 
@@ -3093,7 +3198,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     SECTION("set property values removes object from Results") {
         realm->begin_transaction();
-        Results results(realm, table->where().equal(table->get_column_key("int"),0));
+        Results results(realm, table->where().equal(table->get_column_key("int"), 0));
         CHECK(results.size() == 2);
         r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
         CHECK(results.size() == 0);
@@ -3139,14 +3244,26 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
             CHECK(r.get(i).get<Timestamp>("date") == any_cast<Timestamp>(timestamp));
         }
 
-        ObjKey object_key = table->create_object().get_key();
+        util::Any object_id = ObjectId("ffffffffffffffffffffffff");
+        r.set_property_value(ctx, "object id", object_id);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get<ObjectId>("object id") == any_cast<ObjectId>(object_id));
+        }
+
+        util::Any decimal = Decimal128("876.54e32");
+        r.set_property_value(ctx, "decimal", decimal);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
+        }
+
+        ObjKey object_key = table->create_object_with_primary_key(3).get_key();
         Object linked_obj(realm, "AllTypes", object_key);
         r.set_property_value(ctx, "object", util::Any(linked_obj));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get<ObjKey>("object") == object_key);
         }
 
-        ObjKey list_object_key = table->create_object().get_key();
+        ObjKey list_object_key = table->create_object_with_primary_key(4).get_key();
         Object list_object(realm, "AllTypes", list_object_key);
         r.set_property_value(ctx, "list", util::Any(AnyVector{list_object, list_object}));
         for (size_t i = 0; i < r.size(); i++) {
@@ -3193,6 +3310,12 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
         r.set_property_value(ctx, "date array", util::Any(AnyVec{Timestamp(10,20), Timestamp(20,30), Timestamp(30,40)}));
         check_array(table->get_column_key("date array"), Timestamp(10,20), Timestamp(20,30), Timestamp(30,40));
+
+        r.set_property_value(ctx, "object id array", util::Any(AnyVec{ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888")}));
+        check_array(table->get_column_key("object id array"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("888888888888888888888888"));
+
+        r.set_property_value(ctx, "decimal array", util::Any(AnyVec{Decimal128("123.45e67"), Decimal128("876.54e32")}));
+        check_array(table->get_column_key("decimal array"), Decimal128("123.45e67"), Decimal128("876.54e32"));
     }
 }
 
@@ -3317,5 +3440,47 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
         REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
+    }
+}
+
+TEST_CASE("results: query helpers", "[include]") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+        {"linking_object", {
+            {"link", PropertyType::Array|PropertyType::Object, "object"}
+        }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto col = table->get_column_key("value");
+
+    realm->begin_transaction();
+    for (int i = 0; i < 8; ++i) {
+        table->create_object().set(col, (i + 2) % 4);
+    }
+    realm->commit_transaction();
+
+    Results r(realm, table);
+
+    SECTION("not valid") {
+        std::vector<StringData> paths;
+        parser::KeyPathMapping mapping;
+        ObjectSchema schema = *realm->schema().find("object");
+        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
+        CHECK(!includes.is_valid());
+    }
+    SECTION("valid") {
+        std::vector<StringData> paths = {"@links.linking_object.link"};
+        parser::KeyPathMapping mapping;
+        realm::populate_keypath_mapping(mapping, *realm);
+        ObjectSchema schema = *realm->schema().find("object");
+        IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
+        CHECK(includes.is_valid());
+        CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
     }
 }

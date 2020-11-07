@@ -22,7 +22,6 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "sync/partial_sync.hpp"
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -31,7 +30,6 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
-#include <realm/sync/permissions.hpp>
 #include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
@@ -72,13 +70,15 @@ DataType to_core_type(PropertyType type)
     REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
     REALM_ASSERT(type != PropertyType::Any); // Mixed columns can't be created
     switch (type & ~PropertyType::Flags) {
-        case PropertyType::Int:    return type_Int;
-        case PropertyType::Bool:   return type_Bool;
-        case PropertyType::Float:  return type_Float;
-        case PropertyType::Double: return type_Double;
-        case PropertyType::String: return type_String;
-        case PropertyType::Date:   return type_Timestamp;
-        case PropertyType::Data:   return type_Binary;
+        case PropertyType::Int:         return type_Int;
+        case PropertyType::Bool:        return type_Bool;
+        case PropertyType::Float:       return type_Float;
+        case PropertyType::Double:      return type_Double;
+        case PropertyType::String:      return type_String;
+        case PropertyType::Date:        return type_Timestamp;
+        case PropertyType::Data:        return type_Binary;
+        case PropertyType::ObjectId:    return type_ObjectId;
+        case PropertyType::Decimal:     return type_Decimal;
         default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
@@ -125,16 +125,21 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
 {
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
-    TableRef table;
+    TableRef table = group.get_table(name);
+    if (table)
+        return table;
+
     if (auto* pk_property = object_schema.primary_key_property()) {
-        table = group.get_table(name);
-        if (!table) {
-            table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
-                                                     is_nullable(pk_property->type));
-        }
+        table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
+                                                 is_nullable(pk_property->type));
     }
     else {
-        table = group.get_or_add_table(name);
+        if (object_schema.is_embedded) {
+            table = group.add_embedded_table(name);
+        }
+        else {
+            table = group.get_or_add_table(name);
+        }
     }
 
     return table;
@@ -248,6 +253,14 @@ struct SchemaDifferenceExplainer {
         // We never do anything for RemoveTable
     }
 
+    void operator()(schema_change::ChangeTableType op)
+    {
+        if (op.object->is_embedded)
+            errors.emplace_back("Class '%1' has been changed from top-level to embedded.", op.object->name);
+        else
+            errors.emplace_back("Class '%1' has been changed from embedded to top-level.", op.object->name);
+    }
+
     void operator()(schema_change::AddInitialProperties)
     {
         // Nothing. Always preceded by AddTable.
@@ -348,6 +361,7 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         bool operator()(AddProperty) { return true; }
         bool operator()(AddTable) { return false; }
         bool operator()(RemoveTable) { return false; }
+        bool operator()(ChangeTableType) { return true; }
         bool operator()(ChangePrimaryKey) { return true; }
         bool operator()(ChangePropertyType) { return true; }
         bool operator()(MakePropertyNullable) { return true; }
@@ -398,7 +412,7 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
         void operator()(AddIndex) { index_changes = true; }
         void operator()(RemoveIndex) { index_changes = true; }
     } verifier;
-    verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    verify_no_errors<InvalidAdditiveSchemaChangeException>(verifier, changes);
     return verifier.other_changes || (verifier.index_changes && update_indexes);
 }
 
@@ -431,11 +445,12 @@ void ObjectStore::verify_compatible_for_immutable_and_readonly(std::vector<Schem
 
         void operator()(AddTable) { }
         void operator()(AddInitialProperties) { }
+        void operator()(ChangeTableType) { }
         void operator()(RemoveProperty) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
     } verifier;
-    verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    verify_no_errors<InvalidReadOnlySchemaChangeException>(verifier, changes);
 }
 
 static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> const& changes)
@@ -458,6 +473,15 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
     verify_no_errors<SchemaMismatchException>(applier, changes);
 }
 
+static void set_embedded(Table& table, ObjectSchema::IsEmbedded is_embedded)
+{
+    if (!table.set_embedded(is_embedded) && is_embedded) {
+        auto msg = util::format("Cannot convert object type '%1' to embedded because objects have multiple incoming links.",
+                                ObjectStore::object_type_for_table_name(table.get_name()));
+        throw std::logic_error(std::move(msg));
+    }
+}
+
 static void create_initial_tables(Group& group, std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
@@ -475,6 +499,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // Implementing these makes us better able to handle weird
         // not-quite-correct files produced by other things and has no obvious
         // downside.
+        void operator()(ChangeTableType op) { set_embedded(table(op.object), op.object->is_embedded); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->column_key); }
         void operator()(MakePropertyNullable op) { make_property_optional(table(op.object), *op.property); }
@@ -513,6 +538,7 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         void operator()(RemoveProperty) { }
 
         // No need for errors for these, as we've already verified that they aren't present
+        void operator()(ChangeTableType) { }
         void operator()(ChangePrimaryKey) { }
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
@@ -534,6 +560,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
 
         void operator()(AddTable op) { create_table(group, *op.object); }
         void operator()(RemoveTable) { }
+        void operator()(ChangeTableType op) { set_embedded(table(op.object), op.object->is_embedded); }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty) { /* delayed until after the migration */ }
@@ -603,6 +630,7 @@ static void apply_post_migration_changes(Group& group,
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->column_key); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->column_key); }
 
+        void operator()(ChangeTableType) { }
         void operator()(RemoveTable) { }
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
@@ -615,80 +643,10 @@ static void apply_post_migration_changes(Group& group,
     }
 }
 
-static void create_default_permissions(Transaction& group, std::vector<SchemaChange> const& changes,
-                                       std::string const& sync_user_id)
-{
-#if !REALM_ENABLE_SYNC
-    static_cast<void>(group);
-    static_cast<void>(changes);
-    static_cast<void>(sync_user_id);
-#else
-    _impl::initialize_schema(group);
-    sync::set_up_basic_permissions(group, true);
-
-    // Ensure that this user exists so that local privileges checks work immediately
-    sync::add_user_to_role(group, sync_user_id, "everyone");
-
-    // Ensure that the user's private role exists so that local privilege checks work immediately.
-    ObjectStore::ensure_private_role_exists_for_user(group, sync_user_id);
-
-    // Mark all tables we just created as fully world-accessible
-    // This has to be done after the first pass of schema init is done so that we can be
-    // sure that the permissions tables actually exist.
-    using namespace schema_change;
-    struct Applier {
-        Transaction& group;
-        void operator()(AddTable op)
-        {
-            sync::set_class_permissions_for_role(group, op.object->name, "everyone",
-                                                 static_cast<int>(ComputedPrivileges::All));
-        }
-
-        void operator()(RemoveTable) { }
-        void operator()(AddInitialProperties) { }
-        void operator()(AddProperty) { }
-        void operator()(RemoveProperty) { }
-        void operator()(MakePropertyNullable) { }
-        void operator()(MakePropertyRequired) { }
-        void operator()(ChangePrimaryKey) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
-        void operator()(ChangePropertyType) { }
-    } applier{group};
-
-    for (auto& change : changes) {
-        change.visit(applier);
-    }
-#endif
-}
-
-#if REALM_ENABLE_SYNC
-void ObjectStore::ensure_private_role_exists_for_user(Transaction& group, StringData sync_user_id)
-{
-    std::string private_role_name = util::format("__User:%1", sync_user_id);
-
-    TableRef roles = ObjectStore::table_for_object_type(group, "__Role");
-    ObjKey private_role_ndx = roles->find_first_string(roles->get_column_key("name"), private_role_name);
-    if (private_role_ndx) {
-        // The private role already exists, so there's nothing for us to do.
-        return;
-    }
-
-    // Add the user to the private role, creating the private role in the process.
-    sync::add_user_to_role(group, sync_user_id, private_role_name);
-
-    // Set the private role on the user.
-    private_role_ndx = roles->find_first_string(roles->get_column_key("name"), private_role_name);
-    TableRef users = ObjectStore::table_for_object_type(group, "__User");
-    ObjKey user_ndx = users->find_first_string(users->get_column_key("id"), sync_user_id);
-    users->get_object(user_ndx).set("role", private_role_ndx);
-}
-#endif
 
 void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                       util::Optional<std::string> sync_user_id,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);
@@ -703,9 +661,6 @@ void ObjectStore::apply_schema_changes(Transaction& group, uint64_t schema_versi
 
         if (target_schema_is_newer)
             set_schema_version(group, target_schema_version);
-
-        if (sync_user_id)
-            create_default_permissions(group, changes, *sync_user_id);
 
         set_schema_keys(group, target_schema);
         return;
@@ -768,13 +723,13 @@ Schema ObjectStore::schema_from_group(Group const& group) {
     return schema;
 }
 
-util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& table, ColKey column_key)
+util::Optional<Property> ObjectStore::property_for_column_key(ConstTableRef& table, ColKey column_key)
 {
     StringData column_name = table->get_column_name(column_key);
 
     Property property;
     property.name = column_name;
-    property.type = ObjectSchema::from_core_type(*table, column_key);
+    property.type = ObjectSchema::from_core_type(column_key);
     property.is_primary = table->get_primary_key_column() == column_key;
     property.is_indexed = table->has_search_index(column_key);
     property.column_key = column_key;
@@ -887,12 +842,18 @@ InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_versio
 {
 }
 
+static void append_errors(std::string& message, std::vector<ObjectSchemaValidationException> const& errors)
+{
+    for (auto const& error : errors) {
+        message += "\n- ";
+        message += error.what();
+    }
+}
+
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "Schema validation failed due to the following errors:";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {
@@ -901,20 +862,25 @@ SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaVal
 SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "Migration is required due to the following errors:";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {
 }
 
-InvalidSchemaChangeException::InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
+InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
+: std::logic_error([&] {
+    std::string message = "The following changes cannot be made in read-only schema mode:";
+    append_errors(message, errors);
+    return message;
+}())
+{
+}
+
+InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "The following changes cannot be made in additive-only schema mode:";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {
@@ -926,9 +892,7 @@ InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(std::
         "Unsupported schema changes were made by another client or process. For a "
         "synchronized Realm, this may be due to the server reverting schema changes which "
         "the local user did not have permission to make.";
-    for (auto const& error : errors) {
-        message += std::string("\n- ") + error.what();
-    }
+    append_errors(message, errors);
     return message;
 }())
 {

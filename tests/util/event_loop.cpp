@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <util/event_loop.hpp>
+#include <util/event_loop_dispatcher.hpp>
 
 #include <realm/util/features.h>
 
@@ -38,6 +39,35 @@
 #endif
 
 using namespace realm::util;
+
+namespace {
+template <typename Desired, typename Actual>
+void static_assert_EventLoopDispatcher_guide(const EventLoopDispatcher<Actual>&) {
+    static_assert(std::is_same_v<Actual, Desired>);
+}
+
+[[maybe_unused]] void check_EventLoopDispatcher_guides() {
+    // This doesn't actually run, the only "test" is that it compiles.
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher([]{}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher(+[]{}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher([]() mutable {}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher(+[]() mutable {}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher([]() noexcept {}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher(+[]() noexcept {}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher([]() mutable noexcept {}));
+    static_assert_EventLoopDispatcher_guide<void()>(EventLoopDispatcher(+[]() mutable noexcept {}));
+
+    static_assert_EventLoopDispatcher_guide<void(int)>(EventLoopDispatcher([](int){}));
+    static_assert_EventLoopDispatcher_guide<void(int)>(EventLoopDispatcher(+[](int){}));
+    static_assert_EventLoopDispatcher_guide<void(int, const double&)>(EventLoopDispatcher([](int, const double&){}));
+    static_assert_EventLoopDispatcher_guide<void(int, const double&)>(EventLoopDispatcher(+[](int, const double&){}));
+
+    struct Funcy {
+        void operator()(int) const & noexcept {}
+    };
+    static_assert_EventLoopDispatcher_guide<void(int)>(EventLoopDispatcher(Funcy()));
+}
+}
 
 struct EventLoop::Impl {
     // Returns the main event loop.

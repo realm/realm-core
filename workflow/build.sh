@@ -30,7 +30,7 @@ if [ "${flavor}" = "android" ]; then
 fi
 
 if [ "${sync}" = "sync" ]; then
-    cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_SERVER=1 -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}"
+    cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1 -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}"
 fi
 
 cmake ${cmake_flags} ${extra_flags} ..

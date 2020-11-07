@@ -22,7 +22,7 @@ cd coverage.build
 
 cmake_flags="-DCMAKE_CXX_FLAGS=-Werror"
 if [ "${sync}" = "sync" ]; then
-    cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1 -DREALM_ENABLE_SERVER=1 -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}"
+    cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1 -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}"
 fi
 
 cmake ${cmake_flags} -G Ninja -DCMAKE_BUILD_TYPE=Coverage -DDEPENDENCIES_FILE="dependencies${deps_suffix}.list" ..

@@ -151,12 +151,12 @@ public:
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(ColKey column={}) REQUIRES(!m_mutex);
     util::Optional<Mixed> min(ColKey column={}) REQUIRES(!m_mutex);
-    util::Optional<double> average(ColKey column={}) REQUIRES(!m_mutex);
+    util::Optional<Mixed> average(ColKey column={}) REQUIRES(!m_mutex);
     util::Optional<Mixed> sum(ColKey column={}) REQUIRES(!m_mutex);
 
     util::Optional<Mixed> max(StringData column_name) REQUIRES(!m_mutex) { return max(key(column_name)); }
     util::Optional<Mixed> min(StringData column_name) REQUIRES(!m_mutex) { return min(key(column_name)); }
-    util::Optional<double> average(StringData column_name) REQUIRES(!m_mutex) { return average(key(column_name)); }
+    util::Optional<Mixed> average(StringData column_name) REQUIRES(!m_mutex) { return average(key(column_name)); }
     util::Optional<Mixed> sum(StringData column_name) REQUIRES(!m_mutex) { return sum(key(column_name)); }
 
     enum class Mode {
@@ -189,13 +189,12 @@ public:
 
     // The input Row object is not attached
     struct DetatchedAccessorException : public std::logic_error {
-        DetatchedAccessorException() : std::logic_error("Atempting to access an invalid object") {}
+        DetatchedAccessorException() : std::logic_error("Attempting to access an invalid object") {}
     };
 
     // The input Row object belongs to a different table
     struct IncorrectTableException : public std::logic_error {
-        IncorrectTableException(StringData e, StringData a, const std::string &error) :
-            std::logic_error(error), expected(e), actual(a) {}
+        IncorrectTableException(StringData e, StringData a);
         const StringData expected;
         const StringData actual;
     };

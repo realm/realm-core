@@ -59,6 +59,7 @@ public:
 }
 
 using namespace realm;
+using util::any_cast;
 
 TEST_CASE("Construct frozen Realm") {
     TestFile config;

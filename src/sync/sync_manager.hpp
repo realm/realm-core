@@ -21,6 +21,7 @@
 
 #include "shared_realm.hpp"
 
+#include "app.hpp"
 #include "sync_user.hpp"
 
 #include <realm/sync/client.hpp>
@@ -31,6 +32,8 @@
 #include <mutex>
 #include <unordered_map>
 
+struct TestSyncManager;
+
 namespace realm {
 
 struct SyncConfig;
@@ -39,6 +42,7 @@ class SyncUser;
 class SyncFileManager;
 class SyncMetadataManager;
 class SyncFileActionMetadata;
+class SyncAppMetadata;
 
 namespace _impl {
 struct SyncClient;
@@ -91,17 +95,11 @@ struct SyncClientConfig {
     SyncClientTimeouts timeouts;
 };
 
-class SyncManager {
+class SyncManager : public std::enable_shared_from_this<SyncManager> {
 friend class SyncSession;
+friend struct ::TestSyncManager;
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
-
-    static SyncManager& shared();
-
-    // Configure the metadata and file management subsystems and sync client
-    // options. This must be called before a SyncSession is first created, and
-    // will not reconfigure anything if the SyncClient already exists.
-    void configure(SyncClientConfig config);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -141,7 +139,7 @@ public:
     ///
     /// Refer to `SyncSession::handle_reconnect()` to see what sort of work is done
     /// on a per-session basis.
-    void reconnect();
+    void reconnect() const;
 
     util::Logger::Level log_level() const noexcept;
 
@@ -159,36 +157,40 @@ public:
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier, std::string refresh_token);
-
-    // Get or create an admin token user based on the given identity.
-    // Please note: a future version will remove this method and deprecate the
-    // use of identities for admin users completely.
-    // Warning: it is an error to create or get an admin token user with a given identity and
-    // specifying a URL, and later get that same user by specifying only the identity and no
-    // URL, or vice versa.
-    std::shared_ptr<SyncUser> get_admin_token_user_from_identity(const std::string& identity,
-                                                                 util::Optional<std::string> server_url,
-                                                                 const std::string& token);
-
-    // Get or create an admin token user for the given URL.
-    // If the user already exists, the token value will be ignored.
-    // If an old identity is provided and a directory for the user already exists, the directory
-    // will be renamed.
-    std::shared_ptr<SyncUser> get_admin_token_user(const std::string& server_url,
-                                                   const std::string& token,
-                                                   util::Optional<std::string> old_identity=none);
+    std::shared_ptr<SyncUser> get_user(const std::string& id,
+                                       std::string refresh_token,
+                                       std::string access_token,
+                                       const std::string provider_type,
+                                       std::string device_id);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const SyncUserIdentifier&) const;
+    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const;
 
     // Get all the users that are logged in and not errored out.
-    std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
-    // Gets the currently logged in user. If there are more than 1 users logged in, an exception is thrown.
+    std::vector<std::shared_ptr<SyncUser>> all_users();
+
+    // Gets the currently active user.
     std::shared_ptr<SyncUser> get_current_user() const;
 
+    // Log out a given user
+    void log_out_user(const std::string& user_id);
+
+    // Sets the currently active user.
+    void set_current_user(const std::string& user_id);
+
+    // Removes a user
+    void remove_user(const std::string& user_id);
+
     // Get the default path for a Realm for the given user and absolute unresolved URL.
-    std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
+    // If the default path of `<rootDir>/<appId>/<userId>/<realm_file_name>.realm` cannot
+    // be created, this function may pass back `<rootDir>/<hashedFileName>.realm`
+    std::string path_for_realm(const SyncUser& user, const std::string& realm_file_name) const;
+
+    // Get the default path for a Realm for the given configuration.
+    // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
+    // If the file cannot be created at this location, for example due to path length restrictions,
+    // this function may pass back `<rootDir>/<hashedFileName>.realm`
+    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name = none) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
@@ -201,36 +203,57 @@ public:
     // calling this method.
     void reset_for_testing();
 
+    // Get the app metadata for the active app.
+    util::Optional<SyncAppMetadata> app_metadata() const;
+
+    void set_sync_route(std::string sync_route) {
+        m_sync_route = std::move(sync_route);
+    }
+
+    const std::string sync_route() const {
+        return m_sync_route;
+    }
+
+    std::weak_ptr<app::App> app() const
+    {
+        return m_app;
+    }
+
+    SyncManager() = default;
+    SyncManager(const SyncManager&) = delete;
+    SyncManager& operator=(const SyncManager&) = delete;
 private:
+    friend class app::App;
+
+    void configure(std::shared_ptr<app::App> app,
+                   const std::string& sync_route,
+                   const SyncClientConfig& config);
+
     using ReconnectMode = sync::Client::ReconnectMode;
-    
-    static constexpr const char c_admin_identity[] = "__auth";
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
     void unregister_session(const std::string& path);
 
-    SyncManager() = default;
-    SyncManager(const SyncManager&) = delete;
-    SyncManager& operator=(const SyncManager&) = delete;
-
     _impl::SyncClient& get_sync_client() const;
     std::unique_ptr<_impl::SyncClient> create_sync_client() const;
 
     std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const;
 
+    std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept;
+
     mutable std::mutex m_mutex;
 
     bool run_file_action(const SyncFileActionMetadata&);
+    void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Protects m_users
     mutable std::mutex m_user_mutex;
 
-    // A map of user ID/auth server URL pairs to (shared pointers to) SyncUser objects.
-    std::unordered_map<SyncUserIdentifier, std::shared_ptr<SyncUser>> m_users;
-    // A map of local identifiers to admin token users.
-    std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_admin_token_users;
+    // A vector of all SyncUser objects.
+    std::vector<std::shared_ptr<SyncUser>> m_users;
+    std::shared_ptr<SyncUser> m_current_user;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
@@ -255,6 +278,10 @@ private:
 
     // The unique identifier of this client.
     util::Optional<std::string> m_client_uuid;
+
+    std::string m_sync_route;
+
+    std::weak_ptr<app::App> m_app;
 };
 
 } // namespace realm
