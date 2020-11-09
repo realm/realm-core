@@ -2216,4 +2216,14 @@ TEST(Group_ChangeStringPrimaryKeyValuesInMigration)
     }
 }
 
+TEST(Group_UniqueColumnKeys)
+{
+    Group g;
+    auto foo = g.add_table("foo");
+    auto bar = g.add_table("bar");
+    auto col_foo = foo->add_column(type_Int, "ints");
+    auto col_bar = bar->add_column(type_Int, "ints");
+    CHECK_NOT_EQUAL(col_foo, col_bar);
+}
+
 #endif // TEST_GROUP
