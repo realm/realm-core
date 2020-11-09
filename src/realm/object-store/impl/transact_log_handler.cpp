@@ -330,7 +330,7 @@ struct TransactLogValidator : public TransactLogValidationMixin {
 // Extends TransactLogValidator to track changes made to LinkViews
 class TransactLogObserver : public TransactLogValidationMixin {
     _impl::TransactionChangeInfo& m_info;
-    _impl::CollectionChangeBuilder* m_active_list = nullptr;
+    _impl::CollectionChangeBuilder* m_active_collection = nullptr;
     ObjectChangeSet* m_active_table = nullptr;
 
     _impl::CollectionChangeBuilder* find_list(ObjKey obj, ColKey col)
@@ -384,54 +384,73 @@ public:
     bool select_collection(ColKey col, ObjKey obj)
     {
         modify_object(col, obj);
-        m_active_list = find_list(obj, col);
+        m_active_collection = find_list(obj, col);
         return true;
     }
 
     bool list_set(size_t index)
     {
-        if (m_active_list)
-            m_active_list->modify(index);
+        if (m_active_collection)
+            m_active_collection->modify(index);
         return true;
     }
 
     bool list_insert(size_t index)
     {
-        if (m_active_list)
-            m_active_list->insert(index);
+        if (m_active_collection)
+            m_active_collection->insert(index);
         return true;
     }
 
     bool list_erase(size_t index)
     {
-        if (m_active_list)
-            m_active_list->erase(index);
+        if (m_active_collection)
+            m_active_collection->erase(index);
         return true;
     }
 
     bool list_swap(size_t index1, size_t index2)
     {
-        if (m_active_list) {
+        if (m_active_collection) {
             if (index1 > index2)
                 std::swap(index1, index2);
-            m_active_list->move(index1, index2);
+            m_active_collection->move(index1, index2);
             if (index1 + 1 != index2)
-                m_active_list->move(index2 - 1, index1);
+                m_active_collection->move(index2 - 1, index1);
         }
         return true;
     }
 
     bool list_clear(size_t old_size)
     {
-        if (m_active_list)
-            m_active_list->clear(old_size);
+        if (m_active_collection)
+            m_active_collection->clear(old_size);
         return true;
     }
 
     bool list_move(size_t from, size_t to)
     {
-        if (m_active_list)
-            m_active_list->move(from, to);
+        if (m_active_collection)
+            m_active_collection->move(from, to);
+        return true;
+    }
+
+    bool set_insert(size_t index)
+    {
+        if (m_active_collection)
+            m_active_collection->insert(index);
+        return true;
+    }
+    bool set_erase(size_t index)
+    {
+        if (m_active_collection)
+            m_active_collection->erase(index);
+        return true;
+    }
+    bool set_clear(size_t old_size)
+    {
+        if (m_active_collection)
+            m_active_collection->clear(old_size);
         return true;
     }
 

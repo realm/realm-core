@@ -1,5 +1,23 @@
+////////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2020 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
+
 #include <realm/object-store/set.hpp>
-#include <realm/object-store/impl/list_notifier.hpp>
+#include <realm/object-store/impl/set_notifier.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -10,6 +28,7 @@
 #include <realm/set.hpp>
 
 namespace realm::object_store {
+using namespace _impl;
 
 Set::Set() noexcept = default;
 Set::~Set() = default;
@@ -222,16 +241,21 @@ Results Set::snapshot() const
 
 Results Set::sort(SortDescriptor order) const
 {
-    static_cast<void>(order);
-    REALM_TERMINATE("Not implemented yet");
-    return {};
+    verify_attached();
+    if ((m_type == PropertyType::Object)) {
+        REALM_TERMINATE("Not implemented yet");
+//        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none, std::move(order));
+    }
+    else {
+        DescriptorOrdering o;
+        o.append_sort(order);
+        return Results(m_realm, m_set_base, std::move(o));
+    }
 }
 
 Results Set::sort(const std::vector<std::pair<std::string, bool>>& keypaths) const
 {
-    static_cast<void>(keypaths);
-    REALM_TERMINATE("Not implemented yet");
-    return {};
+    return as_results().sort(keypaths);
 }
 
 Results Set::filter(Query q) const
@@ -255,8 +279,21 @@ bool Set::is_frozen() const noexcept
 
 NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
 {
-    static_cast<void>(cb);
-    return {};
+    verify_attached();
+    m_realm->verify_notifications_available();
+    // Adding a new callback to a notifier which had all of its callbacks
+    // removed does not properly reinitialize the notifier. Work around this by
+    // recreating it instead.
+    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
+    // from a notifier a zombie is left sitting around uselessly) and should be
+    // cleaned up.
+    if (m_notifier && !m_notifier->have_callbacks())
+        m_notifier.reset();
+    if (!m_notifier) {
+        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
+        RealmCoordinator::register_notifier(m_notifier);
+    }
+    return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
