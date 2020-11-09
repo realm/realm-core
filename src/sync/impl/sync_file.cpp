@@ -132,8 +132,6 @@ std::string file_path_by_appending_component(const std::string& path, const std:
 #else
     const char separator = '/';
 #endif
-
-    // FIXME: Does this have to be changed to accomodate Windows platforms?
     std::string buffer;
     buffer.reserve(2 + path.length() + component.length());
     buffer.append(path);
