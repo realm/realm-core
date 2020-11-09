@@ -2216,4 +2216,20 @@ TEST(Group_ChangeStringPrimaryKeyValuesInMigration)
     }
 }
 
+TEST(Group_UniqueColumnKeys)
+{
+    // Table key is shifted 30 bits before added to ColKey, so when handled as
+    // 32 bit value, only the two LSB has effect
+    Group g;
+    g.add_table("0");
+    auto foo = g.add_table("foo"); // TableKey == 1
+    g.add_table("2");
+    g.add_table("3");
+    g.add_table("4");
+    auto bar = g.add_table("bar"); // Tablekey == 5. Upper bit stripped off before fix, so equal to 1
+    auto col_foo = foo->add_column(type_Int, "ints");
+    auto col_bar = bar->add_column(type_Int, "ints");
+    CHECK_NOT_EQUAL(col_foo, col_bar);
+}
+
 #endif // TEST_GROUP
