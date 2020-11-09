@@ -72,15 +72,17 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("Benchmark index change calculations", "[benchmark]")
-{
+TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     _impl::CollectionChangeBuilder c;
 
-    auto all_modified = [](size_t) { return true; };
-    auto none_modified = [](size_t) { return false; };
+    auto all_modified = [](size_t) {
+        return true;
+    };
+    auto none_modified = [](size_t) {
+        return false;
+    };
 
-    SECTION("reports inserts/deletes for simple reorderings")
-    {
+    SECTION("reports inserts/deletes for simple reorderings") {
         auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows,
                         std::function<bool(size_t)> modifications) {
             return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, modifications);
@@ -143,8 +145,7 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]")
     }
 }
 
-TEST_CASE("Benchmark object", "[benchmark]")
-{
+TEST_CASE("Benchmark object", "[benchmark]") {
     using namespace std::string_literals;
     using AnyVec = std::vector<util::Any>;
     using AnyDict = std::map<std::string, util::Any>;
@@ -199,8 +200,7 @@ TEST_CASE("Benchmark object", "[benchmark]")
     auto r = Realm::get_shared_realm(config);
     TestContext d(r);
 
-    SECTION("create object")
-    {
+    SECTION("create object") {
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
 
@@ -233,8 +233,7 @@ TEST_CASE("Benchmark object", "[benchmark]")
         r->commit_transaction();
     }
 
-    SECTION("update object")
-    {
+    SECTION("update object") {
         auto table = r->read_group().get_table("class_all types");
         r->begin_transaction();
         ObjectSchema all_types = *r->schema().find("all types");
@@ -264,8 +263,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
 
         Results result(r, table);
         size_t num_modifications = 0;
-        auto token = result.add_notification_callback(
-            [&](CollectionChangeSet c, std::exception_ptr) { num_modifications += c.modifications.count(); });
+        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            num_modifications += c.modifications.count();
+        });
 
         advance_and_notify(*r);
         int64_t update_int = 1;
@@ -290,8 +290,7 @@ TEST_CASE("Benchmark object", "[benchmark]")
         };
     }
 
-    SECTION("change notifications reporting")
-    {
+    SECTION("change notifications reporting") {
         auto table = r->read_group().get_table("class_person");
         Results result(r, table);
         size_t num_calls = 0;
@@ -330,7 +329,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
                 Object::create(d, r, person_schema, Any(person), CreatePolicy::ForceCreate);
             }
             r->commit_transaction();
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == num_objects);
             REQUIRE(num_modifications == 0);
@@ -375,7 +376,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
             result.clear();
             r->commit_transaction();
 
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == num_objects);
             REQUIRE(num_modifications == 0);
@@ -424,7 +427,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
             }
             r->commit_transaction();
 
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects);
@@ -433,8 +438,7 @@ TEST_CASE("Benchmark object", "[benchmark]")
         };
     }
 
-    SECTION("merging notifications from different versions")
-    {
+    SECTION("merging notifications from different versions") {
         advance_and_notify(*r);
         ObjectSchema schema = *r->schema().find("all types");
 
@@ -506,8 +510,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
                 change_object();
             }
 
-            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(),
-                                [](auto& it) { return it.num_calls == 0 && it.num_modifications == 0; }));
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
+                return it.num_calls == 0 && it.num_modifications == 0;
+            }));
 
             // Each of the Objects now has a different source version and state at
             // that version, so they should all see different changes despite
@@ -517,21 +522,22 @@ TEST_CASE("Benchmark object", "[benchmark]")
                     advance_and_notify(*notifier.obj.get_realm());
             });
 
-            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(),
-                                [](auto& it) { return it.num_calls == 1 && it.num_modifications == 1; }));
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
+                return it.num_calls == 1 && it.num_modifications == 1;
+            }));
 
             // After making another change, they should all get the same notification
             change_object();
             for (auto& notifier : notifiers)
                 advance_and_notify(*notifier.obj.get_realm());
 
-            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(),
-                                [](auto& it) { return it.num_calls == 2 && it.num_modifications == 2; }));
+            REQUIRE(std::all_of(notifiers.begin(), notifiers.end(), [](auto& it) {
+                return it.num_calls == 2 && it.num_modifications == 2;
+            }));
         };
     }
 
-    SECTION("change notifications sorted")
-    {
+    SECTION("change notifications sorted") {
         auto table = r->read_group().get_table("class_person");
         auto age_col = table->get_column_key("age");
         Results result = Results(r, table).sort({{"age", true}});
@@ -578,7 +584,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == num_prepend_objects);
             REQUIRE(num_modifications == 0);
@@ -615,7 +623,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == 0);
@@ -646,7 +656,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects);
@@ -689,7 +701,9 @@ TEST_CASE("Benchmark object", "[benchmark]")
             num_modifications = 0;
             num_deletions = 0;
 
-            meter.measure([&r] { on_change_but_no_notify(*r); });
+            meter.measure([&r] {
+                on_change_but_no_notify(*r);
+            });
             r->notify();
             REQUIRE(num_insertions == 0);
             REQUIRE(num_modifications == num_objects / 2);

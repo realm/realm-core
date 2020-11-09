@@ -61,16 +61,14 @@ public:
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("Construct frozen Realm")
-{
+TEST_CASE("Construct frozen Realm") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}}},
     };
 
-    SECTION("Create frozen Realm directly")
-    {
+    SECTION("Create frozen Realm directly") {
         auto realm = Realm::get_shared_realm(config);
         realm->read_group();
         auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
@@ -79,8 +77,7 @@ TEST_CASE("Construct frozen Realm")
     }
 }
 
-TEST_CASE("Freeze Realm", "[freeze_realm]")
-{
+TEST_CASE("Freeze Realm", "[freeze_realm]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{
@@ -91,35 +88,29 @@ TEST_CASE("Freeze Realm", "[freeze_realm]")
     realm->read_group();
     auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
 
-    SECTION("is_frozen")
-    {
+    SECTION("is_frozen") {
         REQUIRE(frozen_realm->is_frozen());
     }
 
-    SECTION("refresh() returns false")
-    {
+    SECTION("refresh() returns false") {
         REQUIRE(!frozen_realm->refresh());
     }
 
-    SECTION("wait_for_change() returns false")
-    {
+    SECTION("wait_for_change() returns false") {
         REQUIRE(!frozen_realm->wait_for_change());
     }
 
-    SECTION("auto_refresh")
-    {
+    SECTION("auto_refresh") {
         REQUIRE(!frozen_realm->auto_refresh());
         REQUIRE_THROWS(frozen_realm->set_auto_refresh(true));
         REQUIRE(!frozen_realm->auto_refresh());
     }
 
-    SECTION("begin_transaction() throws")
-    {
+    SECTION("begin_transaction() throws") {
         REQUIRE_THROWS(frozen_realm->begin_transaction());
     }
 
-    SECTION("can call methods on another thread")
-    {
+    SECTION("can call methods on another thread") {
         JoiningThread thread([&] {
             // Smoke-test
             REQUIRE_NOTHROW(frozen_realm->write_copy());
@@ -127,16 +118,14 @@ TEST_CASE("Freeze Realm", "[freeze_realm]")
         });
     }
 
-    SECTION("release all locks")
-    {
+    SECTION("release all locks") {
         frozen_realm->close();
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
 
-TEST_CASE("Freeze Results", "[freeze_results]")
-{
+TEST_CASE("Freeze Results", "[freeze_results]") {
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{{"object",
@@ -174,8 +163,7 @@ TEST_CASE("Freeze Results", "[freeze_results]")
     auto frozen_realm = Realm::get_frozen_realm(config, realm->read_transaction_version());
     Results frozen_results = results.freeze(frozen_realm);
 
-    SECTION("is_frozen")
-    {
+    SECTION("is_frozen") {
         REQUIRE(!results.is_frozen());
         REQUIRE(frozen_results.is_frozen());
         JoiningThread thread([&] {
@@ -185,13 +173,11 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("add_notification throws")
-    {
+    SECTION("add_notification throws") {
         REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
     }
 
-    SECTION("Result constructor - Empty")
-    {
+    SECTION("Result constructor - Empty") {
         Results res = Results();
         REQUIRE(res.is_frozen()); // All Results are considered frozen
         Results frozen_res = res.freeze(frozen_realm);
@@ -201,8 +187,7 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("Result constructor - Table")
-    {
+    SECTION("Result constructor - Table") {
         Results res = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
         Results frozen_res = results.freeze(frozen_realm);
         JoiningThread thread([&] {
@@ -214,8 +199,7 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("Result constructor - Primitive list")
-    {
+    SECTION("Result constructor - Primitive list") {
         const List list = List(frozen_realm, table->get_object(0), int_link_col);
         auto list_results = list.as_results();
 
@@ -234,8 +218,7 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("Result constructor - Query")
-    {
+    SECTION("Result constructor - Query") {
         Query q = table->column<Int>(value_col) > 0;
         DescriptorOrdering ordering;
         ordering.append_sort(SortDescriptor({{value_col}}, {false}));
@@ -250,8 +233,7 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("Result constructor - TableView")
-    {
+    SECTION("Result constructor - TableView") {
         Query q = table->column<Int>(value_col) > 2;
         DescriptorOrdering ordering;
         ordering.append_sort(SortDescriptor({{value_col}}, {false}));
@@ -266,8 +248,7 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("Result constructor - LinkList")
-    {
+    SECTION("Result constructor - LinkList") {
         Obj obj = results.get(0);
         std::shared_ptr<LnkLst> link_list = obj.get_linklist_ptr(object_link_col);
         Results res = Results(realm, link_list);
@@ -283,16 +264,14 @@ TEST_CASE("Freeze Results", "[freeze_results]")
         });
     }
 
-    SECTION("release all locks")
-    {
+    SECTION("release all locks") {
         frozen_realm->close();
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
 
-TEST_CASE("Freeze List", "[freeze_list]")
-{
+TEST_CASE("Freeze List", "[freeze_list]") {
 
     TestFile config;
     config.schema_version = 1;
@@ -332,8 +311,7 @@ TEST_CASE("Freeze List", "[freeze_list]")
     List frozen_link_list = List(realm, *link_list).freeze(frozen_realm);
     List frozen_primitive_list = List(realm, table->get_object(0), int_link_col).freeze(frozen_realm);
 
-    SECTION("is_frozen")
-    {
+    SECTION("is_frozen") {
         REQUIRE(frozen_primitive_list.is_frozen());
         REQUIRE(frozen_link_list.is_frozen());
         JoiningThread thread([&] {
@@ -342,15 +320,13 @@ TEST_CASE("Freeze List", "[freeze_list]")
         });
     }
 
-    SECTION("add_notification throws")
-    {
+    SECTION("add_notification throws") {
         REQUIRE_THROWS(frozen_link_list.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
         REQUIRE_THROWS(
             frozen_primitive_list.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
     }
 
-    SECTION("read across threads")
-    {
+    SECTION("read across threads") {
         JoiningThread thread([&] {
             REQUIRE(frozen_primitive_list.size() == 5);
             REQUIRE(frozen_link_list.size() == 5);
@@ -361,16 +337,14 @@ TEST_CASE("Freeze List", "[freeze_list]")
         });
     }
 
-    SECTION("release all locks")
-    {
+    SECTION("release all locks") {
         frozen_realm->close();
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
 
-TEST_CASE("Freeze Object", "[freeze_object]")
-{
+TEST_CASE("Freeze Object", "[freeze_object]") {
 
     TestFile config;
     config.schema_version = 1;
@@ -408,18 +382,15 @@ TEST_CASE("Freeze Object", "[freeze_object]")
     Object frozen_obj = Object(realm, table->get_object(0)).freeze(frozen_realm);
     CppContext ctx(frozen_realm);
 
-    SECTION("is_frozen")
-    {
+    SECTION("is_frozen") {
         REQUIRE(frozen_obj.is_frozen());
     }
 
-    SECTION("add_notification throws")
-    {
+    SECTION("add_notification throws") {
         REQUIRE_THROWS(frozen_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
     }
 
-    SECTION("read across threads")
-    {
+    SECTION("read across threads") {
         JoiningThread thread([&] {
             REQUIRE(frozen_obj.is_valid());
             REQUIRE(any_cast<Int>(frozen_obj.get_property_value<util::Any>(ctx, "value")) == 100);
@@ -430,8 +401,7 @@ TEST_CASE("Freeze Object", "[freeze_object]")
         });
     }
 
-    SECTION("release all locks")
-    {
+    SECTION("release all locks") {
         frozen_realm->close();
         realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));

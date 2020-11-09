@@ -82,8 +82,7 @@ struct TestContext : CppContext {
     }
 };
 
-TEST_CASE("object")
-{
+TEST_CASE("object") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
 
@@ -199,8 +198,7 @@ TEST_CASE("object")
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
-    SECTION("add_notification_callback()")
-    {
+    SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
         auto col_keys = table->get_column_keys();
         std::vector<int64_t> pks = {3, 4, 7, 9, 10, 21, 24, 34, 42, 50};
@@ -224,8 +222,9 @@ TEST_CASE("object")
         };
 
         auto require_change = [&] {
-            auto token =
-                object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
             return token;
         };
@@ -240,53 +239,59 @@ TEST_CASE("object")
             return token;
         };
 
-        SECTION("deleting the object sends a change notification")
-        {
+        SECTION("deleting the object sends a change notification") {
             auto token = require_change();
-            write([&] { obj.remove(); });
+            write([&] {
+                obj.remove();
+            });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("clearing the table sends a change notification")
-        {
+        SECTION("clearing the table sends a change notification") {
             auto token = require_change();
-            write([&] { table->clear(); });
+            write([&] {
+                table->clear();
+            });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("clearing the table sends a change notification to the last object")
-        {
+        SECTION("clearing the table sends a change notification to the last object") {
             obj = table->get_object(table->size() - 1);
             object = Object(r, obj);
 
             auto token = require_change();
-            write([&] { table->clear(); });
+            write([&] {
+                table->clear();
+            });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("modifying the object sends a change notification")
-        {
+        SECTION("modifying the object sends a change notification") {
             auto token = require_change();
 
-            write([&] { obj.set(col_keys[0], 10); });
+            write([&] {
+                obj.set(col_keys[0], 10);
+            });
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE(change.columns.size() == 1);
             REQUIRE_INDICES(change.columns[col_keys[0].value], 0);
 
-            write([&] { obj.set(col_keys[1], 10); });
+            write([&] {
+                obj.set(col_keys[1], 10);
+            });
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE(change.columns.size() == 1);
             REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
-        SECTION("modifying a different object")
-        {
+        SECTION("modifying a different object") {
             auto token = require_no_change();
-            write([&] { table->get_object(1).set(col_keys[0], 10); });
+            write([&] {
+                table->get_object(1).set(col_keys[0], 10);
+            });
         }
 
-        SECTION("multiple write transactions")
-        {
+        SECTION("multiple write transactions") {
             auto token = require_change();
 
             auto r2row = r2->read_group().get_table("class_table")->get_object(0);
@@ -303,8 +308,7 @@ TEST_CASE("object")
             REQUIRE_INDICES(change.columns[col_keys[1].value], 0);
         }
 
-        SECTION("skipping a notification")
-        {
+        SECTION("skipping a notification") {
             auto token = require_no_change();
             write([&] {
                 obj.set(col_keys[0], 1);
@@ -312,33 +316,39 @@ TEST_CASE("object")
             });
         }
 
-        SECTION("skipping only effects the current transaction even if no notification would occur anyway")
-        {
+        SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
             auto token = require_change();
 
             // would not produce a notification even if it wasn't skipped because no changes were made
-            write([&] { token.suppress_next(); });
+            write([&] {
+                token.suppress_next();
+            });
             REQUIRE(change.empty());
 
             // should now produce a notification
-            write([&] { obj.set(col_keys[0], 1); });
+            write([&] {
+                obj.set(col_keys[0], 1);
+            });
             REQUIRE_INDICES(change.modifications, 0);
         }
 
-        SECTION("add notification callback, remove it, then add another notification callback")
-        {
+        SECTION("add notification callback, remove it, then add another notification callback") {
             {
-                auto token = object.add_notification_callback(
-                    [&](CollectionChangeSet, std::exception_ptr) { FAIL("This should never happen"); });
+                auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    FAIL("This should never happen");
+                });
             }
             auto token = require_change();
-            write([&] { obj.remove(); });
+            write([&] {
+                obj.remove();
+            });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        SECTION("observing deleted object throws")
-        {
-            write([&] { obj.remove(); });
+        SECTION("observing deleted object throws") {
+            write([&] {
+                obj.remove();
+            });
             REQUIRE_THROWS(require_change());
         }
     }
@@ -363,8 +373,7 @@ TEST_CASE("object")
         return obj;
     };
 
-    SECTION("create object")
-    {
+    SECTION("create object") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"bool", true},
@@ -441,8 +450,7 @@ TEST_CASE("object")
         REQUIRE(list->get_object(0).get<Int>(array_target_table->get_column_key("value")) == 20);
     }
 
-    SECTION("create uses defaults for missing values")
-    {
+    SECTION("create uses defaults for missing values") {
         d.defaults["all types"] = {
             {"bool", true},
             {"int", INT64_C(5)},
@@ -501,8 +509,7 @@ TEST_CASE("object")
         REQUIRE(row.get_listbase_ptr(table->get_column_key("uuid array"))->size() == 2);
     }
 
-    SECTION("create can use defaults for primary key")
-    {
+    SECTION("create can use defaults for primary key") {
         d.defaults["all types"] = {
             {"_id", INT64_C(10)},
         };
@@ -525,8 +532,7 @@ TEST_CASE("object")
         REQUIRE(row.get<Int>(row.get_table()->get_column_key("_id")) == 10);
     }
 
-    SECTION("create does not complain about missing values for nullable fields")
-    {
+    SECTION("create does not complain about missing values for nullable fields") {
         r->begin_transaction();
         realm::Object obj;
         REQUIRE_NOTHROW(obj = Object::create(d, r, *r->schema().find("all optional types"), util::Any(AnyDict{})));
@@ -554,16 +560,14 @@ TEST_CASE("object")
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).size() == 0);
     }
 
-    SECTION("create throws for missing values if there is no default")
-    {
+    SECTION("create throws for missing values if there is no default") {
         REQUIRE_THROWS(create(AnyDict{
             {"_id", INT64_C(1)},
             {"float", 6.6f},
         }));
     }
 
-    SECTION("create always sets the PK first")
-    {
+    SECTION("create always sets the PK first") {
         AnyDict value{
             {"array 1", AnyVector{AnyDict{{"_id", INT64_C(1)}, {"value", INT64_C(1)}}}},
             {"array 2", AnyVector{AnyDict{{"_id", INT64_C(2)}, {"value", INT64_C(2)}}}},
@@ -576,8 +580,7 @@ TEST_CASE("object")
         REQUIRE_NOTHROW(Object::create(d, r, *r->schema().find("pk after list"), util::Any(value)));
     }
 
-    SECTION("create with update")
-    {
+    SECTION("create with update") {
         CollectionChangeSet change;
         bool callback_called;
         Object obj = create(AnyDict{
@@ -640,8 +643,7 @@ TEST_CASE("object")
         REQUIRE(row.get<UUID>(table->get_column_key("uuid")) == UUID("3b241101-9999-9999-9999-4136c566a962"));
     }
 
-    SECTION("create with update - only with diffs")
-    {
+    SECTION("create with update - only with diffs") {
         CollectionChangeSet change;
         bool callback_called;
         AnyDict adam{
@@ -718,8 +720,7 @@ TEST_CASE("object")
         REQUIRE_INDICES(change.modifications, 1);
     }
 
-    SECTION("create with update - identical sub-object")
-    {
+    SECTION("create with update - identical sub-object") {
         Object sub_obj = create_sub(AnyDict{{"value", INT64_C(10)}, {"_id", INT64_C(10)}});
         Object obj = create(AnyDict{
             {"_id", INT64_C(1)},
@@ -741,12 +742,15 @@ TEST_CASE("object")
         bool callback_called;
         bool results_callback_called;
         bool sub_callback_called;
-        auto token1 =
-            obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { callback_called = true; });
-        auto token2 = result.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { results_callback_called = true; });
-        auto token3 = sub_obj.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { sub_callback_called = true; });
+        auto token1 = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            callback_called = true;
+        });
+        auto token2 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            results_callback_called = true;
+        });
+        auto token3 = sub_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            sub_callback_called = true;
+        });
         advance_and_notify(*r);
 
         auto table = r->read_group().get_table("class_link target");
@@ -805,8 +809,7 @@ TEST_CASE("object")
         REQUIRE(sub_callback_called);
     }
 
-    SECTION("create with update - identical array of sub-objects")
-    {
+    SECTION("create with update - identical array of sub-objects") {
         bool callback_called;
         auto dict = AnyDict{
             {"_id", INT64_C(1)},
@@ -827,8 +830,9 @@ TEST_CASE("object")
 
         auto obj_table = r->read_group().get_table("class_all types");
         Results result(r, obj_table);
-        auto token1 = result.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { callback_called = true; });
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            callback_called = true;
+        });
         advance_and_notify(*r);
 
         create(dict, CreatePolicy::UpdateModified);
@@ -847,8 +851,7 @@ TEST_CASE("object")
     }
 
     for (auto policy : {CreatePolicy::UpdateAll, CreatePolicy::UpdateModified}) {
-        SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)"))
-        {
+        SECTION("set existing fields to null with update "s + (policy.diff ? "(diffed)" : "(all)")) {
             AnyDict initial_values{
                 {"_id", INT64_C(1)},
                 {"bool", true},
@@ -1014,8 +1017,7 @@ TEST_CASE("object")
         }
     }
 
-    SECTION("create throws for duplicate pk if update is not specified")
-    {
+    SECTION("create throws for duplicate pk if update is not specified") {
         create(AnyDict{
             {"_id", INT64_C(1)},
             {"bool", true},
@@ -1048,8 +1050,7 @@ TEST_CASE("object")
         }));
     }
 
-    SECTION("create with explicit null pk does not fall back to default")
-    {
+    SECTION("create with explicit null pk does not fall back to default") {
         d.defaults["nullable int pk"] = {
             {"_id", INT64_C(10)},
         };
@@ -1076,8 +1077,7 @@ TEST_CASE("object")
         REQUIRE(obj.obj().get<String>(col_pk_str) == "value");
     }
 
-    SECTION("create null and 0 primary keys for Int types")
-    {
+    SECTION("create null and 0 primary keys for Int types") {
         auto create = [&](util::Any&& value, StringData type) {
             r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
@@ -1089,8 +1089,7 @@ TEST_CASE("object")
         REQUIRE(Results(r, r->read_group().get_table("class_all optional types")).size() == 2);
     }
 
-    SECTION("create null and default primary keys for ObjectId types")
-    {
+    SECTION("create null and default primary keys for ObjectId types") {
         auto create = [&](util::Any&& value, StringData type) {
             r->begin_transaction();
             auto obj = Object::create(d, r, *r->schema().find(type), value);
@@ -1102,8 +1101,7 @@ TEST_CASE("object")
         REQUIRE(Results(r, r->read_group().get_table("class_nullable object id pk")).size() == 2);
     }
 
-    SECTION("getters and setters")
-    {
+    SECTION("getters and setters") {
         r->begin_transaction();
 
         auto table = r->read_group().get_table("class_all types");
@@ -1163,8 +1161,7 @@ TEST_CASE("object")
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5))));
     }
 
-    SECTION("list property self-assign is a no-op")
-    {
+    SECTION("list property self-assign is a no-op") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"bool", true},
@@ -1197,8 +1194,7 @@ TEST_CASE("object")
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
-    SECTION("defaults do not override values explicitly passed to create()")
-    {
+    SECTION("defaults do not override values explicitly passed to create()") {
         TestSyncManager init_sync_manager({}, {false});
         auto& server = init_sync_manager.sync_server();
         SyncTestFile config1(init_sync_manager.app(), "shared");
@@ -1237,8 +1233,9 @@ TEST_CASE("object")
         r1->commit_transaction();
 
         server.start();
-        util::EventLoop::main().run_until(
-            [&] { return r1->read_group().get_table("class_array target")->size() == 4; });
+        util::EventLoop::main().run_until([&] {
+            return r1->read_group().get_table("class_array target")->size() == 4;
+        });
 
         Obj obj = object1.obj();
         REQUIRE(obj.get<Int>("_id") == 7); // pk
@@ -1250,8 +1247,7 @@ TEST_CASE("object")
 #endif
 }
 
-TEST_CASE("Embedded Object")
-{
+TEST_CASE("Embedded Object") {
     Schema schema{
         {"all types",
          {
@@ -1291,8 +1287,7 @@ TEST_CASE("Embedded Object")
         return obj;
     };
 
-    SECTION("Basic object creation")
-    {
+    SECTION("Basic object creation") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
@@ -1309,16 +1304,14 @@ TEST_CASE("Embedded Object")
         REQUIRE(list.get(1).get<int64_t>("value") == 30);
     }
 
-    SECTION("set_property_value() on link to embedded object")
-    {
+    SECTION("set_property_value() on link to embedded object") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
         });
 
-        SECTION("throws when given a managed object")
-        {
+        SECTION("throws when given a managed object") {
             realm->begin_transaction();
             REQUIRE_THROWS_WITH(
                 obj.set_property_value(ctx, "object", obj.get_property_value<util::Any>(ctx, "object")),
@@ -1326,8 +1319,7 @@ TEST_CASE("Embedded Object")
             realm->cancel_transaction();
         }
 
-        SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll")
-        {
+        SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll") {
             realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}));
@@ -1337,8 +1329,7 @@ TEST_CASE("Embedded Object")
             realm->cancel_transaction();
         }
 
-        SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified")
-        {
+        SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified") {
             realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}),
@@ -1350,8 +1341,7 @@ TEST_CASE("Embedded Object")
             realm->cancel_transaction();
         }
 
-        SECTION("can set embedded link to null")
-        {
+        SECTION("can set embedded link to null") {
             realm->begin_transaction();
             auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any());
@@ -1362,8 +1352,7 @@ TEST_CASE("Embedded Object")
         }
     }
 
-    SECTION("set_property_value() on list of embedded objects")
-    {
+    SECTION("set_property_value() on list of embedded objects") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
@@ -1375,16 +1364,14 @@ TEST_CASE("Embedded Object")
         });
         List list2(realm, obj2.obj().get_linklist("array"));
 
-        SECTION("throws when given a managed object")
-        {
+        SECTION("throws when given a managed object") {
             realm->begin_transaction();
             REQUIRE_THROWS_WITH(obj.set_property_value(ctx, "array", util::Any{AnyVector{list2.get(0)}}),
                                 "Cannot add an existing managed embedded object to a List.");
             realm->cancel_transaction();
         }
 
-        SECTION("replaces objects when given a dictionary and CreatePolicy::UpdateAll")
-        {
+        SECTION("replaces objects when given a dictionary and CreatePolicy::UpdateAll") {
             realm->begin_transaction();
             auto old_obj_1 = list.get(0);
             auto old_obj_2 = list.get(1);
@@ -1401,8 +1388,7 @@ TEST_CASE("Embedded Object")
             realm->cancel_transaction();
         }
 
-        SECTION("mutates existing objects when given a dictionary and CreatePolicy::UpdateModified")
-        {
+        SECTION("mutates existing objects when given a dictionary and CreatePolicy::UpdateModified") {
             realm->begin_transaction();
             auto old_obj_1 = list.get(0);
             auto old_obj_2 = list.get(1);
@@ -1419,8 +1405,7 @@ TEST_CASE("Embedded Object")
             realm->cancel_transaction();
         }
 
-        SECTION("clears list when given null")
-        {
+        SECTION("clears list when given null") {
             realm->begin_transaction();
             obj.set_property_value(ctx, "array", util::Any());
             REQUIRE(list.size() == 0);
@@ -1428,8 +1413,7 @@ TEST_CASE("Embedded Object")
         }
     }
 
-    SECTION("create with UpdateModified diffs child objects")
-    {
+    SECTION("create with UpdateModified diffs child objects") {
         auto obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
@@ -1440,11 +1424,13 @@ TEST_CASE("Embedded Object")
         Results result(realm, array_table);
 
         bool obj_callback_called = false;
-        auto token = obj.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { obj_callback_called = true; });
+        auto token = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            obj_callback_called = true;
+        });
         bool list_callback_called = false;
-        auto token1 = result.add_notification_callback(
-            [&](CollectionChangeSet, std::exception_ptr) { list_callback_called = true; });
+        auto token1 = result.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            list_callback_called = true;
+        });
         advance_and_notify(*realm);
 
         // Update with identical value
@@ -1476,8 +1462,7 @@ TEST_CASE("Embedded Object")
         REQUIRE(list_callback_called);
     }
 
-    SECTION("deleting parent object sends change notification")
-    {
+    SECTION("deleting parent object sends change notification") {
         auto parent = create(AnyDict{
             {"_id", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},

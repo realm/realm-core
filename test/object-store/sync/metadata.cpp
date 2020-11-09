@@ -36,8 +36,7 @@ using SyncAction = SyncFileActionMetadata::Action;
 static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_metadata";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
-TEST_CASE("sync_metadata: migration", "[sync]")
-{
+TEST_CASE("sync_metadata: migration", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -88,8 +87,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
          }},
     };
 
-    SECTION("properly upgrades from v0 to v2")
-    {
+    SECTION("properly upgrades from v0 to v2") {
         // Open v0 metadata (create a Realm directly)
         {
             Realm::Config config;
@@ -119,8 +117,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
         // Open v2 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none);
-            SECTION("for existing entries")
-            {
+            SECTION("for existing entries") {
                 auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
                 REQUIRE(bool(md_1));
                 CHECK(md_1->identity() == identity_1);
@@ -137,8 +134,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
                 CHECK(md_2->is_valid());
             }
 
-            SECTION("and creates new entries properly")
-            {
+            SECTION("and creates new entries properly") {
                 auto user_metadata = manager.get_or_make_user_metadata(identity_3, provider_type);
                 REQUIRE(user_metadata->is_valid());
                 CHECK(user_metadata->identity() == identity_3);
@@ -149,8 +145,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
         }
     }
 
-    SECTION("properly upgrades from v1 to v2")
-    {
+    SECTION("properly upgrades from v1 to v2") {
         // Open v1 metadata (create a Realm directly)
         {
             Realm::Config config;
@@ -180,8 +175,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
         // Open v2 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none);
-            SECTION("for existing entries")
-            {
+            SECTION("for existing entries") {
                 auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
                 REQUIRE(bool(md_1));
                 CHECK(md_1->identity() == identity_1);
@@ -198,8 +192,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
                 CHECK(md_2->is_valid());
             }
 
-            SECTION("and creates new entries properly")
-            {
+            SECTION("and creates new entries properly") {
                 auto user_metadata = manager.get_or_make_user_metadata(identity_3, provider_type);
                 REQUIRE(user_metadata->is_valid());
                 CHECK(user_metadata->identity() == identity_3);
@@ -213,8 +206,7 @@ TEST_CASE("sync_metadata: migration", "[sync]")
     }
 }
 
-TEST_CASE("sync_metadata: user metadata", "[sync]")
-{
+TEST_CASE("sync_metadata: user metadata", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -223,8 +215,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
-    SECTION("can be properly constructed")
-    {
+    SECTION("can be properly constructed") {
         const auto identity = "testcase1a";
         auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->identity() == identity);
@@ -232,8 +223,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
         REQUIRE(user_metadata->access_token().empty());
     }
 
-    SECTION("properly reflects updating state")
-    {
+    SECTION("properly reflects updating state") {
         const auto identity = "testcase1b";
         const std::string sample_token = "this_is_a_user_token";
         auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
@@ -243,8 +233,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
         REQUIRE(user_metadata->access_token() == sample_token);
     }
 
-    SECTION("can be properly re-retrieved from the same manager")
-    {
+    SECTION("can be properly re-retrieved from the same manager") {
         const auto identity = "testcase1c";
         const std::string sample_token = "this_is_a_user_token";
         auto first = manager.get_or_make_user_metadata(identity, provider_type);
@@ -256,8 +245,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
         REQUIRE(second->access_token() == sample_token);
     }
 
-    SECTION("properly reflects changes across different instances")
-    {
+    SECTION("properly reflects changes across different instances") {
         const auto identity = "testcase1d";
         const std::string sample_token_1 = "this_is_a_user_token";
         auto first = manager.get_or_make_user_metadata(identity, provider_type);
@@ -280,8 +268,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
         REQUIRE(second->access_token() == sample_token_2);
     }
 
-    SECTION("can be removed")
-    {
+    SECTION("can be removed") {
         const auto identity = "testcase1e";
         auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->is_valid());
@@ -289,18 +276,15 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
         REQUIRE(!user_metadata->is_valid());
     }
 
-    SECTION("respects make_if_absent flag set to false in constructor")
-    {
+    SECTION("respects make_if_absent flag set to false in constructor") {
         const std::string sample_token = "this_is_a_user_token";
 
-        SECTION("with no prior metadata for the identifier")
-        {
+        SECTION("with no prior metadata for the identifier") {
             const auto identity = "testcase1g1";
             auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type, false);
             REQUIRE(!user_metadata);
         }
-        SECTION("with valid prior metadata for the identifier")
-        {
+        SECTION("with valid prior metadata for the identifier") {
             const auto identity = "testcase1g2";
             auto first = manager.get_or_make_user_metadata(identity, provider_type);
             first->set_access_token(sample_token);
@@ -310,8 +294,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
             REQUIRE(second->provider_type() == provider_type);
             REQUIRE(second->access_token() == sample_token);
         }
-        SECTION("with invalid prior metadata for the identifier")
-        {
+        SECTION("with invalid prior metadata for the identifier") {
             const auto identity = "testcase1g3";
             auto first = manager.get_or_make_user_metadata(identity, provider_type);
             first->set_access_token(sample_token);
@@ -322,8 +305,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]")
     }
 }
 
-TEST_CASE("sync_metadata: user metadata APIs", "[sync]")
-{
+TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -332,8 +314,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]")
     SyncMetadataManager manager(metadata_path, false);
     const std::string provider_type = "https://realm.example.org";
 
-    SECTION("properly list all marked and unmarked users")
-    {
+    SECTION("properly list all marked and unmarked users") {
         const auto identity1 = "testcase2a1";
         const auto identity2 = "testcase2a1"; // same as identity 1
         const auto identity3 = "testcase2a3";
@@ -363,8 +344,7 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]")
     }
 }
 
-TEST_CASE("sync_metadata: file action metadata", "[sync]")
-{
+TEST_CASE("sync_metadata: file action metadata", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -377,8 +357,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]")
     const std::string url_1 = "realm://realm.example.com/1";
     const std::string url_2 = "realm://realm.example.com/2";
 
-    SECTION("can be properly constructed")
-    {
+    SECTION("can be properly constructed") {
         const auto original_name = util::make_temp_dir() + "foobar/test1";
         manager.make_file_action_metadata(original_name, url_1, local_uuid_1, SyncAction::BackUpThenDeleteRealm);
         auto metadata = *manager.get_file_action_metadata(original_name);
@@ -389,8 +368,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]")
         REQUIRE(metadata.user_local_uuid() == local_uuid_1);
     }
 
-    SECTION("properly reflects updating state, across multiple instances")
-    {
+    SECTION("properly reflects updating state, across multiple instances") {
         const auto original_name = util::make_temp_dir() + "foobar/test2a";
         const std::string new_name_1 = util::make_temp_dir() + "foobar/test2b";
         const std::string new_name_2 = util::make_temp_dir() + "foobar/test2c";
@@ -417,16 +395,14 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]")
     }
 }
 
-TEST_CASE("sync_metadata: file action metadata APIs", "[sync]")
-{
+TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
 
     SyncMetadataManager manager(metadata_path, false);
-    SECTION("properly list all pending actions, reflecting their deletion")
-    {
+    SECTION("properly list all pending actions, reflecting their deletion") {
         const auto filename1 = util::make_temp_dir() + "foobar/file1";
         const auto filename2 = util::make_temp_dir() + "foobar/file2";
         const auto filename3 = util::make_temp_dir() + "foobar/file3";
@@ -448,8 +424,7 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]")
     }
 }
 
-TEST_CASE("sync_metadata: results", "[sync]")
-{
+TEST_CASE("sync_metadata: results", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -464,8 +439,7 @@ TEST_CASE("sync_metadata: results", "[sync]")
     const std::string provider_type_3 = "https://realm.example.org";
 
 
-    SECTION("properly update as underlying items are added")
-    {
+    SECTION("properly update as underlying items are added") {
         auto results = manager.all_unmarked_users();
         REQUIRE(results.size() == 0);
         // Add users, one at a time.
@@ -480,8 +454,7 @@ TEST_CASE("sync_metadata: results", "[sync]")
         REQUIRE(results_contains_user(results, identity3, provider_type_3));
     }
 
-    SECTION("properly update as underlying items are removed")
-    {
+    SECTION("properly update as underlying items are removed") {
         auto results = manager.all_unmarked_users();
         auto first = manager.get_or_make_user_metadata(identity1, provider_type_1);
         auto second = manager.get_or_make_user_metadata(identity2, provider_type_2);
@@ -502,15 +475,13 @@ TEST_CASE("sync_metadata: results", "[sync]")
     }
 }
 
-TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync]")
-{
+TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
 
-    SECTION("works for the basic case")
-    {
+    SECTION("works for the basic case") {
         const auto identity = "testcase4a";
         const std::string provider_type = "any-type";
         const std::string sample_token = "this_is_a_user_token";
@@ -534,29 +505,24 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
     }
 }
 
-TEST_CASE("sync_metadata: encryption", "[sync]")
-{
+TEST_CASE("sync_metadata: encryption", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
 
-    SECTION("prohibits opening the metadata Realm with different keys")
-    {
-        SECTION("different keys")
-        {
+    SECTION("prohibits opening the metadata Realm with different keys") {
+        SECTION("different keys") {
             SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
             REQUIRE_THROWS(SyncMetadataManager(metadata_path, true, make_test_encryption_key(11)));
         }
-        SECTION("different encryption settings")
-        {
+        SECTION("different encryption settings") {
             SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
             REQUIRE_THROWS(SyncMetadataManager(metadata_path, false));
         }
     }
 
-    SECTION("works when enabled")
-    {
+    SECTION("works when enabled") {
         std::vector<char> key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
         const auto auth_url = "https://realm.example.org";

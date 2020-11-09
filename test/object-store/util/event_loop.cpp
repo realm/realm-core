@@ -165,8 +165,9 @@ struct IdleHandler {
     }
     ~IdleHandler()
     {
-        uv_close(reinterpret_cast<uv_handle_t*>(idle),
-                 [](uv_handle_t* handle) { delete reinterpret_cast<uv_idle_t*>(handle); });
+        uv_close(reinterpret_cast<uv_handle_t*>(idle), [](uv_handle_t* handle) {
+            delete reinterpret_cast<uv_idle_t*>(handle);
+        });
     }
 };
 
