@@ -55,6 +55,7 @@ ExternalCommitHelper::~ExternalCommitHelper()
 
 void ExternalCommitHelper::notify_others()
 {
+    std::lock_guard<InterprocessMutex> lock(m_mutex);
     m_commit_available.notify_all();
 }
 
