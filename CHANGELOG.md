@@ -5,7 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Issue fixed by release v6.2.1:
+  * Files upgraded on 32-bit devices could end up being inconsistent resulting in "Key not found" exception to be thown. ([#6992](https://github.com/realm/realm-java/issues/6992), since v6.0.16)
  
 ### Breaking changes
 * None.
@@ -379,6 +380,13 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
  
+# 6.2.1 Release notes
+
+### Fixed
+* Files upgraded on 32-bit devices could end up being inconsistent resulting in "Key not found" exception to be thown. ([#6992](https://github.com/realm/realm-java/issues/6992), since v6.0.16)
+ 
+----------------------------------------------
+
 # 6.2.0 Release notes
 
 ### Enhancements
