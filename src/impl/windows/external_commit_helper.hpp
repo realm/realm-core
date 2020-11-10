@@ -26,30 +26,6 @@ namespace _impl {
 class RealmCoordinator;
 
 namespace win32 {
-// #if REALM_WINDOWS
-#define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
-        OpenFileMappingW(dwDesiredAccess, bInheritHandle, lpName);
-
-#define CreateFileMappingInternal(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName)\
-        CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
-
-#define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
-        MapViewOfFile(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
-
-// // #elif REALM_UWP
-// // #define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
-// //         OpenFileMappingFromApp(dwDesiredAccess, bInheritHandle, lpName);
-
-// // #define CreateFileMappingInternal(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName)\
-// //         CreateFileMappingFromApp(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
-
-// // #define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
-// //         MapViewOfFileFromApp(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
-
-// #elif
-// #error Unknown win32 platform
-// #endif
-
 template <class T, void (*Initializer)(T&)>
 class SharedMemory {
 public:
@@ -57,11 +33,11 @@ public:
         //assume another process have already initialzied the shared memory
         bool shouldInit = false;
 
-        HANDLE mapping = OpenFileMappingInternal(FILE_MAP_ALL_ACCESS, FALSE, name);
+        HANDLE mapping = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, name);
         auto error = GetLastError();
 
         if (mapping == NULL) {
-            mapping = CreateFileMappingInternal(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
+            mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
             error = GetLastError();
 
             //init since this is the first process creating the shared memory
@@ -72,7 +48,7 @@ public:
             throw std::system_error(error, std::system_category());
         }
 
-        LPVOID view = MapViewOfFileInternal(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T));
+        LPVOID view = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T));
         error = GetLastError();
         if (view == NULL) {
             throw std::system_error(error, std::system_category());
