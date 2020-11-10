@@ -43,7 +43,7 @@ Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey c
 Collection::Collection(std::shared_ptr<Realm> r, const CollectionBase& coll)
     : m_realm(std::move(r))
     , m_type(ObjectSchema::from_core_type(coll.get_col_key()) & ~PropertyType::Collection)
-    , m_coll_base(coll.clone())
+    , m_coll_base(coll.clone_collection())
 {
 }
 

@@ -43,7 +43,8 @@ DictionaryClusterTree::~DictionaryClusterTree() {}
 /******************************** Dictionary *********************************/
 
 Dictionary::Dictionary(const Obj& obj, ColKey col_key)
-    : CollectionBase(obj, col_key)
+    : m_obj(obj)
+    , m_col_key(col_key)
     , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
 {
     init_from_parent();
@@ -484,7 +485,7 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
 
 /************************* Dictionary::Iterator *************************/
 
-Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
+CollectionIterator<Dictionary>::CollectionIterator(const Dictionary* dict, size_t pos)
     : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
     , m_key_type(dict->get_key_data_type())
 {

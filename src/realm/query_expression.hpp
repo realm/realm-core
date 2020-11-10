@@ -683,12 +683,8 @@ private:
 
 class Expression {
 public:
-    Expression()
-    {
-    }
-    virtual ~Expression()
-    {
-    }
+    Expression() {}
+    virtual ~Expression() {}
 
     virtual double init()
     {
@@ -698,9 +694,7 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(ConstTableRef table) = 0;
     virtual void set_cluster(const Cluster*) = 0;
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
     virtual ConstTableRef get_base_table() const = 0;
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
@@ -715,9 +709,7 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
 
 class Subexpr {
 public:
-    virtual ~Subexpr()
-    {
-    }
+    virtual ~Subexpr() {}
 
     virtual std::unique_ptr<Subexpr> clone() const = 0;
 
@@ -732,9 +724,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
-    virtual void set_cluster(const Cluster*)
-    {
-    }
+    virtual void set_cluster(const Cluster*) {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
@@ -744,9 +734,7 @@ public:
         return nullptr;
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual bool has_constant_evaluation() const
     {
@@ -1074,9 +1062,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, UUID>,
                  public Overloads<T, null> {
 public:
-    virtual ~Subexpr2()
-    {
-    }
+    virtual ~Subexpr2() {}
 
     DataType get_type() const final
     {
@@ -2771,7 +2757,7 @@ template <typename T>
 class Sum;
 template <typename T>
 class Average;
-}
+} // namespace aggregate_operations
 
 class ColumnListBase {
 public:
@@ -2938,6 +2924,17 @@ private:
         : ColumnListBase(column_key, table, links, type)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
+    }
+};
+
+template <>
+class Columns<LnkLst> : public Columns<Lst<ObjKey>> {
+public:
+    using Columns<Lst<ObjKey>>::Columns;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<LnkLst>>(*this);
     }
 };
 
@@ -3904,7 +3901,7 @@ public:
         return "@avg";
     }
 };
-}
+} // namespace aggregate_operations
 
 template <class oper, class TLeft>
 class UnaryOperator : public Subexpr2<typename oper::type> {
@@ -4266,5 +4263,5 @@ private:
     mutable size_t m_index_get = 0;
     size_t m_index_end = 0;
 };
-}
+} // namespace realm
 #endif // REALM_QUERY_EXPRESSION_HPP

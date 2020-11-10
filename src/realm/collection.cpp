@@ -1,27 +1,52 @@
 #include <realm/collection.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_key.hpp>
 
 namespace realm {
 
-CollectionBase::CollectionBase(const Obj& owner, ColKey col_key)
-    : m_obj(owner)
-    , m_col_key(col_key)
+namespace _impl {
+
+size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
-    if (!col_key.is_collection()) {
-        throw LogicError(LogicError::collection_type_mismatch);
+    for (auto i : vec) {
+        if (i > ndx)
+            break;
+        ndx++;
     }
-    m_nullable = col_key.is_nullable();
+    return ndx;
 }
 
-CollectionBase::~CollectionBase() {}
-
-ref_type CollectionBase::get_child_ref(size_t) const noexcept
+size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
-    try {
-        return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-    }
-    catch (const KeyNotFound&) {
-        return ref_type(0);
+    // Subtract the number of tombstones below ndx.
+    auto it = std::lower_bound(vec.begin(), vec.end(), ndx);
+    auto n = it - vec.begin();
+    return ndx - n;
+}
+
+void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree)
+{
+    vec.clear();
+    if (tree.is_attached()) {
+        // Only do the scan if context flag is set.
+        if (tree.get_context_flag()) {
+            auto func = [&vec](BPlusTreeNode* node, size_t offset) {
+                auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
+                size_t sz = leaf->size();
+                for (size_t i = 0; i < sz; i++) {
+                    auto k = leaf->get(i);
+                    if (k.is_unresolved()) {
+                        vec.push_back(i + offset);
+                    }
+                }
+                return false;
+            };
+
+            tree.traverse(func);
+        }
     }
 }
+
+} // namespace _impl
 
 } // namespace realm

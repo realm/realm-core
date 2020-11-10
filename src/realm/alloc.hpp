@@ -310,7 +310,8 @@ private:
     friend class Group;
     friend class WrappedAllocator;
     friend class Obj;
-    friend class CollectionBase;
+    template <class>
+    friend class CollectionBaseImpl;
     friend class Dictionary;
 };
 
@@ -325,9 +326,7 @@ public:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
-    ~WrappedAllocator()
-    {
-    }
+    ~WrappedAllocator() {}
 
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {
@@ -428,9 +427,7 @@ inline MemRef::MemRef() noexcept
 {
 }
 
-inline MemRef::~MemRef() noexcept
-{
-}
+inline MemRef::~MemRef() noexcept {}
 
 inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
     : m_addr(addr)
@@ -543,9 +540,7 @@ inline Allocator::Allocator() noexcept
     m_ref_translation_ptr = nullptr;
 }
 
-inline Allocator::~Allocator() noexcept
-{
-}
+inline Allocator::~Allocator() noexcept {}
 
 // performance critical part of the translation process. Less critical code is in translate_less_critical.
 inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept

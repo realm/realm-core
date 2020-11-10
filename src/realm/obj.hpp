@@ -273,6 +273,8 @@ private:
     template <class, class>
     friend class Collection;
     template <class>
+    friend class CollectionBaseImpl;
+    template <class>
     friend class Lst;
     friend class LnkLst;
     friend class Dictionary;
@@ -351,6 +353,9 @@ private:
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
+
+template <>
+int64_t Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...

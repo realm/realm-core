@@ -29,27 +29,29 @@ namespace realm {
 
 class DictionaryClusterTree;
 
-class Dictionary : public CollectionBase {
+class Dictionary : public CollectionBase, private ArrayParent {
 public:
-    class Iterator;
+    using Iterator = CollectionIterator<Dictionary>;
 
     Dictionary() {}
     ~Dictionary();
 
     Dictionary(const Obj& obj, ColKey col_key);
     Dictionary(const Dictionary& other)
-        : CollectionBase(other)
+        : m_obj(other.m_obj)
+        , m_col_key(other.m_col_key)
         , m_key_type(other.m_key_type)
     {
         *this = other;
     }
     Dictionary& operator=(const Dictionary& other);
 
-
-    // Overriding members of CollectionBase:
-    size_t size() const final;
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
+
+    // Overriding members of CollectionBase:
+    std::unique_ptr<CollectionBase> clone_collection() const;
+    size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
 
@@ -60,6 +62,13 @@ public:
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+    TableRef get_target_table() const final;
+    const Obj& get_obj() const noexcept final;
+    ColKey get_col_key() const final;
+    ObjKey get_key() const final;
+    bool is_attached() const final;
+    bool has_changed() const final;
+    ConstTableRef get_table() const final;
 
 
     void create();
@@ -107,15 +116,49 @@ public:
     Iterator begin() const;
     Iterator end() const;
 
+protected:
+    bool update_if_needed() const final;
+
 private:
     mutable DictionaryClusterTree* m_clusters = nullptr;
+    Obj m_obj;
+    ColKey m_col_key;
     DataType m_key_type = type_String;
+
+    mutable uint_fast64_t m_content_version = 0;
+    mutable uint_fast64_t m_last_content_version = 0;
 
     bool init_from_parent() const final;
     Mixed do_get(ClusterNode::State&&) const;
+
+    // Overriding ArrayParent interface:
+    ref_type get_child_ref(size_t child_ndx) const noexcept final
+    {
+        static_cast<void>(child_ndx);
+        try {
+            return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
+        }
+        catch (const KeyNotFound&) {
+            return ref_type(0);
+        }
+    }
+
+    void update_child_ref(size_t child_ndx, ref_type new_ref) final
+    {
+        REALM_ASSERT(child_ndx == 0);
+        m_obj.set_int(m_col_key, from_ref(new_ref));
+    }
+
+    void update_content_version() const
+    {
+        m_content_version = m_obj.get_alloc().get_content_version();
+    }
+
+    friend class CollectionIterator<Dictionary>;
 };
 
-class Dictionary::Iterator : public ClusterTree::Iterator {
+template <>
+class CollectionIterator<Dictionary> : public ClusterTree::Iterator {
 public:
     typedef std::forward_iterator_tag iterator_category;
     typedef std::pair<const Mixed, Mixed> value_type;
@@ -131,13 +174,69 @@ private:
 
     DataType m_key_type;
 
-    Iterator(const Dictionary* dict, size_t pos);
+    CollectionIterator(const Dictionary* dict, size_t pos);
 };
 
 inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const Obj& obj)
 {
     return insert(key, Mixed(obj.get_link()));
 }
+
+inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
+{
+    return m_obj.get_dictionary_ptr(m_col_key);
+}
+
+inline TableRef Dictionary::get_target_table() const
+{
+    return m_obj.get_target_table(m_col_key);
+}
+
+inline const Obj& Dictionary::get_obj() const noexcept
+{
+    return m_obj;
+}
+
+inline ColKey Dictionary::get_col_key() const
+{
+    return m_col_key;
+}
+
+inline ObjKey Dictionary::get_key() const
+{
+    return m_obj.get_key();
+}
+
+inline bool Dictionary::is_attached() const
+{
+    return m_obj.is_valid();
+}
+
+inline bool Dictionary::has_changed() const
+{
+    update_if_needed();
+    if (m_last_content_version != m_content_version) {
+        m_last_content_version = m_content_version;
+        return true;
+    }
+    return false;
+}
+
+inline ConstTableRef Dictionary::get_table() const
+{
+    return m_obj.get_table();
+}
+
+inline bool Dictionary::update_if_needed() const
+{
+    auto content_version = m_obj.get_alloc().get_content_version();
+    if (m_obj.update_if_needed() || content_version != m_content_version) {
+        init_from_parent();
+        return true;
+    }
+    return false;
+}
+
 
 } // namespace realm
 

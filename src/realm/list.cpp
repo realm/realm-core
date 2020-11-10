@@ -255,7 +255,6 @@ void Lst<ObjKey>::clear()
             while (ndx--) {
                 do_set(ndx, null_key);
                 m_tree->erase(ndx);
-                CollectionBase::adj_remove(ndx);
             }
             // m_obj.bump_both_versions();
             m_obj.bump_content_version();
@@ -382,74 +381,18 @@ void Lst<Mixed>::do_remove(size_t ndx)
     }
 }
 
-Obj LnkLst::get_object(size_t ndx) const
-{
-    ObjKey k = get(ndx);
-    return get_target_table()->get_object(k);
-}
-
 bool LnkLst::init_from_parent() const
 {
-    Collection<ObjKey, LstBase>::init_from_parent();
-    update_unresolved(m_unresolved, *m_tree);
-
-    return m_valid;
-}
-
-size_t virtual2real(const std::vector<size_t>& vec, size_t ndx)
-{
-    for (auto i : vec) {
-        if (i > ndx)
-            break;
-        ndx++;
-    }
-    return ndx;
-}
-
-void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree)
-{
-    vec.clear();
-    if (tree.is_attached()) {
-        // Only do the scan if context flag is set.
-        if (tree.get_context_flag()) {
-            auto func = [&vec](BPlusTreeNode* node, size_t offset) {
-                auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
-                size_t sz = leaf->size();
-                for (size_t i = 0; i < sz; i++) {
-                    auto k = leaf->get(i);
-                    if (k.is_unresolved()) {
-                        vec.push_back(i + offset);
-                    }
-                }
-                return false;
-            };
-
-            tree.traverse(func);
-        }
-    }
-}
-
-void LnkLst::set(size_t ndx, ObjKey value)
-{
-    if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    Lst<ObjKey>::set(virtual2real(m_unresolved, ndx), value);
-}
-
-void LnkLst::insert(size_t ndx, ObjKey value)
-{
-    if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    Lst<ObjKey>::insert(virtual2real(m_unresolved, ndx), value);
+    m_keys.init_from_parent();
+    update_unresolved(*m_keys.m_tree);
+    return m_keys.m_valid;
 }
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
-    Lst<ObjKey>::insert(ndx, o.get_key());
+    m_keys.insert(ndx, o.get_key());
     return o;
 }
 
@@ -457,13 +400,13 @@ Obj LnkLst::create_and_set_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
-    Lst<ObjKey>::set(ndx, o.get_key());
+    m_keys.set(ndx, o.get_key());
     return o;
 }
 
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
 {
-    TableView tv(get_target_table(), clone());
+    TableView tv(get_target_table(), clone_linklist());
     tv.do_sync();
     tv.sort(std::move(order));
     return tv;
@@ -486,28 +429,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
-        _impl::TableFriend::batch_erase_rows(*get_target_table(), *this->m_tree);
-    }
-}
-
-LnkLst::LnkLst(const Obj& owner, ColKey col_key)
-    : Lst<ObjKey>(owner, col_key)
-{
-    update_unresolved(m_unresolved, *m_tree);
-}
-
-void LnkLst::get_dependencies(TableVersions& versions) const
-{
-    if (is_attached()) {
-        auto table = get_table();
-        versions.emplace_back(table->get_key(), table->get_content_version());
-    }
-}
-
-void LnkLst::sync_if_needed() const
-{
-    if (this->is_attached()) {
-        const_cast<LnkLst*>(this)->update_if_needed();
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_keys.m_tree);
     }
 }
 

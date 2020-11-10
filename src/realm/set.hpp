@@ -30,9 +30,9 @@ public:
     using CollectionBase::CollectionBase;
 
     virtual ~SetBase() {}
-    SetBasePtr clone() const
+    virtual SetBasePtr clone() const
     {
-        return m_obj.get_setbase_ptr(m_col_key);
+        return get_obj().get_setbase_ptr(get_col_key());
     }
 
     virtual std::pair<size_t, bool> insert_null() = 0;
@@ -48,28 +48,42 @@ protected:
 };
 
 template <class T>
-class Set : public Collection<T, SetBase> {
+class SetInterface : public SetBase, public CollectionOf<T> {
 public:
-    using Collection<T, SetBase>::m_tree;
-    using Collection<T, SetBase>::size;
-    using Collection<T, SetBase>::begin;
-    using Collection<T, SetBase>::end;
-    using Collection<T, SetBase>::get;
+    using value_type = T;
+
+    virtual std::pair<size_t, bool> insert(T value) = 0;
+    virtual size_t find(T value) const = 0;
+    virtual std::pair<size_t, bool> erase(T value) = 0;
+};
+
+template <class T>
+class Set : public CollectionBaseImpl<SetInterface<T>> {
+public:
+    using Base = CollectionBaseImpl<SetInterface<T>>;
+    using Base::begin;
+    using Base::end;
+    using Base::get;
+    using Base::size;
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
 
     /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
     /// or the index of the already-existing value.
-    std::pair<size_t, bool> insert(T value);
+    std::pair<size_t, bool> insert(T value) final;
 
     /// Find the index of a value in the set, or `size_t(-1)` if it is not in the set.
-    size_t find(T value) const;
+    size_t find(T value) const final;
 
     /// Erase an element from the set, returning true if the set contained the element.
-    std::pair<size_t, bool> erase(T value);
+    std::pair<size_t, bool> erase(T value) final;
 
     // Overriding members of CollectionBase:
+    std::unique_ptr<CollectionBase> clone_collection() const final
+    {
+        return std::make_unique<Set<T>>(m_obj, m_col_key);
+    }
     Mixed min(size_t* return_ndx = nullptr) const final;
     Mixed max(size_t* return_ndx = nullptr) const final;
     Mixed sum(size_t* return_cnt = nullptr) const final;
@@ -78,15 +92,17 @@ public:
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
     // Overriding members of SetBase:
-    std::pair<size_t, bool> insert_null() override;
-    std::pair<size_t, bool> erase_null() override;
-    std::pair<size_t, bool> insert_any(Mixed value) override;
-    std::pair<size_t, bool> erase_any(Mixed value) override;
-    void clear() override;
+    std::pair<size_t, bool> insert_null() final;
+    std::pair<size_t, bool> erase_null() final;
+    std::pair<size_t, bool> insert_any(Mixed value) final;
+    std::pair<size_t, bool> erase_any(Mixed value) final;
+    void clear() final;
 
 private:
-    using Collection<T, SetBase>::m_valid;
-    using Collection<T, SetBase>::m_obj;
+    using Base::m_col_key;
+    using Base::m_obj;
+    using Base::m_tree;
+    using Base::m_valid;
 
     void create()
     {
@@ -268,7 +284,7 @@ struct SetElementEquals<Mixed> {
 
 template <class T>
 inline Set<T>::Set(const Obj& obj, ColKey col_key)
-    : Collection<T, SetBase>(obj, col_key)
+    : Base(obj, col_key)
 {
     if (m_obj) {
         this->init_from_parent();
@@ -316,7 +332,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
     }
 
     do_insert(it.index(), value);
-    CollectionBase::m_obj.bump_content_version();
+    m_obj.bump_content_version();
     return {it.index(), true};
 }
 
@@ -354,7 +370,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
         this->erase_repl(repl, it.index(), value);
     }
     do_erase(it.index());
-    CollectionBase::m_obj.bump_content_version();
+    m_obj.bump_content_version();
     return {it.index(), true};
 }
 
