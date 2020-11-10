@@ -29,8 +29,9 @@ namespace realm {
 
 class DictionaryClusterTree;
 
-class Dictionary : public CollectionBase, private ArrayParent {
+class Dictionary final : public CollectionBaseImpl<CollectionBase> {
 public:
+    using Base = CollectionBaseImpl<CollectionBase>;
     using Iterator = CollectionIterator<Dictionary>;
 
     Dictionary() {}
@@ -38,8 +39,7 @@ public:
 
     Dictionary(const Obj& obj, ColKey col_key);
     Dictionary(const Dictionary& other)
-        : m_obj(other.m_obj)
-        , m_col_key(other.m_col_key)
+        : Base(static_cast<const Base&>(other))
         , m_key_type(other.m_key_type)
     {
         *this = other;
@@ -62,14 +62,6 @@ public:
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
-    TableRef get_target_table() const final;
-    const Obj& get_obj() const noexcept final;
-    ColKey get_col_key() const final;
-    ObjKey get_key() const final;
-    bool is_attached() const final;
-    bool has_changed() const final;
-    ConstTableRef get_table() const final;
-
 
     void create();
 
@@ -116,43 +108,12 @@ public:
     Iterator begin() const;
     Iterator end() const;
 
-protected:
-    bool update_if_needed() const final;
-
 private:
     mutable DictionaryClusterTree* m_clusters = nullptr;
-    Obj m_obj;
-    ColKey m_col_key;
     DataType m_key_type = type_String;
-
-    mutable uint_fast64_t m_content_version = 0;
-    mutable uint_fast64_t m_last_content_version = 0;
 
     bool init_from_parent() const final;
     Mixed do_get(ClusterNode::State&&) const;
-
-    // Overriding ArrayParent interface:
-    ref_type get_child_ref(size_t child_ndx) const noexcept final
-    {
-        static_cast<void>(child_ndx);
-        try {
-            return to_ref(m_obj._get<int64_t>(m_col_key.get_index()));
-        }
-        catch (const KeyNotFound&) {
-            return ref_type(0);
-        }
-    }
-
-    void update_child_ref(size_t child_ndx, ref_type new_ref) final
-    {
-        REALM_ASSERT(child_ndx == 0);
-        m_obj.set_int(m_col_key, from_ref(new_ref));
-    }
-
-    void update_content_version() const
-    {
-        m_content_version = m_obj.get_alloc().get_content_version();
-    }
 
     friend class CollectionIterator<Dictionary>;
 };
@@ -185,56 +146,6 @@ inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const
 inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
 {
     return m_obj.get_dictionary_ptr(m_col_key);
-}
-
-inline TableRef Dictionary::get_target_table() const
-{
-    return m_obj.get_target_table(m_col_key);
-}
-
-inline const Obj& Dictionary::get_obj() const noexcept
-{
-    return m_obj;
-}
-
-inline ColKey Dictionary::get_col_key() const
-{
-    return m_col_key;
-}
-
-inline ObjKey Dictionary::get_key() const
-{
-    return m_obj.get_key();
-}
-
-inline bool Dictionary::is_attached() const
-{
-    return m_obj.is_valid();
-}
-
-inline bool Dictionary::has_changed() const
-{
-    update_if_needed();
-    if (m_last_content_version != m_content_version) {
-        m_last_content_version = m_content_version;
-        return true;
-    }
-    return false;
-}
-
-inline ConstTableRef Dictionary::get_table() const
-{
-    return m_obj.get_table();
-}
-
-inline bool Dictionary::update_if_needed() const
-{
-    auto content_version = m_obj.get_alloc().get_content_version();
-    if (m_obj.update_if_needed() || content_version != m_content_version) {
-        init_from_parent();
-        return true;
-    }
-    return false;
 }
 
 
