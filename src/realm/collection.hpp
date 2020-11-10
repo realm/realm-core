@@ -318,7 +318,7 @@ protected:
 
     void update_child_ref(size_t child_ndx, ref_type new_ref) final
     {
-        REALM_ASSERT(child_ndx == 0);
+        static_cast<void>(child_ndx);
         m_obj.set_int(m_col_key, from_ref(new_ref));
     }
 };
