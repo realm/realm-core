@@ -623,6 +623,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else {
         m_tombstones = nullptr;
     }
+    m_cookie = cookie_initialized;
 }
 
 
@@ -1061,8 +1062,9 @@ void Table::do_set_embedded(bool embedded)
 }
 
 
-void Table::detach() noexcept
+void Table::detach(LifeCycleCookie cookie) noexcept
 {
+    m_cookie = cookie;
     m_alloc.bump_instance_version();
 }
 
@@ -1095,6 +1097,7 @@ Table::~Table() noexcept
         delete index;
     }
     m_index_accessors.clear();
+    m_cookie = cookie_deleted;
 }
 
 
@@ -1820,6 +1823,26 @@ StringData Table::get_name() const noexcept
     REALM_ASSERT(dynamic_cast<Group*>(parent));
     return static_cast<Group*>(parent)->get_table_name(get_key());
 }
+
+const char* Table::get_state() const noexcept
+{
+    switch (m_cookie) {
+        case cookie_created:
+            return "created";
+        case cookie_transaction_ended:
+            return "transaction_ended";
+        case cookie_initialized:
+            return "initialised";
+        case cookie_removed:
+            return "removed";
+        case cookie_void:
+            return "void";
+        case cookie_deleted:
+            return "deleted";
+    }
+    return "";
+}
+
 
 bool Table::is_nullable(ColKey col_key) const
 {
@@ -2710,6 +2733,7 @@ void Table::refresh_content_version()
 
 void Table::refresh_accessor_tree()
 {
+    REALM_ASSERT(m_cookie == cookie_initialized);
     REALM_ASSERT(m_top.is_attached());
     m_top.init_from_parent();
     m_spec.init_from_parent();

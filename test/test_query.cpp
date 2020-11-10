@@ -5764,4 +5764,79 @@ TEST(Query_AllocatorBug)
     CHECK_EQUAL(cnt, 421);
 }
 
+TEST(Query_StringNodeEqualBaseBug)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_type = table->add_column(type_String, "type");
+    auto col_tags = table->add_column(type_String, "tags");
+    table->add_search_index(col_type);
+
+    // Create 2 clusters
+    for (int i = 0; i < 500; i++) {
+        table->create_object().set(col_type, "project").set(col_tags, "tag001");
+    }
+
+    Query q = table->where().equal(col_type, "test", false).Or().contains(col_tags, "tag005", false);
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 0);
+    table->begin()->set(col_type, "task");
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 0);
+}
+
+TEST(Query_OptimalNode)
+{
+    const char* types[9] = {"todo", "task", "issue", "report", "test", "item", "epic", "story", "flow"};
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_type = table->add_column(type_String, "type");
+    auto col_tags = table->add_column(type_String, "tags");
+    table->add_search_index(col_type);
+
+    for (int i = 0; i < 10000; i++) {
+        auto obj = table->create_object();
+        std::string type = types[i % 9];
+        std::string val = type + util::to_string(i % 10);
+        obj.set(col_type, val);
+        std::string tags;
+        for (int j = 0; j < 7; j++) {
+            tags += " TAG" + util::to_string(i % 500);
+        }
+        obj.set(col_tags, tags);
+    }
+
+    auto q1 = table->where().equal(col_type, "todo0", false);
+    q1.count(); // Warm up
+    auto t1 = steady_clock::now();
+    auto cnt = q1.count();
+    auto t2 = steady_clock::now();
+    CHECK_EQUAL(cnt, 112);
+    auto dur1 = duration_cast<microseconds>(t2 - t1).count();
+    // std::cout << "cnt: " << cnt << " dur1: " << dur1 << " us" << std::endl;
+
+    auto q2 = table->where().contains(col_tags, "tag0", false);
+    q2.count(); // Warm up
+    t1 = steady_clock::now();
+    cnt = q2.count();
+    t2 = steady_clock::now();
+    CHECK_EQUAL(cnt, 20);
+    auto dur2 = duration_cast<microseconds>(t2 - t1).count();
+    // std::cout << "cnt: " << cnt << " dur2: " << dur2 << " us" << std::endl;
+
+    Query q = q1.and_query(q2);
+    q.count(); // Warm up
+    t1 = steady_clock::now();
+    cnt = q.count();
+    t2 = steady_clock::now();
+    CHECK_EQUAL(cnt, 3);
+    auto dur3 = duration_cast<microseconds>(t2 - t1).count();
+
+    // The duration of the combined query should be closer to the duration for
+    // the query using the index.
+    CHECK_GREATER(dur3, dur1);
+    CHECK_LESS(dur3, dur2 / 5);
+    // std::cout << "cnt: " << cnt << " dur3: " << dur3 << " us" << std::endl;
+}
+
 #endif // TEST_QUERY

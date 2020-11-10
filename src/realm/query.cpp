@@ -381,50 +381,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
     ColumnAttrMask attr = column_key.get_attrs();
 
     if (attr.test(col_attr_List)) {
-        switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_OldDateTime: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<int64_t, Cond>(value, column_key)};
-            }
-            case type_Float: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<float, Cond>(value, column_key)};
-            }
-            case type_Double: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<double, Cond>(value, column_key)};
-            }
-            case type_String: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<String, Cond>(value, column_key)};
-            }
-            case type_Binary: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Binary, Cond>(value, column_key)};
-            }
-            case type_Timestamp: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Timestamp, Cond>(value, column_key)};
-            }
-            case type_LinkList: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
-            }
-            case type_ObjectId: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<ObjectId, Cond>(value, column_key)};
-            }
-            case type_Mixed: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Mixed, Cond>(value, column_key)};
-            }
-            case type_Decimal: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Decimal128, Cond>(value, column_key)};
-            }
-            case type_UUID: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<UUID, Cond>(value, column_key)};
-            }
-            case type_TypedLink:
-                [[fallthrough]];
-            case type_Link:
-                [[fallthrough]];
-            case type_OldTable: {
-                throw_type_mismatch_error();
-            }
-        }
+        return std::unique_ptr<ParentNode>{new SizeListNode<Cond>(value, column_key)};
     }
     switch (type) {
         case type_String: {
@@ -986,6 +943,7 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
         // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
         size_t best = find_best_node(pn);
         start = pn->m_children[best]->aggregate_local(st, start, end, findlocals, source_column);
+        double current_cost = pn->m_children[best]->cost();
 
         // Make remaining conditions compute their m_dD (statistics)
         for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
@@ -993,8 +951,7 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
                 continue;
 
             // Skip test if there is no way its cost can ever be better than best node's
-            double cost = pn->m_children[c]->cost();
-            if (pn->m_children[c]->m_dT < cost) {
+            if (pn->m_children[c]->m_dT < current_cost) {
 
                 // Limit to bestdist in order not to skip too large parts of index nodes
                 size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
