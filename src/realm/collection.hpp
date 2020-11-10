@@ -64,18 +64,6 @@ protected:
     virtual bool update_if_needed() const = 0;
 };
 
-template <class T>
-class CollectionOf {
-public:
-    using value_type = T;
-
-    virtual ~CollectionOf() {}
-    virtual size_t size() const = 0;
-    virtual T get(size_t ndx) const = 0;
-    virtual bool is_null(size_t ndx) const = 0;
-    virtual size_t find_first(const T&) const = 0;
-};
-
 
 template <class T>
 inline void check_column_type(ColKey col)
@@ -194,57 +182,11 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
 template <class Interface>
-class CollectionBaseImpl : public Interface, private ArrayParent {
+class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
-    using value_type = typename Interface::value_type;
-    using iterator = CollectionIterator<CollectionBaseImpl<Interface>>;
-
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
-    static_assert(std::is_base_of_v<CollectionOf<value_type>, Interface>);
 
     // Overriding members of CollectionBase:
-
-    size_t size() const final
-    {
-        if (!is_attached())
-            return 0;
-        update_if_needed();
-        if (!m_valid) {
-            return 0;
-        }
-        return m_tree->size();
-    }
-
-    bool is_null(size_t ndx) const final
-    {
-        return m_nullable && value_is_null(get(ndx));
-    }
-
-    Mixed get_any(size_t ndx) const final
-    {
-        return get(ndx);
-    }
-
-    Mixed min(size_t* return_ndx = nullptr) const override
-    {
-        return MinHelper<value_type>::eval(*m_tree, return_ndx);
-    }
-
-    Mixed max(size_t* return_ndx = nullptr) const override
-    {
-        return MaxHelper<value_type>::eval(*m_tree, return_ndx);
-    }
-
-    Mixed sum(size_t* return_cnt = nullptr) const override
-    {
-        return SumHelper<value_type>::eval(*m_tree, return_cnt);
-    }
-
-    Mixed avg(size_t* return_cnt = nullptr) const override
-    {
-        return AverageHelper<value_type>::eval(*m_tree, return_cnt);
-    }
-
     ColKey get_col_key() const noexcept final
     {
         return m_col_key;
@@ -285,40 +227,6 @@ public:
         return m_obj.get_table();
     }
 
-    // Overriding members of CollectionOf<T>:
-
-    value_type get(size_t ndx) const final
-    {
-        const auto current_size = size();
-        if (ndx >= current_size) {
-            throw std::out_of_range("Index out of range");
-        }
-        return m_tree->get(ndx);
-    }
-
-    size_t find_first(const value_type& value) const final
-    {
-        if (!m_valid && !init_from_parent())
-            return not_found;
-        update_if_needed();
-        return m_tree->find_first(value);
-    }
-
-    const BPlusTree<value_type>& get_tree() const
-    {
-        return *m_tree;
-    }
-
-    iterator begin() const
-    {
-        return iterator{this, 0};
-    }
-
-    iterator end() const
-    {
-        return iterator{this, size()};
-    }
-
 protected:
     Obj m_obj;
     ColKey m_col_key;
@@ -326,42 +234,16 @@ protected:
 
     mutable uint_fast64_t m_content_version = 0;
     mutable uint_fast64_t m_last_content_version = 0;
-    mutable std::unique_ptr<BPlusTree<value_type>> m_tree;
     mutable bool m_valid = false;
 
     CollectionBaseImpl() = default;
+    CollectionBaseImpl(const CollectionBaseImpl& other) = default;
 
     CollectionBaseImpl(const Obj& obj, ColKey col_key)
         : m_obj(obj)
         , m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
-        , m_tree(new BPlusTree<value_type>(obj.get_alloc()))
     {
-        if (!col_key.is_collection()) {
-            throw LogicError(LogicError::collection_type_mismatch);
-        }
-
-        check_column_type<value_type>(m_col_key);
-
-        m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
-    }
-
-    CollectionBaseImpl(const CollectionBaseImpl& other)
-        : Interface(static_cast<const Interface&>(other))
-        , m_obj(other.m_obj)
-        , m_col_key(other.m_col_key)
-        , m_nullable(other.m_nullable)
-        , m_content_version(other.m_content_version)
-        , m_last_content_version(other.m_last_content_version)
-        , m_valid(other.m_valid)
-    {
-        if (other.m_tree) {
-            Allocator& alloc = other.m_tree->get_alloc();
-            m_tree = std::make_unique<BPlusTree<value_type>>(alloc);
-            m_tree->set_parent(this, 0);
-            if (m_valid)
-                m_tree->init_from_ref(other.m_tree->get_ref());
-        }
     }
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
@@ -375,15 +257,6 @@ protected:
             m_content_version = other.m_content_version;
             m_last_content_version = other.m_last_content_version;
             m_valid = other.m_valid;
-            m_tree = nullptr;
-
-            if (other.m_tree) {
-                Allocator& alloc = other.m_tree->get_alloc();
-                m_tree = std::make_unique<BPlusTree<value_type>>(alloc);
-                m_tree->set_parent(this, 0);
-                if (m_valid)
-                    m_tree->init_from_ref(other.m_tree->get_ref());
-            }
         }
 
         return *this;
@@ -399,26 +272,12 @@ protected:
         return !(*this == other);
     }
 
-    template <typename Func>
-    void find_all(value_type value, Func&& func) const
-    {
-        if (m_valid && init_from_parent())
-            m_tree->find_all(value, std::forward<Func>(func));
-    }
-
     // Overriding members of CollectionBase:
-    bool init_from_parent() const final
-    {
-        m_valid = m_tree->init_from_parent();
-        update_content_version();
-        return m_valid;
-    }
-
     bool update_if_needed() const override
     {
         auto content_version = m_obj.get_alloc().get_content_version();
         if (m_obj.update_if_needed() || content_version != m_content_version) {
-            init_from_parent();
+            this->init_from_parent();
             return true;
         }
         return false;
@@ -432,7 +291,7 @@ protected:
     void ensure_writeable()
     {
         if (m_obj.ensure_writeable()) {
-            init_from_parent();
+            this->init_from_parent();
         }
     }
 
@@ -472,26 +331,14 @@ void check_for_last_unresolved(BPlusTree<ObjKey>& tree);
 template <class Interface>
 class ObjCollectionBase : public Interface, public ObjList {
 public:
-    static_assert(std::is_base_of_v<CollectionOf<ObjKey>, Interface>);
+    static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
-    using Interface::get;
     using Interface::get_table;
     using Interface::is_attached;
     using Interface::size;
     using Interface::update_if_needed;
 
     // Overriding methods in ObjList:
-
-    Obj get_object(size_t ndx) const final
-    {
-        ObjKey key = this->get(ndx);
-        return get_target_table()->get_object(key);
-    }
-
-    ObjKey get_key(size_t ndx) const final
-    {
-        return get(ndx);
-    }
 
     void get_dependencies(TableVersions& versions) const final
     {
@@ -511,11 +358,6 @@ public:
     bool is_in_sync() const final
     {
         return true;
-    }
-
-    Obj operator[](size_t ndx) const
-    {
-        return get_object(ndx);
     }
 
     bool has_unresolved() const noexcept
@@ -584,8 +426,6 @@ struct CollectionIterator {
     using difference_type = ptrdiff_t;
     using pointer = const value_type*;
     using reference = const value_type&;
-
-    static_assert(std::is_base_of_v<CollectionOf<value_type>, L>);
 
     CollectionIterator(const L* l, size_t ndx) noexcept
         : m_list(l)

@@ -48,46 +48,86 @@ protected:
 };
 
 template <class T>
-class SetInterface : public SetBase, public CollectionOf<T> {
+class Set : public CollectionBaseImpl<SetBase> {
 public:
+    using Base = CollectionBaseImpl<SetBase>;
     using value_type = T;
-
-    virtual std::pair<size_t, bool> insert(T value) = 0;
-    virtual size_t find(T value) const = 0;
-    virtual std::pair<size_t, bool> erase(T value) = 0;
-};
-
-template <class T>
-class Set : public CollectionBaseImpl<SetInterface<T>> {
-public:
-    using Base = CollectionBaseImpl<SetInterface<T>>;
-    using Base::begin;
-    using Base::end;
-    using Base::get;
-    using Base::size;
+    using iterator = CollectionIterator<Set<T>>;
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
 
+    T get(size_t ndx) const
+    {
+        const auto current_size = size();
+        if (ndx >= current_size) {
+            throw std::out_of_range("Index out of range");
+        }
+        return m_tree->get(ndx);
+    }
+
+    iterator begin() const noexcept
+    {
+        return iterator{this, 0};
+    }
+
+    iterator end() const noexcept
+    {
+        return iterator{this, size()};
+    }
+
+    size_t find_first(const T& value) const
+    {
+        return find(value);
+    }
+
+    template <class Func>
+    void find_all(T value, Func&& func) const
+    {
+        size_t found = find(value);
+        if (found != not_found) {
+            func(found);
+        }
+    }
+
     /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
     /// or the index of the already-existing value.
-    std::pair<size_t, bool> insert(T value) final;
+    std::pair<size_t, bool> insert(T value);
 
     /// Find the index of a value in the set, or `size_t(-1)` if it is not in the set.
-    size_t find(T value) const final;
+    size_t find(T value) const;
 
     /// Erase an element from the set, returning true if the set contained the element.
-    std::pair<size_t, bool> erase(T value) final;
+    std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
-    std::unique_ptr<CollectionBase> clone_collection() const final
+    size_t size() const final
     {
-        return std::make_unique<Set<T>>(m_obj, m_col_key);
+        if (!is_attached())
+            return 0;
+        update_if_needed();
+        if (!m_valid) {
+            return 0;
+        }
+        return m_tree->size();
     }
+    bool is_null(size_t ndx) const final
+    {
+        return m_nullable && value_is_null(get(ndx));
+    }
+    Mixed get_any(size_t ndx) const final
+    {
+        return get(ndx);
+    }
+    void clear() final;
     Mixed min(size_t* return_ndx = nullptr) const final;
     Mixed max(size_t* return_ndx = nullptr) const final;
     Mixed sum(size_t* return_cnt = nullptr) const final;
     Mixed avg(size_t* return_cnt = nullptr) const final;
+    std::unique_ptr<CollectionBase> clone_collection() const final
+    {
+        return std::make_unique<Set<T>>(m_obj, m_col_key);
+    }
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
@@ -96,12 +136,16 @@ public:
     std::pair<size_t, bool> erase_null() final;
     std::pair<size_t, bool> insert_any(Mixed value) final;
     std::pair<size_t, bool> erase_any(Mixed value) final;
-    void clear() final;
+
+    const BPlusTree<T>& get_tree() const
+    {
+        return *m_tree;
+    }
 
 private:
+    mutable std::unique_ptr<BPlusTree<value_type>> m_tree;
     using Base::m_col_key;
     using Base::m_obj;
-    using Base::m_tree;
     using Base::m_valid;
 
     void create()
@@ -110,13 +154,21 @@ private:
         m_valid = true;
     }
 
-    bool update_if_needed()
+    bool init_from_parent() const final
+    {
+        m_valid = m_tree->init_from_parent();
+        update_content_version();
+        return m_valid;
+    }
+
+    bool update_if_needed() const final
     {
         if (m_obj.update_if_needed()) {
             return this->init_from_parent();
         }
         return false;
     }
+
     void ensure_created()
     {
         if (!m_valid && m_obj.is_valid()) {
@@ -285,8 +337,17 @@ struct SetElementEquals<Mixed> {
 template <class T>
 inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
+    , m_tree(new BPlusTree<value_type>(obj.get_alloc()))
 {
+    if (!col_key.is_set()) {
+        throw LogicError(LogicError::collection_type_mismatch);
+    }
+
+    check_column_type<value_type>(m_col_key);
+
+    m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     if (m_obj) {
+        // Fine because init_from_parent() is final.
         this->init_from_parent();
     }
 }

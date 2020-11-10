@@ -80,71 +80,55 @@ protected:
     void swap_repl(Replication* repl, size_t ndx1, size_t ndx2) const;
 };
 
-/*
- * Virtual interface to a writable list with elements of a specific type.
- */
 template <class T>
-class LstInterface : public LstBase, public CollectionOf<T> {
+class Lst final : public CollectionBaseImpl<LstBase> {
 public:
-    virtual ~LstInterface() {}
-    virtual void insert(size_t ndx, T value) = 0;
-    virtual T set(size_t ndx, T value) = 0;
-    virtual T remove(size_t ndx) = 0;
-
-    virtual void add(T value)
-    {
-        insert(size(), std::move(value));
-    }
-
-    T operator[](size_t ndx) const
-    {
-        return this->get(ndx);
-    }
-
-    using LstBase::size;
-};
-
-
-template <class T>
-class Lst final : public CollectionBaseImpl<LstInterface<T>> {
-public:
-    using Base = CollectionBaseImpl<LstInterface<T>>;
-    using iterator = typename Base::iterator;
+    using Base = CollectionBaseImpl<LstBase>;
+    using iterator = LstIterator<T>;
+    using value_type = T;
 
     Lst() = default;
     Lst(const Obj& owner, ColKey col_key);
-    Lst(const Lst& other) = default;
+    Lst(const Lst& other);
     Lst& operator=(const Lst& other);
     Lst& operator=(const BPlusTree<T>& other);
 
     void create();
 
-    using Base::begin;
-    using Base::end;
-    using Base::find_all;
+    iterator begin() const noexcept
+    {
+        return iterator{this, 0};
+    }
+
+    iterator end() const noexcept
+    {
+        return iterator{this, size()};
+    }
+
+    T get(size_t ndx) const;
+    size_t find_first(const T& value) const;
+    T set(size_t ndx, T value);
+    void insert(size_t ndx, T value);
+    T remove(size_t ndx);
 
     // Overriding members of CollectionBase:
-    using Base::avg;
-    using Base::get_any;
     using Base::get_col_key;
     using Base::get_obj;
     using Base::get_table;
     using Base::get_target_table;
     using Base::has_changed;
     using Base::is_attached;
-    using Base::is_null;
-    using Base::max;
-    using Base::min;
-    using Base::size;
-    using Base::sum;
+    size_t size() const final;
     void clear() final;
+    Mixed get_any(size_t ndx) const final;
+    bool is_null(size_t ndx) const final;
     CollectionBasePtr clone_collection() const final;
+    Mixed min(size_t* return_ndx = nullptr) const final;
+    Mixed max(size_t* return_ndx = nullptr) const final;
+    Mixed sum(size_t* return_cnt = nullptr) const final;
+    Mixed avg(size_t* return_cnt = nullptr) const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
-
-    // Overriding members of CollectionOf<T>:
-    using Base::find_first;
-    using Base::get;
 
     // Overriding members of LstBase:
     LstBasePtr clone() const final;
@@ -157,14 +141,30 @@ public:
     void move(size_t from, size_t to) final;
     void swap(size_t ndx1, size_t ndx2) final;
 
-    // Overriding members of LstInterface<T>:
-    T set(size_t ndx, T value) final;
-    void insert(size_t ndx, T value) final;
-    T remove(size_t ndx) final;
-    using Base::operator[];
-
     // Lst<T> interface:
     T remove(const iterator& it);
+
+    void add(T value)
+    {
+        insert(size(), std::move(value));
+    }
+
+    T operator[](size_t ndx) const
+    {
+        return this->get(ndx);
+    }
+
+    template <typename Func>
+    void find_all(value_type value, Func&& func) const
+    {
+        if (m_valid && init_from_parent())
+            m_tree->find_all(value, std::forward<Func>(func));
+    }
+
+    inline const BPlusTree<T>& get_tree() const
+    {
+        return *m_tree;
+    }
 
 protected:
     bool update_if_needed() const final;
@@ -175,13 +175,20 @@ protected:
 
     friend class LnkLst;
 
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
     using Base::m_col_key;
     using Base::m_nullable;
     using Base::m_obj;
-    using Base::m_tree;
     using Base::m_valid;
 
     using Base::update_if_needed;
+
+    bool init_from_parent() const final
+    {
+        m_valid = m_tree->init_from_parent();
+        update_content_version();
+        return m_valid;
+    }
 };
 
 // Specialization of Lst<ObjKey>:
@@ -213,9 +220,9 @@ template <>
 void Lst<ObjLink>::do_remove(size_t);
 extern template class Lst<ObjLink>;
 
-class LnkLst final : public ObjCollectionBase<LstInterface<ObjKey>> {
+class LnkLst final : public ObjCollectionBase<LstBase> {
 public:
-    using Base = ObjCollectionBase<LstInterface<ObjKey>>;
+    using Base = ObjCollectionBase<LstBase>;
     using value_type = ObjKey;
     using iterator = CollectionIterator<LnkLst>;
 
@@ -231,6 +238,23 @@ public:
     LnkLst& operator=(const LnkLst& other) = default;
     bool operator==(const LnkLst& other) const;
     bool operator!=(const LnkLst& other) const;
+
+    Obj operator[](size_t ndx) const
+    {
+        return get_object(ndx);
+    }
+
+    ObjKey get(size_t ndx) const;
+    size_t find_first(const ObjKey&) const;
+    void insert(size_t ndx, ObjKey value);
+    ObjKey set(size_t ndx, ObjKey value);
+    ObjKey remove(size_t ndx);
+
+    void add(ObjKey value)
+    {
+        // FIXME: Should this add to the end of the unresolved list?
+        insert(size(), value);
+    }
 
     // Overriding members of CollectionBase:
     size_t size() const final;
@@ -271,21 +295,21 @@ public:
     void move(size_t from, size_t to) final;
     void swap(size_t ndx1, size_t ndx2) final;
 
-    // Overriding members of CollectionOf<ObjKey>:
-    ObjKey get(size_t ndx) const final;
-    size_t find_first(const ObjKey&) const final;
-
-    // Overriding members of LstInterface<ObjKey>:
-    void insert(size_t ndx, ObjKey value);
-    ObjKey set(size_t ndx, ObjKey value);
-    ObjKey remove(size_t ndx);
-
     // Overriding members of ObjList:
-    using Base::get_key;
     bool is_obj_valid(size_t) const noexcept final
     {
         // A link list cannot contain null values
         return true;
+    }
+    Obj get_object(size_t ndx) const final
+    {
+        ObjKey key = this->get(ndx);
+        return get_target_table()->get_object(key);
+    }
+
+    ObjKey get_key(size_t ndx) const final
+    {
+        return get(ndx);
     }
 
     // LnkLst interface:
@@ -333,6 +357,10 @@ public:
         return iterator{this, size()};
     }
 
+    const BPlusTree<ObjKey>& get_tree() const
+    {
+        return m_keys.get_tree();
+    }
 
 protected:
     bool update_if_needed() const final
@@ -364,10 +392,31 @@ inline void LstBase::swap_repl(Replication* repl, size_t ndx1, size_t ndx2) cons
 template <class T>
 inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
+    , m_tree(new BPlusTree<T>(obj.get_alloc()))
 {
+    if (!col_key.is_list()) {
+        throw LogicError(LogicError::collection_type_mismatch);
+    }
+
+    check_column_type<T>(m_col_key);
+
+    m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     if (m_obj) {
         // Fine because init_from_parent() is final.
         this->init_from_parent();
+    }
+}
+
+template <class T>
+inline Lst<T>::Lst(const Lst& other)
+    : Base(static_cast<const Base&>(other))
+{
+    if (other.m_tree) {
+        Allocator& alloc = other.m_tree->get_alloc();
+        m_tree = std::make_unique<BPlusTree<T>>(alloc);
+        m_tree->set_parent(this, 0);
+        if (m_valid)
+            m_tree->init_from_ref(other.m_tree->get_ref());
     }
 }
 
@@ -382,6 +431,19 @@ template <class T>
 Lst<T>& Lst<T>::operator=(const Lst& other)
 {
     Base::operator=(static_cast<const Base&>(other));
+
+    if (this != &other) {
+        m_tree.reset();
+        if (other.m_tree) {
+            Allocator& alloc = other.m_tree->get_alloc();
+            m_tree = std::make_unique<BPlusTree<T>>(alloc);
+            m_tree->set_parent(this, 0);
+            if (m_valid) {
+                m_tree->init_from_ref(other.m_tree->get_ref());
+            }
+        }
+    }
+
     return *this;
 }
 
@@ -396,6 +458,30 @@ template <class T>
 T Lst<T>::remove(const iterator& it)
 {
     return remove(it.index());
+}
+
+template <class T>
+inline size_t Lst<T>::size() const
+{
+    if (!is_attached())
+        return 0;
+    update_if_needed();
+    if (!m_valid) {
+        return 0;
+    }
+    return m_tree->size();
+}
+
+template <class T>
+inline bool Lst<T>::is_null(size_t ndx) const
+{
+    return m_nullable && value_is_null(get(ndx));
+}
+
+template <class T>
+inline Mixed Lst<T>::get_any(size_t ndx) const
+{
+    return get(ndx);
 }
 
 template <class T>
@@ -505,6 +591,49 @@ template <class T>
 CollectionBasePtr Lst<T>::clone_collection() const
 {
     return std::make_unique<Lst<T>>(m_obj, m_col_key);
+}
+
+template <class T>
+inline T Lst<T>::get(size_t ndx) const
+{
+    const auto current_size = size();
+    if (ndx >= current_size) {
+        throw std::out_of_range("Index out of range");
+    }
+    return m_tree->get(ndx);
+}
+
+template <class T>
+inline size_t Lst<T>::find_first(const T& value) const
+{
+    if (!m_valid && !init_from_parent())
+        return not_found;
+    update_if_needed();
+    return m_tree->find_first(value);
+}
+
+template <class T>
+inline Mixed Lst<T>::min(size_t* return_ndx) const
+{
+    return MinHelper<T>::eval(*m_tree, return_ndx);
+}
+
+template <class T>
+inline Mixed Lst<T>::max(size_t* return_ndx) const
+{
+    return MaxHelper<T>::eval(*m_tree, return_ndx);
+}
+
+template <class T>
+inline Mixed Lst<T>::sum(size_t* return_cnt) const
+{
+    return SumHelper<T>::eval(*m_tree, return_cnt);
+}
+
+template <class T>
+inline Mixed Lst<T>::avg(size_t* return_cnt) const
+{
+    return AverageHelper<T>::eval(*m_tree, return_cnt);
 }
 
 template <class T>
