@@ -301,9 +301,10 @@ Mixed ValueExpression::value_of_type_for_query<Mixed>()
         case Expression::Type::SubQuery:
         case Expression::Type::KeyPath:
         case Expression::Type::None:
-            throw std::runtime_error(util::format("Error converting value for mixed comparison with type %1 (%2)",
-                                                  int(value->type), value->s));
+            break;
     }
+    throw std::runtime_error(
+        util::format("Error converting value for mixed comparison with type %1 (%2)", int(value->type), value->s));
 }
 
 
