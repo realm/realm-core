@@ -26,49 +26,82 @@ namespace _impl {
 class RealmCoordinator;
 
 namespace win32 {
-    template <class T, void (*Initializer)(T&)>
-    class SharedMemory {
-    public:
-        SharedMemory(LPCWSTR name) {
 #if REALM_WINDOWS
-            HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
-            auto error = GetLastError();
-            if (mapping != NULL)
-                m_memory = reinterpret_cast<T*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T)));
+#define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
+        OpenFileMappingW(dwDesiredAccess, bInheritHandle, lpName);
+
+#define CreateFileMappingInternal(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName)\
+        CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
+
+#define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
+        MapViewOfFile(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
+
 #elif REALM_UWP
-            HANDLE mapping = CreateFileMappingFromApp(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, sizeof(T), name);
-            auto error = GetLastError();
-            if (mapping != NULL)
-                m_memory = reinterpret_cast<T*>(MapViewOfFileFromApp(mapping, FILE_MAP_ALL_ACCESS, 0, sizeof(T)));
+#define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
+        OpenFileMappingFromApp(dwDesiredAccess, bInheritHandle, lpName);
+
+#define CreateFileMappingInternal(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName)\
+        CreateFileMappingFromApp(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
+
+#define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
+        MapViewOfFileFromApp(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
+
+#elif
+#error Unknown win32 platform
 #endif
 
-            if (mapping) {
-                // we can close the handle we own because the view has now referenced it
-                CloseHandle(mapping);
-            }
+template <class T, void (*Initializer)(T&)>
+class SharedMemory {
+public:
+    SharedMemory(LPCWSTR name) {
+        //assume another process have already initialzied the shared memory
+        bool shouldInit = false;
 
+        HANDLE mapping = OpenFileMappingInternal(FILE_MAP_ALL_ACCESS, FALSE, name);
+        auto error = GetLastError();
+
+        if (mapping == NULL) {
+            mapping = CreateFileMappingInternal(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
+            error = GetLastError();
+
+            //init since this is the first process creating the shared memory
+            shouldInit = true;
+        }
+
+        if (mapping == NULL) {
+            throw std::system_error(error, std::system_category());
+        }
+
+        LPVOID view = MapViewOfFileInternal(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T));
+        error = GetLastError();
+        if (view == NULL) {
+            throw std::system_error(error, std::system_category());
+        }
+        m_memory = reinterpret_cast<T*>(view);
+
+        if (shouldInit) {
             try {
-                if (error == 0) {
-                    Initializer(get());
-                }
-                else if (error != ERROR_ALREADY_EXISTS) {
-                    throw std::system_error(error, std::system_category());
-                }
+                Initializer(get());
             }
             catch (...) {
                 UnmapViewOfFile(m_memory);
                 throw;
             }
         }
+    }
 
-        T& get() const noexcept { return *m_memory; }
+    T& get() const noexcept { return *m_memory; }
 
-        ~SharedMemory() {
+    ~SharedMemory() {
+        if (m_memory) {
             UnmapViewOfFile(m_memory);
+            m_memory = nullptr;
         }
-    private:
-        T* m_memory = nullptr;
-    };
+    }
+
+private:
+    T* m_memory = nullptr;
+};
 }
 
 class ExternalCommitHelper {
