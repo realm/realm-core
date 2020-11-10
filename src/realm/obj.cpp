@@ -235,7 +235,7 @@ TableRef Obj::get_target_table(ObjLink link) const
     }
 }
 
-inline bool Obj::update() const
+bool Obj::update() const
 {
     // Get a new object from key
     Obj new_obj = get_tree_top()->get(m_key);
@@ -254,15 +254,6 @@ inline bool Obj::update() const
 inline bool Obj::_update_if_needed() const
 {
     auto current_version = _get_alloc().get_storage_version();
-    if (current_version != m_storage_version) {
-        return update();
-    }
-    return false;
-}
-
-bool Obj::update_if_needed() const
-{
-    auto current_version = get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
         return update();
     }
@@ -1191,19 +1182,6 @@ bool Obj::ensure_writeable()
         return true;
     }
     return false;
-}
-
-void Obj::bump_content_version()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-}
-
-void Obj::bump_both_versions()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-    alloc.bump_storage_version();
 }
 
 template <>

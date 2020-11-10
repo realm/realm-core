@@ -327,7 +327,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
-    void bump_content_version();
+    int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
@@ -509,6 +509,29 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
 
     return _set(start_index, v, tail...);
 }
+
+inline bool Obj::update_if_needed() const
+{
+    auto current_version = get_alloc().get_storage_version();
+    if (current_version != m_storage_version) {
+        return update();
+    }
+    return false;
+}
+
+inline int_fast64_t Obj::bump_content_version()
+{
+    Allocator& alloc = get_alloc();
+    return alloc.bump_content_version();
+}
+
+inline void Obj::bump_both_versions()
+{
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    alloc.bump_storage_version();
+}
+
 } // namespace realm
 
 #endif // REALM_OBJ_HPP
