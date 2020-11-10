@@ -245,6 +245,11 @@ public:
     LnkLstPtr get_linklist_ptr(ColKey col_key) const;
     LnkLst get_linklist(StringData col_name) const;
 
+    /// Get a type-erased list instance for the given list column.
+    ///
+    /// Note: For lists of links, this always returns a `LnkLst`, rather than a
+    /// `Lst<ObjKey>`. Use `get_list_ptr<ObjKey>(col_key)` to get a list of
+    /// links with uncondensed indices.
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     template <typename U>
