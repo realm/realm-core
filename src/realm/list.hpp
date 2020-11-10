@@ -548,30 +548,6 @@ inline LnkLst Obj::get_linklist(StringData col_name) const
 }
 
 template <class T>
-inline ColumnSumType<T> list_sum(const Lst<T>& list, size_t* return_cnt = nullptr)
-{
-    return bptree_sum(list.get_tree(), return_cnt);
-}
-
-template <class T>
-inline ColumnMinMaxType<T> list_maximum(const Lst<T>& list, size_t* return_ndx = nullptr)
-{
-    return bptree_maximum(list.get_tree(), return_ndx);
-}
-
-template <class T>
-inline ColumnMinMaxType<T> list_minimum(const Lst<T>& list, size_t* return_ndx = nullptr)
-{
-    return bptree_minimum(list.get_tree(), return_ndx);
-}
-
-template <class T>
-inline ColumnAverageType<T> list_average(const Lst<T>& list, size_t* return_cnt = nullptr)
-{
-    return bptree_average(list.get_tree(), return_cnt);
-}
-
-template <class T>
 void Lst<T>::clear()
 {
     static_assert(!std::is_same_v<T, ObjKey>);
