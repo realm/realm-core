@@ -27,6 +27,7 @@
 #include <realm/object-store/object_accessor.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/object.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
@@ -110,6 +111,7 @@ TEST_CASE("object")
              {"object id", PropertyType::ObjectId},
              {"decimal", PropertyType::Decimal},
              {"uuid", PropertyType::UUID},
+             {"mixed", PropertyType::Mixed | PropertyType::Nullable},
              {"object", PropertyType::Object | PropertyType::Nullable, "link target"},
 
              {"bool array", PropertyType::Array | PropertyType::Bool},
@@ -123,6 +125,7 @@ TEST_CASE("object")
              {"object id array", PropertyType::Array | PropertyType::ObjectId},
              {"uuid array", PropertyType::Array | PropertyType::UUID},
              {"decimal array", PropertyType::Array | PropertyType::Decimal},
+             {"mixed array", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable},
          }},
         {"all optional types",
          {
@@ -358,7 +361,7 @@ TEST_CASE("object")
     };
     auto create_company = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::ForceCreate) {
         r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("person"), value, policy);
+        Object obj = Object::create(d, r, *r->schema().find("person"), value, policy);
         r->commit_transaction();
         return obj;
     };
@@ -378,6 +381,7 @@ TEST_CASE("object")
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-abba-baba-caca-4136c566a962")},
+            {"mixed", "mixed"s},
 
             {"bool array", AnyVec{true, false}},
             {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -390,11 +394,14 @@ TEST_CASE("object")
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
             {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
+            {"mixed array",
+             AnyVec{25, "b"s, 1.45, util::none, Timestamp(30, 40), Decimal128("1.23e45"),
+                    ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
         });
 
-        auto row = obj.obj();
+        Obj row = obj.obj();
         auto link_target = *r->read_group().get_table("class_link target")->begin();
-        auto table = row.get_table();
+        TableRef table = row.get_table();
         auto target_table = link_target.get_table();
         auto array_target_table = r->read_group().get_table("class_array target");
         REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
@@ -409,6 +416,7 @@ TEST_CASE("object")
         REQUIRE(row.get<ObjectId>(table->get_column_key("object id")) == ObjectId("000000000000000000000001"));
         REQUIRE(row.get<Decimal128>(table->get_column_key("decimal")) == Decimal128("1.23e45"));
         REQUIRE(row.get<UUID>(table->get_column_key("uuid")) == UUID("3b241101-abba-baba-caca-4136c566a962"));
+        REQUIRE(row.get<Mixed>(table->get_column_key("mixed")) == Mixed("mixed"));
 
         REQUIRE(link_target.get<Int>(target_table->get_column_key("value")) == 10);
 
@@ -435,6 +443,18 @@ TEST_CASE("object")
                     ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB"));
         check_array(table->get_column_key("decimal array"), Decimal128("1.23e45"), Decimal128("6.78e9"));
         check_array(table->get_column_key("uuid array"), UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
+        {
+            auto list = row.get_list<Mixed>(table->get_column_key("mixed array"));
+            REQUIRE(list.size() == 8);
+            REQUIRE(list.get(0).get_int() == 25);
+            REQUIRE(list.get(1).get_string() == "b");
+            REQUIRE(list.get(2).get_double() == 1.45);
+            REQUIRE(list.get(3).is_null());
+            REQUIRE(list.get(4).get_timestamp() == Timestamp(30, 40));
+            REQUIRE(list.get(5).get_decimal() == Decimal128("1.23e45"));
+            REQUIRE(list.get(6).get_object_id() == ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"));
+            REQUIRE(list.get(7).get_uuid() == UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
+        }
 
         auto list = row.get_linklist_ptr(table->get_column_key("object array"));
         REQUIRE(list->size() == 1);
@@ -469,13 +489,13 @@ TEST_CASE("object")
             {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
         };
 
-        auto obj = create(AnyDict{
+        Object obj = create(AnyDict{
             {"_id", INT64_C(1)},
             {"float", 6.6f},
         });
 
-        auto row = obj.obj();
-        auto table = row.get_table();
+        Obj row = obj.obj();
+        TableRef table = row.get_table();
         REQUIRE(row.get<Int>(table->get_column_key("_id")) == 1);
         REQUIRE(row.get<Bool>(table->get_column_key("bool")) == true);
         REQUIRE(row.get<Int>(table->get_column_key("int")) == 5);
@@ -1144,6 +1164,25 @@ TEST_CASE("object")
 
         obj.set_property_value(d, "uuid", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
         REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "uuid")) ==
+                UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
+
+        obj.set_property_value(d, "mixed", util::Any(25));
+        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
+        obj.set_property_value(d, "mixed", util::Any("Hello"s));
+        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
+        obj.set_property_value(d, "mixed", util::Any(1.23));
+        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
+        obj.set_property_value(d, "mixed", util::Any(123.45f));
+        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
+        obj.set_property_value(d, "mixed", util::Any(Timestamp(30, 40)));
+        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
+        obj.set_property_value(d, "mixed", util::Any(ObjectId("111111111111111111111111")));
+        REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "mixed")) ==
+                ObjectId("111111111111111111111111"));
+        obj.set_property_value(d, "mixed", util::Any(Decimal128("42.4242e42")));
+        REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
+        obj.set_property_value(d, "mixed", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
+        REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());

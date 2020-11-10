@@ -685,9 +685,9 @@ TEST_CASE("Schema")
                                   {"pk", PropertyType::Float, Property::IsPrimary{true}},
                               }}};
 
-            schema.begin()->primary_key_property()->type = PropertyType::Any;
+            schema.begin()->primary_key_property()->type = PropertyType::Mixed;
             REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'any' cannot be made the primary key.");
+                                      "Property 'object.pk' of type 'mixed' cannot be made the primary key.");
 
             schema.begin()->primary_key_property()->type = PropertyType::Bool;
             REQUIRE_THROWS_CONTAINING(schema.validate(),
