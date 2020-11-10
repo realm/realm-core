@@ -62,10 +62,6 @@ public:
     using CollectionBase::CollectionBase;
 
     virtual ~LstBase() {}
-    // LstBasePtr clone() const
-    // {
-    //     return m_obj.get_listbase_ptr(m_col_key);
-    // }
     virtual LstBasePtr clone() const = 0;
     virtual void set_null(size_t ndx) = 0;
     virtual void set_any(size_t ndx, Mixed val) = 0;
@@ -167,7 +163,6 @@ public:
     }
 
 protected:
-    bool update_if_needed() const final;
     void ensure_created();
     void do_set(size_t ndx, T value);
     void do_insert(size_t ndx, T value);
@@ -180,7 +175,6 @@ protected:
     using Base::m_nullable;
     using Base::m_obj;
     using Base::m_valid;
-
     using Base::update_if_needed;
 
     bool init_from_parent() const final
@@ -365,7 +359,11 @@ public:
 protected:
     bool update_if_needed() const final
     {
-        return m_keys.update_if_needed();
+        if (m_keys.update_if_needed()) {
+            update_unresolved(*m_keys.m_tree);
+            return true;
+        }
+        return false;
     }
 
 private:
@@ -403,7 +401,7 @@ inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
     m_tree->set_parent(this, 0); // ndx not used, implicit in m_owner
     if (m_obj) {
         // Fine because init_from_parent() is final.
-        this->init_from_parent();
+        init_from_parent();
     }
 }
 
@@ -485,15 +483,6 @@ inline Mixed Lst<T>::get_any(size_t ndx) const
 }
 
 template <class T>
-inline bool Lst<T>::update_if_needed() const
-{
-    if (m_obj.update_if_needed()) {
-        return this->init_from_parent();
-    }
-    return false;
-}
-
-template <class T>
 inline void Lst<T>::ensure_created()
 {
     if (!m_valid && m_obj.is_valid()) {
@@ -559,7 +548,7 @@ void Lst<T>::clear()
             repl->list_clear(*this);
         }
         m_tree->clear();
-        m_obj.bump_content_version();
+        bump_content_version();
     }
 }
 
@@ -685,7 +674,7 @@ void Lst<T>::remove(size_t from, size_t to)
 template <class T>
 void Lst<T>::move(size_t from, size_t to)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
     if (from != to) {
         this->ensure_writeable();
         if (Replication* repl = this->m_obj.get_replication()) {
@@ -705,27 +694,27 @@ void Lst<T>::move(size_t from, size_t to)
         m_tree->swap(from, to);
         m_tree->erase(from);
 
-        m_obj.bump_content_version();
+        bump_content_version();
     }
 }
 
 template <class T>
 void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
     if (ndx1 != ndx2) {
         if (Replication* repl = this->m_obj.get_replication()) {
             LstBase::swap_repl(repl, ndx1, ndx2);
         }
         m_tree->swap(ndx1, ndx2);
-        m_obj.bump_content_version();
+        bump_content_version();
     }
 }
 
 template <class T>
 T Lst<T>::set(size_t ndx, T value)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
 
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
@@ -735,7 +724,7 @@ T Lst<T>::set(size_t ndx, T value)
     if (old != value) {
         this->ensure_writeable();
         do_set(ndx, value);
-        m_obj.bump_content_version();
+        bump_content_version();
     }
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_set(*this, ndx, value);
@@ -746,7 +735,7 @@ T Lst<T>::set(size_t ndx, T value)
 template <class T>
 void Lst<T>::insert(size_t ndx, T value)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
 
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
@@ -760,13 +749,13 @@ void Lst<T>::insert(size_t ndx, T value)
         repl->list_insert(*this, ndx, value);
     }
     do_insert(ndx, value);
-    m_obj.bump_content_version();
+    bump_content_version();
 }
 
 template <class T>
 T Lst<T>::remove(size_t ndx)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
 
     this->ensure_writeable();
 
@@ -777,7 +766,7 @@ T Lst<T>::remove(size_t ndx)
     }
 
     do_remove(ndx);
-    m_obj.bump_content_version();
+    bump_content_version();
     return old;
 }
 
@@ -792,16 +781,19 @@ inline bool LnkLst::operator!=(const LnkLst& other) const
 
 inline size_t LnkLst::size() const
 {
+    update_if_needed();
     return m_keys.size() - num_unresolved();
 }
 
 inline bool LnkLst::is_null(size_t ndx) const
 {
+    update_if_needed();
     return m_keys.is_null(virtual2real(ndx));
 }
 
 inline Mixed LnkLst::get_any(size_t ndx) const
 {
+    update_if_needed();
     return m_keys.get_any(virtual2real(ndx));
 }
 
@@ -888,46 +880,55 @@ inline ColKey LnkLst::get_col_key() const
 
 inline void LnkLst::set_null(size_t ndx)
 {
+    update_if_needed();
     m_keys.set_null(virtual2real(ndx));
 }
 
 inline void LnkLst::set_any(size_t ndx, Mixed val)
 {
+    update_if_needed();
     m_keys.set_any(virtual2real(ndx), val);
 }
 
 inline void LnkLst::insert_null(size_t ndx)
 {
+    update_if_needed();
     m_keys.insert_null(virtual2real(ndx));
 }
 
 inline void LnkLst::insert_any(size_t ndx, Mixed val)
 {
+    update_if_needed();
     m_keys.insert_any(virtual2real(ndx), val);
 }
 
 inline void LnkLst::resize(size_t new_size)
 {
+    update_if_needed();
     m_keys.resize(new_size + num_unresolved());
 }
 
 inline void LnkLst::remove(size_t from, size_t to)
 {
+    update_if_needed();
     m_keys.remove(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::move(size_t from, size_t to)
 {
+    update_if_needed();
     m_keys.move(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::swap(size_t ndx1, size_t ndx2)
 {
+    update_if_needed();
     m_keys.swap(virtual2real(ndx1), virtual2real(ndx2));
 }
 
 inline ObjKey LnkLst::get(size_t ndx) const
 {
+    update_if_needed();
     return m_keys.get(virtual2real(ndx));
 }
 
@@ -936,6 +937,7 @@ inline size_t LnkLst::find_first(const ObjKey& key) const
     if (key.is_unresolved())
         return not_found;
 
+    update_if_needed();
     size_t found = m_keys.find_first(key);
     if (found == not_found)
         return not_found;
@@ -947,6 +949,7 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
+    update_if_needed();
     m_keys.insert(virtual2real(ndx), value);
 }
 
@@ -955,6 +958,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
+    update_if_needed();
     ObjKey old = m_keys.set(virtual2real(ndx), value);
     REALM_ASSERT(!old.is_unresolved());
     return old;
@@ -962,6 +966,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 
 inline ObjKey LnkLst::remove(size_t ndx)
 {
+    update_if_needed();
     ObjKey old = m_keys.remove(virtual2real(ndx));
     REALM_ASSERT(!old.is_unresolved());
     return old;

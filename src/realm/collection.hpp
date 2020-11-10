@@ -17,7 +17,6 @@ struct CollectionIterator;
 class CollectionBase {
 public:
     virtual ~CollectionBase() {}
-    CollectionBase(const CollectionBase&) = default;
 
     /*
      * Operations that makes sense without knowing the specific type
@@ -59,6 +58,7 @@ public:
 protected:
     friend class Transaction;
     CollectionBase() = default;
+    CollectionBase(const CollectionBase&) = default;
 
     virtual bool init_from_parent() const = 0;
     virtual bool update_if_needed() const = 0;
@@ -273,10 +273,13 @@ protected:
     }
 
     // Overriding members of CollectionBase:
-    bool update_if_needed() const override
+    bool update_if_needed() const final
     {
+        if (!m_obj.is_valid())
+            return false;
+
         auto content_version = m_obj.get_alloc().get_content_version();
-        if (m_obj.update_if_needed() || content_version != m_content_version) {
+        if (content_version != m_content_version || m_obj.update_if_needed()) {
             this->init_from_parent();
             return true;
         }
@@ -288,6 +291,11 @@ protected:
         m_content_version = m_obj.get_alloc().get_content_version();
     }
 
+    void bump_content_version()
+    {
+        m_content_version = m_obj.bump_content_version();
+    }
+
     void ensure_writeable()
     {
         if (m_obj.ensure_writeable()) {
@@ -295,7 +303,7 @@ protected:
         }
     }
 
-private:
+protected:
     // Overriding ArrayParent interface:
     ref_type get_child_ref(size_t child_ndx) const noexcept final
     {
@@ -336,7 +344,6 @@ public:
     using Interface::get_table;
     using Interface::is_attached;
     using Interface::size;
-    using Interface::update_if_needed;
 
     // Overriding methods in ObjList:
 
@@ -371,6 +378,8 @@ protected:
     ObjCollectionBase(ObjCollectionBase&&) = default;
     ObjCollectionBase& operator=(const ObjCollectionBase&) = default;
     ObjCollectionBase& operator=(ObjCollectionBase&&) = default;
+
+    using Interface::update_if_needed;
 
     size_t virtual2real(size_t ndx) const noexcept
     {

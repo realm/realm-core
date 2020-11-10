@@ -48,7 +48,7 @@ protected:
 };
 
 template <class T>
-class Set : public CollectionBaseImpl<SetBase> {
+class Set final : public CollectionBaseImpl<SetBase> {
 public:
     using Base = CollectionBaseImpl<SetBase>;
     using value_type = T;
@@ -159,14 +159,6 @@ private:
         m_valid = m_tree->init_from_parent();
         update_content_version();
         return m_valid;
-    }
-
-    bool update_if_needed() const final
-    {
-        if (m_obj.update_if_needed()) {
-            return this->init_from_parent();
-        }
-        return false;
     }
 
     void ensure_created()
@@ -373,7 +365,7 @@ size_t Set<T>::find(T value) const
 template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
 
     ensure_created();
     this->ensure_writeable();
@@ -393,7 +385,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
     }
 
     do_insert(it.index(), value);
-    m_obj.bump_content_version();
+    bump_content_version();
     return {it.index(), true};
 }
 
@@ -416,7 +408,7 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 template <class T>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
-    REALM_ASSERT_DEBUG(!update_if_needed());
+    update_if_needed();
     this->ensure_writeable();
 
     auto b = this->begin();
@@ -431,7 +423,7 @@ std::pair<size_t, bool> Set<T>::erase(T value)
         this->erase_repl(repl, it.index(), value);
     }
     do_erase(it.index());
-    m_obj.bump_content_version();
+    bump_content_version();
     return {it.index(), true};
 }
 
@@ -474,7 +466,7 @@ inline void Set<T>::clear()
             this->clear_repl(repl);
         }
         m_tree->clear();
-        m_obj.bump_content_version();
+        bump_content_version();
     }
 }
 
