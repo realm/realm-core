@@ -208,7 +208,7 @@ make_mixed_constraint_query(const Predicate::Comparison& cmp, LHS&& lhs, RHS&& r
             return lhs >= rhs;
         default:
             throw_logic_error(
-                util::format("Unsupported operator '%1' for string queries.", operator_description(cmp.op)));
+                util::format("Unsupported operator '%1' for mixed queries.", operator_description(cmp.op)));
     }
 }
 
@@ -240,7 +240,7 @@ make_mixed_constraint_query(const Predicate::Comparison& cmp, LHS&& lhs, RHS&& r
             // These queries are not the same: "'asdf' CONTAINS string_property" vs "string_property CONTAINS 'asdf'"
         default:
             throw_logic_error(
-                util::format("Unsupported query comparison '%1' for a single string vs a string property.",
+                util::format("Unsupported query comparison '%1' for a single mixed property vs a mixed property.",
                              operator_description(cmp.op)));
     }
 }

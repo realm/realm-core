@@ -1052,7 +1052,8 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, ObjectId>,
                  public Overloads<T, Decimal128>,
                  public Overloads<T, UUID>,
-                 public Overloads<T, null> {
+                 public Overloads<T, null>,
+                 public Overloads<T, Mixed> {
 public:
     virtual ~Subexpr2()
     {
@@ -1075,7 +1076,8 @@ public:
     RLM_U2(ObjectId, o)                                                                                              \
     RLM_U2(Decimal128, o)                                                                                            \
     RLM_U2(UUID, o)                                                                                                  \
-    RLM_U2(null, o)
+    RLM_U2(null, o)                                                                                                  \
+    RLM_U2(Mixed, o)
     RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
@@ -1163,6 +1165,9 @@ public:
     {
         return type_Mixed;
     }
+
+    using T = Mixed; // used inside the following macros for operator overloads
+    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
 struct TrueExpression : Expression {
@@ -2221,12 +2226,6 @@ private:
     ArrayInteger* m_leaf_ptr = nullptr;
 };
 
-// Columns<Mixed> == String
-inline Query operator==(Columns<Mixed>&& left, const char* right)
-{
-    return left == StringData(right);
-}
-
 template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
@@ -2395,6 +2394,11 @@ inline Query operator!=(realm::null, const Columns<BinaryData>& right)
     return create<NotEqual>(BinaryData(), right);
 }
 
+// Columns<Mixed> == String
+inline Query operator==(Columns<Mixed>&& left, const char* right)
+{
+    return mixed_compare<Mixed, Equal, EqualIns>(left, StringData(right), true);
+}
 
 // This class is intended to perform queries on the *pointers* of links, contrary to performing queries on *payload*
 // in linked-to tables. Queries can be "find first link that points at row X" or "find first null-link". Currently

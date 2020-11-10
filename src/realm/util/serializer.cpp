@@ -212,6 +212,7 @@ std::string print_value<>(realm::Mixed mixed)
         case type_OldTable:
             throw std::logic_error(util::format("unsupported type serializeation from mixed: %1", mixed.get_type()));
     }
+    return "UnknownValue";
 }
 
 // The variable name must be unique with respect to the already chosen variables at
