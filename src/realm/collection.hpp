@@ -491,7 +491,7 @@ struct CollectionIterator {
         return *this;
     }
 
-    friend ptrdiff_t operator-(CollectionIterator& lhs, CollectionIterator& rhs) noexcept
+    friend ptrdiff_t operator-(const CollectionIterator& lhs, const CollectionIterator& rhs) noexcept
     {
         return ptrdiff_t(lhs.m_ndx) - ptrdiff_t(rhs.m_ndx);
     }
