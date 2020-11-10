@@ -119,8 +119,7 @@ private:
 };
 
 template <>
-class CollectionIterator<Dictionary> : public ClusterTree::Iterator {
-public:
+struct CollectionIterator<Dictionary> : public ClusterTree::Iterator {
     typedef std::forward_iterator_tag iterator_category;
     typedef std::pair<const Mixed, Mixed> value_type;
     typedef ptrdiff_t difference_type;
