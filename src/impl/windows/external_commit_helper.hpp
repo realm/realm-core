@@ -26,7 +26,7 @@ namespace _impl {
 class RealmCoordinator;
 
 namespace win32 {
-#if REALM_WINDOWS
+// #if REALM_WINDOWS
 #define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
         OpenFileMappingW(dwDesiredAccess, bInheritHandle, lpName);
 
@@ -36,19 +36,19 @@ namespace win32 {
 #define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
         MapViewOfFile(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
 
-#elif REALM_UWP
-#define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
-        OpenFileMappingFromApp(dwDesiredAccess, bInheritHandle, lpName);
+// // #elif REALM_UWP
+// // #define OpenFileMappingInternal(dwDesiredAccess, bInheritHandle, lpName)\
+// //         OpenFileMappingFromApp(dwDesiredAccess, bInheritHandle, lpName);
 
-#define CreateFileMappingInternal(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName)\
-        CreateFileMappingFromApp(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
+// // #define CreateFileMappingInternal(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName)\
+// //         CreateFileMappingFromApp(hFile, lpFileMappingAttributes, flProtect, dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
 
-#define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
-        MapViewOfFileFromApp(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
+// // #define MapViewOfFileInternal(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap)\
+// //         MapViewOfFileFromApp(hFileMappingObject, dwDesiredAccess, dwFileOffsetHigh, dwFileOffsetLow, dwNumberOfBytesToMap);
 
-#elif
-#error Unknown win32 platform
-#endif
+// #elif
+// #error Unknown win32 platform
+// #endif
 
 template <class T, void (*Initializer)(T&)>
 class SharedMemory {
