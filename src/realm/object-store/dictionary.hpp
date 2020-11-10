@@ -28,21 +28,53 @@ namespace object_store {
 
 class Dictionary : public object_store::Collection {
 public:
+    using Iterator = realm::Dictionary::Iterator;
     Dictionary() noexcept;
     Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& list);
     ~Dictionary() override;
+
+    bool operator==(const Dictionary& rgt) const noexcept
+    {
+        return *m_dict == *rgt.m_dict;
+    }
 
     template <typename T>
     void insert(StringData key, T value);
     template <typename T>
     T get(StringData key) const;
 
+    void erase(StringData key)
+    {
+        verify_in_transaction();
+        m_dict->erase(key);
+    }
+    void remove_all()
+    {
+        verify_in_transaction();
+        m_dict->clear();
+    }
 
     template <typename T, typename U, typename Context>
     void insert(Context&, T&& key, U&& value, CreatePolicy = CreatePolicy::SetLink);
     template <typename Context, typename T>
     auto get(Context&, T key) const;
+    template <typename Context, typename T>
+    void erase(Context&, T key) const;
+
+    // Replace the values in this dictionary with the values from an map type object
+    template <typename T, typename Context>
+    void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
+
+    Iterator begin()
+    {
+        return m_dict->begin();
+    }
+
+    Iterator end()
+    {
+        return m_dict->end();
+    }
 
 private:
     realm::Dictionary* m_dict;
@@ -127,6 +159,41 @@ auto Dictionary::get(Context& ctx, T key) const
     });
 }
 
+template <typename Context, typename T>
+void Dictionary::erase(Context& ctx, T key) const
+{
+    this->erase(ctx.template unbox<StringData>(key));
+}
+
+template <typename T, typename Context>
+void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
+{
+    if (ctx.is_same_dictionary(*this, values))
+        return;
+
+    if (ctx.is_null(values)) {
+        remove_all();
+        return;
+    }
+
+    if (!policy.diff)
+        remove_all();
+
+    ctx.enumerate_dictionary(values, [&](auto&& key, auto&& value) {
+        if (policy.diff) {
+            auto k = ctx.template unbox<StringData>(key);
+            util::Optional<Mixed> old_value = m_dict->try_get(k);
+            auto new_value = ctx.template unbox<Mixed>(value);
+            if (!old_value || *old_value != new_value) {
+                m_dict->insert(k, new_value);
+            }
+        }
+        else {
+            this->insert(ctx, key, value, policy);
+        }
+    });
+    // FIXME: Remove entries not included in the new value
+}
 
 } // namespace object_store
 } // namespace realm
