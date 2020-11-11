@@ -437,5 +437,21 @@ void LnkLst::remove_all_target_rows()
 template class Lst<ObjKey>;
 template class Lst<Mixed>;
 template class Lst<ObjLink>;
+template class Lst<int64_t>;
+template class Lst<bool>;
+template class Lst<StringData>;
+template class Lst<BinaryData>;
+template class Lst<Timestamp>;
+template class Lst<float>;
+template class Lst<double>;
+template class Lst<Decimal128>;
+template class Lst<ObjectId>;
+template class Lst<UUID>;
+template class Lst<util::Optional<int64_t>>;
+template class Lst<util::Optional<bool>>;
+template class Lst<util::Optional<float>>;
+template class Lst<util::Optional<double>>;
+template class Lst<util::Optional<ObjectId>>;
+template class Lst<util::Optional<UUID>>;
 
 } // namespace realm

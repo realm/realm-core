@@ -216,6 +216,24 @@ template <>
 void Lst<ObjLink>::do_remove(size_t);
 extern template class Lst<ObjLink>;
 
+// Extern template declarations for lists of primitives:
+extern template class Lst<int64_t>;
+extern template class Lst<bool>;
+extern template class Lst<StringData>;
+extern template class Lst<BinaryData>;
+extern template class Lst<Timestamp>;
+extern template class Lst<float>;
+extern template class Lst<double>;
+extern template class Lst<Decimal128>;
+extern template class Lst<ObjectId>;
+extern template class Lst<UUID>;
+extern template class Lst<util::Optional<int64_t>>;
+extern template class Lst<util::Optional<bool>>;
+extern template class Lst<util::Optional<float>>;
+extern template class Lst<util::Optional<double>>;
+extern template class Lst<util::Optional<ObjectId>>;
+extern template class Lst<util::Optional<UUID>>;
+
 class LnkLst final : public ObjCollectionBase<LstBase> {
 public:
     using Base = ObjCollectionBase<LstBase>;
@@ -475,14 +493,14 @@ inline Lst<T>& Lst<T>::operator=(Lst&& other) noexcept
 }
 
 template <class T>
-Lst<T>& Lst<T>::operator=(const BPlusTree<T>& other)
+inline Lst<T>& Lst<T>::operator=(const BPlusTree<T>& other)
 {
     *m_tree = other;
     return *this;
 }
 
 template <class T>
-T Lst<T>::remove(const iterator& it)
+inline T Lst<T>::remove(const iterator& it)
 {
     return remove(it.index());
 }
@@ -539,13 +557,13 @@ inline void Lst<T>::do_remove(size_t ndx)
 
 
 template <typename U>
-Lst<U> Obj::get_list(ColKey col_key) const
+inline Lst<U> Obj::get_list(ColKey col_key) const
 {
     return Lst<U>(*this, col_key);
 }
 
 template <typename U>
-LstPtr<U> Obj::get_list_ptr(ColKey col_key) const
+inline LstPtr<U> Obj::get_list_ptr(ColKey col_key) const
 {
     return std::make_unique<Lst<U>>(*this, col_key);
 }
@@ -582,7 +600,7 @@ void Lst<T>::clear()
 }
 
 template <class T>
-CollectionBasePtr Lst<T>::clone_collection() const
+inline CollectionBasePtr Lst<T>::clone_collection() const
 {
     return std::make_unique<Lst<T>>(m_obj, m_col_key);
 }
@@ -631,13 +649,13 @@ inline Mixed Lst<T>::avg(size_t* return_cnt) const
 }
 
 template <class T>
-LstBasePtr Lst<T>::clone() const
+inline LstBasePtr Lst<T>::clone() const
 {
     return std::make_unique<Lst<T>>(m_obj, m_col_key);
 }
 
 template <class T>
-void Lst<T>::set_null(size_t ndx)
+inline void Lst<T>::set_null(size_t ndx)
 {
     set(ndx, BPlusTree<T>::default_value(m_nullable));
 }
@@ -659,13 +677,13 @@ void Lst<T>::set_any(size_t ndx, Mixed val)
 }
 
 template <class T>
-void Lst<T>::insert_null(size_t ndx)
+inline void Lst<T>::insert_null(size_t ndx)
 {
     insert(ndx, BPlusTree<T>::default_value(m_nullable));
 }
 
 template <class T>
-void Lst<T>::insert_any(size_t ndx, Mixed val)
+inline void Lst<T>::insert_any(size_t ndx, Mixed val)
 {
     if constexpr (std::is_same_v<T, Mixed>) {
         insert(ndx, val);
@@ -693,7 +711,7 @@ void Lst<T>::resize(size_t new_size)
 }
 
 template <class T>
-void Lst<T>::remove(size_t from, size_t to)
+inline void Lst<T>::remove(size_t from, size_t to)
 {
     while (from < to) {
         remove(--to);
@@ -803,6 +821,7 @@ inline bool LnkLst::operator==(const LnkLst& other) const
 {
     return m_keys == other.m_keys;
 }
+
 inline bool LnkLst::operator!=(const LnkLst& other) const
 {
     return m_keys != other.m_keys;
@@ -837,16 +856,19 @@ inline Mixed LnkLst::min(size_t* return_ndx) const
     static_cast<void>(return_ndx);
     REALM_TERMINATE("Not implemented yet");
 }
+
 inline Mixed LnkLst::max(size_t* return_ndx) const
 {
     static_cast<void>(return_ndx);
     REALM_TERMINATE("Not implemented yet");
 }
+
 inline Mixed LnkLst::sum(size_t* return_cnt) const
 {
     static_cast<void>(return_cnt);
     REALM_TERMINATE("Not implemented yet");
 }
+
 inline Mixed LnkLst::avg(size_t* return_cnt) const
 {
     static_cast<void>(return_cnt);
