@@ -176,12 +176,36 @@ public:
     }
     util::Any box(Obj) const;
 
-    // Any properties are only supported by the Cocoa binding to enable reading
-    // old Realm files that may have used them. Other bindings can safely not
-    // implement this.
-    util::Any box(Mixed) const
+    util::Any box(Mixed v) const
     {
-        REALM_TERMINATE("not supported");
+        if (!v.is_null()) {
+            switch (v.get_type()) {
+                case type_Int:
+                    return v.get_int();
+                case type_Bool:
+                    return v.get_bool();
+                case type_Float:
+                    return v.get_float();
+                case type_Double:
+                    return v.get_double();
+                case type_String:
+                    return std::string(v.get_string());
+                case type_Binary:
+                    return std::string(v.get_binary());
+                case type_Timestamp:
+                    return v.get_timestamp();
+                case type_ObjectId:
+                    return v.get<ObjectId>();
+                case type_Decimal:
+                    return v.get<Decimal128>();
+                case type_UUID:
+                    return v.get<UUID>();
+                default:
+                    REALM_TERMINATE("not supported");
+                    break;
+            }
+        }
+        return util::none;
     }
 
     // Convert from the boxed type to core types. This needs to be implemented
@@ -320,9 +344,43 @@ inline util::Optional<UUID> CppContext::unbox(util::Any& v, CreatePolicy, ObjKey
 }
 
 template <>
-inline Mixed CppContext::unbox(util::Any&, CreatePolicy, ObjKey) const
+inline Mixed CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
-    throw std::logic_error("'Any' type is unsupported");
+    if (v.has_value()) {
+        const std::type_info& this_type{v.type()};
+        if (this_type == typeid(int)) {
+            return Mixed(util::any_cast<int>(v));
+        }
+        else if (this_type == typeid(int64_t)) {
+            return Mixed(util::any_cast<int64_t>(v));
+        }
+        else if (this_type == typeid(std::string)) {
+            auto& value = util::any_cast<std::string&>(v);
+            return Mixed(value);
+        }
+        else if (this_type == typeid(Timestamp)) {
+            return Mixed(util::any_cast<Timestamp>(v));
+        }
+        else if (this_type == typeid(double)) {
+            return Mixed(util::any_cast<double>(v));
+        }
+        else if (this_type == typeid(float)) {
+            return Mixed(util::any_cast<float>(v));
+        }
+        else if (this_type == typeid(bool)) {
+            return Mixed(util::any_cast<bool>(v));
+        }
+        else if (this_type == typeid(Decimal128)) {
+            return Mixed(util::any_cast<Decimal128>(v));
+        }
+        else if (this_type == typeid(ObjectId)) {
+            return Mixed(util::any_cast<ObjectId>(v));
+        }
+        else if (this_type == typeid(UUID)) {
+            return Mixed(util::any_cast<UUID>(v));
+        }
+    }
+    return {};
 }
 
 inline Obj CppContext::create_embedded_object()

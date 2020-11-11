@@ -91,7 +91,7 @@ DataType to_core_type(PropertyType type)
             return type_Decimal;
         case PropertyType::UUID:
             return type_UUID;
-        case PropertyType::Any:
+        case PropertyType::Mixed:
             return type_Mixed;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();

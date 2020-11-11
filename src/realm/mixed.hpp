@@ -185,6 +185,9 @@ public:
     StringData get_string() const;
     BinaryData get_binary() const;
     Timestamp get_timestamp() const;
+    Decimal128 get_decimal() const;
+    ObjectId get_object_id() const;
+    UUID get_uuid() const;
     ObjLink get_link() const;
 
     bool is_null() const;
@@ -517,6 +520,11 @@ inline Decimal128 Mixed::get<Decimal128>() const noexcept
     return decimal_val;
 }
 
+inline Decimal128 Mixed::get_decimal() const
+{
+    return get<Decimal128>();
+}
+
 template <>
 inline ObjectId Mixed::get<ObjectId>() const noexcept
 {
@@ -524,11 +532,21 @@ inline ObjectId Mixed::get<ObjectId>() const noexcept
     return id_val;
 }
 
+inline ObjectId Mixed::get_object_id() const
+{
+    return get<ObjectId>();
+}
+
 template <>
 inline UUID Mixed::get<UUID>() const noexcept
 {
     REALM_ASSERT(get_type() == type_UUID);
     return uuid_val;
+}
+
+inline UUID Mixed::get_uuid() const
+{
+    return get<UUID>();
 }
 
 template <>
