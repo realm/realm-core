@@ -29,8 +29,9 @@ namespace win32 {
 template <class T, void (*Initializer)(T&)>
 class SharedMemory {
 public:
-    SharedMemory(LPCWSTR name) {
-        //assume another process have already initialzied the shared memory
+    SharedMemory(LPCWSTR name) 
+    {
+        // assume another process have already initialzied the shared memory
         bool shouldInit = false;
 
         m_mapped_file = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, name);
@@ -40,7 +41,7 @@ public:
             m_mapped_file = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
             error = GetLastError();
 
-            //init since this is the first process creating the shared memory
+            // init since this is the first process creating the shared memory
             shouldInit = true;
         }
 
@@ -66,9 +67,13 @@ public:
         }
     }
 
-    T& get() const noexcept { return *m_memory; }
+    T& get() const noexcept 
+    { 
+        return *m_memory; 
+    }
 
-    ~SharedMemory() {
+    ~SharedMemory() 
+    {
         if (m_memory) {
             UnmapViewOfFile(m_memory);
             m_memory = nullptr;
@@ -84,7 +89,7 @@ private:
     T* m_memory = nullptr;
     HANDLE m_mapped_file = nullptr;
 };
-}
+} // namespace win32
 
 class ExternalCommitHelper {
 public:
