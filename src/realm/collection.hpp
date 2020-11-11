@@ -246,21 +246,7 @@ protected:
     {
     }
 
-    CollectionBaseImpl& operator=(const CollectionBaseImpl& other)
-    {
-        static_cast<Interface&>(*this) = static_cast<const Interface&>(other);
-
-        if (this != &other) {
-            m_obj = other.m_obj;
-            m_col_key = other.m_col_key;
-            m_nullable = other.m_nullable;
-            m_content_version = other.m_content_version;
-            m_last_content_version = other.m_last_content_version;
-            m_valid = other.m_valid;
-        }
-
-        return *this;
-    }
+    CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
 
     bool operator==(const CollectionBaseImpl& other) const noexcept
     {
