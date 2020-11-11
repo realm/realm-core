@@ -29,7 +29,7 @@ namespace win32 {
 template <class T, void (*Initializer)(T&)>
 class SharedMemory {
 public:
-    SharedMemory(LPCWSTR name) 
+    SharedMemory(LPCWSTR name)
     {
         // assume another process have already initialzied the shared memory
         bool shouldInit = false;
@@ -67,12 +67,12 @@ public:
         }
     }
 
-    T& get() const noexcept 
-    { 
-        return *m_memory; 
+    T& get() const noexcept
+    {
+        return *m_memory;
     }
 
-    ~SharedMemory() 
+    ~SharedMemory()
     {
         if (m_memory) {
             UnmapViewOfFile(m_memory);
