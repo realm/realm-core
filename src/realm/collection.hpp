@@ -59,6 +59,9 @@ protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
     CollectionBase(const CollectionBase&) noexcept = default;
+    CollectionBase(CollectionBase&&) noexcept = default;
+    CollectionBase& operator=(const CollectionBase&) noexcept = default;
+    CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
     virtual bool init_from_parent() const = 0;
     virtual bool update_if_needed() const = 0;
@@ -238,6 +241,7 @@ protected:
 
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other) = default;
+    CollectionBaseImpl(CollectionBaseImpl&& other) = default;
 
     CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
         : m_obj(obj)
@@ -247,6 +251,7 @@ protected:
     }
 
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
+    CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
 
     bool operator==(const CollectionBaseImpl& other) const noexcept
     {

@@ -86,7 +86,9 @@ public:
     Lst() = default;
     Lst(const Obj& owner, ColKey col_key);
     Lst(const Lst& other);
+    Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
+    Lst& operator=(Lst&& other) noexcept;
     Lst& operator=(const BPlusTree<T>& other);
 
     void create();
@@ -229,7 +231,9 @@ public:
     }
 
     LnkLst(const LnkLst& other) = default;
+    LnkLst(LnkLst&& other) = default;
     LnkLst& operator=(const LnkLst& other) = default;
+    LnkLst& operator=(LnkLst&& other) = default;
     bool operator==(const LnkLst& other) const;
     bool operator!=(const LnkLst& other) const;
 
@@ -419,6 +423,16 @@ inline Lst<T>::Lst(const Lst& other)
 }
 
 template <class T>
+inline Lst<T>::Lst(Lst&& other) noexcept
+    : Base(static_cast<Base&&>(other))
+    , m_tree(std::exchange(other.m_tree, nullptr))
+{
+    if (m_tree) {
+        m_tree->set_parent(this, 0);
+    }
+}
+
+template <class T>
 inline void Lst<T>::create()
 {
     m_tree->create();
@@ -439,6 +453,21 @@ Lst<T>& Lst<T>::operator=(const Lst& other)
             if (m_valid) {
                 m_tree->init_from_ref(other.m_tree->get_ref());
             }
+        }
+    }
+
+    return *this;
+}
+
+template <class T>
+inline Lst<T>& Lst<T>::operator=(Lst&& other) noexcept
+{
+    Base::operator=(static_cast<Base&&>(other));
+
+    if (this != &other) {
+        m_tree = std::exchange(other.m_tree, nullptr);
+        if (m_tree) {
+            m_tree->set_parent(this, 0);
         }
     }
 
