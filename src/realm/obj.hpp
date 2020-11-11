@@ -77,7 +77,7 @@ public:
         return m_table.cast_away_const();
     }
 
-    Allocator& get_alloc() const noexcept;
+    Allocator& get_alloc() const;
 
     bool operator==(const Obj& other) const;
 

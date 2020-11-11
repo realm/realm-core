@@ -74,7 +74,7 @@ const TableClusterTree* Obj::get_tree_top() const
     }
 }
 
-Allocator& Obj::get_alloc() const noexcept
+Allocator& Obj::get_alloc() const
 {
     // Do a "checked" deref to table to ensure the instance_version is correct.
     // Even if removed from the public API, this should *not* be optimized away,
