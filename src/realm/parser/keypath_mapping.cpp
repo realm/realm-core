@@ -33,12 +33,6 @@ std::size_t TableAndColHash::operator()(const std::pair<ConstTableRef, std::stri
 }
 
 
-KeyPathMapping::KeyPathMapping()
-    : m_allow_backlinks(true)
-    , m_mapping()
-{
-}
-
 bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
 {
     if (m_mapping.find({table, name}) == m_mapping.end()) {

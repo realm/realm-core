@@ -58,7 +58,7 @@ struct TableAndColHash {
 // It can also be used to allow querying named backlinks if bindings provide the mappings themselves.
 class KeyPathMapping {
 public:
-    KeyPathMapping();
+    KeyPathMapping() = default;
     // returns true if added, false if duplicate key already exists
     bool add_mapping(ConstTableRef table, std::string name, std::string alias);
     void remove_mapping(ConstTableRef table, std::string name);
@@ -74,7 +74,7 @@ public:
                                        ExpressionComparisonType type = ExpressionComparisonType::Any);
 
 protected:
-    bool m_allow_backlinks;
+    bool m_allow_backlinks = true;
     std::string m_backlink_class_prefix;
     std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;
 };
