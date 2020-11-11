@@ -347,35 +347,36 @@ template <>
 inline Mixed CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 {
     if (v.has_value()) {
-        if (v.type() == typeid(int)) {
+        const std::type_info& this_type{v.type()};
+        if (this_type == typeid(int)) {
             return Mixed(util::any_cast<int>(v));
         }
-        else if (v.type() == typeid(int64_t)) {
+        else if (this_type == typeid(int64_t)) {
             return Mixed(util::any_cast<int64_t>(v));
         }
-        else if (v.type() == typeid(std::string)) {
+        else if (this_type == typeid(std::string)) {
             auto& value = util::any_cast<std::string&>(v);
             return Mixed(value);
         }
-        else if (v.type() == typeid(Timestamp)) {
+        else if (this_type == typeid(Timestamp)) {
             return Mixed(util::any_cast<Timestamp>(v));
         }
-        else if (v.type() == typeid(double)) {
+        else if (this_type == typeid(double)) {
             return Mixed(util::any_cast<double>(v));
         }
-        else if (v.type() == typeid(float)) {
+        else if (this_type == typeid(float)) {
             return Mixed(util::any_cast<float>(v));
         }
-        else if (v.type() == typeid(bool)) {
+        else if (this_type == typeid(bool)) {
             return Mixed(util::any_cast<bool>(v));
         }
-        else if (v.type() == typeid(Decimal128)) {
+        else if (this_type == typeid(Decimal128)) {
             return Mixed(util::any_cast<Decimal128>(v));
         }
-        else if (v.type() == typeid(ObjectId)) {
+        else if (this_type == typeid(ObjectId)) {
             return Mixed(util::any_cast<ObjectId>(v));
         }
-        else if (v.type() == typeid(UUID)) {
+        else if (this_type == typeid(UUID)) {
             return Mixed(util::any_cast<UUID>(v));
         }
     }
