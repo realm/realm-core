@@ -33,22 +33,22 @@ public:
         //assume another process have already initialzied the shared memory
         bool shouldInit = false;
 
-        HANDLE mapping = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, name);
+        m_mapped_file = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, name);
         auto error = GetLastError();
 
-        if (mapping == NULL) {
-            mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
+        if (m_mapped_file == NULL) {
+            m_mapped_file = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
             error = GetLastError();
 
             //init since this is the first process creating the shared memory
             shouldInit = true;
         }
 
-        if (mapping == NULL) {
+        if (m_mapped_file == NULL) {
             throw std::system_error(error, std::system_category());
         }
 
-        LPVOID view = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T));
+        LPVOID view = MapViewOfFile(m_mapped_file, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(T));
         error = GetLastError();
         if (view == NULL) {
             throw std::system_error(error, std::system_category());
@@ -73,10 +73,16 @@ public:
             UnmapViewOfFile(m_memory);
             m_memory = nullptr;
         }
+
+        if (m_mapped_file) {
+            CloseHandle(m_mapped_file);
+            m_mapped_file = nullptr;
+        }
     }
 
 private:
     T* m_memory = nullptr;
+    HANDLE m_mapped_file = nullptr;
 };
 }
 
