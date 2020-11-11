@@ -89,7 +89,6 @@ public:
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
     Lst& operator=(Lst&& other) noexcept;
-    Lst& operator=(const BPlusTree<T>& other);
 
     void create();
 
@@ -489,13 +488,6 @@ inline Lst<T>& Lst<T>::operator=(Lst&& other) noexcept
         }
     }
 
-    return *this;
-}
-
-template <class T>
-inline Lst<T>& Lst<T>::operator=(const BPlusTree<T>& other)
-{
-    *m_tree = other;
     return *this;
 }
 
