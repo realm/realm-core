@@ -115,7 +115,7 @@ private:
     bool init_from_parent() const final;
     Mixed do_get(ClusterNode::State&&) const;
 
-    friend class CollectionIterator<Dictionary>;
+    friend struct CollectionIterator<Dictionary>;
 };
 
 template <>
