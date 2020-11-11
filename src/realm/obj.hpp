@@ -72,16 +72,16 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table() const
+    TableRef get_table() const noexcept
     {
         return m_table.cast_away_const();
     }
 
-    Allocator& get_alloc() const;
+    Allocator& get_alloc() const noexcept;
 
     bool operator==(const Obj& other) const;
 
-    ObjKey get_key() const
+    ObjKey get_key() const noexcept
     {
         return m_key;
     }
@@ -89,16 +89,16 @@ public:
     GlobalKey get_object_id() const;
     ObjLink get_link() const;
 
-    Replication* get_replication() const;
+    Replication* get_replication() const noexcept;
 
     // Check if this object is default constructed
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return m_table != nullptr;
     }
 
     // Check if the object is still alive
-    bool is_valid() const;
+    bool is_valid() const noexcept;
     // Will throw if object is not valid
     void check_valid() const;
     // Delete object from table. Object is invalid afterwards.
@@ -296,7 +296,7 @@ private:
     mutable uint64_t m_storage_version;
     mutable bool m_valid;
 
-    Allocator& _get_alloc() const;
+    Allocator& _get_alloc() const noexcept;
     bool update() const;
     // update if needed - with and without check of table instance version:
     bool update_if_needed() const;
@@ -307,7 +307,7 @@ private:
     const TableClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
     ColKey get_primary_key_column() const;
-    TableKey get_table_key() const;
+    TableKey get_table_key() const noexcept;
     TableRef get_target_table(ColKey col_key) const;
     TableRef get_target_table(ObjLink link) const;
     const Spec& get_spec() const;

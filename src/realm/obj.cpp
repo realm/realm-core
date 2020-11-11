@@ -74,7 +74,7 @@ const TableClusterTree* Obj::get_tree_top() const
     }
 }
 
-Allocator& Obj::get_alloc() const
+Allocator& Obj::get_alloc() const noexcept
 {
     // Do a "checked" deref to table to ensure the instance_version is correct.
     // Even if removed from the public API, this should *not* be optimized away,
@@ -83,7 +83,7 @@ Allocator& Obj::get_alloc() const
     return m_table->m_alloc;
 }
 
-Allocator& Obj::_get_alloc() const
+Allocator& Obj::_get_alloc() const noexcept
 {
     // Bypass check of table instance version. To be used only in contexts,
     // where instance version match has already been established (e.g _get<>)
@@ -95,7 +95,7 @@ const Spec& Obj::get_spec() const
     return m_table.unchecked_ptr()->m_spec;
 }
 
-Replication* Obj::get_replication() const
+Replication* Obj::get_replication() const noexcept
 {
     return m_table->get_repl();
 }
@@ -178,7 +178,7 @@ bool Obj::operator==(const Obj& other) const
     return true;
 }
 
-bool Obj::is_valid() const
+bool Obj::is_valid() const noexcept
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid)
@@ -210,7 +210,7 @@ ColKey Obj::get_column_key(StringData col_name) const
     return get_table()->get_column_key(col_name);
 }
 
-TableKey Obj::get_table_key() const
+TableKey Obj::get_table_key() const noexcept
 {
     return get_table()->get_key();
 }

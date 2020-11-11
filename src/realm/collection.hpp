@@ -52,13 +52,13 @@ public:
     virtual ObjKey get_key() const = 0;
     virtual bool is_attached() const = 0;
     virtual bool has_changed() const = 0;
-    virtual ConstTableRef get_table() const = 0;
-    virtual ColKey get_col_key() const = 0;
+    virtual ConstTableRef get_table() const noexcept = 0;
+    virtual ColKey get_col_key() const noexcept = 0;
 
 protected:
     friend class Transaction;
-    CollectionBase() = default;
-    CollectionBase(const CollectionBase&) = default;
+    CollectionBase() noexcept = default;
+    CollectionBase(const CollectionBase&) noexcept = default;
 
     virtual bool init_from_parent() const = 0;
     virtual bool update_if_needed() const = 0;
@@ -103,7 +103,7 @@ inline void check_column_type<ObjKey>(ColKey col)
 template <class T, class = void>
 struct MinHelper {
     template <class U>
-    static Mixed eval(U&, size_t*)
+    static Mixed eval(U&, size_t*) noexcept
     {
         return Mixed{};
     }
@@ -121,7 +121,7 @@ struct MinHelper<T, std::void_t<ColumnMinMaxType<T>>> {
 template <class T, class Enable = void>
 struct MaxHelper {
     template <class U>
-    static Mixed eval(U&, size_t*)
+    static Mixed eval(U&, size_t*) noexcept
     {
         return Mixed{};
     }
@@ -140,7 +140,7 @@ template <class T, class Enable = void>
 class SumHelper {
 public:
     template <class U>
-    static Mixed eval(U&, size_t* return_cnt)
+    static Mixed eval(U&, size_t* return_cnt) noexcept
     {
         if (return_cnt)
             *return_cnt = 0;
@@ -161,7 +161,7 @@ public:
 template <class T, class = void>
 struct AverageHelper {
     template <class U>
-    static Mixed eval(U&, size_t* return_cnt)
+    static Mixed eval(U&, size_t* return_cnt) noexcept
     {
         if (return_cnt)
             *return_cnt = 0;
@@ -222,7 +222,7 @@ public:
         return false;
     }
 
-    ConstTableRef get_table() const final
+    ConstTableRef get_table() const noexcept final
     {
         return m_obj.get_table();
     }
@@ -239,7 +239,7 @@ protected:
     CollectionBaseImpl() = default;
     CollectionBaseImpl(const CollectionBaseImpl& other) = default;
 
-    CollectionBaseImpl(const Obj& obj, ColKey col_key)
+    CollectionBaseImpl(const Obj& obj, ColKey col_key) noexcept
         : m_obj(obj)
         , m_col_key(col_key)
         , m_nullable(col_key.is_nullable())
@@ -286,7 +286,7 @@ protected:
         return false;
     }
 
-    void update_content_version() const
+    void update_content_version() const noexcept
     {
         m_content_version = m_obj.get_alloc().get_content_version();
     }
@@ -362,7 +362,7 @@ public:
         }
     }
 
-    bool is_in_sync() const final
+    bool is_in_sync() const noexcept final
     {
         return true;
     }
@@ -401,7 +401,7 @@ protected:
         _impl::check_for_last_unresolved(tree);
     }
 
-    void clear_unresolved()
+    void clear_unresolved() noexcept
     {
         m_unresolved.clear();
     }
@@ -442,37 +442,37 @@ struct CollectionIterator {
     {
     }
 
-    pointer operator->() const noexcept
+    pointer operator->() const
     {
         m_val = m_list->get(m_ndx);
         return &m_val;
     }
 
-    reference operator*() const noexcept
+    reference operator*() const
     {
         return *operator->();
     }
 
-    CollectionIterator& operator++()
+    CollectionIterator& operator++() noexcept
     {
         ++m_ndx;
         return *this;
     }
 
-    CollectionIterator operator++(int)
+    CollectionIterator operator++(int) noexcept
     {
         auto tmp = *this;
         operator++();
         return tmp;
     }
 
-    CollectionIterator& operator--()
+    CollectionIterator& operator--() noexcept
     {
         --m_ndx;
         return *this;
     }
 
-    CollectionIterator operator--(int)
+    CollectionIterator operator--(int) noexcept
     {
         auto tmp = *this;
         operator--();

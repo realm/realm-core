@@ -267,8 +267,8 @@ public:
     ObjKey get_key() const final;
     bool is_attached() const final;
     bool has_changed() const final;
-    ConstTableRef get_table() const final;
-    ColKey get_col_key() const final;
+    ConstTableRef get_table() const noexcept final;
+    ColKey get_col_key() const noexcept final;
 
     // Overriding members of LstBase:
     std::unique_ptr<LstBase> clone() const
@@ -868,12 +868,12 @@ inline bool LnkLst::has_changed() const
     return m_keys.has_changed();
 }
 
-inline ConstTableRef LnkLst::get_table() const
+inline ConstTableRef LnkLst::get_table() const noexcept
 {
     return m_keys.get_table();
 }
 
-inline ColKey LnkLst::get_col_key() const
+inline ColKey LnkLst::get_col_key() const noexcept
 {
     return m_keys.get_col_key();
 }
