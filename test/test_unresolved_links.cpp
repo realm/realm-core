@@ -452,6 +452,8 @@ TEST(Unresolved_CondensedIndices)
     list2 = list1;
     CHECK_EQUAL(list2.size(), 1);
 
+    auto key_list = obj789.get_list<ObjKey>("t2s");
+    CHECK_EQUAL(key_list.size(), 2);
 
     // Check that find methods return condensed indices.
 
@@ -469,6 +471,23 @@ TEST(Unresolved_CondensedIndices)
     });
     CHECK_EQUAL(found_indices.size(), 1);
     CHECK_EQUAL(found_indices[0], 0);
+
+    // Check that the list of unresolved indices remains consistent over
+    // insertion to the middle. list1 currently considers index 0 to be
+    // unresolved, because obj123 was invalidated above. Insertion to index 0
+    // should bump the unresolved index to 1.
+    CHECK_EQUAL(key_list.get(0), obj123.get_key());
+    CHECK_EQUAL(key_list.get(1), obj456.get_key());
+    key_list.insert(2, obj123.get_key());
+    key_list.insert(3, obj456.get_key());
+    // Uncondensed list is now: (obj123, obj456, obj123, obj456)
+    // Condensed list is now: (obj456, obj456)
+    list1.insert(0, obj456.get_key());
+    // Uncondensed list is now: (obj123, obj456, obj456, obj123, obj456)
+    // Condensed list should now be: (obj456, obj456, obj456)
+    CHECK_EQUAL(list1.get(0), obj456.get_key());
+    CHECK_EQUAL(list1.get(1), obj456.get_key());
+    CHECK_EQUAL(list1.get(2), obj456.get_key());
 }
 
 #endif
