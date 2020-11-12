@@ -95,7 +95,7 @@ const Spec& Obj::get_spec() const
     return m_table.unchecked_ptr()->m_spec;
 }
 
-Replication* Obj::get_replication() const noexcept
+Replication* Obj::get_replication() const
 {
     return m_table->get_repl();
 }
@@ -210,7 +210,7 @@ ColKey Obj::get_column_key(StringData col_name) const
     return get_table()->get_column_key(col_name);
 }
 
-TableKey Obj::get_table_key() const noexcept
+TableKey Obj::get_table_key() const
 {
     return get_table()->get_key();
 }

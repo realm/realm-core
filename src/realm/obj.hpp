@@ -89,7 +89,7 @@ public:
     GlobalKey get_object_id() const;
     ObjLink get_link() const;
 
-    Replication* get_replication() const noexcept;
+    Replication* get_replication() const;
 
     // Check if this object is default constructed
     explicit operator bool() const noexcept
@@ -307,7 +307,7 @@ private:
     const TableClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
     ColKey get_primary_key_column() const;
-    TableKey get_table_key() const noexcept;
+    TableKey get_table_key() const;
     TableRef get_target_table(ColKey col_key) const;
     TableRef get_target_table(ObjLink link) const;
     const Spec& get_spec() const;
