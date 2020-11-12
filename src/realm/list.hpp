@@ -242,9 +242,9 @@ public:
     LnkLst() = default;
 
     LnkLst(const Obj& owner, ColKey col_key)
-        : m_keys(owner, col_key)
+        : m_list(owner, col_key)
     {
-        update_unresolved(*m_keys.m_tree);
+        update_unresolved(*m_list.m_tree);
     }
 
     LnkLst(const LnkLst& other) = default;
@@ -340,7 +340,7 @@ public:
         if (value.is_unresolved())
             return;
 
-        m_keys.find_all(value, [&](size_t ndx) {
+        m_list.find_all(value, [&](size_t ndx) {
             func(real2virtual(ndx));
         });
     }
@@ -374,14 +374,14 @@ public:
 
     const BPlusTree<ObjKey>& get_tree() const
     {
-        return m_keys.get_tree();
+        return m_list.get_tree();
     }
 
 protected:
     bool update_if_needed() const final
     {
-        if (m_keys.update_if_needed()) {
-            update_unresolved(*m_keys.m_tree);
+        if (m_list.update_if_needed()) {
+            update_unresolved(*m_list.m_tree);
             return true;
         }
         return false;
@@ -391,7 +391,7 @@ private:
     friend class ConstTableView;
     friend class Query;
 
-    Lst<ObjKey> m_keys;
+    Lst<ObjKey> m_list;
 
     bool init_from_parent() const final;
 };
@@ -811,35 +811,35 @@ T Lst<T>::remove(size_t ndx)
 
 inline bool LnkLst::operator==(const LnkLst& other) const
 {
-    return m_keys == other.m_keys;
+    return m_list == other.m_list;
 }
 
 inline bool LnkLst::operator!=(const LnkLst& other) const
 {
-    return m_keys != other.m_keys;
+    return m_list != other.m_list;
 }
 
 inline size_t LnkLst::size() const
 {
     update_if_needed();
-    return m_keys.size() - num_unresolved();
+    return m_list.size() - num_unresolved();
 }
 
 inline bool LnkLst::is_null(size_t ndx) const
 {
     update_if_needed();
-    return m_keys.is_null(virtual2real(ndx));
+    return m_list.is_null(virtual2real(ndx));
 }
 
 inline Mixed LnkLst::get_any(size_t ndx) const
 {
     update_if_needed();
-    return m_keys.get_any(virtual2real(ndx));
+    return m_list.get_any(virtual2real(ndx));
 }
 
 inline void LnkLst::clear()
 {
-    m_keys.clear();
+    m_list.clear();
     clear_unresolved();
 }
 
@@ -874,7 +874,7 @@ inline std::unique_ptr<CollectionBase> LnkLst::clone_collection() const
 
 inline TableRef LnkLst::get_target_table() const
 {
-    return m_keys.get_target_table();
+    return m_list.get_target_table();
 }
 
 inline void LnkLst::sort(std::vector<size_t>& indices, bool ascending) const
@@ -893,86 +893,86 @@ inline void LnkLst::distinct(std::vector<size_t>& indices, util::Optional<bool> 
 
 inline const Obj& LnkLst::get_obj() const noexcept
 {
-    return m_keys.get_obj();
+    return m_list.get_obj();
 }
 
 inline ObjKey LnkLst::get_key() const
 {
-    return m_keys.get_key();
+    return m_list.get_key();
 }
 
 inline bool LnkLst::is_attached() const
 {
-    return m_keys.is_attached();
+    return m_list.is_attached();
 }
 
 inline bool LnkLst::has_changed() const
 {
-    return m_keys.has_changed();
+    return m_list.has_changed();
 }
 
 inline ConstTableRef LnkLst::get_table() const noexcept
 {
-    return m_keys.get_table();
+    return m_list.get_table();
 }
 
 inline ColKey LnkLst::get_col_key() const noexcept
 {
-    return m_keys.get_col_key();
+    return m_list.get_col_key();
 }
 
 inline void LnkLst::set_null(size_t ndx)
 {
     update_if_needed();
-    m_keys.set_null(virtual2real(ndx));
+    m_list.set_null(virtual2real(ndx));
 }
 
 inline void LnkLst::set_any(size_t ndx, Mixed val)
 {
     update_if_needed();
-    m_keys.set_any(virtual2real(ndx), val);
+    m_list.set_any(virtual2real(ndx), val);
 }
 
 inline void LnkLst::insert_null(size_t ndx)
 {
     update_if_needed();
-    m_keys.insert_null(virtual2real(ndx));
+    m_list.insert_null(virtual2real(ndx));
 }
 
 inline void LnkLst::insert_any(size_t ndx, Mixed val)
 {
     update_if_needed();
-    m_keys.insert_any(virtual2real(ndx), val);
+    m_list.insert_any(virtual2real(ndx), val);
 }
 
 inline void LnkLst::resize(size_t new_size)
 {
     update_if_needed();
-    m_keys.resize(new_size + num_unresolved());
+    m_list.resize(new_size + num_unresolved());
 }
 
 inline void LnkLst::remove(size_t from, size_t to)
 {
     update_if_needed();
-    m_keys.remove(virtual2real(from), virtual2real(to));
+    m_list.remove(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::move(size_t from, size_t to)
 {
     update_if_needed();
-    m_keys.move(virtual2real(from), virtual2real(to));
+    m_list.move(virtual2real(from), virtual2real(to));
 }
 
 inline void LnkLst::swap(size_t ndx1, size_t ndx2)
 {
     update_if_needed();
-    m_keys.swap(virtual2real(ndx1), virtual2real(ndx2));
+    m_list.swap(virtual2real(ndx1), virtual2real(ndx2));
 }
 
 inline ObjKey LnkLst::get(size_t ndx) const
 {
     update_if_needed();
-    return m_keys.get(virtual2real(ndx));
+    return m_list.get(virtual2real(ndx));
 }
 
 inline size_t LnkLst::find_first(const ObjKey& key) const
@@ -981,7 +981,7 @@ inline size_t LnkLst::find_first(const ObjKey& key) const
         return not_found;
 
     update_if_needed();
-    size_t found = m_keys.find_first(key);
+    size_t found = m_list.find_first(key);
     if (found == not_found)
         return not_found;
     return real2virtual(found);
@@ -993,7 +993,7 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
     update_if_needed();
-    m_keys.insert(virtual2real(ndx), value);
+    m_list.insert(virtual2real(ndx), value);
 }
 
 inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
@@ -1002,7 +1002,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw LogicError(LogicError::wrong_kind_of_table);
     update_if_needed();
-    ObjKey old = m_keys.set(virtual2real(ndx), value);
+    ObjKey old = m_list.set(virtual2real(ndx), value);
     REALM_ASSERT(!old.is_unresolved());
     return old;
 }
@@ -1010,7 +1010,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 inline ObjKey LnkLst::remove(size_t ndx)
 {
     update_if_needed();
-    ObjKey old = m_keys.remove(virtual2real(ndx));
+    ObjKey old = m_list.remove(virtual2real(ndx));
     REALM_ASSERT(!old.is_unresolved());
     return old;
 }

@@ -383,16 +383,16 @@ void Lst<Mixed>::do_remove(size_t ndx)
 
 bool LnkLst::init_from_parent() const
 {
-    m_keys.init_from_parent();
-    update_unresolved(*m_keys.m_tree);
-    return m_keys.m_valid;
+    m_list.init_from_parent();
+    update_unresolved(*m_list.m_tree);
+    return m_list.m_valid;
 }
 
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
-    m_keys.insert(ndx, o.get_key());
+    m_list.insert(ndx, o.get_key());
     return o;
 }
 
@@ -400,7 +400,7 @@ Obj LnkLst::create_and_set_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
-    m_keys.set(ndx, o.get_key());
+    m_list.set(ndx, o.get_key());
     return o;
 }
 
@@ -429,7 +429,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
-        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_keys.m_tree);
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
 }
 
