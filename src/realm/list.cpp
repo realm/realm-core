@@ -163,22 +163,6 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 
 /********************************* Lst<Key> *********************************/
 
-namespace {
-void check_for_last_unresolved(BPlusTree<ObjKey>& tree)
-{
-    bool no_more_unresolved = true;
-    size_t sz = tree.size();
-    for (size_t n = 0; n < sz; n++) {
-        if (tree.get(n).is_unresolved()) {
-            no_more_unresolved = false;
-            break;
-        }
-    }
-    if (no_more_unresolved)
-        tree.set_context_flag(true);
-}
-} // namespace
-
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
@@ -200,7 +184,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
     }
     else if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(*m_tree);
     }
 }
 
@@ -233,7 +217,7 @@ void Lst<ObjKey>::do_remove(size_t ndx)
     }
     if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(*m_tree);
     }
 }
 
