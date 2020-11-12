@@ -35,7 +35,6 @@ public:
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
     virtual std::pair<size_t, bool> erase_any(Mixed value) = 0;
-    virtual void clear() = 0;
 
 protected:
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
