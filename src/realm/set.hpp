@@ -191,7 +191,7 @@ public:
     size_t find(ObjKey) const;
     size_t find_first(ObjKey) const;
     std::pair<size_t, bool> insert(ObjKey);
-    std::pair<size_t, bool> remove(ObjKey);
+    std::pair<size_t, bool> erase(ObjKey);
 
     // Overriding members of CollectionBase:
     CollectionBasePtr clone_collection() const
@@ -758,6 +758,238 @@ template <class T>
 void Set<T>::do_erase(size_t ndx)
 {
     m_tree->erase(ndx);
+}
+
+
+inline ObjKey LnkSet::get(size_t ndx) const
+{
+    update_if_needed();
+    return m_set.get(virtual2real(ndx));
+}
+
+inline size_t LnkSet::find(ObjKey value) const
+{
+    update_if_needed();
+
+    if (value.is_unresolved()) {
+        return not_found;
+    }
+
+    size_t ndx = m_set.find(value);
+    if (ndx == not_found) {
+        return not_found;
+    }
+    return real2virtual(ndx);
+}
+
+inline size_t LnkSet::find_first(ObjKey value) const
+{
+    return find(value);
+}
+
+inline size_t LnkSet::size() const
+{
+    update_if_needed();
+    return m_set.size() - num_unresolved();
+}
+
+inline std::pair<size_t, bool> LnkSet::insert(ObjKey value)
+{
+    REALM_ASSERT(!value.is_unresolved());
+    update_if_needed();
+
+    auto [ndx, inserted] = m_set.insert(value);
+    return {real2virtual(ndx), inserted};
+}
+
+inline std::pair<size_t, bool> LnkSet::erase(ObjKey value)
+{
+    REALM_ASSERT(!value.is_unresolved());
+    update_if_needed();
+
+    auto [ndx, removed] = m_set.erase(value);
+    if (removed) {
+        ndx = real2virtual(ndx);
+    }
+    return {ndx, removed};
+}
+
+inline bool LnkSet::is_null(size_t ndx) const
+{
+    update_if_needed();
+    return m_set.is_null(virtual2real(ndx));
+}
+
+inline Mixed LnkSet::get_any(size_t ndx) const
+{
+    update_if_needed();
+    return m_set.get_any(virtual2real(ndx));
+}
+
+inline std::pair<size_t, bool> LnkSet::insert_null()
+{
+    update_if_needed();
+    auto [ndx, inserted] = m_set.insert_null();
+    return {real2virtual(ndx), inserted};
+}
+
+inline std::pair<size_t, bool> LnkSet::erase_null()
+{
+    update_if_needed();
+    auto [ndx, erased] = m_set.erase_null();
+    if (erased) {
+        ndx = real2virtual(ndx);
+    }
+    return {ndx, erased};
+}
+
+inline std::pair<size_t, bool> LnkSet::insert_any(Mixed value)
+{
+    update_if_needed();
+    auto [ndx, inserted] = m_set.insert_any(value);
+    return {real2virtual(ndx), inserted};
+}
+
+inline std::pair<size_t, bool> LnkSet::erase_any(Mixed value)
+{
+    auto [ndx, erased] = m_set.erase_any(value);
+    if (erased) {
+        ndx = real2virtual(ndx);
+    }
+    return {ndx, erased};
+}
+
+inline void LnkSet::clear()
+{
+    m_set.clear();
+    clear_unresolved();
+}
+
+inline Mixed LnkSet::min(size_t* return_ndx) const
+{
+    size_t found = not_found;
+    auto value = m_set.min(&found);
+    if (found != not_found && return_ndx) {
+        *return_ndx = real2virtual(found);
+    }
+    return value;
+}
+
+inline Mixed LnkSet::max(size_t* return_ndx) const
+{
+    size_t found = not_found;
+    auto value = m_set.max(&found);
+    if (found != not_found && return_ndx) {
+        *return_ndx = real2virtual(found);
+    }
+    return value;
+}
+
+inline Mixed LnkSet::sum(size_t* return_cnt) const
+{
+    static_cast<void>(return_cnt);
+    REALM_TERMINATE("Not implemented");
+}
+
+inline Mixed LnkSet::avg(size_t* return_cnt) const
+{
+    static_cast<void>(return_cnt);
+    REALM_TERMINATE("Not implemented");
+}
+
+inline TableRef LnkSet::get_target_table() const
+{
+    return m_set.get_target_table();
+}
+
+inline void LnkSet::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    update_if_needed();
+
+    // Map the input indices to real indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return virtual2real(ndx);
+    });
+
+    m_set.sort(indices, ascending);
+
+    // Map the output indices to virtual indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return real2virtual(ndx);
+    });
+}
+
+inline void LnkSet::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+{
+    update_if_needed();
+
+    // Map the input indices to real indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return virtual2real(ndx);
+    });
+
+    m_set.distinct(indices, sort_order);
+
+    // Map the output indices to virtual indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return real2virtual(ndx);
+    });
+}
+
+inline const Obj& LnkSet::get_obj() const noexcept
+{
+    return m_set.get_obj();
+}
+
+inline ObjKey LnkSet::get_key() const
+{
+    return m_set.get_key();
+}
+
+inline bool LnkSet::is_attached() const
+{
+    return m_set.is_attached();
+}
+
+inline bool LnkSet::has_changed() const
+{
+    return m_set.has_changed();
+}
+
+inline ConstTableRef LnkSet::get_table() const noexcept
+{
+    return m_set.get_table();
+}
+
+inline ColKey LnkSet::get_col_key() const noexcept
+{
+    return m_set.get_col_key();
+}
+
+inline size_t LnkSet::find_any(Mixed value) const
+{
+    size_t found = m_set.find_any(value);
+    if (found != not_found) {
+        found = real2virtual(found);
+    }
+    return found;
+}
+
+inline bool LnkSet::is_obj_valid(size_t ndx) const noexcept
+{
+    update_if_needed();
+    return m_set.get(virtual2real(ndx)) != ObjKey{};
+}
+
+inline Obj LnkSet::get_object(size_t ndx) const
+{
+    ObjKey key = get(ndx);
+    return get_target_table()->get_object(key);
+}
+
+inline ObjKey LnkSet::get_key(size_t ndx) const
+{
+    return get(ndx);
 }
 
 } // namespace realm

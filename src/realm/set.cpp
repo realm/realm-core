@@ -213,5 +213,11 @@ void Set<Mixed>::do_erase(size_t ndx)
     }
 }
 
+bool LnkSet::init_from_parent() const
+{
+    m_set.init_from_parent();
+    update_unresolved(*m_set.m_tree);
+    return m_set.m_valid;
+}
 
 } // namespace realm
