@@ -270,7 +270,7 @@ protected:
             return false;
 
         auto content_version = m_obj.get_alloc().get_content_version();
-        if (content_version != m_content_version || m_obj.update_if_needed()) {
+        if (m_obj.update_if_needed() || content_version != m_content_version) {
             this->init_from_parent();
             return true;
         }
@@ -370,7 +370,33 @@ protected:
     ObjCollectionBase& operator=(const ObjCollectionBase&) = default;
     ObjCollectionBase& operator=(ObjCollectionBase&&) = default;
 
-    using Interface::update_if_needed;
+    // Implementations should call `update_if_needed()` on their inner accessor
+    // (without `update_unresolved()`).
+    virtual bool do_update_if_needed() const = 0;
+    virtual bool do_init_from_parent() const = 0;
+    // Implementations should return a non-const reference to their internal
+    // `BPlusTree<T>`.
+    virtual BPlusTree<ObjKey>& get_mutable_tree() const = 0;
+
+    bool init_from_parent() const final
+    {
+        clear_unresolved();
+        bool valid = do_init_from_parent();
+        if (valid) {
+            update_unresolved();
+        }
+        return valid;
+    }
+
+    // Implements update_if_needed() in a way that ensures the consistency of
+    // the unresolved list. Derived classes should call this instead of calling
+    // `update_if_needed()` on their inner accessor
+    bool update_if_needed() const final
+    {
+        bool updated = do_update_if_needed();
+        update_unresolved();
+        return updated;
+    }
 
     size_t virtual2real(size_t ndx) const noexcept
     {
@@ -382,19 +408,30 @@ protected:
         return _impl::real2virtual(m_unresolved, ndx);
     }
 
-    void update_unresolved(BPlusTree<ObjKey>& tree) const
+    void update_unresolved() const
     {
-        _impl::update_unresolved(m_unresolved, tree);
+        const auto& obj = this->get_obj();
+        if (obj.is_valid()) {
+            auto content_version = this->get_obj().get_alloc().get_content_version();
+            if (content_version != m_content_version) {
+                _impl::update_unresolved(m_unresolved, get_mutable_tree());
+                m_content_version = content_version;
+            }
+        }
+        else {
+            clear_unresolved();
+        }
     }
 
-    void check_for_last_unresolved(BPlusTree<ObjKey>& tree)
+    void check_for_last_unresolved()
     {
-        _impl::check_for_last_unresolved(tree);
+        _impl::check_for_last_unresolved(get_mutable_tree());
     }
 
-    void clear_unresolved() noexcept
+    void clear_unresolved() const noexcept
     {
         m_unresolved.clear();
+        m_content_version = uint_fast64_t(-1);
     }
 
     size_t num_unresolved() const noexcept
@@ -405,6 +442,12 @@ protected:
 private:
     // Sorted set of indices containing unresolved links.
     mutable std::vector<size_t> m_unresolved;
+
+    // We need to track the content version separately to keep the list of
+    // unresolved indices up to date, and can't rely on the return value of
+    // `do_update_if_needed()`, because the inner accessor may have been
+    // refreshed without our knowledge.
+    mutable uint_fast64_t m_content_version = uint_fast64_t(-1);
 };
 
 /*

@@ -244,7 +244,7 @@ public:
     LnkLst(const Obj& owner, ColKey col_key)
         : m_list(owner, col_key)
     {
-        update_unresolved(*m_list.m_tree);
+        update_unresolved();
     }
 
     LnkLst(const LnkLst& other) = default;
@@ -377,23 +377,28 @@ public:
         return m_list.get_tree();
     }
 
-protected:
-    bool update_if_needed() const final
-    {
-        if (m_list.update_if_needed()) {
-            update_unresolved(*m_list.m_tree);
-            return true;
-        }
-        return false;
-    }
-
 private:
     friend class ConstTableView;
     friend class Query;
 
     Lst<ObjKey> m_list;
 
-    bool init_from_parent() const final;
+    // Overriding members of ObjCollectionBase:
+
+    bool do_update_if_needed() const final
+    {
+        return m_list.update_if_needed();
+    }
+
+    bool do_init_from_parent() const final
+    {
+        return m_list.init_from_parent();
+    }
+
+    BPlusTree<ObjKey>& get_mutable_tree() const final
+    {
+        return *m_list.m_tree;
+    }
 };
 
 
