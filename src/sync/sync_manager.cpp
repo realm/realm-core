@@ -208,9 +208,6 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    if (m_file_manager)
-        util::try_remove_dir_recursive(m_file_manager->base_path());
-    m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
 
@@ -250,6 +247,10 @@ void SyncManager::reset_for_testing()
 
         m_sync_route = "";
     }
+
+    if (m_file_manager)
+        util::try_remove_dir_recursive(m_file_manager->base_path());
+    m_file_manager = nullptr;
 }
 
 void SyncManager::set_log_level(util::Logger::Level level) noexcept
