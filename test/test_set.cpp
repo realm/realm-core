@@ -154,6 +154,7 @@ TEST(Set_Links)
     auto cab3 = cabs->create_object();
 
     auto set_links = foo.get_set<ObjKey>(col_links);
+    auto lnkset_links = foo.get_setbase_ptr(col_links);
     auto set_typed_links = foo.get_set<ObjLink>(col_typed_links);
     auto set_mixeds = foo.get_set<Mixed>(col_mixeds);
 
@@ -225,10 +226,14 @@ TEST(Set_Links)
     bar2.invalidate();
 
     CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(lnkset_links->size(), 1); // Unresolved link was hidden from LnkSet
     CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
-    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);
+    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);           // The original bar2 key is no longer in the set
+    CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos); // The unresolved bar2 key is in the set
+    // CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by
+    // LnkSet
     CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
 }
