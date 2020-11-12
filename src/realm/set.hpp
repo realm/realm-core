@@ -20,6 +20,8 @@
 #define REALM_SET_HPP
 
 #include <realm/collection.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_key.hpp>
 
 #include <numeric> // std::iota
 
@@ -137,7 +139,7 @@ public:
     }
 
 private:
-    mutable std::unique_ptr<BPlusTree<value_type>> m_tree;
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
     using Base::m_col_key;
     using Base::m_obj;
     using Base::m_valid;
@@ -163,6 +165,120 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+
+    friend class LnkSet;
+};
+
+class LnkSet final : public ObjCollectionBase<SetBase> {
+public:
+    using Base = ObjCollectionBase<SetBase>;
+    using value_type = ObjKey;
+    using iterator = CollectionIterator<LnkSet>;
+
+    LnkSet() = default;
+    LnkSet(const Obj& owner, ColKey col_key)
+        : m_set(owner, col_key)
+    {
+        update_unresolved(*m_set.m_tree);
+    }
+
+    LnkSet(const LnkSet&) = default;
+    LnkSet(LnkSet&&) = default;
+    LnkSet& operator=(const LnkSet&) = default;
+    LnkSet& operator=(LnkSet&&) = default;
+
+    ObjKey get(size_t ndx) const;
+    size_t find(ObjKey) const;
+    size_t find_first(ObjKey) const;
+    std::pair<size_t, bool> insert(ObjKey);
+    std::pair<size_t, bool> remove(ObjKey);
+
+    // Overriding members of CollectionBase:
+    CollectionBasePtr clone_collection() const
+    {
+        return clone_linkset();
+    }
+    size_t size() const final;
+    bool is_null(size_t ndx) const final;
+    Mixed get_any(size_t ndx) const final;
+    void clear() final;
+    Mixed min(size_t* return_ndx = nullptr) const final;
+    Mixed max(size_t* return_ndx = nullptr) const final;
+    Mixed sum(size_t* return_cnt = nullptr) const final;
+    Mixed avg(size_t* return_cnt = nullptr) const final;
+    TableRef get_target_table() const final;
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+    const Obj& get_obj() const noexcept final;
+    ObjKey get_key() const final;
+    bool is_attached() const final;
+    bool has_changed() const final;
+    ConstTableRef get_table() const noexcept final;
+    ColKey get_col_key() const noexcept final;
+
+    // Overriding members of SetBase:
+    SetBasePtr clone() const
+    {
+        return clone_linkset();
+    }
+    size_t find_any(Mixed) const final;
+    std::pair<size_t, bool> insert_null() final;
+    std::pair<size_t, bool> erase_null() final;
+    std::pair<size_t, bool> insert_any(Mixed value) final;
+    std::pair<size_t, bool> erase_any(Mixed value) final;
+
+    // Overriding members of ObjList:
+    bool is_obj_valid(size_t) const noexcept final;
+    Obj get_object(size_t ndx) const final;
+    ObjKey get_key(size_t ndx) const final;
+
+    // LnkSet interface:
+
+    std::unique_ptr<LnkSet> clone_linkset() const
+    {
+        return std::make_unique<LnkSet>(*this);
+    }
+
+    template <class Func>
+    void find_all(ObjKey value, Func&& func) const
+    {
+        if (value.is_unresolved()) {
+            return;
+        }
+
+        m_set.find_all(value, [&](size_t ndx) {
+            func(virtual2real(ndx));
+        });
+    }
+
+    TableView get_sorted_view(SortDescriptor order) const;
+    TableView get_sorted_view(ColKey column_key, bool ascending = true);
+    void remove_target_row(size_t link_ndx);
+    void remove_all_target_rows();
+
+    iterator begin() const noexcept
+    {
+        return iterator{this, 0};
+    }
+
+    iterator end() const noexcept
+    {
+        return iterator{this, size()};
+    }
+
+private:
+    Set<ObjKey> m_set;
+
+    bool update_if_needed() const final
+    {
+        if (m_set.update_if_needed()) {
+            update_unresolved(*m_set.m_tree);
+            return true;
+        }
+        return false;
+    }
+
+    bool init_from_parent() const final;
 };
 
 template <>
