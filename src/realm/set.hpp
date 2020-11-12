@@ -30,11 +30,7 @@ public:
     using CollectionBase::CollectionBase;
 
     virtual ~SetBase() {}
-    virtual SetBasePtr clone() const
-    {
-        return get_obj().get_setbase_ptr(get_col_key());
-    }
-
+    virtual SetBasePtr clone() const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
@@ -56,6 +52,15 @@ public:
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
+    Set(const Set& other);
+    Set(Set&& other) noexcept;
+    Set& operator=(const Set& other);
+    Set& operator=(Set&& other) noexcept;
+
+    SetBasePtr clone() const final
+    {
+        return std::make_unique<Set<T>>(*this);
+    }
 
     T get(size_t ndx) const
     {
@@ -342,6 +347,64 @@ inline Set<T>::Set(const Obj& obj, ColKey col_key)
         // Fine because init_from_parent() is final.
         this->init_from_parent();
     }
+}
+
+template <class T>
+inline Set<T>::Set(const Set& other)
+    : Base(static_cast<const Base&>(other))
+{
+    if (other.m_tree) {
+        Allocator& alloc = other.m_tree->get_alloc();
+        m_tree = std::make_unique<BPlusTree<T>>(alloc);
+        m_tree->set_parent(this, 0);
+        if (m_valid)
+            m_tree->init_from_ref(other.m_tree->get_ref());
+    }
+}
+
+template <class T>
+inline Set<T>::Set(Set&& other) noexcept
+    : Base(static_cast<Base&&>(other))
+    , m_tree(std::exchange(other.m_tree, nullptr))
+{
+    if (m_tree) {
+        m_tree->set_parent(this, 0);
+    }
+}
+
+template <class T>
+inline Set<T>& Set<T>::operator=(const Set& other)
+{
+    Base::operator=(static_cast<const Base&>(other));
+
+    if (this != &other) {
+        m_tree.reset();
+        if (other.m_tree) {
+            Allocator& alloc = other.m_tree->get_alloc();
+            m_tree = std::make_unique<BPlusTree<T>>(alloc);
+            m_tree->set_parent(this, 0);
+            if (m_valid) {
+                m_tree->init_from_ref(other.m_tree->get_ref());
+            }
+        }
+    }
+
+    return *this;
+}
+
+template <class T>
+inline Set<T>& Set<T>::operator=(Set&& other) noexcept
+{
+    Base::operator=(static_cast<Base&&>(other));
+
+    if (this != &other) {
+        m_tree = std::exchange(other.m_tree, nullptr);
+        if (m_tree) {
+            m_tree->set_parent(this, 0);
+        }
+    }
+
+    return *this;
 }
 
 template <typename U>
