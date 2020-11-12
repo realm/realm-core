@@ -105,20 +105,8 @@ public:
     std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
-    size_t size() const final
-    {
-        if (!is_attached())
-            return 0;
-        update_if_needed();
-        if (!m_valid) {
-            return 0;
-        }
-        return m_tree->size();
-    }
-    bool is_null(size_t ndx) const final
-    {
-        return m_nullable && value_is_null(get(ndx));
-    }
+    size_t size() const final;
+    bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final
     {
         return get(ndx);
@@ -515,6 +503,24 @@ template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
     return erase(BPlusTree<T>::default_value(this->m_nullable));
+}
+
+template <class T>
+size_t Set<T>::size() const
+{
+    if (!is_attached())
+        return 0;
+    update_if_needed();
+    if (!m_valid) {
+        return 0;
+    }
+    return m_tree->size();
+}
+
+template <class T>
+inline bool Set<T>::is_null(size_t ndx) const
+{
+    return m_nullable && value_is_null(get(ndx));
 }
 
 template <class T>
