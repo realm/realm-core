@@ -31,6 +31,7 @@ public:
 
     virtual ~SetBase() {}
     virtual SetBasePtr clone() const = 0;
+    virtual size_t find_any(Mixed) const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
@@ -124,6 +125,7 @@ public:
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
     // Overriding members of SetBase:
+    size_t find_any(Mixed) const final;
     std::pair<size_t, bool> insert_null() final;
     std::pair<size_t, bool> erase_null() final;
     std::pair<size_t, bool> insert_any(Mixed value) final;
@@ -410,6 +412,25 @@ size_t Set<T>::find(T value) const
         return it.index();
     }
     return npos;
+}
+
+template <class T>
+size_t Set<T>::find_any(Mixed value) const
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        return find(value);
+    }
+    else {
+        if (value.is_null()) {
+            if (!m_nullable) {
+                return not_found;
+            }
+            return find(BPlusTree<T>::default_value(true));
+        }
+        else {
+            return find(value.get<typename util::RemoveOptional<T>::type>());
+        }
+    }
 }
 
 template <class T>
