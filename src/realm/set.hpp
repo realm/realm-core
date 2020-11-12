@@ -530,6 +530,10 @@ inline void Set<T>::clear()
         }
         m_tree->clear();
         bump_content_version();
+
+        // For Set<ObjKey>, we are sure that there are no longer any unresolved
+        // links.
+        m_tree->set_context_flag(false);
     }
 }
 

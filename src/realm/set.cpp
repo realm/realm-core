@@ -129,6 +129,9 @@ void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
     m_obj.set_backlink(m_col_key, {target_table_key, target_key});
     m_tree->insert(ndx, target_key);
+    if (target_key.is_unresolved()) {
+        m_tree->set_context_flag(true);
+    }
 }
 
 template <>
@@ -145,6 +148,13 @@ void Set<ObjKey>::do_erase(size_t ndx)
 
     if (recurse) {
         _impl::TableFriend::remove_recursive(*origin_table, state); // Throws
+    }
+    if (old_key.is_unresolved()) {
+        // We might have removed the last unresolved link - check it
+
+        // FIXME: Exploit the fact that the values are sorted and unresolved
+        // keys have a negative value.
+        _impl::check_for_last_unresolved(*m_tree);
     }
 }
 
