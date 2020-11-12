@@ -118,7 +118,7 @@ public:
     Mixed avg(size_t* return_cnt = nullptr) const final;
     std::unique_ptr<CollectionBase> clone_collection() const final
     {
-        return std::make_unique<Set<T>>(m_obj, m_col_key);
+        return std::make_unique<Set<T>>(*this);
     }
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
