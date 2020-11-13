@@ -18,38 +18,65 @@ class CollectionBase {
 public:
     virtual ~CollectionBase() {}
 
-    /*
-     * Operations that makes sense without knowing the specific type
-     * can be made virtual.
-     */
+    /// The size of the collection.
     virtual size_t size() const = 0;
+
+    /// True if the element at @a ndx is NULL.
     virtual bool is_null(size_t ndx) const = 0;
+
+    /// Get element at @a ndx as a `Mixed`.
     virtual Mixed get_any(size_t ndx) const = 0;
+
+    /// Clear the collection.
     virtual void clear() = 0;
 
+    /// Get the min element, according to whatever comparison function is
+    /// meaningful for the collection.
     virtual Mixed min(size_t* return_ndx = nullptr) const = 0;
+
+    /// Get the max element, according to whatever comparison function is
+    /// meaningful for the collection.
     virtual Mixed max(size_t* return_ndx = nullptr) const = 0;
+
+    /// For collections of arithmetic types, return the sum of all elements.
     virtual Mixed sum(size_t* return_cnt = nullptr) const = 0;
+
+    /// For collections of arithmetic types, return the average of all elements.
     virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
+
+    /// Produce a clone of the collection accessor referring to the same
+    /// underlying memory.
     virtual std::unique_ptr<CollectionBase> clone_collection() const = 0;
 
-    // Modifies a vector of indices so that they refer to values sorted according
-    // to the specified sort order
+    /// Modifies a vector of indices so that they refer to values sorted
+    /// according to the specified sort order.
     virtual void sort(std::vector<size_t>& indices, bool ascending = true) const = 0;
-    // Modifies a vector of indices so that they refer to distinct values.
-    // If 'sort_order' is supplied, the indices will refer to values in sort order,
-    // otherwise the indices will be in original order.
+
+    /// Modifies a vector of indices so that they refer to distinct values. If
+    /// @a sort_order is supplied, the indices will refer to values in sort
+    /// order, otherwise the indices will be in the same order as they appear in
+    /// the collection.
     virtual void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const = 0;
 
-    bool is_empty() const
+    /// True if `size()` returns 0.
+    virtual bool is_empty() const final
     {
         return size() == 0;
     }
 
+    /// Get the object that owns this collection.
     virtual const Obj& get_obj() const noexcept = 0;
+
+    /// Get the column key for this collection.
     virtual ColKey get_col_key() const noexcept = 0;
+
+    /// Return true if the collection has changed since the last call to
+    /// `has_changed()`. Note that this function is not idempotent and updates
+    /// the internal state of the accessor if it has changed.
     virtual bool has_changed() const = 0;
 
+    /// Returns true if the accessor is in the attached state. By default, this
+    /// checks if the owning object is still valid.
     virtual bool is_attached() const
     {
         return get_obj().is_valid();
@@ -57,16 +84,19 @@ public:
 
     // Note: virtual..final prevents static override.
 
+    /// Get the key of the object that owns this collection.
     virtual ObjKey get_key() const noexcept final
     {
         return get_obj().get_key();
     }
 
+    /// Get the table of the object that owns this collection.
     virtual ConstTableRef get_table() const noexcept final
     {
         return get_obj().get_table();
     }
 
+    /// If this is a collection of links, get the target table.
     virtual TableRef get_target_table() const final
     {
         return get_obj().get_target_table(get_col_key());
@@ -80,7 +110,13 @@ protected:
     CollectionBase& operator=(const CollectionBase&) noexcept = default;
     CollectionBase& operator=(CollectionBase&&) noexcept = default;
 
+    /// Unconditionally (re)initialize this accessor from its parent (the owner
+    /// object). May leave the collection detached if the object is no longer
+    /// valid. Return true if the accessor is attached.
     virtual bool init_from_parent() const = 0;
+
+    /// If the underlying memory has changed, update this accessor to reflect
+    /// the new state. Returns true if the accessor was actually updated.
     virtual bool update_if_needed() const = 0;
 };
 
@@ -315,16 +351,22 @@ protected:
 };
 
 namespace _impl {
-// Translate from userfacing index to internal index.
+/// Translate from condensed index to uncondensed index in collections that hide
+/// tombstones.
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept;
+
+/// Translate from uncondensed index to condensed into in collections that hide
+/// tombstones.
 size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept;
-// Scan through the list to find unresolved links
+
+/// Rebuild the list of unresolved keys for tombstone handling.
 void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
-// Clear the context flag on the tree if there are no more unresolved links.
+
+/// Clear the context flag on the tree if there are no more unresolved links.
 void check_for_last_unresolved(BPlusTree<ObjKey>& tree);
 
-// Proxy class needed because the ObjList interface clobbers method names
-// from CollectionBase.
+/// Proxy class needed because the ObjList interface clobbers method names from
+/// CollectionBase.
 struct ObjListProxy : ObjList {
     virtual TableRef proxy_get_target_table() const = 0;
 
@@ -383,14 +425,19 @@ protected:
     ObjCollectionBase& operator=(const ObjCollectionBase&) = default;
     ObjCollectionBase& operator=(ObjCollectionBase&&) = default;
 
-    // Implementations should call `update_if_needed()` on their inner accessor
-    // (without `update_unresolved()`).
+    /// Implementations should call `update_if_needed()` on their inner accessor
+    /// (without `update_unresolved()`).
     virtual bool do_update_if_needed() const = 0;
+
+    /// Implementations should call `init_from_parent()` on their inner accessor
+    /// (without `update_unresolved()`).
     virtual bool do_init_from_parent() const = 0;
-    // Implementations should return a non-const reference to their internal
-    // `BPlusTree<T>`.
+
+    /// Implementations should return a non-const reference to their internal
+    /// `BPlusTree<T>`.
     virtual BPlusTree<ObjKey>& get_mutable_tree() const = 0;
 
+    /// Calls `do_init_from_parent()` and updates the list of unresolved links.
     bool init_from_parent() const final
     {
         clear_unresolved();
@@ -401,9 +448,9 @@ protected:
         return valid;
     }
 
-    // Implements update_if_needed() in a way that ensures the consistency of
-    // the unresolved list. Derived classes should call this instead of calling
-    // `update_if_needed()` on their inner accessor
+    /// Implements update_if_needed() in a way that ensures the consistency of
+    /// the unresolved list. Derived classes should call this instead of calling
+    /// `update_if_needed()` on their inner accessor.
     bool update_if_needed() const final
     {
         bool updated = do_update_if_needed();
@@ -411,16 +458,19 @@ protected:
         return updated;
     }
 
+    /// Translate from condensed index to uncondensed.
     size_t virtual2real(size_t ndx) const noexcept
     {
         return _impl::virtual2real(m_unresolved, ndx);
     }
 
+    /// Translate from uncondensed index to condensed.
     size_t real2virtual(size_t ndx) const noexcept
     {
         return _impl::real2virtual(m_unresolved, ndx);
     }
 
+    /// Rebuild the list of tombstones if there is a chance that it has changed.
     void update_unresolved() const
     {
         const auto& obj = this->get_obj();
@@ -441,12 +491,15 @@ protected:
         _impl::check_for_last_unresolved(get_mutable_tree());
     }
 
+    /// Clear the list of tombstones. It will be rebuilt the next time
+    /// `update_if_needed()` is called.
     void clear_unresolved() const noexcept
     {
         m_unresolved.clear();
         m_content_version = uint_fast64_t(-1);
     }
 
+    /// Return the number of tombstones.
     size_t num_unresolved() const noexcept
     {
         return m_unresolved.size();
@@ -468,18 +521,10 @@ private:
     }
 };
 
-/*
- * This class implements a forward iterator over the elements in a Lst.
- *
- * The iterator is stable against deletions in the list. If you try to
- * dereference an iterator that points to an element, that is deleted, the
- * call will throw.
- *
- * Values are read into a member variable (m_val). This is the only way to
- * implement operator-> and operator* returning a pointer and a reference resp.
- * There is no overhead compared to the alternative where operator* would have
- * to return T by value.
- */
+/// Random-access iterator over elements of a collection.
+///
+/// Values are cached into a member variable in order to support `operator->`
+/// and `operator*` returning a pointer and a reference, respectively.
 template <class L>
 struct CollectionIterator {
     using iterator_category = std::random_access_iterator_tag;
