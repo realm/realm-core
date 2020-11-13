@@ -272,21 +272,25 @@ protected:
         return m_storage_versioning_counter.load(std::memory_order_acquire);
     }
 
+public:
     inline uint_fast64_t get_storage_version()
     {
         return m_storage_versioning_counter.load(std::memory_order_acquire);
     }
 
+protected:
     inline void bump_storage_version() noexcept
     {
         m_storage_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
     }
 
+public:
     REALM_WORKAROUND_MSVC_BUG inline uint_fast64_t get_content_version() noexcept
     {
         return m_content_versioning_counter.load(std::memory_order_acquire);
     }
 
+protected:
     inline uint_fast64_t bump_content_version() noexcept
     {
         return m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel) + 1;

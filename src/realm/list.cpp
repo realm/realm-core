@@ -365,13 +365,6 @@ void Lst<Mixed>::do_remove(size_t ndx)
     }
 }
 
-bool LnkLst::init_from_parent() const
-{
-    m_list.init_from_parent();
-    update_unresolved(*m_list.m_tree);
-    return m_list.m_valid;
-}
-
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
