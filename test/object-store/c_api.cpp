@@ -86,8 +86,7 @@ static void check_err(realm_errno_e e)
     CHECK(err.error == e);
 }
 
-TEST_CASE("C API")
-{
+TEST_CASE("C API") {
     const char* file_name = "c_api_test.realm";
 
     // FIXME: Use a better test file guard.
@@ -190,8 +189,7 @@ TEST_CASE("C API")
         realm_release(config);
     }
 
-    SECTION("schema validates")
-    {
+    SECTION("schema validates") {
         auto schema = realm_get_schema(realm);
         CHECK(checked(schema));
         CHECK(checked(realm_schema_validate(schema)));
@@ -228,8 +226,7 @@ TEST_CASE("C API")
     CHECK(checked(realm_find_property(realm, bar_info.key, rlm_str("strings"), &found, &bar_strings_property)));
     CHECK(found);
 
-    SECTION("missing primary key")
-    {
+    SECTION("missing primary key") {
         write([&]() {
             auto p = realm_object_create(realm, bar_info.key);
             CHECK(!p);
@@ -237,8 +234,7 @@ TEST_CASE("C API")
         });
     }
 
-    SECTION("wrong primary key type")
-    {
+    SECTION("wrong primary key type") {
         write([&]() {
             auto p = realm_object_create_with_primary_key(realm, bar_info.key, rlm_str_val("Hello"));
             CHECK(!p);
@@ -252,8 +248,7 @@ TEST_CASE("C API")
         });
     }
 
-    SECTION("objects")
-    {
+    SECTION("objects") {
         CPtr<realm_object_t> obj1;
         CPtr<realm_object_t> obj2;
         write([&]() {
@@ -269,8 +264,7 @@ TEST_CASE("C API")
         CHECK(checked(realm_get_num_objects(realm, foo_info.key, &num_foos)));
         CHECK(checked(realm_get_num_objects(realm, bar_info.key, &num_bars)));
 
-        SECTION("find with primary key")
-        {
+        SECTION("find with primary key") {
             bool found = false;
 
             auto p =
@@ -287,8 +281,7 @@ TEST_CASE("C API")
             CHECK(!found);
         }
 
-        SECTION("query basics")
-        {
+        SECTION("query basics") {
             auto arg = rlm_str_val("Hello, World!");
             auto q = make_cptr(checked(realm_query_parse(realm, foo_info.key, rlm_str("str == $0"), 1, &arg)));
             size_t count;
@@ -337,8 +330,7 @@ TEST_CASE("C API")
             CHECK(value.dnum == 123.0);
         }
 
-        SECTION("set wrong field type")
-        {
+        SECTION("set wrong field type") {
             write([&]() {
                 CHECK(!realm_set_value(obj1.get(), foo_int_property.key, rlm_null(), false));
                 check_err(RLM_ERR_PROPERTY_NOT_NULLABLE);
@@ -348,8 +340,7 @@ TEST_CASE("C API")
             });
         }
 
-        SECTION("delete causes invalidation errors")
-        {
+        SECTION("delete causes invalidation errors") {
             write([&]() {
                 // Get a list instance for later
                 auto list = checked(make_cptr(realm_get_list(obj1.get(), foo_bars_property.key)));
@@ -376,10 +367,8 @@ TEST_CASE("C API")
             });
         }
 
-        SECTION("lists")
-        {
-            SECTION("nullable strings")
-            {
+        SECTION("lists") {
+            SECTION("nullable strings") {
                 auto strings = checked(make_cptr(realm_get_list(obj2.get(), bar_strings_property.key)));
                 CHECK(strings);
 
@@ -387,8 +376,7 @@ TEST_CASE("C API")
                 realm_value_t b = rlm_str_val("b");
                 realm_value_t c = rlm_null();
 
-                SECTION("insert, then get")
-                {
+                SECTION("insert, then get") {
                     write([&]() {
                         CHECK(checked(realm_list_insert(strings.get(), 0, a)));
                         CHECK(checked(realm_list_insert(strings.get(), 1, b)));
@@ -406,8 +394,7 @@ TEST_CASE("C API")
                 }
             }
 
-            SECTION("links")
-            {
+            SECTION("links") {
                 CPtr<realm_list_t> bars;
 
                 write([&]() {
@@ -423,8 +410,7 @@ TEST_CASE("C API")
                     CHECK(size == 2);
                 });
 
-                SECTION("get")
-                {
+                SECTION("get") {
                     realm_value_t val;
                     CHECK(checked(realm_list_get(bars.get(), 0, &val)));
                     CHECK(val.type == RLM_TYPE_LINK);
@@ -441,8 +427,7 @@ TEST_CASE("C API")
                     check_err(RLM_ERR_INDEX_OUT_OF_BOUNDS);
                 }
 
-                SECTION("set wrong type")
-                {
+                SECTION("set wrong type") {
                     write([&]() {
                         auto foo2 = make_cptr(realm_object_create(realm, foo_info.key));
                         CHECK(foo2);
@@ -456,8 +441,7 @@ TEST_CASE("C API")
                 }
             }
 
-            SECTION("notifications")
-            {
+            SECTION("notifications") {
                 struct State {
                     CPtr<realm_collection_changes_t> changes;
                     CPtr<realm_async_error_t> error;
@@ -488,8 +472,7 @@ TEST_CASE("C API")
                     return token;
                 };
 
-                SECTION("insertion sends a change callback")
-                {
+                SECTION("insertion sends a change callback") {
                     auto token = require_change();
                     write([&]() {
                         checked(realm_list_insert(strings.get(), 0, str1));
@@ -515,8 +498,7 @@ TEST_CASE("C API")
                     CHECK(insertion_range.to == 3);
                 }
 
-                SECTION("insertion, deletion, modification, modification after")
-                {
+                SECTION("insertion, deletion, modification, modification after") {
                     write([&]() {
                         checked(realm_list_insert(strings.get(), 0, str1));
                         checked(realm_list_insert(strings.get(), 1, str2));
@@ -563,8 +545,7 @@ TEST_CASE("C API")
             }
         }
 
-        SECTION("notifications")
-        {
+        SECTION("notifications") {
             struct State {
                 CPtr<realm_object_changes_t> changes;
                 CPtr<realm_async_error_t> error;
@@ -589,8 +570,7 @@ TEST_CASE("C API")
                 return token;
             };
 
-            SECTION("deleting the object sends a change notification")
-            {
+            SECTION("deleting the object sends a change notification") {
                 auto token = require_change();
                 write([&]() {
                     checked(realm_object_delete(obj1.get()));
@@ -601,8 +581,7 @@ TEST_CASE("C API")
                 CHECK(deleted);
             }
 
-            SECTION("modifying the object sends a change notification for the object, and for the changed column")
-            {
+            SECTION("modifying the object sends a change notification for the object, and for the changed column") {
                 auto token = require_change();
                 write([&]() {
                     checked(realm_set_value(obj1.get(), foo_int_property.key, rlm_int_val(999), false));
