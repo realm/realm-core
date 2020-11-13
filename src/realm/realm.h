@@ -340,6 +340,12 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  * the call that caused the error to occur. The error is specific to the current
  * thread, and not the Realm instance for which the error occurred.
  *
+ * Note: The error message in @a err will only be safe to use until the next API
+ *       call is made on the current thread.
+ *
+ * Note: As opposed to other instances of `realm_string_t`, the error message
+ *       string is guaranteed to be zero-terminated.
+ *
  * Note: The error is not cleared by subsequent successful calls to this
  *       function, but it will be overwritten by subsequent failing calls to
  *       other library functions.
@@ -348,9 +354,8 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  *
  * This function does not allocate any memory.
  *
- * @param err A pointer to a `realm_error_t` struct that will be populated
- *            with information about the last error, if there is one. May be
- *            NULL.
+ * @param err A pointer to a `realm_error_t` struct that will be populated with
+ *            information about the last error, if there is one. May be NULL.
  * @return True if an error occurred.
  */
 RLM_API bool realm_get_last_error(realm_error_t* err);
