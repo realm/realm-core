@@ -179,7 +179,7 @@ public:
     LnkSet(const Obj& owner, ColKey col_key)
         : m_set(owner, col_key)
     {
-        update_unresolved(*m_set.m_tree);
+        update_unresolved();
     }
 
     LnkSet(const LnkSet&) = default;
@@ -206,14 +206,11 @@ public:
     Mixed max(size_t* return_ndx = nullptr) const final;
     Mixed sum(size_t* return_cnt = nullptr) const final;
     Mixed avg(size_t* return_cnt = nullptr) const final;
-    TableRef get_target_table() const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    ObjKey get_key() const final;
     bool is_attached() const final;
     bool has_changed() const final;
-    ConstTableRef get_table() const noexcept final;
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of SetBase:
@@ -269,16 +266,20 @@ public:
 private:
     Set<ObjKey> m_set;
 
-    bool update_if_needed() const final
+    bool do_update_if_needed() const final
     {
-        if (m_set.update_if_needed()) {
-            update_unresolved(*m_set.m_tree);
-            return true;
-        }
-        return false;
+        return m_set.update_if_needed();
     }
 
-    bool init_from_parent() const final;
+    bool do_init_from_parent() const final
+    {
+        return m_set.init_from_parent();
+    }
+
+    BPlusTree<ObjKey>& get_mutable_tree() const final
+    {
+        return *m_set.m_tree;
+    }
 };
 
 template <>
@@ -897,11 +898,6 @@ inline Mixed LnkSet::avg(size_t* return_cnt) const
     REALM_TERMINATE("Not implemented");
 }
 
-inline TableRef LnkSet::get_target_table() const
-{
-    return m_set.get_target_table();
-}
-
 inline void LnkSet::sort(std::vector<size_t>& indices, bool ascending) const
 {
     update_if_needed();
@@ -941,11 +937,6 @@ inline const Obj& LnkSet::get_obj() const noexcept
     return m_set.get_obj();
 }
 
-inline ObjKey LnkSet::get_key() const
-{
-    return m_set.get_key();
-}
-
 inline bool LnkSet::is_attached() const
 {
     return m_set.is_attached();
@@ -954,11 +945,6 @@ inline bool LnkSet::is_attached() const
 inline bool LnkSet::has_changed() const
 {
     return m_set.has_changed();
-}
-
-inline ConstTableRef LnkSet::get_table() const noexcept
-{
-    return m_set.get_table();
 }
 
 inline ColKey LnkSet::get_col_key() const noexcept
