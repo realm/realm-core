@@ -479,8 +479,12 @@ RLM_API bool realm_is_frozen(const void*);
  * - `realm_object_t`
  * - `realm_results_t`
  * - `realm_list_t`
+ * - `realm_t`
  *
- * This does not assume ownership of the object.
+ * This does not assume ownership of the object, except for `realm_t`, where the
+ * instance is transferred by value, and must be transferred back to the current
+ * thread to be used. Note that the `realm_thread_safe_reference_t` object must
+ * still be destroyed after having been converted into a `realm_t` object.
  *
  * @return A non-null pointer if no exception occurred.
  */
