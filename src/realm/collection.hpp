@@ -217,7 +217,7 @@ public:
         return m_obj;
     }
 
-    bool has_changed() const noexcept final
+    bool has_changed() const final
     {
         update_if_needed();
         if (m_last_content_version != m_content_version) {
