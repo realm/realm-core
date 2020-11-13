@@ -44,6 +44,7 @@ template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
+using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
@@ -51,6 +52,7 @@ using LnkLstPtr = std::unique_ptr<LnkLst>;
 template <class>
 class Set;
 class Dictionary;
+using DictionaryPtr = std::unique_ptr<Dictionary>;
 
 enum JSONOutputMode {
     output_mode_json,       // default / existing implementation for outputting realm to json
@@ -254,7 +256,10 @@ public:
     Set<U> get_set(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
+    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
+
+    CollectionBasePtr get_collection_ptr(ColKey col_key) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
@@ -449,9 +454,20 @@ Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 {
     size_t sz = values.size();
     auto list = get_list<U>(col_key);
-    list.resize(sz);
-    for (size_t i = 0; i < sz; i++)
+    size_t list_sz = list.size();
+    if (sz < list_sz) {
+        list.resize(sz);
+        list_sz = sz;
+    }
+    size_t i = 0;
+    while (i < list_sz) {
         list.set(i, values[i]);
+        i++;
+    }
+    while (i < sz) {
+        list.add(values[i]);
+        i++;
+    }
 
     return *this;
 }

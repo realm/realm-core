@@ -45,10 +45,9 @@ using namespace realm::util;
 static const std::string dummy_auth_url = "https://realm.example.org";
 static const std::string dummy_device_id = "123400000000000000000000";
 
-static const std::string base_path = tmp_dir() + "realm_objectstore_sync_connection_state_changes";
+static const std::string base_path = util::make_temp_dir() + "realm_objectstore_sync_connection_state_changes";
 
-TEST_CASE("sync: Connection state changes", "[sync]")
-{
+TEST_CASE("sync: Connection state changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -60,38 +59,50 @@ TEST_CASE("sync: Connection state changes", "[sync]")
         app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("not_a_real_token"),
                                       ENCODE_FAKE_JWT("also_not_a_real_token"), dummy_auth_url, dummy_device_id);
 
-    SECTION("register connection change listener")
-    {
+    SECTION("register connection change listener") {
         auto session = sync_session(
             user, "/connection-state-changes-1", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
 
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        EventLoop::main().run_until([&] { return sessions_are_connected(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
+        EventLoop::main().run_until([&] {
+            return sessions_are_connected(*session);
+        });
 
         std::atomic<bool> listener_called(false);
-        session->register_connection_change_callback(
-            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) { listener_called = true; });
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+            listener_called = true;
+        });
 
         user->log_out();
-        EventLoop::main().run_until([&] { return sessions_are_disconnected(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_disconnected(*session);
+        });
         REQUIRE(listener_called == true);
     }
 
-    SECTION("unregister connection change listener")
-    {
+    SECTION("unregister connection change listener") {
         auto session = sync_session(
             user, "/connection-state-changes-2", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
 
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        EventLoop::main().run_until([&] { return sessions_are_connected(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
+        EventLoop::main().run_until([&] {
+            return sessions_are_connected(*session);
+        });
 
         std::atomic<bool> listener1_called(false);
         std::atomic<bool> listener2_called(false);
         auto token1 = session->register_connection_change_callback(
-            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) { listener1_called = true; });
+            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+                listener1_called = true;
+            });
         session->unregister_connection_change_callback(token1);
-        session->register_connection_change_callback(
-            [&](SyncSession::ConnectionState, SyncSession::ConnectionState) { listener2_called = true; });
+        session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
+            listener2_called = true;
+        });
 
         user->log_out();
         REQUIRE(sessions_are_disconnected(*session));

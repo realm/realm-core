@@ -47,18 +47,6 @@ void reset_test_directory(const std::string& base_path)
     util::make_dir(base_path);
 }
 
-std::string tmp_dir()
-{
-    const char* dir = getenv("TMPDIR");
-    if (dir && *dir)
-        return dir;
-#if REALM_ANDROID
-    return "/data/local/tmp/";
-#else
-    return "/tmp/";
-#endif
-}
-
 std::vector<char> make_test_encryption_key(const char start)
 {
     std::vector<char> vector;

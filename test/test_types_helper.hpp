@@ -151,9 +151,6 @@ struct Prop<T, state,
     using underlying_type = T;
     static type default_value()
     {
-        if constexpr (realm::is_any_v<type, util::Optional<float>, util::Optional<double>>) {
-            return type(); // optional float/double would return NaN and for consistency we want to operate on null
-        }
         return ColumnTypeTraits<type>::cluster_leaf_type::default_value(is_nullable);
     }
     static underlying_type default_non_nullable_value()

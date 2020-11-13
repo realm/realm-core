@@ -9,6 +9,7 @@ set(SOURCES
     collection_change_indices.cpp
     frozen_objects.cpp
     index_set.cpp
+    dictionary.cpp
     list.cpp
     main.cpp
     migrations.cpp

@@ -71,6 +71,11 @@ public:
         return values[ndx];
     }
 
+    Mixed get_any(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
+    }
+
     void add(Decimal128 value)
     {
         insert(size(), value);

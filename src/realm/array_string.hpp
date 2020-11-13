@@ -105,6 +105,7 @@ public:
     void insert(size_t ndx, StringData value);
     StringData get(size_t ndx) const;
     StringData get_legacy(size_t ndx) const;
+    Mixed get_any(size_t ndx) const override;
     bool is_null(size_t ndx) const;
     void erase(size_t ndx);
     void move(ArrayString& dst, size_t ndx);

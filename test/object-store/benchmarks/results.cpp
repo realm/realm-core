@@ -33,8 +33,7 @@
 
 using namespace realm;
 
-TEST_CASE("Benchmark results", "[benchmark]")
-{
+TEST_CASE("Benchmark results", "[benchmark]") {
     InMemoryTestFile config;
     config.schema = Schema{
         {"object",
@@ -88,8 +87,7 @@ TEST_CASE("Benchmark results", "[benchmark]")
             REQUIRE(results.get(i).get_key() == expected[i]);                                                        \
     } while (0)
 
-    SECTION("basics")
-    {
+    SECTION("basics") {
         REQUIRE(r.filter(Query(table->where().less(col_value, 2))).size() == 2);
         BENCHMARK("basic filter")
         {
@@ -133,8 +131,7 @@ TEST_CASE("Benchmark results", "[benchmark]")
         };
     }
 
-    SECTION("iteration")
-    {
+    SECTION("iteration") {
         const int additional_row_count = 10000;
         realm->begin_transaction();
         table->create_objects(additional_row_count, table_keys);

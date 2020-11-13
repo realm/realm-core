@@ -519,8 +519,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     auto results = list.as_results();
     CppContext ctx(r);
 
-    SECTION("get_realm()")
-    {
+    SECTION("get_realm()") {
         REQUIRE(list.get_realm() == r);
         REQUIRE(results.get_realm() == r);
     }
@@ -533,111 +532,93 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results.get_query().count() == 1);
     }
 #endif
-    SECTION("get_origin_row_index()")
-    {
+    SECTION("get_origin_row_index()") {
         REQUIRE(list.get_parent_object_key() == obj.get_key());
         table->create_object();
         REQUIRE(list.get_parent_object_key() == obj.get_key());
     }
 
-    SECTION("get_type()")
-    {
+    SECTION("get_type()") {
         REQUIRE(list.get_type() == TestType::property_type());
         REQUIRE(results.get_type() == TestType::property_type());
     }
 
-    SECTION("get_object_type()")
-    {
+    SECTION("get_object_type()") {
         REQUIRE(results.get_object_type() == StringData());
     }
 
-    SECTION("is_valid()")
-    {
+    SECTION("is_valid()") {
         REQUIRE(list.is_valid());
         REQUIRE(results.is_valid());
 
-        SECTION("invalidate")
-        {
+        SECTION("invalidate") {
             r->invalidate();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
 
-        SECTION("close")
-        {
+        SECTION("close") {
             r->close();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
 
-        SECTION("delete row")
-        {
+        SECTION("delete row") {
             obj.remove();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
 
-        SECTION("rollback transaction creating list")
-        {
+        SECTION("rollback transaction creating list") {
             r->cancel_transaction();
             REQUIRE_FALSE(list.is_valid());
             REQUIRE_FALSE(results.is_valid());
         }
     }
 
-    SECTION("verify_attached()")
-    {
+    SECTION("verify_attached()") {
         REQUIRE_NOTHROW(list.verify_attached());
 
-        SECTION("invalidate")
-        {
+        SECTION("invalidate") {
             r->invalidate();
             REQUIRE_THROWS(list.verify_attached());
         }
 
-        SECTION("close")
-        {
+        SECTION("close") {
             r->close();
             REQUIRE_THROWS(list.verify_attached());
         }
 
-        SECTION("delete row")
-        {
+        SECTION("delete row") {
             obj.remove();
             REQUIRE_THROWS(list.verify_attached());
         }
 
-        SECTION("rollback transaction creating list")
-        {
+        SECTION("rollback transaction creating list") {
             r->cancel_transaction();
             REQUIRE_THROWS(list.verify_attached());
         }
     }
 
-    SECTION("verify_in_transaction()")
-    {
+    SECTION("verify_in_transaction()") {
         REQUIRE_NOTHROW(list.verify_in_transaction());
 
-        SECTION("invalidate")
-        {
+        SECTION("invalidate") {
             r->invalidate();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
-        SECTION("close")
-        {
+        SECTION("close") {
             r->close();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
-        SECTION("delete row")
-        {
+        SECTION("delete row") {
             obj.remove();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
 
-        SECTION("end write")
-        {
+        SECTION("end write") {
             r->commit_transaction();
             REQUIRE_THROWS(list.verify_in_transaction());
         }
@@ -649,8 +630,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     for (T value : values)
         list.add(value);
 
-    SECTION("move()")
-    {
+    SECTION("move()") {
         if (list.size() < 3)
             return;
 
@@ -675,8 +655,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results == values);
     }
 
-    SECTION("remove()")
-    {
+    SECTION("remove()") {
         if (list.size() < 3)
             return;
 
@@ -686,15 +665,13 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results == values);
     }
 
-    SECTION("remove_all()")
-    {
+    SECTION("remove_all()") {
         list.remove_all();
         REQUIRE(list.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("swap()")
-    {
+    SECTION("swap()") {
         if (list.size() < 3)
             return;
 
@@ -704,22 +681,19 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results == values);
     }
 
-    SECTION("delete_all()")
-    {
+    SECTION("delete_all()") {
         list.delete_all();
         REQUIRE(list.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("clear()")
-    {
+    SECTION("clear()") {
         results.clear();
         REQUIRE(list.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("get()")
-    {
+    SECTION("get()") {
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(list.get<T>(i) == values[i]);
@@ -733,23 +707,20 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE_THROWS(results.get(ctx, values.size()));
     }
 
-    SECTION("first()")
-    {
+    SECTION("first()") {
         REQUIRE(*results.first<T>() == values.front());
         REQUIRE(any_cast<Boxed>(*results.first(ctx)) == Boxed(values.front()));
         list.remove_all();
         REQUIRE(results.first<T>() == util::none);
     }
 
-    SECTION("last()")
-    {
+    SECTION("last()") {
         REQUIRE(*results.last<T>() == values.back());
         list.remove_all();
         REQUIRE(results.last<T>() == util::none);
     }
 
-    SECTION("set()")
-    {
+    SECTION("set()") {
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             auto rev = values.size() - i - 1;
@@ -767,8 +738,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE_THROWS(list.set(list.size(), static_cast<T>(values[0])));
     }
 
-    SECTION("find()")
-    {
+    SECTION("find()") {
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(list.find<T>(values[i]) == i);
@@ -790,8 +760,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(list.find(ctx, TestType::to_any(values[0])) == npos);
         REQUIRE(results.index_of(ctx, TestType::to_any(values[0])) == npos);
     }
-    SECTION("sorted index_of()")
-    {
+    SECTION("sorted index_of()") {
         auto sorted = list.sort({{"self", true}});
         std::sort(begin(values), end(values), less());
         for (size_t i = 0; i < values.size(); ++i) {
@@ -818,8 +787,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
     }
 #endif
-    SECTION("sort()")
-    {
+    SECTION("sort()") {
         auto unsorted = list.sort(std::vector<std::pair<std::string, bool>>{});
         REQUIRE(unsorted == values);
 
@@ -844,8 +812,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
                                          string_for_property_type(TestType::property_type() & ~PropertyType::Flags)));
     }
 
-    SECTION("distinct()")
-    {
+    SECTION("distinct()") {
         for (T value : values)
             list.add(value);
         auto values2 = values;
@@ -884,8 +851,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
 #endif
 
-    SECTION("min()")
-    {
+    SECTION("min()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.min());
             REQUIRE_THROWS(results.min());
@@ -899,8 +865,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results.min() == util::none);
     }
 
-    SECTION("max()")
-    {
+    SECTION("max()") {
         if (!TestType::can_minmax()) {
             REQUIRE_THROWS(list.max());
             REQUIRE_THROWS(results.max());
@@ -914,8 +879,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results.max() == util::none);
     }
 
-    SECTION("sum()")
-    {
+    SECTION("sum()") {
         if (!TestType::can_sum()) {
             REQUIRE_THROWS(list.sum());
             return;
@@ -928,8 +892,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(get<W>(*results.sum()) == W{});
     }
 
-    SECTION("average()")
-    {
+    SECTION("average()") {
         if (!TestType::can_average()) {
             REQUIRE_THROWS(list.average());
             return;
@@ -942,23 +905,20 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results.average() == util::none);
     }
 
-    SECTION("operator==()")
-    {
+    SECTION("operator==()") {
         Obj obj1 = table->create_object();
         REQUIRE(list == List(r, obj, col));
         REQUIRE_FALSE(list == List(r, obj1, col));
     }
 
-    SECTION("hash")
-    {
+    SECTION("hash") {
         Obj obj1 = table->create_object();
         std::hash<List> h;
         REQUIRE(h(list) == h(List(r, obj, col)));
         REQUIRE_FALSE(h(list) == h(List(r, obj1, col)));
     }
 
-    SECTION("handover")
-    {
+    SECTION("handover") {
         r->commit_transaction();
 
         auto list2 = ThreadSafeReference(list).resolve<List>(r);
@@ -967,8 +927,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         REQUIRE(results2 == values);
     }
 
-    SECTION("notifications")
-    {
+    SECTION("notifications") {
         r->commit_transaction();
 
         auto sorted = results.sort({{"self", true}});
@@ -988,8 +947,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             ++calls;
         });
 
-        SECTION("add value to list")
-        {
+        SECTION("add value to list") {
             // Remove the existing copy of this value so that the sorted list
             // doesn't have dupes resulting in an unstable order
             advance_and_notify(*r);
@@ -1009,8 +967,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE_INDICES(srchange.insertions, values.size() - 1);
         }
 
-        SECTION("remove value from list")
-        {
+        SECTION("remove value from list") {
             advance_and_notify(*r);
             r->begin_transaction();
             list.remove(1);
@@ -1024,8 +981,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE_INDICES(srchange.deletions, TestType::is_optional);
         }
 
-        SECTION("clear list")
-        {
+        SECTION("clear list") {
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -1037,8 +993,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE(srchange.deletions.count() == values.size());
         }
 
-        SECTION("delete containing row")
-        {
+        SECTION("delete containing row") {
             advance_and_notify(*r);
             REQUIRE(calls == 3);
 
@@ -1058,8 +1013,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE(calls == 6);
         }
 
-        SECTION("deleting containing row before first run of notifier")
-        {
+        SECTION("deleting containing row before first run of notifier") {
             r2->begin_transaction();
             table2->begin()->remove();
             r2->commit_transaction();
@@ -1069,8 +1023,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
     }
 
 #if REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
-    SECTION("sync compatibility")
-    {
+    SECTION("sync compatibility") {
         if (!util::EventLoop::has_implementation())
             return;
 

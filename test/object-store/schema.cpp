@@ -82,10 +82,8 @@ struct StringMaker<SchemaChange> {
 };
 } // namespace Catch
 
-TEST_CASE("ObjectSchema")
-{
-    SECTION("Aliases are still present in schema returned from the Realm")
-    {
+TEST_CASE("ObjectSchema") {
+    SECTION("Aliases are still present in schema returned from the Realm") {
         TestFile config;
         config.schema_version = 1;
         config.schema = Schema{
@@ -97,8 +95,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE(realm->schema().find("object")->property_for_name("value")->public_name == "alias");
     }
 
-    SECTION("looking up properties by alias matches name if alias is not set")
-    {
+    SECTION("looking up properties by alias matches name if alias is not set") {
         auto schema = Schema{
             {"object",
              {{"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "alias"},
@@ -110,8 +107,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE(schema.find("object")->property_for_public_name("other_value")->name == "other_value");
     }
 
-    SECTION("from a Group")
-    {
+    SECTION("from a Group") {
         Group g;
 
         TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
@@ -132,6 +128,7 @@ TEST_CASE("ObjectSchema")
         table->add_column(*target, "object");
         table->add_column_list(*target, "array");
         table->add_column_set(*target, "set");
+        table->add_column_dictionary(*target, "dictionary");
 
         table->add_column(type_Int, "int?", true);
         table->add_column(type_Bool, "bool?", true);
@@ -194,6 +191,21 @@ TEST_CASE("ObjectSchema")
         add_set(table, type_Decimal, "decimal? set", true);
         add_set(table, type_UUID, "uuid? set", true);
 
+        auto add_dictionary = [](TableRef table, DataType type, StringData name) {
+            table->add_column_dictionary(type, name);
+        };
+
+        add_dictionary(table, type_Int, "int dictionary");
+        add_dictionary(table, type_Bool, "bool dictionary");
+        add_dictionary(table, type_Float, "float dictionary");
+        add_dictionary(table, type_Double, "double dictionary");
+        add_dictionary(table, type_String, "string dictionary");
+        add_dictionary(table, type_Binary, "data dictionary");
+        add_dictionary(table, type_Timestamp, "date dictionary");
+        add_dictionary(table, type_ObjectId, "object id dictionary");
+        add_dictionary(table, type_Decimal, "decimal dictionary");
+        add_dictionary(table, type_UUID, "uuid dictionary");
+
         std::vector<ColKey> indexed_cols;
         indexed_cols.push_back(table->add_column(type_Int, "indexed int"));
         indexed_cols.push_back(table->add_column(type_Bool, "indexed bool"));
@@ -247,6 +259,7 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("object", Object | PropertyType::Nullable, "target");
         REQUIRE_PROPERTY("array", Array | PropertyType::Object, "target");
         REQUIRE_PROPERTY("set", Set | PropertyType::Object, "target");
+        REQUIRE_PROPERTY("dictionary", Dictionary | PropertyType::Object, "target");
 
         REQUIRE_PROPERTY("int?", Int | PropertyType::Nullable);
         REQUIRE_PROPERTY("bool?", Bool | PropertyType::Nullable);
@@ -301,6 +314,17 @@ TEST_CASE("ObjectSchema")
         REQUIRE_PROPERTY("decimal? set", Decimal | PropertyType::Set | PropertyType::Nullable);
         REQUIRE_PROPERTY("uuid? set", UUID | PropertyType::Set | PropertyType::Nullable);
 
+        REQUIRE_PROPERTY("int dictionary", Int | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("bool dictionary", Bool | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("float dictionary", Float | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("double dictionary", Double | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("string dictionary", String | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("data dictionary", Data | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("date dictionary", Date | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("object id dictionary", ObjectId | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("decimal dictionary", Decimal | PropertyType::Dictionary);
+        REQUIRE_PROPERTY("uuid dictionary", UUID | PropertyType::Dictionary);
+
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string", String, Property::IsPrimary{false}, Property::IsIndexed{true});
@@ -322,12 +346,9 @@ TEST_CASE("ObjectSchema")
     }
 }
 
-TEST_CASE("Schema")
-{
-    SECTION("validate()")
-    {
-        SECTION("rejects link properties with no target object")
-        {
+TEST_CASE("Schema") {
+    SECTION("validate()") {
+        SECTION("rejects link properties with no target object") {
             Schema schema = {
                 {"object", {{"link", PropertyType::Object | PropertyType::Nullable}}},
             };
@@ -335,8 +356,7 @@ TEST_CASE("Schema")
                                       "Property 'object.link' of type 'object' has unknown object type ''");
         }
 
-        SECTION("rejects array properties with no target object")
-        {
+        SECTION("rejects array properties with no target object") {
             Schema schema = {
                 {"object", {{"array", PropertyType::Array | PropertyType::Object}}},
             };
@@ -344,24 +364,21 @@ TEST_CASE("Schema")
                                       "Property 'object.array' of type 'array' has unknown object type ''");
         }
 
-        SECTION("rejects link properties with a target not in the schema")
-        {
+        SECTION("rejects link properties with a target not in the schema") {
             Schema schema = {{"object", {{"link", PropertyType::Object | PropertyType::Nullable, "invalid target"}}}};
             REQUIRE_THROWS_CONTAINING(
                 schema.validate(),
                 "Property 'object.link' of type 'object' has unknown object type 'invalid target'");
         }
 
-        SECTION("rejects array properties with a target not in the schema")
-        {
+        SECTION("rejects array properties with a target not in the schema") {
             Schema schema = {{"object", {{"array", PropertyType::Array | PropertyType::Object, "invalid target"}}}};
             REQUIRE_THROWS_CONTAINING(
                 schema.validate(),
                 "Property 'object.array' of type 'array' has unknown object type 'invalid target'");
         }
 
-        SECTION("allows link properties from embedded to top-level")
-        {
+        SECTION("allows link properties from embedded to top-level") {
             Schema schema = {{"target", {{"value", PropertyType::Int}}},
                              {"origin",
                               ObjectSchema::IsEmbedded{true},
@@ -369,8 +386,7 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("allows array properties from embedded to top-level")
-        {
+        SECTION("allows array properties from embedded to top-level") {
             Schema schema = {{"target", {{"value", PropertyType::Int}}},
                              {"origin",
                               ObjectSchema::IsEmbedded{true},
@@ -378,8 +394,7 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("allows linking objects from embedded to top-level")
-        {
+        SECTION("allows linking objects from embedded to top-level") {
             Schema schema = {{"target",
                               ObjectSchema::IsEmbedded{true},
                               {{"value", PropertyType::Int}},
@@ -388,8 +403,7 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects embedded objects self loop via top level object")
-        {
+        SECTION("rejects embedded objects self loop via top level object") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
@@ -401,8 +415,7 @@ TEST_CASE("Schema")
                                       "'EmbeddedObject.link_to_top_level_object.link_to_embedded_object'");
         }
 
-        SECTION("rejects embedded objects loop to itself")
-        {
+        SECTION("rejects embedded objects loop to itself") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject"}}},
@@ -414,8 +427,7 @@ TEST_CASE("Schema")
                 "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
         }
 
-        SECTION("rejects embedded objects self loop via different embedded object")
-        {
+        SECTION("rejects embedded objects self loop via different embedded object") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
@@ -429,8 +441,7 @@ TEST_CASE("Schema")
                                                          "supported: 'EmbeddedObjectA.link_to_b.link_to_a'");
         }
 
-        SECTION("rejects with descriptions of all embedded object loops")
-        {
+        SECTION("rejects with descriptions of all embedded object loops") {
             Schema schema = {
                 {"TopLevelObject",
                  {{"link_to_embedded_object", PropertyType::Object | PropertyType::Nullable, "EmbeddedObjectA"}}},
@@ -462,8 +473,7 @@ TEST_CASE("Schema")
                                  "'EmbeddedObjectC.link_to_a.link_to_c'") != std::string::npos);
         }
 
-        SECTION("allows top level loops")
-        {
+        SECTION("allows top level loops") {
             Schema schema = {{"TopLevelObjectA",
                               {{"link_to_top_b", PropertyType::Object | PropertyType::Nullable, "TopLevelObjectB"}}},
                              {"TopLevelObjectB",
@@ -477,8 +487,7 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects linking objects without a source object")
-        {
+        SECTION("rejects linking objects without a source object") {
             Schema schema = {{"object",
                               {
                                   {"value", PropertyType::Int},
@@ -488,8 +497,7 @@ TEST_CASE("Schema")
                 schema.validate(), "Property 'object.incoming' of type 'linking objects' has unknown object type ''");
         }
 
-        SECTION("rejects linking objects without a source property")
-        {
+        SECTION("rejects linking objects without a source property") {
             Schema schema = {{"object",
                               {
                                   {"value", PropertyType::Int},
@@ -500,8 +508,7 @@ TEST_CASE("Schema")
                 "Property 'object.incoming' of type 'linking objects' must have an origin property name.");
         }
 
-        SECTION("rejects linking objects with invalid source object")
-        {
+        SECTION("rejects linking objects with invalid source object") {
             Schema schema = {
                 {"object",
                  {
@@ -513,8 +520,7 @@ TEST_CASE("Schema")
                 "Property 'object.incoming' of type 'linking objects' has unknown object type 'not an object type'");
         }
 
-        SECTION("rejects linking objects with invalid source property")
-        {
+        SECTION("rejects linking objects with invalid source property") {
             Schema schema = {{"object",
                               {
                                   {"value", PropertyType::Int},
@@ -538,8 +544,7 @@ TEST_CASE("Schema")
                                       "'object.incoming' links to type 'object 2'");
         }
 
-        SECTION("rejects non-array linking objects")
-        {
+        SECTION("rejects non-array linking objects") {
             Schema schema = {{"object",
                               {
                                   {"link", PropertyType::Object | PropertyType::Nullable, "object"},
@@ -549,8 +554,7 @@ TEST_CASE("Schema")
                                       "Linking Objects property 'object.incoming' must be an array.");
         }
 
-        SECTION("rejects target object types for non-link properties")
-        {
+        SECTION("rejects target object types for non-link properties") {
             Schema schema = {{"object",
                               {
                                   {"int", PropertyType::Int},
@@ -571,8 +575,7 @@ TEST_CASE("Schema")
             }
         }
 
-        SECTION("rejects source property name for non-linking objects properties")
-        {
+        SECTION("rejects source property name for non-linking objects properties") {
             Schema schema = {{"object",
                               {
                                   {"int", PropertyType::Int},
@@ -598,15 +601,13 @@ TEST_CASE("Schema")
             }
         }
 
-        SECTION("rejects non-nullable link properties")
-        {
+        SECTION("rejects non-nullable link properties") {
             Schema schema = {{"object", {{"link", PropertyType::Object, "target"}}},
                              {"target", {{"value", PropertyType::Int}}}};
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.link' of type 'object' must be nullable.");
         }
 
-        SECTION("rejects nullable array properties")
-        {
+        SECTION("rejects nullable array properties") {
             Schema schema = {
                 {"object",
                  {{"array", PropertyType::Array | PropertyType::Object | PropertyType::Nullable, "target"}}},
@@ -615,8 +616,7 @@ TEST_CASE("Schema")
                                       "Property 'object.array' of type 'array' cannot be nullable.");
         }
 
-        SECTION("rejects nullable linking objects")
-        {
+        SECTION("rejects nullable linking objects") {
             Schema schema = {
                 {"object",
                  {
@@ -628,8 +628,7 @@ TEST_CASE("Schema")
                                       "Property 'object.incoming' of type 'linking objects' cannot be nullable.");
         }
 
-        SECTION("rejects duplicate primary keys")
-        {
+        SECTION("rejects duplicate primary keys") {
             Schema schema = {{"object",
                               {
                                   {"pk1", PropertyType::Int, Property::IsPrimary{true}},
@@ -639,8 +638,7 @@ TEST_CASE("Schema")
                                       "Properties 'pk2' and 'pk1' are both marked as the primary key of 'object'.");
         }
 
-        SECTION("rejects primary key on embedded table")
-        {
+        SECTION("rejects primary key on embedded table") {
             Schema schema = {{"object",
                               ObjectSchema::IsEmbedded{true},
                               {
@@ -650,16 +648,15 @@ TEST_CASE("Schema")
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Embedded object type 'object' cannot have a primary key.");
         }
 
-        SECTION("rejects invalid primary key types")
-        {
+        SECTION("rejects invalid primary key types") {
             Schema schema = {{"object",
                               {
                                   {"pk", PropertyType::Float, Property::IsPrimary{true}},
                               }}};
 
-            schema.begin()->primary_key_property()->type = PropertyType::Any;
+            schema.begin()->primary_key_property()->type = PropertyType::Mixed;
             REQUIRE_THROWS_CONTAINING(schema.validate(),
-                                      "Property 'object.pk' of type 'any' cannot be made the primary key.");
+                                      "Property 'object.pk' of type 'mixed' cannot be made the primary key.");
 
             schema.begin()->primary_key_property()->type = PropertyType::Bool;
             REQUIRE_THROWS_CONTAINING(schema.validate(),
@@ -694,8 +691,7 @@ TEST_CASE("Schema")
                                       "Property 'object.pk' of type 'decimal' cannot be made the primary key.");
         }
 
-        SECTION("allows valid primary key types")
-        {
+        SECTION("allows valid primary key types") {
             Schema schema = {{"object",
                               {
                                   {"pk", PropertyType::Int, Property::IsPrimary{true}},
@@ -719,8 +715,7 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects nonexistent primary key")
-        {
+        SECTION("rejects nonexistent primary key") {
             Schema schema = {{"object",
                               {
                                   {"value", PropertyType::Int},
@@ -730,8 +725,7 @@ TEST_CASE("Schema")
                                       "Specified primary key 'object.nonexistent' does not exist.");
         }
 
-        SECTION("rejects indexes for types that cannot be indexed")
-        {
+        SECTION("rejects indexes for types that cannot be indexed") {
             Schema schema = {{"object",
                               {
                                   {"float", PropertyType::Float},
@@ -751,8 +745,7 @@ TEST_CASE("Schema")
             }
         }
 
-        SECTION("allows indexing types that can be indexed")
-        {
+        SECTION("allows indexing types that can be indexed") {
             Schema schema = {
                 {"object",
                  {
@@ -766,8 +759,7 @@ TEST_CASE("Schema")
             REQUIRE_NOTHROW(schema.validate());
         }
 
-        SECTION("rejects duplicate types with the same name")
-        {
+        SECTION("rejects duplicate types with the same name") {
             Schema schema = {{"object1",
                               {
                                   {"int", PropertyType::Int},
@@ -793,8 +785,7 @@ TEST_CASE("Schema")
                                                          "- Type 'object2' appears more than once in the schema.");
         }
 
-        SECTION("rejects properties with the same name")
-        {
+        SECTION("rejects properties with the same name") {
             Schema schema = {{"object",
                               {
                                   {"child", PropertyType::Object | PropertyType::Nullable, "object"},
@@ -813,8 +804,7 @@ TEST_CASE("Schema")
                                       "- Property 'parent' appears more than once in the schema for type 'object'.");
         }
 
-        SECTION("rejects schema if all properties have the same name")
-        {
+        SECTION("rejects schema if all properties have the same name") {
             Schema schema = {{"object",
                               {
                                   {"field", PropertyType::Int},
@@ -834,8 +824,7 @@ TEST_CASE("Schema")
                                    "- Property 'otherField' appears more than once in the schema for type 'object'.");
         }
 
-        SECTION("rejects properties with the same alias")
-        {
+        SECTION("rejects properties with the same alias") {
             Schema schema = {
                 {"object",
                  {
@@ -867,8 +856,7 @@ TEST_CASE("Schema")
                                       "- Alias '_parent' appears more than once in the schema for type 'object'.");
         }
 
-        SECTION("rejects properties whose name conflicts with an alias for another property")
-        {
+        SECTION("rejects properties whose name conflicts with an alias for another property") {
             Schema schema = {
                 {"object",
                  {
@@ -886,12 +874,10 @@ TEST_CASE("Schema")
         }
     }
 
-    SECTION("compare()")
-    {
+    SECTION("compare()") {
         using namespace schema_change;
         using vec = std::vector<SchemaChange>;
-        SECTION("add table")
-        {
+        SECTION("add table") {
             Schema schema1 = {{"object 1",
                                {
                                    {"int", PropertyType::Int},
@@ -909,8 +895,7 @@ TEST_CASE("Schema")
             REQUIRE(schema1.compare(schema2) == expected);
         }
 
-        SECTION("add property")
-        {
+        SECTION("add property") {
             Schema schema1 = {{"object",
                                {
                                    {"int 1", PropertyType::Int},
@@ -924,8 +909,7 @@ TEST_CASE("Schema")
                     vec{(AddProperty{&*schema1.find("object"), &schema2.find("object")->persisted_properties[1]})});
         }
 
-        SECTION("remove property")
-        {
+        SECTION("remove property") {
             Schema schema1 = {{"object",
                                {
                                    {"int 1", PropertyType::Int},
@@ -940,8 +924,7 @@ TEST_CASE("Schema")
                 vec{(RemoveProperty{&*schema1.find("object"), &schema1.find("object")->persisted_properties[1]})});
         }
 
-        SECTION("change property type")
-        {
+        SECTION("change property type") {
             Schema schema1 = {{"object",
                                {
                                    {"value", PropertyType::Int},
@@ -956,8 +939,7 @@ TEST_CASE("Schema")
                                         &schema2.find("object")->persisted_properties[0]})});
         };
 
-        SECTION("change link target")
-        {
+        SECTION("change link target") {
             Schema schema1 = {
                 {"object",
                  {
@@ -992,8 +974,7 @@ TEST_CASE("Schema")
                                         &schema2.find("object")->persisted_properties[0]})});
         }
 
-        SECTION("add index")
-        {
+        SECTION("add index") {
             Schema schema1 = {{"object",
                                {
                                    {"int", PropertyType::Int},
@@ -1007,8 +988,7 @@ TEST_CASE("Schema")
                     vec{(AddIndex{object_schema, &object_schema->persisted_properties[0]})});
         }
 
-        SECTION("remove index")
-        {
+        SECTION("remove index") {
             Schema schema1 = {{"object",
                                {
                                    {"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
@@ -1022,8 +1002,7 @@ TEST_CASE("Schema")
                     vec{(RemoveIndex{object_schema, &object_schema->persisted_properties[0]})});
         }
 
-        SECTION("add index and make nullable")
-        {
+        SECTION("add index and make nullable") {
             Schema schema1 = {{"object",
                                {
                                    {"int", PropertyType::Int},
@@ -1039,8 +1018,7 @@ TEST_CASE("Schema")
                          AddIndex{object_schema, &object_schema->persisted_properties[0]}}));
         }
 
-        SECTION("add index and change type")
-        {
+        SECTION("add index and change type") {
             Schema schema1 = {{"object",
                                {
                                    {"value", PropertyType::Int},
@@ -1056,8 +1034,7 @@ TEST_CASE("Schema")
                                         &schema2.find("object")->persisted_properties[0]})});
         }
 
-        SECTION("make nullable and change type")
-        {
+        SECTION("make nullable and change type") {
             Schema schema1 = {{"object",
                                {
                                    {"value", PropertyType::Int},
