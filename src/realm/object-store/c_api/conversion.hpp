@@ -319,6 +319,8 @@ static inline realm_property_type_e to_capi(PropertyType type) noexcept
             [[fallthrough]];
         case PropertyType::Set:
             [[fallthrough]];
+        case PropertyType::Dictionary:
+            [[fallthrough]];
         case PropertyType::Collection:
             [[fallthrough]];
         case PropertyType::Array:
@@ -382,10 +384,14 @@ static inline Property from_capi(const realm_property_info_t& p) noexcept
             prop.type |= PropertyType::Array;
             break;
         }
-        case RLM_COLLECTION_TYPE_SET:
-            [[fallthrough]];
-        case RLM_COLLECTION_TYPE_DICTIONARY:
-            REALM_TERMINATE("Not implemented yet.");
+        case RLM_COLLECTION_TYPE_SET: {
+            prop.type |= PropertyType::Set;
+            break;
+        }
+        case RLM_COLLECTION_TYPE_DICTIONARY: {
+            prop.type |= PropertyType::Dictionary;
+            break;
+        }
     }
     return prop;
 }
@@ -410,6 +416,10 @@ static inline realm_property_info_t to_capi(const Property& prop) noexcept
     p.collection_type = RLM_COLLECTION_TYPE_NONE;
     if (bool(prop.type & PropertyType::Array))
         p.collection_type = RLM_COLLECTION_TYPE_LIST;
+    if (bool(prop.type & PropertyType::Set))
+        p.collection_type = RLM_COLLECTION_TYPE_SET;
+    if (bool(prop.type & PropertyType::Dictionary))
+        p.collection_type = RLM_COLLECTION_TYPE_DICTIONARY;
 
     p.key = to_capi(prop.column_key);
 
