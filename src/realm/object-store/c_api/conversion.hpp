@@ -295,8 +295,8 @@ static inline realm_property_type_e to_capi(PropertyType type) noexcept
             return RLM_PROPERTY_TYPE_STRING;
         case PropertyType::Data:
             return RLM_PROPERTY_TYPE_BINARY;
-        case PropertyType::Any:
-            return RLM_PROPERTY_TYPE_ANY;
+        case PropertyType::Mixed:
+            return RLM_PROPERTY_TYPE_MIXED;
         case PropertyType::Date:
             return RLM_PROPERTY_TYPE_TIMESTAMP;
         case PropertyType::Float:
@@ -338,8 +338,8 @@ static inline PropertyType from_capi(realm_property_type_e type) noexcept
             return PropertyType::String;
         case RLM_PROPERTY_TYPE_BINARY:
             return PropertyType::Data;
-        case RLM_PROPERTY_TYPE_ANY:
-            return PropertyType::Any;
+        case RLM_PROPERTY_TYPE_MIXED:
+            return PropertyType::Mixed;
         case RLM_PROPERTY_TYPE_TIMESTAMP:
             return PropertyType::Date;
         case RLM_PROPERTY_TYPE_FLOAT:

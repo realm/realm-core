@@ -409,57 +409,57 @@ auto value_or_object(const std::shared_ptr<Realm>& realm, PropertyType val_type,
 
     PropertyType base_type = (val_type & ~PropertyType::Flags);
 
-    // Note: The following checks PropertyType::Any on the assumption that it
+    // Note: The following checks PropertyType::Mixed on the assumption that it
     // will become un-deprecated when Mixed is exposed in Object Store.
 
     switch (val.get_type()) {
         case type_Int: {
-            if (base_type != PropertyType::Int && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Int && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<int64_t>());
         }
         case type_Bool: {
-            if (base_type != PropertyType::Bool && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Bool && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<bool>());
         }
         case type_String: {
-            if (base_type != PropertyType::String && base_type != PropertyType::Any)
+            if (base_type != PropertyType::String && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<StringData>());
         }
         case type_Binary: {
-            if (base_type != PropertyType::Data && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Data && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<BinaryData>());
         }
         case type_Timestamp: {
-            if (base_type != PropertyType::Date && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Date && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<Timestamp>());
         }
         case type_Float: {
-            if (base_type != PropertyType::Float && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Float && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<float>());
         }
         case type_Double: {
-            if (base_type != PropertyType::Double && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Double && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<double>());
         }
         case type_Decimal: {
-            if (base_type != PropertyType::Decimal && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Decimal && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<Decimal128>());
         }
         case type_ObjectId: {
-            if (base_type != PropertyType::ObjectId && base_type != PropertyType::Any)
+            if (base_type != PropertyType::ObjectId && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<ObjectId>());
         }
         case type_TypedLink: {
-            if (base_type != PropertyType::Object && base_type != PropertyType::Any)
+            if (base_type != PropertyType::Object && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             // Object Store performs link validation already. Just create an Obj
             // for the link, and pass it on.
@@ -469,7 +469,7 @@ auto value_or_object(const std::shared_ptr<Realm>& realm, PropertyType val_type,
             return f(std::move(obj));
         }
         case type_UUID: {
-            if (base_type != PropertyType::UUID && base_type != PropertyType::Any)
+            if (base_type != PropertyType::UUID && base_type != PropertyType::Mixed)
                 throw std::invalid_argument{"Type mismatch"};
             return f(val.get<UUID>());
         }
