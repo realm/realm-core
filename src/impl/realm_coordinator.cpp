@@ -800,8 +800,8 @@ void RealmCoordinator::on_change()
 #if REALM_ENABLE_SYNC
     // Invoke realm sync if another process has notified for a change
     if (m_sync_session) {
-        auto versionId = m_db->start_read()->get_version_of_current_transaction();
-        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, versionId.version);
+        auto version = m_db->get_version_of_latest_snapshot();
+        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
     }
 #endif
 }
