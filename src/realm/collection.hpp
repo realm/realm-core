@@ -33,8 +33,6 @@ public:
     virtual Mixed avg(size_t* return_cnt = nullptr) const = 0;
     virtual std::unique_ptr<CollectionBase> clone_collection() const = 0;
 
-    virtual TableRef get_target_table() const = 0;
-
     // Modifies a vector of indices so that they refer to values sorted according
     // to the specified sort order
     virtual void sort(std::vector<size_t>& indices, bool ascending = true) const = 0;
@@ -49,11 +47,30 @@ public:
     }
 
     virtual const Obj& get_obj() const noexcept = 0;
-    virtual ObjKey get_key() const = 0;
-    virtual bool is_attached() const = 0;
-    virtual bool has_changed() const = 0;
-    virtual ConstTableRef get_table() const noexcept = 0;
     virtual ColKey get_col_key() const noexcept = 0;
+    virtual bool has_changed() const = 0;
+
+    virtual bool is_attached() const
+    {
+        return get_obj().is_valid();
+    }
+
+    // Note: virtual..final prevents static override.
+
+    virtual ObjKey get_key() const noexcept final
+    {
+        return get_obj().get_key();
+    }
+
+    virtual ConstTableRef get_table() const noexcept final
+    {
+        return get_obj().get_table();
+    }
+
+    virtual TableRef get_target_table() const final
+    {
+        return get_obj().get_target_table(get_col_key());
+    }
 
 protected:
     friend class Transaction;
@@ -195,24 +212,9 @@ public:
         return m_col_key;
     }
 
-    TableRef get_target_table() const final
-    {
-        return m_obj.get_target_table(m_col_key);
-    }
-
     const Obj& get_obj() const noexcept final
     {
         return m_obj;
-    }
-
-    ObjKey get_key() const noexcept final
-    {
-        return m_obj.get_key();
-    }
-
-    bool is_attached() const noexcept final
-    {
-        return m_obj.is_valid();
     }
 
     bool has_changed() const noexcept final
@@ -225,10 +227,8 @@ public:
         return false;
     }
 
-    ConstTableRef get_table() const noexcept final
-    {
-        return m_obj.get_table();
-    }
+    using Interface::get_key;
+    using Interface::get_target_table;
 
 protected:
     Obj m_obj;
@@ -322,13 +322,24 @@ size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept;
 void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree);
 // Clear the context flag on the tree if there are no more unresolved links.
 void check_for_last_unresolved(BPlusTree<ObjKey>& tree);
-} // namespace _impl
 
+// Proxy class needed because the ObjList interface clobbers method names
+// from CollectionBase.
+struct ObjListProxy : ObjList {
+    virtual TableRef proxy_get_target_table() const = 0;
+
+    TableRef get_target_table() const final
+    {
+        return proxy_get_target_table();
+    }
+};
+
+} // namespace _impl
 
 /// Base class for collections of objects, where unresolved links (tombstones)
 /// can occur.
 template <class Interface>
-class ObjCollectionBase : public Interface, public ObjList {
+class ObjCollectionBase : public Interface, public _impl::ObjListProxy {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
 
@@ -362,6 +373,8 @@ public:
     {
         return m_unresolved.size() != 0;
     }
+
+    using Interface::get_target_table;
 
 protected:
     ObjCollectionBase() = default;
@@ -448,6 +461,11 @@ private:
     // `do_update_if_needed()`, because the inner accessor may have been
     // refreshed without our knowledge.
     mutable uint_fast64_t m_content_version = uint_fast64_t(-1);
+
+    TableRef proxy_get_target_table() const final
+    {
+        return Interface::get_target_table();
+    }
 };
 
 /*

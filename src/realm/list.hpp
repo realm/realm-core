@@ -109,12 +109,6 @@ public:
     T remove(size_t ndx);
 
     // Overriding members of CollectionBase:
-    using Base::get_col_key;
-    using Base::get_obj;
-    using Base::get_table;
-    using Base::get_target_table;
-    using Base::has_changed;
-    using Base::is_attached;
     size_t size() const final;
     void clear() final;
     Mixed get_any(size_t ndx) const final;
@@ -272,6 +266,7 @@ public:
     }
 
     // Overriding members of CollectionBase:
+    using CollectionBase::get_key;
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
@@ -281,14 +276,10 @@ public:
     Mixed sum(size_t* return_cnt = nullptr) const final;
     Mixed avg(size_t* return_cnt = nullptr) const final;
     std::unique_ptr<CollectionBase> clone_collection() const final;
-    TableRef get_target_table() const final;
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    ObjKey get_key() const final;
-    bool is_attached() const final;
     bool has_changed() const final;
-    ConstTableRef get_table() const noexcept final;
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of LstBase:
@@ -321,7 +312,6 @@ public:
         ObjKey key = this->get(ndx);
         return get_target_table()->get_object(key);
     }
-
     ObjKey get_key(size_t ndx) const final
     {
         return get(ndx);
@@ -877,11 +867,6 @@ inline std::unique_ptr<CollectionBase> LnkLst::clone_collection() const
     return get_obj().get_linklist_ptr(get_col_key());
 }
 
-inline TableRef LnkLst::get_target_table() const
-{
-    return m_list.get_target_table();
-}
-
 inline void LnkLst::sort(std::vector<size_t>& indices, bool ascending) const
 {
     static_cast<void>(indices);
@@ -901,24 +886,9 @@ inline const Obj& LnkLst::get_obj() const noexcept
     return m_list.get_obj();
 }
 
-inline ObjKey LnkLst::get_key() const
-{
-    return m_list.get_key();
-}
-
-inline bool LnkLst::is_attached() const
-{
-    return m_list.is_attached();
-}
-
 inline bool LnkLst::has_changed() const
 {
     return m_list.has_changed();
-}
-
-inline ConstTableRef LnkLst::get_table() const noexcept
-{
-    return m_list.get_table();
 }
 
 inline ColKey LnkLst::get_col_key() const noexcept
