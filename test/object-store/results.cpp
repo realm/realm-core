@@ -3485,6 +3485,7 @@ TEST_CASE("results: limit", "[limit]") {
     }
 }
 
+/*
 TEST_CASE("results: query helpers", "[include]") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -3510,14 +3511,14 @@ TEST_CASE("results: query helpers", "[include]") {
 
     SECTION("not valid") {
         std::vector<StringData> paths;
-        parser::KeyPathMapping mapping;
+        query_parser::KeyPathMapping mapping;
         ObjectSchema schema = *realm->schema().find("object");
         IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
         CHECK(!includes.is_valid());
     }
     SECTION("valid") {
         std::vector<StringData> paths = {"@links.linking_object.link"};
-        parser::KeyPathMapping mapping;
+        query_parser::KeyPathMapping mapping;
         realm::populate_keypath_mapping(mapping, *realm);
         ObjectSchema schema = *realm->schema().find("object");
         IncludeDescriptor includes = realm::generate_include_from_keypaths(paths, *realm, schema, mapping);
@@ -3525,3 +3526,4 @@ TEST_CASE("results: query helpers", "[include]") {
         CHECK(includes.get_description(table) == "INCLUDE(@links.class_linking_object.link)");
     }
 }
+*/
