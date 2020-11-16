@@ -30,7 +30,7 @@ FromCharsResult from_chars(const char* const first, const char* const last, T& v
             return uint8_t(c - 'a' + 10);
         if (c >= 'A' && c <= 'Z')
             return uint8_t(c - 'A' + 10);
-        return 36; // Illegal digit value for all supported bases.
+        return 0xff; // Illegal digit value for all supported bases.
     };
 
     if (first == last) {
@@ -51,7 +51,11 @@ FromCharsResult from_chars(const char* const first, const char* const last, T& v
             break;
         }
 
-        if (int_multiply_with_overflow_detect(res_value, base) || int_add_with_overflow_detect(res_value, digit)) {
+        bool overflow = int_multiply_with_overflow_detect(res_value, base);
+        if (!overflow) {
+            overflow = int_add_with_overflow_detect(res_value, digit);
+        }
+        if (overflow) {
             ptr = std::find_if_not(ptr, last, [&](char ch) {
                 return digit_value(ch) <= base - 1;
             });
