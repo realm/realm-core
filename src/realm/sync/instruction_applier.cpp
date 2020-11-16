@@ -309,14 +309,17 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto visitor = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
                         link_list.set(index, link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.set(index, link);
                     }
                     else if (data_type == type_LinkList || data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -560,14 +563,17 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
                         link_list.insert(index, link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.insert(index, link);
                     }
                     else if (data_type == type_LinkList || data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -613,6 +619,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                                                 target_table->get_name());
                         }
 
+                        REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
                         auto& link_list = static_cast<LnkLst&>(list);
                         link_list.create_and_insert_linked_object(index);
                     }
@@ -722,14 +729,17 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
                         auto& link_set = static_cast<Set<ObjLink>&>(set);
                         link_set.insert(link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.insert(link);
                     }
                     else if (data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
                         auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -791,14 +801,17 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
                         auto& link_set = static_cast<Set<ObjLink>&>(set);
                         link_set.erase(link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.erase(link);
                     }
                     else if (data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
                         auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -969,7 +982,7 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
             if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
                 auto table = obj.get_table();
                 if (!table->get_link_target(col)->is_embedded()) {
-                    list = std::make_unique<Lst<ObjKey>>(obj, col);
+                    list = obj.get_list_ptr<ObjKey>(col);
                 }
                 else {
                     list = obj.get_listbase_ptr(col);
@@ -1043,6 +1056,7 @@ void InstructionApplier::resolve_list_element(LstBase& list, size_t index, Instr
                                 list.get_table()->get_name(), index);
         }
 
+        REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
         auto& link_list = static_cast<LnkLst&>(list);
         if (index >= link_list.size()) {
             bad_transaction_log("%1: Out-of-bounds index through list at '%3.%2[%4]'", instr_name, field_name,

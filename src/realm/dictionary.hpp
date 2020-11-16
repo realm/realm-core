@@ -29,27 +29,29 @@ namespace realm {
 
 class DictionaryClusterTree;
 
-class Dictionary : public CollectionBase {
+class Dictionary final : public CollectionBaseImpl<CollectionBase> {
 public:
-    class Iterator;
+    using Base = CollectionBaseImpl<CollectionBase>;
+    using Iterator = CollectionIterator<Dictionary>;
 
     Dictionary() {}
     ~Dictionary();
 
     Dictionary(const Obj& obj, ColKey col_key);
     Dictionary(const Dictionary& other)
-        : CollectionBase(other)
+        : Base(static_cast<const Base&>(other))
         , m_key_type(other.m_key_type)
     {
         *this = other;
     }
     Dictionary& operator=(const Dictionary& other);
 
-
-    // Overriding members of CollectionBase:
-    size_t size() const final;
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
+
+    // Overriding members of CollectionBase:
+    std::unique_ptr<CollectionBase> clone_collection() const;
+    size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
 
@@ -60,7 +62,6 @@ public:
 
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
-
 
     void create();
 
@@ -113,10 +114,12 @@ private:
 
     bool init_from_parent() const final;
     Mixed do_get(ClusterNode::State&&) const;
+
+    friend struct CollectionIterator<Dictionary>;
 };
 
-class Dictionary::Iterator : public ClusterTree::Iterator {
-public:
+template <>
+struct CollectionIterator<Dictionary> : public ClusterTree::Iterator {
     typedef std::forward_iterator_tag iterator_category;
     typedef std::pair<const Mixed, Mixed> value_type;
     typedef ptrdiff_t difference_type;
@@ -131,13 +134,19 @@ private:
 
     DataType m_key_type;
 
-    Iterator(const Dictionary* dict, size_t pos);
+    CollectionIterator(const Dictionary* dict, size_t pos);
 };
 
 inline std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, const Obj& obj)
 {
     return insert(key, Mixed(obj.get_link()));
 }
+
+inline std::unique_ptr<CollectionBase> Dictionary::clone_collection() const
+{
+    return m_obj.get_dictionary_ptr(m_col_key);
+}
+
 
 } // namespace realm
 

@@ -78,7 +78,7 @@ void TransactLogConvenientEncoder::do_select_collection(const CollectionBase& li
 {
     select_table(list.get_table().unchecked_ptr());
     ColKey col_key = list.get_col_key();
-    ObjKey key = list.CollectionBase::get_key();
+    ObjKey key = list.get_key();
 
     m_encoder.select_collection(col_key, key); // Throws
     m_selected_list = CollectionId(list.get_table()->get_key(), key, col_key);
