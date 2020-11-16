@@ -553,7 +553,7 @@ def doBuildMacOs(String buildType, boolean runTests) {
             def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
 
             dir("build-macosx-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -563,7 +563,8 @@ def doBuildMacOs(String buildType, boolean runTests) {
                                     rm -rf *
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                                          -D REALM_VERSION=${gitDescribeVersion}\\
+                                          -D REALM_VERSION=${gitDescribeVersion} \\
+                                          -D OSX_ARM64=1 \\
                                           ${buildTests}${cxx_flags} -G Ninja ..
                                 """
                         }
@@ -609,7 +610,7 @@ def doBuildMacOsCatalyst(String buildType) {
             getArchive()
 
             dir("build-maccatalyst-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     sh """
                             rm -rf *
                             cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
@@ -617,6 +618,7 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_VERSION=${gitDescribeVersion} \\
                                   -D REALM_SKIP_SHARED_LIB=ON \\
                                   -D REALM_BUILD_LIB_ONLY=ON \\
+                                  -D OSX_ARM64=1 \\
                                   -G Ninja ..
                         """
                     runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-maccatalyst-${buildType}")
