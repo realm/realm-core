@@ -961,10 +961,10 @@ inline size_t LnkSet::find_any(Mixed value) const
     return found;
 }
 
-inline bool LnkSet::is_obj_valid(size_t ndx) const noexcept
+inline bool LnkSet::is_obj_valid(size_t) const noexcept
 {
-    update_if_needed();
-    return m_set.get(virtual2real(ndx)) != ObjKey{};
+    // LnkSet cannot contain NULL links.
+    return true;
 }
 
 inline Obj LnkSet::get_object(size_t ndx) const
