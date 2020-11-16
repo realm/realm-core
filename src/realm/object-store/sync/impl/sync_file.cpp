@@ -134,7 +134,8 @@ std::string make_raw_string(const std::string& percent_encoded_string)
     return buffer;
 }
 
-std::string file_path_by_appending_component(const std::string& path, const std::string& component, FilePathType path_type)
+std::string file_path_by_appending_component(const std::string& path, const std::string& component,
+                                             FilePathType path_type)
 {
 #ifdef _WIN32
     const char separator = '\\';
@@ -153,10 +154,12 @@ std::string file_path_by_appending_component(const std::string& path, const std:
     if (path_last == separator && component_first == separator) {
         buffer.append(component.substr(1));
         buffer.append(terminal);
-    } else if (path_last == separator || component_first == separator) {
+    }
+    else if (path_last == separator || component_first == separator) {
         buffer.append(component);
         buffer.append(terminal);
-    } else {
+    }
+    else {
         buffer.append(std::string(1, separator));
         buffer.append(component);
         buffer.append(terminal);

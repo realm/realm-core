@@ -24,7 +24,8 @@
 using namespace realm;
 using namespace realm::_impl;
 
-static std::string normalize_realm_path_for_windows_kernel_object_name(std::string realm_path) {
+static std::string normalize_realm_path_for_windows_kernel_object_name(std::string realm_path)
+{
     // windows named objects names should not contain backslash
     std::replace(realm_path.begin(), realm_path.end(), '\\', '/');
 
@@ -37,7 +38,8 @@ static std::string normalize_realm_path_for_windows_kernel_object_name(std::stri
     return realm_path;
 }
 
-static std::string create_condvar_sharedmemory_name(std::string realm_path) {
+static std::string create_condvar_sharedmemory_name(std::string realm_path)
+{
     realm_path = normalize_realm_path_for_windows_kernel_object_name(realm_path);
 
     std::string name("Local\\Realm_ObjectStore_ExternalCommitHelper_SharedCondVar_");
@@ -46,19 +48,20 @@ static std::string create_condvar_sharedmemory_name(std::string realm_path) {
 }
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-: m_parent(parent)
-, m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()))
+    : m_parent(parent)
+    , m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()))
 {
-    m_mutex.set_shared_part(InterprocessMutex::SharedPart(), 
-        normalize_realm_path_for_windows_kernel_object_name(parent.get_path()), 
-        "ExternalCommitHelper_ControlMutex");
+    m_mutex.set_shared_part(InterprocessMutex::SharedPart(),
+                            normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
+                            "ExternalCommitHelper_ControlMutex");
 
-    m_commit_available.set_shared_part(m_condvar_shared.get(), 
-        normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
-        "ExternalCommitHelper_CommitCondVar",
-        std::filesystem::temp_directory_path().u8string());
+    m_commit_available.set_shared_part(
+        m_condvar_shared.get(), normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
+        "ExternalCommitHelper_CommitCondVar", std::filesystem::temp_directory_path().u8string());
 
-    m_thread = std::async(std::launch::async, [this]() { listen(); });
+    m_thread = std::async(std::launch::async, [this]() {
+        listen();
+    });
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
@@ -84,7 +87,7 @@ void ExternalCommitHelper::listen()
     while (m_keep_listening) {
         m_commit_available.wait(m_mutex, nullptr);
         if (m_keep_listening) {
-			m_parent.on_change();
+            m_parent.on_change();
         }
     }
 }

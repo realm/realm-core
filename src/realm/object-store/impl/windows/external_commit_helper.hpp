@@ -58,7 +58,7 @@ public:
             throw std::system_error(error, std::system_category());
         }
         m_memory = reinterpret_cast<T*>(view);
-        
+
         if (shouldInit) {
             try {
                 Initializer(get());
