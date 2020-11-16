@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
