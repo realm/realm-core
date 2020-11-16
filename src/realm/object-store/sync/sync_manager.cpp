@@ -354,7 +354,9 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
-                                 [](auto& user) { return user->state() == SyncUser::State::Removed; }),
+                                 [](auto& user) {
+                                     return user->state() == SyncUser::State::Removed;
+                                 }),
                   m_users.end());
     return m_users;
 }
@@ -387,8 +389,9 @@ void SyncManager::log_out_user(const std::string& user_id)
 
     // Move this user to the end of the vector
     if (m_users.size() > 1) {
-        auto it = std::find_if(m_users.begin(), m_users.end(),
-                               [user_id](const auto& user) { return user->identity() == user_id; });
+        auto it = std::find_if(m_users.begin(), m_users.end(), [user_id](const auto& user) {
+            return user->identity() == user_id;
+        });
 
         if (it != m_users.end())
             std::rotate(it, it + 1, m_users.end());
@@ -584,8 +587,9 @@ bool SyncManager::has_existing_sessions()
 
 bool SyncManager::do_has_existing_sessions()
 {
-    return std::any_of(m_sessions.begin(), m_sessions.end(),
-                       [](auto& element) { return element.second->existing_external_reference(); });
+    return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element) {
+        return element.second->existing_external_reference();
+    });
 }
 
 void SyncManager::unregister_session(const std::string& path)

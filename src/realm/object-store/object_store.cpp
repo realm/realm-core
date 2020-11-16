@@ -446,7 +446,9 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         }
     };
 
-    return std::any_of(begin(changes), end(changes), [](auto&& change) { return change.visit(Visitor()); });
+    return std::any_of(begin(changes), end(changes), [](auto&& change) {
+        return change.visit(Visitor());
+    });
 }
 
 void ObjectStore::verify_no_changes_required(std::vector<SchemaChange> const& changes)

@@ -58,7 +58,9 @@ std::string uuid_string()
 
     std::array<uint8_t, 16> uuid_bytes;
     std::uniform_int_distribution<unsigned int> distribution(0, std::numeric_limits<uint8_t>::max());
-    std::generate(begin(uuid_bytes), end(uuid_bytes), [&] { return distribution(engine); });
+    std::generate(begin(uuid_bytes), end(uuid_bytes), [&] {
+        return distribution(engine);
+    });
 
     // Version 4 UUID.
     uuid_bytes[6] = (uuid_bytes[6] & 0x0f) | 0x40;

@@ -365,7 +365,9 @@ auto Results::dispatch(Fn&& fn) const
 template <typename Context>
 auto Results::get(Context& ctx, size_t row_ndx)
 {
-    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) {
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+    });
 }
 
 template <typename Context>

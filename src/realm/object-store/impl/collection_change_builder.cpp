@@ -69,7 +69,9 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     if (!c.moves.empty() || !c.deletions.empty() || !c.insertions.empty()) {
         auto it = std::remove_if(begin(moves), end(moves), [&](auto& old) {
             // Check if the moved row was moved again, and if so just update the destination
-            auto it = find_if(begin(c.moves), end(c.moves), [&](auto const& m) { return old.to == m.from; });
+            auto it = find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
+                return old.to == m.from;
+            });
             if (it != c.moves.end()) {
                 for_each_col([&](auto& col, auto& other) {
                     if (col.contains(it->from))
@@ -96,9 +98,11 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     // Ignore new moves of rows which were previously inserted (the implicit
     // delete from the move will remove the insert)
     if (!insertions.empty() && !c.moves.empty()) {
-        c.moves.erase(
-            std::remove_if(begin(c.moves), end(c.moves), [&](auto const& m) { return insertions.contains(m.from); }),
-            end(c.moves));
+        c.moves.erase(std::remove_if(begin(c.moves), end(c.moves),
+                                     [&](auto const& m) {
+                                         return insertions.contains(m.from);
+                                     }),
+                      end(c.moves));
     }
 
     // Ensure that any previously modified rows which were moved are still modified
@@ -179,7 +183,9 @@ void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_move
 {
     REALM_ASSERT(count != 0);
 
-    for_each_col([=](auto& col) { col.shift_for_insert_at(index, count); });
+    for_each_col([=](auto& col) {
+        col.shift_for_insert_at(index, count);
+    });
     if (!track_moves)
         return;
 
@@ -193,7 +199,9 @@ void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_move
 
 void CollectionChangeBuilder::erase(size_t index)
 {
-    for_each_col([=](auto& col) { col.erase_at(index); });
+    for_each_col([=](auto& col) {
+        col.erase_at(index);
+    });
     size_t unshifted = insertions.erase_or_unshift(index);
     if (unshifted != IndexSet::npos)
         deletions.add_shifted(unshifted);
@@ -415,7 +423,9 @@ private:
             // Find the TV indicies at which this row appears in the new results
             // There should always be at least one (or it would have been
             // filtered out earlier), but there can be multiple if there are dupes
-            auto it = lower_bound(begin(b), end(b), ai, [](auto lft, auto rgt) { return lft.key < rgt; });
+            auto it = lower_bound(begin(b), end(b), ai, [](auto lft, auto rgt) {
+                return lft.key < rgt;
+            });
             REALM_ASSERT(it != end(b) && it->key == ai);
             for (; it != end(b) && it->key == ai; ++it) {
                 size_t j = it->tv_index;
@@ -487,8 +497,9 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
     a.reserve(rows.size());
     for (auto& row : rows)
         a.push_back({row.key, row.prev_tv_index});
-    std::sort(begin(a), end(a),
-              [](auto lft, auto rgt) { return std::tie(lft.tv_index, lft.key) < std::tie(rgt.tv_index, rgt.key); });
+    std::sort(begin(a), end(a), [](auto lft, auto rgt) {
+        return std::tie(lft.tv_index, lft.key) < std::tie(rgt.tv_index, rgt.key);
+    });
 
     // Before constructing `b`, first find the first index in `a` which will
     // actually differ in `b`, and skip everything else if there aren't any
@@ -506,8 +517,9 @@ void calculate_moves_sorted(std::vector<RowInfo>& rows, CollectionChangeSet& cha
     b.reserve(rows.size());
     for (size_t i = 0; i < rows.size(); ++i)
         b.push_back({rows[i].key, i});
-    std::sort(begin(b), end(b),
-              [](auto lft, auto rgt) { return std::tie(lft.key, lft.tv_index) < std::tie(rgt.key, rgt.tv_index); });
+    std::sort(begin(b), end(b), [](auto lft, auto rgt) {
+        return std::tie(lft.key, lft.tv_index) < std::tie(rgt.key, rgt.tv_index);
+    });
 
     // Calculate the LCS of the two sequences
     auto matches =
@@ -583,10 +595,14 @@ void calculate(CollectionChangeBuilder& ret, std::vector<RowInfo> old_rows, std:
 
     // Filter out the new insertions since we don't need them for any of the
     // further calculations
-    new_rows.erase(
-        std::remove_if(begin(new_rows), end(new_rows), [](auto& row) { return row.prev_tv_index == IndexSet::npos; }),
-        end(new_rows));
-    std::sort(begin(new_rows), end(new_rows), [](auto& lft, auto& rgt) { return lft.tv_index < rgt.tv_index; });
+    new_rows.erase(std::remove_if(begin(new_rows), end(new_rows),
+                                  [](auto& row) {
+                                      return row.prev_tv_index == IndexSet::npos;
+                                  }),
+                   end(new_rows));
+    std::sort(begin(new_rows), end(new_rows), [](auto& lft, auto& rgt) {
+        return lft.tv_index < rgt.tv_index;
+    });
 
     for (auto& row : new_rows) {
         if (key_did_change(row.key)) {
@@ -611,7 +627,9 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<int64_t> 
         info.reserve(rows.size());
         for (size_t i = 0; i < rows.size(); ++i)
             info.push_back({rows[i], IndexSet::npos, i});
-        std::sort(begin(info), end(info), [](auto& lft, auto& rgt) { return lft.key < rgt.key; });
+        std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
+            return lft.key < rgt.key;
+        });
         return info;
     };
 
@@ -632,7 +650,9 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> c
         info.reserve(rows.size());
         for (size_t i = 0; i < rows.size(); ++i)
             info.push_back({static_cast<int64_t>(rows[i]), IndexSet::npos, i});
-        std::sort(begin(info), end(info), [](auto& lft, auto& rgt) { return lft.key < rgt.key; });
+        std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
+            return lft.key < rgt.key;
+        });
         return info;
     };
 
