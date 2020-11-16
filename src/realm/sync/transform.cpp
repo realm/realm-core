@@ -847,7 +847,7 @@ struct TransformerImpl::Transformer {
         m_minor_side.skip_tombstones();
 
 #if defined(REALM_DEBUG) // LCOV_EXCL_START Debug tracing
-        const bool print_noop_merges = true;
+        const bool print_noop_merges = false;
         bool new_major = true; // print an instruction every time we go to the next major regardless
 #endif                         // LCOV_EXCL_STOP REALM_DEBUG
 
