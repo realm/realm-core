@@ -89,7 +89,6 @@ public:
 private:
     T* m_memory = nullptr;
     HANDLE m_mapped_file = nullptr;
-    std::string m_name;
 };
 } // namespace win32
 
