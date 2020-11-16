@@ -3,6 +3,7 @@
 ### Enhancements
 * New data types: Mixed, UUID and TypedLink.
 * New collection types: Set and Dictionary 
+* Enable mixed comparison queries between two columns of arbitrary types according to the Mixed::compare rules. ([#4018](https://github.com/realm/realm-core/pull/4018))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -18,6 +19,37 @@
 ### Internals
 * Set::erase_null() would not properly erase a potential null value ([#4001](https://github.com/realm/realm-core/issues/4001), (not in any release))
 
+----------------------------------------------
+
+# 10.1.2 Release notes
+
+### Fixed
+* Issue fixed by release v6.2.1:
+  * Files upgraded on 32-bit devices could end up being inconsistent resulting in "Key not found" exception to be thown. ([#6992](https://github.com/realm/realm-java/issues/6992), since v6.0.16)
+ 
+----------------------------------------------
+
+# 10.1.1 Release notes
+
+### Fixed
+* `Obj::set_list_values` inappropriately resizes list for LinkList causing LogicError to be thrown. ([#4028](https://github.com/realm/realm-core/issues/4028), since v6.0.0)
+* Set the supported deployment targets for the Swift package, which fixes errors when archiving an iOS app which depends on it.
+* Reenable filelock emulation on watchOS so that the OS does not kill the app when it is suspended while a Realm is open on watchOS 7 ([Cocoa #6861](https://github.com/realm/realm-cocoa/issues/6861), since v6.1.4).
+
+----------------------------------------------
+
+# 10.1.0 Release notes
+
+### Enhancements
+* Features added by release v6.2.0:
+  * In cases where we use an outdated TableRef, we throw InvalidTableRef exception instead of NoSuchTable. NoSuchTable could be misleading as the table is most likely still there.
+
+### Fixed
+* Issues fixed by release v6.2.0:
+  * Fix crash in case insensitive query on indexed string columns when nothing matches ([#6836](https://github.com/realm/realm-cocoa/issues/6836), since v6.0.0)
+  * Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, ([#3987](https://github.com/realm/realm-core/pull/3987), since v6.0.0).
+  * Fix queries for the size of a list of primitive nullable ints returning size + 1. This applies to the `Query::size_*` methods (SizeListNode) and not query expression syntax (SizeOperator). ([#4016](https://github.com/realm/realm-core/pull/4016), since v6.0.0).
+ 
 ----------------------------------------------
 
 # 10.0.0 Release notes
@@ -359,6 +391,33 @@ This release also contains the changes introduced by v6.0.4
 
 ----------------------------------------------
  
+# 6.2.1 Release notes
+
+### Fixed
+* Files upgraded on 32-bit devices could end up being inconsistent resulting in "Key not found" exception to be thown. ([#6992](https://github.com/realm/realm-java/issues/6992), since v6.0.16)
+ 
+----------------------------------------------
+
+# 6.2.0 Release notes
+
+### Enhancements
+* In cases where we use an outdated TableRef, we throw InvalidTableRef exception instead of NoSuchTable. NoSuchTable could be misleading as the table is most likely still there.
+
+### Fixed
+* Fix crash in case insensitive query on indexed string columns when nothing matches ([#6836](https://github.com/realm/realm-cocoa/issues/6836), since v6.0.0)
+* Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, ([#3987](https://github.com/realm/realm-core/pull/3987), since v6.0.0).
+* Fix queries for the size of a list of primitive nullable ints returning size + 1. This applies to the `Query::size_*` methods (SizeListNode) and not query expression syntax (SizeOperator). ([#4016](https://github.com/realm/realm-core/pull/4016), since v6.0.0).
+
+### Breaking changes
+* None.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 6.1.4 Release notes
 
 ### Fixed

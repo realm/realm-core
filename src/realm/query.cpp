@@ -382,50 +382,7 @@ std::unique_ptr<ParentNode> make_size_condition_node(const Table& table, ColKey 
     ColumnAttrMask attr = column_key.get_attrs();
 
     if (attr.test(col_attr_List)) {
-        switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_OldDateTime: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<int64_t, Cond>(value, column_key)};
-            }
-            case type_Float: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<float, Cond>(value, column_key)};
-            }
-            case type_Double: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<double, Cond>(value, column_key)};
-            }
-            case type_String: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<String, Cond>(value, column_key)};
-            }
-            case type_Binary: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Binary, Cond>(value, column_key)};
-            }
-            case type_Timestamp: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Timestamp, Cond>(value, column_key)};
-            }
-            case type_LinkList: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<ObjKey, Cond>(value, column_key)};
-            }
-            case type_ObjectId: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<ObjectId, Cond>(value, column_key)};
-            }
-            case type_Mixed: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Mixed, Cond>(value, column_key)};
-            }
-            case type_Decimal: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<Decimal128, Cond>(value, column_key)};
-            }
-            case type_UUID: {
-                return std::unique_ptr<ParentNode>{new SizeListNode<UUID, Cond>(value, column_key)};
-            }
-            case type_TypedLink:
-                [[fallthrough]];
-            case type_Link:
-                [[fallthrough]];
-            case type_OldTable: {
-                throw_type_mismatch_error();
-            }
-        }
+        return std::unique_ptr<ParentNode>{new SizeListNode<Cond>(value, column_key)};
     }
     switch (type) {
         case type_String: {
@@ -459,142 +416,42 @@ Query& Query::add_size_condition(ColKey column_key, int64_t value)
     return *this;
 }
 
-
-template <class ColumnType>
+// Two column methods, any type
 Query& Query::equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Equal>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-
-// Two column methods, any type
-template <class ColumnType>
 Query& Query::less(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Less>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::less_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<LessEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::greater(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Greater>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::greater_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<GreaterEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::not_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<NotEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
-}
-
-// column vs column, integer
-Query& Query::equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::not_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::less_int(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::greater_int(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayInteger>(column_key1, column_key2);
-}
-
-
-// column vs column, float
-Query& Query::not_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::less_float(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::greater_float(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayFloat>(column_key1, column_key2);
-}
-
-// column vs column, double
-Query& Query::equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayDouble>(column_key1, column_key2);
-}
-Query& Query::greater_double(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayDouble>(column_key1, column_key2);
-}
-Query& Query::less_double(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::not_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayDouble>(column_key1, column_key2);
 }
 
 // null vs column
@@ -1089,6 +946,7 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
         // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
         size_t best = find_best_node(pn);
         start = pn->m_children[best]->aggregate_local(st, start, end, findlocals, source_column);
+        double current_cost = pn->m_children[best]->cost();
 
         // Make remaining conditions compute their m_dD (statistics)
         for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
@@ -1096,8 +954,7 @@ void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start,
                 continue;
 
             // Skip test if there is no way its cost can ever be better than best node's
-            double cost = pn->m_children[c]->cost();
-            if (pn->m_children[c]->m_dT < cost) {
+            if (pn->m_children[c]->m_dT < current_cost) {
 
                 // Limit to bestdist in order not to skip too large parts of index nodes
                 size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;

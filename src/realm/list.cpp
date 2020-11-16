@@ -337,7 +337,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
-    if (value.get_type() == type_TypedLink) {
+    if (!value.is_null() && value.get_type() == type_TypedLink) {
         m_obj.set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);

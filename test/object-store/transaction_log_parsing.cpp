@@ -186,8 +186,9 @@ public:
 
     bool modified(size_t index, ColKey col_key) const noexcept
     {
-        auto it = std::find_if(begin(m_result), end(m_result),
-                               [=](auto&& change) { return (void*)(uintptr_t)index == change.info; });
+        auto it = std::find_if(begin(m_result), end(m_result), [=](auto&& change) {
+            return (void*)(uintptr_t)index == change.info;
+        });
         if (it == m_result.end())
             return false;
         auto col = it->changes.find(col_key.value);
@@ -223,8 +224,7 @@ private:
     }
 };
 
-TEST_CASE("Transaction log parsing: schema change validation")
-{
+TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.schema_mode = SchemaMode::Additive;
@@ -239,8 +239,7 @@ TEST_CASE("Transaction log parsing: schema change validation")
     auto history = make_in_realm_history(config.path);
     auto db = DB::create(*history, config.options());
 
-    SECTION("adding a table is allowed")
-    {
+    SECTION("adding a table is allowed") {
         auto wt = db->start_write();
         TableRef table = wt->add_table("new table");
         table->add_column(type_String, "new col");
@@ -249,8 +248,7 @@ TEST_CASE("Transaction log parsing: schema change validation")
         REQUIRE_NOTHROW(r->refresh());
     }
 
-    SECTION("adding a column at the end of an existing table is allowed")
-    {
+    SECTION("adding a column at the end of an existing table is allowed") {
         auto wt = db->start_write();
         TableRef table = wt->get_table("class_table");
         table->add_column(type_String, "new col");
@@ -259,8 +257,7 @@ TEST_CASE("Transaction log parsing: schema change validation")
         REQUIRE_NOTHROW(r->refresh());
     }
 
-    SECTION("removing a column is not allowed")
-    {
+    SECTION("removing a column is not allowed") {
         auto wt = db->start_write();
         TableRef table = wt->get_table("class_table");
         table->remove_column(table->get_column_key("indexed"));
@@ -269,8 +266,7 @@ TEST_CASE("Transaction log parsing: schema change validation")
         REQUIRE_THROWS(r->refresh());
     }
 
-    SECTION("removing a table is not allowed")
-    {
+    SECTION("removing a table is not allowed") {
         auto wt = db->start_write();
         wt->remove_table("class_table");
         wt->commit();
@@ -279,13 +275,11 @@ TEST_CASE("Transaction log parsing: schema change validation")
     }
 }
 
-TEST_CASE("Transaction log parsing: changeset calcuation")
-{
+TEST_CASE("Transaction log parsing: changeset calcuation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
-    SECTION("table change information")
-    {
+    SECTION("table change information") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"table", {{"pk", PropertyType::Int}, {"value", PropertyType::Int}}},
@@ -318,22 +312,23 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             return info;
         };
 
-        SECTION("modifying a row marks it as modified")
-        {
-            auto info = track_changes({table_key}, [&] { table.get_object(objects[1]).set(cols[1], 2); });
+        SECTION("modifying a row marks it as modified") {
+            auto info = track_changes({table_key}, [&] {
+                table.get_object(objects[1]).set(cols[1], 2);
+            });
             REQUIRE(info.tables.size() == 1);
             REQUIRE(info.tables[table_key].modifications_size() == 1);
             REQUIRE(info.tables[table_key].modifications_contains(1));
         }
 
-        SECTION("modifications to untracked tables are ignored")
-        {
-            auto info = track_changes({}, [&] { table.get_object(objects[1]).set(cols[1], 2); });
+        SECTION("modifications to untracked tables are ignored") {
+            auto info = track_changes({}, [&] {
+                table.get_object(objects[1]).set(cols[1], 2);
+            });
             REQUIRE(info.tables.empty());
         }
 
-        SECTION("new row additions are reported")
-        {
+        SECTION("new row additions are reported") {
             auto info = track_changes({table_key}, [&] {
                 table.create_object();
                 table.create_object();
@@ -344,8 +339,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(info.tables[table_key].insertions_contains(11));
         }
 
-        SECTION("deleting newly added rows makes them not be reported")
-        {
+        SECTION("deleting newly added rows makes them not be reported") {
             auto info = track_changes({table_key}, [&] {
                 table.create_object();
                 table.remove_object(table.create_object().get_key());
@@ -356,9 +350,10 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(info.tables[table_key].deletions_empty());
         }
 
-        SECTION("modifying newly added rows does not report it as a modification")
-        {
-            auto info = track_changes({table_key}, [&] { table.create_object().set_all(10, 0); });
+        SECTION("modifying newly added rows does not report it as a modification") {
+            auto info = track_changes({table_key}, [&] {
+                table.create_object().set_all(10, 0);
+            });
             REQUIRE(info.tables.size() == 1);
             REQUIRE(info.tables[table_key].insertions_size() == 1);
             REQUIRE(info.tables[table_key].insertions_contains(10));
@@ -367,8 +362,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(info.tables[table_key].deletions_empty());
         }
 
-        SECTION("remove_object() does not shift rows")
-        {
+        SECTION("remove_object() does not shift rows") {
             auto info = track_changes({table_key}, [&] {
                 table.remove_object(objects[2]);
                 table.remove_object(objects[3]);
@@ -381,8 +375,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(info.tables[table_key].modifications_empty());
         }
 
-        SECTION("SetDefault does not mark a row as modified")
-        {
+        SECTION("SetDefault does not mark a row as modified") {
             auto info = track_changes({table_key}, [&] {
                 bool is_default = true;
                 table.get_object(objects[0]).set(cols[0], 1, is_default);
@@ -391,8 +384,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
         }
     }
 
-    SECTION("LinkView change information")
-    {
+    SECTION("LinkView change information") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"origin", {{"array", PropertyType::Array | PropertyType::Object, "target"}}},
@@ -420,18 +412,15 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
          helper; out = helper.finish())
 
         CollectionChangeSet changes;
-        SECTION("single change type")
-        {
-            SECTION("add single")
-            {
+        SECTION("single change type") {
+            SECTION("add single") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.add(target_keys[0]);
                 }
                 REQUIRE_INDICES(changes.insertions, 10);
             }
-            SECTION("add multiple")
-            {
+            SECTION("add multiple") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.add(target_keys[0]);
@@ -440,16 +429,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.insertions, 10, 11);
             }
 
-            SECTION("erase single")
-            {
+            SECTION("erase single") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(5);
                 }
                 REQUIRE_INDICES(changes.deletions, 5);
             }
-            SECTION("erase contiguous forward")
-            {
+            SECTION("erase contiguous forward") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(5);
@@ -458,8 +445,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.deletions, 5, 6, 7);
             }
-            SECTION("erase contiguous reverse")
-            {
+            SECTION("erase contiguous reverse") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(7);
@@ -468,8 +454,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.deletions, 5, 6, 7);
             }
-            SECTION("erase contiguous mixed")
-            {
+            SECTION("erase contiguous mixed") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(5);
@@ -478,8 +463,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.deletions, 5, 6, 7);
             }
-            SECTION("erase scattered forward")
-            {
+            SECTION("erase scattered forward") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(3);
@@ -488,8 +472,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.deletions, 3, 5, 7);
             }
-            SECTION("erase scattered backwards")
-            {
+            SECTION("erase scattered backwards") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(7);
@@ -498,8 +481,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.deletions, 3, 5, 7);
             }
-            SECTION("erase scattered mixed")
-            {
+            SECTION("erase scattered mixed") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(3);
@@ -509,16 +491,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.deletions, 3, 5, 7);
             }
 
-            SECTION("set single")
-            {
+            SECTION("set single") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[0]);
                 }
                 REQUIRE_INDICES(changes.modifications, 5);
             }
-            SECTION("set contiguous")
-            {
+            SECTION("set contiguous") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[0]);
@@ -527,8 +507,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.modifications, 5, 6, 7);
             }
-            SECTION("set scattered")
-            {
+            SECTION("set scattered") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[0]);
@@ -537,8 +516,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 }
                 REQUIRE_INDICES(changes.modifications, 5, 7, 9);
             }
-            SECTION("set redundant")
-            {
+            SECTION("set redundant") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[0]);
@@ -548,8 +526,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.modifications, 5);
             }
 
-            SECTION("clear")
-            {
+            SECTION("clear") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.clear();
@@ -557,8 +534,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
             }
 
-            SECTION("move backward")
-            {
+            SECTION("move backward") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(5, 3);
@@ -566,8 +542,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {5, 3});
             }
 
-            SECTION("move forward")
-            {
+            SECTION("move forward") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(1, 3);
@@ -575,8 +550,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {1, 3});
             }
 
-            SECTION("chained moves")
-            {
+            SECTION("chained moves") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(1, 3);
@@ -585,8 +559,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {1, 5});
             }
 
-            SECTION("backwards chained moves")
-            {
+            SECTION("backwards chained moves") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(5, 3);
@@ -595,8 +568,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {5, 1});
             }
 
-            SECTION("moves shifting other moves")
-            {
+            SECTION("moves shifting other moves") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(1, 5);
@@ -612,8 +584,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {1, 6}, {7, 0});
             }
 
-            SECTION("move to current location is a no-op")
-            {
+            SECTION("move to current location is a no-op") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(5, 5);
@@ -623,8 +594,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.moves.empty());
             }
 
-            SECTION("delete a target row")
-            {
+            SECTION("delete a target row") {
                 VALIDATE_CHANGES(changes)
                 {
                     target->get_object(5).remove();
@@ -632,8 +602,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.deletions, 5);
             }
 
-            SECTION("delete all target rows")
-            {
+            SECTION("delete all target rows") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove_all_target_rows();
@@ -641,8 +610,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
             }
 
-            SECTION("clear target table")
-            {
+            SECTION("clear target table") {
                 VALIDATE_CHANGES(changes)
                 {
                     target->clear();
@@ -650,8 +618,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
             }
 
-            SECTION("swap()")
-            {
+            SECTION("swap()") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.swap(3, 5);
@@ -660,10 +627,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             }
         }
 
-        SECTION("mixed change types")
-        {
-            SECTION("set -> insert")
-            {
+        SECTION("mixed change types") {
+            SECTION("set -> insert") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[0]);
@@ -680,8 +645,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.insertions, 5);
                 REQUIRE_INDICES(changes.modifications, 4);
             }
-            SECTION("insert -> set")
-            {
+            SECTION("insert -> set") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.insert(5, target_keys[0]);
@@ -707,8 +671,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.modifications, 5);
             }
 
-            SECTION("set -> erase")
-            {
+            SECTION("set -> erase") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[0]);
@@ -735,8 +698,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.modifications.empty());
             }
 
-            SECTION("erase -> set")
-            {
+            SECTION("erase -> set") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(5);
@@ -746,8 +708,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.modifications, 5);
             }
 
-            SECTION("insert -> clear")
-            {
+            SECTION("insert -> clear") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.add(target_keys[0]);
@@ -757,8 +718,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.insertions.empty());
             }
 
-            SECTION("set -> clear")
-            {
+            SECTION("set -> clear") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(0, target_keys[5]);
@@ -768,8 +728,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.modifications.empty());
             }
 
-            SECTION("clear -> insert")
-            {
+            SECTION("clear -> insert") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.clear();
@@ -779,8 +738,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.insertions, 0);
             }
 
-            SECTION("insert -> delete")
-            {
+            SECTION("insert -> delete") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.add(target_keys[0]);
@@ -822,8 +780,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.insertions, 1, 2, 3);
             }
 
-            SECTION("delete -> insert")
-            {
+            SECTION("delete -> insert") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(9);
@@ -833,8 +790,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.insertions, 9);
             }
 
-            SECTION("interleaved delete and insert")
-            {
+            SECTION("interleaved delete and insert") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(9);
@@ -860,8 +816,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.insertions, 0, 1, 2, 3, 4);
             }
 
-            SECTION("move after set is just insert+delete")
-            {
+            SECTION("move after set is just insert+delete") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.set(5, target_keys[6]);
@@ -873,8 +828,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {5, 0});
             }
 
-            SECTION("set after move is just insert+delete")
-            {
+            SECTION("set after move is just insert+delete") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(5, 0);
@@ -886,8 +840,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {5, 0});
             }
 
-            SECTION("delete after move removes original row")
-            {
+            SECTION("delete after move removes original row") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(5, 0);
@@ -898,8 +851,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.moves.empty());
             }
 
-            SECTION("moving newly inserted row just changes reported index of insert")
-            {
+            SECTION("moving newly inserted row just changes reported index of insert") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(5, 0);
@@ -910,8 +862,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.moves.empty());
             }
 
-            SECTION("moves shift insertions/changes like any other insertion")
-            {
+            SECTION("moves shift insertions/changes like any other insertion") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.insert(5, target_keys[5]);
@@ -924,8 +875,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {6, 4});
             }
 
-            SECTION("clear after delete")
-            {
+            SECTION("clear after delete") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.remove(5);
@@ -934,8 +884,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_INDICES(changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
             }
 
-            SECTION("erase before previous move target")
-            {
+            SECTION("erase before previous move target") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(2, 8);
@@ -946,8 +895,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE_MOVES(changes, {2, 7});
             }
 
-            SECTION("insert after move updates move destination")
-            {
+            SECTION("insert after move updates move destination") {
                 VALIDATE_CHANGES(changes)
                 {
                     lv.move(2, 8);
@@ -957,10 +905,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             }
         }
 
-        SECTION("deleting the linkview")
-        {
-            SECTION("directly")
-            {
+        SECTION("deleting the linkview") {
+            SECTION("directly") {
                 VALIDATE_CHANGES(changes)
                 {
                     origin->get_object(0).remove();
@@ -971,8 +917,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.modifications.empty());
             }
 
-            SECTION("table clear")
-            {
+            SECTION("table clear") {
                 VALIDATE_CHANGES(changes)
                 {
                     origin->clear();
@@ -983,8 +928,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.modifications.empty());
             }
 
-            SECTION("delete a different lv")
-            {
+            SECTION("delete a different lv") {
                 r->begin_transaction();
                 auto new_obj = origin->create_object();
                 r->commit_transaction();
@@ -999,8 +943,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             }
         }
 
-        SECTION("modifying a different linkview should not produce notifications")
-        {
+        SECTION("modifying a different linkview should not produce notifications") {
             r->begin_transaction();
             auto lv2 = origin->create_object().get_linklist("array");
             lv2.add(target_keys[5]);
@@ -1024,8 +967,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
         }
     }
 
-    SECTION("object change information")
-    {
+    SECTION("object change information") {
         config.cache = false;
         auto realm = Realm::get_shared_realm(config);
         realm->update_schema({
@@ -1128,42 +1070,48 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             return observer;
         };
 
-        SECTION("setting a property marks that property as changed")
-        {
+        SECTION("setting a property marks that property as changed") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { o.set(target_cols[0], 1); });
+            auto changes = observe({o}, [&] {
+                o.set(target_cols[0], 1);
+            });
             REQUIRE(changes.modified(0, target_cols[0]));
             REQUIRE_FALSE(changes.modified(0, target_cols[1]));
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("self-assignment marks as changed")
-        {
+        SECTION("self-assignment marks as changed") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { o.set(target_cols[0], o.get<int64_t>(target_cols[0])); });
+            auto changes = observe({o}, [&] {
+                o.set(target_cols[0], o.get<int64_t>(target_cols[0]));
+            });
             REQUIRE(changes.modified(0, target_cols[0]));
             REQUIRE_FALSE(changes.modified(0, target_cols[1]));
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("SetDefault does not mark as changed")
-        {
+        SECTION("SetDefault does not mark as changed") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { o.set(target_cols[0], 5, true); });
+            auto changes = observe({o}, [&] {
+                o.set(target_cols[0], 5, true);
+            });
             REQUIRE_FALSE(changes.modified(0, target_cols[0]));
             REQUIRE_FALSE(changes.modified(0, target_cols[1]));
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("multiple properties on a single object are handled properly")
-        {
+        SECTION("multiple properties on a single object are handled properly") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { o.set(target_cols[1], 1); });
+            auto changes = observe({o}, [&] {
+                o.set(target_cols[1], 1);
+            });
             REQUIRE_FALSE(changes.modified(0, target_cols[0]));
             REQUIRE(changes.modified(0, target_cols[1]));
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
 
-            changes = observe({o}, [&] { o.set(target_cols[2], 1); });
+            changes = observe({o}, [&] {
+                o.set(target_cols[2], 1);
+            });
             REQUIRE_FALSE(changes.modified(0, target_cols[0]));
             REQUIRE_FALSE(changes.modified(0, target_cols[1]));
             REQUIRE(changes.modified(0, target_cols[2]));
@@ -1186,49 +1134,55 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("setting other objects does not mark as changed")
-        {
+        SECTION("setting other objects does not mark as changed") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { target->get_object(target_keys[1]).set(target_cols[0], 5); });
+            auto changes = observe({o}, [&] {
+                target->get_object(target_keys[1]).set(target_cols[0], 5);
+            });
             REQUIRE_FALSE(changes.modified(0, target_cols[0]));
             REQUIRE_FALSE(changes.modified(0, target_cols[1]));
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("deleting an observed object adds it to invalidated")
-        {
+        SECTION("deleting an observed object adds it to invalidated") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { o.remove(); });
+            auto changes = observe({o}, [&] {
+                o.remove();
+            });
             REQUIRE(changes.invalidated(0));
         }
 
-        SECTION("deleting an unobserved object does nothing")
-        {
+        SECTION("deleting an unobserved object does nothing") {
             auto o = target->get_object(target_keys[0]);
-            auto changes = observe({o}, [&] { target->get_object(target_keys[1]).remove(); });
+            auto changes = observe({o}, [&] {
+                target->get_object(target_keys[1]).remove();
+            });
             REQUIRE_FALSE(changes.invalidated(0));
         }
 
-        SECTION("deleting the target of a link marks the link as modified")
-        {
+        SECTION("deleting the target of a link marks the link as modified") {
             auto o = obj0;
-            auto changes = observe({o}, [&] { o.get_linked_object(origin_cols[1]).remove(); });
+            auto changes = observe({o}, [&] {
+                o.get_linked_object(origin_cols[1]).remove();
+            });
             REQUIRE(changes.modified(0, origin_cols[1]));
         }
 
-        SECTION("clearing the target table of a link marks the link as modified")
-        {
+        SECTION("clearing the target table of a link marks the link as modified") {
             auto o = obj0;
-            auto changes = observe({o}, [&] { target->clear(); });
+            auto changes = observe({o}, [&] {
+                target->clear();
+            });
             REQUIRE(changes.modified(0, origin_cols[1]));
         }
 
-        SECTION("clearing a table invalidates all observers for that table")
-        {
+        SECTION("clearing a table invalidates all observers for that table") {
             auto r1 = target->get_object(target_keys[0]);
             auto r2 = target->get_object(target_keys[5]);
             auto r3 = obj0;
-            auto changes = observe({r1, r2, r3}, [&] { target->clear(); });
+            auto changes = observe({r1, r2, r3}, [&] {
+                target->clear();
+            });
             REQUIRE(changes.invalidated(0));
             REQUIRE(changes.invalidated(1));
             REQUIRE_FALSE(changes.invalidated(2));
@@ -1237,14 +1191,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
         using Kind = BindingContext::ColumnInfo::Kind;
         auto o = obj0;
         const auto lv_col = origin_cols[2];
-        SECTION("array: add()")
-        {
-            auto changes = observe({o}, [&] { lv.add(target_keys[0]); });
+        SECTION("array: add()") {
+            auto changes = observe({o}, [&] {
+                lv.add(target_keys[0]);
+            });
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {10}}));
         }
 
-        SECTION("array: insert()")
-        {
+        SECTION("array: insert()") {
             auto changes = observe({o}, [&] {
                 lv.insert(4, target_keys[0]);
                 lv.insert(2, target_keys[0]);
@@ -1253,8 +1207,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {2, 5, 8}}));
         }
 
-        SECTION("array: remove()")
-        {
+        SECTION("array: remove()") {
             auto changes = observe({o}, [&] {
                 lv.remove(0);
                 lv.remove(2);
@@ -1262,8 +1215,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Remove, {0, 3}}));
         }
 
-        SECTION("array: set()")
-        {
+        SECTION("array: set()") {
             auto changes = observe({o}, [&] {
                 lv.set(0, target_keys[3]);
                 lv.set(2, target_keys[3]);
@@ -1271,34 +1223,36 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Set, {0, 2}}));
         }
 
-        SECTION("array: move()")
-        {
-            SECTION("swap forward")
-            {
-                auto changes = observe({o}, [&] { lv.move(3, 4); });
+        SECTION("array: move()") {
+            SECTION("swap forward") {
+                auto changes = observe({o}, [&] {
+                    lv.move(3, 4);
+                });
                 REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Set, {3, 4}}));
             }
 
-            SECTION("swap backwards")
-            {
-                auto changes = observe({o}, [&] { lv.move(4, 3); });
+            SECTION("swap backwards") {
+                auto changes = observe({o}, [&] {
+                    lv.move(4, 3);
+                });
                 REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Set, {3, 4}}));
             }
 
-            SECTION("move fowards")
-            {
-                auto changes = observe({o}, [&] { lv.move(3, 5); });
+            SECTION("move fowards") {
+                auto changes = observe({o}, [&] {
+                    lv.move(3, 5);
+                });
                 REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Set, {3, 4, 5}}));
             }
 
-            SECTION("move backwards")
-            {
-                auto changes = observe({o}, [&] { lv.move(5, 3); });
+            SECTION("move backwards") {
+                auto changes = observe({o}, [&] {
+                    lv.move(5, 3);
+                });
                 REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Set, {3, 4, 5}}));
             }
 
-            SECTION("multiple moves collapsing to nothing")
-            {
+            SECTION("multiple moves collapsing to nothing") {
                 auto changes = observe({o}, [&] {
                     lv.move(3, 4);
                     lv.move(4, 5);
@@ -1307,8 +1261,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
                 REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::None, {}}));
             }
 
-            SECTION("multiple moves")
-            {
+            SECTION("multiple moves") {
                 auto changes = observe({o}, [&] {
                     lv.move(3, 6);
                     lv.move(6, 4);
@@ -1329,20 +1282,21 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             }
         }
 
-        SECTION("array: swap()")
-        {
-            auto changes = observe({o}, [&] { lv.swap(5, 3); });
+        SECTION("array: swap()") {
+            auto changes = observe({o}, [&] {
+                lv.swap(5, 3);
+            });
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Set, {3, 5}}));
         }
 
-        SECTION("array: clear()")
-        {
-            auto changes = observe({o}, [&] { lv.clear(); });
+        SECTION("array: clear()") {
+            auto changes = observe({o}, [&] {
+                lv.clear();
+            });
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: clear() after add()")
-        {
+        SECTION("array: clear() after add()") {
             auto changes = observe({o}, [&] {
                 lv.add(target_keys[0]);
                 lv.clear();
@@ -1350,8 +1304,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: clear() after set()")
-        {
+        SECTION("array: clear() after set()") {
             auto changes = observe({o}, [&] {
                 lv.set(5, target_keys[3]);
                 lv.clear();
@@ -1359,8 +1312,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: clear() after remove()")
-        {
+        SECTION("array: clear() after remove()") {
             auto changes = observe({o}, [&] {
                 lv.remove(2);
                 lv.clear();
@@ -1368,14 +1320,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: rollback clear()")
-        {
-            auto changes = observe_rollback({o}, [&] { lv.clear(); });
+        SECTION("array: rollback clear()") {
+            auto changes = observe_rollback({o}, [&] {
+                lv.clear();
+            });
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: rollback clear() after add()")
-        {
+        SECTION("array: rollback clear() after add()") {
             auto changes = observe_rollback({o}, [&] {
                 lv.add(target_keys[0]);
                 lv.clear();
@@ -1383,8 +1335,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: rollback clear() after set()")
-        {
+        SECTION("array: rollback clear() after set()") {
             auto changes = observe_rollback({o}, [&] {
                 lv.set(5, target_keys[3]);
                 lv.clear();
@@ -1392,8 +1343,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: rollback clear() after remove()")
-        {
+        SECTION("array: rollback clear() after remove()") {
             auto changes = observe_rollback({o}, [&] {
                 lv.remove(2);
                 lv.clear();
@@ -1401,8 +1351,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("array: rollback add after clear()")
-        {
+        SECTION("array: rollback add after clear()") {
             auto changes = observe_rollback({o}, [&] {
                 lv.clear();
                 lv.add(target_keys[0]);
@@ -1410,8 +1359,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::SetAll, {}}));
         }
 
-        SECTION("array: multiple change kinds")
-        {
+        SECTION("array: multiple change kinds") {
             auto changes = observe({o}, [&] {
                 lv.add(target_keys[0]);
                 lv.remove(0);
@@ -1419,8 +1367,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::SetAll, {}}));
         }
 
-        SECTION("array: modify newly inserted row")
-        {
+        SECTION("array: modify newly inserted row") {
             auto changes = observe({o}, [&] {
                 lv.add(target_keys[0]);
                 lv.set(lv.size() - 1, target_keys[1]);
@@ -1428,22 +1375,21 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, lv_col) == (ArrayChange{Kind::Insert, {10}}));
         }
 
-        SECTION("array: modifying different array does not produce changes")
-        {
-            auto changes = observe({o}, [&] { lv2.add(target_keys[0]); });
+        SECTION("array: modifying different array does not produce changes") {
+            auto changes = observe({o}, [&] {
+                lv2.add(target_keys[0]);
+            });
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("array: modifying different table does not produce changes")
-        {
+        SECTION("array: modifying different table does not produce changes") {
             auto changes = observe({o}, [&] {
                 realm->read_group().get_table("class_origin 2")->begin()->get_linklist("array").add(target_keys[0]);
             });
             REQUIRE_FALSE(changes.modified(0, target_cols[2]));
         }
 
-        SECTION("array: deleting the containing row after making changes discards the changes")
-        {
+        SECTION("array: deleting the containing row after making changes discards the changes") {
             auto changes = observe({o}, [&] {
                 lv.insert(4, target_keys[0]);
                 lv.insert(2, target_keys[0]);
@@ -1456,14 +1402,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
         // ----------------------------------------------------------------------
 
         const auto tr_col = origin_cols[3];
-        SECTION("int array: add()")
-        {
-            auto changes = observe({o}, [&] { tr.add(0); });
+        SECTION("int array: add()") {
+            auto changes = observe({o}, [&] {
+                tr.add(0);
+            });
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Insert, {10}}));
         }
 
-        SECTION("int array: insert()")
-        {
+        SECTION("int array: insert()") {
             auto changes = observe({o}, [&] {
                 tr.insert(4, 0);
                 tr.insert(2, 0);
@@ -1472,8 +1418,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Insert, {2, 5, 8}}));
         }
 
-        SECTION("int array: remove()")
-        {
+        SECTION("int array: remove()") {
             auto changes = observe({o}, [&] {
                 tr.remove(0);
                 tr.remove(2);
@@ -1481,8 +1426,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Remove, {0, 3}}));
         }
 
-        SECTION("int array: set()")
-        {
+        SECTION("int array: set()") {
             auto changes = observe({o}, [&] {
                 tr.set(0, 3);
                 tr.set(2, 3);
@@ -1490,8 +1434,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {0, 2}}));
         }
 
-        SECTION("int array: move()")
-        {
+        SECTION("int array: move()") {
             auto changes = observe({o}, [&] {
                 tr.move(8, 2);
                 tr.move(4, 6);
@@ -1502,8 +1445,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {2, 3, 6, 7, 8}}));
         }
 
-        SECTION("int array: emulated move()")
-        {
+        SECTION("int array: emulated move()") {
             auto changes = observe({o}, [&] {
                 // list.move(8, 2);
                 tr.insert(2, 0);
@@ -1521,28 +1463,29 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {2, 3, 6, 7, 8}}));
         }
 
-        SECTION("int array: swap()")
-        {
-            SECTION("adjacent")
-            {
-                auto changes = observe({o}, [&] { tr.swap(5, 4); });
+        SECTION("int array: swap()") {
+            SECTION("adjacent") {
+                auto changes = observe({o}, [&] {
+                    tr.swap(5, 4);
+                });
                 REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {4, 5}}));
             }
-            SECTION("non-adjacent")
-            {
-                auto changes = observe({o}, [&] { tr.swap(5, 3); });
+            SECTION("non-adjacent") {
+                auto changes = observe({o}, [&] {
+                    tr.swap(5, 3);
+                });
                 REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Set, {3, 5}}));
             }
         }
 
-        SECTION("int array: clear()")
-        {
-            auto changes = observe({o}, [&] { tr.clear(); });
+        SECTION("int array: clear()") {
+            auto changes = observe({o}, [&] {
+                tr.clear();
+            });
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: clear() after add()")
-        {
+        SECTION("int array: clear() after add()") {
             auto changes = observe({o}, [&] {
                 tr.add(0);
                 tr.clear();
@@ -1550,8 +1493,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: clear() after set()")
-        {
+        SECTION("int array: clear() after set()") {
             auto changes = observe({o}, [&] {
                 tr.set(5, 3);
                 tr.clear();
@@ -1559,8 +1501,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: clear() after remove()")
-        {
+        SECTION("int array: clear() after remove()") {
             auto changes = observe({o}, [&] {
                 tr.remove(2);
                 tr.clear();
@@ -1568,8 +1509,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Remove, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: multiple change kinds")
-        {
+        SECTION("int array: multiple change kinds") {
             auto changes = observe({o}, [&] {
                 tr.add(0);
                 tr.remove(0);
@@ -1577,14 +1517,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::SetAll, {}}));
         }
 
-        SECTION("int array: modifying different array does not produce changes")
-        {
-            auto changes = observe({o}, [&] { tr2.add(0); });
+        SECTION("int array: modifying different array does not produce changes") {
+            auto changes = observe({o}, [&] {
+                tr2.add(0);
+            });
             REQUIRE_FALSE(changes.modified(0, target_cols[3]));
         }
 
-        SECTION("int array: deleting the containing row after making changes discards the changes")
-        {
+        SECTION("int array: deleting the containing row after making changes discards the changes") {
             auto changes = observe({o}, [&] {
                 tr.insert(4, 0);
                 tr.insert(2, 0);
@@ -1594,14 +1534,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::None, {}}));
         }
 
-        SECTION("int array: rollback clear()")
-        {
-            auto changes = observe_rollback({o}, [&] { tr.clear(); });
+        SECTION("int array: rollback clear()") {
+            auto changes = observe_rollback({o}, [&] {
+                tr.clear();
+            });
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: rollback clear() after add()")
-        {
+        SECTION("int array: rollback clear() after add()") {
             auto changes = observe_rollback({o}, [&] {
                 tr.add(0);
                 tr.clear();
@@ -1609,8 +1549,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: rollback clear() after set()")
-        {
+        SECTION("int array: rollback clear() after set()") {
             auto changes = observe_rollback({o}, [&] {
                 tr.set(5, 3);
                 tr.clear();
@@ -1618,8 +1557,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: rollback clear() after remove()")
-        {
+        SECTION("int array: rollback clear() after remove()") {
             auto changes = observe_rollback({o}, [&] {
                 tr.remove(2);
                 tr.clear();
@@ -1627,8 +1565,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
             REQUIRE(changes.array_change(0, tr_col) == (ArrayChange{Kind::Insert, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}));
         }
 
-        SECTION("int array: rollback add() after clear()")
-        {
+        SECTION("int array: rollback add() after clear()") {
             auto changes = observe_rollback({o}, [&] {
                 tr.clear();
                 tr.add(0);
@@ -1638,8 +1575,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation")
     }
 }
 
-TEST_CASE("DeepChangeChecker")
-{
+TEST_CASE("DeepChangeChecker") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1678,20 +1614,19 @@ TEST_CASE("DeepChangeChecker")
     _impl::DeepChangeChecker::find_related_tables(tables, *table);
 
     auto cols = table->get_column_keys();
-    SECTION("direct changes are tracked")
-    {
-        auto info = track_changes([&] { table->get_object(9).set(cols[0], 10); });
+    SECTION("direct changes are tracked") {
+        auto info = track_changes([&] {
+            table->get_object(9).set(cols[0], 10);
+        });
 
         _impl::DeepChangeChecker checker(info, *table, tables);
         REQUIRE_FALSE(checker(8));
         REQUIRE(checker(9));
     }
 
-    SECTION("changes over links are tracked")
-    {
+    SECTION("changes over links are tracked") {
         bool did_run_section = false;
-        SECTION("first link set")
-        {
+        SECTION("first link set") {
             did_run_section = true;
             r->begin_transaction();
             objects[0].set(cols[1], objects[1].get_key());
@@ -1699,8 +1634,7 @@ TEST_CASE("DeepChangeChecker")
             objects[2].set(cols[1], objects[4].get_key());
             r->commit_transaction();
         }
-        SECTION("second link set")
-        {
+        SECTION("second link set") {
             did_run_section = true;
             r->begin_transaction();
             objects[0].set(cols[2], objects[1].get_key());
@@ -1708,8 +1642,7 @@ TEST_CASE("DeepChangeChecker")
             objects[2].set(cols[2], objects[4].get_key());
             r->commit_transaction();
         }
-        SECTION("both set")
-        {
+        SECTION("both set") {
             did_run_section = true;
             r->begin_transaction();
             objects[0].set(cols[1], objects[1].get_key());
@@ -1721,8 +1654,7 @@ TEST_CASE("DeepChangeChecker")
             objects[2].set(cols[2], objects[4].get_key());
             r->commit_transaction();
         }
-        SECTION("circular link")
-        {
+        SECTION("circular link") {
             did_run_section = true;
             r->begin_transaction();
             objects[0].set(cols[1], objects[0].get_key());
@@ -1738,7 +1670,9 @@ TEST_CASE("DeepChangeChecker")
         }
 
         catch2_ensure_section_run_workaround(did_run_section, "changes over links are tracked", [&]() {
-            auto info = track_changes([&] { objects[4].set(cols[0], 10); });
+            auto info = track_changes([&] {
+                objects[4].set(cols[0], 10);
+            });
 
             // link chain should cascade to all but #3 being marked as modified
             REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
@@ -1748,8 +1682,7 @@ TEST_CASE("DeepChangeChecker")
         });
     }
 
-    SECTION("changes over linklists are tracked")
-    {
+    SECTION("changes over linklists are tracked") {
         r->begin_transaction();
         for (int i = 0; i < 3; ++i) {
             objects[i].get_linklist(cols[3]).add(objects[i].get_key());
@@ -1758,34 +1691,37 @@ TEST_CASE("DeepChangeChecker")
         }
         r->commit_transaction();
 
-        auto info = track_changes([&] { objects[4].set(cols[0], 10); });
+        auto info = track_changes([&] {
+            objects[4].set(cols[0], 10);
+        });
 
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
     }
 
-    SECTION("cycles over links do not loop forever")
-    {
+    SECTION("cycles over links do not loop forever") {
         r->begin_transaction();
         objects[0].set(cols[1], objects[0].get_key());
         r->commit_transaction();
 
-        auto info = track_changes([&] { objects[9].set(cols[0], 10); });
+        auto info = track_changes([&] {
+            objects[9].set(cols[0], 10);
+        });
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
     }
 
-    SECTION("cycles over linklists do not loop forever")
-    {
+    SECTION("cycles over linklists do not loop forever") {
         r->begin_transaction();
         objects[0].get_linklist(cols[3]).add(objects[0].get_key());
         r->commit_transaction();
 
-        auto info = track_changes([&] { objects[9].set(cols[0], 10); });
+        auto info = track_changes([&] {
+            objects[9].set(cols[0], 10);
+        });
         REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(0));
     }
 
-    SECTION("link chains are tracked up to 4 levels deep")
-    {
+    SECTION("link chains are tracked up to 4 levels deep") {
         r->begin_transaction();
         for (int i = 0; i < 10; ++i)
             objects.push_back(table->create_object());
@@ -1793,7 +1729,9 @@ TEST_CASE("DeepChangeChecker")
             objects[i].set(cols[1], objects[i + 1].get_key());
         r->commit_transaction();
 
-        auto info = track_changes([&] { objects[19].set(cols[0], -1); });
+        auto info = track_changes([&] {
+            objects[19].set(cols[0], -1);
+        });
 
         _impl::DeepChangeChecker checker(info, *table, tables);
         CHECK(checker(19));
@@ -1816,8 +1754,7 @@ TEST_CASE("DeepChangeChecker")
         CHECK(checker3(19));
     }
 
-    SECTION("changes made in the 3rd elements in the link list")
-    {
+    SECTION("changes made in the 3rd elements in the link list") {
         r->begin_transaction();
         objects[0].get_linklist(cols[3]).add(objects[1].get_key());
         objects[0].get_linklist(cols[3]).add(objects[2].get_key());
@@ -1827,16 +1764,19 @@ TEST_CASE("DeepChangeChecker")
         objects[3].set(cols[1], objects[0].get_key());
         r->commit_transaction();
 
-        auto info = track_changes([&] { objects[3].set(cols[0], 42); });
+        auto info = track_changes([&] {
+            objects[3].set(cols[0], 42);
+        });
         _impl::DeepChangeChecker checker(info, *table, tables);
         REQUIRE(checker(1));
         REQUIRE(checker(2));
         REQUIRE(checker(3));
     }
 
-    SECTION("changes made to lists mark the containing row as modified")
-    {
-        auto info = track_changes([&] { objects[0].get_linklist(cols[3]).add(objects[1].get_key()); });
+    SECTION("changes made to lists mark the containing row as modified") {
+        auto info = track_changes([&] {
+            objects[0].get_linklist(cols[3]).add(objects[1].get_key());
+        });
         _impl::DeepChangeChecker checker(info, *table, tables);
         REQUIRE(checker(0));
     }

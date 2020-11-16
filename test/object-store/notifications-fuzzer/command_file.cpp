@@ -46,7 +46,9 @@ static T read_value(std::istream& input)
 template <typename... Args>
 static auto make_reader(void (*fn)(RealmState&, Args...))
 {
-    return [=](std::istream& input) { return std::bind(fn, std::placeholders::_1, read_value<Args>(input)...); };
+    return [=](std::istream& input) {
+        return std::bind(fn, std::placeholders::_1, read_value<Args>(input)...);
+    };
 }
 
 static void run_add(RealmState& state, int64_t value)

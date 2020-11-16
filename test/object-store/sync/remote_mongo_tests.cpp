@@ -60,8 +60,7 @@ std::string operator""_nows(const char* str, size_t len)
 }
 } // namespace
 
-TEST_CASE("Validate _nows helper", "[mongo]")
-{
+TEST_CASE("Validate _nows helper", "[mongo]") {
     // WARNING: if you are debugging this test, be aware that catch can be inconsistent with leading whitespace when
     // printing mulit-line strings. You may want to do your own printing.
 
@@ -87,35 +86,29 @@ TEST_CASE("Validate _nows helper", "[mongo]")
              mr bob)"_nows == "hello\nmr bob");
 }
 
-TEST_CASE("WatchStream SSE processing", "[mongo]")
-{
+TEST_CASE("WatchStream SSE processing", "[mongo]") {
     WatchStream ws;
 
-    SECTION("successes")
-    {
-        SECTION("empty kind")
-        {
+    SECTION("successes") {
+        SECTION("empty kind") {
             ws.feed_sse({R"({"a": 1})", ""});
             REQUIRE(ws.state() == WatchStream::HAVE_EVENT);
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
-        SECTION("message kind")
-        {
+        SECTION("message kind") {
             ws.feed_sse({R"({"a": 1})", "message"});
             REQUIRE(ws.state() == WatchStream::HAVE_EVENT);
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
-        SECTION("message kind by default")
-        {
+        SECTION("message kind by default") {
             ws.feed_sse({R"({"a": 1})"});
             REQUIRE(ws.state() == WatchStream::HAVE_EVENT);
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
-        SECTION("two messages")
-        {
+        SECTION("two messages") {
             ws.feed_sse({R"({"a": 1})"});
             REQUIRE(ws.state() == WatchStream::HAVE_EVENT);
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
@@ -125,8 +118,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 2})"));
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
-        SECTION("unknown kinds are ignored")
-        {
+        SECTION("unknown kinds are ignored") {
             ws.feed_sse({R"({"a": 1})", "ignoreme"});
             REQUIRE(ws.state() == WatchStream::NEED_DATA);
             ws.feed_sse({R"({"a": 2})"});
@@ -134,8 +126,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 2})"));
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
-        SECTION("percent encoding (all valid)")
-        {
+        SECTION("percent encoding (all valid)") {
             // Note that %0A and %0D are both whitespace control characters,
             // so they are not allowed to appear in json strings, and are
             // ignored like whitespace during parsing. The error section
@@ -145,8 +136,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
             CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": "%"})"));
             CHECK(ws.state() == WatchStream::NEED_DATA);
         }
-        SECTION("percent encoding (some invalid)")
-        {
+        SECTION("percent encoding (some invalid)") {
             // Unknown % sequences are ignored.
             ws.feed_sse({R"({"a": "%25 %26%" %0A %0D })"});
             REQUIRE(ws.state() == WatchStream::HAVE_EVENT);
@@ -155,19 +145,15 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
         }
     }
 
-    SECTION("errors")
-    {
-        SECTION("well-formed server error")
-        {
-            SECTION("simple")
-            {
+    SECTION("errors") {
+        SECTION("well-formed server error") {
+            SECTION("simple") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
                 CHECK(ws.error().message == ":(");
             }
-            SECTION("reading error doesn't consume it")
-            {
+            SECTION("reading error doesn't consume it") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
@@ -177,74 +163,63 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
                 CHECK(ws.error().message == ":(");
             }
-            SECTION("with unknown code")
-            {
+            SECTION("with unknown code") {
                 ws.feed_sse({R"({"error_code": "WhoKnows", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == ":(");
             }
-            SECTION("percent encoding")
-            {
+            SECTION("percent encoding") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": "100%25 failure"})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
                 CHECK(ws.error().message == "100% failure");
             }
-            SECTION("extra field")
-            {
+            SECTION("extra field") {
                 ws.feed_sse({R"({"bonus": "field", "error_code": "BadRequest", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::bad_request));
                 CHECK(ws.error().message == ":(");
             }
         }
-        SECTION("malformed server error")
-        {
-            SECTION("invalid json")
-            {
+        SECTION("malformed server error") {
+            SECTION("invalid json") {
                 ws.feed_sse({R"({"no closing: "}")", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == R"({"no closing: "}")");
             }
-            SECTION("missing error")
-            {
+            SECTION("missing error") {
                 ws.feed_sse({R"({"error_code": "BadRequest"})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == R"({"error_code": "BadRequest"})");
             }
-            SECTION("missing error_code")
-            {
+            SECTION("missing error_code") {
                 ws.feed_sse({R"({"error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == R"({"error": ":("})");
             }
-            SECTION("error wrong type")
-            {
+            SECTION("error wrong type") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": 1})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == R"({"error_code": "BadRequest", "error": 1})");
             }
-            SECTION("error_code wrong type")
-            {
+            SECTION("error_code wrong type") {
                 ws.feed_sse({R"({"error_code": 1, "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == R"({"error_code": 1, "error": ":("})");
             }
-            SECTION("not an object")
-            {
+            SECTION("not an object") {
                 ws.feed_sse({R"("I'm just a string in the world")", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(ServiceErrorCode::unknown));
                 CHECK(ws.error().message == R"("I'm just a string in the world")");
             }
-            SECTION("a lot of percent encoding")
-            {
+            SECTION("a lot of percent encoding") {
                 // Note, trailing % is a special case that should be preserved if more is added.
                 ws.feed_sse({R"(%25%26%0A%0D%)", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
@@ -252,17 +227,14 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
                 CHECK(ws.error().message == "%%26\n\r%"); // NOTE: not a raw string so has real CR and LF bytes.
             }
         }
-        SECTION("malformed ordinary event")
-        {
-            SECTION("invalid json")
-            {
+        SECTION("malformed ordinary event") {
+            SECTION("invalid json") {
                 ws.feed_sse({R"({"no closing: "}")"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(JSONErrorCode::bad_bson_parse));
                 CHECK(ws.error().message == R"(server returned malformed event: {"no closing: "}")");
             }
-            SECTION("not an object")
-            {
+            SECTION("not an object") {
                 ws.feed_sse({R"("I'm just a string in the world")"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
                 CHECK(ws.error().error_code == make_error_code(JSONErrorCode::bad_bson_parse));
@@ -275,12 +247,10 @@ TEST_CASE("WatchStream SSE processing", "[mongo]")
 // Defining a shorthand so that it is less disruptive to put this after every line.
 #define REQ_ND REQUIRE(ws.state() == WatchStream::NEED_DATA)
 
-TEST_CASE("WatchStream line processing", "[mongo]")
-{
+TEST_CASE("WatchStream line processing", "[mongo]") {
     WatchStream ws;
 
-    SECTION("simple")
-    {
+    SECTION("simple") {
         ws.feed_line(R"(event: message)");
         REQ_ND;
         ws.feed_line(R"(data: {"a": 1})");
@@ -290,8 +260,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("with LF")
-    {
+    SECTION("with LF") {
         ws.feed_line(R"(event: message)"
                      "\n");
         REQ_ND;
@@ -304,8 +273,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("with CR")
-    {
+    SECTION("with CR") {
         ws.feed_line(R"(event: message)"
                      "\r");
         REQ_ND;
@@ -318,8 +286,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("with CRLF")
-    {
+    SECTION("with CRLF") {
         ws.feed_line(R"(event: message)"
                      "\r\n");
         REQ_ND;
@@ -332,8 +299,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("no space")
-    {
+    SECTION("no space") {
         ws.feed_line(R"(event:message)");
         REQ_ND;
         ws.feed_line(R"(data:{"a": 1})");
@@ -343,8 +309,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("only last event kind used")
-    {
+    SECTION("only last event kind used") {
         ws.feed_line(R"(event: error)");
         REQ_ND;
         ws.feed_line(R"(data: {"a": 1})");
@@ -358,8 +323,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("multiple")
-    {
+    SECTION("multiple") {
         ws.feed_line(R"(event: message)");
         REQ_ND;
         ws.feed_line(R"(data: {"a": 1})");
@@ -377,8 +341,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 2})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("multiple with implicit event kind")
-    {
+    SECTION("multiple with implicit event kind") {
         ws.feed_line(R"(data: {"a": 1})");
         REQ_ND;
         ws.feed_line(R"()");
@@ -392,8 +355,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 2})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("data spread over multiple lines")
-    {
+    SECTION("data spread over multiple lines") {
         ws.feed_line(R"(data: {"a")");
         REQ_ND;
         ws.feed_line(R"(data::)");
@@ -404,8 +366,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("comments ignored")
-    {
+    SECTION("comments ignored") {
         ws.feed_line(R"(:)");
         REQ_ND;
         ws.feed_line(R"(data: {"a")");
@@ -425,8 +386,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("unknown fields ignored")
-    {
+    SECTION("unknown fields ignored") {
         ws.feed_line(R"(hmm: thinking)");
         REQ_ND;
         ws.feed_line(R"(data: {"a")");
@@ -446,8 +406,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("events without data are ignored")
-    {
+    SECTION("events without data are ignored") {
         ws.feed_line(R"(event: message)");
         REQ_ND;
         ws.feed_line(R"()"); // noop dispatch
@@ -465,8 +424,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("new line handling (prestripped)")
-    {
+    SECTION("new line handling (prestripped)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
         ws.feed_line(R"(event: error)");
         REQ_ND;
@@ -480,8 +438,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
         CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
     }
-    SECTION("new line handling (LF)")
-    {
+    SECTION("new line handling (LF)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
         ws.feed_line(R"(event: error)"
                      "\n");
@@ -500,8 +457,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
         CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
     }
-    SECTION("new line handling (CR)")
-    {
+    SECTION("new line handling (CR)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
         ws.feed_line(R"(event: error)"
                      "\r");
@@ -520,8 +476,7 @@ TEST_CASE("WatchStream line processing", "[mongo]")
         REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
         CHECK(ws.error().message == "this error\n has three lines\n but only two LFs");
     }
-    SECTION("new line handling (CRLF)")
-    {
+    SECTION("new line handling (CRLF)") {
         // since newlines are ignored in json, this tests using the mal-formed error case
         ws.feed_line(R"(event: error)"
                      "\r\n");
@@ -542,12 +497,10 @@ TEST_CASE("WatchStream line processing", "[mongo]")
     }
 }
 
-TEST_CASE("WatchStream buffer processing", "[mongo]")
-{
+TEST_CASE("WatchStream buffer processing", "[mongo]") {
     WatchStream ws;
 
-    SECTION("simple")
-    {
+    SECTION("simple") {
         ws.feed_buffer(R"(
             event: message
             data: {"a": 1}
@@ -557,8 +510,7 @@ TEST_CASE("WatchStream buffer processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 1})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("multi")
-    {
+    SECTION("multi") {
         ws.feed_buffer(R"(
             event: message
             data: {"a": 1}
@@ -576,8 +528,7 @@ TEST_CASE("WatchStream buffer processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 2})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("multi in one buffer")
-    {
+    SECTION("multi in one buffer") {
         ws.feed_buffer(R"(
             event: message
             data: {"a": 1}
@@ -592,8 +543,7 @@ TEST_CASE("WatchStream buffer processing", "[mongo]")
         CHECK(Bson(ws.next_event()) == bson::parse(R"({"a": 2})"));
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
-    SECTION("partial lines")
-    {
+    SECTION("partial lines") {
         ws.feed_buffer(R"(
             event: message
             data: {"a":)"_nows);
@@ -610,8 +560,7 @@ TEST_CASE("WatchStream buffer processing", "[mongo]")
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
 
-    SECTION("multi and partial lines")
-    {
+    SECTION("multi and partial lines") {
         ws.feed_buffer(R"(
             event: message
             data: {"a": 1}
@@ -638,8 +587,7 @@ TEST_CASE("WatchStream buffer processing", "[mongo]")
         CHECK(ws.state() == WatchStream::NEED_DATA);
     }
 
-    SECTION("CR alone isn't treated as a newline")
-    {
+    SECTION("CR alone isn't treated as a newline") {
         // This is a deviation from the spec. We do not support the legacy macOS < 10 CR-only newlines.
         // The server does not generate them, and there would be some overhead to supporting them.
         ws.feed_buffer("event: message\rdata: {\"a\": 1}\r\r");

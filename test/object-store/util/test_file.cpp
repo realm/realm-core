@@ -120,7 +120,9 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
                                                                    app->base_url(), fake_device_id),
                                      name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](auto, auto) { abort(); };
+    sync_config->error_handler = [](auto, auto) {
+        abort();
+    };
     schema_mode = SchemaMode::Additive;
 }
 
@@ -164,7 +166,9 @@ SyncServer::~SyncServer()
 void SyncServer::start()
 {
     REALM_ASSERT(!m_thread.joinable());
-    m_thread = std::thread([this] { m_server.run(); });
+    m_thread = std::thread([this] {
+        m_server.run();
+    });
 }
 
 void SyncServer::stop()
@@ -194,7 +198,9 @@ static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(st
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(wait_mutex);
-    cv.wait(lock, [&]() { return wait_flag == true; });
+    cv.wait(lock, [&]() {
+        return wait_flag == true;
+    });
     return ec;
 }
 
@@ -281,7 +287,9 @@ static class TsanNotifyWorker {
 public:
     TsanNotifyWorker()
     {
-        m_thread = std::thread([&] { work(); });
+        m_thread = std::thread([&] {
+            work();
+        });
     }
 
     void work()

@@ -40,8 +40,7 @@
 using namespace realm;
 using util::any_cast;
 
-TEST_CASE("list")
-{
+TEST_CASE("list") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -94,8 +93,7 @@ TEST_CASE("list")
     auto r2 = coordinator.get_realm();
     auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
-    SECTION("add_notification_block()")
-    {
+    SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, obj, col_link);
 
@@ -108,8 +106,9 @@ TEST_CASE("list")
         };
 
         auto require_change = [&] {
-            auto token =
-                lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
             return token;
         };
@@ -124,8 +123,7 @@ TEST_CASE("list")
             return token;
         };
 
-        SECTION("modifying the list sends a change notifications")
-        {
+        SECTION("modifying the list sends a change notifications") {
             auto token = require_change();
             write([&] {
                 if (lv2->size() > 5)
@@ -134,8 +132,7 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.deletions, 5);
         }
 
-        SECTION("modifying a different list doesn't send a change notification")
-        {
+        SECTION("modifying a different list doesn't send a change notification") {
             auto token = require_no_change();
             write([&] {
                 if (lv2->size() > 5)
@@ -143,43 +140,49 @@ TEST_CASE("list")
             });
         }
 
-        SECTION("deleting the list sends a change notification")
-        {
+        SECTION("deleting the list sends a change notification") {
             auto token = require_change();
-            write([&] { obj.remove(); });
+            write([&] {
+                obj.remove();
+            });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 
             // Should not resend delete all notification after another commit
             change = {};
-            write([&] { target->create_object(); });
+            write([&] {
+                target->create_object();
+            });
             REQUIRE(change.empty());
         }
 
-        SECTION("deleting list before first run of notifier reports deletions")
-        {
-            auto token =
-                lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+        SECTION("deleting list before first run of notifier reports deletions") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
-            write([&] { origin->begin()->remove(); });
+            write([&] {
+                origin->begin()->remove();
+            });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
         }
 
-        SECTION("modifying one of the target rows sends a change notification")
-        {
+        SECTION("modifying one of the target rows sends a change notification") {
             auto token = require_change();
-            write([&] { lst.get(5).set(col_value, 6); });
+            write([&] {
+                lst.get(5).set(col_value, 6);
+            });
             REQUIRE_INDICES(change.modifications, 5);
         }
 
-        SECTION("deleting a target row sends a change notification")
-        {
+        SECTION("deleting a target row sends a change notification") {
             auto token = require_change();
-            write([&] { target->remove_object(target_keys[5]); });
+            write([&] {
+                target->remove_object(target_keys[5]);
+            });
             REQUIRE_INDICES(change.deletions, 5);
         }
 
-        SECTION("adding a row and then modifying the target row does not mark the row as modified")
-        {
+        SECTION("adding a row and then modifying the target row does not mark the row as modified") {
             auto token = require_change();
             write([&] {
                 Obj obj = target->get_object(target_keys[5]);
@@ -190,8 +193,7 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.modifications, 5);
         }
 
-        SECTION("modifying and then moving a row reports move/insert but not modification")
-        {
+        SECTION("modifying and then moving a row reports move/insert but not modification") {
             auto token = require_change();
             write([&] {
                 target->get_object(target_keys[5]).set(col_value, 10);
@@ -203,37 +205,39 @@ TEST_CASE("list")
             REQUIRE(change.modifications.empty());
         }
 
-        SECTION("modifying a row which appears multiple times in a list marks them all as modified")
-        {
+        SECTION("modifying a row which appears multiple times in a list marks them all as modified") {
             r->begin_transaction();
             lst.add(target_keys[5]);
             r->commit_transaction();
 
             auto token = require_change();
-            write([&] { target->get_object(target_keys[5]).set(col_value, 10); });
+            write([&] {
+                target->get_object(target_keys[5]).set(col_value, 10);
+            });
             REQUIRE_INDICES(change.modifications, 5, 10);
         }
 
-        SECTION("deleting a row which appears multiple times in a list marks them all as modified")
-        {
+        SECTION("deleting a row which appears multiple times in a list marks them all as modified") {
             r->begin_transaction();
             lst.add(target_keys[5]);
             r->commit_transaction();
 
             auto token = require_change();
-            write([&] { target->remove_object(target_keys[5]); });
+            write([&] {
+                target->remove_object(target_keys[5]);
+            });
             REQUIRE_INDICES(change.deletions, 5, 10);
         }
 
-        SECTION("clearing the target table sends a change notification")
-        {
+        SECTION("clearing the target table sends a change notification") {
             auto token = require_change();
-            write([&] { target->clear(); });
+            write([&] {
+                target->clear();
+            });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
         }
 
-        SECTION("moving a target row does not send a change notification")
-        {
+        SECTION("moving a target row does not send a change notification") {
             // Remove a row from the LV so that we have one to delete that's not in the list
             r->begin_transaction();
             if (lv->size() > 2)
@@ -241,11 +245,12 @@ TEST_CASE("list")
             r->commit_transaction();
 
             auto token = require_no_change();
-            write([&] { target->remove_object(target_keys[2]); });
+            write([&] {
+                target->remove_object(target_keys[2]);
+            });
         }
 
-        SECTION("multiple LinkViews for the same LinkList can get notifications")
-        {
+        SECTION("multiple LinkViews for the same LinkList can get notifications") {
             r->begin_transaction();
             target->clear();
             std::vector<ObjKey> keys;
@@ -272,8 +277,10 @@ TEST_CASE("list")
 
             for (int i = 0; i < 3; ++i) {
                 lists[i] = get_list();
-                tokens[i] = lists[i].add_notification_callback(
-                    [i, &changes](CollectionChangeSet c, std::exception_ptr) { changes[i] = std::move(c); });
+                tokens[i] =
+                    lists[i].add_notification_callback([i, &changes](CollectionChangeSet c, std::exception_ptr) {
+                        changes[i] = std::move(c);
+                    });
                 change_list();
             }
 
@@ -303,8 +310,7 @@ TEST_CASE("list")
             }
         }
 
-        SECTION("multiple callbacks for the same Lists can be skipped individually")
-        {
+        SECTION("multiple callbacks for the same Lists can be skipped individually") {
             auto token = require_no_change();
             auto token2 = require_change();
 
@@ -317,13 +323,13 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.insertions, 10);
         }
 
-        SECTION("multiple Lists for the same LinkView can be skipped individually")
-        {
+        SECTION("multiple Lists for the same LinkView can be skipped individually") {
             auto token = require_no_change();
 
             List list2(r, obj, col_link);
-            auto token2 =
-                list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
 
             r->begin_transaction();
@@ -335,8 +341,7 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.insertions, 10);
         }
 
-        SECTION("skipping only effects the current transaction even if no notification would occur anyway")
-        {
+        SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
             auto token = require_change();
 
             // would not produce a notification even if it wasn't skipped because no changes were made
@@ -354,18 +359,19 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.insertions, 10);
         }
 
-        SECTION("modifying a different table does not send a change notification")
-        {
+        SECTION("modifying a different table does not send a change notification") {
             auto token = require_no_change();
-            write([&] { other_lv->add(other_target_keys[0]); });
+            write([&] {
+                other_lv->add(other_target_keys[0]);
+            });
         }
 
-        SECTION("changes are reported correctly for multiple tables")
-        {
+        SECTION("changes are reported correctly for multiple tables") {
             List list2(r, *other_lv);
             CollectionChangeSet other_changes;
-            auto token1 = list2.add_notification_callback(
-                [&](CollectionChangeSet c, std::exception_ptr) { other_changes = std::move(c); });
+            auto token1 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                other_changes = std::move(c);
+            });
             auto token2 = require_change();
 
             write([&] {
@@ -396,14 +402,14 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.insertions, 14, 15);
         }
 
-        SECTION("tables-of-interest are tracked properly for multiple source versions")
-        {
+        SECTION("tables-of-interest are tracked properly for multiple source versions") {
             // Add notifiers for different tables at different versions to verify
             // that the tables of interest are updated correctly as we process
             // new notifiers
             CollectionChangeSet changes1, changes2;
-            auto token1 = lst.add_notification_callback(
-                [&](CollectionChangeSet c, std::exception_ptr) { changes1 = std::move(c); });
+            auto token1 = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                changes1 = std::move(c);
+            });
 
             r2->begin_transaction();
             r2->read_group().get_table("class_target")->get_object(target_keys[0]).set(col_value, 10);
@@ -414,8 +420,9 @@ TEST_CASE("list")
             r2->commit_transaction();
 
             List list2(r2, r2->read_group().get_table("class_other_origin")->get_object(0), other_col_link);
-            auto token2 = list2.add_notification_callback(
-                [&](CollectionChangeSet c, std::exception_ptr) { changes2 = std::move(c); });
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                changes2 = std::move(c);
+            });
 
             auto r3 = coordinator.get_realm();
             r3->begin_transaction();
@@ -433,8 +440,7 @@ TEST_CASE("list")
             REQUIRE_INDICES(changes2.modifications, 3);
         }
 
-        SECTION("modifications are reported for rows that are moved and then moved back in a second transaction")
-        {
+        SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
             auto token = require_change();
 
             r2->begin_transaction();
@@ -458,10 +464,10 @@ TEST_CASE("list")
             REQUIRE_MOVES(change, {1, 2});
         }
 
-        SECTION("changes are sent in initial notification")
-        {
-            auto token =
-                lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+        SECTION("changes are sent in initial notification") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             r2->begin_transaction();
             r2_lv->remove(5);
             r2->commit_transaction();
@@ -469,10 +475,10 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.deletions, 5);
         }
 
-        SECTION("changes are sent in initial notification after removing and then re-adding callback")
-        {
-            auto token =
-                lst.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { REQUIRE(false); });
+        SECTION("changes are sent in initial notification after removing and then re-adding callback") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                REQUIRE(false);
+            });
             token = {};
 
             auto write = [&] {
@@ -481,9 +487,10 @@ TEST_CASE("list")
                 r2->commit_transaction();
             };
 
-            SECTION("add new callback before transaction")
-            {
-                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            SECTION("add new callback before transaction") {
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
 
                 write();
 
@@ -491,22 +498,24 @@ TEST_CASE("list")
                 REQUIRE_INDICES(change.deletions, 5);
             }
 
-            SECTION("add new callback after transaction")
-            {
+            SECTION("add new callback after transaction") {
                 write();
 
-                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
 
                 advance_and_notify(*r);
                 REQUIRE_INDICES(change.deletions, 5);
             }
 
-            SECTION("add new callback after transaction and after changeset was calculated")
-            {
+            SECTION("add new callback after transaction and after changeset was calculated") {
                 write();
                 coordinator.on_change();
 
-                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+                token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                    change = c;
+                });
 
                 advance_and_notify(*r);
                 REQUIRE_INDICES(change.deletions, 5);
@@ -514,8 +523,7 @@ TEST_CASE("list")
         }
     }
 
-    SECTION("sorted add_notification_block()")
-    {
+    SECTION("sorted add_notification_block()") {
         List lst(r, *lv);
         Results results = lst.sort({{{col_value}}, {false}});
 
@@ -536,8 +544,7 @@ TEST_CASE("list")
 
             advance_and_notify(*r);
         };
-        SECTION("add duplicates")
-        {
+        SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
                 lst.add(target_keys[5]);
@@ -547,29 +554,31 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.insertions, 5, 6, 7);
         }
 
-        SECTION("change order by modifying target")
-        {
-            write([&] { lst.get(5).set(col_value, 15); });
+        SECTION("change order by modifying target") {
+            write([&] {
+                lst.get(5).set(col_value, 15);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 4);
             REQUIRE_INDICES(change.insertions, 0);
         }
 
-        SECTION("swap")
-        {
-            write([&] { lst.swap(1, 2); });
+        SECTION("swap") {
+            write([&] {
+                lst.swap(1, 2);
+            });
             REQUIRE(notification_calls == 1);
         }
 
-        SECTION("move")
-        {
-            write([&] { lst.move(5, 3); });
+        SECTION("move") {
+            write([&] {
+                lst.move(5, 3);
+            });
             REQUIRE(notification_calls == 1);
         }
     }
 
-    SECTION("filtered add_notification_block()")
-    {
+    SECTION("filtered add_notification_block()") {
         List lst(r, *lv);
         Results results = lst.filter(target->where().less(col_value, 9));
 
@@ -590,8 +599,7 @@ TEST_CASE("list")
 
             advance_and_notify(*r);
         };
-        SECTION("add duplicates")
-        {
+        SECTION("add duplicates") {
             write([&] {
                 lst.add(target_keys[5]);
                 lst.add(target_keys[5]);
@@ -601,36 +609,40 @@ TEST_CASE("list")
             REQUIRE_INDICES(change.insertions, 9, 10, 11);
         }
 
-        SECTION("swap")
-        {
-            write([&] { lst.swap(1, 2); });
+        SECTION("swap") {
+            write([&] {
+                lst.swap(1, 2);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 2);
             REQUIRE_INDICES(change.insertions, 1);
 
-            write([&] { lst.swap(5, 8); });
+            write([&] {
+                lst.swap(5, 8);
+            });
             REQUIRE(notification_calls == 3);
             REQUIRE_INDICES(change.deletions, 5, 8);
             REQUIRE_INDICES(change.insertions, 5, 8);
         }
 
-        SECTION("move")
-        {
-            write([&] { lst.move(5, 3); });
+        SECTION("move") {
+            write([&] {
+                lst.move(5, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 5);
             REQUIRE_INDICES(change.insertions, 3);
         }
 
-        SECTION("move non-matching entry")
-        {
-            write([&] { lst.move(9, 3); });
+        SECTION("move non-matching entry") {
+            write([&] {
+                lst.move(9, 3);
+            });
             REQUIRE(notification_calls == 1);
         }
     }
 
-    SECTION("sort()")
-    {
+    SECTION("sort()") {
         auto objectschema = &*r->schema().find("target");
         List list(r, *lv);
         auto results = list.sort({{{col_value}}, {false}});
@@ -659,8 +671,7 @@ TEST_CASE("list")
         REQUIRE(results.get_mode() == Results::Mode::LinkList);
     }
 
-    SECTION("filter()")
-    {
+    SECTION("filter()") {
         auto objectschema = &*r->schema().find("target");
         List list(r, *lv);
         auto results = list.filter(target->where().greater(col_value, 5));
@@ -674,8 +685,7 @@ TEST_CASE("list")
         }
     }
 
-    SECTION("snapshot()")
-    {
+    SECTION("snapshot()") {
         auto objectschema = &*r->schema().find("target");
         List list(r, *lv);
 
@@ -706,15 +716,13 @@ TEST_CASE("list")
         REQUIRE(snapshot.size() == 10);
     }
 
-    SECTION("get_object_schema()")
-    {
+    SECTION("get_object_schema()") {
         List list(r, *lv);
         auto objectschema = &*r->schema().find("target");
         REQUIRE(&list.get_object_schema() == objectschema);
     }
 
-    SECTION("delete_at()")
-    {
+    SECTION("delete_at()") {
         List list(r, *lv);
         r->begin_transaction();
         auto initial_view_size = lv->size();
@@ -725,8 +733,7 @@ TEST_CASE("list")
         r->cancel_transaction();
     }
 
-    SECTION("delete_all()")
-    {
+    SECTION("delete_all()") {
         List list(r, *lv);
         r->begin_transaction();
         list.delete_all();
@@ -735,8 +742,7 @@ TEST_CASE("list")
         r->cancel_transaction();
     }
 
-    SECTION("as_results().clear()")
-    {
+    SECTION("as_results().clear()") {
         List list(r, *lv);
         r->begin_transaction();
         list.as_results().clear();
@@ -745,8 +751,7 @@ TEST_CASE("list")
         r->cancel_transaction();
     }
 
-    SECTION("snapshot().clear()")
-    {
+    SECTION("snapshot().clear()") {
         List list(r, *lv);
         r->begin_transaction();
         auto snapshot = list.snapshot();
@@ -758,86 +763,72 @@ TEST_CASE("list")
         r->cancel_transaction();
     }
 
-    SECTION("add(RowExpr)")
-    {
+    SECTION("add(RowExpr)") {
         List list(r, *lv);
         r->begin_transaction();
-        SECTION("adds rows from the correct table")
-        {
+        SECTION("adds rows from the correct table") {
             list.add(target_keys[5]);
             REQUIRE(list.size() == 11);
             REQUIRE(list.get(10).get_key() == target_keys[5]);
         }
 
-        SECTION("throws for rows from the wrong table")
-        {
+        SECTION("throws for rows from the wrong table") {
             REQUIRE_THROWS(list.add(obj));
         }
         r->cancel_transaction();
     }
 
-    SECTION("insert(RowExpr)")
-    {
+    SECTION("insert(RowExpr)") {
         List list(r, *lv);
         r->begin_transaction();
 
-        SECTION("insert rows from the correct table")
-        {
+        SECTION("insert rows from the correct table") {
             list.insert(0, target_keys[5]);
             REQUIRE(list.size() == 11);
             REQUIRE(list.get(0).get_key() == target_keys[5]);
         }
 
-        SECTION("throws for rows from the wrong table")
-        {
+        SECTION("throws for rows from the wrong table") {
             REQUIRE_THROWS(list.insert(0, obj));
         }
 
-        SECTION("throws for out of bounds insertions")
-        {
+        SECTION("throws for out of bounds insertions") {
             REQUIRE_THROWS(list.insert(11, target_keys[5]));
             REQUIRE_NOTHROW(list.insert(10, target_keys[5]));
         }
         r->cancel_transaction();
     }
 
-    SECTION("set(RowExpr)")
-    {
+    SECTION("set(RowExpr)") {
         List list(r, *lv);
         r->begin_transaction();
 
-        SECTION("assigns for rows from the correct table")
-        {
+        SECTION("assigns for rows from the correct table") {
             list.set(0, target_keys[5]);
             REQUIRE(list.size() == 10);
             REQUIRE(list.get(0).get_key() == target_keys[5]);
         }
 
-        SECTION("throws for rows from the wrong table")
-        {
+        SECTION("throws for rows from the wrong table") {
             REQUIRE_THROWS(list.set(0, obj));
         }
 
-        SECTION("throws for out of bounds sets")
-        {
+        SECTION("throws for out of bounds sets") {
             REQUIRE_THROWS(list.set(10, target_keys[5]));
         }
         r->cancel_transaction();
     }
 
-    SECTION("find(RowExpr)")
-    {
+    SECTION("find(RowExpr)") {
         List list(r, *lv);
         Obj obj1 = target->get_object(target_keys[1]);
         Obj obj5 = target->get_object(target_keys[5]);
 
-        SECTION("returns index in list for values in the list")
-        {
+        SECTION("returns index in list for values in the list") {
             REQUIRE(list.find(obj5) == 5);
         }
 
-        SECTION("returns index in list and not index in table")
-        {
+        SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(obj5) == 4);
@@ -845,8 +836,7 @@ TEST_CASE("list")
             r->cancel_transaction();
         }
 
-        SECTION("returns npos for values not in the list")
-        {
+        SECTION("returns npos for values not in the list") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(obj1) == npos);
@@ -854,67 +844,57 @@ TEST_CASE("list")
             r->cancel_transaction();
         }
 
-        SECTION("throws for row in wrong table")
-        {
+        SECTION("throws for row in wrong table") {
             REQUIRE_THROWS(list.find(obj));
             REQUIRE_THROWS(list.as_results().index_of(obj));
         }
     }
 
-    SECTION("find(Query)")
-    {
+    SECTION("find(Query)") {
         List list(r, *lv);
 
-        SECTION("returns index in list for values in the list")
-        {
+        SECTION("returns index in list for values in the list") {
             REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 5);
         }
 
-        SECTION("returns index in list and not index in table")
-        {
+        SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
             r->cancel_transaction();
         }
 
-        SECTION("returns npos for values not in the list")
-        {
+        SECTION("returns npos for values not in the list") {
             REQUIRE(list.find(std::move(target->where().equal(col_value, 11))) == npos);
         }
     }
 
-    SECTION("add(Context)")
-    {
+    SECTION("add(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
         r->begin_transaction();
 
-        SECTION("adds boxed RowExpr")
-        {
+        SECTION("adds boxed RowExpr") {
             list.add(ctx, util::Any(target->get_object(target_keys[5])));
             REQUIRE(list.size() == 11);
             REQUIRE(list.get(10).get_key().value == 5);
         }
 
-        SECTION("adds boxed realm::Object")
-        {
+        SECTION("adds boxed realm::Object") {
             realm::Object obj(r, list.get_object_schema(), target->get_object(target_keys[5]));
             list.add(ctx, util::Any(obj));
             REQUIRE(list.size() == 11);
             REQUIRE(list.get(10).get_key() == target_keys[5]);
         }
 
-        SECTION("creates new object for dictionary")
-        {
+        SECTION("creates new object for dictionary") {
             list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == 11);
             REQUIRE(list.get(10).get<Int>(col_value) == 20);
         }
 
-        SECTION("throws for object in wrong table")
-        {
+        SECTION("throws for object in wrong table") {
             REQUIRE_THROWS(list.add(ctx, util::Any(origin->get_object(0))));
             realm::Object object(r, *r->schema().find("origin"), origin->get_object(0));
             REQUIRE_THROWS(list.add(ctx, util::Any(object)));
@@ -923,36 +903,30 @@ TEST_CASE("list")
         r->cancel_transaction();
     }
 
-    SECTION("find(Context)")
-    {
+    SECTION("find(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
 
-        SECTION("returns index in list for boxed RowExpr")
-        {
+        SECTION("returns index in list for boxed RowExpr") {
             REQUIRE(list.find(ctx, util::Any(target->get_object(target_keys[5]))) == 5);
         }
 
-        SECTION("returns index in list for boxed Object")
-        {
+        SECTION("returns index in list for boxed Object") {
             realm::Object obj(r, *r->schema().find("origin"), target->get_object(target_keys[5]));
             REQUIRE(list.find(ctx, util::Any(obj)) == 5);
         }
 
-        SECTION("does not insert new objects for dictionaries")
-        {
+        SECTION("does not insert new objects for dictionaries") {
             REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", INT64_C(20)}})) == npos);
             REQUIRE(target->size() == 10);
         }
 
-        SECTION("throws for object in wrong table")
-        {
+        SECTION("throws for object in wrong table") {
             REQUIRE_THROWS(list.find(ctx, util::Any(obj)));
         }
     }
 
-    SECTION("get(Context)")
-    {
+    SECTION("get(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
 
@@ -963,8 +937,7 @@ TEST_CASE("list")
     }
 }
 
-TEST_CASE("embedded List")
-{
+TEST_CASE("embedded List") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     auto r = Realm::get_shared_realm(config);
@@ -1010,8 +983,7 @@ TEST_CASE("embedded List")
     auto r2 = coordinator.get_realm();
     auto r2_lv = r2->read_group().get_table("class_origin")->get_object(0).get_linklist_ptr(col_link);
 
-    SECTION("add_notification_block()")
-    {
+    SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, obj, col_link);
 
@@ -1024,8 +996,9 @@ TEST_CASE("embedded List")
         };
 
         auto require_change = [&] {
-            auto token =
-                lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
             return token;
         };
@@ -1040,23 +1013,26 @@ TEST_CASE("embedded List")
             return token;
         };
 
-        SECTION("modifying the list sends a change notifications")
-        {
+        SECTION("modifying the list sends a change notifications") {
             auto token = require_change();
-            write([&] { lst.remove(5); });
+            write([&] {
+                lst.remove(5);
+            });
             REQUIRE_INDICES(change.deletions, 5);
         }
 
-        SECTION("modifying a different list doesn't send a change notification")
-        {
+        SECTION("modifying a different list doesn't send a change notification") {
             auto token = require_no_change();
-            write([&] { lv2->remove(5); });
+            write([&] {
+                lv2->remove(5);
+            });
         }
 
-        SECTION("deleting the list sends a change notification")
-        {
+        SECTION("deleting the list sends a change notification") {
             auto token = require_change();
-            write([&] { obj.remove(); });
+            write([&] {
+                obj.remove();
+            });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 
             // Should not resend delete all notification after another commit
@@ -1068,31 +1044,34 @@ TEST_CASE("embedded List")
             REQUIRE(change.empty());
         }
 
-        SECTION("deleting list before first run of notifier reports deletions")
-        {
-            auto token =
-                lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) { change = c; });
+        SECTION("deleting list before first run of notifier reports deletions") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
             advance_and_notify(*r);
-            write([&] { origin->begin()->remove(); });
+            write([&] {
+                origin->begin()->remove();
+            });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
         }
 
-        SECTION("modifying one of the target rows sends a change notification")
-        {
+        SECTION("modifying one of the target rows sends a change notification") {
             auto token = require_change();
-            write([&] { lst.get(5).set(col_value, 6); });
+            write([&] {
+                lst.get(5).set(col_value, 6);
+            });
             REQUIRE_INDICES(change.modifications, 5);
         }
 
-        SECTION("deleting a target row sends a change notification")
-        {
+        SECTION("deleting a target row sends a change notification") {
             auto token = require_change();
-            write([&] { target->remove_object(lv->get(5)); });
+            write([&] {
+                target->remove_object(lv->get(5));
+            });
             REQUIRE_INDICES(change.deletions, 5);
         }
 
-        SECTION("modifying and then moving a row reports move/insert but not modification")
-        {
+        SECTION("modifying and then moving a row reports move/insert but not modification") {
             auto token = require_change();
             write([&] {
                 target->get_object(lv->get(5)).set(col_value, 10);
@@ -1104,16 +1083,16 @@ TEST_CASE("embedded List")
             REQUIRE(change.modifications.empty());
         }
 
-        SECTION("clearing the target table sends a change notification")
-        {
+        SECTION("clearing the target table sends a change notification") {
             auto token = require_change();
-            write([&] { target->clear(); });
+            write([&] {
+                target->clear();
+            });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
         }
     }
 
-    SECTION("sorted add_notification_block()")
-    {
+    SECTION("sorted add_notification_block()") {
         List lst(r, *lv);
         Results results = lst.sort({{{col_value}}, {false}});
 
@@ -1135,29 +1114,31 @@ TEST_CASE("embedded List")
             advance_and_notify(*r);
         };
 
-        SECTION("change order by modifying target")
-        {
-            write([&] { lst.get(5).set(col_value, 15); });
+        SECTION("change order by modifying target") {
+            write([&] {
+                lst.get(5).set(col_value, 15);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 4);
             REQUIRE_INDICES(change.insertions, 0);
         }
 
-        SECTION("swap")
-        {
-            write([&] { lst.swap(1, 2); });
+        SECTION("swap") {
+            write([&] {
+                lst.swap(1, 2);
+            });
             REQUIRE(notification_calls == 1);
         }
 
-        SECTION("move")
-        {
-            write([&] { lst.move(5, 3); });
+        SECTION("move") {
+            write([&] {
+                lst.move(5, 3);
+            });
             REQUIRE(notification_calls == 1);
         }
     }
 
-    SECTION("filtered add_notification_block()")
-    {
+    SECTION("filtered add_notification_block()") {
         List lst(r, *lv);
         Results results = lst.filter(target->where().less(col_value, 9));
 
@@ -1179,38 +1160,42 @@ TEST_CASE("embedded List")
             advance_and_notify(*r);
         };
 
-        SECTION("swap")
-        {
-            write([&] { lst.swap(1, 2); });
+        SECTION("swap") {
+            write([&] {
+                lst.swap(1, 2);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 2);
             REQUIRE_INDICES(change.insertions, 1);
 
-            write([&] { lst.swap(5, 8); });
+            write([&] {
+                lst.swap(5, 8);
+            });
             REQUIRE(notification_calls == 3);
             REQUIRE_INDICES(change.deletions, 5, 8);
             REQUIRE_INDICES(change.insertions, 5, 8);
         }
 
-        SECTION("move")
-        {
-            write([&] { lst.move(5, 3); });
+        SECTION("move") {
+            write([&] {
+                lst.move(5, 3);
+            });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 5);
             REQUIRE_INDICES(change.insertions, 3);
         }
 
-        SECTION("move non-matching entry")
-        {
-            write([&] { lst.move(9, 3); });
+        SECTION("move non-matching entry") {
+            write([&] {
+                lst.move(9, 3);
+            });
             REQUIRE(notification_calls == 1);
         }
     }
 
     auto initial_view_size = lv->size();
     auto initial_target_size = target->size();
-    SECTION("delete_at()")
-    {
+    SECTION("delete_at()") {
         List list(r, *lv);
         r->begin_transaction();
         list.delete_at(1);
@@ -1219,8 +1204,7 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("delete_all()")
-    {
+    SECTION("delete_all()") {
         List list(r, *lv);
         r->begin_transaction();
         list.delete_all();
@@ -1229,8 +1213,7 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("as_results().clear()")
-    {
+    SECTION("as_results().clear()") {
         List list(r, *lv);
         r->begin_transaction();
         list.as_results().clear();
@@ -1239,8 +1222,7 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("snapshot().clear()")
-    {
+    SECTION("snapshot().clear()") {
         List list(r, *lv);
         r->begin_transaction();
         auto snapshot = list.snapshot();
@@ -1252,8 +1234,7 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("add(), insert(), and set() to existing object is not allowed")
-    {
+    SECTION("add(), insert(), and set() to existing object is not allowed") {
         List list(r, *lv);
         r->begin_transaction();
         REQUIRE_THROWS_AS(list.add(target->get_object(0)), List::InvalidEmbeddedOperationException);
@@ -1262,19 +1243,16 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("find(RowExpr)")
-    {
+    SECTION("find(RowExpr)") {
         List list(r, *lv);
         Obj obj1 = target->get_object(1);
         Obj obj5 = target->get_object(5);
 
-        SECTION("returns index in list for values in the list")
-        {
+        SECTION("returns index in list for values in the list") {
             REQUIRE(list.find(obj5) == 5);
         }
 
-        SECTION("returns index in list and not index in table")
-        {
+        SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(obj5) == 4);
@@ -1282,8 +1260,7 @@ TEST_CASE("embedded List")
             r->cancel_transaction();
         }
 
-        SECTION("returns npos for values not in the list")
-        {
+        SECTION("returns npos for values not in the list") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(obj1) == npos);
@@ -1291,53 +1268,45 @@ TEST_CASE("embedded List")
             r->cancel_transaction();
         }
 
-        SECTION("throws for row in wrong table")
-        {
+        SECTION("throws for row in wrong table") {
             REQUIRE_THROWS(list.find(obj));
             REQUIRE_THROWS(list.as_results().index_of(obj));
         }
     }
 
-    SECTION("find(Query)")
-    {
+    SECTION("find(Query)") {
         List list(r, *lv);
 
-        SECTION("returns index in list for values in the list")
-        {
+        SECTION("returns index in list for values in the list") {
             REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 5);
         }
 
-        SECTION("returns index in list and not index in table")
-        {
+        SECTION("returns index in list and not index in table") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(std::move(target->where().equal(col_value, 5))) == 4);
             r->cancel_transaction();
         }
 
-        SECTION("returns npos for values not in the list")
-        {
+        SECTION("returns npos for values not in the list") {
             REQUIRE(list.find(std::move(target->where().equal(col_value, 11))) == npos);
         }
     }
 
-    SECTION("add(Context)")
-    {
+    SECTION("add(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
         r->begin_transaction();
 
         auto initial_target_size = target->size();
-        SECTION("rejects boxed Obj and Object")
-        {
+        SECTION("rejects boxed Obj and Object") {
             REQUIRE_THROWS_AS(list.add(ctx, util::Any(target->get_object(5))),
                               List::InvalidEmbeddedOperationException);
             REQUIRE_THROWS_AS(list.add(ctx, util::Any(Object(r, target->get_object(5)))),
                               List::InvalidEmbeddedOperationException);
         }
 
-        SECTION("creates new object for dictionary")
-        {
+        SECTION("creates new object for dictionary") {
             list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == initial_target_size + 1);
@@ -1347,23 +1316,20 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("set(Context)")
-    {
+    SECTION("set(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
         r->begin_transaction();
 
         auto initial_target_size = target->size();
-        SECTION("rejects boxed Obj and Object")
-        {
+        SECTION("rejects boxed Obj and Object") {
             REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(target->get_object(5))),
                               List::InvalidEmbeddedOperationException);
             REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(Object(r, target->get_object(5)))),
                               List::InvalidEmbeddedOperationException);
         }
 
-        SECTION("creates new object for update mode All")
-        {
+        SECTION("creates new object for update mode All") {
             auto old_object = list.get<Obj>(0);
             list.set(ctx, 0, util::Any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 10);
@@ -1372,8 +1338,7 @@ TEST_CASE("embedded List")
             REQUIRE_FALSE(old_object.is_valid());
         }
 
-        SECTION("mutates the existing object for update mode Modified")
-        {
+        SECTION("mutates the existing object for update mode Modified") {
             auto old_object = list.get<Obj>(0);
             list.set(ctx, 0, util::Any(AnyDict{{"value", INT64_C(20)}}), CreatePolicy::UpdateModified);
             REQUIRE(list.size() == 10);
@@ -1386,37 +1351,31 @@ TEST_CASE("embedded List")
         r->cancel_transaction();
     }
 
-    SECTION("find(Context)")
-    {
+    SECTION("find(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
 
-        SECTION("returns index in list for boxed Obj")
-        {
+        SECTION("returns index in list for boxed Obj") {
             REQUIRE(list.find(ctx, util::Any(list.get(5))) == 5);
         }
 
-        SECTION("returns index in list for boxed Object")
-        {
+        SECTION("returns index in list for boxed Object") {
             realm::Object obj(r, *r->schema().find("origin"), list.get(5));
             REQUIRE(list.find(ctx, util::Any(obj)) == 5);
         }
 
-        SECTION("does not insert new objects for dictionaries")
-        {
+        SECTION("does not insert new objects for dictionaries") {
             auto initial_target_size = target->size();
             REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", INT64_C(20)}})) == npos);
             REQUIRE(target->size() == initial_target_size);
         }
 
-        SECTION("throws for object in wrong table")
-        {
+        SECTION("throws for object in wrong table") {
             REQUIRE_THROWS(list.find(ctx, util::Any(obj)));
         }
     }
 
-    SECTION("get(Context)")
-    {
+    SECTION("get(Context)") {
         List list(r, *lv);
         CppContext ctx(r, &list.get_object_schema());
 
@@ -1428,8 +1387,7 @@ TEST_CASE("embedded List")
 }
 
 
-TEST_CASE("list of embedded objects")
-{
+TEST_CASE("list of embedded objects") {
     Schema schema{
         {"parent",
          {
@@ -1479,8 +1437,7 @@ TEST_CASE("list of embedded objects")
         end.set(col_value, 20);
     };
 
-    SECTION("add to list")
-    {
+    SECTION("add to list") {
         realm->begin_transaction();
         add_two_elements();
         realm->commit_transaction();
@@ -1490,8 +1447,7 @@ TEST_CASE("list of embedded objects")
         REQUIRE(list.get(1).get<int64_t>(col_value) == 2);
     }
 
-    SECTION("insert in list")
-    {
+    SECTION("insert in list") {
         realm->begin_transaction();
         add_two_elements();
         insert_three_elements();
@@ -1505,8 +1461,7 @@ TEST_CASE("list of embedded objects")
         REQUIRE(list.get(4).get<int64_t>(col_value) == 20); // inserted end
     }
 
-    SECTION("set in list")
-    {
+    SECTION("set in list") {
         realm->begin_transaction();
 
         add_two_elements();
@@ -1529,8 +1484,7 @@ TEST_CASE("list of embedded objects")
         REQUIRE(list.get(4).get<int64_t>(col_value) == 20);  // inserted at end
     }
 
-    SECTION("invalid indices")
-    {
+    SECTION("invalid indices") {
         // Insertions
         REQUIRE_THROWS(list.insert_embedded(-1)); // Negative
         REQUIRE_THROWS(list.insert_embedded(1));  // At index > size()
