@@ -26,8 +26,7 @@
 using namespace realm;
 using namespace realm::util;
 
-TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]")
-{
+TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -42,49 +41,63 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]")
     auto sync_manager = init_sync_manager.app()->sync_manager();
     std::atomic<bool> handler_called(false);
 
-    SECTION("works properly when called after the session is bound")
-    {
+    SECTION("works properly when called after the session is bound") {
         server.start();
         auto user = sync_manager->get_user("user-async-wait-download-1", ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/async-wait-download-1", [](auto, auto) {});
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         // Register the download-completion notification
-        session->wait_for_download_completion([&](auto) { handler_called = true; });
-        EventLoop::main().run_until([&] { return handler_called == true; });
+        session->wait_for_download_completion([&](auto) {
+            handler_called = true;
+        });
+        EventLoop::main().run_until([&] {
+            return handler_called == true;
+        });
     }
 
-    SECTION("works properly when called on a logged-out session")
-    {
+    SECTION("works properly when called on a logged-out session") {
         server.start();
         const auto user_id = "user-async-wait-download-3";
         auto user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/user-async-wait-download-3", [](auto, auto) {});
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         // Log the user out, and wait for the sessions to log out.
         user->log_out();
-        EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session);
+        });
         // Register the download-completion notification
-        session->wait_for_download_completion([&](auto) { handler_called = true; });
+        session->wait_for_download_completion([&](auto) {
+            handler_called = true;
+        });
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
         user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
                                       ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         // Now, wait for the completion handler to be called.
-        EventLoop::main().run_until([&] { return handler_called == true; });
+        EventLoop::main().run_until([&] {
+            return handler_called == true;
+        });
     }
 
-    SECTION("aborts properly when queued and the session errors out")
-    {
+    SECTION("aborts properly when queued and the session errors out") {
         using ProtocolError = realm::sync::ProtocolError;
         auto user = sync_manager->get_user("user-async-wait-download-4", ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         std::atomic<int> error_count(0);
-        std::shared_ptr<SyncSession> session =
-            sync_session(user, "/async-wait-download-4", [&](auto, auto) { ++error_count; });
+        std::shared_ptr<SyncSession> session = sync_session(user, "/async-wait-download-4", [&](auto, auto) {
+            ++error_count;
+        });
         std::error_code code =
             std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the download-completion notification
@@ -95,13 +108,14 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]")
         REQUIRE(handler_called == false);
         // Now trigger an error
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
-        EventLoop::main().run_until([&] { return error_count > 0; });
+        EventLoop::main().run_until([&] {
+            return error_count > 0;
+        });
         REQUIRE(handler_called == true);
     }
 }
 
-TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]")
-{
+TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -119,39 +133,53 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]")
     auto sync_manager = init_sync_manager.app()->sync_manager();
     std::atomic<bool> handler_called(false);
 
-    SECTION("works properly when called after the session is bound")
-    {
+    SECTION("works properly when called after the session is bound") {
         server.start();
         auto user = sync_manager->get_user("user-async-wait-upload-1", ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/async-wait-upload-1", [](auto, auto) {});
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         // Register the upload-completion notification
-        session->wait_for_upload_completion([&](auto) { handler_called = true; });
-        EventLoop::main().run_until([&] { return handler_called == true; });
+        session->wait_for_upload_completion([&](auto) {
+            handler_called = true;
+        });
+        EventLoop::main().run_until([&] {
+            return handler_called == true;
+        });
     }
 
-    SECTION("works properly when called on a logged-out session")
-    {
+    SECTION("works properly when called on a logged-out session") {
         server.start();
         const auto user_id = "user-async-wait-upload-3";
         auto user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
                                            ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
         auto session = sync_session(user, "/user-async-wait-upload-3", [](auto, auto) {});
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         // Log the user out, and wait for the sessions to log out.
         user->log_out();
-        EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session);
+        });
         // Register the upload-completion notification
-        session->wait_for_upload_completion([&](auto) { handler_called = true; });
+        session->wait_for_upload_completion([&](auto) {
+            handler_called = true;
+        });
         spin_runloop();
         REQUIRE(handler_called == false);
         // Log the user back in
         user = sync_manager->get_user(user_id, ENCODE_FAKE_JWT("not_a_real_token"),
                                       ENCODE_FAKE_JWT("not_a_real_token"), dummy_auth_url, dummy_device_id);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         // Now, wait for the completion handler to be called.
-        EventLoop::main().run_until([&] { return handler_called == true; });
+        EventLoop::main().run_until([&] {
+            return handler_called == true;
+        });
     }
 
     // FIXME: There seems to be a race condition here where the upload completion handler

@@ -75,12 +75,10 @@ TEST(TableView_Json)
 
     TableView v = table.where().find_all(1);
     std::stringstream ss;
-    std::map<std::string, std::string> renames;
-    renames["_key"] = "objid";
-    v.to_json(ss, 0, &renames);
+    v.to_json(ss);
     const std::string json = ss.str();
     CHECK_EQUAL(true, json.length() > 0);
-    CHECK_EQUAL("[{\"objid\":1,\"first\":2},{\"objid\":2,\"first\":3}]", json);
+    CHECK_EQUAL("[{\"_key\":1,\"first\":2},{\"_key\":2,\"first\":3}]", json);
 }
 
 

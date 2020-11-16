@@ -1,10 +1,10 @@
 {
-    "id": "5ed6e50abfbde00f7edd66ba",
-    "database": "test_data",
     "collection": "Person",
+    "database": "test_data",
+    "id": "5f92b2ebe246d032a440495c",
     "relationships": {
         "dogs": {
-            "ref": "#/stitch/BackingDB/test_data/Dog",
+            "ref": "#/relationship/BackingDB/test_data/Dog",
             "source_key": "dogs",
             "foreign_key": "_id",
             "is_list": true

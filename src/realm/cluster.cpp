@@ -184,16 +184,13 @@ void Cluster::init(MemRef mem)
     }
 }
 
-bool Cluster::update_from_parent(size_t old_baseline) noexcept
+void Cluster::update_from_parent() noexcept
 {
-    if (Array::update_from_parent(old_baseline)) {
-        auto rot = Array::get_as_ref_or_tagged(0);
-        if (!rot.is_tagged()) {
-            m_keys.update_from_parent(old_baseline);
-        }
-        return true;
+    Array::update_from_parent();
+    auto rot = Array::get_as_ref_or_tagged(0);
+    if (!rot.is_tagged()) {
+        m_keys.update_from_parent();
     }
-    return false;
 }
 
 MemRef Cluster::ensure_writeable(ObjKey)
@@ -1340,8 +1337,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
                     }
                     else {
                         std::cout << ", " << arr.get(i);
@@ -1353,8 +1349,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
                     }
                     else {
                         std::cout << ", " << arr.get(i);
@@ -1366,11 +1361,10 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
                     }
                     else {
-                        std::cout << ", " << arr.get(i);
+                        std::cout << ", " << *arr.get(i);
                     }
                     break;
                 }
@@ -1379,8 +1373,7 @@ void Cluster::dump_objects(int64_t key_offset, std::string lead) const
                     ref_type ref = Array::get_as_ref(j);
                     arr.init_from_ref(ref);
                     if (arr.is_null(i)) {
-                        std::cout << ", "
-                                  << "null";
+                        std::cout << ", null";
                     }
                     else {
                         std::cout << ", " << arr.get(i);

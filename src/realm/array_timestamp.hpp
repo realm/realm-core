@@ -77,6 +77,10 @@ public:
         util::Optional<int64_t> seconds = m_seconds.get(ndx);
         return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds.get(ndx))) : Timestamp{};
     }
+    Mixed get_any(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
+    }
     bool is_null(size_t ndx) const
     {
         return m_seconds.is_null(ndx);

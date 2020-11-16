@@ -434,6 +434,24 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
+ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key_type)
+{
+    // Both origin and target must be group-level tables, and in the same group.
+    Group* origin_group = get_parent_group();
+    Group* target_group = target.get_parent_group();
+    if (!origin_group || !target_group)
+        throw LogicError(LogicError::wrong_kind_of_table);
+    if (origin_group != target_group)
+        throw LogicError(LogicError::group_mismatch);
+    if (target.is_embedded())
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    ColumnAttrMask attr;
+    attr.set(col_attr_Dictionary);
+    ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
+    return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
+}
+
 void Table::remove_recursive(CascadeState& cascade_state)
 {
     Group* group = get_parent_group();
@@ -605,6 +623,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     else {
         m_tombstones = nullptr;
     }
+    m_cookie = cookie_initialized;
 }
 
 
@@ -1043,8 +1062,9 @@ void Table::do_set_embedded(bool embedded)
 }
 
 
-void Table::detach() noexcept
+void Table::detach(LifeCycleCookie cookie) noexcept
 {
+    m_cookie = cookie;
     m_alloc.bump_instance_version();
 }
 
@@ -1077,6 +1097,7 @@ Table::~Table() noexcept
         delete index;
     }
     m_index_accessors.clear();
+    m_cookie = cookie_deleted;
 }
 
 
@@ -1803,6 +1824,26 @@ StringData Table::get_name() const noexcept
     return static_cast<Group*>(parent)->get_table_name(get_key());
 }
 
+const char* Table::get_state() const noexcept
+{
+    switch (m_cookie) {
+        case cookie_created:
+            return "created";
+        case cookie_transaction_ended:
+            return "transaction_ended";
+        case cookie_initialized:
+            return "initialised";
+        case cookie_removed:
+            return "removed";
+        case cookie_void:
+            return "void";
+        case cookie_deleted:
+            return "deleted";
+    }
+    return "";
+}
+
+
 bool Table::is_nullable(ColKey col_key) const
 {
     REALM_ASSERT_DEBUG(valid_column(col_key));
@@ -2499,30 +2540,24 @@ const Table* Table::get_link_chain_target(const std::vector<ColKey>& link_chain)
 }
 
 
-void Table::update_from_parent(size_t old_baseline) noexcept
+void Table::update_from_parent() noexcept
 {
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        if (!m_top.update_from_parent(old_baseline))
-            return;
-
-        m_spec.update_from_parent(old_baseline);
-        if (m_top.size() > top_position_for_cluster_tree) {
-            m_clusters.update_from_parent(old_baseline);
-        }
-        if (m_top.size() > top_position_for_search_indexes) {
-            if (m_index_refs.update_from_parent(old_baseline)) {
-                for (auto index : m_index_accessors) {
-                    if (index != nullptr) {
-                        index->update_from_parent(old_baseline);
-                    }
-                }
+        m_top.update_from_parent();
+        m_spec.update_from_parent();
+        m_clusters.update_from_parent();
+        m_index_refs.update_from_parent();
+        for (auto index : m_index_accessors) {
+            if (index != nullptr) {
+                index->update_from_parent();
             }
         }
+        // FIXME: REMOVE CONDITIONAL CHECKS?
         if (m_top.size() > top_position_for_opposite_table)
-            m_opposite_table.update_from_parent(old_baseline);
+            m_opposite_table.update_from_parent();
         if (m_top.size() > top_position_for_opposite_column)
-            m_opposite_column.update_from_parent(old_baseline);
+            m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
             m_is_embedded = flags & 0x1;
@@ -2530,14 +2565,76 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         else {
             m_is_embedded = false;
         }
+        if (m_tombstones)
+            m_tombstones->update_from_parent();
+
         refresh_content_version();
         m_has_any_embedded_objects.reset();
     }
     m_alloc.bump_storage_version();
 }
 
+void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const
+{
+    out << "{";
+    auto name = get_name();
+    if (renames.count(name))
+        name = renames.at(name);
+    out << "\"name\":\"" << name << "\"";
+    if (this->m_primary_key_col) {
+        out << ",";
+        out << "\"primaryKey\":\"" << this->get_column_name(m_primary_key_col) << "\"";
+    }
+    if (is_embedded()) {
+        out << ",\"isEmbedded\":true";
+    }
+    out << ",\"properties\":[";
+    auto col_keys = get_column_keys();
+    int sz = int(col_keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto col_key = col_keys[i];
+        name = get_column_name(col_key);
+        auto type = col_key.get_type();
+        if (renames.count(name))
+            name = renames.at(name);
+        out << "{";
+        out << "\"name\":\"" << name << "\"";
+        if (this->is_link_type(type)) {
+            out << ",\"type\":\"object\"";
+            name = this->get_opposite_table(col_key)->get_name();
+            if (renames.count(name))
+                name = renames.at(name);
+            out << ",\"objectType\":\"" << name << "\"";
+        }
+        else {
+            out << ",\"type\":\"" << get_data_type_name(DataType(type)) << "\"";
+        }
+        if (col_key.is_list()) {
+            out << ",\"isArray\":true";
+        }
+        else if (col_key.is_set()) {
+            out << ",\"isSet\":true";
+        }
+        else if (col_key.is_dictionary()) {
+            out << ",\"isMap\":true";
+            auto key_type = get_dictionary_key_type(col_key);
+            out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
+        }
+        if (col_key.is_nullable()) {
+            out << ",\"isOptional\":true";
+        }
+        if (has_search_index(col_key)) {
+            out << ",\"isIndexed\":true";
+        }
+        out << "}";
+        if (i < sz - 1) {
+            out << ",";
+        }
+    }
+    out << "]}";
+}
 
-void Table::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames,
+void Table::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                     JSONOutputMode output_mode) const
 {
     // Represent table as list of objects
@@ -2636,6 +2733,7 @@ void Table::refresh_content_version()
 
 void Table::refresh_accessor_tree()
 {
+    REALM_ASSERT(m_cookie == cookie_initialized);
     REALM_ASSERT(m_top.is_attached());
     m_top.init_from_parent();
     m_spec.init_from_parent();
@@ -2653,6 +2751,8 @@ void Table::refresh_accessor_tree()
     else {
         m_is_embedded = false;
     }
+    if (m_tombstones)
+        m_tombstones->init_from_parent();
     refresh_content_version();
     bump_storage_version();
     build_column_mapping();
@@ -2717,6 +2817,8 @@ void Table::verify() const
         m_top.verify();
     m_spec.verify();
     m_clusters.verify();
+    if (nb_unresolved())
+        m_tombstones->verify();
 #endif
 }
 
@@ -3215,7 +3317,9 @@ void Table::create_objects(const std::vector<ObjKey>& keys)
 
 void Table::dump_objects()
 {
-    return m_clusters.dump_objects();
+    m_clusters.dump_objects();
+    if (nb_unresolved())
+        m_tombstones->dump_objects();
 }
 
 void Table::remove_object(ObjKey key)

@@ -51,8 +51,7 @@ static Object create_object(SharedRealm const& realm, StringData object_type, An
     return Object::create(ctx, realm, object_type, util::Any(value));
 }
 
-TEST_CASE("thread safe reference")
-{
+TEST_CASE("thread safe reference") {
     using namespace std::string_literals;
 
     Schema schema{
@@ -85,23 +84,19 @@ TEST_CASE("thread safe reference")
 
     const auto int_obj_col = r->schema().find("int object")->persisted_properties[0].column_key;
 
-    SECTION("allowed during write transactions")
-    {
-        SECTION("obtain")
-        {
+    SECTION("allowed during write transactions") {
+        SECTION("obtain") {
             r->begin_transaction();
             REQUIRE_NOTHROW(ThreadSafeReference(foo));
         }
-        SECTION("resolve")
-        {
+        SECTION("resolve") {
             auto ref = ThreadSafeReference(foo);
             r->begin_transaction();
             REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
     }
 
-    SECTION("cleanup properly unpins version")
-    {
+    SECTION("cleanup properly unpins version") {
         auto history = make_in_realm_history(config.path);
         auto shared_group = DB::create(*history, config.options());
 
@@ -125,10 +120,8 @@ TEST_CASE("thread safe reference")
         REQUIRE_THROWS(shared_group->start_read(reference_version)); // Verify unpinned
     }
 
-    SECTION("version mismatch")
-    {
-        SECTION("resolves at older version")
-        {
+    SECTION("version mismatch") {
+        SECTION("resolves at older version") {
             r->begin_transaction();
             Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
             r->commit_transaction();
@@ -163,8 +156,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(num.obj().get<Int>(col) == 11);
         }
 
-        SECTION("resolve at newer version")
-        {
+        SECTION("resolve at newer version") {
             r->begin_transaction();
             Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
             r->commit_transaction();
@@ -199,8 +191,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(num.obj().get<Int>(col) == 11);
         }
 
-        SECTION("resolve at newer version when schema is specified")
-        {
+        SECTION("resolve at newer version when schema is specified") {
             r->close();
             config.schema = schema;
             SharedRealm r = Realm::get_shared_realm(config);
@@ -218,8 +209,7 @@ TEST_CASE("thread safe reference")
             REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
 
-        SECTION("resolve references at multiple versions")
-        {
+        SECTION("resolve references at multiple versions") {
             auto commit_new_num = [&](int64_t value) -> Object {
                 r->begin_transaction();
                 Object num = create_object(r, "int object", {{"value", value}});
@@ -241,8 +231,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("same thread")
-    {
+    SECTION("same thread") {
         r->begin_transaction();
         Object num = create_object(r, "int object", {{"value", INT64_C(7)}});
         r->commit_transaction();
@@ -252,8 +241,7 @@ TEST_CASE("thread safe reference")
         auto ref = ThreadSafeReference(num);
         bool did_run_section = false;
 
-        SECTION("same realm")
-        {
+        SECTION("same realm") {
             did_run_section = true;
             {
                 Object num = ref.resolve<Object>(r);
@@ -265,8 +253,7 @@ TEST_CASE("thread safe reference")
             }
             REQUIRE(num.obj().get<Int>(col) == 9);
         }
-        SECTION("different realm")
-        {
+        SECTION("different realm") {
             did_run_section = true;
             {
                 SharedRealm r = Realm::get_shared_realm(config);
@@ -286,10 +273,8 @@ TEST_CASE("thread safe reference")
         });
     }
 
-    SECTION("passing over")
-    {
-        SECTION("objects")
-        {
+    SECTION("passing over") {
+        SECTION("objects") {
             r->begin_transaction();
             auto str = create_object(r, "string object", {});
             auto num = create_object(r, "int object", {{"value", INT64_C(0)}});
@@ -322,8 +307,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(num.obj().get<Int>(col_num) == 42);
         }
 
-        SECTION("object list")
-        {
+        SECTION("object list") {
             r->begin_transaction();
             auto zero = create_object(r, "int object", {{"value", INT64_C(0)}});
             auto obj = create_object(r, "int array object", {{"value", AnyVector{zero}}});
@@ -363,8 +347,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(list.get(1).get<int64_t>(int_obj_col) == 2);
         }
 
-        SECTION("sorted object results")
-        {
+        SECTION("sorted object results") {
             auto& table = *get_table(*r, "string object");
             auto col = table.get_column_key("value");
             auto results = Results(r, table.where().not_equal(col, "C")).sort({{{col}}, {false}});
@@ -413,8 +396,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(results.get(1).get<StringData>(col) == "B");
         }
 
-        SECTION("distinct object results")
-        {
+        SECTION("distinct object results") {
             auto& table = *get_table(*r, "string object");
             auto col = table.get_column_key("value");
             auto results = Results(r, table.where()).distinct({{{col}}}).sort({{"value", true}});
@@ -460,8 +442,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(results.get(2).get<StringData>(col) == "C");
         }
 
-        SECTION("int list")
-        {
+        SECTION("int list") {
             r->begin_transaction();
             auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0)}}});
             auto col = get_table(*r, "int array")->get_column_key("value");
@@ -496,8 +477,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(list.get<int64_t>(1) == 2);
         }
 
-        SECTION("sorted int results")
-        {
+        SECTION("sorted int results") {
             r->begin_transaction();
             auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
             auto col = get_table(*r, "int array")->get_column_key("value");
@@ -547,8 +527,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(results.get<int64_t>(2) == 1);
         }
 
-        SECTION("distinct int results")
-        {
+        SECTION("distinct int results") {
             r->begin_transaction();
             auto obj = create_object(
                 r, "int array", {{"value", AnyVector{INT64_C(3), INT64_C(2), INT64_C(1), INT64_C(1), INT64_C(2)}}});
@@ -598,8 +577,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(results.get<int64_t>(1) == 2);
         }
 
-        SECTION("multiple types")
-        {
+        SECTION("multiple types") {
             auto results = Results(r, get_table(*r, "int object")->where().equal(int_obj_col, 5));
 
             r->begin_transaction();
@@ -647,8 +625,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("resolve at version where handed over thing has been deleted")
-    {
+    SECTION("resolve at version where handed over thing has been deleted") {
         Object obj;
         auto delete_and_resolve = [&](auto&& list) {
             auto ref = ThreadSafeReference(list);
@@ -660,8 +637,7 @@ TEST_CASE("thread safe reference")
             return ref.resolve<typename std::remove_reference<decltype(list)>::type>(r);
         };
 
-        SECTION("object")
-        {
+        SECTION("object") {
             r->begin_transaction();
             obj = create_object(r, "int object", {{"value", INT64_C(7)}});
             r->commit_transaction();
@@ -669,8 +645,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(!delete_and_resolve(obj).is_valid());
         }
 
-        SECTION("object list")
-        {
+        SECTION("object list") {
             r->begin_transaction();
             obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
             auto col = get_table(*r, "int array object")->get_column_key("value");
@@ -680,8 +655,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(!delete_and_resolve(list).is_valid());
         }
 
-        SECTION("int list")
-        {
+        SECTION("int list") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
             auto col = get_table(*r, "int array")->get_column_key("value");
@@ -691,8 +665,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(!delete_and_resolve(list).is_valid());
         }
 
-        SECTION("object results")
-        {
+        SECTION("object results") {
             r->begin_transaction();
             obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
             auto col = get_table(*r, "int array object")->get_column_key("value");
@@ -704,8 +677,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(results.size() == 0);
         }
 
-        SECTION("int results")
-        {
+        SECTION("int results") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
             List list(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
@@ -715,8 +687,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("resolve at version before where handed over thing was created")
-    {
+    SECTION("resolve at version before where handed over thing was created") {
         auto create_ref = [&](auto&& fn) -> ThreadSafeReference {
             ThreadSafeReference ref;
             {
@@ -729,8 +700,7 @@ TEST_CASE("thread safe reference")
             return ref;
         };
 
-        SECTION("object")
-        {
+        SECTION("object") {
             auto obj = create_ref([](auto& r) {
                            return create_object(r, "int object", {{"value", INT64_C(7)}});
                        }).resolve<Object>(r);
@@ -738,8 +708,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(obj.get_column_value<int64_t>("value") == 7);
         }
 
-        SECTION("object list")
-        {
+        SECTION("object list") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array object",
                                                      {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
@@ -749,8 +718,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(list.size() == 1);
         }
 
-        SECTION("int list")
-        {
+        SECTION("int list") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                             return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
@@ -759,8 +727,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(list.size() == 1);
         }
 
-        SECTION("object results")
-        {
+        SECTION("object results") {
             auto results =
                 create_ref([](auto& r) {
                     auto obj =
@@ -774,8 +741,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(results.size() == 1);
         }
 
-        SECTION("int results")
-        {
+        SECTION("int results") {
             auto results = create_ref([](auto& r) {
                                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"))
@@ -786,8 +752,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("create TSR inside the write transaction which created the object being handed over")
-    {
+    SECTION("create TSR inside the write transaction which created the object being handed over") {
         auto create_ref = [&](auto&& fn) -> ThreadSafeReference {
             ThreadSafeReference ref;
             {
@@ -799,8 +764,7 @@ TEST_CASE("thread safe reference")
             return ref;
         };
 
-        SECTION("object")
-        {
+        SECTION("object") {
             auto obj = create_ref([](auto& r) {
                            return create_object(r, "int object", {{"value", INT64_C(7)}});
                        }).resolve<Object>(r);
@@ -808,8 +772,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(obj.get_column_value<int64_t>("value") == 7);
         }
 
-        SECTION("object list")
-        {
+        SECTION("object list") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array object",
                                                      {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
@@ -819,8 +782,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(list.size() == 1);
         }
 
-        SECTION("int list")
-        {
+        SECTION("int list") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                             return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
@@ -829,8 +791,7 @@ TEST_CASE("thread safe reference")
             REQUIRE(list.size() == 1);
         }
 
-        SECTION("object results")
-        {
+        SECTION("object results") {
             REQUIRE_THROWS(create_ref([](auto& r) {
                 auto obj =
                     create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
@@ -841,8 +802,7 @@ TEST_CASE("thread safe reference")
             }));
         }
 
-        SECTION("int results")
-        {
+        SECTION("int results") {
             auto results = create_ref([](auto& r) {
                                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"))
@@ -853,8 +813,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("create TSR inside cancelled write transaction")
-    {
+    SECTION("create TSR inside cancelled write transaction") {
         auto create_ref = [&](auto&& fn) -> ThreadSafeReference {
             ThreadSafeReference ref;
             {
@@ -866,16 +825,14 @@ TEST_CASE("thread safe reference")
             return ref;
         };
 
-        SECTION("object")
-        {
+        SECTION("object") {
             auto obj = create_ref([](auto& r) {
                            return create_object(r, "int object", {{"value", INT64_C(7)}});
                        }).resolve<Object>(r);
             REQUIRE_FALSE(obj.is_valid());
         }
 
-        SECTION("object list")
-        {
+        SECTION("object list") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array object",
                                                      {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
@@ -884,8 +841,7 @@ TEST_CASE("thread safe reference")
             REQUIRE_FALSE(list.is_valid());
         }
 
-        SECTION("int list")
-        {
+        SECTION("int list") {
             auto list = create_ref([](auto& r) {
                             auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                             return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"));
@@ -893,8 +849,7 @@ TEST_CASE("thread safe reference")
             REQUIRE_FALSE(list.is_valid());
         }
 
-        SECTION("object results")
-        {
+        SECTION("object results") {
             REQUIRE_THROWS(create_ref([](auto& r) {
                 auto obj =
                     create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
@@ -905,8 +860,7 @@ TEST_CASE("thread safe reference")
             }));
         }
 
-        SECTION("int results")
-        {
+        SECTION("int results") {
             auto results = create_ref([](auto& r) {
                                auto obj = create_object(r, "int array", {{"value", AnyVector{{INT64_C(1)}}}});
                                return List(r, obj.obj(), get_table(*r, "int array")->get_column_key("value"))
@@ -916,10 +870,8 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("lifetime")
-    {
-        SECTION("retains source realm")
-        { // else version will become unpinned
+    SECTION("lifetime") {
+        SECTION("retains source realm") { // else version will become unpinned
             auto ref = ThreadSafeReference(foo);
             foo = {};
             r = nullptr;
@@ -927,8 +879,7 @@ TEST_CASE("thread safe reference")
             REQUIRE_NOTHROW(ref.resolve<Object>(r));
         }
 
-        SECTION("retains source RealmCoordinator")
-        {
+        SECTION("retains source RealmCoordinator") {
             auto ref = ThreadSafeReference(foo);
             auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path).get();
             foo = {};
@@ -937,8 +888,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("metadata")
-    {
+    SECTION("metadata") {
         r->begin_transaction();
         auto num = create_object(r, "int object", {{"value", INT64_C(5)}});
         r->commit_transaction();
@@ -952,8 +902,7 @@ TEST_CASE("thread safe reference")
         }
     }
 
-    SECTION("allow multiple resolves")
-    {
+    SECTION("allow multiple resolves") {
         auto ref = ThreadSafeReference(foo);
         ref.resolve<Object>(r);
         REQUIRE_NOTHROW(ref.resolve<Object>(r));

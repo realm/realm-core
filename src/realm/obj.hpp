@@ -44,6 +44,7 @@ template <class T>
 using LstPtr = std::unique_ptr<Lst<T>>;
 using LstBasePtr = std::unique_ptr<LstBase>;
 using SetBasePtr = std::unique_ptr<SetBase>;
+using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
@@ -51,6 +52,7 @@ using LnkLstPtr = std::unique_ptr<LnkLst>;
 template <class>
 class Set;
 class Dictionary;
+using DictionaryPtr = std::unique_ptr<Dictionary>;
 
 enum JSONOutputMode {
     output_mode_json,       // default / existing implementation for outputting realm to json
@@ -70,7 +72,7 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table() const
+    TableRef get_table() const noexcept
     {
         return m_table.cast_away_const();
     }
@@ -79,7 +81,7 @@ public:
 
     bool operator==(const Obj& other) const;
 
-    ObjKey get_key() const
+    ObjKey get_key() const noexcept
     {
         return m_key;
     }
@@ -90,13 +92,13 @@ public:
     Replication* get_replication() const;
 
     // Check if this object is default constructed
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return m_table != nullptr;
     }
 
     // Check if the object is still alive
-    bool is_valid() const;
+    bool is_valid() const noexcept;
     // Will throw if object is not valid
     void check_valid() const;
     // Delete object from table. Object is invalid afterwards.
@@ -141,16 +143,13 @@ public:
     template <class T>
     bool evaluate(T func) const;
 
-    void to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                  std::vector<ColKey>& followed, JSONOutputMode output_mode) const;
-    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                  JSONOutputMode output_mode = output_mode_json) const
     {
-        std::map<std::string, std::string> renames2;
-        renames = renames ? renames : &renames2;
-
         std::vector<ColKey> followed;
-        to_json(out, link_depth, *renames, followed, output_mode);
+        to_json(out, link_depth, renames, followed, output_mode);
     }
 
     std::string to_string() const;
@@ -246,6 +245,11 @@ public:
     LnkLstPtr get_linklist_ptr(ColKey col_key) const;
     LnkLst get_linklist(StringData col_name) const;
 
+    /// Get a type-erased list instance for the given list column.
+    ///
+    /// Note: For lists of links, this always returns a `LnkLst`, rather than a
+    /// `Lst<ObjKey>`. Use `get_list_ptr<ObjKey>(col_key)` to get a list of
+    /// links with uncondensed indices.
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     template <typename U>
@@ -257,7 +261,10 @@ public:
     Set<U> get_set(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
+    DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
     Dictionary get_dictionary(StringData col_name) const;
+
+    CollectionBasePtr get_collection_ptr(ColKey col_key) const;
 
     void assign_pk_and_backlinks(const Obj& other);
 
@@ -270,6 +277,8 @@ private:
     friend class ConstTableView;
     template <class, class>
     friend class Collection;
+    template <class>
+    friend class CollectionBaseImpl;
     template <class>
     friend class Lst;
     friend class LnkLst;
@@ -287,7 +296,7 @@ private:
     mutable uint64_t m_storage_version;
     mutable bool m_valid;
 
-    Allocator& _get_alloc() const;
+    Allocator& _get_alloc() const noexcept;
     bool update() const;
     // update if needed - with and without check of table instance version:
     bool update_if_needed() const;
@@ -323,7 +332,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
-    void bump_content_version();
+    int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
@@ -349,6 +358,9 @@ private:
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
+
+template <>
+int64_t Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
@@ -452,9 +464,20 @@ Obj& Obj::set_list_values(ColKey col_key, const std::vector<U>& values)
 {
     size_t sz = values.size();
     auto list = get_list<U>(col_key);
-    list.resize(sz);
-    for (size_t i = 0; i < sz; i++)
+    size_t list_sz = list.size();
+    if (sz < list_sz) {
+        list.resize(sz);
+        list_sz = sz;
+    }
+    size_t i = 0;
+    while (i < list_sz) {
         list.set(i, values[i]);
+        i++;
+    }
+    while (i < sz) {
+        list.add(values[i]);
+        i++;
+    }
 
     return *this;
 }
@@ -502,6 +525,29 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
 
     return _set(start_index, v, tail...);
 }
+
+inline bool Obj::update_if_needed() const
+{
+    auto current_version = get_alloc().get_storage_version();
+    if (current_version != m_storage_version) {
+        return update();
+    }
+    return false;
+}
+
+inline int_fast64_t Obj::bump_content_version()
+{
+    Allocator& alloc = get_alloc();
+    return alloc.bump_content_version();
+}
+
+inline void Obj::bump_both_versions()
+{
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    alloc.bump_storage_version();
+}
+
 } // namespace realm
 
 #endif // REALM_OBJ_HPP

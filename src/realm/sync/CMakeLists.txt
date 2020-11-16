@@ -122,7 +122,16 @@ set_target_properties(Sync PROPERTIES
     OUTPUT_NAME "realm-sync"
 )
 
-target_link_libraries(Sync PUBLIC Storage ZLIB::ZLIB)
+target_link_libraries(Sync PUBLIC Storage)
+
+# Use Zlib if the imported target is defined, otherise use -lz on Apple platforms
+if(TARGET ZLIB::ZLIB)
+    target_link_libraries(Sync PUBLIC ZLIB::ZLIB)
+elseif(APPLE)
+    target_link_options(Sync PUBLIC "-lz")
+else()
+    message(FATAL_ERROR "No zlib dependency defined for Realm::Sync")
+endif()
 
 add_library(SyncServer STATIC EXCLUDE_FROM_ALL ${SERVER_SOURCES} ${SYNC_SERVER_HEADERS})
 add_library(Realm::SyncServer ALIAS SyncServer)
@@ -204,11 +213,12 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
                           DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
 		  target_link_libraries(DumpCommand Sync Storage)
 
-    add_executable(StatCommand stat_command.cpp)
-    set_target_properties(StatCommand PROPERTIES
-                          OUTPUT_NAME "realm-stat"
-                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
-    target_link_libraries(StatCommand Sync Storage)
+    # FIXME: RCORE-331 stat command currently fails to build
+    # add_executable(StatCommand stat_command.cpp)
+    # set_target_properties(StatCommand PROPERTIES
+    #                       OUTPUT_NAME "realm-stat"
+    #                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+    # target_link_libraries(StatCommand Sync Storage)
 
     # FIXME: Port realm-hist to new instruction format
     # add_executable(HistCommand sync/hist_command.cpp)
@@ -246,7 +256,7 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
         VacuumCommand
         EncryptionTransformer
         DumpCommand
-        StatCommand
+        # StatCommand
         # HistCommand
         VerifyServerFileCommand
         ServerIndexCommand

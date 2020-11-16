@@ -53,39 +53,17 @@ List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 
 List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-    : m_realm(std::move(r))
-    , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Array)
-    , m_list_base(parent_obj.get_listbase_ptr(col))
+    : Collection(std::move(r), parent_obj, col)
+    , m_list_base(std::dynamic_pointer_cast<LstBase>(m_coll_base))
     , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
 }
 
 List::List(std::shared_ptr<Realm> r, const LstBase& list)
-    : m_realm(std::move(r))
-    , m_type(ObjectSchema::from_core_type(list.get_col_key()) & ~PropertyType::Array)
-    , m_list_base(list.clone())
+    : Collection(std::move(r), list)
+    , m_list_base(std::dynamic_pointer_cast<LstBase>(m_coll_base))
     , m_is_embedded(m_type == PropertyType::Object && as<Obj>().get_target_table()->is_embedded())
 {
-}
-
-static StringData object_name(Table const& table)
-{
-    return ObjectStore::object_type_for_table_name(table.get_name());
-}
-
-ObjectSchema const& List::get_object_schema() const
-{
-    verify_attached();
-
-    REALM_ASSERT(get_type() == PropertyType::Object);
-    auto object_schema = m_object_schema.load();
-    if (!object_schema) {
-        auto object_type = object_name(*static_cast<LnkLst&>(*m_list_base).get_target_table());
-        auto it = m_realm->schema().find(object_type);
-        REALM_ASSERT(it != m_realm->schema().end());
-        m_object_schema = object_schema = &*it;
-    }
-    return *object_schema;
 }
 
 Query List::get_query() const
@@ -94,71 +72,6 @@ Query List::get_query() const
     if (m_type == PropertyType::Object)
         return static_cast<LnkLst&>(*m_list_base).get_target_table()->where(as<Obj>());
     throw std::runtime_error("not implemented");
-}
-
-ObjKey List::get_parent_object_key() const
-{
-    verify_attached();
-    return m_list_base->get_key();
-}
-
-ColKey List::get_parent_column_key() const
-{
-    verify_attached();
-    return m_list_base->get_col_key();
-}
-
-TableKey List::get_parent_table_key() const
-{
-    verify_attached();
-    return m_list_base->get_table()->get_key();
-}
-
-void List::verify_valid_row(size_t row_ndx, bool insertion) const
-{
-    size_t s = size();
-    if (row_ndx > s || (!insertion && row_ndx == s)) {
-        throw OutOfBoundsIndexException{row_ndx, s + insertion};
-    }
-}
-
-void List::validate(const Obj& obj) const
-{
-    if (!obj.is_valid())
-        throw std::invalid_argument("Object has been deleted or invalidated");
-    auto target = static_cast<LnkLst&>(*m_list_base).get_target_table();
-    if (obj.get_table() != target)
-        throw std::invalid_argument(util::format("Object of type (%1) does not match List type (%2)",
-                                                 object_name(*obj.get_table()), object_name(*target)));
-}
-
-bool List::is_valid() const
-{
-    if (!m_realm)
-        return false;
-    m_realm->verify_thread();
-    if (!m_realm->is_in_read_transaction())
-        return false;
-    return m_list_base->is_attached();
-}
-
-void List::verify_attached() const
-{
-    if (!is_valid()) {
-        throw InvalidatedException();
-    }
-}
-
-void List::verify_in_transaction() const
-{
-    verify_attached();
-    m_realm->verify_in_write();
-}
-
-size_t List::size() const
-{
-    verify_attached();
-    return m_list_base->size();
 }
 
 template <typename T>
@@ -368,13 +281,6 @@ Results List::filter(Query q) const
     return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_list_base), get_query().and_query(std::move(q)));
 }
 
-Results List::as_results() const
-{
-    verify_attached();
-    return m_type == PropertyType::Object ? Results(m_realm, std::static_pointer_cast<LnkLst>(m_list_base))
-                                          : Results(m_realm, m_list_base);
-}
-
 Results List::snapshot() const
 {
     return as_results().snapshot();
@@ -511,18 +417,6 @@ List List::freeze(std::shared_ptr<Realm> const& frozen_realm) const
     return List(frozen_realm, *frozen_realm->import_copy_of(*m_list_base));
 }
 
-bool List::is_frozen() const noexcept
-{
-    return m_realm->is_frozen();
-}
-
-List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-    : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
-    , requested(r)
-    , valid_count(c)
-{
-}
-
 #define REALM_PRIMITIVE_LIST_TYPE(T)                                                                                 \
     template T List::get<T>(size_t) const;                                                                           \
     template size_t List::find<T>(T const&) const;                                                                   \
@@ -541,6 +435,7 @@ REALM_PRIMITIVE_LIST_TYPE(ObjKey)
 REALM_PRIMITIVE_LIST_TYPE(ObjectId)
 REALM_PRIMITIVE_LIST_TYPE(Decimal)
 REALM_PRIMITIVE_LIST_TYPE(UUID)
+REALM_PRIMITIVE_LIST_TYPE(Mixed)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)

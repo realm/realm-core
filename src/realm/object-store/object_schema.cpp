@@ -69,12 +69,16 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
 {
     auto flags = PropertyType::Required;
     auto attr = col.get_attrs();
+
     if (attr.test(col_attr_Nullable))
         flags |= PropertyType::Nullable;
     if (attr.test(col_attr_List))
         flags |= PropertyType::Array;
     else if (attr.test(col_attr_Set))
         flags |= PropertyType::Set;
+    else if (attr.test(col_attr_Dictionary))
+        flags |= PropertyType::Dictionary;
+
     switch (col.get_type()) {
         case col_type_Int:
             return PropertyType::Int | flags;
@@ -91,7 +95,7 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
         case col_type_Timestamp:
             return PropertyType::Date | flags;
         case col_type_Mixed:
-            return PropertyType::Any | flags;
+            return PropertyType::Mixed | flags;
         case col_type_ObjectId:
             return PropertyType::ObjectId | flags;
         case col_type_Decimal:
@@ -99,7 +103,7 @@ PropertyType ObjectSchema::from_core_type(ColKey col)
         case col_type_UUID:
             return PropertyType::UUID | flags;
         case col_type_Link: {
-            if (attr.test(col_attr_Set)) {
+            if (attr.test(col_attr_Set) || attr.test(col_attr_Dictionary)) {
                 return PropertyType::Object | flags;
             }
             else {
@@ -302,7 +306,8 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     }
 }
 
-void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const
+void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
+                            bool for_sync) const
 {
     std::vector<StringData> public_property_names;
     std::vector<StringData> internal_property_names;
@@ -382,6 +387,19 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     }
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
+    }
+
+    if (for_sync && !is_embedded) {
+        if (primary_key.empty()) {
+            exceptions.emplace_back(util::format("There must be a primary key property named '_id' on a synchronized "
+                                                 "Realm but none was found for type '%1'",
+                                                 name));
+        }
+        else if (primary_key != "_id") {
+            exceptions.emplace_back(util::format(
+                "The primary key property on a synchronized Realm must be named '_id' but found '%1' for type '%2'",
+                primary_key, name));
+        }
     }
 }
 

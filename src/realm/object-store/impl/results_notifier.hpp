@@ -88,7 +88,7 @@ public:
     bool get_list_indices(ListIndices& out) override;
 
 private:
-    std::shared_ptr<LstBase> m_list;
+    std::shared_ptr<CollectionBase> m_list;
     util::Optional<bool> m_sort_order;
     bool m_distinct = false;
 

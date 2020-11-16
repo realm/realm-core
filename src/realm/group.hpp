@@ -508,8 +508,8 @@ public:
     //@}
 
     // Conversion
-    template <class S>
-    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+    void schema_to_json(std::ostream& out, std::map<std::string, std::string>* renames = nullptr) const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
                  JSONOutputMode output_mode = output_mode_json) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
@@ -715,7 +715,7 @@ private:
     /// that exists across Group::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
-    void update_refs(ref_type top_ref, size_t old_baseline) noexcept;
+    void update_refs(ref_type top_ref) noexcept;
 
     // Overriding method in ArrayParent
     void update_child_ref(size_t, ref_type) override;
@@ -750,7 +750,9 @@ private:
     void set_metrics(std::shared_ptr<metrics::Metrics> other) noexcept;
     void update_num_objects();
     class TransactAdvancer;
-    void advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream&, bool writable);
+    /// Memory mappings must have been updated to reflect any growth in filesize before
+    /// calling advance_transact()
+    void advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream&, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 
@@ -1044,43 +1046,6 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
         table = do_add_table(name, false);
     }
     return TableRef(table, table->m_alloc.get_instance_version());
-}
-
-template <class S>
-void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames,
-                    JSONOutputMode output_mode) const
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-
-    std::map<std::string, std::string> renames2;
-    renames = renames ? renames : &renames2;
-
-    out << "{" << std::endl;
-
-    auto keys = get_table_keys();
-    bool first = true;
-    for (size_t i = 0; i < keys.size(); ++i) {
-        auto key = keys[i];
-        StringData name = get_table_name(key);
-        std::map<std::string, std::string>& m = *renames;
-        if (m[name] != "")
-            name = m[name];
-
-        ConstTableRef table = get_table(key);
-
-        if (!table->is_embedded()) {
-            if (!first)
-                out << ",";
-            out << "\"" << name << "\"";
-            out << ":";
-            table->to_json(out, link_depth, renames, output_mode);
-            out << std::endl;
-            first = false;
-        }
-    }
-
-    out << "}" << std::endl;
 }
 
 inline void Group::init_array_parents() noexcept

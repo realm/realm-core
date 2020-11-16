@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.0.0-beta.9"
+let versionStr = "10.1.2"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -54,6 +54,12 @@ let syncCommandSources = [
 
 let package = Package(
     name: "RealmDatabase",
+    platforms: [
+        .macOS(.v10_10),
+        .iOS(.v11),
+        .tvOS(.v9),
+        .watchOS(.v2)
+    ],
     products: [
         .library(
             name: "RealmStorage",

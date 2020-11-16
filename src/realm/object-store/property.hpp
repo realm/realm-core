@@ -41,6 +41,7 @@ class StringData;
 class Table;
 class Timestamp;
 class UUID;
+class Mixed;
 
 enum class PropertyType : unsigned short {
     Int = 0,
@@ -53,9 +54,7 @@ enum class PropertyType : unsigned short {
     Object = 7,         // currently must be either Array xor Nullable
     LinkingObjects = 8, // currently must be Array and not Nullable
 
-    // deprecated and remains only for reading old files
-    Any = 9,
-
+    Mixed = 9,
     ObjectId = 10,
     Decimal = 11,
     UUID = 12,
@@ -65,9 +64,10 @@ enum class PropertyType : unsigned short {
     Nullable = 64,
     Array = 128,
     Set = 256,
+    Dictionary = 512,
 
-    Collection = Array | Set,
-    Flags = Nullable | Array | Set
+    Collection = Array | Set | Dictionary,
+    Flags = Nullable | Collection
 };
 
 struct Property {
@@ -189,6 +189,11 @@ inline constexpr bool is_set(PropertyType a)
     return to_underlying(a & PropertyType::Set) == to_underlying(PropertyType::Set);
 }
 
+inline constexpr bool is_dictionary(PropertyType a)
+{
+    return to_underlying(a & PropertyType::Dictionary) == to_underlying(PropertyType::Dictionary);
+}
+
 inline constexpr bool is_collection(PropertyType a)
 {
     return to_underlying(a & PropertyType::Collection) != 0;
@@ -240,6 +245,8 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
             return fn((Decimal128*)0);
         case PT::UUID:
             return is_optional ? fn((util::Optional<UUID>*)0) : fn((UUID*)0);
+        case PT::Mixed:
+            return fn((Mixed*)0);
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -254,6 +261,9 @@ static const char* string_for_property_type(PropertyType type)
     }
     if (is_set(type)) {
         return "set";
+    }
+    if (is_dictionary(type)) {
+        return "dictionary";
     }
     switch (type & ~PropertyType::Flags) {
         case PropertyType::String:
@@ -272,8 +282,8 @@ static const char* string_for_property_type(PropertyType type)
             return "float";
         case PropertyType::Object:
             return "object";
-        case PropertyType::Any:
-            return "any";
+        case PropertyType::Mixed:
+            return "mixed";
         case PropertyType::UUID:
             return "uuid";
         case PropertyType::LinkingObjects:
@@ -333,6 +343,12 @@ inline std::string Property::type_string() const
         if (type == PropertyType::Object)
             return "set<" + object_type + ">";
         return std::string("set<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+    }
+    if (is_dictionary(type)) {
+        REALM_ASSERT(type != PropertyType::LinkingObjects);
+        if (type == PropertyType::Object)
+            return "dictionary<string, " + object_type + ">";
+        return std::string("dictionary<string, ") + string_for_property_type(type & ~PropertyType::Flags) + ">";
     }
     switch (auto base_type = (type & ~PropertyType::Flags)) {
         case PropertyType::Object:

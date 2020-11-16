@@ -170,8 +170,8 @@ public:
 
     double cost() const
     {
-        return 8 * bitwidth_time_unit / m_dD +
-               m_dT; // dt = 1/64 to 1. Match dist is 8 times more important than bitwidth
+        // dt = 1/64 to 1. Match dist is 8 times more important than bitwidth
+        return 8 * bitwidth_time_unit / m_dD + m_dT;
     }
 
     size_t find_first(size_t start, size_t end);
@@ -180,6 +180,8 @@ public:
 
     virtual void init(bool will_query_ranges)
     {
+        m_dD = 100.0;
+
         if (m_child)
             m_child->init(will_query_ranges);
 
@@ -338,7 +340,7 @@ public:
     mutable ColKey m_condition_column_key = ColKey(); // Column of search criteria
 
     double m_dD;       // Average row distance between each local match at current position
-    double m_dT = 0.0; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0
+    double m_dT = 1.0; // Time overhead of testing index i + 1 if we have just tested index i. > 1 for linear scans, 0
     // for index/tableview
 
     size_t m_probes = 0;
@@ -371,38 +373,6 @@ private:
     }
 };
 
-
-namespace _impl {
-
-template <class LeafType>
-struct CostHeuristic;
-
-template <>
-struct CostHeuristic<ArrayInteger> {
-    static constexpr double dD()
-    {
-        return 100.0;
-    }
-    static constexpr double dT()
-    {
-        return 1.0 / 4.0;
-    }
-};
-
-template <>
-struct CostHeuristic<ArrayIntNull> {
-    static constexpr double dD()
-    {
-        return 100.0;
-    }
-    static constexpr double dT()
-    {
-        return 1.0 / 4.0;
-    }
-};
-
-// FIXME: Add AdaptiveStringColumn, BasicColumn, etc.
-}
 
 class ColumnNodeBase : public ParentNode {
 protected:
@@ -559,8 +529,7 @@ protected:
     {
         ColumnNodeBase::init(will_query_ranges);
 
-        m_dT = _impl::CostHeuristic<LeafType>::dT();
-        m_dD = _impl::CostHeuristic<LeafType>::dD();
+        m_dT = .25;
     }
 
     bool should_run_in_fastmode(ArrayPayload* source_leaf) const
@@ -910,12 +879,6 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init(bool will_query_ranges) override
-    {
-        ParentNode::init(will_query_ranges);
-        m_dD = 100.0;
-    }
-
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction cond;
@@ -977,6 +940,7 @@ public:
         : m_value(v)
     {
         m_condition_column_key = column;
+        m_dT = 20.0;
     }
 
     void cluster_changed() override
@@ -989,12 +953,6 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) LeafType(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    void init(bool will_query_ranges) override
-    {
-        ParentNode::init(will_query_ranges);
-        m_dD = 10.0;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1033,14 +991,23 @@ private:
     int64_t m_value;
 };
 
+extern size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool nullable);
 
-template <class T, class TConditionFunction>
+template <class TConditionFunction>
 class SizeListNode : public ParentNode {
 public:
     SizeListNode(int64_t v, ColKey column)
         : m_value(v)
     {
         m_condition_column_key = column;
+        m_dT = 30.0;
+    }
+
+    void reset_cache()
+    {
+        m_cached_col_type = m_condition_column_key.get_type();
+        m_cached_nullable = m_condition_column_key.is_nullable();
+        REALM_ASSERT_DEBUG(m_condition_column_key.is_list());
     }
 
     void cluster_changed() override
@@ -1053,22 +1020,22 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
+        reset_cache();
     }
 
     void init(bool will_query_ranges) override
     {
         ParentNode::init(will_query_ranges);
-        m_dD = 50.0;
+        reset_cache();
     }
 
     size_t find_first_local(size_t start, size_t end) override
     {
+        Allocator& alloc = m_table.unchecked_ptr()->get_alloc();
         for (size_t s = start; s < end; ++s) {
             ref_type ref = m_leaf_ptr->get(s);
             if (ref) {
-                ListType list(m_table.unchecked_ptr()->get_alloc());
-                list.init_from_ref(ref);
-                int64_t sz = list.size();
+                int64_t sz = size_of_list_from_ref(ref, alloc, m_cached_col_type, m_cached_nullable);
                 if (TConditionFunction()(sz, m_value))
                     return s;
             }
@@ -1089,7 +1056,6 @@ public:
 
 private:
     // Leaf cache
-    using ListType = BPlusTree<T>;
     using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(ArrayList)>::type;
     using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
@@ -1097,6 +1063,9 @@ private:
     const ArrayList* m_leaf_ptr = nullptr;
 
     int64_t m_value;
+
+    ColumnType m_cached_col_type;
+    bool m_cached_nullable;
 };
 
 
@@ -1109,8 +1078,8 @@ public:
     BinaryNode(BinaryData v, ColKey column)
         : m_value(v)
     {
-        m_dT = 100.0;
         m_condition_column_key = column;
+        m_dT = 100.0;
     }
 
     BinaryNode(null, ColKey column)
@@ -1124,13 +1093,6 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayBinary(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    void init(bool will_query_ranges) override
-    {
-        ParentNode::init(will_query_ranges);
-
-        m_dD = 100.0;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1196,13 +1158,6 @@ public:
         m_leaf_ptr = m_array_ptr.get();
     }
 
-    void init(bool will_query_ranges) override
-    {
-        ParentNode::init(will_query_ranges);
-
-        m_dD = 100.0;
-    }
-
     size_t find_first_local(size_t start, size_t end) override
     {
         TConditionFunction condition;
@@ -1244,6 +1199,7 @@ public:
         : m_value(v)
     {
         m_condition_column_key = column;
+        m_dT = 2.0;
     }
 
     TimestampNodeBase(null, ColKey column)
@@ -1257,13 +1213,6 @@ public:
         m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayTimestamp(m_table.unchecked_ptr()->get_alloc()));
         m_cluster->init_leaf(this->m_condition_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
-    }
-
-    void init(bool will_query_ranges) override
-    {
-        ParentNode::init(will_query_ranges);
-
-        m_dD = 100.0;
     }
 
 protected:
@@ -1614,6 +1563,15 @@ public:
         m_dD = 100.0;
     }
 
+    std::string describe(util::serializer::SerialisationState& state) const override
+    {
+        REALM_ASSERT(m_condition_column_key);
+        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + this->describe_condition() +
+               " " +
+               (m_value_is_null ? util::serializer::print_value(realm::null())
+                                : util::serializer::print_value(m_value));
+    }
+
 protected:
     MixedNodeBase(const MixedNodeBase& from)
         : ParentNode(from)
@@ -1655,13 +1613,9 @@ public:
         return realm::npos;
     }
 
-    std::string describe(util::serializer::SerialisationState& state) const override
+    virtual std::string describe_condition() const override
     {
-        REALM_ASSERT(m_condition_column_key);
-        return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
-               TConditionFunction::description() + " " +
-               (m_value_is_null ? util::serializer::print_value(realm::null())
-                                : util::serializer::print_value(MixedNode::m_value));
+        return TConditionFunction::description();
     }
 
     std::unique_ptr<ParentNode> clone() const override
@@ -1685,6 +1639,7 @@ public:
         : m_value(v.is_null() ? util::none : util::make_optional(std::string(v)))
     {
         m_condition_column_key = column;
+        m_dT = 10.0;
     }
 
     void table_changed() override
@@ -1709,7 +1664,6 @@ public:
     {
         ParentNode::init(will_query_ranges);
 
-        m_dT = 10.0;
         m_probes = 0;
         m_matches = 0;
         m_end_s = 0;
@@ -1781,11 +1735,8 @@ public:
 
     void init(bool will_query_ranges) override
     {
-        clear_leaf_state();
-
-        m_dD = 100.0;
-
         StringNodeBase::init(will_query_ranges);
+        clear_leaf_state();
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1844,15 +1795,13 @@ public:
             unsigned char c = v[i];
             m_charmap[c] = jump;
         }
+        m_dT = 50.0;
     }
 
     void init(bool will_query_ranges) override
     {
-        clear_leaf_state();
-
-        m_dD = 100.0;
-
         StringNodeBase::init(will_query_ranges);
+        clear_leaf_state();
     }
 
 
@@ -1923,15 +1872,13 @@ public:
             m_charmap[uc] = jump;
             m_charmap[lc] = jump;
         }
+        m_dT = 75.0;
     }
 
     void init(bool will_query_ranges) override
     {
-        clear_leaf_state();
-
-        m_dD = 100.0;
-
         StringNodeBase::init(will_query_ranges);
+        clear_leaf_state();
     }
 
 
@@ -2257,9 +2204,6 @@ public:
     void init(bool will_query_ranges) override
     {
         ParentNode::init(will_query_ranges);
-
-        m_dD = 10.0;
-
         combine_conditions(!will_query_ranges);
 
         m_start.clear();
@@ -2393,9 +2337,6 @@ public:
     void init(bool will_query_ranges) override
     {
         ParentNode::init(will_query_ranges);
-
-        m_dD = 10.0;
-
         std::vector<ParentNode*> v;
 
         m_condition->init(false);
@@ -2470,35 +2411,45 @@ private:
     size_t find_first_no_overlap(size_t start, size_t end);
 };
 
-
 // Compare two columns with eachother row-by-row
-template <class LeafType, class TConditionFunction>
-class TwoColumnsNode : public ParentNode {
+class TwoColumnsNodeBase : public ParentNode {
 public:
-    using TConditionValue = typename LeafType::value_type;
-
-    TwoColumnsNode(ColKey column1, ColKey column2)
+    TwoColumnsNodeBase(ColKey column1, ColKey column2)
     {
         m_dT = 100.0;
         m_condition_column_key1 = column1;
         m_condition_column_key2 = column2;
     }
 
-    ~TwoColumnsNode() noexcept override
+    ~TwoColumnsNodeBase() noexcept override {}
+    void table_changed() override
     {
+        if (this->m_table) {
+            if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
+                throw std::runtime_error(util::format("queries comparing two properties are not yet supported for "
+                                                      "collections (list/set/dictionary) (%1 and %2)",
+                                                      ParentNode::m_table->get_column_name(m_condition_column_key1),
+                                                      ParentNode::m_table->get_column_name(m_condition_column_key2)));
+            }
+            ParentNode::m_table->check_column(m_condition_column_key1);
+            ParentNode::m_table->check_column(m_condition_column_key2);
+        }
     }
 
+    static std::unique_ptr<ArrayPayload> update_cached_leaf_pointers_for_column(Allocator& alloc,
+                                                                                const ColKey& col_key);
     void cluster_changed() override
     {
-        m_array_ptr1 = nullptr;
-        m_array_ptr1 = LeafPtr(new (&m_leaf_cache_storage1) LeafType(m_table.unchecked_ptr()->get_alloc()));
-        this->m_cluster->init_leaf(this->m_condition_column_key1, m_array_ptr1.get());
-        m_leaf_ptr1 = m_array_ptr1.get();
-
-        m_array_ptr2 = nullptr;
-        m_array_ptr2 = LeafPtr(new (&m_leaf_cache_storage2) LeafType(m_table.unchecked_ptr()->get_alloc()));
-        this->m_cluster->init_leaf(this->m_condition_column_key2, m_array_ptr2.get());
-        m_leaf_ptr2 = m_array_ptr2.get();
+        if (!m_leaf_ptr1) {
+            m_leaf_ptr1 =
+                update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key1);
+        }
+        if (!m_leaf_ptr2) {
+            m_leaf_ptr2 =
+                update_cached_leaf_pointers_for_column(m_table.unchecked_ptr()->get_alloc(), m_condition_column_key2);
+        }
+        this->m_cluster->init_leaf(m_condition_column_key1, m_leaf_ptr1.get());
+        this->m_cluster->init_leaf(m_condition_column_key2, m_leaf_ptr2.get());
     }
 
     virtual std::string describe(util::serializer::SerialisationState& state) const override
@@ -2508,86 +2459,55 @@ public:
                " " + state.describe_column(ParentNode::m_table, m_condition_column_key2);
     }
 
-    virtual std::string describe_condition() const override
-    {
-        return TConditionFunction::description();
-    }
-
-    void init(bool will_query_ranges) override
-    {
-        ParentNode::init(will_query_ranges);
-        m_dD = 100.0;
-    }
-
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        size_t s = start;
-
-        while (s < end) {
-            if (std::is_same<TConditionValue, int64_t>::value) {
-                // For int64_t we've created an array intrinsics named compare_leafs which template expands bitwidths
-                // of boths arrays to make Get faster.
-                QueryState<int64_t> qs(act_ReturnFirst);
-                bool resume = m_leaf_ptr1->template compare_leafs<TConditionFunction, act_ReturnFirst>(
-                    m_leaf_ptr2, start, end, 0, &qs, CallbackDummy());
-
-                if (resume)
-                    s = end;
-                else
-                    return to_size_t(qs.m_state);
-            }
-            else {
-// This is for float and double.
-
-#if 0 && defined(REALM_COMPILER_AVX)
-// AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
-//
-// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
-// or movemask_cmp_ps (gcc/clang)
-//
-// See https://github.com/rrrlasse/realm/tree/AVX for an example of utilizing AVX for a two-column search which has
-// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs
-// 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
-#endif
-
-                TConditionValue v1 = m_leaf_ptr1->get(s);
-                TConditionValue v2 = m_leaf_ptr2->get(s);
-                TConditionFunction C;
-
-                if (C(v1, v2))
-                    return s;
-                else
-                    s++;
-            }
-        }
-        return not_found;
-    }
-
-    std::unique_ptr<ParentNode> clone() const override
-    {
-        return std::unique_ptr<ParentNode>(new TwoColumnsNode<LeafType, TConditionFunction>(*this));
-    }
-
-    TwoColumnsNode(const TwoColumnsNode& from)
+    TwoColumnsNodeBase(const TwoColumnsNodeBase& from)
         : ParentNode(from)
         , m_condition_column_key1(from.m_condition_column_key1)
         , m_condition_column_key2(from.m_condition_column_key2)
     {
     }
 
-private:
+protected:
     mutable ColKey m_condition_column_key1;
     mutable ColKey m_condition_column_key2;
+    std::unique_ptr<ArrayPayload> m_leaf_ptr1 = nullptr;
+    std::unique_ptr<ArrayPayload> m_leaf_ptr2 = nullptr;
+};
 
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(LeafType), alignof(LeafType)>::type;
-    using LeafPtr = std::unique_ptr<LeafType, PlacementDelete>;
 
-    LeafCacheStorage m_leaf_cache_storage1;
-    LeafPtr m_array_ptr1;
-    const LeafType* m_leaf_ptr1 = nullptr;
-    LeafCacheStorage m_leaf_cache_storage2;
-    LeafPtr m_array_ptr2;
-    const LeafType* m_leaf_ptr2 = nullptr;
+template <class TConditionFunction>
+class TwoColumnsNode : public TwoColumnsNodeBase {
+public:
+    using TwoColumnsNodeBase::TwoColumnsNodeBase;
+    ~TwoColumnsNode() noexcept override {}
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        size_t s = start;
+        while (s < end) {
+            Mixed v1 = m_leaf_ptr1->get_any(s);
+            Mixed v2 = m_leaf_ptr2->get_any(s);
+            if (TConditionFunction()(v1, v2, v1.is_null(), v2.is_null()))
+                return s;
+            else
+                s++;
+        }
+        return not_found;
+    }
+
+    virtual std::string describe_condition() const override
+    {
+        return TConditionFunction::description();
+    }
+
+    std::unique_ptr<ParentNode> clone() const override
+    {
+        return std::unique_ptr<ParentNode>(new TwoColumnsNode<TConditionFunction>(*this));
+    }
+
+protected:
+    TwoColumnsNode(const TwoColumnsNode& from, Transaction* tr)
+        : TwoColumnsNode(from, tr)
+    {
+    }
 };
 
 
@@ -2619,7 +2539,6 @@ public:
     LinksToNode(ColKey origin_column_key, ObjKey target_key)
         : m_target_keys(1, target_key)
     {
-        m_dD = 10.0;
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
     }
@@ -2627,7 +2546,6 @@ public:
     LinksToNode(ColKey origin_column_key, const std::vector<ObjKey>& target_keys)
         : m_target_keys(target_keys)
     {
-        m_dD = 10.0;
         m_dT = 50.0;
         m_condition_column_key = origin_column_key;
     }

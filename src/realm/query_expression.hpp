@@ -683,12 +683,8 @@ private:
 
 class Expression {
 public:
-    Expression()
-    {
-    }
-    virtual ~Expression()
-    {
-    }
+    Expression() {}
+    virtual ~Expression() {}
 
     virtual double init()
     {
@@ -698,9 +694,7 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(ConstTableRef table) = 0;
     virtual void set_cluster(const Cluster*) = 0;
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
     virtual ConstTableRef get_base_table() const = 0;
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
@@ -715,9 +709,7 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
 
 class Subexpr {
 public:
-    virtual ~Subexpr()
-    {
-    }
+    virtual ~Subexpr() {}
 
     virtual std::unique_ptr<Subexpr> clone() const = 0;
 
@@ -732,9 +724,7 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const = 0;
 
-    virtual void set_cluster(const Cluster*)
-    {
-    }
+    virtual void set_cluster(const Cluster*) {}
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
@@ -744,9 +734,7 @@ public:
         return nullptr;
     }
 
-    virtual void collect_dependencies(std::vector<TableKey>&) const
-    {
-    }
+    virtual void collect_dependencies(std::vector<TableKey>&) const {}
 
     virtual bool has_constant_evaluation() const
     {
@@ -971,57 +959,37 @@ public:
     {
 #ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
         // Test if expressions are of type Columns. Other possibilities are Value and Operator.
-        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
+        const Columns<L>* left_col = dynamic_cast<const Columns<L>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
         // >=},
         // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col && std::is_same_v<L, R> && !left_col->is_nullable() && !right_col->is_nullable() &&
-            !left_col->links_exist() && !right_col->links_exist()) {
+        if (left_col && right_col) {
             ConstTableRef t = left_col->get_base_table();
-
-            if (std::numeric_limits<L>::is_integer) {
-                if (std::is_same_v<Cond, Less>)
-                    return Query(t).less_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal_int(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal_int(left_col->column_key(), right_col->column_key());
+            ConstTableRef t_right = right_col->get_base_table();
+            REALM_ASSERT_DEBUG(t);
+            REALM_ASSERT_DEBUG(t_right);
+            // we only support multi column comparisons if they stem from the same table
+            if (t->get_key() != t_right->get_key()) {
+                throw std::runtime_error(util::format(
+                    "Comparison between two properties must be linked with a relationship or exist on the same "
+                    "Table (%1 and %2)",
+                    t->get_name(), t_right->get_name()));
             }
-            else if (std::is_same_v<L, float>) {
+            if (!left_col->links_exist() && !right_col->links_exist()) {
                 if (std::is_same_v<Cond, Less>)
-                    return Query(t).less_float(left_col->column_key(), right_col->column_key());
+                    return Query(t).less(left_col->column_key(), right_col->column_key());
                 if (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater_float(left_col->column_key(), right_col->column_key());
+                    return Query(t).greater(left_col->column_key(), right_col->column_key());
                 if (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal_float(left_col->column_key(), right_col->column_key());
+                    return Query(t).equal(left_col->column_key(), right_col->column_key());
                 if (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal_float(left_col->column_key(), right_col->column_key());
+                    return Query(t).not_equal(left_col->column_key(), right_col->column_key());
                 if (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal_float(left_col->column_key(), right_col->column_key());
+                    return Query(t).less_equal(left_col->column_key(), right_col->column_key());
                 if (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal_float(left_col->column_key(), right_col->column_key());
-            }
-            else if (std::is_same_v<L, double>) {
-                if (std::is_same_v<Cond, Less>)
-                    return Query(t).less_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal_double(left_col->column_key(), right_col->column_key());
-                if (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal_double(left_col->column_key(), right_col->column_key());
+                    return Query(t).greater_equal(left_col->column_key(), right_col->column_key());
             }
         }
 #endif
@@ -1074,9 +1042,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, UUID>,
                  public Overloads<T, null> {
 public:
-    virtual ~Subexpr2()
-    {
-    }
+    virtual ~Subexpr2() {}
 
     DataType get_type() const final
     {
@@ -1842,11 +1808,6 @@ private:
     friend Query compare(const Subexpr2<Link>&, const Obj&);
 };
 
-template <class T, class S, class I>
-Query string_compare(const Subexpr2<StringData>& left, T right, bool case_insensitive);
-template <class S, class I>
-Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData>& right, bool case_insensitive);
-
 template <class T>
 Value<T> make_value_for_link(bool only_unary_links, size_t size)
 {
@@ -2212,7 +2173,15 @@ public:
 };
 
 template <class T, class S, class I>
-Query string_compare(const Subexpr2<StringData>& left, T right, bool case_sensitive)
+inline std::enable_if_t<!realm::is_any_v<T, StringData, realm::null, const char*, std::string>, Query>
+string_compare(const Subexpr2<StringData>& left, T right, bool)
+{
+    return make_expression<Compare<Equal>>(right.clone(), left.clone());
+}
+
+template <class T, class S, class I>
+inline std::enable_if_t<realm::is_any_v<T, StringData, realm::null, const char*, std::string>, Query>
+string_compare(const Subexpr2<StringData>& left, T right, bool case_sensitive)
 {
     StringData sd(right);
     if (case_sensitive)
@@ -2771,7 +2740,7 @@ template <typename T>
 class Sum;
 template <typename T>
 class Average;
-}
+} // namespace aggregate_operations
 
 class ColumnListBase {
 public:
@@ -2938,6 +2907,17 @@ private:
         : ColumnListBase(column_key, table, links, type)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
+    }
+};
+
+template <>
+class Columns<LnkLst> : public Columns<Lst<ObjKey>> {
+public:
+    using Columns<Lst<ObjKey>>::Columns;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<LnkLst>>(*this);
     }
 };
 
@@ -3904,7 +3884,7 @@ public:
         return "@avg";
     }
 };
-}
+} // namespace aggregate_operations
 
 template <class oper, class TLeft>
 class UnaryOperator : public Subexpr2<typename oper::type> {
@@ -4266,5 +4246,5 @@ private:
     mutable size_t m_index_get = 0;
     size_t m_index_end = 0;
 };
-}
+} // namespace realm
 #endif // REALM_QUERY_EXPRESSION_HPP

@@ -83,7 +83,7 @@ Allocator& Obj::get_alloc() const
     return m_table->m_alloc;
 }
 
-Allocator& Obj::_get_alloc() const
+Allocator& Obj::_get_alloc() const noexcept
 {
     // Bypass check of table instance version. To be used only in contexts,
     // where instance version match has already been established (e.g _get<>)
@@ -178,7 +178,7 @@ bool Obj::operator==(const Obj& other) const
     return true;
 }
 
-bool Obj::is_valid() const
+bool Obj::is_valid() const noexcept
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid)
@@ -202,6 +202,7 @@ void Obj::remove()
 void Obj::invalidate()
 {
     m_table.cast_away_const()->invalidate_object(m_key);
+    m_key = m_key.get_unresolved();
 }
 
 ColKey Obj::get_column_key(StringData col_name) const
@@ -234,7 +235,7 @@ TableRef Obj::get_target_table(ObjLink link) const
     }
 }
 
-inline bool Obj::update() const
+bool Obj::update() const
 {
     // Get a new object from key
     Obj new_obj = get_tree_top()->get(m_key);
@@ -253,15 +254,6 @@ inline bool Obj::update() const
 inline bool Obj::_update_if_needed() const
 {
     auto current_version = _get_alloc().get_storage_version();
-    if (current_version != m_storage_version) {
-        return update();
-    }
-    return false;
-}
-
-bool Obj::update_if_needed() const
-{
-    auto current_version = get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
         return update();
     }
@@ -964,13 +956,13 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 }
 
 } // anonymous namespace
-void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>& renames,
+void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                   std::vector<ColKey>& followed, JSONOutputMode output_mode) const
 {
     StringData name = "_key";
     bool prefixComma = false;
-    if (renames[name] != "")
-        name = renames[name];
+    if (renames.count(name))
+        name = renames.at(name);
     out << "{";
     if (output_mode == output_mode_json) {
         prefixComma = true;
@@ -981,8 +973,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
         auto type = ck.get_type();
-        if (renames[name] != "")
-            name = renames[name];
+        if (renames.count(name))
+            name = renames.at(name);
 
         if (prefixComma)
             out << ",";
@@ -1169,13 +1161,13 @@ void Obj::to_json(std::ostream& out, size_t link_depth, std::map<std::string, st
 std::string Obj::to_string() const
 {
     std::ostringstream ostr;
-    to_json(ostr, 0, nullptr);
+    to_json(ostr, 0, {});
     return ostr.str();
 }
 
 std::ostream& operator<<(std::ostream& ostr, const Obj& obj)
 {
-    obj.to_json(ostr, -1, nullptr);
+    obj.to_json(ostr, -1, {});
     return ostr;
 }
 
@@ -1190,19 +1182,6 @@ bool Obj::ensure_writeable()
         return true;
     }
     return false;
-}
-
-void Obj::bump_content_version()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-}
-
-void Obj::bump_both_versions()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-    alloc.bump_storage_version();
 }
 
 template <>
@@ -1962,9 +1941,28 @@ Dictionary Obj::get_dictionary(ColKey col_key) const
     return Dictionary(Obj(*this), col_key);
 }
 
+DictionaryPtr Obj::get_dictionary_ptr(ColKey col_key) const
+{
+    return std::make_unique<Dictionary>(Obj(*this), col_key);
+}
+
 Dictionary Obj::get_dictionary(StringData col_name) const
 {
     return get_dictionary(get_column_key(col_name));
+}
+
+CollectionBasePtr Obj::get_collection_ptr(ColKey col_key) const
+{
+    if (col_key.is_list()) {
+        return get_listbase_ptr(col_key);
+    }
+    else if (col_key.is_set()) {
+        return get_setbase_ptr(col_key);
+    }
+    else if (col_key.is_dictionary()) {
+        return get_dictionary_ptr(col_key);
+    }
+    return {};
 }
 
 void Obj::assign_pk_and_backlinks(const Obj& other)

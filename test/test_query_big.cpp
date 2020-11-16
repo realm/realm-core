@@ -364,12 +364,24 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.between(col_int, int{}, {})); });
 
     // Conditions: 2 int columns
-    helper([&](Query& q, auto&& test) { test(q.equal_int(col_int, col_int)); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal_int(col_int, col_int)); });
-    helper([&](Query& q, auto&& test) { test(q.greater_int(col_int, col_int)); });
-    helper([&](Query& q, auto&& test) { test(q.less_int(col_int, col_int)); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal_int(col_int, col_int)); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal_int(col_int, col_int)); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_int, col_int));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_int, col_int));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_int, col_int));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_int, col_int));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_int, col_int));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_int, col_int));
+    });
 
     // Conditions: float
     helper([&](Query& q, auto&& test) { test(q.equal(col_float, float{})); });
@@ -381,12 +393,24 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.between(col_float, float{}, {})); });
 
     // Conditions: 2 float columns
-    helper([&](Query& q, auto&& test) { test(q.equal_float(col_float, col_float)); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal_float(col_float, col_float)); });
-    helper([&](Query& q, auto&& test) { test(q.greater_float(col_float, col_float)); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal_float(col_float, col_float)); });
-    helper([&](Query& q, auto&& test) { test(q.less_float(col_float, col_float)); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal_float(col_float, col_float)); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_float, col_float));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_float, col_float));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_float, col_float));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_float, col_float));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_float, col_float));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_float, col_float));
+    });
 
     // Conditions: double
     helper([&](Query& q, auto&& test) { test(q.equal(col_double, double{})); });
@@ -398,12 +422,24 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.between(col_double, double{}, {})); });
 
     // Conditions: 2 double columns
-    helper([&](Query& q, auto&& test) { test(q.equal_double(col_double, col_double)); });
-    helper([&](Query& q, auto&& test) { test(q.not_equal_double(col_double, col_double)); });
-    helper([&](Query& q, auto&& test) { test(q.greater_double(col_double, col_double)); });
-    helper([&](Query& q, auto&& test) { test(q.greater_equal_double(col_double, col_double)); });
-    helper([&](Query& q, auto&& test) { test(q.less_double(col_double, col_double)); });
-    helper([&](Query& q, auto&& test) { test(q.less_equal_double(col_double, col_double)); });
+    helper([&](Query& q, auto&& test) {
+        test(q.equal(col_double, col_double));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.not_equal(col_double, col_double));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater(col_double, col_double));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.greater_equal(col_double, col_double));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less(col_double, col_double));
+    });
+    helper([&](Query& q, auto&& test) {
+        test(q.less_equal(col_double, col_double));
+    });
 
     // Conditions: timestamp
     helper([&](Query& q, auto&& test) { test(q.equal(col_timestamp, Timestamp{5, 5})); });

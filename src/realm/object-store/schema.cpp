@@ -24,6 +24,8 @@
 #include <realm/object-store/property.hpp>
 
 #include <algorithm>
+#include <queue>
+#include <unordered_set>
 
 using namespace realm;
 
@@ -77,7 +79,56 @@ Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
     return const_cast<Schema*>(this)->find(object);
 }
 
-void Schema::validate() const
+namespace {
+
+struct CheckObjectPath {
+    const ObjectSchema& object;
+    std::string path;
+};
+
+// a non-recursive search that returns a path to any embedded object that has multiple paths from the start
+std::string do_check(Schema const& schema, const ObjectSchema& start)
+{
+    std::queue<CheckObjectPath> to_visit;
+    std::unordered_set<std::string> visited;
+    to_visit.push(CheckObjectPath{start, start.name});
+
+    while (to_visit.size() > 0) {
+        auto current = to_visit.front();
+        visited.insert(current.object.name);
+        for (auto& prop : current.object.persisted_properties) {
+            if (prop.type == PropertyType::Object) {
+                auto it = schema.find(prop.object_type);
+                REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
+                auto next_path = current.path + "." + prop.name;
+                if (visited.find(prop.object_type) == visited.end()) {
+                    to_visit.push(CheckObjectPath{*it, next_path});
+                }
+                else if (it->is_embedded) {
+                    return next_path;
+                }
+            }
+        }
+        to_visit.pop();
+    }
+    return "";
+}
+
+void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions)
+{
+    for (auto const& object : schema) {
+        if (object.is_embedded) {
+            std::string loop = do_check(schema, object);
+            if (!loop.empty()) {
+                exceptions.push_back(
+                    util::format("Cycles containing embedded objects are not currently supported: '%1'", loop));
+            }
+        }
+    }
+}
+} // namespace
+
+void Schema::validate(bool for_sync) const
 {
     std::vector<ObjectSchemaValidationException> exceptions;
 
@@ -93,7 +144,15 @@ void Schema::validate() const
     }
 
     for (auto const& object : *this) {
-        object.validate(*this, exceptions);
+        object.validate(*this, exceptions, for_sync);
+    }
+
+    // TODO: remove this client side check once the server supports it
+    // or generates a better error message.
+    if (exceptions.empty()) {
+        // only attempt to check for loops if the rest of the schema is valid
+        // because we rely on all link types being defined
+        check_for_embedded_objects_loop(*this, exceptions);
     }
 
     if (exceptions.size()) {
@@ -117,7 +176,8 @@ static void compare(ObjectSchema const& existing_schema, ObjectSchema const& tar
         }
         if (current_prop.type != target_prop->type || current_prop.object_type != target_prop->object_type ||
             is_array(current_prop.type) != is_array(target_prop->type) ||
-            is_set(current_prop.type) != is_set(target_prop->type)) {
+            is_set(current_prop.type) != is_set(target_prop->type) ||
+            is_dictionary(current_prop.type) != is_dictionary(target_prop->type)) {
 
             changes.emplace_back(schema_change::ChangePropertyType{&existing_schema, &current_prop, target_prop});
             continue;

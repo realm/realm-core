@@ -88,19 +88,11 @@ public:
 private:
     // Underlying array structure.
     //
-    // `m_subspecs` contains one entry for each subtable column, one entry for
-    // each link or link list columns, two entries for each backlink column, and
-    // zero entries for all other column types. For subtable columns the entry
-    // is a ref pointing to the subtable spec, for link and link list columns it
-    // is the group-level table index of the target table, and for backlink
-    // columns the first entry is the group-level table index of the origin
-    // table, and the second entry is the index of the origin column in the
-    // origin table.
     Array m_top;
     Array m_types;            // 1st slot in m_top
     ArrayStringShort m_names; // 2nd slot in m_top
     Array m_attr;             // 3rd slot in m_top
-    Array m_oldsubspecs;  // 4th slot in m_top
+    // 4th slot in m_top is vacant
     Array m_enumkeys;     // 5th slot in m_top
     Array m_keys;         // 6th slot in m_top
     size_t m_num_public_columns;
@@ -121,7 +113,7 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    bool update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 
@@ -133,11 +125,11 @@ private:
     void fix_column_keys(TableKey table_key);
     bool has_subspec()
     {
-        return m_oldsubspecs.is_attached();
+        return m_top.get(3) != 0;
     }
     void destroy_subspec()
     {
-        m_oldsubspecs.destroy();
+        Node::destroy(m_top.get_as_ref(3), m_top.get_alloc());
         m_top.set(3, 0);
     }
     TableKey get_opposite_link_table_key(size_t column_ndx) const noexcept;
@@ -170,10 +162,14 @@ inline Spec::Spec(Allocator& alloc) noexcept
     , m_types(alloc)
     , m_names(alloc)
     , m_attr(alloc)
-    , m_oldsubspecs(alloc)
     , m_enumkeys(alloc)
     , m_keys(alloc)
 {
+    m_types.set_parent(&m_top, 0);
+    m_names.set_parent(&m_top, 1);
+    m_attr.set_parent(&m_top, 2);
+    m_enumkeys.set_parent(&m_top, 4);
+    m_keys.set_parent(&m_top, 5);
 }
 
 inline bool Spec::init_from_parent() noexcept

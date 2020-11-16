@@ -70,6 +70,8 @@ ForEachMacros:
   - foreach
   - Q_FOREACH
   - BOOST_FOREACH
+  - SECTION
+  - TEST_CASE
 IncludeBlocks:   Preserve
 IncludeCategories:
   - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
@@ -113,7 +115,7 @@ SpaceBeforeAssignmentOperators: true
 SpaceBeforeCpp11BracedList: false
 SpaceBeforeCtorInitializerColon: true
 SpaceBeforeInheritanceColon: true
-SpaceBeforeParens: ControlStatements
+SpaceBeforeParens: ControlStatementsExceptForEachMacros
 SpaceBeforeRangeBasedForLoopColon: true
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 1

@@ -21,13 +21,13 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
-#include <realm/object-store/sync/generic_network_transport.hpp>
-#include <realm/object-store/sync/sync_manager.hpp>
-#include <realm/object-store/sync/remote_mongo_client.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
-#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
+#include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include <external/json/json.hpp>
 #include <string>
@@ -163,7 +163,7 @@ void App::configure(const SyncClientConfig& sync_client_config)
 static void handle_default_response(const Response& response,
                                     std::function<void(Optional<AppError>)> completion_block)
 {
-    if (auto error = check_for_errors(response)) {
+    if (auto error = AppUtils::check_for_errors(response)) {
         return completion_block(error);
     }
     else {
@@ -335,7 +335,7 @@ void App::UserAPIKeyProviderClient::create_api_key(
     std::string route = url_for_path();
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block({}, error);
         }
 
@@ -375,7 +375,7 @@ void App::UserAPIKeyProviderClient::fetch_api_key(
     std::string route = url_for_path(id.to_string());
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block({}, error);
         }
 
@@ -412,7 +412,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(
     std::string route = url_for_path();
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(std::vector<UserAPIKey>(), error);
         }
 
@@ -458,7 +458,7 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
     std::string route = url_for_path(id.to_string());
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
         else {
@@ -480,7 +480,7 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
     std::string route = url_for_path(util::format("%1/enable", id.to_string()));
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
         else {
@@ -502,7 +502,7 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
     std::string route = url_for_path(util::format("%1/disable", id.to_string()));
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
         else {
@@ -533,7 +533,7 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
                       std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block)
 {
     auto profile_handler = [completion_block, this, sync_user](const Response& profile_response) {
-        if (auto error = check_for_errors(profile_response)) {
+        if (auto error = AppUtils::check_for_errors(profile_response)) {
             return completion_block(nullptr, error);
         }
 
@@ -614,7 +614,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials, const std::
                                      linking_user ? "?link=true" : "");
 
     auto handler = [completion_block, credentials, linking_user, this](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(nullptr, error);
         }
 
@@ -682,7 +682,7 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
     }
 
     auto handler = [completion_block, user](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
         return completion_block(util::none);
@@ -702,7 +702,7 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
     req.headers.insert({"Authorization", util::format("Bearer %1", refresh_token)});
 
     do_request(req, [completion_block, req](Response response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             // We do not care about handling auth errors on log out
             completion_block(error);
         }
@@ -877,7 +877,7 @@ void App::do_authenticated_request(Request request, std::shared_ptr<SyncUser> sy
                                                                                 : RequestTokenType::AccessToken);
 
     do_request(request, [completion_block, request, sync_user, this](Response response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
         }
         else {
@@ -904,7 +904,7 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
     };
 
     // Only handle auth failures
-    if (error.is_http_error() && error.error_code.value() == 401) {
+    if (*error.http_status_code && *error.http_status_code == 401) {
         if (request.uses_refresh_token) {
             if (sync_user && sync_user->is_logged_in()) {
                 sync_user->log_out();
@@ -936,7 +936,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
     }
 
     auto handler = [completion_block, sync_user](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error);
         }
 
@@ -968,7 +968,7 @@ void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name,
                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
 {
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
+        if (auto error = AppUtils::check_for_errors(response)) {
             return completion_block(error, util::none);
         }
         completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
@@ -1033,11 +1033,6 @@ Request App::make_streaming_request(std::shared_ptr<SyncUser> user, const std::s
         m_request_timeout_ms,
         {{"Accept", "text/event-stream"}},
     };
-}
-
-RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
-{
-    return RemoteMongoClient(shared_from_this(), service_name);
 }
 
 PushClient App::push_notification_client(const std::string& service_name)

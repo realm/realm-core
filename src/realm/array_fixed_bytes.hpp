@@ -79,6 +79,11 @@ public:
         return get_pos(ndx).get_value(this);
     }
 
+    Mixed get_any(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
+    }
+
     void add(const ObjectType& value)
     {
         insert(size(), value);
@@ -203,6 +208,10 @@ public:
             return util::none;
         }
         return pos.get_value(this);
+    }
+    Mixed get_any(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
     }
     size_t find_first(const util::Optional<ObjectType>& value, size_t begin = 0, size_t end = npos) const
     {

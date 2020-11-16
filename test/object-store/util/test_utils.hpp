@@ -29,7 +29,6 @@ namespace realm {
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);
-std::string tmp_dir();
 std::vector<char> make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
                                           std::function<void()> func);
@@ -72,6 +71,8 @@ static inline std::string random_string(std::string::size_type length)
         REQUIRE(!util::File::exists((macro_path) + ".lock"));                                                        \
         REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management");                                                    \
     } while (0)
+
+#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 

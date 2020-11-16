@@ -42,7 +42,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 {
     auto table_name = get_table_name(instr);
 
-    auto add_table = util::overloaded{
+    auto add_table = util::overload{
         [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
             if (spec.type == Instruction::Payload::Type::GlobalKey) {
                 log("sync::create_table(group, \"%1\");", table_name);
@@ -96,7 +96,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
     ColKey pk_col = table->get_primary_key_column();
 
     mpark::visit(
-        util::overloaded{
+        util::overload{
             [&](mpark::monostate) {
                 if (!pk_col) {
                     bad_transaction_log("CreateObject(NULL) on table without a primary key");
@@ -239,7 +239,7 @@ void InstructionApplier::visit_payload(const Instruction::Payload& payload, F&& 
 
 void InstructionApplier::operator()(const Instruction::Update& instr)
 {
-    auto setter = util::overloaded{
+    auto setter = util::overload{
         [&](Obj& obj, ColKey col) {
             // Update of object field.
 
@@ -248,7 +248,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto field_name = table->get_column_name(col);
             auto data_type = DataType(col.get_type());
 
-            auto visitor = util::overloaded{
+            auto visitor = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_Mixed || data_type == type_TypedLink) {
                         obj.set_any(col, link, instr.is_default);
@@ -306,17 +306,20 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
-            auto visitor = util::overloaded{
+            auto visitor = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
                         link_list.set(index, link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.set(index, link);
                     }
                     else if (data_type == type_LinkList || data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -365,7 +368,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
         [&](Dictionary& dict, Mixed key) {
             // Update (insert) of dictionary element.
 
-            auto visitor = util::overloaded{
+            auto visitor = util::overload{
                 [&](Mixed value) {
                     if (value.is_null()) {
                         // FIXME: Separate handling of NULL is needed because
@@ -399,7 +402,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
 void InstructionApplier::operator()(const Instruction::AddInteger& instr)
 {
-    auto setter = util::overloaded{
+    auto setter = util::overload{
         [&](Obj& obj, ColKey col) {
             // Increment of object field.
 
@@ -535,7 +538,7 @@ void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             auto col = list.get_col_key();
             auto data_type = DataType(col.get_type());
@@ -557,17 +560,20 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                                     instr.prior_size);
             }
 
-            auto inserter = util::overloaded{
+            auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
                         link_list.insert(index, link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.insert(index, link);
                     }
                     else if (data_type == type_LinkList || data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -613,6 +619,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                                                 target_table->get_name());
                         }
 
+                        REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
                         auto& link_list = static_cast<LnkLst&>(list);
                         link_list.create_and_insert_linked_object(index);
                     }
@@ -641,7 +648,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             if (index >= list.size()) {
                 bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", instr.index(), list.size());
@@ -669,7 +676,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             if (index >= instr.prior_size) {
                 bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
@@ -694,12 +701,8 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](LstBase& list) {
-            if (instr.prior_size != list.size()) {
-                bad_transaction_log("ArrayClear: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
-                                    instr.prior_size);
-            }
             list.clear();
         },
         [](Dictionary& dict) {
@@ -715,7 +718,7 @@ void InstructionApplier::operator()(const Instruction::ArrayClear& instr)
 
 void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](SetBase& set) {
             auto col = set.get_col_key();
             auto data_type = DataType(col.get_type());
@@ -723,17 +726,20 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
-            auto inserter = util::overloaded{
+            auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
                         auto& link_set = static_cast<Set<ObjLink>&>(set);
                         link_set.insert(link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.insert(link);
                     }
                     else if (data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
                         auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -784,7 +790,7 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 
 void InstructionApplier::operator()(const Instruction::SetErase& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](SetBase& set) {
             auto col = set.get_col_key();
             auto data_type = DataType(col.get_type());
@@ -792,17 +798,20 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
-            auto inserter = util::overloaded{
+            auto inserter = util::overload{
                 [&](const ObjLink& link) {
                     if (data_type == type_TypedLink) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
                         auto& link_set = static_cast<Set<ObjLink>&>(set);
                         link_set.erase(link);
                     }
                     else if (data_type == type_Mixed) {
+                        REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.erase(link);
                     }
                     else if (data_type == type_Link) {
+                        REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
                         auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
                         auto target_table = table->get_link_target(col);
@@ -853,7 +862,7 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
 
 void InstructionApplier::operator()(const Instruction::SetClear& instr)
 {
-    auto callback = util::overloaded{
+    auto callback = util::overload{
         [&](SetBase& set) {
             set.clear();
         },
@@ -973,7 +982,7 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
             if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
                 auto table = obj.get_table();
                 if (!table->get_link_target(col)->is_embedded()) {
-                    list = std::make_unique<Lst<ObjKey>>(obj, col);
+                    list = obj.get_list_ptr<ObjKey>(col);
                 }
                 else {
                     list = obj.get_listbase_ptr(col);
@@ -1047,6 +1056,7 @@ void InstructionApplier::resolve_list_element(LstBase& list, size_t index, Instr
                                 list.get_table()->get_name(), index);
         }
 
+        REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
         auto& link_list = static_cast<LnkLst&>(list);
         if (index >= link_list.size()) {
             bad_transaction_log("%1: Out-of-bounds index through list at '%3.%2[%4]'", instr_name, field_name,
@@ -1096,7 +1106,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
         pk_type = table.get_column_type(pk_col);
     }
     return mpark::visit(
-        util::overloaded{
+        util::overload{
             [&](mpark::monostate) {
                 if (!pk_col) {
                     bad_transaction_log(

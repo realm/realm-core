@@ -2866,10 +2866,10 @@ void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transacti
     };
 
     auto promote_primary_key = [&](Instruction::PrimaryKey& pk) {
-        mpark::visit(overloaded{[&](GlobalKey& key) {
-                                    promote_global_key(key);
-                                },
-                                [](auto&&) {}},
+        mpark::visit(overload{[&](GlobalKey& key) {
+                                  promote_global_key(key);
+                              },
+                              [](auto&&) {}},
                      pk);
     };
 

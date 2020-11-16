@@ -79,6 +79,10 @@ public:
     void set_null(size_t ndx);
     void insert(size_t ndx, Mixed value);
     Mixed get(size_t ndx) const;
+    Mixed get_any(size_t ndx) const override
+    {
+        return get(ndx);
+    }
     bool is_null(size_t ndx) const
     {
         return m_composite.get(ndx) == 0;

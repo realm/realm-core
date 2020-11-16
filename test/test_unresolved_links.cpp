@@ -110,6 +110,7 @@ TEST(Unresolved_Basic)
 
     rt->advance_read();
     rt->verify();
+    CHECK_EQUAL(cars->nb_unresolved(), 0);
     CHECK_EQUAL(cars->get_object_with_primary_key("Tesla 10").get_backlink_count(), 3);
     CHECK_EQUAL(stock.size(), 2);
     CHECK_EQUAL(cars->size(), 2);
@@ -127,6 +128,7 @@ TEST(Unresolved_Basic)
 
     rt->advance_read();
     rt->verify();
+    CHECK(finn.is_unresolved(col_owns));
     CHECK_EQUAL(stock.size(), 1);
     CHECK_EQUAL(stock.get(0), cars->get_object_with_primary_key("Skoda Fabia").get_key());
     CHECK_EQUAL(cars->size(), 1);
@@ -300,7 +302,7 @@ TEST(Unresolved_QueryOverLinks)
     CHECK_EQUAL(q.count(), 1);
 
     auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    bilmekka.get_linklist(col_has).insert(0, new_tesla);
+    bilmekka.get_list<ObjKey>(col_has).insert(0, new_tesla);
     CHECK_EQUAL(q.count(), 1);
 
     q = persons->link(col_owns).column<Decimal128>(col_price) < Decimal128("1000000");
@@ -449,6 +451,43 @@ TEST(Unresolved_CondensedIndices)
     CHECK_EQUAL(list1.get_object(0).get_key(), obj456.get_key());
     list2 = list1;
     CHECK_EQUAL(list2.size(), 1);
+
+    auto key_list = obj789.get_list<ObjKey>("t2s");
+    CHECK_EQUAL(key_list.size(), 2);
+
+    // Check that find methods return condensed indices.
+
+    CHECK_EQUAL(list1.find_first(obj123.get_key()), not_found);
+    CHECK_EQUAL(list1.find_first(obj456.get_key()), 0);
+
+    std::vector<size_t> found_indices;
+    list1.find_all(obj123.get_key(), [&](size_t index) {
+        found_indices.push_back(index);
+    });
+    CHECK_EQUAL(found_indices.size(), 0);
+    found_indices.clear();
+    list1.find_all(obj456.get_key(), [&](size_t index) {
+        found_indices.push_back(index);
+    });
+    CHECK_EQUAL(found_indices.size(), 1);
+    CHECK_EQUAL(found_indices[0], 0);
+
+    // Check that the list of unresolved indices remains consistent over
+    // insertion to the middle. list1 currently considers index 0 to be
+    // unresolved, because obj123 was invalidated above. Insertion to index 0
+    // should bump the unresolved index to 1.
+    CHECK_EQUAL(key_list.get(0), obj123.get_key());
+    CHECK_EQUAL(key_list.get(1), obj456.get_key());
+    key_list.insert(2, obj123.get_key());
+    key_list.insert(3, obj456.get_key());
+    // Uncondensed list is now: (obj123, obj456, obj123, obj456)
+    // Condensed list is now: (obj456, obj456)
+    list1.insert(0, obj456.get_key());
+    // Uncondensed list is now: (obj123, obj456, obj456, obj123, obj456)
+    // Condensed list should now be: (obj456, obj456, obj456)
+    CHECK_EQUAL(list1.get(0), obj456.get_key());
+    CHECK_EQUAL(list1.get(1), obj456.get_key());
+    CHECK_EQUAL(list1.get(2), obj456.get_key());
 }
 
 #endif

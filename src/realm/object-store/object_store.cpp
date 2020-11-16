@@ -91,7 +91,7 @@ DataType to_core_type(PropertyType type)
             return type_Decimal;
         case PropertyType::UUID:
             return type_UUID;
-        case PropertyType::Any:
+        case PropertyType::Mixed:
             return type_Mixed;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
@@ -120,6 +120,9 @@ ColKey add_column(Group& group, Table& table, Property const& property)
         else if (is_set(property.type)) {
             return table.add_column_set(*link_table, property.name);
         }
+        else if (is_dictionary(property.type)) {
+            return table.add_column_dictionary(*link_table, property.name);
+        }
         else {
             return table.add_column(*link_table, property.name);
         }
@@ -131,6 +134,9 @@ ColKey add_column(Group& group, Table& table, Property const& property)
     else if (is_set(property.type)) {
         return table.add_column_set(to_core_type(property.type & ~PropertyType::Flags), property.name,
                                     is_nullable(property.type));
+    }
+    else if (is_dictionary(property.type)) {
+        return table.add_column_dictionary(to_core_type(property.type & ~PropertyType::Flags), property.name);
     }
     else {
         auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
@@ -197,6 +203,16 @@ void make_property_required(Group& group, Table& table, Property property)
     property.type &= ~PropertyType::Nullable;
     table.remove_column(property.column_key);
     property.column_key = add_column(group, table, property).value;
+}
+
+void add_search_index(Table& table, Property property)
+{
+    table.add_search_index(table.get_column_key(property.name));
+}
+
+void remove_search_index(Table& table, Property property)
+{
+    table.remove_search_index(table.get_column_key(property.name));
 }
 
 } // anonymous namespace
@@ -628,11 +644,11 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         }
         void operator()(AddIndex op)
         {
-            table(op.object).add_search_index(op.property->column_key);
+            add_search_index(table(op.object), *op.property);
         }
         void operator()(RemoveIndex op)
         {
-            table(op.object).remove_search_index(op.property->column_key);
+            remove_search_index(table(op.object), *op.property);
         }
 
         void operator()(ChangePropertyType op)
@@ -748,11 +764,11 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         }
         void operator()(AddIndex op)
         {
-            table(op.object).add_search_index(op.property->column_key);
+            add_search_index(table(op.object), *op.property);
         }
         void operator()(RemoveIndex op)
         {
-            table(op.object).remove_search_index(op.property->column_key);
+            remove_search_index(table(op.object), *op.property);
         }
     } applier{group};
 

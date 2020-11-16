@@ -98,6 +98,8 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    const char* get_state() const noexcept;
+
     /// If this table is a group-level table, the parent group is returned,
     /// otherwise null is returned.
     Group* get_parent_group() const noexcept;
@@ -141,6 +143,7 @@ public:
     ColKey add_column_set(DataType type, StringData name, bool nullable = false);
     ColKey add_column_set(Table& target, StringData name);
     ColKey add_column_dictionary(DataType type, StringData name, DataType key_type = type_String);
+    ColKey add_column_dictionary(Table& target, StringData name, DataType key_type = type_String);
 
     [[deprecated("Use add_column(Table&) or add_column_list(Table&) instead.")]] //
     ColKey
@@ -557,7 +560,8 @@ public:
     LinkChain backlink(const Table& origin, ColKey origin_col_key) const;
 
     // Conversion
-    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+    void schema_to_json(std::ostream& out, const std::map<std::string, std::string>& renames) const;
+    void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                  JSONOutputMode output_mode = output_mode_json) const;
 
     /// \brief Compare two tables for equality.
@@ -611,6 +615,15 @@ protected:
     void check_lists_are_empty(size_t row_ndx) const;
 
 private:
+    enum LifeCycleCookie {
+        cookie_created = 0x1234,
+        cookie_transaction_ended = 0xcafe,
+        cookie_initialized = 0xbeef,
+        cookie_removed = 0xbabe,
+        cookie_void = 0x5678,
+        cookie_deleted = 0xdead,
+    };
+
     mutable WrappedAllocator m_alloc;
     Array m_top;
     void update_allocator_wrapper(bool writable)
@@ -724,11 +737,11 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(size_t old_baseline) noexcept;
+    void update_from_parent() noexcept;
 
     // Detach accessor. This recycles the Table accessor and all subordinate
     // accessors become invalid.
-    void detach() noexcept;
+    void detach(LifeCycleCookie) noexcept;
     void fully_detach() noexcept;
 
     ColumnType get_real_column_type(ColKey col_key) const noexcept;
@@ -770,6 +783,7 @@ private:
     std::vector<size_t> m_leaf_ndx2spec_ndx;
     bool m_is_embedded = false;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
+    LifeCycleCookie m_cookie;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
@@ -1135,6 +1149,7 @@ inline Table::Table(Replication* const* repl, Allocator& alloc)
     m_index_refs.set_parent(&m_top, top_position_for_search_indexes);
     m_opposite_table.set_parent(&m_top, top_position_for_opposite_table);
     m_opposite_column.set_parent(&m_top, top_position_for_opposite_column);
+    m_cookie = cookie_created;
 }
 
 inline void Table::revive(Replication* const* repl, Allocator& alloc, bool writable)
