@@ -283,3 +283,63 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
         }
     }
 }
+
+TEST(Set_LnkSetUnresolved)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    auto bars = g.add_table("class_Bar");
+
+    ColKey col_links = foos->add_column_set(*bars, "links");
+    auto foo = foos->create_object();
+    auto bar1 = bars->create_object();
+    auto bar2 = bars->create_object();
+    auto bar3 = bars->create_object();
+
+    auto key_set = foo.get_set<ObjKey>(col_links);
+    auto link_set = foo.get_linkset(col_links);
+
+    link_set.insert(bar1.get_key());
+    link_set.insert(bar2.get_key());
+    link_set.insert(bar1.get_key());
+    link_set.insert(bar2.get_key());
+
+    CHECK_EQUAL(key_set.size(), 2);
+    CHECK_EQUAL(link_set.size(), 2);
+    CHECK_EQUAL(key_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(key_set.find(bar2.get_key()), 1);
+    CHECK_EQUAL(link_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(link_set.find(bar2.get_key()), 1);
+
+    bar2.invalidate();
+
+    CHECK_EQUAL(key_set.size(), 2);
+    CHECK_EQUAL(link_set.size(), 1);
+    CHECK_EQUAL(key_set.find(bar2.get_key()), 0);
+    CHECK_EQUAL(key_set.find(bar1.get_key()), 1);
+    CHECK_EQUAL(link_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(link_set.find(bar2.get_key()), not_found);
+
+    link_set.insert(bar3.get_key());
+
+    CHECK_EQUAL(key_set.size(), 3);
+    CHECK_EQUAL(link_set.size(), 2);
+
+    CHECK_EQUAL(key_set.find(bar2.get_key()), 0);
+    CHECK_EQUAL(key_set.find(bar1.get_key()), 1);
+    CHECK_EQUAL(key_set.find(bar3.get_key()), 2);
+
+    CHECK_EQUAL(link_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(link_set.find(bar2.get_key()), not_found);
+    CHECK_EQUAL(link_set.find(bar3.get_key()), 1);
+
+    CHECK_EQUAL(link_set.get(0), bar1.get_key());
+    CHECK_EQUAL(link_set.get(1), bar3.get_key());
+
+    std::vector<size_t> found;
+    link_set.find_all(bar3.get_key(), [&](size_t ndx) {
+        found.push_back(ndx);
+    });
+    CHECK_EQUAL(found.size(), 1);
+    CHECK_EQUAL(found[0], 1);
+}
