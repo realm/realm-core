@@ -40,7 +40,9 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     m_commit_available.set_shared_part(m_condvar_shared.get(), parent.get_path(),
                                        "ExternalCommitHelper_CommitCondVar",
                                        std::filesystem::temp_directory_path().u8string());
-    m_thread = std::async(std::launch::async, [this]() { listen(); });
+    m_thread = std::async(std::launch::async, [this]() {
+        listen();
+    });
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()

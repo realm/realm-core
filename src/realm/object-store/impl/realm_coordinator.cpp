@@ -157,8 +157,10 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
 
-    bool no_existing_realm = std::all_of(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
-                                         [](auto& notifier) { return notifier.expired(); });
+    bool no_existing_realm =
+        std::all_of(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [](auto& notifier) {
+            return notifier.expired();
+        });
     if (no_existing_realm) {
         m_config = config;
         m_config.scheduler = nullptr;
@@ -540,8 +542,8 @@ uint64_t RealmCoordinator::get_schema_version() const noexcept
     return m_schema_version;
 }
 
-bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version, uint64_t& transaction) const
-    noexcept
+bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,
+                                         uint64_t& transaction) const noexcept
 {
     util::CheckedLockGuard lock(m_schema_cache_mutex);
     if (!m_cached_schema)
@@ -624,8 +626,9 @@ void RealmCoordinator::unregister_realm(Realm* realm)
     }
     {
         util::CheckedLockGuard lock(m_realm_mutex);
-        auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
-                                 [=](auto& notifier) { return notifier.expired() || notifier.is_for_realm(realm); });
+        auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [=](auto& notifier) {
+            return notifier.expired() || notifier.is_for_realm(realm);
+        });
         m_weak_realm_notifiers.erase(new_end, end(m_weak_realm_notifiers));
     }
 }
@@ -715,8 +718,9 @@ void RealmCoordinator::commit_write(Realm& realm)
         tr.commit_and_continue_as_read();
 
         // Don't need to check m_new_notifiers because those don't skip versions
-        bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(),
-                                          [&](auto&& notifier) { return notifier->is_for_realm(realm); });
+        bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(), [&](auto&& notifier) {
+            return notifier->is_for_realm(realm);
+        });
         if (have_notifiers) {
             m_notifier_skip_version = Realm::Internal::get_transaction(realm).get_version_of_current_transaction();
         }
@@ -823,7 +827,9 @@ public:
         if (notifiers.empty())
             return;
 
-        auto cmp = [&](auto&& lft, auto&& rgt) { return lft->version() < rgt->version(); };
+        auto cmp = [&](auto&& lft, auto&& rgt) {
+            return lft->version() < rgt->version();
+        };
 
         // Sort the notifiers by their source version so that we can pull them
         // all forward to the latest version in a single pass over the transaction log
@@ -891,7 +897,9 @@ public:
         }
 
         // Copy the list change info if there are multiple LinkViews for the same LinkList
-        auto id = [](auto const& list) { return std::tie(list.table_key, list.col_key, list.row_key); };
+        auto id = [](auto const& list) {
+            return std::tie(list.table_key, list.col_key, list.row_key);
+        };
         for (size_t i = 1; i < m_current->lists.size(); ++i) {
             for (size_t j = i; j > 0; --j) {
                 if (id(m_current->lists[i]) == id(m_current->lists[j - 1])) {

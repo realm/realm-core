@@ -174,8 +174,8 @@ public:
     }
 
     version_type find_history_entry(version_type begin_version, version_type end_version,
-                                    file_ident_type remote_file_ident, bool only_nonempty, HistoryEntry& entry) const
-        noexcept
+                                    file_ident_type remote_file_ident, bool only_nonempty,
+                                    HistoryEntry& entry) const noexcept
     {
         if (begin_version == 0) {
             begin_version = s_initial_version;
@@ -344,8 +344,8 @@ public:
     {
     }
 
-    version_type find_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry) const
-        noexcept override final
+    version_type find_history_entry(version_type begin_version, version_type end_version,
+                                    HistoryEntry& entry) const noexcept override final
     {
         bool only_nonempty = true;
         return m_history.find_history_entry(begin_version, end_version, m_remote_file_ident, only_nonempty, entry);

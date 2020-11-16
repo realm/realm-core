@@ -312,8 +312,8 @@ private:
 
     // sum_of_history_entry_sizes calculates the sum of the changeset sizes of the local history
     // entries that produced a version that succeeds `begin_version` and precedes `end_version`.
-    std::uint_fast64_t sum_of_history_entry_sizes(version_type begin_version, version_type end_version) const
-        noexcept;
+    std::uint_fast64_t sum_of_history_entry_sizes(version_type begin_version,
+                                                  version_type end_version) const noexcept;
 
     void prepare_for_write();
     void add_ct_history_entry(BinaryData changeset);

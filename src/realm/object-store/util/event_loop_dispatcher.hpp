@@ -119,7 +119,7 @@ struct ExtractSignatureImpl<void (T::*)(Args...) const noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
-struct ExtractSignatureImpl<void (T::*)(Args...) & noexcept> {
+struct ExtractSignatureImpl<void (T::*)(Args...)& noexcept> {
     using signature = void(Args...);
 };
 template <typename T, typename... Args>
@@ -135,12 +135,12 @@ using ExtractSignature = typename ExtractSignatureImpl<T>::signature;
 
 // Deduction guide for function pointers.
 template <typename... Args>
-EventLoopDispatcher(void (*)(Args...))->EventLoopDispatcher<void(Args...)>;
+EventLoopDispatcher(void (*)(Args...)) -> EventLoopDispatcher<void(Args...)>;
 
 // Deduction guide for callable objects, such as lambdas. Only supports types with a non-overloaded, non-templated
 // call operator, so no polymorphic (auto argument) lambdas.
 template <typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
-EventLoopDispatcher(const T&)->EventLoopDispatcher<Sig>;
+EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
 
 
 } // namespace util

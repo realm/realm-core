@@ -51,13 +51,16 @@ Schema::Schema(std::initializer_list<ObjectSchema> types)
 Schema::Schema(base types) noexcept
     : base(std::move(types))
 {
-    std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) { return lft.name < rgt.name; });
+    std::sort(begin(), end(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+        return lft.name < rgt.name;
+    });
 }
 
 Schema::iterator Schema::find(StringData name) noexcept
 {
-    auto it = std::lower_bound(begin(), end(), name,
-                               [](ObjectSchema const& lft, StringData rgt) { return lft.name < rgt; });
+    auto it = std::lower_bound(begin(), end(), name, [](ObjectSchema const& lft, StringData rgt) {
+        return lft.name < rgt;
+    });
     if (it != end() && it->name != name) {
         it = end();
     }
@@ -134,8 +137,9 @@ void Schema::validate(bool for_sync) const
 
     // As the types are added sorted by name, we can detect duplicates by just looking at the following element.
     auto find_next_duplicate = [&](const_iterator start) {
-        return std::adjacent_find(
-            start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) { return lft.name == rgt.name; });
+        return std::adjacent_find(start, cend(), [](ObjectSchema const& lft, ObjectSchema const& rgt) {
+            return lft.name == rgt.name;
+        });
     };
 
     for (auto it = find_next_duplicate(cbegin()); it != cend(); it = find_next_duplicate(++it)) {
@@ -295,7 +299,9 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
 #define REALM_SC_COMPARE(type, ...)                                                                                  \
     bool operator()(type rgt) const                                                                                  \
     {                                                                                                                \
-        auto cmp = [](auto&& v) { return std::tie(__VA_ARGS__); };                                                   \
+        auto cmp = [](auto&& v) {                                                                                    \
+            return std::tie(__VA_ARGS__);                                                                            \
+        };                                                                                                           \
         return cmp(value.type) == cmp(rgt);                                                                          \
     }
 
