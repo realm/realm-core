@@ -93,7 +93,7 @@ public:
     void enumerate_dictionary(util::Any& value, Func&& fn)
     {
         for (auto&& v : util::any_cast<AnyDict&>(value))
-            fn(util::Any(v.first), v.second);
+            fn(v.first, v.second);
     }
 
     // Determine if `value` boxes the same List as `list`

@@ -55,12 +55,10 @@ public:
         m_dict->clear();
     }
 
-    template <typename T, typename U, typename Context>
-    void insert(Context&, T&& key, U&& value, CreatePolicy = CreatePolicy::SetLink);
-    template <typename Context, typename T>
-    auto get(Context&, T key) const;
-    template <typename Context, typename T>
-    void erase(Context&, T key) const;
+    template <typename T, typename Context>
+    void insert(Context&, StringData key, T&& value, CreatePolicy = CreatePolicy::SetLink);
+    template <typename Context>
+    auto get(Context&, StringData key) const;
 
     // Replace the values in this dictionary with the values from an map type object
     template <typename T, typename Context>
@@ -142,27 +140,20 @@ inline Obj Dictionary::get<Obj>(StringData key) const
     return get_object(key);
 }
 
-template <typename T, typename U, typename Context>
-void Dictionary::insert(Context& ctx, T&& key, U&& value, CreatePolicy policy)
+template <typename T, typename Context>
+void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
     dispatch([&](auto t) {
-        this->insert(ctx.template unbox<StringData>(key),
-                     ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+        this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
     });
 }
 
-template <typename Context, typename T>
-auto Dictionary::get(Context& ctx, T key) const
+template <typename Context>
+auto Dictionary::get(Context& ctx, StringData key) const
 {
     return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(ctx.template unbox<StringData>(key)));
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(key));
     });
-}
-
-template <typename Context, typename T>
-void Dictionary::erase(Context& ctx, T key) const
-{
-    this->erase(ctx.template unbox<StringData>(key));
 }
 
 template <typename T, typename Context>
@@ -179,13 +170,12 @@ void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
     if (!policy.diff)
         remove_all();
 
-    ctx.enumerate_dictionary(values, [&](auto&& key, auto&& value) {
+    ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
         if (policy.diff) {
-            auto k = ctx.template unbox<StringData>(key);
-            util::Optional<Mixed> old_value = m_dict->try_get(k);
+            util::Optional<Mixed> old_value = m_dict->try_get(key);
             auto new_value = ctx.template unbox<Mixed>(value);
             if (!old_value || *old_value != new_value) {
-                m_dict->insert(k, new_value);
+                m_dict->insert(key, new_value);
             }
         }
         else {
