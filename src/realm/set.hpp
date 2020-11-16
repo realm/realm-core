@@ -194,6 +194,7 @@ public:
     std::pair<size_t, bool> erase(ObjKey);
 
     // Overriding members of CollectionBase:
+    using CollectionBase::get_key;
     CollectionBasePtr clone_collection() const
     {
         return clone_linkset();
