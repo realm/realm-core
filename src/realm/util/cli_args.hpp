@@ -25,6 +25,8 @@ private:
 
 class CliFlag {
 public:
+    virtual ~CliFlag() = default;
+
     explicit CliFlag(CliArgumentParser& parser, StringView name, char short_name = '\0')
         : m_name(name)
         , m_short_name(short_name)
@@ -32,7 +34,7 @@ public:
         parser.add_argument(this);
     }
 
-    operator bool() const noexcept
+    explicit operator bool() const noexcept
     {
         return m_found;
     }
