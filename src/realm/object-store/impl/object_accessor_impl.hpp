@@ -89,11 +89,26 @@ public:
             fn(v);
     }
 
+    template <typename Func>
+    void enumerate_dictionary(util::Any& value, Func&& fn)
+    {
+        for (auto&& v : util::any_cast<AnyDict&>(value))
+            fn(v.first, v.second);
+    }
+
     // Determine if `value` boxes the same List as `list`
     bool is_same_list(List const& list, util::Any const& value)
     {
         if (auto list2 = util::any_cast<List>(&value))
             return list == *list2;
+        return false;
+    }
+
+    // Determine if `value` boxes the same Dictionary as `dict`
+    bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
+    {
+        if (auto dict2 = util::any_cast<object_store::Dictionary>(&value))
+            return dict == *dict2;
         return false;
     }
 
@@ -105,6 +120,16 @@ public:
     util::Any box(List v) const
     {
         return v;
+    }
+    util::Any box(object_store::Dictionary v) const
+    {
+        AnyDict ret;
+        for (const auto& it : v) {
+            std::string key{it.first.get_string()};
+            auto value = box(it.second);
+            ret.emplace(key, value);
+        }
+        return ret;
     }
     util::Any box(Object v) const
     {
