@@ -1633,7 +1633,7 @@ DEFINE_MERGE(Instruction::Update, Instruction::Update)
 
         if (left.value.type != right.value.type) {
             // Embedded object / dictionary creation should always lose to an
-            // Update(NULL), because these structures are nested, and we need to
+            // Update(value), because these structures are nested, and we need to
             // discard any update inside the structure.
             if (left.value.type == Type::Dictionary || left.value.type == Type::ObjectValue) {
                 left_side.discard();
