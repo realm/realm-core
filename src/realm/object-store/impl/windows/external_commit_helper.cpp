@@ -23,6 +23,7 @@
 
 using namespace realm;
 using namespace realm::_impl;
+using namespace realm::util;
 
 static std::string normalize_realm_path_for_windows_kernel_object_name(std::string realm_path)
 {
