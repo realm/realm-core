@@ -796,6 +796,14 @@ void RealmCoordinator::on_change()
     for (auto& realm : m_weak_realm_notifiers) {
         realm.notify();
     }
+
+#if REALM_ENABLE_SYNC
+    // Invoke realm sync if another process has notified for a change
+    if (m_sync_session) {
+        auto version = m_db->get_version_of_latest_snapshot();
+        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
+    }
+#endif
 }
 
 namespace {
