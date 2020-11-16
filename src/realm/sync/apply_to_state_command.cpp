@@ -78,8 +78,8 @@ StringView parse_header_value(StringView sv, T&& cur_arg)
 {
     auto parse_res = realm::util::from_chars(sv.begin(), sv.end(), cur_arg, 10);
     if (parse_res.ec != std::errc{}) {
-        throw MessageParseException(
-                "error parsing integer in header line: %1", std::make_error_code(parse_res.ec).message());
+        throw MessageParseException("error parsing integer in header line: %1",
+                                    std::make_error_code(parse_res.ec).message());
     }
 
     return sv.substr(parse_res.ptr - sv.begin());
@@ -204,10 +204,10 @@ ParseResult<DownloadMessage> DownloadMessage::parse(StringView sv, Logger& logge
     auto body_view = message_body.body_view;
 
     logger.trace("decoding download message. "
-                  "{download: {server: %1, client: %2} upload: {server: %3, client: %4}, latest: %5}",
-                  ret.progress.download.server_version, ret.progress.download.last_integrated_client_version,
-                  ret.progress.upload.last_integrated_server_version, ret.progress.upload.client_version,
-                  ret.latest_server_version.version);
+                 "{download: {server: %1, client: %2} upload: {server: %3, client: %4}, latest: %5}",
+                 ret.progress.download.server_version, ret.progress.download.last_integrated_client_version,
+                 ret.progress.upload.last_integrated_server_version, ret.progress.upload.client_version,
+                 ret.latest_server_version.version);
 
     while (!body_view.empty()) {
         realm::sync::Transformer::RemoteChangeset cur_changeset;
@@ -225,8 +225,8 @@ ParseResult<DownloadMessage> DownloadMessage::parse(StringView sv, Logger& logge
         realm::_impl::SimpleNoCopyInputStream changeset_stream(body_view.data(), changeset_size);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
         logger.trace("found download changeset: serverVersion: %1, clientVersion: %2, origin: %3 %4",
-                      cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
-                      cur_changeset.origin_file_ident, parsed_changeset);
+                     cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
+                     cur_changeset.origin_file_ident, parsed_changeset);
         realm::BinaryData changeset_data{body_view.data(), changeset_size};
         cur_changeset.data = changeset_data;
         ret.changesets.push_back(cur_changeset);
@@ -263,8 +263,8 @@ ParseResult<UploadMessage> UploadMessage::parse(StringView sv, Logger& logger)
         }
 
         logger.trace("found upload changeset: %1 %2 %3 %4 %5", cur_changeset.last_integrated_remote_version,
-                      cur_changeset.version, cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
-                      changeset_size);
+                     cur_changeset.version, cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
+                     changeset_size);
         realm::_impl::SimpleNoCopyInputStream changeset_stream(body_view.data(), changeset_size);
         try {
             realm::sync::parse_changeset(changeset_stream, cur_changeset);
@@ -359,26 +359,27 @@ int main(int argc, const char** argv)
 
         input_view = message.second;
         mpark::visit(realm::util::overload{
-            [&](const DownloadMessage& download_message) {
-                realm::sync::VersionInfo version_info;
-                realm::sync::ClientReplication::IntegrationError integration_error;
-                history.integrate_server_changesets(
-                    download_message.progress, &download_message.downloadable_bytes, download_message.changesets.data(),
-                    download_message.changesets.size(), version_info, integration_error, *logger, nullptr);
-            },
-            [&](const UploadMessage& upload_message) {
-                for (const auto& changeset : upload_message.changesets) {
-                    auto transaction = local_db->start_write();
-                    realm::sync::InstructionApplier applier(*transaction);
-                    applier.apply(changeset, logger.get());
-                    auto generated_version = transaction->commit();
-                    logger->debug("integrated local changesets as version %1", generated_version);
-                }
-            },
-            [&](const ServerIdentMessage& ident_message) {
-                history.set_client_file_ident(ident_message.file_ident, true);
-            }
-        }, message.first);
+                         [&](const DownloadMessage& download_message) {
+                             realm::sync::VersionInfo version_info;
+                             realm::sync::ClientReplication::IntegrationError integration_error;
+                             history.integrate_server_changesets(
+                                 download_message.progress, &download_message.downloadable_bytes,
+                                 download_message.changesets.data(), download_message.changesets.size(), version_info,
+                                 integration_error, *logger, nullptr);
+                         },
+                         [&](const UploadMessage& upload_message) {
+                             for (const auto& changeset : upload_message.changesets) {
+                                 auto transaction = local_db->start_write();
+                                 realm::sync::InstructionApplier applier(*transaction);
+                                 applier.apply(changeset, logger.get());
+                                 auto generated_version = transaction->commit();
+                                 logger->debug("integrated local changesets as version %1", generated_version);
+                             }
+                         },
+                         [&](const ServerIdentMessage& ident_message) {
+                             history.set_client_file_ident(ident_message.file_ident, true);
+                         }},
+                     message.first);
     }
 
     return EXIT_SUCCESS;
