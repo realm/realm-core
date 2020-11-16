@@ -244,7 +244,7 @@ public:
         }
 
         m_set.find_all(value, [&](size_t ndx) {
-            func(virtual2real(ndx));
+            func(real2virtual(ndx));
         });
     }
 
