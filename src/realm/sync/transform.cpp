@@ -1001,8 +1001,8 @@ struct MergeUtils {
         REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");
     }
 
-    bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
-        noexcept
+    bool same_path_element(const Instruction::Path::Element& left,
+                           const Instruction::Path::Element& right) const noexcept
     {
         auto pred = util::overload{
             [&](uint32_t lhs, uint32_t rhs) {
@@ -1033,14 +1033,14 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_table(const Instruction::TableInstruction& left, const Instruction::TableInstruction& right) const
-        noexcept
+    bool same_table(const Instruction::TableInstruction& left,
+                    const Instruction::TableInstruction& right) const noexcept
     {
         return same_string(left.table, right.table);
     }
 
-    bool same_object(const Instruction::ObjectInstruction& left, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool same_object(const Instruction::ObjectInstruction& left,
+                     const Instruction::ObjectInstruction& right) const noexcept
     {
         return same_table(left, right) && same_key(left.object, right.object);
     }
@@ -1061,8 +1061,8 @@ struct MergeUtils {
         }
     }
 
-    bool same_field(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool same_field(const Instruction::PathInstruction& left,
+                    const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right) && same_string(left.field, right.field);
     }
@@ -1092,8 +1092,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_container(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool same_container(const Instruction::PathInstruction& left,
+                        const Instruction::PathInstruction& right) const noexcept
     {
         return same_field(left, right) && same_container(left.path, right.path);
     }
@@ -1129,8 +1129,8 @@ struct MergeUtils {
         return same_column(left, right);
     }
 
-    bool is_prefix_of(const Instruction::EraseColumn& left, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::EraseColumn& left,
+                      const Instruction::ObjectInstruction& right) const noexcept
     {
         return same_column(left, right);
     }
@@ -1141,8 +1141,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_prefix_of(const Instruction::ObjectInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::ObjectInstruction& left,
+                      const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right);
     }
@@ -1154,8 +1154,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::PathInstruction& left,
+                      const Instruction::PathInstruction& right) const noexcept
     {
         if (left.path.size() < right.path.size() && same_field(left, right)) {
             for (size_t i = 0; i < left.path.size(); ++i) {
@@ -1190,8 +1190,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_table(const Instruction::Payload& value, const Instruction::TableInstruction& right) const
-        noexcept
+    bool value_targets_table(const Instruction::Payload& value,
+                             const Instruction::TableInstruction& right) const noexcept
     {
         if (value.type == Instruction::Payload::Type::Link) {
             StringData target_table = m_left_side.get_string(value.data.link.target_table);
@@ -1201,8 +1201,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_object(const Instruction::Payload& value, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool value_targets_object(const Instruction::Payload& value,
+                              const Instruction::ObjectInstruction& right) const noexcept
     {
         if (value_targets_table(value, right)) {
             return same_key(value.data.link.target, right.object);
@@ -1246,8 +1246,8 @@ struct MergeUtils {
         REALM_UNREACHABLE();
     }
 
-    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx, const uint32_t& move_to_ndx) const
-        noexcept
+    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx,
+                           const uint32_t& move_to_ndx) const noexcept
     {
         if (get_ndx == move_from_ndx) {
             // CONFLICT: Update of a moved element.
@@ -1473,10 +1473,9 @@ DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddTable);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddTable);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddTable);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddTable);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddTable);
 
 /// EraseTable rules
 
@@ -1520,10 +1519,9 @@ DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseTable);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseTable);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseTable);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseTable);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseTable);
 
 
 /// CreateObject rules
@@ -1551,10 +1549,9 @@ DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::CreateObject);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::CreateObject);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::CreateObject);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::CreateObject);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::CreateObject);
 
 
 /// Erase rules
@@ -1590,10 +1587,9 @@ DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseObject);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseObject);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseObject);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseObject);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseObject);
 
 
 /// Set rules
@@ -1770,10 +1766,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::Update)
 }
 
 // Handled by nested rule
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::Update);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::Update);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Update);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Update);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::Update);
 
 
 /// AddInteger rules
@@ -1785,10 +1780,9 @@ DEFINE_MERGE_NOOP(Instruction::EraseColumn, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddInteger);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddInteger);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddInteger);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddInteger);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddInteger);
 
 
 /// AddColumn rules
@@ -1866,10 +1860,9 @@ DEFINE_MERGE(Instruction::EraseColumn, Instruction::AddColumn)
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::AddColumn);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::AddColumn);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::AddColumn);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::AddColumn);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::AddColumn);
 
 
 /// EraseColumn rules
@@ -1887,10 +1880,9 @@ DEFINE_MERGE(Instruction::EraseColumn, Instruction::EraseColumn)
 DEFINE_MERGE_NOOP(Instruction::ArrayInsert, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayMove, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::ArrayErase, Instruction::EraseColumn);
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::EraseColumn);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::EraseColumn);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::EraseColumn);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::EraseColumn);
 
 /// ArrayInsert rules
 
@@ -1984,10 +1976,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayInsert)
 }
 
 // Handled by nested rules
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayInsert);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::ArrayInsert);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayInsert);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayInsert);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayInsert);
 
 
 /// ArrayMove rules
@@ -2125,10 +2116,9 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayMove)
 }
 
 // Handled by nested rule.
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayMove);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::ArrayMove);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayMove);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayMove);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayMove);
 
 
 /// ArrayErase rules
@@ -2178,28 +2168,25 @@ DEFINE_MERGE(Instruction::ArrayErase, Instruction::ArrayErase)
 }
 
 // Handled by nested rules.
-DEFINE_MERGE_NOOP(Instruction::ArrayClear, Instruction::ArrayErase);
+DEFINE_MERGE_NOOP(Instruction::Clear, Instruction::ArrayErase);
 DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayErase);
 DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayErase);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayErase);
 
 
-/// ArrayClear rules
+/// Clear rules
 
-DEFINE_NESTED_MERGE(Instruction::ArrayClear)
+DEFINE_NESTED_MERGE(Instruction::Clear)
 {
-    // Note: ArrayClear instructions do not have an index in their path.
+    // Note: Clear instructions do not have an index in their path.
     if (is_prefix_of(outer, inner)) {
         inner_side.discard();
     }
 }
 
-DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayClear)
+DEFINE_MERGE(Instruction::Clear, Instruction::Clear)
 {
     if (same_path(left, right)) {
-        REALM_MERGE_ASSERT(left.prior_size == right.prior_size);
-
-        // CONFLICT: Two clears of the same list.
+        // CONFLICT: Two clears of the same container.
         //
         // RESOLUTION: Discard the clear with the lower timestamp. This has the
         // effect of preserving insertions that came after the clear from the
@@ -2213,9 +2200,8 @@ DEFINE_MERGE(Instruction::ArrayClear, Instruction::ArrayClear)
     }
 }
 
-DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::ArrayClear);
-DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::ArrayClear);
-DEFINE_MERGE_NOOP(Instruction::SetClear, Instruction::ArrayClear);
+DEFINE_MERGE_NOOP(Instruction::SetInsert, Instruction::Clear);
+DEFINE_MERGE_NOOP(Instruction::SetErase, Instruction::Clear);
 
 
 /// SetInsert rules
@@ -2265,17 +2251,6 @@ DEFINE_MERGE(Instruction::SetErase, Instruction::SetInsert)
     }
 }
 
-DEFINE_MERGE(Instruction::SetClear, Instruction::SetInsert)
-{
-    if (same_path(left, right)) {
-        // CONFLICT: Insertion and clear in the same set.
-        //
-        // RESOLUTION: Always discard the insertion. This mirrors the behavior of `ArrayClear`, although the
-        // mechanics there are based on nested rules.
-        right_side.discard();
-    }
-}
-
 
 /// SetErase rules.
 
@@ -2296,32 +2271,6 @@ DEFINE_MERGE(Instruction::SetErase, Instruction::SetErase)
                 right_side.discard();
             }
         }
-    }
-}
-
-DEFINE_MERGE(Instruction::SetClear, Instruction::SetErase)
-{
-    if (same_path(left, right)) {
-        // CONFLICT: Erase and clear of the same set.
-        //
-        // RESOLUTION: Always let the clear instruction win.
-        right_side.discard();
-    }
-}
-
-
-/// SetClear rules.
-
-DEFINE_NESTED_MERGE_NOOP(Instruction::SetClear);
-
-DEFINE_MERGE(Instruction::SetClear, Instruction::SetClear)
-{
-    if (same_path(left, right)) {
-        // CONFLICT: Both sides cleared the set.
-        //
-        // RESOLUTION: The clear instructions cancel each other out.
-        left_side.discard();
-        right_side.discard();
     }
 }
 

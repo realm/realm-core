@@ -420,10 +420,11 @@ void ChangesetParser::State::parse_one()
             m_handler(instr);
             return;
         }
-        case Instruction::Type::ArrayClear: {
-            Instruction::ArrayClear instr;
+        case Instruction::Type::Clear: {
+            Instruction::Clear instr;
             read_path_instr(instr);
-            instr.prior_size = read_int<uint32_t>();
+            uint32_t prior_size = read_int<uint32_t>();
+            static_cast<void>(prior_size); // Ignored
             m_handler(instr);
             return;
         }
@@ -438,12 +439,6 @@ void ChangesetParser::State::parse_one()
             Instruction::SetErase instr;
             read_path_instr(instr);
             instr.value = read_payload();
-            m_handler(instr);
-            return;
-        }
-        case Instruction::Type::SetClear: {
-            Instruction::SetClear instr;
-            read_path_instr(instr);
             m_handler(instr);
             return;
         }

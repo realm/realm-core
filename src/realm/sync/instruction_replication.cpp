@@ -567,12 +567,10 @@ void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
 
 void SyncReplication::list_clear(const CollectionBase& view)
 {
-    size_t prior_size = view.size();
     TrivialReplication::list_clear(view);
     if (select_collection(view)) {
-        Instruction::ArrayClear instr;
+        Instruction::Clear instr;
         populate_path_instr(instr, view);
-        instr.prior_size = uint32_t(prior_size);
         emit(instr);
     }
 }
@@ -606,7 +604,7 @@ void SyncReplication::set_clear(const CollectionBase& set)
     TrivialReplication::set_clear(set);
 
     if (select_collection(set)) {
-        Instruction::SetClear instr;
+        Instruction::Clear instr;
         populate_path_instr(instr, set);
         emit(instr);
     }

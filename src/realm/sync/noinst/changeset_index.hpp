@@ -302,8 +302,7 @@ inline bool is_container_instruction(const sync::Instruction& instr) noexcept
 
     return mpark::holds_alternative<Instruction::ArrayInsert>(v) ||
            mpark::holds_alternative<Instruction::ArrayMove>(v) ||
-           mpark::holds_alternative<Instruction::ArrayErase>(v) ||
-           mpark::holds_alternative<Instruction::ArrayClear>(v);
+           mpark::holds_alternative<Instruction::ArrayErase>(v) || mpark::holds_alternative<Instruction::Clear>(v);
 }
 
 } // namespace _impl

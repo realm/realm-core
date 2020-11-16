@@ -85,7 +85,7 @@ util::EnumAssoc InstructionTypeSpec::map[] = {{int(sync::Instruction::Type::Sele
                                               {int(sync::Instruction::Type::ArrayInsert), "ArrayInsert"},
                                               {int(sync::Instruction::Type::ArrayMove), "ArrayMove"},
                                               {int(sync::Instruction::Type::ArrayErase), "ArrayErase"},
-                                              {int(sync::Instruction::Type::ArrayClear), "ArrayClear"},
+                                              {int(sync::Instruction::Type::Clear), "Clear"},
                                               {0, nullptr}};
 using InstructionTypeEnum = util::Enum<sync::Instruction::Type, InstructionTypeSpec>;
 
