@@ -954,7 +954,11 @@ inline ColKey LnkSet::get_col_key() const noexcept
 
 inline size_t LnkSet::find_any(Mixed value) const
 {
-    size_t found = m_set.find_any(value);
+    if (value.is_null())
+        return not_found;
+    if (value.get_type() != type_Link)
+        return not_found;
+    size_t found = find(value.get<ObjKey>());
     if (found != not_found) {
         found = real2virtual(found);
     }

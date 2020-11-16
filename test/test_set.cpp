@@ -230,10 +230,9 @@ TEST(Set_Links)
     CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
-    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);           // The original bar2 key is no longer in the set
-    CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos); // The unresolved bar2 key is in the set
-    // CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by
-    // LnkSet
+    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);               // The original bar2 key is no longer in the set
+    CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);     // The unresolved bar2 key is in the set
+    CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by LnkSet
     CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
 }
