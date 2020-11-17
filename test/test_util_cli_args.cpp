@@ -17,7 +17,7 @@ TEST(CliArgs_Basic)
     CliFlag missing(arg_parser, "missing");
     auto to_parse = std::array<const char*, 5>({"yolo", "--foo", "--bar", "bizz", "buzz"});
 
-    auto results = arg_parser.parse(to_parse.size(), to_parse.data());
+    auto results = arg_parser.parse(static_cast<int>(to_parse.size()), to_parse.data());
     CHECK_EQUAL(results.program_name, "yolo");
     CHECK_EQUAL(results.unmatched_arguments.size(), 1);
     CHECK_EQUAL(results.unmatched_arguments[0], "buzz");
@@ -34,7 +34,7 @@ TEST(CliArgs_Short)
     CliArgument arg(arg_parser, "bar", 'b');
     auto to_parse = std::array<const char*, 5>({"yolo", "-f", "-b", "bizz", "buzz"});
 
-    auto results = arg_parser.parse(to_parse.size(), to_parse.data());
+    auto results = arg_parser.parse(static_cast<int>(to_parse.size()), to_parse.data());
     CHECK_EQUAL(results.program_name, "yolo");
     CHECK_EQUAL(results.unmatched_arguments.size(), 1);
     CHECK_EQUAL(results.unmatched_arguments[0], "buzz");
@@ -50,7 +50,7 @@ TEST(CliArgs_Mixed)
     CliArgument arg(arg_parser, "bar", 'b');
     auto to_parse = std::array<const char*, 5>({"yolo", "-f", "--bar", "bizz", "buzz"});
 
-    auto results = arg_parser.parse(to_parse.size(), to_parse.data());
+    auto results = arg_parser.parse(static_cast<int>(to_parse.size()), to_parse.data());
     CHECK_EQUAL(results.program_name, "yolo");
     CHECK_EQUAL(results.unmatched_arguments.size(), 1);
     CHECK_EQUAL(results.unmatched_arguments[0], "buzz");
@@ -66,7 +66,7 @@ TEST(CliArgs_EqAssign)
     CliArgument arg_str(arg_parser, "bizz");
     auto to_parse = std::array<const char*, 4>({"yolo", "--bar=6", "--bizz", "buzz"});
 
-    auto results = arg_parser.parse(to_parse.size(), to_parse.data());
+    auto results = arg_parser.parse(static_cast<int>(to_parse.size()), to_parse.data());
     CHECK_EQUAL(results.program_name, "yolo");
     CHECK_EQUAL(results.unmatched_arguments.size(), 0);
     CHECK(arg_int);
@@ -84,7 +84,7 @@ TEST(CliArgs_IntegersMixed)
     CliArgument arg_str(arg_parser, "bizz");
     auto to_parse = std::array<const char*, 6>({"yolo", "-f", "--bar", "6", "--bizz", "buzz"});
 
-    auto results = arg_parser.parse(to_parse.size(), to_parse.data());
+    auto results = arg_parser.parse(static_cast<int>(to_parse.size()), to_parse.data());
     CHECK_EQUAL(results.program_name, "yolo");
     CHECK_EQUAL(results.unmatched_arguments.size(), 0);
     CHECK(flag);
