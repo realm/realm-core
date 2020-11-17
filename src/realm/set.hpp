@@ -883,7 +883,7 @@ struct CountingOutputIterator {
     }
     CountingOutputIterator& operator=(const CountingOutputIterator&) = delete;
 
-    size_t& num = 0;
+    size_t& num;
 
     CountingOutputIterator& operator=(const T&)
     {
