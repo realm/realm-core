@@ -749,16 +749,6 @@ private:
     friend class GroupWriter;
 };
 
-class ClusterKeyArray : public ArrayUnsigned {
-public:
-    using ArrayUnsigned::ArrayUnsigned;
-
-    uint64_t get(size_t ndx) const
-    {
-        return (m_data != nullptr) ? ArrayUnsigned::get(ndx) : uint64_t(ndx);
-    }
-};
-
 // Implementation:
 template <>
 class QueryState<int64_t> : public QueryStateBase {

@@ -2289,7 +2289,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if (std::is_same<TConditionValue, int64_t>::value) {
+            if constexpr (std::is_same<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named compare_leafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 QueryState<int64_t> qs(act_ReturnFirst);

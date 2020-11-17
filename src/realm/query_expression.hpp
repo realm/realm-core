@@ -3726,31 +3726,34 @@ public:
             // Not a Link column
             size_t colsize = leaf->size();
 
-            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
-            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
-            // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
-            if (std::is_same_v<U, int64_t> && index + ValueBase::chunk_size <= colsize) {
-                Value<int64_t> v(false, ValueBase::chunk_size);
+            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage.
+            if constexpr (std::is_same_v<U, int64_t>) {
+                // If it's an integer leaf, then it contains the method get_chunk() which copies
+                // these values in a super fast way (only feasible if more than chunk_size in column)
+                if (index + ValueBase::chunk_size <= colsize) {
+                    Value<int64_t> v(false, ValueBase::chunk_size);
 
-                // If you want to modify 'chunk_size' then update Array::get_chunk()
-                REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
+                    // If you want to modify 'chunk_size' then update Array::get_chunk()
+                    REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);
 
-                auto leaf_2 = static_cast<const Array*>(leaf);
-                leaf_2->get_chunk(index, v.m_storage.m_first);
+                    auto leaf_2 = static_cast<const Array*>(leaf);
+                    leaf_2->get_chunk(index, v.m_storage.m_first);
 
-                destination.import(v);
+                    destination.import(v);
+                    return;
+                }
             }
-            else {
-                size_t rows = colsize - index;
-                if (rows > ValueBase::chunk_size)
-                    rows = ValueBase::chunk_size;
-                Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
-                for (size_t t = 0; t < rows; t++)
-                    v.m_storage.set(t, leaf->get(index + t));
+            // Otherwise, copy the values one by one in a for-loop
+            size_t rows = colsize - index;
+            if (rows > ValueBase::chunk_size)
+                rows = ValueBase::chunk_size;
+            Value<typename util::RemoveOptional<U>::type> v(false, rows);
 
-                destination.import(v);
-            }
+            for (size_t t = 0; t < rows; t++)
+                v.m_storage.set(t, leaf->get(index + t));
+
+            destination.import(v);
         }
     }
 

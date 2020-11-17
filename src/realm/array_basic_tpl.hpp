@@ -30,7 +30,7 @@ namespace realm {
 
 template <class T>
 inline BasicArray<T>::BasicArray(Allocator& allocator) noexcept
-    : Array(allocator)
+    : Node(allocator)
 {
 }
 
@@ -142,13 +142,13 @@ void BasicArray<T>::insert(size_t ndx, T value)
 
     // Make room for the new value
     const auto old_size = m_size;
-    alloc(m_size + 1, m_width); // Throws
+    alloc(m_size + 1, sizeof(T)); // Throws
 
     // Move values below insertion
     if (ndx != old_size) {
-        char* src_begin = m_data + ndx * m_width;
-        char* src_end = m_data + old_size * m_width;
-        char* dst_end = src_end + m_width;
+        char* src_begin = m_data + ndx * sizeof(T);
+        char* src_end = m_data + old_size * sizeof(T);
+        char* dst_end = src_end + sizeof(T);
         std::copy_backward(src_begin, src_end, dst_end);
     }
 
@@ -167,9 +167,9 @@ void BasicArray<T>::erase(size_t ndx)
 
     // move data under deletion up
     if (ndx < m_size - 1) {
-        char* dst_begin = m_data + ndx * m_width;
-        const char* src_begin = dst_begin + m_width;
-        const char* src_end = m_data + m_size * m_width;
+        char* dst_begin = m_data + ndx * sizeof(T);
+        const char* src_begin = dst_begin + sizeof(T);
+        const char* src_end = m_data + m_size * sizeof(T);
         realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
     }
 
@@ -197,18 +197,6 @@ inline void BasicArray<T>::clear()
 {
     truncate(0); // Throws
 }
-
-template <class T>
-bool BasicArray<T>::compare(const BasicArray<T>& a) const
-{
-    size_t n = size();
-    if (a.size() != n)
-        return false;
-    const T* data_1 = reinterpret_cast<const T*>(m_data);
-    const T* data_2 = reinterpret_cast<const T*>(a.m_data);
-    return realm::safe_equal(data_1, data_1 + n, data_2);
-}
-
 
 template <class T>
 size_t BasicArray<T>::calc_byte_len(size_t for_size, size_t) const
@@ -247,18 +235,6 @@ inline size_t BasicArray<T>::find_first(T value, size_t begin, size_t end) const
 }
 
 template <class T>
-void BasicArray<T>::find_all(IntegerColumn* result, T value, size_t add_offset, size_t begin, size_t end) const
-{
-    size_t first = begin - 1;
-    for (;;) {
-        first = this->find(value, first + 1, end);
-        if (first == not_found)
-            break;
-
-        Array::add_to_column(result, first + add_offset);
-    }
-}
-template <class T>
 size_t BasicArrayNull<T>::find_first_null(size_t begin, size_t end) const
 {
     size_t sz = Array::size();
@@ -271,92 +247,6 @@ size_t BasicArrayNull<T>::find_first_null(size_t begin, size_t end) const
         begin++;
     }
     return not_found;
-}
-
-template <class T>
-void BasicArrayNull<T>::find_all_null(IntegerColumn* result, size_t add_offset, size_t begin, size_t end) const
-{
-    size_t first = begin - 1;
-    for (;;) {
-        first = this->find_first_null(first + 1, end);
-        if (first == not_found)
-            break;
-
-        Array::add_to_column(result, first + add_offset);
-    }
-}
-
-template <class T>
-size_t BasicArray<T>::count(T value, size_t begin, size_t end) const
-{
-    if (end == npos)
-        end = m_size;
-    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
-    const T* data = reinterpret_cast<const T*>(m_data);
-    return std::count(data + begin, data + end, value);
-}
-
-#if 0
-// currently unused
-template <class T>
-double BasicArray<T>::sum(size_t begin, size_t end) const
-{
-    if (end == npos)
-        end = m_size;
-    REALM_ASSERT(begin <= m_size && end <= m_size && begin <= end);
-    const T* data = reinterpret_cast<const T*>(m_data);
-    return std::accumulate(data + begin, data + end, double(0));
-}
-#endif
-
-template <class T>
-template <bool find_max>
-bool BasicArray<T>::minmax(T& result, size_t begin, size_t end) const
-{
-    if (end == npos)
-        end = m_size;
-    if (m_size == 0)
-        return false;
-    REALM_ASSERT(begin < m_size && end <= m_size && begin < end);
-
-    T m = get(begin);
-    ++begin;
-    for (; begin < end; ++begin) {
-        T val = get(begin);
-        if (find_max ? val > m : val < m)
-            m = val;
-    }
-    result = m;
-    return true;
-}
-
-template <class T>
-bool BasicArray<T>::maximum(T& result, size_t begin, size_t end) const
-{
-    return minmax<true>(result, begin, end);
-}
-
-template <class T>
-bool BasicArray<T>::minimum(T& result, size_t begin, size_t end) const
-{
-    return minmax<false>(result, begin, end);
-}
-
-
-template <class T>
-inline size_t BasicArray<T>::lower_bound(T value) const noexcept
-{
-    const T* begin = reinterpret_cast<const T*>(m_data);
-    const T* end = begin + size();
-    return std::lower_bound(begin, end, value) - begin;
-}
-
-template <class T>
-inline size_t BasicArray<T>::upper_bound(T value) const noexcept
-{
-    const T* begin = reinterpret_cast<const T*>(m_data);
-    const T* end = begin + size();
-    return std::upper_bound(begin, end, value) - begin;
 }
 
 template <class T>
