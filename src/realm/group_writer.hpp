@@ -57,6 +57,24 @@ public:
     ~GroupWriter();
 
     void set_versions(uint64_t current, uint64_t read_lock) noexcept;
+    void set_evacuation_zone(size_t evac_start, size_t evac_end) noexcept;
+    bool evacuated() noexcept;
+
+    // Read in freelist to internal structures - also determine if any
+    // evacuation zone has been evacuated and if it has been freed.
+    // (evacuation may complete before everything is freed because
+    // older blocks are not fully free until their transaction dies)
+    // The total amount of memory which bis ready for allocation is
+    // also computed. This excludes free memory inside any evacuation zone.
+    //
+    // Must be called before write_group()
+    struct ZoneStat {
+        size_t ref_end; // end of zone
+        size_t total_free; // includes locked memory
+        size_t largest_free; // includes locked memory
+    };
+    using Zones = std::vector<ZoneStat>;
+    void read_in_freelist(bool& evac_done, bool& zone_freed, size_t& allocatable, Zones& zones);
 
     /// Write all changed array nodes into free space.
     ///
@@ -69,7 +87,8 @@ public:
     /// returned by write_group().
     void commit(ref_type new_top_ref);
 
-    size_t get_file_size() const noexcept;
+    size_t get_logical_file_size() const noexcept;
+    size_t get_physical_file_size() const noexcept;
 
     ref_type write_array(const char*, size_t, uint32_t) override;
 
@@ -99,6 +118,9 @@ private:
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
+    size_t m_evac_start = 0;
+    size_t m_evac_end = 0;
+    bool m_evacuated = false;
     Durability m_durability;
 
     struct FreeSpaceEntry {
@@ -125,7 +147,6 @@ private:
     std::multimap<size_t, size_t> m_size_map;
     using FreeListElement = std::multimap<size_t, size_t>::iterator;
 
-    void read_in_freelist();
     size_t recreate_freelist(size_t reserve_pos);
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
@@ -188,6 +209,18 @@ private:
 
 
 // Implementation:
+
+inline void GroupWriter::set_evacuation_zone(size_t evac_start, size_t evac_end) noexcept
+{
+    m_evac_start = evac_start;
+    m_evac_end = evac_end;
+    m_evacuated = false;
+}
+
+inline bool GroupWriter::evacuated() noexcept
+{
+    return m_evacuated;
+}
 
 inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
 {

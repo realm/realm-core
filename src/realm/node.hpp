@@ -340,6 +340,7 @@ private:
     bool m_missing_parent_update = false;
 
     void do_copy_on_write(size_t minimum_size = 0);
+    friend class Group;
 };
 
 class Spec;

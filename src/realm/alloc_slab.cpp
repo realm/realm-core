@@ -215,7 +215,6 @@ MemRef SlabAlloc::do_alloc(size_t size)
     FreeBlock* entry = allocate_block(static_cast<int>(size));
     mark_allocated(entry);
     ref_type ref = entry->ref;
-
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out))
         std::cerr << "Alloc ref: " << ref << " size: " << size << "\n";
@@ -457,7 +456,6 @@ SlabAlloc::FreeBlock* SlabAlloc::grow_slab(int size)
         new_size = already_allocated;
     if (new_size > maximal_alloc)
         new_size = maximal_alloc;
-
     ref_type ref;
     if (m_slabs.empty()) {
         ref = m_baseline.load(std::memory_order_relaxed);

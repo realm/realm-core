@@ -280,6 +280,23 @@ void Array::destroy_children(size_t offset) noexcept
     }
 }
 
+ref_type Array::write(ref_type ref, Allocator& alloc, _impl::ArrayWriterBase& out, bool only_if_modified)
+{
+    ref_type result;
+    if (only_if_modified && alloc.is_read_only(ref)) {
+        result = ref;
+    } else {
+        Array array(alloc);
+        array.init_from_ref(ref);
+
+        if (!array.m_has_refs)
+            result = array.do_write_shallow(out); // Throws
+        else
+            result = array.do_write_deep(out, only_if_modified); // Throws
+    }
+    return result;
+}
+
 
 ref_type Array::do_write_shallow(_impl::ArrayWriterBase& out) const
 {
@@ -313,7 +330,6 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         }
         new_array.add(value); // Throws
     }
-
     return new_array.do_write_shallow(out); // Throws
 }
 
@@ -393,7 +409,6 @@ void Array::set(size_t ndx, int64_t value)
 
     // Grow the array if needed to store this value
     ensure_minimum_width(value); // Throws
-
     // Set the value
     (this->*(m_vtable->setter))(ndx, value);
 }
