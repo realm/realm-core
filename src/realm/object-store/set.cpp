@@ -287,14 +287,13 @@ NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
     // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
     // from a notifier a zombie is left sitting around uselessly) and should be
     // cleaned up.
-//    if (m_notifier && !m_notifier->have_callbacks())
-//        m_notifier.reset();
-//    if (!m_notifier) {
-//        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
-//        RealmCoordinator::register_notifier(m_notifier);
-//    }
-//    return {m_notifier, m_notifier->add_callback(std::move(cb))};
-    return {};
+    if (m_notifier && !m_notifier->have_callbacks())
+        m_notifier.reset();
+    if (!m_notifier) {
+        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
+        RealmCoordinator::register_notifier(m_notifier);
+    }
+    return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
