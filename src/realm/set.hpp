@@ -881,7 +881,6 @@ struct CountingOutputIterator {
         : num(num)
     {
     }
-    CountingOutputIterator& operator=(const CountingOutputIterator&) = delete;
 
     size_t& num;
 
