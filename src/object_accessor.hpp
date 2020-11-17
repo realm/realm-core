@@ -248,7 +248,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
             if (!created && !policy.update) {
                 if (!realm->is_in_migration()) {
                     throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                                                        object_schema.name, ctx.print(*primary_value)));
+                                                        object_schema.name, primary_value ? ctx.print(*primary_value) : "null"));
                 }
                 table->set_primary_key_column(ColKey{});
                 skip_primary = false;
