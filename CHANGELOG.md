@@ -1,6 +1,7 @@
-# NEXT RELEASE
+# 10.2.0 Release notes
 
 ### Enhancements
+* Includes the open-sourced Sync client and also Object Store.
 * New data types: Mixed, UUID and TypedLink.
 * New collection types: Set and Dictionary 
 * Enable mixed comparison queries between two columns of arbitrary types according to the Mixed::compare rules. ([#4018](https://github.com/realm/realm-core/pull/4018))
