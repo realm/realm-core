@@ -29,11 +29,11 @@ namespace realm {
 namespace _impl {
 class SetNotifier : public CollectionNotifier {
 public:
-    SetNotifier(std::shared_ptr<Realm> realm, CollectionBaseImpl<SetBase> const& set, PropertyType type);
+    SetNotifier(std::shared_ptr<Realm> realm, SetBase const& set, PropertyType type);
 
 private:
     PropertyType m_type;
-    std::unique_ptr<SetBasePtr> m_set;
+    std::unique_ptr<SetBase> m_set;
 
     TableKey m_table;
     ColKey m_col;

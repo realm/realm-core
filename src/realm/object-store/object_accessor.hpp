@@ -24,6 +24,7 @@
 
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/set.hpp>
 #include <realm/object-store/dictionary.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -133,10 +134,18 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
         return;
     }
 
+    if (is_dictionary(property.type)) {
+        ContextType child_ctx(ctx, m_obj, property);
+        object_store::Dictionary dict(m_realm, m_obj, col);
+        dict.assign(child_ctx, value, policy);
+        ctx.did_change();
+        return;
+    }
+    
     if (is_set(property.type)) {
         if (property.type == PropertyType::LinkingObjects)
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
-
+        
         ContextType child_ctx(ctx, m_obj, property);
         object_store::Set set(m_realm, m_obj, col);
         set.assign(child_ctx, value, policy);

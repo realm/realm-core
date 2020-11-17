@@ -96,6 +96,14 @@ public:
             fn(v.first, v.second);
     }
 
+    // Determine if `value` boxes the same Set as `set`
+    bool is_same_set(object_store::Set const& set, util::Any const& value)
+    {
+        if (auto set2 = util::any_cast<object_store::Set>(&value))
+            return set == *set2;
+        return false;
+    }
+
     // Determine if `value` boxes the same List as `list`
     bool is_same_list(List const& list, util::Any const& value)
     {
@@ -104,11 +112,11 @@ public:
         return false;
     }
 
-    // Determine if `value` boxes the same Set as `set`
-    bool is_same_set(object_store::Set const& set, util::Any const& value)
+    // Determine if `value` boxes the same Dictionary as `dict`
+    bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
     {
-        if (auto set2 = util::any_cast<object_store::Set>(&value))
-            return set == *set2;
+        if (auto dict2 = util::any_cast<object_store::Dictionary>(&value))
+            return dict == *dict2;
         return false;
     }
 
@@ -129,9 +137,19 @@ public:
     {
         return v;
     }
-    util::Any box(object_store::Set v) const
+    util::Any box(object_store::Set s) const
     {
-        return v;
+        return s;
+    }
+    util::Any box(object_store::Dictionary v) const
+    {
+        AnyDict ret;
+        for (const auto& it : v) {
+            std::string key{it.first.get_string()};
+            auto value = box(it.second);
+            ret.emplace(key, value);
+        }
+        return ret;
     }
 
     util::Any box(object_store::Dictionary v) const

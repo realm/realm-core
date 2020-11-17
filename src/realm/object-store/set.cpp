@@ -185,24 +185,13 @@ Set Set::freeze(const std::shared_ptr<Realm>& realm) const
 
 NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
 {
-    verify_attached();
-    m_realm->verify_notifications_available();
-    static_cast<void>(cb);
-    REALM_TERMINATE("Not implemented yet");
-    // Adding a new callback to a notifier which had all of its callbacks
-    // removed does not properly reinitialize the notifier. Work around this by
-    // recreating it instead.
-    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
-    // from a notifier a zombie is left sitting around uselessly) and should be
-    // cleaned up.
-    //    if (m_notifier && !m_notifier->have_callbacks())
-    //        m_notifier.reset();
-    //    if (!m_notifier) {
-    //        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
-    //        RealmCoordinator::register_notifier(m_notifier);
-    //    }
-    //    return {m_notifier, m_notifier->add_callback(std::move(cb))};
-    return {};
+    if (m_notifier && !m_notifier->have_callbacks())
+        m_notifier.reset();
+    if (!m_notifier) {
+        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
+        RealmCoordinator::register_notifier(m_notifier);
+    }
+    return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
