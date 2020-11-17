@@ -140,7 +140,7 @@ jobWrapper {
             extendedChecks = [
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
-                checkMacOsDebug               : doBuildMacOs('Debug', true),
+                checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType : "Debug", enableSync : "ON"]),
                 buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                      : doBuildCoverage(),
