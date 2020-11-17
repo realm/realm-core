@@ -166,7 +166,6 @@ Mixed::Mixed(const Obj& obj) noexcept
 {
 }
 
-
 bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 {
     if (lhs.m_type == rhs.m_type)
@@ -177,6 +176,14 @@ bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
 
     DataType l_type = lhs.get_type();
     DataType r_type = rhs.get_type();
+    return data_types_are_comparable(l_type, r_type);
+}
+
+bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
+{
+    if (l_type == r_type)
+        return true;
+
     bool l_is_numeric = l_type == type_Int || l_type == type_Bool || l_type == type_Float || l_type == type_Double ||
                         l_type == type_Decimal;
     bool r_is_numeric = r_type == type_Int || r_type == type_Bool || r_type == type_Float || r_type == type_Double ||
@@ -193,7 +200,6 @@ bool Mixed::types_are_comparable(const Mixed& lhs, const Mixed& rhs)
     }
     return false;
 }
-
 
 int Mixed::compare(const Mixed& b) const
 {

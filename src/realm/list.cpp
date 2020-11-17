@@ -163,26 +163,12 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 
 /********************************* Lst<Key> *********************************/
 
-void check_for_last_unresolved(BPlusTree<ObjKey>& tree)
-{
-    bool no_more_unresolved = true;
-    size_t sz = tree.size();
-    for (size_t n = 0; n < sz; n++) {
-        if (tree.get(n).is_unresolved()) {
-            no_more_unresolved = false;
-            break;
-        }
-    }
-    if (no_more_unresolved)
-        tree.set_context_flag(true);
-}
-
 template <>
 void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
 {
     auto origin_table = m_obj.get_table();
     auto target_table_key = origin_table->get_opposite_table_key(m_col_key);
-    ObjKey old_key = m_tree->get(ndx);
+    ObjKey old_key = this->get(ndx);
     CascadeState state(CascadeState::Mode::Strong);
     bool recurse =
         m_obj.replace_backlink(m_col_key, {target_table_key, old_key}, {target_table_key, target_key}, state);
@@ -198,7 +184,7 @@ void Lst<ObjKey>::do_set(size_t ndx, ObjKey target_key)
     }
     else if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(*m_tree);
     }
 }
 
@@ -231,7 +217,7 @@ void Lst<ObjKey>::do_remove(size_t ndx)
     }
     if (old_key.is_unresolved()) {
         // We might have removed the last unresolved link - check it
-        check_for_last_unresolved(*m_tree);
+        _impl::check_for_last_unresolved(*m_tree);
     }
 }
 
@@ -239,7 +225,7 @@ template <>
 void Lst<ObjKey>::clear()
 {
     update_if_needed();
-    auto sz = m_tree->size();
+    auto sz = Lst<ObjKey>::size();
 
     if (sz > 0) {
         auto origin_table = m_obj.get_table();
@@ -253,7 +239,6 @@ void Lst<ObjKey>::clear()
             while (ndx--) {
                 do_set(ndx, null_key);
                 m_tree->erase(ndx);
-                CollectionBase::adj_remove(ndx);
             }
             // m_obj.bump_both_versions();
             m_obj.bump_content_version();
@@ -352,7 +337,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 {
-    if (value.get_type() == type_TypedLink) {
+    if (!value.is_null() && value.get_type() == type_TypedLink) {
         m_obj.set_backlink(m_col_key, value.get<ObjLink>());
     }
     m_tree->insert(ndx, value);
@@ -380,82 +365,11 @@ void Lst<Mixed>::do_remove(size_t ndx)
     }
 }
 
-Obj LnkLst::get_object(size_t ndx) const
-{
-    ObjKey k = get(ndx);
-    return get_target_table()->get_object(k);
-}
-
-bool LnkLst::init_from_parent() const
-{
-    Collection<ObjKey, LstBase>::init_from_parent();
-    update_unresolved(m_unresolved, *m_tree);
-
-    return m_valid;
-}
-
-size_t virtual2real(const std::vector<size_t>& vec, size_t ndx)
-{
-    for (auto i : vec) {
-        if (i > ndx)
-            break;
-        ndx++;
-    }
-    return ndx;
-}
-
-size_t real2virtual(const std::vector<size_t>& vec, size_t ndx)
-{
-    // Subtract the number of tombstones below ndx from ndx.
-    auto it = std::lower_bound(vec.begin(), vec.end(), ndx);
-    auto adjust = it - vec.begin();
-    return ndx - adjust;
-}
-
-void update_unresolved(std::vector<size_t>& vec, const BPlusTree<ObjKey>& tree)
-{
-    vec.clear();
-    if (tree.is_attached()) {
-        // Only do the scan if context flag is set.
-        if (tree.get_context_flag()) {
-            auto func = [&vec](BPlusTreeNode* node, size_t offset) {
-                auto leaf = static_cast<typename BPlusTree<ObjKey>::LeafNode*>(node);
-                size_t sz = leaf->size();
-                for (size_t i = 0; i < sz; i++) {
-                    auto k = leaf->get(i);
-                    if (k.is_unresolved()) {
-                        vec.push_back(i + offset);
-                    }
-                }
-                return false;
-            };
-
-            tree.traverse(func);
-        }
-    }
-}
-
-void LnkLst::set(size_t ndx, ObjKey value)
-{
-    if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    Lst<ObjKey>::set(virtual2real(m_unresolved, ndx), value);
-}
-
-void LnkLst::insert(size_t ndx, ObjKey value)
-{
-    if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    Lst<ObjKey>::insert(virtual2real(m_unresolved, ndx), value);
-}
-
 Obj LnkLst::create_and_insert_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
-    Lst<ObjKey>::insert(ndx, o.get_key());
+    m_list.insert(ndx, o.get_key());
     return o;
 }
 
@@ -463,13 +377,13 @@ Obj LnkLst::create_and_set_linked_object(size_t ndx)
 {
     Table& t = *get_target_table();
     auto o = t.is_embedded() ? t.create_linked_object() : t.create_object();
-    Lst<ObjKey>::set(ndx, o.get_key());
+    m_list.set(ndx, o.get_key());
     return o;
 }
 
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
 {
-    TableView tv(get_target_table(), clone());
+    TableView tv(get_target_table(), clone_linklist());
     tv.do_sync();
     tv.sort(std::move(order));
     return tv;
@@ -492,28 +406,7 @@ void LnkLst::remove_target_row(size_t link_ndx)
 void LnkLst::remove_all_target_rows()
 {
     if (is_attached()) {
-        _impl::TableFriend::batch_erase_rows(*get_target_table(), *this->m_tree);
-    }
-}
-
-LnkLst::LnkLst(const Obj& owner, ColKey col_key)
-    : Lst<ObjKey>(owner, col_key)
-{
-    update_unresolved(m_unresolved, *m_tree);
-}
-
-void LnkLst::get_dependencies(TableVersions& versions) const
-{
-    if (is_attached()) {
-        auto table = get_table();
-        versions.emplace_back(table->get_key(), table->get_content_version());
-    }
-}
-
-void LnkLst::sync_if_needed() const
-{
-    if (this->is_attached()) {
-        const_cast<LnkLst*>(this)->update_if_needed();
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_list.m_tree);
     }
 }
 
@@ -521,5 +414,21 @@ void LnkLst::sync_if_needed() const
 template class Lst<ObjKey>;
 template class Lst<Mixed>;
 template class Lst<ObjLink>;
+template class Lst<int64_t>;
+template class Lst<bool>;
+template class Lst<StringData>;
+template class Lst<BinaryData>;
+template class Lst<Timestamp>;
+template class Lst<float>;
+template class Lst<double>;
+template class Lst<Decimal128>;
+template class Lst<ObjectId>;
+template class Lst<UUID>;
+template class Lst<util::Optional<int64_t>>;
+template class Lst<util::Optional<bool>>;
+template class Lst<util::Optional<float>>;
+template class Lst<util::Optional<double>>;
+template class Lst<util::Optional<ObjectId>>;
+template class Lst<util::Optional<UUID>>;
 
 } // namespace realm

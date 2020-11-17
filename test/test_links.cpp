@@ -242,7 +242,7 @@ TEST(Links_SetLinkLogicErrors)
     CHECK_THROW(obj.set(col0, ObjKey(10)), KeyNotFound);
 
     group.remove_table("origin");
-    CHECK_THROW(obj.set(col0, ObjKey(10)), realm::NoSuchTable);
+    CHECK_THROW(obj.set(col0, ObjKey(10)), realm::InvalidTableRef);
 }
 
 
@@ -474,12 +474,11 @@ TEST(Links_LinkList_Construction)
     table1->create_objects(target_keys);
 
     auto links0 = origin->create_object().get_linklist(col_link);
-    auto links1 = origin->create_object().get_linklist(col_link);
+    auto obj1 = origin->create_object();
+    auto links1 = obj1.get_linklist(col_link);
 
     // add several links to a single linklist
-    links1.add(target_keys[0]);
-    links1.add(target_keys[1]);
-    links1.add(target_keys[2]);
+    obj1.set_list_values(col_link, target_keys);
 
     CHECK_EQUAL(0, links0.size());
     CHECK_EQUAL(3, links1.size());
@@ -496,9 +495,7 @@ TEST(Links_LinkList_Construction)
     CHECK_EQUAL(3, list1.size());
     list1.clear();
     CHECK_EQUAL(0, list1.size());
-    list1.add(target_keys[0]);
-    list1.add(target_keys[1]);
-    list1.add(target_keys[2]);
+    obj1.set_list_values(col_link, target_keys);
 
     LnkLst list2 = default_list; // Constructed from default object
     CHECK_EQUAL(0, list2.size());
@@ -781,7 +778,7 @@ TEST(Links_LinkList_Inserts)
     auto obj = origin->create_object();
     auto links = obj.get_linklist_ptr(col_link);
     auto links2 = obj.get_linklist_ptr(col_link);
-    auto k0 = links->CollectionBase::get_key();
+    auto k0 = links->get_key();
 
     CHECK_EQUAL(0, links->size());
     CHECK_EQUAL(0, links2->size());
@@ -832,7 +829,7 @@ TEST(Links_LinkList_Backlinks)
 
     Obj origin_obj = origin->create_object();
     auto links = origin_obj.get_linklist_ptr(col_link);
-    auto k0 = links->CollectionBase::get_key();
+    auto k0 = links->get_key();
 
     // add several links to a single linklist
     links->add(key2);
@@ -866,8 +863,8 @@ TEST(Links_LinkList_Backlinks)
     auto links2 = origin->create_object().get_linklist_ptr(col_link);
     links1->add(obj1.get_key());
     links2->add(obj0.get_key());
-    auto k1 = links1->CollectionBase::get_key();
-    auto k2 = links2->CollectionBase::get_key();
+    auto k1 = links1->get_key();
+    auto k2 = links2->get_key();
 
     // Verify backlinks
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
@@ -924,8 +921,12 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(not_found, links->find_first(key2));
     CHECK_EQUAL(not_found, links2->find_first(key2));
 
-    links->find_all(key2, [&](size_t) { CHECK(false); });
-    links2->find_all(key2, [&](size_t) { CHECK(false); });
+    links->find_all(key2, [&](size_t) {
+        CHECK(false);
+    });
+    links2->find_all(key2, [&](size_t) {
+        CHECK(false);
+    });
 
     links->add(key2);
     links->add(key1);
@@ -939,10 +940,16 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(2, links2->find_first(key0));
 
     int calls = 0;
-    links->find_all(key2, [&](size_t i) { CHECK_EQUAL(i, 0); ++calls; });
+    links->find_all(key2, [&](size_t i) {
+        CHECK_EQUAL(i, 0);
+        ++calls;
+    });
     CHECK_EQUAL(calls, 1);
     calls = 0;
-    links2->find_all(key0, [&](size_t i) { CHECK_EQUAL(i, 2); ++calls; });
+    links2->find_all(key0, [&](size_t i) {
+        CHECK_EQUAL(i, 2);
+        ++calls;
+    });
     CHECK_EQUAL(calls, 1);
 
     links->remove(0);
@@ -954,7 +961,10 @@ TEST(Links_LinkList_FindByOrigin)
     links->add(key0);
 
     calls = 0;
-    links->find_all(key0, [&](size_t i) { CHECK(i >= 1); ++calls; });
+    links->find_all(key0, [&](size_t i) {
+        CHECK(i >= 1);
+        ++calls;
+    });
     CHECK_EQUAL(calls, 3);
 }
 

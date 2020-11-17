@@ -159,7 +159,6 @@ namespace realm {
 /// for more on this.
 class ConstTableView : public ObjList {
 public:
-
     /// Construct null view (no memory allocated).
     ConstTableView()
         : m_key_values(Allocator::get_default())
@@ -299,7 +298,10 @@ public:
 
     // A TableView is frozen if it is a) obtained from a query against a frozen table
     // and b) is synchronized (is_in_sync())
-    bool is_frozen() { return m_table->is_frozen() && is_in_sync(); }
+    bool is_frozen()
+    {
+        return m_table->is_frozen() && is_in_sync();
+    }
     // Tells if this TableView depends on a LinkList or row that has been deleted.
     bool depends_on_deleted_object() const;
 
@@ -483,8 +485,6 @@ private:
 };
 
 
-
-
 // ================================================================================================
 // ConstTableView Implementation:
 
@@ -540,7 +540,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
-    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone() : LnkLstPtr{})
+    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{})
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
@@ -607,7 +607,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
-    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone() : LnkLstPtr{};
+    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
 
     return *this;

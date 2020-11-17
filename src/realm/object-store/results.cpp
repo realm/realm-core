@@ -50,38 +50,21 @@ Results::Results(SharedRealm r, ConstTableRef table)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list)
     : m_realm(std::move(r))
-    , m_list(list)
+    , m_collection(std::move(list))
     , m_mode(Mode::List)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o)
+Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<CollectionBase> list, DescriptorOrdering o)
     : m_realm(std::move(r))
     , m_descriptor_ordering(std::move(o))
-    , m_list(std::move(list))
+    , m_collection(std::move(list))
     , m_mode(Mode::List)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
-}
-
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<SetBase> set)
-    : Results(std::move(r), std::move(set), DescriptorOrdering{})
-{
-}
-
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<SetBase> set, DescriptorOrdering o)
-    : m_realm(std::move(r))
-    , m_descriptor_ordering(std::move(o))
-    // , m_set(set)
-    // , m_mode(Mode::Set)
-    , m_mutex(m_realm && m_realm->is_frozen())
-{
-    static_cast<void>(set);
-    static_cast<void>(o);
-    REALM_TERMINATE("Not implemented yet");
 }
 
 Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
@@ -131,8 +114,8 @@ bool Results::is_valid() const
     if (m_table.unchecked_ptr() != nullptr)
         return !!m_table; // ... and then we check if it is valid
 
-    if (m_list)
-        return m_list->is_attached();
+    if (m_collection)
+        return m_collection->is_attached();
 
     return true;
 }
@@ -169,7 +152,7 @@ size_t Results::do_size()
             return m_link_list->size();
         case Mode::List:
             evaluate_sort_and_distinct_on_list();
-            return m_list_indices ? m_list_indices->size() : m_list->size();
+            return m_list_indices ? m_list_indices->size() : m_collection->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
             if (!m_descriptor_ordering.will_apply_distinct())
@@ -209,7 +192,7 @@ StringData Results::get_object_type() const noexcept
 template <typename T>
 auto& Results::list_as() const
 {
-    return static_cast<Lst<T>&>(*m_list);
+    return static_cast<Lst<T>&>(*m_collection);
 }
 
 void Results::evaluate_sort_and_distinct_on_list()
@@ -222,14 +205,14 @@ void Results::evaluate_sort_and_distinct_on_list()
     if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
         return;
 
-    bool needs_update = m_list->has_changed();
+    bool needs_update = m_collection->has_changed();
     if (!m_list_indices) {
         m_list_indices = std::vector<size_t>{};
         needs_update = true;
     }
     if (!needs_update)
         return;
-    if (m_list->is_empty()) {
+    if (m_collection->is_empty()) {
         m_list_indices->clear();
         return;
     }
@@ -246,9 +229,9 @@ void Results::evaluate_sort_and_distinct_on_list()
     }
 
     if (do_distinct)
-        m_list->distinct(*m_list_indices, sort_order);
+        m_collection->distinct(*m_list_indices, sort_order);
     else if (sort_order)
-        m_list->sort(*m_list_indices, *sort_order);
+        m_collection->sort(*m_list_indices, *sort_order);
 }
 
 template <typename T>
@@ -262,7 +245,7 @@ util::Optional<T> Results::try_get(size_t ndx)
                 return list_as<T>().get((*m_list_indices)[ndx]);
         }
         else {
-            if (ndx < m_list->size())
+            if (ndx < m_collection->size())
                 return list_as<T>().get(ndx);
         }
     }
@@ -437,7 +420,7 @@ size_t Results::index_of(Obj const& row)
             return m_table->get_object_ndx(row.get_key());
         case Mode::LinkList:
             if (update_linklist())
-                return m_link_list->Lst<ObjKey>::find_first(row.get_key());
+                return m_link_list->find_first(row.get_key());
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
@@ -488,7 +471,7 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
             type = m_table->get_column_type(column);
             break;
         case Mode::List:
-            type = m_list->get_table()->get_column_type(m_list->get_col_key());
+            type = m_collection->get_table()->get_column_type(m_collection->get_col_key());
             break;
         case Mode::LinkList:
             m_query = do_get_query();
@@ -625,7 +608,7 @@ struct AggregateHelper<Decimal128, Table> {
 };
 
 struct ListAggregateHelper {
-    LstBase& list;
+    CollectionBase& list;
     Mixed min(ColKey, size_t* ndx)
     {
         return list.min(ndx);
@@ -645,37 +628,37 @@ struct ListAggregateHelper {
 };
 
 template <>
-struct AggregateHelper<int64_t, LstBase&> : ListAggregateHelper {
-    AggregateHelper(LstBase& l)
+struct AggregateHelper<int64_t, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
         : ListAggregateHelper{l}
     {
     }
 };
 template <>
-struct AggregateHelper<double, LstBase&> : ListAggregateHelper {
-    AggregateHelper(LstBase& l)
+struct AggregateHelper<double, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
         : ListAggregateHelper{l}
     {
     }
 };
 template <>
-struct AggregateHelper<float, LstBase&> : ListAggregateHelper {
-    AggregateHelper(LstBase& l)
+struct AggregateHelper<float, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
         : ListAggregateHelper{l}
     {
     }
 };
 template <>
-struct AggregateHelper<Decimal128, LstBase&> : ListAggregateHelper {
-    AggregateHelper(LstBase& l)
+struct AggregateHelper<Decimal128, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
         : ListAggregateHelper{l}
     {
     }
 };
 
 template <>
-struct AggregateHelper<Timestamp, LstBase&> : ListAggregateHelper {
-    AggregateHelper(LstBase& l)
+struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
+    AggregateHelper(CollectionBase& l)
         : ListAggregateHelper{l}
     {
     }
@@ -731,7 +714,7 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
-    if (!m_table && !m_list)
+    if (!m_table && !m_collection)
         return none;
 
     auto type = prepare_for_aggregate(column, name);
@@ -739,7 +722,7 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
         case Mode::Table:
             return call_with_helper(func, *m_table, type);
         case Mode::List:
-            return call_with_helper(func, *m_list, type);
+            return call_with_helper(func, *m_collection, type);
         default:
             return call_with_helper(func, m_table_view, type);
     }
@@ -811,7 +794,7 @@ void Results::clear()
             break;
         case Mode::List:
             validate_write();
-            m_list->clear();
+            m_collection->clear();
             break;
         case Mode::LinkList:
             validate_write();
@@ -838,7 +821,7 @@ PropertyType Results::do_get_type() const
         case Mode::Table:
             return PropertyType::Object;
         case Mode::List:
-            return ObjectSchema::from_core_type(m_list->get_col_key());
+            return ObjectSchema::from_core_type(m_collection->get_col_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
@@ -982,7 +965,7 @@ Results Results::sort(SortDescriptor&& sort) const
     if (m_mode == Mode::LinkList)
         return Results(m_realm, m_link_list, util::none, std::move(sort));
     else if (m_mode == Mode::List)
-        return Results(m_realm, m_list, std::move(new_order));
+        return Results(m_realm, m_collection, std::move(new_order));
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
@@ -1036,7 +1019,7 @@ Results Results::distinct(DistinctDescriptor&& uniqueness) const
     new_order.append_distinct(std::move(uniqueness));
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::List)
-        return Results(m_realm, m_list, std::move(new_order));
+        return Results(m_realm, m_collection, std::move(new_order));
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
@@ -1121,7 +1104,7 @@ void Results::prepare_async(ForCallback force) NO_THREAD_SAFETY_ANALYSIS
             return;
     }
 
-    if (m_list)
+    if (m_collection)
         m_notifier = std::make_shared<_impl::ListResultsNotifier>(*this);
     else
         m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
@@ -1177,6 +1160,7 @@ REALM_RESULTS_TYPE(Timestamp)
 REALM_RESULTS_TYPE(ObjectId)
 REALM_RESULTS_TYPE(Decimal)
 REALM_RESULTS_TYPE(UUID)
+REALM_RESULTS_TYPE(Mixed)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)
@@ -1195,7 +1179,7 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
         case Mode::Table:
             return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
         case Mode::List:
-            return Results(frozen_realm, frozen_realm->import_copy_of(*m_list), m_descriptor_ordering);
+            return Results(frozen_realm, frozen_realm->import_copy_of(*m_collection), m_descriptor_ordering);
         case Mode::LinkList: {
             std::shared_ptr<LnkLst> frozen_ll(
                 frozen_realm->import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
@@ -1247,6 +1231,8 @@ static std::string unsupported_operation_msg(ColKey column, Table const& table, 
         return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
     if (is_set(type))
         return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
+    if (is_dictionary(type))
+        return util::format("Cannot %1 '%2' dictionary: operation not supported", operation, column_type);
     return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
                         table.get_column_name(column), column_type);
 }

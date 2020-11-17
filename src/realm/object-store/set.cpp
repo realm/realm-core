@@ -287,13 +287,14 @@ NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
     // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
     // from a notifier a zombie is left sitting around uselessly) and should be
     // cleaned up.
-    if (m_notifier && !m_notifier->have_callbacks())
-        m_notifier.reset();
-    if (!m_notifier) {
-        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
-        RealmCoordinator::register_notifier(m_notifier);
-    }
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+//    if (m_notifier && !m_notifier->have_callbacks())
+//        m_notifier.reset();
+//    if (!m_notifier) {
+//        m_notifier = std::make_shared<SetNotifier>(m_realm, *m_set_base, m_type);
+//        RealmCoordinator::register_notifier(m_notifier);
+//    }
+//    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+    return {};
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
@@ -313,6 +314,7 @@ REALM_PRIMITIVE_SET_TYPE(ObjKey)
 REALM_PRIMITIVE_SET_TYPE(ObjectId)
 REALM_PRIMITIVE_SET_TYPE(Decimal)
 REALM_PRIMITIVE_SET_TYPE(UUID)
+REALM_PRIMITIVE_SET_TYPE(Mixed)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<float>)
