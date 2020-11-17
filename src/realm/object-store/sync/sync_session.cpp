@@ -998,7 +998,9 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
     is_expired = !is_streaming && transferred >= transferrable;
-    return [=, notifier = notifier] { notifier(transferred, transferrable); };
+    return [=, notifier = notifier] {
+        notifier(transferred, transferrable);
+    };
 }
 
 uint64_t SyncSession::ConnectionChangeNotifier::add_callback(std::function<ConnectionStateCallback> callback)
@@ -1014,7 +1016,9 @@ void SyncSession::ConnectionChangeNotifier::remove_callback(uint64_t token)
     Callback old;
     {
         std::lock_guard<std::mutex> lock(m_callback_mutex);
-        auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) { return c.token == token; });
+        auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
+            return c.token == token;
+        });
         if (it == end(m_callbacks)) {
             return;
         }

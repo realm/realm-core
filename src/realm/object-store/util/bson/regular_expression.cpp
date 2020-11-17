@@ -25,7 +25,9 @@ namespace bson {
 RegularExpression::RegularExpression(const std::string pattern, const std::string& options)
     : m_pattern(pattern)
     , m_options(std::accumulate(options.begin(), options.end(), RegularExpression::Option::None,
-                                [](RegularExpression::Option a, char b) { return a | option_char_to_option(b); }))
+                                [](RegularExpression::Option a, char b) {
+                                    return a | option_char_to_option(b);
+                                }))
 {
 }
 

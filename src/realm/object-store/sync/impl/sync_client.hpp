@@ -65,8 +65,9 @@ struct SyncClient {
         , m_thread([this] {
             if (g_binding_callback_thread_observer) {
                 g_binding_callback_thread_observer->did_create_thread();
-                auto will_destroy_thread = util::make_scope_exit(
-                    [&]() noexcept { g_binding_callback_thread_observer->will_destroy_thread(); });
+                auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+                    g_binding_callback_thread_observer->will_destroy_thread();
+                });
                 try {
                     m_client.run(); // Throws
                 }

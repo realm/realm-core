@@ -1557,8 +1557,8 @@ public:
     {
     }
 
-    version_type find_history_entry(version_type begin_version, version_type end_version, HistoryEntry& entry) const
-        noexcept override final
+    version_type find_history_entry(version_type begin_version, version_type end_version,
+                                    HistoryEntry& entry) const noexcept override final
     {
         return m_history.find_history_entry(m_remote_file_ident, begin_version, end_version, entry);
     }

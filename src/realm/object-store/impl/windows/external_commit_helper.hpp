@@ -29,19 +29,22 @@ namespace win32 {
 template <class T, void (*Initializer)(T&)>
 class SharedMemory {
 public:
-    SharedMemory(LPCWSTR name)
+    SharedMemory(std::string name)
     {
         // assume another process have already initialzied the shared memory
         bool shouldInit = false;
 
-        m_mapped_file = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, name);
+        std::wstring wname(name.begin(), name.end());
+        LPCWSTR lpName = wname.c_str();
+
+        m_mapped_file = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, lpName);
         auto error = GetLastError();
 
         if (m_mapped_file == NULL) {
-            m_mapped_file = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), name);
+            m_mapped_file = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(T), lpName);
             error = GetLastError();
 
-            // init since this is the first process creating the shared memory
+            // initialize since this is the first process creating the shared memory
             shouldInit = true;
         }
 

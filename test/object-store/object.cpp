@@ -125,6 +125,8 @@ TEST_CASE("object") {
              {"uuid array", PropertyType::Array | PropertyType::UUID},
              {"decimal array", PropertyType::Array | PropertyType::Decimal},
              {"mixed array", PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable},
+
+             {"dictionary", PropertyType::Dictionary | PropertyType::String},
          }},
         {"all optional types",
          {
@@ -406,6 +408,7 @@ TEST_CASE("object") {
             {"mixed array",
              AnyVec{25, "b"s, 1.45, util::none, Timestamp(30, 40), Decimal128("1.23e45"),
                     ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
+            {"dictionary", AnyDict{{"key", "value"s}}},
         });
 
         Obj row = obj.obj();
@@ -465,6 +468,8 @@ TEST_CASE("object") {
             REQUIRE(list.get(7).get_uuid() == UUID("3b241101-e2bb-4255-8caf-4136c566a962"));
         }
 
+        REQUIRE(row.get_dictionary(table->get_column_key("dictionary")).get("key") == Mixed("value"));
+
         auto list = row.get_linklist_ptr(table->get_column_key("object array"));
         REQUIRE(list->size() == 1);
         REQUIRE(list->get_object(0).get<Int>(array_target_table->get_column_key("value")) == 20);
@@ -495,6 +500,7 @@ TEST_CASE("object") {
             {"object id array", AnyVec{ObjectId("AAAAAAAAAAAAAAAAAAAAAAAA"), ObjectId("BBBBBBBBBBBBBBBBBBBBBBBB")}},
             {"decimal array", AnyVec{Decimal128("1.23e45"), Decimal128("6.78e9")}},
             {"uuid array", AnyVec{UUID(), UUID("3b241101-e2bb-4255-8caf-4136c566a962")}},
+            {"dictionary", AnyDict{{"name", "John Doe"s}}},
         };
 
         Object obj = create(AnyDict{
@@ -515,6 +521,7 @@ TEST_CASE("object") {
         REQUIRE(row.get<ObjectId>(table->get_column_key("object id")) == ObjectId("000000000000000000000001"));
         REQUIRE(row.get<Decimal128>(table->get_column_key("decimal")) == Decimal128("1.23e45"));
         REQUIRE(row.get<UUID>(table->get_column_key("uuid")) == UUID("3b241101-1111-2222-3333-4136c566a962"));
+        REQUIRE(row.get_dictionary(table->get_column_key("dictionary")).get("name") == Mixed("John Doe"));
 
         REQUIRE(row.get_listbase_ptr(table->get_column_key("bool array"))->size() == 2);
         REQUIRE(row.get_listbase_ptr(table->get_column_key("int array"))->size() == 2);
@@ -546,6 +553,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-0000-0000-0000-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
         });
 
         auto row = obj.obj();
@@ -616,6 +624,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
 
             {"bool array", AnyVec{true, false}},
             {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
@@ -755,6 +764,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-9999-9999-9999-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
         });
 
         auto obj_table = r->read_group().get_table("class_all types");
@@ -845,6 +855,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
         };
         Object obj = create(dict);
 
@@ -1052,6 +1063,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
         });
         REQUIRE_THROWS(create(AnyDict{
             {"_id", INT64_C(1)},
@@ -1067,6 +1079,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
         }));
     }
 
@@ -1183,6 +1196,11 @@ TEST_CASE("object") {
         REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
+        obj.set_property_value(d, "dictionary", util::Any(AnyDict({{"k1", "v1"s}, {"k2", "v2"s}})));
+        auto dict = any_cast<AnyDict&&>(obj.get_property_value<util::Any>(d, "dictionary"));
+        REQUIRE(util::any_cast<std::string>(dict["k1"]) == "v1");
+        REQUIRE(util::any_cast<std::string>(dict["k2"]) == "v2");
+
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));
         REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
@@ -1213,6 +1231,7 @@ TEST_CASE("object") {
             {"object id", ObjectId("000000000000000000000001")},
             {"decimal", Decimal128("1.23e45")},
             {"uuid", UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")},
+            {"dictionary", AnyDict{{"key", "value"s}}},
 
             {"bool array", AnyVec{true, false}},
             {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
