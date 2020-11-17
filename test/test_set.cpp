@@ -393,6 +393,17 @@ TEST(Set_Intersection)
         set2.insert(x);
     }
 
+    CHECK(set1.intersects(set2));
+    CHECK(set2.intersects(set1));
+    CHECK(!set1.is_subset_of(set2));
+    CHECK(!set2.is_subset_of(set1));
+    CHECK(!set1.is_superset_of(set2));
+    CHECK(!set2.is_superset_of(set1));
+    std::vector<int64_t> superset{{1, 2, 3, 4, 5}};
+    std::vector<int64_t> subset{{1, 2}};
+    CHECK(set1.is_subset_of(superset));
+    CHECK(set1.is_superset_of(subset));
+
     set1.assign_intersection(set2);
     CHECK_EQUAL(set1.size(), 2);
     CHECK_EQUAL(set1.get(0), 4);

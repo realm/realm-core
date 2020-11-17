@@ -98,6 +98,24 @@ public:
     }
 
     template <class Rhs>
+    bool is_subset_of(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool is_subset_of(It1, It2) const;
+
+    template <class Rhs>
+    bool is_superset_of(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool is_superset_of(It1, It2) const;
+
+    template <class Rhs>
+    bool intersects(const Rhs&) const;
+
+    template <class It1, class It2>
+    bool intersects(It1, It2) const;
+
+    template <class Rhs>
     void assign_union(const Rhs&);
 
     template <class It1, class It2>
@@ -817,9 +835,89 @@ void Set<T>::do_erase(size_t ndx)
 
 template <class T>
 template <class Rhs>
+bool Set<T>::is_subset_of(const Rhs& rhs) const
+{
+    return is_subset_of(std::begin(rhs), std::end(rhs));
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::is_subset_of(It1 first, It2 last) const
+{
+    return std::includes(first, last, begin(), end(), SetElementLessThan<T>{});
+}
+
+template <class T>
+template <class Rhs>
+bool Set<T>::is_superset_of(const Rhs& rhs) const
+{
+    return is_superset_of(std::begin(rhs), std::end(rhs));
+}
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::is_superset_of(It1 first, It2 last) const
+{
+    return std::includes(begin(), end(), first, last, SetElementLessThan<T>{});
+}
+
+template <class T>
+template <class Rhs>
+bool Set<T>::intersects(const Rhs& rhs) const
+{
+    return intersects(std::begin(rhs), std::end(rhs));
+}
+
+namespace _impl {
+template <class T>
+struct CountingOutputIterator {
+    using iterator_category = std::output_iterator_tag;
+    using value_type = void;
+    using difference_type = void;
+    using pointer = void;
+    using reference = void;
+
+    explicit CountingOutputIterator(size_t& num)
+        : num(num)
+    {
+    }
+    CountingOutputIterator& operator=(const CountingOutputIterator&) = delete;
+
+    size_t& num = 0;
+
+    CountingOutputIterator& operator=(const T&)
+    {
+        ++num;
+        return *this;
+    }
+
+    CountingOutputIterator& operator*()
+    {
+        return *this;
+    }
+
+    CountingOutputIterator& operator++()
+    {
+        return *this;
+    }
+};
+} // namespace _impl
+
+template <class T>
+template <class It1, class It2>
+bool Set<T>::intersects(It1 first, It2 last) const
+{
+    size_t count = 0;
+    std::set_intersection(begin(), end(), first, last, _impl::CountingOutputIterator<T>{count},
+                          SetElementLessThan<T>{});
+    return count != 0;
+}
+
+template <class T>
+template <class Rhs>
 inline void Set<T>::assign_union(const Rhs& rhs)
 {
-    assign_union(rhs.begin(), rhs.end());
+    assign_union(std::begin(rhs), std::end(rhs));
 }
 
 template <class T>
@@ -838,7 +936,7 @@ template <class T>
 template <class Rhs>
 inline void Set<T>::assign_intersection(const Rhs& rhs)
 {
-    assign_intersection(rhs.begin(), rhs.end());
+    assign_intersection(std::begin(rhs), std::end(rhs));
 }
 
 template <class T>
@@ -857,7 +955,7 @@ template <class T>
 template <class Rhs>
 inline void Set<T>::assign_difference(const Rhs& rhs)
 {
-    assign_difference(rhs.begin(), rhs.end());
+    assign_difference(std::begin(rhs), std::end(rhs));
 }
 
 template <class T>
@@ -876,7 +974,7 @@ template <class T>
 template <class Rhs>
 inline void Set<T>::assign_symmetric_difference(const Rhs& rhs)
 {
-    assign_symmetric_difference(rhs.begin(), rhs.end());
+    assign_symmetric_difference(std::begin(rhs), std::end(rhs));
 }
 
 template <class T>
@@ -1116,7 +1214,7 @@ inline ObjKey LnkSet::get_key(size_t ndx) const
 template <class Rhs>
 inline void LnkSet::assign_union(const Rhs& rhs)
 {
-    assign_union(rhs.begin(), rhs.end());
+    assign_union(std::begin(rhs), std::end(rhs));
 }
 
 template <class It1, class It2>
@@ -1129,7 +1227,7 @@ inline void LnkSet::assign_union(It1 first, It2 last)
 template <class Rhs>
 inline void LnkSet::assign_intersection(const Rhs& rhs)
 {
-    assign_intersection(rhs.begin(), rhs.end());
+    assign_intersection(std::begin(rhs), std::end(rhs));
 }
 
 template <class It1, class It2>
@@ -1142,7 +1240,7 @@ inline void LnkSet::assign_intersection(It1 first, It2 last)
 template <class Rhs>
 inline void LnkSet::assign_difference(const Rhs& rhs)
 {
-    assign_difference(rhs.begin(), rhs.end());
+    assign_difference(std::begin(rhs), std::end(rhs));
 }
 
 template <class It1, class It2>
@@ -1155,7 +1253,7 @@ inline void LnkSet::assign_difference(It1 first, It2 last)
 template <class Rhs>
 inline void LnkSet::assign_symmetric_difference(const Rhs& rhs)
 {
-    assign_symmetric_difference(rhs.begin(), rhs.end());
+    assign_symmetric_difference(std::begin(rhs), std::end(rhs));
 }
 
 template <class It1, class It2>
