@@ -97,6 +97,30 @@ public:
         }
     }
 
+    template <class Rhs>
+    void assign_union(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_union(It1, It2);
+
+    template <class Rhs>
+    void assign_intersection(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_intersection(It1, It2);
+
+    template <class Rhs>
+    void assign_difference(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_difference(It1, It2);
+
+    template <class Rhs>
+    void assign_symmetric_difference(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_symmetric_difference(It1, It2);
+
     /// Insert a value into the set if it does not already exist, returning the index of the inserted value,
     /// or the index of the already-existing value.
     std::pair<size_t, bool> insert(T value);
@@ -192,6 +216,30 @@ public:
     size_t find_first(ObjKey) const;
     std::pair<size_t, bool> insert(ObjKey);
     std::pair<size_t, bool> erase(ObjKey);
+
+    template <class Rhs>
+    void assign_union(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_union(It1, It2);
+
+    template <class Rhs>
+    void assign_intersection(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_intersection(It1, It2);
+
+    template <class Rhs>
+    void assign_difference(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_difference(It1, It2);
+
+    template <class Rhs>
+    void assign_symmetric_difference(const Rhs&);
+
+    template <class It1, class It2>
+    void assign_symmetric_difference(It1, It2);
 
     // Overriding members of CollectionBase:
     using CollectionBase::get_key;
@@ -767,6 +815,83 @@ void Set<T>::do_erase(size_t ndx)
     m_tree->erase(ndx);
 }
 
+template <class T>
+template <class Rhs>
+inline void Set<T>::assign_union(const Rhs& rhs)
+{
+    assign_union(rhs.begin(), rhs.end());
+}
+
+template <class T>
+template <class It1, class It2>
+void Set<T>::assign_union(It1 first, It2 last)
+{
+    std::vector<T> the_union;
+    std::set_union(begin(), end(), first, last, std::back_inserter(the_union), SetElementLessThan<T>{});
+    clear();
+    for (auto value : the_union) {
+        insert(value);
+    }
+}
+
+template <class T>
+template <class Rhs>
+inline void Set<T>::assign_intersection(const Rhs& rhs)
+{
+    assign_intersection(rhs.begin(), rhs.end());
+}
+
+template <class T>
+template <class It1, class It2>
+void Set<T>::assign_intersection(It1 first, It2 last)
+{
+    std::vector<T> intersection;
+    std::set_intersection(begin(), end(), first, last, std::back_inserter(intersection), SetElementLessThan<T>{});
+    clear();
+    for (auto value : intersection) {
+        insert(value);
+    }
+}
+
+template <class T>
+template <class Rhs>
+inline void Set<T>::assign_difference(const Rhs& rhs)
+{
+    assign_difference(rhs.begin(), rhs.end());
+}
+
+template <class T>
+template <class It1, class It2>
+void Set<T>::assign_difference(It1 first, It2 last)
+{
+    std::vector<T> difference;
+    std::set_difference(begin(), end(), first, last, std::back_inserter(difference), SetElementLessThan<T>{});
+    clear();
+    for (auto value : difference) {
+        insert(value);
+    }
+}
+
+template <class T>
+template <class Rhs>
+inline void Set<T>::assign_symmetric_difference(const Rhs& rhs)
+{
+    assign_symmetric_difference(rhs.begin(), rhs.end());
+}
+
+template <class T>
+template <class It1, class It2>
+void Set<T>::assign_symmetric_difference(It1 first, It2 last)
+{
+    std::vector<T> difference;
+    std::set_symmetric_difference(begin(), end(), first, last, std::back_inserter(difference),
+                                  SetElementLessThan<T>{});
+    clear();
+    for (auto value : difference) {
+        insert(value);
+    }
+}
+
 
 inline ObjKey LnkSet::get(size_t ndx) const
 {
@@ -986,6 +1111,58 @@ inline Obj LnkSet::get_object(size_t ndx) const
 inline ObjKey LnkSet::get_key(size_t ndx) const
 {
     return get(ndx);
+}
+
+template <class Rhs>
+inline void LnkSet::assign_union(const Rhs& rhs)
+{
+    assign_union(rhs.begin(), rhs.end());
+}
+
+template <class It1, class It2>
+inline void LnkSet::assign_union(It1 first, It2 last)
+{
+    m_set.assign_union(first, last);
+    update_unresolved();
+}
+
+template <class Rhs>
+inline void LnkSet::assign_intersection(const Rhs& rhs)
+{
+    assign_intersection(rhs.begin(), rhs.end());
+}
+
+template <class It1, class It2>
+inline void LnkSet::assign_intersection(It1 first, It2 last)
+{
+    m_set.assign_intersection(first, last);
+    update_unresolved();
+}
+
+template <class Rhs>
+inline void LnkSet::assign_difference(const Rhs& rhs)
+{
+    assign_difference(rhs.begin(), rhs.end());
+}
+
+template <class It1, class It2>
+inline void LnkSet::assign_difference(It1 first, It2 last)
+{
+    m_set.assign_difference(first, last);
+    update_unresolved();
+}
+
+template <class Rhs>
+inline void LnkSet::assign_symmetric_difference(const Rhs& rhs)
+{
+    assign_symmetric_difference(rhs.begin(), rhs.end());
+}
+
+template <class It1, class It2>
+inline void LnkSet::assign_symmetric_difference(It1 first, It2 last)
+{
+    m_set.assign_symmetric_difference(first, last);
+    update_unresolved();
 }
 
 } // namespace realm
