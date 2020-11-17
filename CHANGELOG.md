@@ -28,6 +28,13 @@
 
 ----------------------------------------------
 
+# 10.1.3 Release notes
+
+### Enhancements
+* Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
+
+----------------------------------------------
+
 # 10.1.2 Release notes
 
 ### Fixed
