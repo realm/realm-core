@@ -328,7 +328,9 @@ IndexSet::iterator IndexSet::find(size_t index) noexcept
 
 IndexSet::iterator IndexSet::find(size_t index, iterator begin) noexcept
 {
-    auto it = std::find_if(begin.outer(), m_data.end(), [&](auto const& lft) { return lft.end > index; });
+    auto it = std::find_if(begin.outer(), m_data.end(), [&](auto const& lft) {
+        return lft.end > index;
+    });
     if (it == m_data.end())
         return end();
     if (index < it->begin)
@@ -336,8 +338,9 @@ IndexSet::iterator IndexSet::find(size_t index, iterator begin) noexcept
     auto inner_begin = it->data.begin();
     if (it == begin.outer())
         inner_begin += begin.offset();
-    auto inner = std::lower_bound(inner_begin, it->data.end(), index,
-                                  [&](auto const& lft, auto) { return lft.second <= index; });
+    auto inner = std::lower_bound(inner_begin, it->data.end(), index, [&](auto const& lft, auto) {
+        return lft.second <= index;
+    });
     REALM_ASSERT_DEBUG(inner != it->data.end());
 
     return iterator(it, m_data.end(), &*inner);

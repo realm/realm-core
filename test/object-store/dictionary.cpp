@@ -80,7 +80,7 @@ TEST_CASE("dictionary") {
     SECTION("get()") {
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(dict.get<String>(keys[i]) == values[i]);
-            auto val = dict.get(ctx, util::Any(keys[i]));
+            auto val = dict.get(ctx, keys[i]);
             REQUIRE(any_cast<std::string>(val) == values[i]);
         }
     }
@@ -92,7 +92,7 @@ TEST_CASE("dictionary") {
             REQUIRE(dict.get<StringData>(keys[i]) == values[rev]);
         }
         for (size_t i = 0; i < values.size(); ++i) {
-            dict.insert(ctx, util::Any(keys[i]), util::Any(values[i]));
+            dict.insert(ctx, keys[i], util::Any(values[i]));
             REQUIRE(dict.get<StringData>(keys[i]) == values[i]);
         }
     }

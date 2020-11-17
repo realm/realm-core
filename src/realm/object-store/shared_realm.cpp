@@ -618,7 +618,9 @@ void Realm::begin_transaction()
     read_group();
 
     m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+    auto cleanup = util::make_scope_exit([this]() noexcept {
+        m_is_sending_notifications = false;
+    });
 
     try {
         m_coordinator->promote_to_write(*this);
@@ -739,7 +741,9 @@ void Realm::notify()
         }
     }
 
-    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+    auto cleanup = util::make_scope_exit([this]() noexcept {
+        m_is_sending_notifications = false;
+    });
     if (!m_coordinator->can_advance(*this)) {
         m_is_sending_notifications = true;
         m_coordinator->process_available_async(*this);
@@ -807,7 +811,9 @@ bool Realm::do_refresh()
     auto retain_self = shared_from_this();
 
     m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+    auto cleanup = util::make_scope_exit([this]() noexcept {
+        m_is_sending_notifications = false;
+    });
 
     if (m_binding_context) {
         m_binding_context->before_notify();

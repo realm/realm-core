@@ -120,8 +120,8 @@ public:
 
     // Get the latest cached schema and the transaction version which it applies
     // to. Returns false if there is no cached schema.
-    bool get_cached_schema(Schema& schema, uint64_t& schema_version, uint64_t& transaction) const
-        noexcept REQUIRES(!m_schema_cache_mutex);
+    bool get_cached_schema(Schema& schema, uint64_t& schema_version, uint64_t& transaction) const noexcept
+        REQUIRES(!m_schema_cache_mutex);
 
     // Cache the state of the schema at the given transaction version
     void cache_schema(Schema const& new_schema, uint64_t new_schema_version, uint64_t transaction_version)

@@ -977,8 +977,8 @@ struct MergeUtils {
         REALM_MERGE_ASSERT(false && "Invalid payload type in instruction");
     }
 
-    bool same_path_element(const Instruction::Path::Element& left, const Instruction::Path::Element& right) const
-        noexcept
+    bool same_path_element(const Instruction::Path::Element& left,
+                           const Instruction::Path::Element& right) const noexcept
     {
         auto pred = util::overload{
             [&](uint32_t lhs, uint32_t rhs) {
@@ -1009,14 +1009,14 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_table(const Instruction::TableInstruction& left, const Instruction::TableInstruction& right) const
-        noexcept
+    bool same_table(const Instruction::TableInstruction& left,
+                    const Instruction::TableInstruction& right) const noexcept
     {
         return same_string(left.table, right.table);
     }
 
-    bool same_object(const Instruction::ObjectInstruction& left, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool same_object(const Instruction::ObjectInstruction& left,
+                     const Instruction::ObjectInstruction& right) const noexcept
     {
         return same_table(left, right) && same_key(left.object, right.object);
     }
@@ -1037,8 +1037,8 @@ struct MergeUtils {
         }
     }
 
-    bool same_field(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool same_field(const Instruction::PathInstruction& left,
+                    const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right) && same_string(left.field, right.field);
     }
@@ -1068,8 +1068,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool same_container(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool same_container(const Instruction::PathInstruction& left,
+                        const Instruction::PathInstruction& right) const noexcept
     {
         return same_field(left, right) && same_container(left.path, right.path);
     }
@@ -1105,8 +1105,8 @@ struct MergeUtils {
         return same_column(left, right);
     }
 
-    bool is_prefix_of(const Instruction::EraseColumn& left, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::EraseColumn& left,
+                      const Instruction::ObjectInstruction& right) const noexcept
     {
         return same_column(left, right);
     }
@@ -1117,8 +1117,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_prefix_of(const Instruction::ObjectInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::ObjectInstruction& left,
+                      const Instruction::PathInstruction& right) const noexcept
     {
         return same_object(left, right);
     }
@@ -1130,8 +1130,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool is_prefix_of(const Instruction::PathInstruction& left, const Instruction::PathInstruction& right) const
-        noexcept
+    bool is_prefix_of(const Instruction::PathInstruction& left,
+                      const Instruction::PathInstruction& right) const noexcept
     {
         if (left.path.size() < right.path.size() && same_field(left, right)) {
             for (size_t i = 0; i < left.path.size(); ++i) {
@@ -1166,8 +1166,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_table(const Instruction::Payload& value, const Instruction::TableInstruction& right) const
-        noexcept
+    bool value_targets_table(const Instruction::Payload& value,
+                             const Instruction::TableInstruction& right) const noexcept
     {
         if (value.type == Instruction::Payload::Type::Link) {
             StringData target_table = m_left_side.get_string(value.data.link.target_table);
@@ -1177,8 +1177,8 @@ struct MergeUtils {
         return false;
     }
 
-    bool value_targets_object(const Instruction::Payload& value, const Instruction::ObjectInstruction& right) const
-        noexcept
+    bool value_targets_object(const Instruction::Payload& value,
+                              const Instruction::ObjectInstruction& right) const noexcept
     {
         if (value_targets_table(value, right)) {
             return same_key(value.data.link.target, right.object);
@@ -1222,8 +1222,8 @@ struct MergeUtils {
         REALM_UNREACHABLE();
     }
 
-    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx, const uint32_t& move_to_ndx) const
-        noexcept
+    void merge_get_vs_move(uint32_t& get_ndx, const uint32_t& move_from_ndx,
+                           const uint32_t& move_to_ndx) const noexcept
     {
         if (get_ndx == move_from_ndx) {
             // CONFLICT: Update of a moved element.

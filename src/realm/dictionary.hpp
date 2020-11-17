@@ -46,6 +46,11 @@ public:
     }
     Dictionary& operator=(const Dictionary& other);
 
+    bool operator==(const Dictionary& other) const noexcept
+    {
+        return CollectionBaseImpl<CollectionBase>::operator==(other);
+    }
+
     DataType get_key_data_type() const;
     DataType get_value_data_type() const;
 

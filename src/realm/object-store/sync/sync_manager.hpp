@@ -92,6 +92,7 @@ struct SyncClientConfig {
 class SyncManager : public std::enable_shared_from_this<SyncManager> {
     friend class SyncSession;
     friend struct ::TestSyncManager;
+
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
 
