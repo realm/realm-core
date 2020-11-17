@@ -104,7 +104,6 @@ public:
         return false;
     }
 
-
     // Determine if `value` boxes the same List as `list`
     bool is_same_list(List const& list, util::Any const& value)
     {
@@ -144,6 +143,7 @@ public:
         }
         return ret;
     }
+
     util::Any box(Object v) const
     {
         return v;

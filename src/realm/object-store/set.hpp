@@ -26,6 +26,8 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/results.hpp>
 
+#include <realm/set.hpp>
+
 namespace realm {
 
 namespace _impl {
@@ -34,7 +36,7 @@ class SetNotifier;
 
 namespace object_store {
 
-class Set {
+class Set : public Collection {
 public:
     Set() noexcept;
     Set(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
@@ -45,33 +47,6 @@ public:
     Set& operator=(const Set&);
     Set(Set&&);
     Set& operator=(Set&&);
-
-    const std::shared_ptr<Realm>& get_realm() const
-    {
-        return m_realm;
-    }
-
-    ColKey get_parent_column_key() const noexcept;
-    ObjKey get_parent_object_key() const noexcept;
-    TableKey get_parent_table_key() const noexcept;
-
-    PropertyType get_type() const noexcept
-    {
-        return m_type;
-    }
-
-    const ObjectSchema& get_object_schema() const;
-
-    bool is_valid() const;
-    void verify_attached() const;
-    void verify_in_transaction() const;
-
-    /// Number of entries in the set.
-    ///
-    /// CAUTION: For sets of objects, tombstones are included in this number.
-    ///          Use `as_results()` to get the number of objects that are alive.
-    ///
-    size_t size() const;
 
     template <class T>
     size_t find(const T&) const;
@@ -102,11 +77,9 @@ public:
     Results sort(const std::vector<std::pair<std::string, bool>>& keypaths) const;
     Results filter(Query q) const;
 
-    Results as_results() const;
     Results snapshot() const;
 
     Set freeze(const std::shared_ptr<Realm>& realm) const;
-    bool is_frozen() const noexcept;
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
@@ -122,13 +95,6 @@ public:
 
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
-    struct InvalidatedException : public std::logic_error {
-        InvalidatedException()
-            : std::logic_error("Access to invalidated Set object")
-        {
-        }
-    };
-
     struct InvalidEmbeddedOperationException : std::logic_error {
         InvalidEmbeddedOperationException()
             : std::logic_error("Cannot add an embedded object to a Set.")
@@ -137,15 +103,9 @@ public:
     };
 
 private:
-    std::shared_ptr<Realm> m_realm;
-    PropertyType m_type;
-    mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
-     _impl::CollectionNotifier::Handle<_impl::SetNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::SetNotifier> m_notifier;
     std::shared_ptr<realm::SetBase> m_set_base;
-    
-    void verify_valid_row(size_t row_ndx, bool insertion = false) const;
 
-    void validate(const Obj&) const;
     ConstTableRef get_target_table() const;
 
     template <class Fn>
@@ -170,6 +130,20 @@ auto& Set::as() const
     return static_cast<realm::Set<T>&>(*m_set_base);
 }
 
+template <>
+inline auto& Set::as<Obj>() const
+{
+    REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set_base));
+    return static_cast<LnkSet&>(*m_set_base);
+}
+
+template <>
+inline auto& Set::as<ObjKey>() const
+{
+    REALM_ASSERT(dynamic_cast<LnkSet*>(&*m_set_base));
+    return static_cast<LnkSet&>(*m_set_base);
+}
+
 template <class T, class Context>
 size_t Set::find(Context& ctx, const T& value) const
 {
@@ -181,7 +155,9 @@ size_t Set::find(Context& ctx, const T& value) const
 template <typename Context>
 auto Set::get(Context& ctx, size_t row_ndx) const
 {
-    return dispatch([&](auto t) { return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx)); });
+    return dispatch([&](auto t) {
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(row_ndx));
+    });
 }
 
 template <class T, class Context>

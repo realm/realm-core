@@ -25,8 +25,6 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
 
-#include <realm/set.hpp>
-
 namespace realm::object_store {
 using namespace _impl;
 
@@ -38,44 +36,17 @@ Set& Set::operator=(const Set&) = default;
 Set& Set::operator=(Set&&) = default;
 
 Set::Set(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-    : m_realm(std::move(r))
-    , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Set)
-    , m_set_base(parent_obj.get_setbase_ptr(col))
+    : Collection(std::move(r), parent_obj, col)
+    , m_set_base(std::dynamic_pointer_cast<SetBase>(m_coll_base))
 {
 }
 
-const ObjectSchema& Set::get_object_schema() const
+Set::Set(std::shared_ptr<Realm> r, const SetBase& set)
+    : Collection(std::move(r), set)
+    , m_set_base(std::dynamic_pointer_cast<SetBase>(m_coll_base))
 {
-    verify_attached();
-
-    REALM_ASSERT(get_type() == PropertyType::Object);
-    auto object_schema = m_object_schema.load();
-    if (!object_schema) {
-        auto table = m_set_base->get_table();
-        auto col = m_set_base->get_col_key();
-        auto target_table = table->get_link_target(col);
-        auto object_type = ObjectStore::object_type_for_table_name(target_table->get_name());
-        auto it = m_realm->schema().find(object_type);
-        REALM_ASSERT(it != m_realm->schema().end());
-        m_object_schema = object_schema = &*it;
-    }
-    return *m_object_schema;
 }
 
-realm::ObjKey Set::get_parent_object_key() const noexcept
-{
-    return m_set_base->get_key();
-}
-
-realm::ColKey Set::get_parent_column_key() const noexcept
-{
-    return m_set_base->get_col_key();
-}
-
-realm::TableKey Set::get_parent_table_key() const noexcept
-{
-    return m_set_base->get_table()->get_key();
-}
 
 ConstTableRef Set::get_target_table() const
 {
@@ -84,59 +55,6 @@ ConstTableRef Set::get_target_table() const
     if (col.get_type() != col_type_Link)
         return nullptr;
     return table->get_link_target(col);
-}
-
-void Set::validate(const Obj& obj) const
-{
-    if (!obj.is_valid()) {
-        throw std::invalid_argument{"Object has been deleted or invalidated"};
-    }
-    auto col_type = m_set_base->get_col_key().get_type();
-    if (col_type == col_type_Link) {
-        auto target = get_target_table();
-        if (obj.get_table() != target) {
-            throw std::invalid_argument{
-                util::format("Object of type (%1) does not match Set type (%2)",
-                             ObjectStore::object_type_for_table_name(obj.get_table()->get_name()),
-                             ObjectStore::object_type_for_table_name(target->get_name()))};
-        }
-    }
-    else if (col_type == col_type_Mixed || col_type == col_type_TypedLink) {
-        REALM_TERMINATE("Set of Mixed or TypedLink not supported yet");
-        return;
-    }
-    else {
-        throw std::invalid_argument{"Tried to insert object into set of primitive values"};
-    }
-}
-
-bool Set::is_valid() const
-{
-    if (!m_realm)
-        return false;
-    m_realm->verify_thread();
-    if (!m_realm->is_in_read_transaction())
-        return false;
-    return m_set_base->is_attached();
-}
-
-void Set::verify_attached() const
-{
-    if (!is_valid()) {
-        throw InvalidatedException();
-    }
-}
-
-void Set::verify_in_transaction() const
-{
-    verify_attached();
-    m_realm->verify_in_write();
-}
-
-size_t Set::size() const
-{
-    verify_attached();
-    return m_set_base->size();
 }
 
 template <class T>
@@ -152,8 +70,6 @@ T Set::get(size_t row_ndx) const
     verify_valid_row(row_ndx);
     return as<T>().get(row_ndx);
 }
-
-void Set::verify_valid_row(size_t, bool) const { }
 
 template <class T>
 std::pair<size_t, bool> Set::insert(T value)
@@ -228,12 +144,6 @@ bool Set::operator==(const Set& rhs) const noexcept
     return true;
 }
 
-Results Set::as_results() const
-{
-    verify_attached();
-    return Results{m_realm, m_set_base};
-}
-
 Results Set::snapshot() const
 {
     return as_results().snapshot();
@@ -244,7 +154,8 @@ Results Set::sort(SortDescriptor order) const
     verify_attached();
     if ((m_type == PropertyType::Object)) {
         REALM_TERMINATE("Not implemented yet");
-//        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none, std::move(order));
+        //        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none,
+        //        std::move(order));
     }
     else {
         DescriptorOrdering o;
@@ -272,21 +183,8 @@ Set Set::freeze(const std::shared_ptr<Realm>& realm) const
     return *this;
 }
 
-bool Set::is_frozen() const noexcept
-{
-    return m_realm->is_frozen();
-}
-
 NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
 {
-    verify_attached();
-    m_realm->verify_notifications_available();
-    // Adding a new callback to a notifier which had all of its callbacks
-    // removed does not properly reinitialize the notifier. Work around this by
-    // recreating it instead.
-    // FIXME: The notifier lifecycle here is dumb (when all callbacks are removed
-    // from a notifier a zombie is left sitting around uselessly) and should be
-    // cleaned up.
     if (m_notifier && !m_notifier->have_callbacks())
         m_notifier.reset();
     if (!m_notifier) {
@@ -297,7 +195,7 @@ NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &
 }
 
 #define REALM_PRIMITIVE_SET_TYPE(T)                                                                                  \
-    template T Set::get<T>(size_t) const;                                                                           \
+    template T Set::get<T>(size_t) const;                                                                            \
     template size_t Set::find<T>(const T&) const;                                                                    \
     template std::pair<size_t, bool> Set::remove<T>(T const&);                                                       \
     template std::pair<size_t, bool> Set::insert<T>(T);
@@ -351,7 +249,8 @@ template <>
 Obj Set::get<Obj>(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return get_target_table()->get_object(row_ndx);
+    auto& set = as<Obj>();
+    return set.get_object(row_ndx);
 }
 
 template <>
