@@ -20,6 +20,8 @@
 #define REALM_SET_HPP
 
 #include <realm/collection.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/array_key.hpp>
 
 #include <numeric> // std::iota
 
@@ -30,16 +32,12 @@ public:
     using CollectionBase::CollectionBase;
 
     virtual ~SetBase() {}
-    virtual SetBasePtr clone() const
-    {
-        return get_obj().get_setbase_ptr(get_col_key());
-    }
-
+    virtual SetBasePtr clone() const = 0;
+    virtual size_t find_any(Mixed) const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
     virtual std::pair<size_t, bool> erase_any(Mixed value) = 0;
-    virtual void clear() = 0;
 
 protected:
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
@@ -56,6 +54,15 @@ public:
 
     Set() = default;
     Set(const Obj& owner, ColKey col_key);
+    Set(const Set& other);
+    Set(Set&& other) noexcept;
+    Set& operator=(const Set& other);
+    Set& operator=(Set&& other) noexcept;
+
+    SetBasePtr clone() const final
+    {
+        return std::make_unique<Set<T>>(*this);
+    }
 
     T get(size_t ndx) const
     {
@@ -101,20 +108,8 @@ public:
     std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
-    size_t size() const final
-    {
-        if (!is_attached())
-            return 0;
-        update_if_needed();
-        if (!m_valid) {
-            return 0;
-        }
-        return m_tree->size();
-    }
-    bool is_null(size_t ndx) const final
-    {
-        return m_nullable && value_is_null(get(ndx));
-    }
+    size_t size() const final;
+    bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final
     {
         return get(ndx);
@@ -126,12 +121,13 @@ public:
     Mixed avg(size_t* return_cnt = nullptr) const final;
     std::unique_ptr<CollectionBase> clone_collection() const final
     {
-        return std::make_unique<Set<T>>(m_obj, m_col_key);
+        return std::make_unique<Set<T>>(*this);
     }
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
 
     // Overriding members of SetBase:
+    size_t find_any(Mixed) const final;
     std::pair<size_t, bool> insert_null() final;
     std::pair<size_t, bool> erase_null() final;
     std::pair<size_t, bool> insert_any(Mixed value) final;
@@ -143,7 +139,7 @@ public:
     }
 
 private:
-    mutable std::unique_ptr<BPlusTree<value_type>> m_tree;
+    mutable std::unique_ptr<BPlusTree<T>> m_tree;
     using Base::m_col_key;
     using Base::m_obj;
     using Base::m_valid;
@@ -169,6 +165,122 @@ private:
     }
     void do_insert(size_t ndx, T value);
     void do_erase(size_t ndx);
+
+    friend class LnkSet;
+};
+
+class LnkSet final : public ObjCollectionBase<SetBase> {
+public:
+    using Base = ObjCollectionBase<SetBase>;
+    using value_type = ObjKey;
+    using iterator = CollectionIterator<LnkSet>;
+
+    LnkSet() = default;
+    LnkSet(const Obj& owner, ColKey col_key)
+        : m_set(owner, col_key)
+    {
+        update_unresolved();
+    }
+
+    LnkSet(const LnkSet&) = default;
+    LnkSet(LnkSet&&) = default;
+    LnkSet& operator=(const LnkSet&) = default;
+    LnkSet& operator=(LnkSet&&) = default;
+
+    ObjKey get(size_t ndx) const;
+    size_t find(ObjKey) const;
+    size_t find_first(ObjKey) const;
+    std::pair<size_t, bool> insert(ObjKey);
+    std::pair<size_t, bool> erase(ObjKey);
+
+    // Overriding members of CollectionBase:
+    using CollectionBase::get_key;
+    CollectionBasePtr clone_collection() const
+    {
+        return clone_linkset();
+    }
+    size_t size() const final;
+    bool is_null(size_t ndx) const final;
+    Mixed get_any(size_t ndx) const final;
+    void clear() final;
+    Mixed min(size_t* return_ndx = nullptr) const final;
+    Mixed max(size_t* return_ndx = nullptr) const final;
+    Mixed sum(size_t* return_cnt = nullptr) const final;
+    Mixed avg(size_t* return_cnt = nullptr) const final;
+    void sort(std::vector<size_t>& indices, bool ascending = true) const final;
+    void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
+    const Obj& get_obj() const noexcept final;
+    bool is_attached() const final;
+    bool has_changed() const final;
+    ColKey get_col_key() const noexcept final;
+
+    // Overriding members of SetBase:
+    SetBasePtr clone() const
+    {
+        return clone_linkset();
+    }
+    size_t find_any(Mixed) const final;
+    std::pair<size_t, bool> insert_null() final;
+    std::pair<size_t, bool> erase_null() final;
+    std::pair<size_t, bool> insert_any(Mixed value) final;
+    std::pair<size_t, bool> erase_any(Mixed value) final;
+
+    // Overriding members of ObjList:
+    bool is_obj_valid(size_t) const noexcept final;
+    Obj get_object(size_t ndx) const final;
+    ObjKey get_key(size_t ndx) const final;
+
+    // LnkSet interface:
+
+    std::unique_ptr<LnkSet> clone_linkset() const
+    {
+        return std::make_unique<LnkSet>(*this);
+    }
+
+    template <class Func>
+    void find_all(ObjKey value, Func&& func) const
+    {
+        if (value.is_unresolved()) {
+            return;
+        }
+
+        m_set.find_all(value, [&](size_t ndx) {
+            func(real2virtual(ndx));
+        });
+    }
+
+    TableView get_sorted_view(SortDescriptor order) const;
+    TableView get_sorted_view(ColKey column_key, bool ascending = true);
+    void remove_target_row(size_t link_ndx);
+    void remove_all_target_rows();
+
+    iterator begin() const noexcept
+    {
+        return iterator{this, 0};
+    }
+
+    iterator end() const noexcept
+    {
+        return iterator{this, size()};
+    }
+
+private:
+    Set<ObjKey> m_set;
+
+    bool do_update_if_needed() const final
+    {
+        return m_set.update_if_needed();
+    }
+
+    bool do_init_from_parent() const final
+    {
+        return m_set.init_from_parent();
+    }
+
+    BPlusTree<ObjKey>& get_mutable_tree() const final
+    {
+        return *m_set.m_tree;
+    }
 };
 
 template <>
@@ -344,10 +456,73 @@ inline Set<T>::Set(const Obj& obj, ColKey col_key)
     }
 }
 
+template <class T>
+inline Set<T>::Set(const Set& other)
+    : Base(static_cast<const Base&>(other))
+{
+    if (other.m_tree) {
+        Allocator& alloc = other.m_tree->get_alloc();
+        m_tree = std::make_unique<BPlusTree<T>>(alloc);
+        m_tree->set_parent(this, 0);
+        if (m_valid)
+            m_tree->init_from_ref(other.m_tree->get_ref());
+    }
+}
+
+template <class T>
+inline Set<T>::Set(Set&& other) noexcept
+    : Base(static_cast<Base&&>(other))
+    , m_tree(std::exchange(other.m_tree, nullptr))
+{
+    if (m_tree) {
+        m_tree->set_parent(this, 0);
+    }
+}
+
+template <class T>
+inline Set<T>& Set<T>::operator=(const Set& other)
+{
+    Base::operator=(static_cast<const Base&>(other));
+
+    if (this != &other) {
+        m_tree.reset();
+        if (other.m_tree) {
+            Allocator& alloc = other.m_tree->get_alloc();
+            m_tree = std::make_unique<BPlusTree<T>>(alloc);
+            m_tree->set_parent(this, 0);
+            if (m_valid) {
+                m_tree->init_from_ref(other.m_tree->get_ref());
+            }
+        }
+    }
+
+    return *this;
+}
+
+template <class T>
+inline Set<T>& Set<T>::operator=(Set&& other) noexcept
+{
+    Base::operator=(static_cast<Base&&>(other));
+
+    if (this != &other) {
+        m_tree = std::exchange(other.m_tree, nullptr);
+        if (m_tree) {
+            m_tree->set_parent(this, 0);
+        }
+    }
+
+    return *this;
+}
+
 template <typename U>
 Set<U> Obj::get_set(ColKey col_key) const
 {
     return Set<U>(*this, col_key);
+}
+
+inline LnkSet Obj::get_linkset(ColKey col_key) const
+{
+    return LnkSet{*this, col_key};
 }
 
 template <class T>
@@ -360,6 +535,25 @@ size_t Set<T>::find(T value) const
         return it.index();
     }
     return npos;
+}
+
+template <class T>
+size_t Set<T>::find_any(Mixed value) const
+{
+    if constexpr (std::is_same_v<T, Mixed>) {
+        return find(value);
+    }
+    else {
+        if (value.is_null()) {
+            if (!m_nullable) {
+                return not_found;
+            }
+            return find(BPlusTree<T>::default_value(true));
+        }
+        else {
+            return find(value.get<typename util::RemoveOptional<T>::type>());
+        }
+    }
 }
 
 template <class T>
@@ -456,6 +650,24 @@ std::pair<size_t, bool> Set<T>::erase_null()
 }
 
 template <class T>
+size_t Set<T>::size() const
+{
+    if (!is_attached())
+        return 0;
+    update_if_needed();
+    if (!m_valid) {
+        return 0;
+    }
+    return m_tree->size();
+}
+
+template <class T>
+inline bool Set<T>::is_null(size_t ndx) const
+{
+    return m_nullable && value_is_null(get(ndx));
+}
+
+template <class T>
 inline void Set<T>::clear()
 {
     ensure_created();
@@ -467,6 +679,10 @@ inline void Set<T>::clear()
         }
         m_tree->clear();
         bump_content_version();
+
+        // For Set<ObjKey>, we are sure that there are no longer any unresolved
+        // links.
+        m_tree->set_context_flag(false);
     }
 }
 
@@ -549,6 +765,227 @@ template <class T>
 void Set<T>::do_erase(size_t ndx)
 {
     m_tree->erase(ndx);
+}
+
+
+inline ObjKey LnkSet::get(size_t ndx) const
+{
+    update_if_needed();
+    return m_set.get(virtual2real(ndx));
+}
+
+inline size_t LnkSet::find(ObjKey value) const
+{
+    update_if_needed();
+
+    if (value.is_unresolved()) {
+        return not_found;
+    }
+
+    size_t ndx = m_set.find(value);
+    if (ndx == not_found) {
+        return not_found;
+    }
+    return real2virtual(ndx);
+}
+
+inline size_t LnkSet::find_first(ObjKey value) const
+{
+    return find(value);
+}
+
+inline size_t LnkSet::size() const
+{
+    update_if_needed();
+    return m_set.size() - num_unresolved();
+}
+
+inline std::pair<size_t, bool> LnkSet::insert(ObjKey value)
+{
+    REALM_ASSERT(!value.is_unresolved());
+    update_if_needed();
+
+    auto [ndx, inserted] = m_set.insert(value);
+    return {real2virtual(ndx), inserted};
+}
+
+inline std::pair<size_t, bool> LnkSet::erase(ObjKey value)
+{
+    REALM_ASSERT(!value.is_unresolved());
+    update_if_needed();
+
+    auto [ndx, removed] = m_set.erase(value);
+    if (removed) {
+        ndx = real2virtual(ndx);
+    }
+    return {ndx, removed};
+}
+
+inline bool LnkSet::is_null(size_t ndx) const
+{
+    update_if_needed();
+    return m_set.is_null(virtual2real(ndx));
+}
+
+inline Mixed LnkSet::get_any(size_t ndx) const
+{
+    update_if_needed();
+    return m_set.get_any(virtual2real(ndx));
+}
+
+inline std::pair<size_t, bool> LnkSet::insert_null()
+{
+    update_if_needed();
+    auto [ndx, inserted] = m_set.insert_null();
+    return {real2virtual(ndx), inserted};
+}
+
+inline std::pair<size_t, bool> LnkSet::erase_null()
+{
+    update_if_needed();
+    auto [ndx, erased] = m_set.erase_null();
+    if (erased) {
+        ndx = real2virtual(ndx);
+    }
+    return {ndx, erased};
+}
+
+inline std::pair<size_t, bool> LnkSet::insert_any(Mixed value)
+{
+    update_if_needed();
+    auto [ndx, inserted] = m_set.insert_any(value);
+    return {real2virtual(ndx), inserted};
+}
+
+inline std::pair<size_t, bool> LnkSet::erase_any(Mixed value)
+{
+    auto [ndx, erased] = m_set.erase_any(value);
+    if (erased) {
+        ndx = real2virtual(ndx);
+    }
+    return {ndx, erased};
+}
+
+inline void LnkSet::clear()
+{
+    m_set.clear();
+    clear_unresolved();
+}
+
+inline Mixed LnkSet::min(size_t* return_ndx) const
+{
+    size_t found = not_found;
+    auto value = m_set.min(&found);
+    if (found != not_found && return_ndx) {
+        *return_ndx = real2virtual(found);
+    }
+    return value;
+}
+
+inline Mixed LnkSet::max(size_t* return_ndx) const
+{
+    size_t found = not_found;
+    auto value = m_set.max(&found);
+    if (found != not_found && return_ndx) {
+        *return_ndx = real2virtual(found);
+    }
+    return value;
+}
+
+inline Mixed LnkSet::sum(size_t* return_cnt) const
+{
+    static_cast<void>(return_cnt);
+    REALM_TERMINATE("Not implemented");
+}
+
+inline Mixed LnkSet::avg(size_t* return_cnt) const
+{
+    static_cast<void>(return_cnt);
+    REALM_TERMINATE("Not implemented");
+}
+
+inline void LnkSet::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    update_if_needed();
+
+    // Map the input indices to real indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return virtual2real(ndx);
+    });
+
+    m_set.sort(indices, ascending);
+
+    // Map the output indices to virtual indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return real2virtual(ndx);
+    });
+}
+
+inline void LnkSet::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
+{
+    update_if_needed();
+
+    // Map the input indices to real indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return virtual2real(ndx);
+    });
+
+    m_set.distinct(indices, sort_order);
+
+    // Map the output indices to virtual indices.
+    std::transform(indices.begin(), indices.end(), indices.begin(), [this](size_t ndx) {
+        return real2virtual(ndx);
+    });
+}
+
+inline const Obj& LnkSet::get_obj() const noexcept
+{
+    return m_set.get_obj();
+}
+
+inline bool LnkSet::is_attached() const
+{
+    return m_set.is_attached();
+}
+
+inline bool LnkSet::has_changed() const
+{
+    return m_set.has_changed();
+}
+
+inline ColKey LnkSet::get_col_key() const noexcept
+{
+    return m_set.get_col_key();
+}
+
+inline size_t LnkSet::find_any(Mixed value) const
+{
+    if (value.is_null())
+        return not_found;
+    if (value.get_type() != type_Link)
+        return not_found;
+    size_t found = find(value.get<ObjKey>());
+    if (found != not_found) {
+        found = real2virtual(found);
+    }
+    return found;
+}
+
+inline bool LnkSet::is_obj_valid(size_t) const noexcept
+{
+    // LnkSet cannot contain NULL links.
+    return true;
+}
+
+inline Obj LnkSet::get_object(size_t ndx) const
+{
+    ObjKey key = get(ndx);
+    return get_target_table()->get_object(key);
+}
+
+inline ObjKey LnkSet::get_key(size_t ndx) const
+{
+    return get(ndx);
 }
 
 } // namespace realm
