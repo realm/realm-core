@@ -120,14 +120,6 @@ public:
         return false;
     }
 
-    // Determine if `value` boxes the same Dictionary as `dict`
-    bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
-    {
-        if (auto dict2 = util::any_cast<object_store::Dictionary>(&value))
-            return dict == *dict2;
-        return false;
-    }
-
     // Convert from core types to the boxed type
     util::Any box(BinaryData v) const
     {
@@ -152,16 +144,6 @@ public:
         return ret;
     }
 
-    util::Any box(object_store::Dictionary v) const
-    {
-        AnyDict ret;
-        for (const auto& it : v) {
-            std::string key{it.first.get_string()};
-            auto value = box(it.second);
-            ret.emplace(key, value);
-        }
-        return ret;
-    }
     util::Any box(Object v) const
     {
         return v;
