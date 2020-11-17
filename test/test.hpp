@@ -25,6 +25,7 @@
 #include "util/test_types.hpp"
 #include "util/test_path.hpp"
 #include "util/check_logic_error.hpp"
+#include "util/check_system_error.hpp"
 #include "util/test_only.hpp"
 #include "util/crypt_key.hpp"
 

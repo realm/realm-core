@@ -45,7 +45,7 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
 
 DataType ClusterColumn::get_data_type() const
 {
-    const Table* table = m_cluster_tree->get_owner();
+    const Table* table = m_cluster_tree->get_owning_table();
     return table->get_column_type(m_column_key);
 }
 
@@ -56,7 +56,7 @@ bool ClusterColumn::is_nullable() const
 
 StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buffer) const
 {
-    ConstObj obj = m_cluster_tree->get(key);
+    const Obj obj{m_cluster_tree->get(key)};
     DataType type = get_data_type();
 
     if (type == type_Int) {
@@ -95,6 +95,20 @@ StringData ClusterColumn::get_index_data(ObjKey key, StringConversionBuffer& buf
         else {
             GetIndexData<ObjectId> stringifier;
             return stringifier.get_index_data(obj.get<ObjectId>(m_column_key), buffer);
+        }
+    }
+    else if (type == type_Mixed) {
+        GetIndexData<Mixed> stringifier;
+        return stringifier.get_index_data(obj.get<Mixed>(m_column_key), buffer);
+    }
+    else if (type == type_UUID) {
+        if (is_nullable()) {
+            GetIndexData<Optional<UUID>> stringifier;
+            return stringifier.get_index_data(obj.get<Optional<UUID>>(m_column_key), buffer);
+        }
+        else {
+            GetIndexData<UUID> stringifier;
+            return stringifier.get_index_data(obj.get<UUID>(m_column_key), buffer);
         }
     }
     // It should not be possible to reach this line through public Core API

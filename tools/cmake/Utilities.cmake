@@ -48,4 +48,3 @@ macro(set_target_xcode_attributes _target)
             XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
     )
 endmacro()
-

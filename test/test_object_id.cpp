@@ -17,13 +17,21 @@
  **************************************************************************/
 
 #include <realm.hpp>
-#include <realm/array_object_id.hpp>
+#include <realm/array_fixed_bytes.hpp>
 #include <chrono>
 
 #include "test.hpp"
 
 
 using namespace realm;
+
+struct WithIndex {
+    constexpr static bool do_add_index = true;
+};
+
+struct WithoutIndex {
+    constexpr static bool do_add_index = false;
+};
 
 TEST(ObjectId_Basics)
 {
@@ -210,7 +218,7 @@ TEST(ObjectId_ArrayNull_FindFirstNull_StressTest)
     }
 }
 
-TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
+TEST_TYPES(ObjectId_Table, WithIndex, WithoutIndex)
 {
     const char str0[] = "0000012300000000009218a4";
     const char str1[] = "deaddeaddeaddeaddeaddead";
@@ -222,7 +230,7 @@ TEST_TYPES(ObjectId_Table, std::true_type, std::false_type)
     auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
     auto obj2 = t.create_object();
 
-    if constexpr (TEST_TYPE::value) {
+    if constexpr (TEST_TYPE::do_add_index) {
         t.add_search_index(col_id);
         t.add_search_index(col_id_null);
     }
@@ -301,7 +309,7 @@ TEST(ObjectId_Commit)
     }
 }
 
-TEST(ObjectId_Query)
+TEST_TYPES(ObjectId_Query, WithIndex, WithoutIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     DBRef db = DB::create(path);
@@ -323,8 +331,12 @@ TEST(ObjectId_Query)
 
         col_id = table->add_column(type_ObjectId, "alternative_id", true);
         col_int = table->add_column(type_Int, "int");
-        col_has = table->add_column_link(type_Link, "Has", *target);
-        col_owns = origin->add_column_link(type_Link, "Owns", *table);
+        col_has = table->add_column(*target, "Has");
+        col_owns = origin->add_column(*table, "Owns");
+
+        if constexpr (TEST_TYPE::do_add_index) {
+            table->add_search_index(col_id);
+        }
 
         ObjKeys target_keys;
         target->create_objects(16, target_keys);

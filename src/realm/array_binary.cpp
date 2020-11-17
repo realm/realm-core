@@ -122,6 +122,11 @@ BinaryData ArrayBinary::get_at(size_t ndx, size_t& pos) const
     }
 }
 
+Mixed ArrayBinary::get_any(size_t ndx) const
+{
+    return Mixed(get(ndx));
+}
+
 bool ArrayBinary::is_null(size_t ndx) const
 {
     if (!m_is_big) {

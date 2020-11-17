@@ -207,10 +207,16 @@ std::string create_column_name(DataType t)
         case type_Link:
             str = "link_";
             break;
+        case type_TypedLink:
+            str = "typed_link_";
+            break;
         case type_LinkList:
             str = "link_list_";
             break;
-        case type_OldMixed:
+        case type_UUID:
+            str = "uuid_";
+            break;
+        case type_Mixed:
             str = "any_";
             break;
         case type_OldDateTime:
@@ -427,7 +433,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_Link, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
                 }
-                auto col = t1->add_column_link(type_Link, name, *t2);
+                auto col = t1->add_column(*t2, name);
                 if (log) {
                     *log << " // -> " << col << "\n";
                 }
@@ -442,7 +448,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
                 }
-                auto col = t1->add_column_link(type_LinkList, name, *t2);
+                auto col = t1->add_column_list(*t2, name);
                 if (log) {
                     *log << " // -> " << col << "\n";
                 }

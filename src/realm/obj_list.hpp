@@ -47,14 +47,14 @@ public:
         get_dependencies(ret);
         return ret;
     }
-    ConstObj operator[](size_t ndx) const
+    Obj operator[](size_t ndx) const
     {
         return get_object(ndx);
     }
-    ConstObj try_get_object(size_t row_ndx) const
+    Obj try_get_object(size_t row_ndx) const
     {
         REALM_ASSERT(row_ndx < size());
-        return is_obj_valid(row_ndx) ? get_object(row_ndx) : ConstObj();
+        return is_obj_valid(row_ndx) ? get_object(row_ndx) : Obj();
     }
 
     template <class F>

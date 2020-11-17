@@ -24,7 +24,7 @@
 #include <array>
 
 #include <realm/array.hpp>
-#include <realm/cluster_tree.hpp>
+#include <realm/table_cluster_tree.hpp>
 
 /*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_Timestamp and
@@ -105,16 +105,18 @@ private:
     void index_string_all_ins(StringData value, std::vector<ObjKey>& result, const ClusterColumn& column) const;
 };
 
-// 12 is the biggest element size of any non-string/binary Realm type
-constexpr size_t string_conversion_buffer_size = 12;
+// 16 is the biggest element size of any non-string/binary Realm type
+constexpr size_t string_conversion_buffer_size = 16;
 using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
+static_assert(sizeof(UUID::UUIDBytes) <= string_conversion_buffer_size,
+              "if you change the size of a UUID then also change the string index buffer space");
 
 // The purpose of this class is to get easy access to fields in a specific column in the
 // cluster. When you have an object like this, you can get a string version of the relevant
 // field based on the key for the object.
 class ClusterColumn {
 public:
-    ClusterColumn(const ClusterTree* cluster_tree, ColKey column_key)
+    ClusterColumn(const TableClusterTree* cluster_tree, ColKey column_key)
         : m_cluster_tree(cluster_tree)
         , m_column_key(column_key)
     {
@@ -123,14 +125,14 @@ public:
     {
         return m_cluster_tree->size();
     }
-    ClusterTree::ConstIterator begin() const
+    TableClusterTree::Iterator begin() const
     {
-        return ClusterTree::ConstIterator(*m_cluster_tree, 0);
+        return TableClusterTree::Iterator(*m_cluster_tree, 0);
     }
 
-    ClusterTree::ConstIterator end() const
+    TableClusterTree::Iterator end() const
     {
-        return ClusterTree::ConstIterator(*m_cluster_tree, size());
+        return TableClusterTree::Iterator(*m_cluster_tree, size());
     }
 
 
@@ -143,7 +145,7 @@ public:
     StringData get_index_data(ObjKey key, StringConversionBuffer& buffer) const;
 
 private:
-    const ClusterTree* m_cluster_tree;
+    const TableClusterTree* m_cluster_tree;
     ColKey m_column_key;
 };
 
@@ -163,7 +165,7 @@ public:
     static bool type_supported(realm::DataType type)
     {
         return (type == type_Int || type == type_String || type == type_Bool || type == type_Timestamp ||
-                type == type_ObjectId);
+                type == type_ObjectId || type == type_Mixed || type == type_UUID);
     }
 
     static ref_type create_empty(Allocator& alloc);
@@ -308,7 +310,7 @@ private:
 
 class SortedListComparator {
 public:
-    SortedListComparator(const ClusterTree* cluster_tree, ColKey column_key)
+    SortedListComparator(const TableClusterTree* cluster_tree, ColKey column_key)
         : m_column(cluster_tree, column_key)
     {
     }
@@ -371,6 +373,22 @@ struct GetIndexData<StringData> {
 };
 
 template <>
+struct GetIndexData<Mixed> {
+    static StringData get_index_data(Mixed value, StringConversionBuffer& buffer)
+    {
+        if (value.is_null()) {
+            return null{};
+        }
+
+        auto hash = value.hash();
+        const char* c = reinterpret_cast<const char*>(&hash);
+        realm::safe_copy_n(c, sizeof(size_t), buffer.data());
+
+        return StringData{buffer.data(), sizeof(size_t)};
+    }
+};
+
+template <>
 struct GetIndexData<null> {
     static StringData get_index_data(null, StringConversionBuffer&)
     {
@@ -394,6 +412,16 @@ struct GetIndexData<ObjectId> {
     {
         memcpy(&buffer, &value, sizeof(ObjectId));
         return StringData{buffer.data(), sizeof(ObjectId)};
+    }
+};
+
+template <>
+struct GetIndexData<UUID> {
+    static StringData get_index_data(UUID value, StringConversionBuffer& buffer)
+    {
+        const auto bytes = value.to_bytes();
+        std::copy_n(bytes.data(), bytes.size(), buffer.begin());
+        return StringData{buffer.data(), bytes.size()};
     }
 };
 

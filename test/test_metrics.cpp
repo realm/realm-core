@@ -221,7 +221,7 @@ void populate(DBRef sg)
     person->add_column(type_String, "name");
     person->add_column(type_Bool, "account_overdue");
     person->add_column(type_Binary, "data");
-    auto owes_col = person->add_column_link(type_LinkList, "owes_coffee_to", *person);
+    auto owes_col = person->add_column_list(*person, "owes_coffee_to");
 
     auto create_person = [&](int age, double paid, float weight, Timestamp dob, std::string name, bool overdue,
                              std::string data, std::vector<ObjKey> owes_coffee_to) {
@@ -241,7 +241,7 @@ void populate(DBRef sg)
     create_person(33, 29.28, 188.7f, Timestamp(33, 9), "Riley", false, "a208s", {k3, k3, k2, k1});
 
     pet->add_column(type_String, "name");
-    pet->add_column_link(type_Link, "owner", *person);
+    pet->add_column(*person, "owner");
 
     auto create_pet = [&](std::string name, ObjKey owner) { pet->create_object().set_all(name, owner); };
 

@@ -3,7 +3,13 @@
 Realm is a mobile database that runs directly inside phones, tablets or wearables - check out [realm.io](https://realm.io). 
 
 This repository holds the source code for the core database component used by all the Realm Mobile Database products:
-[realm-java](https://github.com/realm/realm-java), [realm-cocoa](https://github.com/realm/realm-cocoa), [realm-js](https://github.com/realm/realm-js) and [realm-dotnet](https://github.com/realm/realm-dotnet). Realm Core is not in itself an "end-user" product with a publicly stable and supported API. It is the intention to build a publicly supported C++ API (see [this issue](https://github.com/realm/realm-core/issues/1954)), but that will be a separate product and likely build on top of [realm-object-store](https://github.com/realm/realm-object-store).
+* [Realm Java](https://github.com/realm/realm-java)
+* [Realm Objective-C](https://github.com/realm/realm-cocoa)
+* [Realm React Native](https://github.com/realm/realm-js)
+* [Realm Swift](https://github.com/realm/realm-cocoa)
+* [Realm .NET](https://github.com/realm/realm-dotnet)
+
+Realm Core is not in itself an "end-user" product with a publicly stable and supported API.
 
 ## Building Realm
 
@@ -29,6 +35,3 @@ Please also see THIRD-PARTY-NOTICES for and licenses related to included third p
 ## Feedback
 
 Feedback to the Realm SDK's should be given in the respective SDK's github mentioned in the top of this readme. Anything else about the Realm Core, please create an [issue here](https://github.com/realm/realm-core/issues/new).
-
-
-![analytics](https://ga-beacon.appspot.com/UA-50247013-2/realm-core/README?pixel)

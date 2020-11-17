@@ -173,7 +173,7 @@ BenchmarkResults::Result BenchmarkResults::Measurement::finish() const
         if (r.rep % 2 == 0) {
             // Equal number of elements: median is the average of the
             // two middle elements.
-            r.median = (samples_copy[r.rep / 2] + samples_copy[r.rep / 2 + 1]) / 2;
+            r.median = (samples_copy[r.rep / 2 - 1] + samples_copy[r.rep / 2]) / 2;
         }
         else {
             // Odd number of elements: median is the middle element.

@@ -75,12 +75,10 @@ TEST(TableView_Json)
 
     TableView v = table.where().find_all(1);
     std::stringstream ss;
-    std::map<std::string, std::string> renames;
-    renames["_key"] = "objid";
-    v.to_json(ss, 0, &renames);
+    v.to_json(ss);
     const std::string json = ss.str();
     CHECK_EQUAL(true, json.length() > 0);
-    CHECK_EQUAL("[{\"objid\":1,\"first\":2},{\"objid\":2,\"first\":3}]", json);
+    CHECK_EQUAL("[{\"_key\":1,\"first\":2},{\"_key\":2,\"first\":3}]", json);
 }
 
 
@@ -1152,8 +1150,8 @@ TEST(TableView_Backlinks)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    auto col_link = links->add_column_link(type_Link, "link", *source);
-    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column(*source, "link");
+    auto col_linklist = links->add_column_list(*source, "link_list");
 
     std::vector<ObjKey> keys;
     source->create_objects(3, keys);
@@ -1200,8 +1198,8 @@ TEST(TableView_BacklinksAfterMoveAssign)
     source->add_column(type_Int, "int");
 
     TableRef links = group.add_table("links");
-    auto col_link = links->add_column_link(type_Link, "link", *source);
-    auto col_linklist = links->add_column_link(type_LinkList, "link_list", *source);
+    auto col_link = links->add_column(*source, "link");
+    auto col_linklist = links->add_column_list(*source, "link_list");
 
     std::vector<ObjKey> keys;
     source->create_objects(3, keys);
@@ -1246,7 +1244,7 @@ TEST(TableView_SortOverLink)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column(*target, "link");
     auto col_int = origin->add_column(type_Int, "int");
     auto col_str = target->add_column(type_String, "s", true);
 
@@ -1297,8 +1295,8 @@ TEST(TableView_SortOverMultiLink)
     TableRef target = g.add_table("target");
     TableRef between = g.add_table("between");
     TableRef origin = g.add_table("origin");
-    auto col_link1 = origin->add_column_link(type_Link, "link", *between);
-    auto col_link2 = between->add_column_link(type_Link, "link", *target);
+    auto col_link1 = origin->add_column(*between, "link");
+    auto col_link2 = between->add_column(*target, "link");
     auto col_int = origin->add_column(type_Int, "int");
 
     auto col_str = target->add_column(type_String, "str");
@@ -1446,7 +1444,7 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     Group g;
     TableRef target = g.add_table("target");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column(*target, "link");
 
     Table& t = *target;
     auto col_str = t.add_column(type_String, "s", true);
@@ -1568,7 +1566,7 @@ TEST(TableView_DistinctOverNullLink)
     ObjKey k1 = target->create_object().set(col_int, 1).get_key();
 
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *target);
+    auto col_link = origin->add_column(*target, "link");
 
     origin->create_object().set(col_link, k0);
     origin->create_object().set(col_link, k1);
@@ -1614,7 +1612,7 @@ TEST(TableView_IsInTableOrder)
     TableRef source = g.add_table("source");
     TableRef target = g.add_table("target");
 
-    auto col_link = source->add_column_link(type_LinkList, "link", *target);
+    auto col_link = source->add_column_list(*target, "link");
     source->add_column(type_String, "name");
     auto col_id = target->add_column(type_Int, "id");
     target->add_search_index(col_id);

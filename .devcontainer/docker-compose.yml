@@ -1,0 +1,30 @@
+version: "3.4"
+services:
+  tests:
+    build: ..
+    command: sleep infinity # indefinetely pause container so it doesn't exit while VS Code is attached
+    volumes:
+      - ..:/realm-object-store:cached
+    depends_on: 
+      - mongodb-realm
+    # [Optional] Required for ptrace-based debuggers like C++, Go, and Rust
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+  mongodb-realm:
+    image: docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - ../tests/mongodb:/apps/auth-integration-tests
+    hostname: mongodb-realm
+    environment: 
+      MONGODB_REALM_HOSTNAME: mongodb-realm
+    ports:
+      - 9090:9090
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 1m

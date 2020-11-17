@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ template "sync-perf-test-client.fullname" . }}
+  labels:
+    app: {{ template "sync-perf-test-client.name" . }}
+    chart: {{ template "sync-perf-test-client.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    prometheus: monitoring
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 10s
+    port: metrics
+  selector:
+    matchLabels:
+      app: {{ template "sync-perf-test-client.name" . }}

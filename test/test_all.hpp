@@ -21,6 +21,6 @@
 
 #include <realm/util/logger.hpp>
 
-int test_all(int argc, char* argv[], realm::util::Logger* = nullptr);
+int test_all(int argc, char* argv[], realm::util::Logger* = nullptr, bool disable_all_sync_to_disk = true);
 
 #endif // REALM_TEST_TEST_ALL_HPP

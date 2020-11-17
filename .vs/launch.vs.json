@@ -1,0 +1,13 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "test\\realm-sync-tests.exe",
+      "name": "test\\realm-sync-tests.exe",
+      "env":  "UNITTEST_PROGRESS=1\u0000SYSTEMROOT=${env.SYSTEMROOT}"
+    }
+  ]
+}

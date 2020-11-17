@@ -1,0 +1,1380 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "hideControls": false,
+  "links": [],
+  "refresh": "5s",
+  "rows": [
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {
+            "Receiving peers": "#bf1b00"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 0,
+          "id": 1,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "Receivers",
+              "yaxis": 2
+            },
+            {
+              "alias": "Receiving peers",
+              "yaxis": 2
+            }
+          ],
+          "spaceLength": 10,
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "max(realm_fan_out_recv_client_propagation_times_f50)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50% (median)",
+              "refId": "G"
+            },
+            {
+              "expr": "max(realm_fan_out_recv_client_propagation_times_f90)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "H"
+            },
+            {
+              "expr": "max(realm_fan_out_recv_client_propagation_times_f99)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "I"
+            },
+            {
+              "expr": "max(realm_fan_out_recv_client_propagation_times_max)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Maximum",
+              "refId": "J"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Receiving peers",
+              "refId": "F"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Propagation time",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {
+            "Receiving peers": "#bf1b00"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 0,
+          "id": 14,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "Receivers",
+              "yaxis": 2
+            },
+            {
+              "alias": "Receiving peers",
+              "yaxis": 2
+            }
+          ],
+          "spaceLength": 10,
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_recv_client_propagation_times_n)",
+              "format": "time_series",
+              "hide": false,
+              "intervalFactor": 1,
+              "legendFormat": "Number of changes received per 30 seconds",
+              "refId": "G"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions)",
+              "format": "time_series",
+              "hide": false,
+              "intervalFactor": 1,
+              "legendFormat": "Receiving peers",
+              "refId": "F"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Received changes",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {
+            "Number of PONG messages received per 30 seconds": "#ba43a9",
+            "Number of PONG messages received per minute": "#ba43a9",
+            "PONG messages per minute": "#bf1b00"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 0,
+          "id": 15,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "Receivers",
+              "yaxis": 2
+            },
+            {
+              "alias": "Receiving peers",
+              "yaxis": 2
+            },
+            {
+              "alias": "Number",
+              "yaxis": 2
+            },
+            {
+              "alias": "PONG messages per minute",
+              "yaxis": 2
+            },
+            {
+              "alias": "Number of PONG messages received per minute",
+              "yaxis": 2
+            },
+            {
+              "alias": "Number of PONG messages received per 30 seconds",
+              "yaxis": 2
+            }
+          ],
+          "spaceLength": 10,
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "max(realm_fan_out_recv_client_roundtrip_times_f50)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "50% (median)",
+              "refId": "G"
+            },
+            {
+              "expr": "max(realm_fan_out_recv_client_roundtrip_times_f90)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "90%",
+              "refId": "H"
+            },
+            {
+              "expr": "max(realm_fan_out_recv_client_roundtrip_times_f99)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "99%",
+              "refId": "I"
+            },
+            {
+              "expr": "max(realm_fan_out_recv_client_roundtrip_times_max)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Maximum",
+              "refId": "J"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_roundtrip_times_n)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Number of PONG messages received per 30 seconds",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Heartbeat round-trip time",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 6,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_send_client_ptime_request_sent)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Count",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Generated changes (cumulative)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 7,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_recv_client_ptime_request_received)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Count",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Received changes (cumulative)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 4,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_send_client_sessions)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Sending peers",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_sessions_connecting+realm_fan_out_send_client_sessions_connected)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Connecting or connected",
+              "refId": "C"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_sessions_connected)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Connected",
+              "refId": "E"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_sessions_with_error)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Errors were seen",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_sessions_with_fatal_error)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Fatal errors were seen",
+              "refId": "D"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Sender connections",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 3,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions)",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Receiving peers",
+              "refId": "D"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions_connecting+realm_fan_out_recv_client_sessions_connected)",
+              "format": "time_series",
+              "instant": false,
+              "intervalFactor": 1,
+              "legendFormat": "Connecting or connected",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions_connected)",
+              "format": "time_series",
+              "instant": false,
+              "intervalFactor": 1,
+              "legendFormat": "Connected",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions_with_error)",
+              "format": "time_series",
+              "instant": false,
+              "intervalFactor": 1,
+              "legendFormat": "Errors were seen",
+              "refId": "C"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_sessions_with_fatal_error)",
+              "format": "time_series",
+              "instant": false,
+              "intervalFactor": 1,
+              "legendFormat": "Fatal errors were seen",
+              "refId": "E"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Receiver connections",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 12,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_send_client_errors)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "All",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_fatal_errors)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Fatal",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_system_connection_reset)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Connection reset",
+              "refId": "C"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_system_broken_pipe)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Broken pipe",
+              "refId": "T"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_system_connect_timeout)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Connect timeout",
+              "refId": "V"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_system_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other system errors",
+              "refId": "U"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_network_end_of_input)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "End of input",
+              "refId": "D"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_network_prematute_end_of_input)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Premature end of input",
+              "refId": "G"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_network_host_not_found)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Host not found",
+              "refId": "H"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_network_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other network errors",
+              "refId": "I"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_ssl)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "SSL",
+              "refId": "J"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_websocket_malformed_response)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Malformed HTTP response",
+              "refId": "E"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_websocket_3xx)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "HTTP 3xx",
+              "refId": "K"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_websocket_4xx)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "HTTP 4xx",
+              "refId": "L"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_websocket_5xx)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "HTTP 5xx",
+              "refId": "M"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_websocket_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other WebSocket errors",
+              "refId": "N"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_client_pong_timeout)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Pong timeout",
+              "refId": "F"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_client_connect_timeout)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Sync connect timeout",
+              "refId": "O"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_client_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other client errors",
+              "refId": "P"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_protocol_connection)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Protocol connection",
+              "refId": "Q"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_protocol_session)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Protocol session",
+              "refId": "R"
+            },
+            {
+              "expr": "sum(realm_fan_out_send_client_errors_unexpected_category)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Unexpected category",
+              "refId": "S"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Sender connection errors (cumulative)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 13,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "All",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_fatal_errors)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Fatal",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_system_connection_reset)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Connection reset",
+              "refId": "C"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_system_broken_pipe)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Broken pipe",
+              "refId": "T"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_system_connect_timeout)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Connect timeout",
+              "refId": "V"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_system_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other system errors",
+              "refId": "U"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_network_end_of_input)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "End of input",
+              "refId": "D"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_network_prematute_end_of_input)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Premature end of input",
+              "refId": "G"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_network_host_not_found)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Host not found",
+              "refId": "H"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_network_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other network errors",
+              "refId": "I"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_ssl)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "SSL",
+              "refId": "J"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_websocket_malformed_response)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Malformed HTTP response",
+              "refId": "E"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_websocket_3xx)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "HTTP 3xx",
+              "refId": "K"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_websocket_4xx)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "HTTP 4xx",
+              "refId": "L"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_websocket_5xx)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "HTTP 5xx",
+              "refId": "M"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_websocket_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other WebSocket errors",
+              "refId": "N"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_client_pong_timeout)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Pong timeout",
+              "refId": "F"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_client_connect_timeout)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Sync connect timeout",
+              "refId": "O"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_client_other)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Other client errors",
+              "refId": "P"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_protocol_connection)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Protocol connection",
+              "refId": "Q"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_protocol_session)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Protocol session",
+              "refId": "R"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_errors_unexpected_category)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Unexpected category",
+              "refId": "S"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Receiver connection errors (cumulative)",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Arena Prometheus",
+          "fill": 1,
+          "id": 2,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "sum(realm_fan_out_send_client_started)",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 2,
+              "legendFormat": "Sender bundles",
+              "refId": "B"
+            },
+            {
+              "expr": "sum(realm_fan_out_recv_client_started)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "Receiver bundles",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Peer bundles started",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "decimals": 0,
+              "format": "short",
+              "label": "",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": false
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
+      "titleSize": "h6"
+    }
+  ],
+  "schemaVersion": 14,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-5m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "timezone": "",
+  "title": "Fan out",
+  "version": 1
+}

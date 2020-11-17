@@ -56,7 +56,7 @@ TEST(Links_Columns)
     TableRef table2 = group.add_table("table2");
 
     // table1 can link to table2
-    table2->add_column_link(type_Link, "link", *table1);
+    table2->add_column(*table1, "link");
 
     // add some more columns to table1 and table2
     auto col_1 = table1->add_column(type_String, "col1");
@@ -72,7 +72,7 @@ TEST(Links_Columns)
     table2->create_objects(table_2_keys);
 
     table1->get_object(table_1_keys[0]).set<String>(col_1, "string1");
-    auto col_link2 = table1->add_column_link(type_Link, "link", *table2);
+    auto col_link2 = table1->add_column(*table2, "link");
 
     // set some links
     table1->get_object(table_1_keys[0]).set(col_link2, table_2_keys[1]);
@@ -125,7 +125,7 @@ TEST(Links_Basic)
 
         // create table with links to table1
         TableRef table2 = group.add_table("table2");
-        col_link = table2->add_column_link(type_Link, "link", *table1);
+        col_link = table2->add_column(*table1, "link");
         CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
         // add a few links
@@ -206,7 +206,7 @@ TEST(Group_LinksToSameTable)
     TableRef table = g.add_table("target");
 
     table->add_column(type_Int, "integers", true);
-    auto link_col = table->add_column_link(type_Link, "links", *table);
+    auto link_col = table->add_column(*table, "links");
 
     // 3 rows linked together in a list
     std::vector<ObjKey> keys;
@@ -226,7 +226,7 @@ TEST(Links_SetLinkLogicErrors)
     Group group;
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    auto col0 = origin->add_column_link(type_Link, "a", *target);
+    auto col0 = origin->add_column(*target, "a");
     origin->add_column(type_Int, "b");
     Obj obj = origin->create_object();
     target->create_object(ObjKey(10));
@@ -258,7 +258,7 @@ TEST(Links_Deletes)
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
-    auto col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
+    auto col_link = table2->add_column(*TableRef(table1), "link");
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     Obj obj0 = table1->create_object().set_all("test1", 1, true, int64_t(Mon));
@@ -340,7 +340,7 @@ TEST(Links_Multi)
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
-    auto col_link = table2->add_column_link(type_Link, "link", *TableRef(table1));
+    auto col_link = table2->add_column(*TableRef(table1), "link");
     CHECK_EQUAL(table1, table2->get_link_target(col_link));
 
     // add a few links pointing to same row
@@ -405,8 +405,8 @@ TEST(Links_MultiToSame)
 
     // create table with multiple links to table1
     TableRef table2 = group.add_table("table2");
-    auto col_link1 = table2->add_column_link(type_Link, "link1", *table1);
-    auto col_link2 = table2->add_column_link(type_Link, "link2", *table1);
+    auto col_link1 = table2->add_column(*table1, "link1");
+    auto col_link2 = table2->add_column(*table1, "link2");
     CHECK_EQUAL(table1, table2->get_link_target(col_link1));
     CHECK_EQUAL(table1, table2->get_link_target(col_link2));
 
@@ -431,14 +431,14 @@ TEST(Links_LinkList_TableOps)
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_list(*TableRef(target), "links");
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     target->create_object().set_all("test1", 1, true, int64_t(Mon));
     target->create_object().set_all("test2", 2, false, int64_t(Tue));
     target->create_object().set_all("test3", 3, true, int64_t(Wed));
 
-    ConstObj obj1 = origin->create_object();
+    const Obj obj1 = origin->create_object();
     CHECK(obj1.get_list<ObjKey>(col_link).is_empty());
     CHECK_EQUAL(0, obj1.get_link_count(col_link));
 
@@ -467,7 +467,7 @@ TEST(Links_LinkList_Construction)
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *table1);
+    auto col_link = origin->add_column_list(*table1, "links");
     CHECK_EQUAL(table1, origin->get_link_target(col_link));
 
     ObjKeys target_keys({4, 5, 6});
@@ -526,7 +526,7 @@ TEST(Links_LinkList_Basics)
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *TableRef(target));
+    auto col_link = origin->add_column_list(*TableRef(target), "links");
     origin->add_column(type_Int, "integers"); // Make sure the link column is not the only column
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
@@ -726,7 +726,7 @@ TEST(ListList_Clear)
     target->add_column(type_Int, "value");
 
     TableRef origin = group->add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    auto col_link = origin->add_column_list(*target, "links");
 
     ObjKey key0 = target->create_object().set_all(1).get_key();
     ObjKey key1 = target->create_object().set_all(2).get_key();
@@ -751,9 +751,9 @@ TEST(Links_AddBacklinkToTableWithEnumColumns)
     auto table = g.add_table("fshno");
     auto col = table->add_column(type_String, "strings", false);
     table->create_object();
-    table->add_column_link(type_Link, "link1", *table);
+    table->add_column(*table, "link1");
     table->enumerate_string_column(col);
-    table->add_column_link(type_Link, "link2", *table);
+    table->add_column(*table, "link2");
 }
 
 TEST(Links_LinkList_Inserts)
@@ -772,13 +772,13 @@ TEST(Links_LinkList_Inserts)
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    auto col_link = origin->add_column_list(*target, "links");
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     auto obj = origin->create_object();
     auto links = obj.get_linklist_ptr(col_link);
     auto links2 = obj.get_linklist_ptr(col_link);
-    auto k0 = links->ConstLstBase::get_key();
+    auto k0 = links->get_key();
 
     CHECK_EQUAL(0, links->size());
     CHECK_EQUAL(0, links2->size());
@@ -824,12 +824,12 @@ TEST(Links_LinkList_Backlinks)
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    auto col_link = origin->add_column_list(*target, "links");
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     Obj origin_obj = origin->create_object();
     auto links = origin_obj.get_linklist_ptr(col_link);
-    auto k0 = links->ConstLstBase::get_key();
+    auto k0 = links->get_key();
 
     // add several links to a single linklist
     links->add(key2);
@@ -863,8 +863,8 @@ TEST(Links_LinkList_Backlinks)
     auto links2 = origin->create_object().get_linklist_ptr(col_link);
     links1->add(obj1.get_key());
     links2->add(obj0.get_key());
-    auto k1 = links1->ConstLstBase::get_key();
-    auto k2 = links2->ConstLstBase::get_key();
+    auto k1 = links1->get_key();
+    auto k2 = links2->get_key();
 
     // Verify backlinks
     CHECK_EQUAL(1, obj0.get_backlink_count(*origin, col_link));
@@ -912,7 +912,7 @@ TEST(Links_LinkList_FindByOrigin)
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    auto col_link = origin->add_column_list(*target, "links");
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     auto obj = origin->create_object();
@@ -921,8 +921,12 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(not_found, links->find_first(key2));
     CHECK_EQUAL(not_found, links2->find_first(key2));
 
-    links->find_all(key2, [&](size_t) { CHECK(false); });
-    links2->find_all(key2, [&](size_t) { CHECK(false); });
+    links->find_all(key2, [&](size_t) {
+        CHECK(false);
+    });
+    links2->find_all(key2, [&](size_t) {
+        CHECK(false);
+    });
 
     links->add(key2);
     links->add(key1);
@@ -936,10 +940,16 @@ TEST(Links_LinkList_FindByOrigin)
     CHECK_EQUAL(2, links2->find_first(key0));
 
     int calls = 0;
-    links->find_all(key2, [&](size_t i) { CHECK_EQUAL(i, 0); ++calls; });
+    links->find_all(key2, [&](size_t i) {
+        CHECK_EQUAL(i, 0);
+        ++calls;
+    });
     CHECK_EQUAL(calls, 1);
     calls = 0;
-    links2->find_all(key0, [&](size_t i) { CHECK_EQUAL(i, 2); ++calls; });
+    links2->find_all(key0, [&](size_t i) {
+        CHECK_EQUAL(i, 2);
+        ++calls;
+    });
     CHECK_EQUAL(calls, 1);
 
     links->remove(0);
@@ -951,7 +961,10 @@ TEST(Links_LinkList_FindByOrigin)
     links->add(key0);
 
     calls = 0;
-    links->find_all(key0, [&](size_t i) { CHECK(i >= 1); ++calls; });
+    links->find_all(key0, [&](size_t i) {
+        CHECK(i >= 1);
+        ++calls;
+    });
     CHECK_EQUAL(calls, 3);
 }
 
@@ -966,8 +979,8 @@ TEST(Links_CircularAccessors)
         WriteTransaction wt(db);
         TableRef table1 = wt.add_table("table1");
         TableRef table2 = wt.add_table("table2");
-        col1 = table1->add_column_link(type_Link, "link", *table2);
-        col2 = table2->add_column_link(type_Link, "link", *table1);
+        col1 = table1->add_column(*table2, "link");
+        col2 = table2->add_column(*table1, "link");
         CHECK_EQUAL(table1, table2->get_link_target(col1));
         CHECK_EQUAL(table2, table1->get_link_target(col2));
         wt.commit();
@@ -1002,7 +1015,7 @@ TEST(Links_Transactions)
         // Create owners table
         TableRef owners = group.add_table("owners");
         owners->add_column(type_String, "name");
-        dog_col = owners->add_column_link(type_Link, "dog", *dogs);
+        dog_col = owners->add_column(*dogs, "dog");
 
         // Insert a single dog
         harvey_key = dogs->create_object().set_all("Harvey").get_key();
@@ -1016,10 +1029,10 @@ TEST(Links_Transactions)
     auto rt = db->start_read();
     ConstTableRef owners = rt->get_table("owners");
     ConstTableRef dogs = rt->get_table("dogs");
-    ConstObj tim = owners->get_object(tim_key);
+    const Obj tim = owners->get_object(tim_key);
     CHECK_NOT(tim.is_null(dog_col));
     CHECK_EQUAL(harvey_key, tim.get<ObjKey>(dog_col));
-    ConstObj harvey = dogs->get_object(harvey_key);
+    const Obj harvey = dogs->get_object(harvey_key);
     CHECK_EQUAL(harvey.get_backlink_count(), 1);
 
     {
@@ -1059,7 +1072,7 @@ TEST(Links_RemoveTargetRows)
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    auto col_link = origin->add_column_list(*target, "links");
 
     Obj obj = origin->create_object();
     auto links = obj.get_linklist(col_link);
@@ -1110,7 +1123,7 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
     target->add_column(type_Int, "i5");
     Obj obj = target->create_object();
 
-    auto col = origin->add_column_link(type_LinkList, "", *target);
+    auto col = origin->add_column_list(*target, "");
     std::vector<ObjKey> keys;
     origin->create_objects(REALM_MAX_BPNODE_SIZE + 1, keys);
     origin->clear();
@@ -1124,7 +1137,7 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     Group group;
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    auto col_link = origin->add_column_link(type_LinkList, "", *target);
+    auto col_link = origin->add_column_list(*target, "");
     ObjKey k = target->create_object().get_key();
     auto ll = origin->create_object().get_linklist(col_link);
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
@@ -1144,7 +1157,7 @@ TEST(Links_FormerMemLeakCase)
         TableRef target = wt.add_table("target");
         target->add_column(type_Int, "int");
         auto k = target->create_object().get_key();
-        auto col = origin->add_column_link(type_Link, "link", *target);
+        auto col = origin->add_column(*target, "link");
         origin->create_object().set(col, k);
         origin->create_object().set(col, k);
         wt.commit();
@@ -1170,7 +1183,7 @@ TEST(Links_CascadeRemove_ColumnLink)
         Fixture()
         {
             target->add_column(type_Int, "t_1");
-            col_link = origin->add_column_link(type_Link, "o_1", *target);
+            col_link = origin->add_column(*target, "o_1");
             for (int i = 0; i < 3; ++i) {
                 auto oo = origin->create_object();
                 auto to = oo.create_and_set_linked_object(col_link);
@@ -1294,7 +1307,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         Fixture()
         {
             target->add_column(type_Int, "t_1");
-            col_link = origin->add_column_link(type_LinkList, "o_1", *target);
+            col_link = origin->add_column_list(*target, "o_1");
             origin->create_objects(3, origin_keys);
             linklists.emplace_back(origin->get_object(origin_keys[0]).get_linklist_ptr(col_link));
             linklists.emplace_back(origin->get_object(origin_keys[1]).get_linklist_ptr(col_link));
@@ -1525,7 +1538,7 @@ TEST(Links_LinkList_Swap)
         ObjKeys tkeys;
         Fixture()
         {
-            auto col_link = origin->add_column_link(type_LinkList, "", *target);
+            auto col_link = origin->add_column_list(*target, "");
             target->add_column(type_Int, "");
             origin->create_objects(2, okeys);
             target->create_objects(2, tkeys);
@@ -1580,7 +1593,7 @@ TEST(Links_DetachedAccessor)
 {
     Group group;
     TableRef table = group.add_table("table");
-    auto col = table->add_column_link(type_LinkList, "l", *table);
+    auto col = table->add_column_list(*table, "l");
     Obj obj = table->create_object();
     auto link_list = obj.get_linklist(col);
     link_list.add(obj.get_key());
