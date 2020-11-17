@@ -141,11 +141,11 @@ void Object::set_property_value_impl(ContextType& ctx, const Property& property,
         ctx.did_change();
         return;
     }
-    
+
     if (is_set(property.type)) {
         if (property.type == PropertyType::LinkingObjects)
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
-        
+
         ContextType child_ctx(ctx, m_obj, property);
         object_store::Set set(m_realm, m_obj, col);
         set.assign(child_ctx, value, policy);
