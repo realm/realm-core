@@ -101,11 +101,29 @@ endif()
 add_custom_command(TARGET ObjectStoreTests POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:ObjectStoreTests>)
 
-if(NOT APPLE)
-    find_package(LibUV REQUIRED)
+# on Apple platforms we use the built-in CFRunLoop
+# everywhere else it's libuv, except UWP where it doesn't build
+if(NOT APPLE AND NOT WINDOWS_STORE)
+    find_package(LibUV)
+    if(LibUV_FOUND)
+        set(libuv_target LibUV::LibUV)
+    else()
+        # download and include libuv
+        include(FetchContent)
+        FetchContent_Declare(
+            libuv
+            GIT_REPOSITORY https://github.com/libuv/libuv.git
+            GIT_TAG        v1.35.0
+        )
+        FetchContent_Populate(libuv)
+        add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR} EXCLUDE_FROM_ALL)
+        set(libuv_target uv_a)
+    endif()
+    target_link_libraries(ObjectStoreTests ${libuv_target})
     # FIXME: ObjectStore itself shouldn't care about this, but we need to refactor scheduler.cpp to make it happen
-    target_link_libraries(ObjectStore PUBLIC LibUV::LibUV)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
+    get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
+    target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
 endif()
 
 add_subdirectory(notifications-fuzzer)

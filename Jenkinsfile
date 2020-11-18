@@ -126,6 +126,7 @@ jobWrapper {
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+            checkAndroidX86Debug    : doAndroidBuildInDocker('x86', 'Debug', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
             buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
@@ -141,8 +142,7 @@ jobWrapper {
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
                 checkMacOsDebug               : doBuildMacOs('Debug', true),
-                buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
-                androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                checkArmeabiRelease           : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
             ]
@@ -462,7 +462,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                         }
                     }
                 } else {
-                    docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
+                    docker.image('tracer0tong/android-emulator').withRun("-e ARCH=${abi}") { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_ENABLE_SYNC=0", name: "android-armeabi-${abi}-${buildType}")
                             dir(buildDir) {
