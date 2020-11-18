@@ -10,6 +10,7 @@
 * Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
 * Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
 * Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, (since v6.0.0).
+* Fix several data races in App and SyncSession initialization. These could possibly have caused strange errors the first time a synchronized Realm was opened (sinrce v10.0.0).
 
 ### Breaking changes
 * None.

@@ -152,6 +152,7 @@ void App::configure(const SyncClientConfig& sync_client_config)
 
     m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
         m_base_route = metadata->hostname + base_path;
         std::string this_app_path = app_path + "/" + m_config.app_id;
         m_app_route = m_base_route + this_app_path;
@@ -579,13 +580,15 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
         return completion_block(sync_user, {});
     };
 
-    std::string profile_route = util::format("%1/auth/profile", m_base_route);
 
     Request req;
     req.method = HttpMethod::get;
-    req.url = profile_route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = false;
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        req.url = util::format("%1/auth/profile", m_base_route);
+    }
 
     do_authenticated_request(req, sync_user, profile_handler);
 }
@@ -700,6 +703,10 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<Ap
     req.uses_refresh_token = true;
     req.headers = get_request_headers();
     req.headers.insert({"Authorization", util::format("Bearer %1", refresh_token)});
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        req.url = util::format("%1/auth/session", m_base_route);
+    }
 
     do_request(req, [completion_block, req](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
@@ -791,6 +798,7 @@ void App::refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
 
 std::string App::url_for_path(const std::string& path = "") const
 {
+    std::lock_guard<std::mutex> lock(*m_route_mutex);
     return util::format("%1%2", m_base_route, path);
 }
 
@@ -827,6 +835,7 @@ void App::init_app_metadata(std::function<void(util::Optional<AppError>, util::O
 
             auto metadata = m_sync_manager->app_metadata();
 
+            std::lock_guard<std::mutex> lock(*m_route_mutex);
             m_base_route = hostname + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
@@ -952,7 +961,11 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         return completion_block(util::none);
     };
 
-    std::string route = util::format("%1/auth/session", m_base_route);
+    std::string route;
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        route = util::format("%1/auth/session", m_base_route);
+    }
 
     do_request(Request{HttpMethod::post, route, m_request_timeout_ms,
                        get_request_headers(sync_user, RequestTokenType::RefreshToken)},
@@ -961,8 +974,10 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
 
 std::string App::function_call_url_path() const
 {
+    std::lock_guard<std::mutex> lock(*m_route_mutex);
     return util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
 }
+
 void App::call_function(std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
                         const util::Optional<std::string>& service_name,
                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block)
