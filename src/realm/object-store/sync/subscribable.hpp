@@ -75,17 +75,21 @@ struct Subscribable {
 
     Subscribable() = default;
     Subscribable(const Subscribable& other)
-    : m_subscribers(other.m_subscribers)
     {
+        std::lock_guard<std::mutex> lock(other.m_mutex);
+        m_subscribers = other.m_subscribers;
     }
     Subscribable(Subscribable&& other)
-    : m_subscribers(std::move(other.m_subscribers))
     {
+        std::lock_guard<std::mutex> lock(other.m_mutex);
+        m_subscribers = std::move(other.m_subscribers);
     }
     Subscribable& operator=(const Subscribable& other) {
+        std::lock_guard<std::mutex> lock(other.m_mutex);
         m_subscribers = other.m_subscribers;
     }
     Subscribable& operator=(Subscribable&& other) {
+        std::lock_guard<std::mutex> lock(other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
     }
     /// Subscribe to notifications for class type T. Any mutation to the T class
