@@ -63,6 +63,7 @@ struct Subscribable {
         {
             return m_token;
         }
+
     private:
         Subscribable* m_subscribable;
         uint64_t m_token;
@@ -115,6 +116,7 @@ struct Subscribable {
     {
         return m_subscribers.size();
     }
+
 protected:
     /// Emit a change event to all subscribers.
     void emit_change_to_subscribers(const T& subject) const
@@ -124,6 +126,7 @@ protected:
             subscriber(subject);
         }
     }
+
 private:
     mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, Observer> m_subscribers;
