@@ -245,7 +245,8 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             if (!subscribe_processed) {
                 subscribe_processed++;
                 REQUIRE(static_cast<bool>(app.current_user()));
-            } else {
+            }
+            else {
                 subscribe_processed++;
                 REQUIRE(!static_cast<bool>(app.current_user()));
             }
@@ -2721,20 +2722,20 @@ TEST_CASE("app: user_semantics", "[app]") {
 
     SECTION("unsubscribed observers no longer process events") {
         app->unsubscribe(token);
-        
+
         const auto user1 = login_user_anonymous();
         CHECK(app->current_user()->identity() == user1->identity());
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
-        
+
         const auto user2 = login_user_anonymous();
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app->all_users().size() == 1);
         CHECK(app->current_user()->identity() == user2->identity());
         CHECK(user1->identity() == user2->identity());
-        
-        app->log_out([&](auto){});
+
+        app->log_out([&](auto) {});
         CHECK(app->all_users().size() == 0);
-        
+
         CHECK(event_processed == 0);
     }
 }

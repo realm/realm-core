@@ -47,7 +47,10 @@ typedef std::shared_ptr<App> SharedApp;
 /// This class provides access to login and authentication.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : public std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient, public Subscribable<App> {
+class App : public std::enable_shared_from_this<App>,
+            public AuthRequestClient,
+            public AppServiceClient,
+            public Subscribable<App> {
 public:
     struct Config {
         std::string app_id;

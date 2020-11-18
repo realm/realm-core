@@ -34,20 +34,22 @@ struct Subscribable {
     /// avoid dangling observers.
     struct Token {
         Token(Subscribable* subscribable, uint64_t token)
-        : m_subscribable(subscribable)
-        , m_token(token)
+            : m_subscribable(subscribable)
+            , m_token(token)
         {
         }
         Token(Token&& other) noexcept
-        : m_subscribable(std::move(other.m_subscribable))
-        , m_token(std::move(other.m_token))
+            : m_subscribable(std::move(other.m_subscribable))
+            , m_token(std::move(other.m_token))
         {
             other.m_subscribable = nullptr;
         }
-        Token& operator=(Token&& other) {
+        Token& operator=(Token&& other) noexcept
+        {
             m_subscribable = std::move(other.m_subscribable);
             m_token = std::move(other.m_token);
             other.m_subscribable = nullptr;
+            return *this;
         }
         Token(const Token&) = delete;
         Token& operator=(const Token&) = delete;
@@ -68,7 +70,8 @@ struct Subscribable {
         Subscribable* m_subscribable;
         uint64_t m_token;
 
-        template <class U> friend struct Subscribable;
+        template <class U>
+        friend struct Subscribable;
     };
 
     using Observer = std::function<void(const T&)>;
@@ -79,18 +82,22 @@ struct Subscribable {
         std::lock_guard<std::mutex> lock(other.m_mutex);
         m_subscribers = other.m_subscribers;
     }
-    Subscribable(Subscribable&& other)
+    Subscribable(Subscribable&& other) noexcept
     {
         std::lock_guard<std::mutex> lock(other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
     }
-    Subscribable& operator=(const Subscribable& other) {
+    Subscribable& operator=(const Subscribable& other)
+    {
         std::lock_guard<std::mutex> lock(other.m_mutex);
         m_subscribers = other.m_subscribers;
+        return *this;
     }
-    Subscribable& operator=(Subscribable&& other) {
+    Subscribable& operator=(Subscribable&& other) noexcept
+    {
         std::lock_guard<std::mutex> lock(other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
+        return *this;
     }
     /// Subscribe to notifications for class type T. Any mutation to the T class
     /// will trigger the observer. Notifying subscribers must be done manually
@@ -100,9 +107,9 @@ struct Subscribable {
     [[nodiscard]] Token subscribe(Observer&& observer)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        static uint64_t m_token = 0;
+        static std::atomic<uint64_t> m_token = 0;
         m_subscribers.insert({m_token, std::move(observer)});
-        return Token {this, m_token++};
+        return Token{this, m_token++};
     }
 
     /// Unsubscribe to notifications for this Subscribable using the
@@ -118,6 +125,7 @@ struct Subscribable {
     /// @return the amount of subscribers subscribed to class T.
     size_t subscribers_count() const
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         return m_subscribers.size();
     }
 
@@ -125,8 +133,12 @@ protected:
     /// Emit a change event to all subscribers.
     void emit_change_to_subscribers(const T& subject) const
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        for (const auto& [_, subscriber] : m_subscribers) {
+        std::unordered_map<uint64_t, Observer> subscribers;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            subscribers = m_subscribers;
+        }
+        for (const auto& [_, subscriber] : subscribers) {
             subscriber(subject);
         }
     }
