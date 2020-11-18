@@ -47,7 +47,6 @@ Set::Set(std::shared_ptr<Realm> r, const SetBase& set)
 {
 }
 
-
 ConstTableRef Set::get_target_table() const
 {
     auto table = m_set_base->get_table();
