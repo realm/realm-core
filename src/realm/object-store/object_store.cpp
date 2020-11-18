@@ -91,7 +91,7 @@ DataType to_core_type(PropertyType type)
             return type_Decimal;
         case PropertyType::UUID:
             return type_UUID;
-        case PropertyType::Any:
+        case PropertyType::Mixed:
             return type_Mixed;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
@@ -446,7 +446,9 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         }
     };
 
-    return std::any_of(begin(changes), end(changes), [](auto&& change) { return change.visit(Visitor()); });
+    return std::any_of(begin(changes), end(changes), [](auto&& change) {
+        return change.visit(Visitor());
+    });
 }
 
 void ObjectStore::verify_no_changes_required(std::vector<SchemaChange> const& changes)

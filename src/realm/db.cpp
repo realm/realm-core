@@ -521,9 +521,7 @@ struct alignas(8) DB::SharedInfo {
     Ringbuffer readers;
 
     SharedInfo(Durability, Replication::HistoryType, int history_schema_version);
-    ~SharedInfo() noexcept
-    {
-    }
+    ~SharedInfo() noexcept {}
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
@@ -1041,8 +1039,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             SlabAlloc::DetachGuard alloc_detach_guard(alloc);
             alloc.note_reader_start(this);
             // must come after the alloc detach guard
-            auto handler = [this, &alloc]() noexcept { alloc.note_reader_end(this); };
-            auto reader_end_guard = make_scope_exit( handler );
+            auto handler = [this, &alloc]() noexcept {
+                alloc.note_reader_end(this);
+            };
+            auto reader_end_guard = make_scope_exit(handler);
 
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
@@ -1285,7 +1285,7 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         break;
     }
 
-// std::cerr << "open completed" << std::endl;
+    // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
     if (options.durability == Durability::Async) {
@@ -1510,7 +1510,7 @@ void DB::release_all_read_locks() noexcept
 {
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
     SharedInfo* r_info = m_reader_map.get_addr();
-    for (auto& read_lock: m_local_locks_held) {
+    for (auto& read_lock : m_local_locks_held) {
         --m_transaction_count;
         const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
         atomic_double_dec(r.count);
@@ -1523,7 +1523,8 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
-    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock), allow_open_read_transactions);
+    close_internal(std::unique_lock<InterprocessMutex>(m_controlmutex, std::defer_lock),
+                   allow_open_read_transactions);
 }
 
 void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_open_read_transactions)
@@ -2107,7 +2108,7 @@ DB::version_type Transaction::commit_and_continue_as_read()
     // completed commit.
 
     DB::ReadLockInfo new_read_lock;
-    VersionID version_id = VersionID();          // Latest available snapshot
+    VersionID version_id = VersionID(); // Latest available snapshot
     // Grabbing the new lock before releasing the old one prevents m_transaction_count
     // from going shortly to zero
     db->grab_read_lock(new_read_lock, version_id); // Throws
@@ -2455,7 +2456,7 @@ void Transaction::rollback()
     // the DB has detached. If so, just back out without trying to change state.
     // the DB object has already been closed and no further processing is possible.
     if (!is_attached())
-        return; 
+        return;
     if (m_transact_stage == DB::transact_Ready)
         return; // Idempotency
 
@@ -2621,8 +2622,8 @@ TableRef Transaction::import_copy_of(ConstTableRef original)
 
 LnkLst Transaction::import_copy_of(const LnkLst& original)
 {
-    if (Obj obj = import_copy_of(original.CollectionBase::m_obj)) {
-        ColKey ck = original.CollectionBase::m_col_key;
+    if (Obj obj = import_copy_of(original.get_obj())) {
+        ColKey ck = original.get_col_key();
         return obj.get_linklist(ck);
     }
     return LnkLst();
@@ -2630,7 +2631,7 @@ LnkLst Transaction::import_copy_of(const LnkLst& original)
 
 LstBasePtr Transaction::import_copy_of(const LstBase& original)
 {
-    if (Obj obj = import_copy_of(original.m_obj)) {
+    if (Obj obj = import_copy_of(original.get_obj())) {
         ColKey ck = original.get_col_key();
         return obj.get_listbase_ptr(ck);
     }
@@ -2639,7 +2640,7 @@ LstBasePtr Transaction::import_copy_of(const LstBase& original)
 
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
-    if (Obj obj = import_copy_of(original.m_obj)) {
+    if (Obj obj = import_copy_of(original.get_obj())) {
         ColKey ck = original.get_col_key();
         return obj.get_collection_ptr(ck);
     }
@@ -2650,8 +2651,8 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
 {
     if (!bool(original))
         return nullptr;
-    if (Obj obj = import_copy_of(original->CollectionBase::m_obj)) {
-        ColKey ck = original->CollectionBase::m_col_key;
+    if (Obj obj = import_copy_of(original->get_obj())) {
+        ColKey ck = original->get_col_key();
         return obj.get_linklist_ptr(ck);
     }
     return std::make_unique<LnkLst>();
@@ -2686,7 +2687,7 @@ public:
     {
     }
 };
-}
+} // namespace
 
 DBRef DB::create(const std::string& file, bool no_create, const DBOptions options)
 {

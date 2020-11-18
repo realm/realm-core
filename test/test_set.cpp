@@ -154,6 +154,7 @@ TEST(Set_Links)
     auto cab3 = cabs->create_object();
 
     auto set_links = foo.get_set<ObjKey>(col_links);
+    auto lnkset_links = foo.get_setbase_ptr(col_links);
     auto set_typed_links = foo.get_set<ObjLink>(col_typed_links);
     auto set_mixeds = foo.get_set<Mixed>(col_mixeds);
 
@@ -225,10 +226,13 @@ TEST(Set_Links)
     bar2.invalidate();
 
     CHECK_EQUAL(set_links.size(), 2);
+    CHECK_EQUAL(lnkset_links->size(), 1); // Unresolved link was hidden from LnkSet
     CHECK_EQUAL(set_typed_links.size(), 3);
     CHECK_EQUAL(set_mixeds.size(), 3);
 
-    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);
+    CHECK_EQUAL(set_links.find(bar2_key), realm::npos);               // The original bar2 key is no longer in the set
+    CHECK_NOT_EQUAL(set_links.find(bar2.get_key()), realm::npos);     // The unresolved bar2 key is in the set
+    CHECK_EQUAL(lnkset_links->find_any(bar2.get_key()), realm::npos); // The unresolved bar2 key is hidden by LnkSet
     CHECK_EQUAL(set_typed_links.find(bar2_link), realm::npos);
     CHECK_EQUAL(set_mixeds.find(bar2_link), realm::npos);
 }
@@ -278,4 +282,183 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
             CHECK_EQUAL(ndx, realm::npos);
         }
     }
+}
+
+TEST(Set_LnkSetUnresolved)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    auto bars = g.add_table("class_Bar");
+
+    ColKey col_links = foos->add_column_set(*bars, "links");
+    auto foo = foos->create_object();
+    auto bar1 = bars->create_object();
+    auto bar2 = bars->create_object();
+    auto bar3 = bars->create_object();
+
+    auto key_set = foo.get_set<ObjKey>(col_links);
+    auto link_set = foo.get_linkset(col_links);
+
+    link_set.insert(bar1.get_key());
+    link_set.insert(bar2.get_key());
+    link_set.insert(bar1.get_key());
+    link_set.insert(bar2.get_key());
+
+    CHECK_EQUAL(key_set.size(), 2);
+    CHECK_EQUAL(link_set.size(), 2);
+    CHECK_EQUAL(key_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(key_set.find(bar2.get_key()), 1);
+    CHECK_EQUAL(link_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(link_set.find(bar2.get_key()), 1);
+
+    bar2.invalidate();
+
+    CHECK_EQUAL(key_set.size(), 2);
+    CHECK_EQUAL(link_set.size(), 1);
+    CHECK_EQUAL(key_set.find(bar2.get_key()), 0);
+    CHECK_EQUAL(key_set.find(bar1.get_key()), 1);
+    CHECK_EQUAL(link_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(link_set.find(bar2.get_key()), not_found);
+
+    link_set.insert(bar3.get_key());
+
+    CHECK_EQUAL(key_set.size(), 3);
+    CHECK_EQUAL(link_set.size(), 2);
+
+    CHECK_EQUAL(key_set.find(bar2.get_key()), 0);
+    CHECK_EQUAL(key_set.find(bar1.get_key()), 1);
+    CHECK_EQUAL(key_set.find(bar3.get_key()), 2);
+
+    CHECK_EQUAL(link_set.find(bar1.get_key()), 0);
+    CHECK_EQUAL(link_set.find(bar2.get_key()), not_found);
+    CHECK_EQUAL(link_set.find(bar3.get_key()), 1);
+
+    CHECK_EQUAL(link_set.get(0), bar1.get_key());
+    CHECK_EQUAL(link_set.get(1), bar3.get_key());
+
+    std::vector<size_t> found;
+    link_set.find_all(bar3.get_key(), [&](size_t ndx) {
+        found.push_back(ndx);
+    });
+    CHECK_EQUAL(found.size(), 1);
+    CHECK_EQUAL(found[0], 1);
+}
+
+TEST(Set_Union)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    set1.assign_union(set2);
+    CHECK_EQUAL(set1.size(), 5);
+    CHECK_EQUAL(set1.get(0), 1);
+    CHECK_EQUAL(set1.get(1), 2);
+    CHECK_EQUAL(set1.get(2), 3);
+    CHECK_EQUAL(set1.get(3), 4);
+    CHECK_EQUAL(set1.get(4), 5);
+}
+
+TEST(Set_Intersection)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    CHECK(set1.intersects(set2));
+    CHECK(set2.intersects(set1));
+    CHECK(!set1.is_subset_of(set2));
+    CHECK(!set2.is_subset_of(set1));
+    CHECK(!set1.is_superset_of(set2));
+    CHECK(!set2.is_superset_of(set1));
+    std::vector<int64_t> superset{{1, 2, 3, 4, 5}};
+    std::vector<int64_t> subset{{1, 2}};
+    CHECK(set1.is_subset_of(superset));
+    CHECK(set1.is_superset_of(subset));
+
+    set1.assign_intersection(set2);
+    CHECK_EQUAL(set1.size(), 2);
+    CHECK_EQUAL(set1.get(0), 4);
+    CHECK_EQUAL(set1.get(1), 5);
+}
+
+TEST(Set_Difference)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    set1.assign_difference(set2);
+    CHECK_EQUAL(set1.size(), 2);
+    CHECK_EQUAL(set1.get(0), 1);
+    CHECK_EQUAL(set1.get(1), 2);
+}
+
+TEST(Set_SymmetricDifference)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    set1.assign_symmetric_difference(set2);
+    CHECK_EQUAL(set1.size(), 3);
+    CHECK_EQUAL(set1.get(0), 1);
+    CHECK_EQUAL(set1.get(1), 2);
+    CHECK_EQUAL(set1.get(2), 3);
 }

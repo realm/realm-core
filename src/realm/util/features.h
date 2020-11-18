@@ -249,29 +249,32 @@
 #if TARGET_OS_IPHONE == 1 && TARGET_OS_IOS == 1
 /* Device (iPhone or iPad) or simulator. */
 #define REALM_IOS 1
-#define REALM_IOS_DEVICE !TARGET_OS_SIMULATOR
+#define REALM_APPLE_DEVICE !TARGET_OS_SIMULATOR
 #else
 #define REALM_IOS 0
-#define REALM_IOS_DEVICE 0
 #endif
 #if TARGET_OS_WATCH == 1
 /* Device (Apple Watch) or simulator. */
 #define REALM_WATCHOS 1
+#define REALM_APPLE_DEVICE !TARGET_OS_SIMULATOR
 #else
 #define REALM_WATCHOS 0
 #endif
 #if TARGET_OS_TV
 /* Device (Apple TV) or simulator. */
 #define REALM_TVOS 1
+#define REALM_APPLE_DEVICE !TARGET_OS_SIMULATOR
 #else
 #define REALM_TVOS 0
 #endif
 #else
 #define REALM_PLATFORM_APPLE 0
 #define REALM_IOS 0
-#define REALM_IOS_DEVICE 0
 #define REALM_WATCHOS 0
 #define REALM_TVOS 0
+#endif
+#ifndef REALM_APPLE_DEVICE
+#define REALM_APPLE_DEVICE 0
 #endif
 
 #if REALM_ANDROID || REALM_IOS || REALM_WATCHOS || REALM_TVOS || REALM_UWP

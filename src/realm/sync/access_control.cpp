@@ -54,8 +54,8 @@ util::Optional<AccessToken> AccessControl::verify_access_token(StringData signed
     return util::none;
 }
 
-bool AccessControl::can(const AccessToken& token, Privilege permission, const RealmFileIdent& realm_file) const
-    noexcept
+bool AccessControl::can(const AccessToken& token, Privilege permission,
+                        const RealmFileIdent& realm_file) const noexcept
 {
     if (token.path && *token.path != realm_file) {
         return false;

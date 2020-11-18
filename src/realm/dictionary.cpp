@@ -43,9 +43,12 @@ DictionaryClusterTree::~DictionaryClusterTree() {}
 /******************************** Dictionary *********************************/
 
 Dictionary::Dictionary(const Obj& obj, ColKey col_key)
-    : CollectionBase(obj, col_key)
+    : Base(obj, col_key)
     , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
 {
+    if (!col_key.is_dictionary()) {
+        throw LogicError(LogicError::collection_type_mismatch);
+    }
     init_from_parent();
 }
 
@@ -56,9 +59,9 @@ Dictionary::~Dictionary()
 
 Dictionary& Dictionary::operator=(const Dictionary& other)
 {
+    Base::operator=(static_cast<const Base&>(other));
+
     if (this != &other) {
-        m_obj = other.m_obj;
-        m_col_key = other.m_col_key;
         init_from_parent();
     }
     return *this;
@@ -298,6 +301,8 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
+    update_if_needed();
+
     ObjLink new_link;
     if (value.get_type() == type_TypedLink) {
         new_link = value.get<ObjLink>();
@@ -322,7 +327,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         repl->dictionary_insert(*this, key, value);
     }
 
-    m_obj.bump_content_version();
+    bump_content_version();
     try {
         ClusterNode::State state = m_clusters->insert(k, key, value);
 
@@ -367,7 +372,7 @@ const Mixed Dictionary::operator[](Mixed key)
         create();
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
-        m_obj.bump_content_version();
+        bump_content_version();
         m_clusters->insert(k, key, Mixed{});
     }
 
@@ -390,14 +395,17 @@ Dictionary::Iterator Dictionary::find(Mixed key)
 
 void Dictionary::erase(Mixed key)
 {
+    update_if_needed();
+
     if (m_clusters) {
         auto hash = key.hash();
         ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
         CascadeState state;
-        m_clusters->erase(k, state);
         if (Replication* repl = this->m_obj.get_replication()) {
             repl->dictionary_erase(*this, key);
         }
+        m_clusters->erase(k, state);
+        bump_content_version();
     }
 }
 
@@ -411,7 +419,7 @@ void Dictionary::nullify(Mixed key)
     auto hash = key.hash();
     ObjKey k(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
 
-    m_obj.bump_content_version();
+    bump_content_version();
 
     auto state = m_clusters->get(k);
     ArrayMixed values(m_obj.get_alloc());
@@ -484,7 +492,7 @@ Mixed Dictionary::do_get(ClusterNode::State&& s) const
 
 /************************* Dictionary::Iterator *************************/
 
-Dictionary::Iterator::Iterator(const Dictionary* dict, size_t pos)
+CollectionIterator<Dictionary>::CollectionIterator(const Dictionary* dict, size_t pos)
     : ClusterTree::Iterator(dict->m_clusters ? *dict->m_clusters : dummy_cluster, pos)
     , m_key_type(dict->get_key_data_type())
 {

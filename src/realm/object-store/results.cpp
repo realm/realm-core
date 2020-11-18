@@ -420,7 +420,7 @@ size_t Results::index_of(Obj const& row)
             return m_table->get_object_ndx(row.get_key());
         case Mode::LinkList:
             if (update_linklist())
-                return m_link_list->Lst<ObjKey>::find_first(row.get_key());
+                return m_link_list->find_first(row.get_key());
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
@@ -731,26 +731,34 @@ util::Optional<Mixed> Results::aggregate(ColKey column, const char* name, Aggreg
 util::Optional<Mixed> Results::max(ColKey column)
 {
     ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "max", [&](auto&& helper) { return helper.max(column, return_ndx); });
+    auto results = aggregate(column, "max", [&](auto&& helper) {
+        return helper.max(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::min(ColKey column)
 {
     ReturnIndexHelper return_ndx;
-    auto results = aggregate(column, "min", [&](auto&& helper) { return helper.min(column, return_ndx); });
+    auto results = aggregate(column, "min", [&](auto&& helper) {
+        return helper.min(column, return_ndx);
+    });
     return return_ndx ? results : none;
 }
 
 util::Optional<Mixed> Results::sum(ColKey column)
 {
-    return aggregate(column, "sum", [&](auto&& helper) { return helper.sum(column); });
+    return aggregate(column, "sum", [&](auto&& helper) {
+        return helper.sum(column);
+    });
 }
 
 util::Optional<Mixed> Results::average(ColKey column)
 {
     size_t value_count = 0;
-    auto results = aggregate(column, "avg", [&](auto&& helper) { return helper.avg(column, &value_count); });
+    auto results = aggregate(column, "avg", [&](auto&& helper) {
+        return helper.avg(column, &value_count);
+    });
     return value_count == 0 ? none : results;
 }
 
@@ -1152,6 +1160,7 @@ REALM_RESULTS_TYPE(Timestamp)
 REALM_RESULTS_TYPE(ObjectId)
 REALM_RESULTS_TYPE(Decimal)
 REALM_RESULTS_TYPE(UUID)
+REALM_RESULTS_TYPE(Mixed)
 REALM_RESULTS_TYPE(util::Optional<bool>)
 REALM_RESULTS_TYPE(util::Optional<int64_t>)
 REALM_RESULTS_TYPE(util::Optional<float>)

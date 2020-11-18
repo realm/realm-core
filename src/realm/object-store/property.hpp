@@ -41,6 +41,7 @@ class StringData;
 class Table;
 class Timestamp;
 class UUID;
+class Mixed;
 
 enum class PropertyType : unsigned short {
     Int = 0,
@@ -53,9 +54,7 @@ enum class PropertyType : unsigned short {
     Object = 7,         // currently must be either Array xor Nullable
     LinkingObjects = 8, // currently must be Array and not Nullable
 
-    // deprecated and remains only for reading old files
-    Any = 9,
-
+    Mixed = 9,
     ObjectId = 10,
     Decimal = 11,
     UUID = 12,
@@ -246,6 +245,8 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
             return fn((Decimal128*)0);
         case PT::UUID:
             return is_optional ? fn((util::Optional<UUID>*)0) : fn((UUID*)0);
+        case PT::Mixed:
+            return fn((Mixed*)0);
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -281,8 +282,8 @@ static const char* string_for_property_type(PropertyType type)
             return "float";
         case PropertyType::Object:
             return "object";
-        case PropertyType::Any:
-            return "any";
+        case PropertyType::Mixed:
+            return "mixed";
         case PropertyType::UUID:
             return "uuid";
         case PropertyType::LinkingObjects:

@@ -83,7 +83,7 @@ Allocator& Obj::get_alloc() const
     return m_table->m_alloc;
 }
 
-Allocator& Obj::_get_alloc() const
+Allocator& Obj::_get_alloc() const noexcept
 {
     // Bypass check of table instance version. To be used only in contexts,
     // where instance version match has already been established (e.g _get<>)
@@ -178,7 +178,7 @@ bool Obj::operator==(const Obj& other) const
     return true;
 }
 
-bool Obj::is_valid() const
+bool Obj::is_valid() const noexcept
 {
     // Cache valid state. If once invalid, it can never become valid again
     if (m_valid)
@@ -202,6 +202,7 @@ void Obj::remove()
 void Obj::invalidate()
 {
     m_table.cast_away_const()->invalidate_object(m_key);
+    m_key = m_key.get_unresolved();
 }
 
 ColKey Obj::get_column_key(StringData col_name) const
@@ -234,7 +235,7 @@ TableRef Obj::get_target_table(ObjLink link) const
     }
 }
 
-inline bool Obj::update() const
+bool Obj::update() const
 {
     // Get a new object from key
     Obj new_obj = get_tree_top()->get(m_key);
@@ -253,15 +254,6 @@ inline bool Obj::update() const
 inline bool Obj::_update_if_needed() const
 {
     auto current_version = _get_alloc().get_storage_version();
-    if (current_version != m_storage_version) {
-        return update();
-    }
-    return false;
-}
-
-bool Obj::update_if_needed() const
-{
-    auto current_version = get_alloc().get_storage_version();
     if (current_version != m_storage_version) {
         return update();
     }
@@ -1190,19 +1182,6 @@ bool Obj::ensure_writeable()
         return true;
     }
     return false;
-}
-
-void Obj::bump_content_version()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-}
-
-void Obj::bump_both_versions()
-{
-    Allocator& alloc = get_alloc();
-    alloc.bump_content_version();
-    alloc.bump_storage_version();
 }
 
 template <>

@@ -39,8 +39,7 @@ using namespace realm;
 using namespace realm::util;
 
 
-TEST_CASE("dictionary")
-{
+TEST_CASE("dictionary") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -58,8 +57,7 @@ TEST_CASE("dictionary")
     auto results = dict.as_results();
     CppContext ctx(r);
 
-    SECTION("get_realm()")
-    {
+    SECTION("get_realm()") {
         REQUIRE(dict.get_realm() == r);
         REQUIRE(results.get_realm() == r);
     }
@@ -72,32 +70,29 @@ TEST_CASE("dictionary")
     }
 
 
-    SECTION("clear()")
-    {
+    SECTION("clear()") {
         REQUIRE(dict.size() == 3);
         results.clear();
         REQUIRE(dict.size() == 0);
         REQUIRE(results.size() == 0);
     }
 
-    SECTION("get()")
-    {
+    SECTION("get()") {
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(dict.get<String>(keys[i]) == values[i]);
-            auto val = dict.get(ctx, util::Any(keys[i]));
+            auto val = dict.get(ctx, keys[i]);
             REQUIRE(any_cast<std::string>(val) == values[i]);
         }
     }
 
-    SECTION("insert()")
-    {
+    SECTION("insert()") {
         for (size_t i = 0; i < values.size(); ++i) {
             auto rev = values.size() - i - 1;
             dict.insert(keys[i], values[rev]);
             REQUIRE(dict.get<StringData>(keys[i]) == values[rev]);
         }
         for (size_t i = 0; i < values.size(); ++i) {
-            dict.insert(ctx, util::Any(keys[i]), util::Any(values[i]));
+            dict.insert(ctx, keys[i], util::Any(values[i]));
             REQUIRE(dict.get<StringData>(keys[i]) == values[i]);
         }
     }

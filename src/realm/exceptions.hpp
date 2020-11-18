@@ -36,6 +36,19 @@ public:
     const char* message() const noexcept override;
 };
 
+class InvalidTableRef : public ExceptionWithBacktrace<std::exception> {
+public:
+    InvalidTableRef(const char* cause)
+        : m_message(cause)
+    {
+    }
+    const char* message() const noexcept override
+    {
+        return m_message.c_str();
+    }
+    std::string m_message;
+};
+
 
 /// Thrown by various functions to indicate that a specified table name is
 /// already in use.

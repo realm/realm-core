@@ -154,12 +154,21 @@ private:
 template <typename T>
 auto& List::as() const
 {
+    REALM_ASSERT(dynamic_cast<Lst<T>*>(&*m_list_base));
     return static_cast<Lst<T>&>(*m_list_base);
 }
 
 template <>
 inline auto& List::as<Obj>() const
 {
+    REALM_ASSERT(dynamic_cast<LnkLst*>(&*m_list_base));
+    return static_cast<LnkLst&>(*m_list_base);
+}
+
+template <>
+inline auto& List::as<ObjKey>() const
+{
+    REALM_ASSERT(dynamic_cast<LnkLst*>(&*m_list_base));
     return static_cast<LnkLst&>(*m_list_base);
 }
 
@@ -274,13 +283,12 @@ void List::assign(Context& ctx, T&& values, CreatePolicy policy)
         return;
     }
 
-
     if (!policy.diff)
         remove_all();
 
     size_t sz = size();
     size_t index = 0;
-    ctx.enumerate_list(values, [&](auto&& element) {
+    ctx.enumerate_collection(values, [&](auto&& element) {
         if (index >= sz)
             this->add(ctx, element, policy);
         else if (policy.diff)

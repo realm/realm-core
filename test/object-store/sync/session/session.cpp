@@ -45,8 +45,7 @@ using namespace realm::util;
 static const std::string dummy_auth_url = "https://realm.example.org";
 static const std::string dummy_device_id = "123400000000000000000000";
 
-TEST_CASE("SyncSession: management by SyncUser", "[sync]")
-{
+TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -55,8 +54,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
     auto app = init_sync_manager.app();
     const std::string realm_base_url = server.base_url();
 
-    SECTION("a SyncUser can properly retrieve its owned sessions")
-    {
+    SECTION("a SyncUser can properly retrieve its owned sessions") {
         std::string path_1;
         std::string path_2;
         auto user =
@@ -66,7 +64,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
             user, "/test1a-1", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded, &path_1);
         auto session2 = sync_session(
             user, "/test1a-2", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded, &path_2);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session1, *session2);
+        });
 
         // Check the sessions on the SyncUser.
         REQUIRE(user->all_sessions().size() == 2);
@@ -78,24 +78,26 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
         CHECK(s2->config().partition_value == "/test1a-2");
     }
 
-    SECTION("a SyncUser properly unbinds its sessions upon logging out")
-    {
+    SECTION("a SyncUser properly unbinds its sessions upon logging out") {
         auto user =
             app->sync_manager()->get_user("user1b", ENCODE_FAKE_JWT("fake_refresh_token"),
                                           ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
         auto session1 = sync_session(user, "/test1b-1", [](auto, auto) {});
         auto session2 = sync_session(user, "/test1b-2", [](auto, auto) {});
-        EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session1, *session2);
+        });
 
         // Log the user out.
         user->log_out();
         // The sessions should log themselves out.
-        EventLoop::main().run_until([&] { return sessions_are_inactive(*session1, *session2); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session1, *session2);
+        });
         CHECK(user->all_sessions().size() == 0);
     }
 
-    SECTION("a SyncUser defers binding new sessions until it is logged in")
-    {
+    SECTION("a SyncUser defers binding new sessions until it is logged in") {
         const std::string user_id = "user1c";
         auto user =
             app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -112,12 +114,13 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
         // Log the user back in via the sync manager.
         user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
                                              ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session1, *session2);
+        });
         REQUIRE(user->all_sessions().size() == 2);
     }
 
-    SECTION("a SyncUser properly rebinds existing sessions upon logging back in")
-    {
+    SECTION("a SyncUser properly rebinds existing sessions upon logging back in") {
         const std::string user_id = "user1d";
         auto user =
             app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -125,7 +128,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
         auto session1 = sync_session(user, "/test1d-1", [](auto, auto) {});
         auto session2 = sync_session(user, "/test1d-2", [](auto, auto) {});
         // Make sure the sessions are bound.
-        EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session1, *session2);
+        });
         REQUIRE(user->all_sessions().size() == 2);
         // Log the user out.
         user->log_out();
@@ -138,12 +143,13 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
         // Log the user back in via the sync manager.
         user = app->sync_manager()->get_user(user_id, ENCODE_FAKE_JWT("fake_refresh_token"),
                                              ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session1, *session2);
+        });
         REQUIRE(user->all_sessions().size() == 2);
     }
 
-    SECTION("sessions that were destroyed can be properly recreated when requested again")
-    {
+    SECTION("sessions that were destroyed can be properly recreated when requested again") {
         const std::string path = "/test1e";
         std::weak_ptr<SyncSession> weak_session;
         std::string on_disk_path;
@@ -162,7 +168,9 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
         }
         // Wait for the session to die. It may not happen immediately if a progress or error handler
         // is called on a background thread and keeps the session alive past the scope of the above block.
-        EventLoop::main().run_until([&] { return weak_session.expired(); });
+        EventLoop::main().run_until([&] {
+            return weak_session.expired();
+        });
 
         // The next time we request it, it'll be created anew.
         // The call to `get_session()` should result in `SyncUser::register_session()` being called.
@@ -172,8 +180,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
         CHECK(session);
     }
 
-    SECTION("a user can create multiple sessions for the same URL")
-    {
+    SECTION("a user can create multiple sessions for the same URL") {
         auto user =
             app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("fake_refresh_token"),
                                           ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
@@ -187,8 +194,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]")
     }
 }
 
-TEST_CASE("sync: log-in", "[sync]")
-{
+TEST_CASE("sync: log-in", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -198,14 +204,19 @@ TEST_CASE("sync: log-in", "[sync]")
     auto user = app->sync_manager()->get_user("user", ENCODE_FAKE_JWT("fake_refresh_token"),
                                               ENCODE_FAKE_JWT("fake_access_token"), dummy_auth_url, dummy_device_id);
 
-    SECTION("Can log in")
-    {
+    SECTION("Can log in") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(user, "/test", [&](auto, auto) { ++error_count; });
+        auto session = sync_session(user, "/test", [&](auto, auto) {
+            ++error_count;
+        });
 
         std::atomic<bool> download_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load() || error_count > 0; });
+        session->wait_for_download_completion([&](auto) {
+            download_did_complete = true;
+        });
+        EventLoop::main().run_until([&] {
+            return download_did_complete.load() || error_count > 0;
+        });
         CHECK(error_count == 0);
     }
 
@@ -213,22 +224,24 @@ TEST_CASE("sync: log-in", "[sync]")
     // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
 }
 
-TEST_CASE("SyncSession: close() API", "[sync]")
-{
+TEST_CASE("SyncSession: close() API", "[sync]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
                                               ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
                                               dummy_device_id);
 
-    SECTION("Behaves properly when called on session in the 'active' or 'inactive' state")
-    {
+    SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
         auto session = sync_session(
             user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
         REQUIRE(sessions_are_active(*session));
         session->close();
-        EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        EventLoop::main().run_until([&] {
+            return sessions_are_inactive(*session);
+        });
         REQUIRE(sessions_are_inactive(*session));
         // Try closing the session again. This should be a no-op.
         session->close();
@@ -236,16 +249,14 @@ TEST_CASE("SyncSession: close() API", "[sync]")
     }
 }
 
-TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]")
-{
+TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"),
                                               ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org",
                                               dummy_device_id);
 
-    SECTION("Behaves properly when called on session in the 'active' or 'inactive' state")
-    {
+    SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
         auto session = sync_session(
             user, "/test-close-for-active", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] {
@@ -264,8 +275,7 @@ TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]")
     }
 }
 
-TEST_CASE("SyncSession: update_configuration()", "[sync]")
-{
+TEST_CASE("SyncSession: update_configuration()", "[sync]") {
     TestSyncManager init_sync_manager({}, {false});
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("userid", ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -273,8 +283,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]")
     auto session = sync_session(
         user, "/update_configuration", [](auto, auto) {}, SyncSessionStopPolicy::AfterChangesUploaded);
 
-    SECTION("updates reported configuration")
-    {
+    SECTION("updates reported configuration") {
         auto config = session->config();
         REQUIRE(config.client_validate_ssl);
         config.client_validate_ssl = false;
@@ -282,8 +291,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]")
         REQUIRE_FALSE(session->config().client_validate_ssl);
     }
 
-    SECTION("handles reconnects while it's trying to deactivate session")
-    {
+    SECTION("handles reconnects while it's trying to deactivate session") {
         bool wait_called = false;
         session->wait_for_download_completion([&](std::error_code ec) {
             REQUIRE(ec == util::error::operation_aborted);
@@ -303,8 +311,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]")
     }
 }
 
-TEST_CASE("sync: error handling", "[sync]")
-{
+TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
     TestSyncManager init_sync_manager;
     auto app = init_sync_manager.app();
@@ -322,38 +329,36 @@ TEST_CASE("sync: error handling", "[sync]")
         },
         SyncSessionStopPolicy::AfterChangesUploaded, &on_disk_path);
     // Make sure the sessions are bound.
-    EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+    EventLoop::main().run_until([&] {
+        return sessions_are_active(*session);
+    });
 
-    SECTION("Doesn't treat unknown system errors as being fatal")
-    {
+    SECTION("Doesn't treat unknown system errors as being fatal") {
         std::error_code code = std::error_code{EBADF, std::generic_category()};
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
         CHECK(!sessions_are_inactive(*session));
     }
 
-    SECTION("Properly handles a client reset error")
-    {
+    SECTION("Properly handles a client reset error") {
         int code = 0;
         util::Optional<SyncError> final_error;
-        error_handler = [&](auto, SyncError error) { final_error = std::move(error); };
+        error_handler = [&](auto, SyncError error) {
+            final_error = std::move(error);
+        };
 
-        SECTION("for bad_server_file_ident")
-        {
+        SECTION("for bad_server_file_ident") {
             code = static_cast<int>(ProtocolError::bad_server_file_ident);
         }
 
-        SECTION("for bad_client_file_ident")
-        {
+        SECTION("for bad_client_file_ident") {
             code = static_cast<int>(ProtocolError::bad_client_file_ident);
         }
 
-        SECTION("for bad_server_version")
-        {
+        SECTION("for bad_server_version") {
             code = static_cast<int>(ProtocolError::bad_server_version);
         }
 
-        SECTION("for diverging_histories")
-        {
+        SECTION("for diverging_histories") {
             code = static_cast<int>(ProtocolError::diverging_histories);
         }
 
@@ -424,9 +429,14 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
 
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
         auto session = sync_session(
-            user, "/test-dying-state", [&](auto, auto) { error_handler_invoked = true; }, stop_policy, nullptr,
-            schema, &config);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+            user, "/test-dying-state",
+            [&](auto, auto) {
+                error_handler_invoked = true;
+            },
+            stop_policy, nullptr, schema, &config);
+        EventLoop::main().run_until([&] {
+            return sessions_are_active(*session);
+        });
 
         // Add an object so there's something to upload
         auto r = Realm::get_shared_realm(config);
@@ -438,39 +448,35 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         return session;
     };
 
-    SECTION("Immediately")
-    {
-        SECTION("transitions directly to Inactive even with the server stopped")
-        {
+    SECTION("Immediately") {
+        SECTION("transitions directly to Inactive even with the server stopped") {
             auto session = create_session(SyncSessionStopPolicy::Immediately);
             session->close();
             REQUIRE(sessions_are_inactive(*session));
         }
     }
 
-    SECTION("AfterChangesUploaded")
-    {
+    SECTION("AfterChangesUploaded") {
         auto session = create_session(SyncSessionStopPolicy::AfterChangesUploaded);
         // Now close the session, causing the state to transition to Dying.
         // (it should remain stuck there until we start the server)
         session->close();
         REQUIRE(session->state() == SyncSession::PublicState::Dying);
 
-        SECTION("transitions to Inactive once the server is started")
-        {
+        SECTION("transitions to Inactive once the server is started") {
             server.start();
-            EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+            EventLoop::main().run_until([&] {
+                return sessions_are_inactive(*session);
+            });
         }
 
-        SECTION("transitions back to Active if the session is revived")
-        {
+        SECTION("transitions back to Active if the session is revived") {
             auto session2 = sync_manager->get_session(config.path, *config.sync_config);
             REQUIRE(session->state() == SyncSession::PublicState::Active);
             REQUIRE(session2 == session);
         }
 
-        SECTION("transitions to Inactive if a fatal error occurs")
-        {
+        SECTION("transitions to Inactive if a fatal error occurs") {
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
             SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
@@ -479,8 +485,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             CHECK(!error_handler_invoked);
         }
 
-        SECTION("ignores non-fatal errors and does not transition to Inactive")
-        {
+        SECTION("ignores non-fatal errors and does not transition to Inactive") {
             // Fire a simulated *non-fatal* error.
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
@@ -490,8 +495,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         }
     }
 
-    SECTION("can change to Immediately after opening the session")
-    {
+    SECTION("can change to Immediately after opening the session") {
         auto session = create_session(SyncSessionStopPolicy::AfterChangesUploaded);
         REQUIRE(session->state() == SyncSession::PublicState::Active);
 
@@ -504,8 +508,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
     }
 }
 
-TEST_CASE("sync: encrypt local realm file", "[sync]")
-{
+TEST_CASE("sync: encrypt local realm file", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -515,8 +518,7 @@ TEST_CASE("sync: encrypt local realm file", "[sync]")
     std::array<char, 64> encryption_key;
     encryption_key.fill(12);
 
-    SECTION("open a session with realm file encryption and then open the same file directly")
-    {
+    SECTION("open a session with realm file encryption and then open the same file directly") {
         SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
         std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
         config.sync_config->realm_encryption_key = encryption_key;
@@ -525,11 +527,19 @@ TEST_CASE("sync: encrypt local realm file", "[sync]")
         {
             std::atomic<bool> handler_called(false);
             auto session = sync_manager->get_session(config.path, *config.sync_config);
-            EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-            session->wait_for_download_completion([&](auto) { handler_called = true; });
-            EventLoop::main().run_until([&] { return handler_called == true; });
+            EventLoop::main().run_until([&] {
+                return sessions_are_active(*session);
+            });
+            session->wait_for_download_completion([&](auto) {
+                handler_called = true;
+            });
+            EventLoop::main().run_until([&] {
+                return handler_called == true;
+            });
             session->close();
-            EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+            EventLoop::main().run_until([&] {
+                return sessions_are_inactive(*session);
+            });
         }
 
         // open a Realm with the same config, if the session didn't use the encryption key this should fail
@@ -538,8 +548,7 @@ TEST_CASE("sync: encrypt local realm file", "[sync]")
         }
     }
 
-    SECTION("errors if encryption keys are different")
-    {
+    SECTION("errors if encryption keys are different") {
         {
             SyncTestFile config(init_sync_manager.app(), "encrypted_realm");
             config.sync_config->realm_encryption_key = encryption_key;
@@ -564,8 +573,7 @@ TEST_CASE("sync: encrypt local realm file", "[sync]")
     }
 }
 
-TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]")
-{
+TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -612,16 +620,14 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
 }
 
 
-TEST_CASE("sync: stable IDs", "[sync]")
-{
+TEST_CASE("sync: stable IDs", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager;
 
-    SECTION("ID column isn't visible in schema read from Group")
-    {
+    SECTION("ID column isn't visible in schema read from Group") {
         SyncTestFile config(init_sync_manager.app(), "schema-test");
         config.schema_version = 1;
         config.schema = Schema{
@@ -702,8 +708,7 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
 }
 #endif
 
-TEST_CASE("sync: client resync")
-{
+TEST_CASE("sync: client resync") {
     using namespace std::literals::chrono_literals;
     if (!EventLoop::has_implementation())
         return;
@@ -811,8 +816,7 @@ TEST_CASE("sync: client resync")
         return realm;
     };
 
-    SECTION("should trigger error callback when mode is manual")
-    {
+    SECTION("should trigger error callback when mode is manual") {
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         std::atomic<bool> called{false};
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
@@ -822,7 +826,9 @@ TEST_CASE("sync: client resync")
 
         auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});
 
-        EventLoop::main().run_until([&] { return called.load(); });
+        EventLoop::main().run_until([&] {
+            return called.load();
+        });
     }
 
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
@@ -856,8 +862,7 @@ TEST_CASE("sync: client resync")
     }
     */
 
-    SECTION("should honor encryption key for downloaded Realm")
-    {
+    SECTION("should honor encryption key for downloaded Realm") {
         config.encryption_key.resize(64, 'a');
         config.sync_config->realm_encryption_key = std::array<char, 64>();
         config.sync_config->realm_encryption_key->fill('a');
@@ -872,8 +877,7 @@ TEST_CASE("sync: client resync")
 
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
-    SECTION("add table in discarded transaction")
-    {
+    SECTION("add table in discarded transaction") {
         setup([&](auto& realm) {
             auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
             REQUIRE(!table);
@@ -905,8 +909,7 @@ TEST_CASE("sync: client resync")
         REQUIRE(!table);
     }
 
-    SECTION("add column in discarded transaction")
-    {
+    SECTION("add column in discarded transaction") {
         auto realm = trigger_client_reset(
             [](auto& realm) {
                 realm.update_schema(
@@ -938,8 +941,7 @@ TEST_CASE("sync: client resync")
 
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
 
-    SECTION("add table pk in recovered transaction")
-    {
+    SECTION("add table pk in recovered transaction") {
         auto realm = trigger_client_reset(
             [](auto& realm) {
                 realm.update_schema(
@@ -966,8 +968,7 @@ TEST_CASE("sync: client resync")
         // REQUIRE(table->size() == 2);
     }
 
-    SECTION("add column in recovered transaction")
-    {
+    SECTION("add column in recovered transaction") {
         auto realm = trigger_client_reset(
             [](auto& realm) {
                 realm.update_schema(
@@ -994,8 +995,7 @@ TEST_CASE("sync: client resync")
         // REQUIRE(table->begin()->get<Int>(table->get_column_key("value2")) == 123);
     }
 
-    SECTION("compatible schema changes in both remote and recovered transactions")
-    {
+    SECTION("compatible schema changes in both remote and recovered transactions") {
         auto realm = trigger_client_reset(
             [](auto& realm) {
                 realm.update_schema(
@@ -1204,8 +1204,7 @@ TEST_CASE("sync: client resync")
     }
     */
 
-    SECTION("link to remotely deleted object")
-    {
+    SECTION("link to remotely deleted object") {
         setup([&](auto& realm) {
             auto k0 = create_object(realm, "link target").set("value", 1).get_key();
             create_object(realm, "link target").set("value", 2);
@@ -1236,8 +1235,7 @@ TEST_CASE("sync: client resync")
         REQUIRE(obj.get<Int>("value") == 1);
     }
 
-    SECTION("add remotely deleted object to list")
-    {
+    SECTION("add remotely deleted object to list") {
         ObjKey k0, k1, k2;
         setup([&](auto& realm) {
             k0 = create_object(realm, "link target").set("value", 1).get_key();
