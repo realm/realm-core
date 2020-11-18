@@ -139,8 +139,7 @@ util::Optional<Mixed> Set::average(ColKey col) const
 
 bool Set::operator==(const Set& rhs) const noexcept
 {
-    static_cast<void>(rhs);
-    return true;
+    REALM_TERMINATE("Not implemented yet");
 }
 
 Results Set::snapshot() const
