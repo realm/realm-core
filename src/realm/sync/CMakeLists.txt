@@ -220,6 +220,12 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
     #                       DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
     # target_link_libraries(StatCommand Sync Storage)
 
+    add_executable(ApplyToStateCommand apply_to_state_command.cpp)
+    set_target_properties(ApplyToStateCommand PROPERTIES
+                          OUTPUT_NAME "realm-apply-to-state"
+                          DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}")
+    target_link_libraries(ApplyToStateCommand Sync Storage)
+
     # FIXME: Port realm-hist to new instruction format
     # add_executable(HistCommand sync/hist_command.cpp)
     # set_target_properties(HistCommand PROPERTIES
@@ -258,6 +264,7 @@ if(REALM_BUILD_COMMANDLINE_TOOLS)
         DumpCommand
         # StatCommand
         # HistCommand
+        ApplyToStateCommand
         VerifyServerFileCommand
         ServerIndexCommand
         COMPONENT runtime
