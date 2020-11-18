@@ -124,7 +124,7 @@ util::Any OrNode::visit(ParserDriver* drv)
 
     ++it;
     while (it != and_preds.end()) {
-        q.and_query(std::move(util::any_cast<Query>((*it)->visit(drv))));
+        q.and_query(util::any_cast<Query>((*it)->visit(drv)));
         ++it;
     }
     return q;
@@ -137,7 +137,7 @@ util::Any AndNode::visit(ParserDriver* drv)
     }
     Query q(drv->m_base_table);
     for (auto it : atom_preds) {
-        q.and_query(std::move(util::any_cast<Query>(it->visit(drv))));
+        q.and_query(util::any_cast<Query>(it->visit(drv)));
     }
     return q;
 }
@@ -390,13 +390,13 @@ util::Any LinkAggrNode::visit(ParserDriver* drv)
 
     std::unique_ptr<Subexpr> sub_column;
     switch (col_key.get_type()) {
-        case type_Float:
+        case col_type_Float:
             sub_column = link_prop->column<float>(col_key).clone();
             break;
-        case type_Double:
+        case col_type_Double:
             sub_column = link_prop->column<double>(col_key).clone();
             break;
-        case type_Decimal:
+        case col_type_Decimal:
             sub_column = link_prop->column<Decimal>(col_key).clone();
             break;
         default:
@@ -533,7 +533,7 @@ util::Any ConstantNode::visit(ParserDriver* drv)
                 std::string s1 = s.substr(1, colon_pos - 1);
                 std::string s2 = s.substr(colon_pos + 1);
                 seconds = strtol(s1.c_str(), nullptr, 0);
-                nanoseconds = strtol(s2.c_str(), nullptr, 0);
+                nanoseconds = int32_t(strtol(s2.c_str(), nullptr, 0));
             }
             else {
                 // readable format YYYY-MM-DD-HH:MM:SS:NANOS nanos optional

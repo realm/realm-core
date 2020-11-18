@@ -2365,7 +2365,7 @@ void realm::query_parser::ParserDriver::scan_begin(bool trace_scanning)
 {
     yy_flex_debug = trace_scanning;
     YY_BUFFER_STATE bp;
-    bp = yy_scan_bytes(parse_string.c_str(), parse_string.size());
+    bp = yy_scan_bytes(parse_string.c_str(), int(parse_string.size()));
     yy_switch_to_buffer(bp);
     scan_buffer = (void*)bp;
 }
