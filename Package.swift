@@ -10,6 +10,7 @@ let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
 
 let cxxSettings: [CXXSetting] = [
     .headerSearchPath("src"),
+    .define("REALM_DEBUG", .when(configuration: .debug)),
     .define("REALM_NO_CONFIG"),
     .define("REALM_INSTALL_LIBEXECDIR", to: ""),
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
