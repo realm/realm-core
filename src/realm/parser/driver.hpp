@@ -2,10 +2,10 @@
 #define DRIVER_HH
 #include <string>
 #include <map>
-#include <any>
-#include <variant>
+#include <external/mpark/variant.hpp>
 #include "realm/parser/query_bison.hpp"
 #include "realm/parser/query_parser.hpp"
+#include "realm/util/any.hpp"
 
 // Give Flex the prototype of yylex we want ...
 #define YY_DECL yy::parser::symbol_type yylex(realm::query_parser::ParserDriver&)
@@ -19,7 +19,7 @@ namespace query_parser {
 class ParserNode {
 public:
     virtual ~ParserNode();
-    virtual std::any visit(ParserDriver*) = 0;
+    virtual util::Any visit(ParserDriver*) = 0;
 };
 
 class OrNode : public ParserNode {
@@ -30,7 +30,7 @@ public:
     {
         and_preds.emplace_back(node);
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class AndNode : public ParserNode {
@@ -41,7 +41,7 @@ public:
     {
         atom_preds.emplace_back(node);
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class AtomPredNode : public ParserNode {
@@ -57,7 +57,7 @@ public:
         : atom_pred(expr)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class ParensNode : public AtomPredNode {
@@ -68,7 +68,7 @@ public:
         : pred(expr)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class CompareNode : public AtomPredNode {
@@ -97,7 +97,7 @@ public:
         values.emplace_back(left);
         values.emplace_back(right);
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class RelationalNode : public CompareNode {
@@ -111,7 +111,7 @@ public:
         values.emplace_back(left);
         values.emplace_back(right);
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class StringOpsNode : public CompareNode {
@@ -126,7 +126,7 @@ public:
         values.emplace_back(left);
         values.emplace_back(right);
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class ConstantNode : public ParserNode {
@@ -141,7 +141,7 @@ public:
         , text(str)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class PostOpNode : public ParserNode {
@@ -154,7 +154,7 @@ public:
         : type(t)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class AggrNode : public ParserNode {
@@ -167,7 +167,7 @@ public:
         : type(t)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class PropertyNode : public ParserNode {
@@ -185,7 +185,7 @@ public:
         , aggr_op(aggr)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class LinkAggrNode : public PropertyNode {
@@ -202,7 +202,7 @@ public:
         , prop(id2)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class PropNode : public PropertyNode {
@@ -224,7 +224,7 @@ public:
         , post_op(po_node)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class ValueNode : public ParserNode {
@@ -240,7 +240,7 @@ public:
         : prop(node)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 class TrueOrFalseNode : public AtomPredNode {
@@ -251,13 +251,13 @@ public:
         : true_or_false(type)
     {
     }
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 };
 
 
 class PathNode : public ParserNode {
 public:
-    std::any visit(ParserDriver*) override;
+    util::Any visit(ParserDriver*) override;
 
     std::vector<std::string> path_elems;
 };
@@ -265,7 +265,7 @@ public:
 // Conducting the whole scanning and parsing of Calc++.
 class ParserDriver {
 public:
-    using Values = std::variant<ExpressionComparisonType, Subexpr*, DataType>;
+    using Values = mpark::variant<ExpressionComparisonType, Subexpr*, DataType>;
     class ParserNodeStore {
     public:
         template <typename T, typename... Args>

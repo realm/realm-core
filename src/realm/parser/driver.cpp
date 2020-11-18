@@ -99,50 +99,50 @@ ParserNode::~ParserNode() {}
 
 AtomPredNode::~AtomPredNode() {}
 
-std::any NotNode::visit(ParserDriver* drv)
+util::Any NotNode::visit(ParserDriver* drv)
 {
-    Query query = std::any_cast<Query>(atom_pred->visit(drv));
+    Query query = util::any_cast<Query>(atom_pred->visit(drv));
     Query q = drv->m_base_table->where();
     q.Not();
     q.and_query(query);
     return {q};
 }
 
-std::any ParensNode::visit(ParserDriver* drv)
+util::Any ParensNode::visit(ParserDriver* drv)
 {
     return pred->visit(drv);
 }
 
-std::any OrNode::visit(ParserDriver* drv)
+util::Any OrNode::visit(ParserDriver* drv)
 {
     if (and_preds.size() == 1) {
         return and_preds[0]->visit(drv);
     }
     auto it = and_preds.begin();
-    auto q = std::any_cast<Query>((*it)->visit(drv));
+    auto q = util::any_cast<Query>((*it)->visit(drv));
     q.Or();
 
     ++it;
     while (it != and_preds.end()) {
-        q.and_query(std::move(std::any_cast<Query>((*it)->visit(drv))));
+        q.and_query(std::move(util::any_cast<Query>((*it)->visit(drv))));
         ++it;
     }
     return q;
 }
 
-std::any AndNode::visit(ParserDriver* drv)
+util::Any AndNode::visit(ParserDriver* drv)
 {
     if (atom_preds.size() == 1) {
         return atom_preds[0]->visit(drv);
     }
     Query q(drv->m_base_table);
     for (auto it : atom_preds) {
-        q.and_query(std::move(std::any_cast<Query>(it->visit(drv))));
+        q.and_query(std::move(util::any_cast<Query>(it->visit(drv))));
     }
     return q;
 }
 
-std::any EqualitylNode::visit(ParserDriver* drv)
+util::Any EqualitylNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -226,7 +226,7 @@ static std::map<int, std::string> opstr = {
     {CompareNode::LIKE, "like"},
 };
 
-std::any RelationalNode::visit(ParserDriver* drv)
+util::Any RelationalNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -280,7 +280,7 @@ std::any RelationalNode::visit(ParserDriver* drv)
     return {};
 }
 
-std::any StringOpsNode::visit(ParserDriver* drv)
+util::Any StringOpsNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -335,7 +335,7 @@ std::any StringOpsNode::visit(ParserDriver* drv)
     return {};
 }
 
-std::any ValueNode::visit(ParserDriver* drv)
+util::Any ValueNode::visit(ParserDriver* drv)
 {
     if (prop) {
         return prop->visit(drv);
@@ -344,10 +344,10 @@ std::any ValueNode::visit(ParserDriver* drv)
     return constant->visit(drv);
 }
 
-std::any PropNode::visit(ParserDriver* drv)
+util::Any PropNode::visit(ParserDriver* drv)
 {
     drv->push(comp_type);
-    Subexpr* subexpr = std::any_cast<LinkChain>(path->visit(drv)).column(identifier);
+    Subexpr* subexpr = util::any_cast<LinkChain>(path->visit(drv)).column(identifier);
 
     if (post_op) {
         drv->push(subexpr);
@@ -356,9 +356,9 @@ std::any PropNode::visit(ParserDriver* drv)
     return subexpr;
 }
 
-std::any PostOpNode::visit(ParserDriver* drv)
+util::Any PostOpNode::visit(ParserDriver* drv)
 {
-    std::unique_ptr<realm::Subexpr> subexpr(std::get<Subexpr*>(drv->pop()));
+    std::unique_ptr<realm::Subexpr> subexpr(mpark::get<Subexpr*>(drv->pop()));
     if (auto s = dynamic_cast<Columns<Link>*>(subexpr.get())) {
         return s->count().clone().release();
     }
@@ -376,10 +376,10 @@ std::any PostOpNode::visit(ParserDriver* drv)
     return {};
 }
 
-std::any LinkAggrNode::visit(ParserDriver* drv)
+util::Any LinkAggrNode::visit(ParserDriver* drv)
 {
     drv->push(ExpressionComparisonType::Any);
-    auto link_chain = std::any_cast<LinkChain>(path->visit(drv));
+    auto link_chain = util::any_cast<LinkChain>(path->visit(drv));
     auto subexpr = std::unique_ptr<Subexpr>(link_chain.column(link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
@@ -406,18 +406,18 @@ std::any LinkAggrNode::visit(ParserDriver* drv)
     return aggr_op->visit(drv);
 }
 
-std::any ListAggrNode::visit(ParserDriver* drv)
+util::Any ListAggrNode::visit(ParserDriver* drv)
 {
     drv->push(ExpressionComparisonType::Any);
-    auto link_chain = std::any_cast<LinkChain>(path->visit(drv));
+    auto link_chain = util::any_cast<LinkChain>(path->visit(drv));
     auto subexpr = link_chain.column(identifier);
     drv->push(subexpr);
     return aggr_op->visit(drv);
 }
 
-std::any AggrNode::visit(ParserDriver* drv)
+util::Any AggrNode::visit(ParserDriver* drv)
 {
-    auto subexpr = std::get<Subexpr*>(drv->pop());
+    auto subexpr = mpark::get<Subexpr*>(drv->pop());
     if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr)) {
         switch (type) {
             case MAX:
@@ -457,10 +457,10 @@ std::any AggrNode::visit(ParserDriver* drv)
     return {};
 }
 
-std::any ConstantNode::visit(ParserDriver* drv)
+util::Any ConstantNode::visit(ParserDriver* drv)
 {
     Subexpr* ret = nullptr;
-    auto hint = std::get<DataType>(drv->pop());
+    auto hint = mpark::get<DataType>(drv->pop());
     switch (type) {
         case Type::NUMBER:
         case Type::FLOAT: {
@@ -645,7 +645,7 @@ std::any ConstantNode::visit(ParserDriver* drv)
     return ret;
 }
 
-std::any TrueOrFalseNode::visit(ParserDriver* drv)
+util::Any TrueOrFalseNode::visit(ParserDriver* drv)
 {
     Query q = drv->m_base_table->where();
     if (true_or_false) {
@@ -657,9 +657,9 @@ std::any TrueOrFalseNode::visit(ParserDriver* drv)
     return q;
 }
 
-std::any PathNode::visit(ParserDriver* drv)
+util::Any PathNode::visit(ParserDriver* drv)
 {
-    auto comp_type = std::get<ExpressionComparisonType>(drv->pop());
+    auto comp_type = mpark::get<ExpressionComparisonType>(drv->pop());
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (auto path_elem : path_elems) {
         link_chain.link(path_elem);
@@ -683,18 +683,18 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
 
     if (right_constant) {
         // Take left first - it cannot be a constant
-        left.reset(std::any_cast<Subexpr*>(left_prop->visit(this)));
+        left.reset(util::any_cast<Subexpr*>(left_prop->visit(this)));
         push(left->get_type());
-        right.reset(std::any_cast<Subexpr*>(right_constant->visit(this)));
+        right.reset(util::any_cast<Subexpr*>(right_constant->visit(this)));
     }
     else {
-        right.reset(std::any_cast<Subexpr*>(right_prop->visit(this)));
+        right.reset(util::any_cast<Subexpr*>(right_prop->visit(this)));
         if (left_constant) {
             push(right->get_type());
-            left.reset(std::any_cast<Subexpr*>(left_constant->visit(this)));
+            left.reset(util::any_cast<Subexpr*>(left_constant->visit(this)));
         }
         else {
-            left.reset(std::any_cast<Subexpr*>(left_prop->visit(this)));
+            left.reset(util::any_cast<Subexpr*>(left_prop->visit(this)));
         }
     }
     return {std::move(left), std::move(right)};
@@ -735,7 +735,7 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args);
     driver.parse(query_string);
-    return std::any_cast<Query>(driver.result->visit(&driver));
+    return util::any_cast<Query>(driver.result->visit(&driver));
 }
 
 Subexpr* LinkChain::column(std::string col)
