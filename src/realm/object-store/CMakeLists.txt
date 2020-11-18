@@ -97,7 +97,6 @@ if(REALM_ENABLE_SYNC)
         sync/mongo_collection.hpp
         sync/mongo_database.hpp
         sync/push_client.hpp
-        sync/subscribable.hpp
 
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
