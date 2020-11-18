@@ -388,21 +388,21 @@ std::any LinkAggrNode::visit(ParserDriver* drv)
     }
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
 
-    Subexpr* sub_column;
+    std::unique_ptr<Subexpr> sub_column;
     switch (col_key.get_type()) {
         case type_Float:
-            sub_column = link_prop->column<float>(col_key).clone().release();
+            sub_column = link_prop->column<float>(col_key).clone();
             break;
         case type_Double:
-            sub_column = link_prop->column<double>(col_key).clone().release();
+            sub_column = link_prop->column<double>(col_key).clone();
             break;
         case type_Decimal:
-            sub_column = link_prop->column<Decimal>(col_key).clone().release();
+            sub_column = link_prop->column<Decimal>(col_key).clone();
             break;
         default:
             break;
     }
-    drv->push(sub_column);
+    drv->push(sub_column.get());
     return aggr_op->visit(drv);
 }
 
