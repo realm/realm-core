@@ -39,7 +39,7 @@ Query::Query()
 
 Query::Query(ConstTableRef table, const LnkLst& list)
     : m_table(table.cast_away_const())
-    , m_source_link_list(list.clone())
+    , m_source_link_list(list.clone_linklist())
 {
     m_view = m_source_link_list.get();
     REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
@@ -90,7 +90,7 @@ Query::Query(const Query& source)
         // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
-        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LnkLstPtr{};
+        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
     }
     if (m_source_table_view) {
         m_view = m_source_table_view;
@@ -118,7 +118,8 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LnkLstPtr{};
+            m_source_link_list =
+                source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
         }
         if (m_source_table_view) {
             m_view = m_source_table_view;
@@ -920,18 +921,20 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
 
 size_t Query::find_best_node(ParentNode* pn) const
 {
-    auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
+    auto score_compare = [](const ParentNode* a, const ParentNode* b) {
+        return a->cost() < b->cost();
+    };
     size_t best = std::distance(pn->m_children.begin(),
                                 std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
     return best;
 }
 
 /**************************************************************************************************************
-*                                                                                                             *
-* Main entry point of a query. Schedules calls to aggregate_local                                             *
-* Return value is the result of the query, or Array pointer for FindAll.                                      *
-*                                                                                                             *
-**************************************************************************************************************/
+ *                                                                                                             *
+ * Main entry point of a query. Schedules calls to aggregate_local                                             *
+ * Return value is the result of the query, or Array pointer for FindAll.                                      *
+ *                                                                                                             *
+ **************************************************************************************************************/
 
 void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                                ArrayPayload* source_column) const
@@ -1764,11 +1767,11 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 }
 
 /* ********************************************************************************************************************
-*
-*  Stuff related to next-generation query syntax
-*
-********************************************************************************************************************
-*/
+ *
+ *  Stuff related to next-generation query syntax
+ *
+ ********************************************************************************************************************
+ */
 
 Query& Query::and_query(const Query& q)
 {
@@ -1880,4 +1883,3 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     }
     return *this;
 }
-

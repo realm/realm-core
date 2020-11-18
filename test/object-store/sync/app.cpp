@@ -3532,7 +3532,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
 TEST_CASE("app: make_streaming_request", "[sync][app]") {
     UnitTestTransport::access_token = good_access_token;
 
-    constexpr auto timeout_ms = 60000;
+    constexpr uint64_t timeout_ms = 60000;
     auto config = get_config([] {
         return std::make_unique<UnitTestTransport>();
     });

@@ -2978,39 +2978,6 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double, Decimal128)
     table.remove_object(ObjKey(5));
 }
 
-TEST(Table_StableIteration)
-{
-    Table table;
-    auto list_col = table.add_column_list(type_Int, "int_list");
-    std::vector<int64_t> values = {1, 7, 3, 5, 5, 2, 4};
-    Obj obj = table.create_object(ObjKey(5)).set_list_values(list_col, values);
-
-    auto list = obj.get_list<int64_t>(list_col);
-    auto x = list.begin();
-    CHECK_EQUAL(*x, 1);
-    ++x; // == 7
-    ++x; // == 3
-    CHECK_EQUAL(*x, 3);
-    auto end = list.end();
-    for (auto it = list.begin(); it != end; it++) {
-        if (*it > 3) {
-            list.remove(it);
-            // When an element is removed, the iterator should be invalid
-            CHECK_THROW_ANY(*it);
-        }
-        // This iterator should keep pointing to the same element
-        CHECK_EQUAL(*x, 3);
-    }
-    // Advancing the iterator should skip the two deleted elements
-    ++x; // == 2
-    CHECK_EQUAL(*x, 2);
-    ++x; // Past end of list
-    CHECK_THROW_ANY(*x);
-    CHECK_EQUAL(list.size(), 3);
-    CHECK_EQUAL(list[0], 1);
-    CHECK_EQUAL(list[1], 3);
-    CHECK_EQUAL(list[2], 2);
-}
 
 TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal>, Prop<ObjectId>, Prop<UUID>,
            Prop<Timestamp>, Prop<String>, Prop<Binary>, Prop<Bool>, Nullable<Int>, Nullable<Float>, Nullable<Double>,

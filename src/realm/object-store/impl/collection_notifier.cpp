@@ -36,7 +36,9 @@ bool CollectionNotifier::all_related_tables_covered(const TableVersions& version
     auto last = versions.end();
     for (auto& it : m_related_tables) {
         TableKey tk{it.table_key};
-        auto match = std::find_if(first, last, [tk](auto& elem) { return elem.first == tk; });
+        auto match = std::find_if(first, last, [tk](auto& elem) {
+            return elem.first == tk;
+        });
         if (match == last) {
             // tk not found in versions
             return false;
@@ -59,12 +61,15 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
         return it != info.tables.end() && !it->second.modifications_empty();
     };
     if (!any_of(begin(m_related_tables), end(m_related_tables), table_modified)) {
-        return [](ObjectChangeSet::ObjectKeyType) { return false; };
+        return [](ObjectChangeSet::ObjectKeyType) {
+            return false;
+        };
     }
     if (m_related_tables.size() == 1) {
         auto& object_set = info.tables.find(m_related_tables[0].table_key.value)->second;
-        return
-            [&](ObjectChangeSet::ObjectKeyType object_key) { return object_set.modifications_contains(object_key); };
+        return [&](ObjectChangeSet::ObjectKeyType object_key) {
+            return object_set.modifications_contains(object_key);
+        };
     }
 
     return DeepChangeChecker(info, *root_table, m_related_tables);
@@ -73,7 +78,9 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info, 
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
 {
     auto table_key = table.get_key();
-    if (any_of(begin(out), end(out), [=](auto& tbl) { return tbl.table_key == table_key; }))
+    if (any_of(begin(out), end(out), [=](auto& tbl) {
+            return tbl.table_key == table_key;
+        }))
         return;
 
     // We need to add this table to `out` before recurring so that the check
@@ -107,8 +114,9 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
 
 bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& table, int64_t obj_key, size_t depth)
 {
-    auto it = find_if(begin(m_related_tables), end(m_related_tables),
-                      [&](auto&& tbl) { return tbl.table_key == table_key; });
+    auto it = find_if(begin(m_related_tables), end(m_related_tables), [&](auto&& tbl) {
+        return tbl.table_key == table_key;
+    });
     if (it == m_related_tables.end())
         return false;
     if (it->links.empty())
@@ -118,8 +126,9 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
     // modified, and if not add it to the stack
     auto already_checking = [&](int64_t col) {
         auto end = m_current_path.begin() + depth;
-        auto match = std::find_if(m_current_path.begin(), end,
-                                  [&](auto& p) { return p.obj_key == obj_key && p.col_key == col; });
+        auto match = std::find_if(m_current_path.begin(), end, [&](auto& p) {
+            return p.obj_key == obj_key && p.col_key == col;
+        });
         if (match != end) {
             for (; match < end; ++match)
                 match->depth_exceeded = true;
@@ -142,8 +151,9 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
 
         auto& target = *table.get_link_target(ColKey(link.col_key));
         auto lvr = obj.get_linklist(ColKey(link.col_key));
-        return std::any_of(lvr.begin(), lvr.end(),
-                           [&, this](auto key) { return this->check_row(target, key.value, depth + 1); });
+        return std::any_of(lvr.begin(), lvr.end(), [&, this](auto key) {
+            return this->check_row(target, key.value, depth + 1);
+        });
     };
 
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);
@@ -262,7 +272,9 @@ std::vector<CollectionNotifier::Callback>::iterator CollectionNotifier::find_cal
 {
     REALM_ASSERT(m_error || m_callbacks.size() > 0);
 
-    auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) { return c.token == token; });
+    auto it = find_if(begin(m_callbacks), end(m_callbacks), [=](const auto& c) {
+        return c.token == token;
+    });
     // We should only fail to find the callback if it was removed due to an error
     REALM_ASSERT(m_error || it != end(m_callbacks));
     return it;

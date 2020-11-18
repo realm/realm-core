@@ -48,6 +48,8 @@ using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
+class LnkSet;
+using LnkSetPtr = std::unique_ptr<LnkSet>;
 
 template <class>
 class Set;
@@ -72,7 +74,7 @@ public:
     }
     Obj(TableRef table, MemRef mem, ObjKey key, size_t row_ndx);
 
-    TableRef get_table() const
+    TableRef get_table() const noexcept
     {
         return m_table.cast_away_const();
     }
@@ -81,7 +83,7 @@ public:
 
     bool operator==(const Obj& other) const;
 
-    ObjKey get_key() const
+    ObjKey get_key() const noexcept
     {
         return m_key;
     }
@@ -92,13 +94,13 @@ public:
     Replication* get_replication() const;
 
     // Check if this object is default constructed
-    explicit operator bool() const
+    explicit operator bool() const noexcept
     {
         return m_table != nullptr;
     }
 
     // Check if the object is still alive
-    bool is_valid() const;
+    bool is_valid() const noexcept;
     // Will throw if object is not valid
     void check_valid() const;
     // Delete object from table. Object is invalid afterwards.
@@ -245,6 +247,11 @@ public:
     LnkLstPtr get_linklist_ptr(ColKey col_key) const;
     LnkLst get_linklist(StringData col_name) const;
 
+    /// Get a type-erased list instance for the given list column.
+    ///
+    /// Note: For lists of links, this always returns a `LnkLst`, rather than a
+    /// `Lst<ObjKey>`. Use `get_list_ptr<ObjKey>(col_key)` to get a list of
+    /// links with uncondensed indices.
     LstBasePtr get_listbase_ptr(ColKey col_key) const;
 
     template <typename U>
@@ -254,6 +261,7 @@ public:
     }
     template <typename U>
     Set<U> get_set(ColKey col_key) const;
+    LnkSet get_linkset(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;
@@ -273,6 +281,8 @@ private:
     template <class, class>
     friend class Collection;
     template <class>
+    friend class CollectionBaseImpl;
+    template <class>
     friend class Lst;
     friend class LnkLst;
     friend class Dictionary;
@@ -289,7 +299,7 @@ private:
     mutable uint64_t m_storage_version;
     mutable bool m_valid;
 
-    Allocator& _get_alloc() const;
+    Allocator& _get_alloc() const noexcept;
     bool update() const;
     // update if needed - with and without check of table instance version:
     bool update_if_needed() const;
@@ -325,7 +335,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
-    void bump_content_version();
+    int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>
     void do_set_null(ColKey col_key);
@@ -351,6 +361,9 @@ private:
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
+
+template <>
+int64_t Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...
@@ -515,6 +528,29 @@ inline Obj& Obj::set_all(Head v, Tail... tail)
 
     return _set(start_index, v, tail...);
 }
+
+inline bool Obj::update_if_needed() const
+{
+    auto current_version = get_alloc().get_storage_version();
+    if (current_version != m_storage_version) {
+        return update();
+    }
+    return false;
+}
+
+inline int_fast64_t Obj::bump_content_version()
+{
+    Allocator& alloc = get_alloc();
+    return alloc.bump_content_version();
+}
+
+inline void Obj::bump_both_versions()
+{
+    Allocator& alloc = get_alloc();
+    alloc.bump_content_version();
+    alloc.bump_storage_version();
+}
+
 } // namespace realm
 
 #endif // REALM_OBJ_HPP

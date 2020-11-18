@@ -28,21 +28,51 @@ namespace object_store {
 
 class Dictionary : public object_store::Collection {
 public:
+    using Iterator = realm::Dictionary::Iterator;
     Dictionary() noexcept;
     Dictionary(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col);
     Dictionary(std::shared_ptr<Realm> r, const realm::Dictionary& list);
     ~Dictionary() override;
+
+    bool operator==(const Dictionary& rgt) const noexcept
+    {
+        return *m_dict == *rgt.m_dict;
+    }
 
     template <typename T>
     void insert(StringData key, T value);
     template <typename T>
     T get(StringData key) const;
 
+    void erase(StringData key)
+    {
+        verify_in_transaction();
+        m_dict->erase(key);
+    }
+    void remove_all()
+    {
+        verify_in_transaction();
+        m_dict->clear();
+    }
 
-    template <typename T, typename U, typename Context>
-    void insert(Context&, T&& key, U&& value, CreatePolicy = CreatePolicy::SetLink);
-    template <typename Context, typename T>
-    auto get(Context&, T key) const;
+    template <typename T, typename Context>
+    void insert(Context&, StringData key, T&& value, CreatePolicy = CreatePolicy::SetLink);
+    template <typename Context>
+    auto get(Context&, StringData key) const;
+
+    // Replace the values in this dictionary with the values from an map type object
+    template <typename T, typename Context>
+    void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);
+
+    Iterator begin()
+    {
+        return m_dict->begin();
+    }
+
+    Iterator end()
+    {
+        return m_dict->end();
+    }
 
 private:
     realm::Dictionary* m_dict;
@@ -110,23 +140,50 @@ inline Obj Dictionary::get<Obj>(StringData key) const
     return get_object(key);
 }
 
-template <typename T, typename U, typename Context>
-void Dictionary::insert(Context& ctx, T&& key, U&& value, CreatePolicy policy)
+template <typename T, typename Context>
+void Dictionary::insert(Context& ctx, StringData key, T&& value, CreatePolicy policy)
 {
     dispatch([&](auto t) {
-        this->insert(ctx.template unbox<StringData>(key),
-                     ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
+        this->insert(key, ctx.template unbox<std::decay_t<decltype(*t)>>(value, policy));
     });
 }
 
-template <typename Context, typename T>
-auto Dictionary::get(Context& ctx, T key) const
+template <typename Context>
+auto Dictionary::get(Context& ctx, StringData key) const
 {
     return dispatch([&](auto t) {
-        return ctx.box(this->get<std::decay_t<decltype(*t)>>(ctx.template unbox<StringData>(key)));
+        return ctx.box(this->get<std::decay_t<decltype(*t)>>(key));
     });
 }
 
+template <typename T, typename Context>
+void Dictionary::assign(Context& ctx, T&& values, CreatePolicy policy)
+{
+    if (ctx.is_same_dictionary(*this, values))
+        return;
+
+    if (ctx.is_null(values)) {
+        remove_all();
+        return;
+    }
+
+    if (!policy.diff)
+        remove_all();
+
+    ctx.enumerate_dictionary(values, [&](StringData key, auto&& value) {
+        if (policy.diff) {
+            util::Optional<Mixed> old_value = m_dict->try_get(key);
+            auto new_value = ctx.template unbox<Mixed>(value);
+            if (!old_value || *old_value != new_value) {
+                m_dict->insert(key, new_value);
+            }
+        }
+        else {
+            this->insert(ctx, key, value, policy);
+        }
+    });
+    // FIXME: Remove entries not included in the new value
+}
 
 } // namespace object_store
 } // namespace realm
