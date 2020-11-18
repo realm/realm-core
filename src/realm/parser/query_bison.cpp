@@ -162,7 +162,7 @@ parser::by_state::by_state(state_type s) YY_NOEXCEPT : state(s) {}
 parser::symbol_kind_type parser::by_state::kind() const YY_NOEXCEPT
 {
     if (state == empty_state)
-        return symbol_kind::S_YYEMPTY;
+        return symbol_kind::SYM_YYEMPTY;
     else
         return YY_CAST(symbol_kind_type, yystos_[+state]);
 }
@@ -173,70 +173,70 @@ parser::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that)
     : super_type(YY_MOVE(that.state))
 {
     switch (that.kind()) {
-        case symbol_kind::S_aggr_op: // aggr_op
+        case symbol_kind::SYM_aggr_op: // aggr_op
             value.YY_MOVE_OR_COPY<AggrNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_and_pred: // and_pred
+        case symbol_kind::SYM_and_pred: // and_pred
             value.YY_MOVE_OR_COPY<AndNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_atom_pred: // atom_pred
+        case symbol_kind::SYM_atom_pred: // atom_pred
             value.YY_MOVE_OR_COPY<AtomPredNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_constant: // constant
+        case symbol_kind::SYM_constant: // constant
             value.YY_MOVE_OR_COPY<ConstantNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_pred: // pred
+        case symbol_kind::SYM_pred: // pred
             value.YY_MOVE_OR_COPY<OrNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_path: // path
+        case symbol_kind::SYM_path: // path
             value.YY_MOVE_OR_COPY<PathNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_post_op: // post_op
+        case symbol_kind::SYM_post_op: // post_op
             value.YY_MOVE_OR_COPY<PostOpNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_prop: // prop
+        case symbol_kind::SYM_prop: // prop
             value.YY_MOVE_OR_COPY<PropertyNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_boolexpr: // boolexpr
+        case symbol_kind::SYM_boolexpr: // boolexpr
             value.YY_MOVE_OR_COPY<TrueOrFalseNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_value: // value
+        case symbol_kind::SYM_value: // value
             value.YY_MOVE_OR_COPY<ValueNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_comp_type:  // comp_type
-        case symbol_kind::S_equality:   // equality
-        case symbol_kind::S_relational: // relational
-        case symbol_kind::S_stringop:   // stringop
+        case symbol_kind::SYM_comp_type:  // comp_type
+        case symbol_kind::SYM_equality:   // equality
+        case symbol_kind::SYM_relational: // relational
+        case symbol_kind::SYM_stringop:   // stringop
             value.YY_MOVE_OR_COPY<int>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_ID:         // "identifier"
-        case symbol_kind::S_STRING:     // "string"
-        case symbol_kind::S_INFINITY:   // "infinity"
-        case symbol_kind::S_NAN:        // "NaN"
-        case symbol_kind::S_NATURAL0:   // "natural0"
-        case symbol_kind::S_NUMBER:     // "number"
-        case symbol_kind::S_FLOAT:      // "float"
-        case symbol_kind::S_TIMESTAMP:  // "date"
-        case symbol_kind::S_UUID:       // "UUID"
-        case symbol_kind::S_OID:        // "ObjectId"
-        case symbol_kind::S_ARG:        // "argument"
-        case symbol_kind::S_BEGINSWITH: // "beginswith"
-        case symbol_kind::S_ENDSWITH:   // "endswith"
-        case symbol_kind::S_CONTAINS:   // "contains"
-        case symbol_kind::S_LIKE:       // "like"
-        case symbol_kind::S_path_elem:  // path_elem
-        case symbol_kind::S_id:         // id
+        case symbol_kind::SYM_ID:         // "identifier"
+        case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_INFINITY:   // "infinity"
+        case symbol_kind::SYM_NAN:        // "NaN"
+        case symbol_kind::SYM_NATURAL0:   // "natural0"
+        case symbol_kind::SYM_NUMBER:     // "number"
+        case symbol_kind::SYM_FLOAT:      // "float"
+        case symbol_kind::SYM_TIMESTAMP:  // "date"
+        case symbol_kind::SYM_UUID:       // "UUID"
+        case symbol_kind::SYM_OID:        // "ObjectId"
+        case symbol_kind::SYM_ARG:        // "argument"
+        case symbol_kind::SYM_BEGINSWITH: // "beginswith"
+        case symbol_kind::SYM_ENDSWITH:   // "endswith"
+        case symbol_kind::SYM_CONTAINS:   // "contains"
+        case symbol_kind::SYM_LIKE:       // "like"
+        case symbol_kind::SYM_path_elem:  // path_elem
+        case symbol_kind::SYM_id:         // id
             value.YY_MOVE_OR_COPY<std::string>(YY_MOVE(that.value));
             break;
 
@@ -254,70 +254,70 @@ parser::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_ty
     : super_type(s)
 {
     switch (that.kind()) {
-        case symbol_kind::S_aggr_op: // aggr_op
+        case symbol_kind::SYM_aggr_op: // aggr_op
             value.move<AggrNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_and_pred: // and_pred
+        case symbol_kind::SYM_and_pred: // and_pred
             value.move<AndNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_atom_pred: // atom_pred
+        case symbol_kind::SYM_atom_pred: // atom_pred
             value.move<AtomPredNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_constant: // constant
+        case symbol_kind::SYM_constant: // constant
             value.move<ConstantNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_pred: // pred
+        case symbol_kind::SYM_pred: // pred
             value.move<OrNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_path: // path
+        case symbol_kind::SYM_path: // path
             value.move<PathNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_post_op: // post_op
+        case symbol_kind::SYM_post_op: // post_op
             value.move<PostOpNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_prop: // prop
+        case symbol_kind::SYM_prop: // prop
             value.move<PropertyNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_boolexpr: // boolexpr
+        case symbol_kind::SYM_boolexpr: // boolexpr
             value.move<TrueOrFalseNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_value: // value
+        case symbol_kind::SYM_value: // value
             value.move<ValueNode*>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_comp_type:  // comp_type
-        case symbol_kind::S_equality:   // equality
-        case symbol_kind::S_relational: // relational
-        case symbol_kind::S_stringop:   // stringop
+        case symbol_kind::SYM_comp_type:  // comp_type
+        case symbol_kind::SYM_equality:   // equality
+        case symbol_kind::SYM_relational: // relational
+        case symbol_kind::SYM_stringop:   // stringop
             value.move<int>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_ID:         // "identifier"
-        case symbol_kind::S_STRING:     // "string"
-        case symbol_kind::S_INFINITY:   // "infinity"
-        case symbol_kind::S_NAN:        // "NaN"
-        case symbol_kind::S_NATURAL0:   // "natural0"
-        case symbol_kind::S_NUMBER:     // "number"
-        case symbol_kind::S_FLOAT:      // "float"
-        case symbol_kind::S_TIMESTAMP:  // "date"
-        case symbol_kind::S_UUID:       // "UUID"
-        case symbol_kind::S_OID:        // "ObjectId"
-        case symbol_kind::S_ARG:        // "argument"
-        case symbol_kind::S_BEGINSWITH: // "beginswith"
-        case symbol_kind::S_ENDSWITH:   // "endswith"
-        case symbol_kind::S_CONTAINS:   // "contains"
-        case symbol_kind::S_LIKE:       // "like"
-        case symbol_kind::S_path_elem:  // path_elem
-        case symbol_kind::S_id:         // id
+        case symbol_kind::SYM_ID:         // "identifier"
+        case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_INFINITY:   // "infinity"
+        case symbol_kind::SYM_NAN:        // "NaN"
+        case symbol_kind::SYM_NATURAL0:   // "natural0"
+        case symbol_kind::SYM_NUMBER:     // "number"
+        case symbol_kind::SYM_FLOAT:      // "float"
+        case symbol_kind::SYM_TIMESTAMP:  // "date"
+        case symbol_kind::SYM_UUID:       // "UUID"
+        case symbol_kind::SYM_OID:        // "ObjectId"
+        case symbol_kind::SYM_ARG:        // "argument"
+        case symbol_kind::SYM_BEGINSWITH: // "beginswith"
+        case symbol_kind::SYM_ENDSWITH:   // "endswith"
+        case symbol_kind::SYM_CONTAINS:   // "contains"
+        case symbol_kind::SYM_LIKE:       // "like"
+        case symbol_kind::SYM_path_elem:  // path_elem
+        case symbol_kind::SYM_id:         // id
             value.move<std::string>(YY_MOVE(that.value));
             break;
 
@@ -326,7 +326,7 @@ parser::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_ty
     }
 
     // that is emptied.
-    that.kind_ = symbol_kind::S_YYEMPTY;
+    that.kind_ = symbol_kind::SYM_YYEMPTY;
 }
 
 #if YY_CPLUSPLUS < 201103L
@@ -334,70 +334,70 @@ parser::stack_symbol_type& parser::stack_symbol_type::operator=(const stack_symb
 {
     state = that.state;
     switch (that.kind()) {
-        case symbol_kind::S_aggr_op: // aggr_op
+        case symbol_kind::SYM_aggr_op: // aggr_op
             value.copy<AggrNode*>(that.value);
             break;
 
-        case symbol_kind::S_and_pred: // and_pred
+        case symbol_kind::SYM_and_pred: // and_pred
             value.copy<AndNode*>(that.value);
             break;
 
-        case symbol_kind::S_atom_pred: // atom_pred
+        case symbol_kind::SYM_atom_pred: // atom_pred
             value.copy<AtomPredNode*>(that.value);
             break;
 
-        case symbol_kind::S_constant: // constant
+        case symbol_kind::SYM_constant: // constant
             value.copy<ConstantNode*>(that.value);
             break;
 
-        case symbol_kind::S_pred: // pred
+        case symbol_kind::SYM_pred: // pred
             value.copy<OrNode*>(that.value);
             break;
 
-        case symbol_kind::S_path: // path
+        case symbol_kind::SYM_path: // path
             value.copy<PathNode*>(that.value);
             break;
 
-        case symbol_kind::S_post_op: // post_op
+        case symbol_kind::SYM_post_op: // post_op
             value.copy<PostOpNode*>(that.value);
             break;
 
-        case symbol_kind::S_prop: // prop
+        case symbol_kind::SYM_prop: // prop
             value.copy<PropertyNode*>(that.value);
             break;
 
-        case symbol_kind::S_boolexpr: // boolexpr
+        case symbol_kind::SYM_boolexpr: // boolexpr
             value.copy<TrueOrFalseNode*>(that.value);
             break;
 
-        case symbol_kind::S_value: // value
+        case symbol_kind::SYM_value: // value
             value.copy<ValueNode*>(that.value);
             break;
 
-        case symbol_kind::S_comp_type:  // comp_type
-        case symbol_kind::S_equality:   // equality
-        case symbol_kind::S_relational: // relational
-        case symbol_kind::S_stringop:   // stringop
+        case symbol_kind::SYM_comp_type:  // comp_type
+        case symbol_kind::SYM_equality:   // equality
+        case symbol_kind::SYM_relational: // relational
+        case symbol_kind::SYM_stringop:   // stringop
             value.copy<int>(that.value);
             break;
 
-        case symbol_kind::S_ID:         // "identifier"
-        case symbol_kind::S_STRING:     // "string"
-        case symbol_kind::S_INFINITY:   // "infinity"
-        case symbol_kind::S_NAN:        // "NaN"
-        case symbol_kind::S_NATURAL0:   // "natural0"
-        case symbol_kind::S_NUMBER:     // "number"
-        case symbol_kind::S_FLOAT:      // "float"
-        case symbol_kind::S_TIMESTAMP:  // "date"
-        case symbol_kind::S_UUID:       // "UUID"
-        case symbol_kind::S_OID:        // "ObjectId"
-        case symbol_kind::S_ARG:        // "argument"
-        case symbol_kind::S_BEGINSWITH: // "beginswith"
-        case symbol_kind::S_ENDSWITH:   // "endswith"
-        case symbol_kind::S_CONTAINS:   // "contains"
-        case symbol_kind::S_LIKE:       // "like"
-        case symbol_kind::S_path_elem:  // path_elem
-        case symbol_kind::S_id:         // id
+        case symbol_kind::SYM_ID:         // "identifier"
+        case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_INFINITY:   // "infinity"
+        case symbol_kind::SYM_NAN:        // "NaN"
+        case symbol_kind::SYM_NATURAL0:   // "natural0"
+        case symbol_kind::SYM_NUMBER:     // "number"
+        case symbol_kind::SYM_FLOAT:      // "float"
+        case symbol_kind::SYM_TIMESTAMP:  // "date"
+        case symbol_kind::SYM_UUID:       // "UUID"
+        case symbol_kind::SYM_OID:        // "ObjectId"
+        case symbol_kind::SYM_ARG:        // "argument"
+        case symbol_kind::SYM_BEGINSWITH: // "beginswith"
+        case symbol_kind::SYM_ENDSWITH:   // "endswith"
+        case symbol_kind::SYM_CONTAINS:   // "contains"
+        case symbol_kind::SYM_LIKE:       // "like"
+        case symbol_kind::SYM_path_elem:  // path_elem
+        case symbol_kind::SYM_id:         // id
             value.copy<std::string>(that.value);
             break;
 
@@ -412,70 +412,70 @@ parser::stack_symbol_type& parser::stack_symbol_type::operator=(stack_symbol_typ
 {
     state = that.state;
     switch (that.kind()) {
-        case symbol_kind::S_aggr_op: // aggr_op
+        case symbol_kind::SYM_aggr_op: // aggr_op
             value.move<AggrNode*>(that.value);
             break;
 
-        case symbol_kind::S_and_pred: // and_pred
+        case symbol_kind::SYM_and_pred: // and_pred
             value.move<AndNode*>(that.value);
             break;
 
-        case symbol_kind::S_atom_pred: // atom_pred
+        case symbol_kind::SYM_atom_pred: // atom_pred
             value.move<AtomPredNode*>(that.value);
             break;
 
-        case symbol_kind::S_constant: // constant
+        case symbol_kind::SYM_constant: // constant
             value.move<ConstantNode*>(that.value);
             break;
 
-        case symbol_kind::S_pred: // pred
+        case symbol_kind::SYM_pred: // pred
             value.move<OrNode*>(that.value);
             break;
 
-        case symbol_kind::S_path: // path
+        case symbol_kind::SYM_path: // path
             value.move<PathNode*>(that.value);
             break;
 
-        case symbol_kind::S_post_op: // post_op
+        case symbol_kind::SYM_post_op: // post_op
             value.move<PostOpNode*>(that.value);
             break;
 
-        case symbol_kind::S_prop: // prop
+        case symbol_kind::SYM_prop: // prop
             value.move<PropertyNode*>(that.value);
             break;
 
-        case symbol_kind::S_boolexpr: // boolexpr
+        case symbol_kind::SYM_boolexpr: // boolexpr
             value.move<TrueOrFalseNode*>(that.value);
             break;
 
-        case symbol_kind::S_value: // value
+        case symbol_kind::SYM_value: // value
             value.move<ValueNode*>(that.value);
             break;
 
-        case symbol_kind::S_comp_type:  // comp_type
-        case symbol_kind::S_equality:   // equality
-        case symbol_kind::S_relational: // relational
-        case symbol_kind::S_stringop:   // stringop
+        case symbol_kind::SYM_comp_type:  // comp_type
+        case symbol_kind::SYM_equality:   // equality
+        case symbol_kind::SYM_relational: // relational
+        case symbol_kind::SYM_stringop:   // stringop
             value.move<int>(that.value);
             break;
 
-        case symbol_kind::S_ID:         // "identifier"
-        case symbol_kind::S_STRING:     // "string"
-        case symbol_kind::S_INFINITY:   // "infinity"
-        case symbol_kind::S_NAN:        // "NaN"
-        case symbol_kind::S_NATURAL0:   // "natural0"
-        case symbol_kind::S_NUMBER:     // "number"
-        case symbol_kind::S_FLOAT:      // "float"
-        case symbol_kind::S_TIMESTAMP:  // "date"
-        case symbol_kind::S_UUID:       // "UUID"
-        case symbol_kind::S_OID:        // "ObjectId"
-        case symbol_kind::S_ARG:        // "argument"
-        case symbol_kind::S_BEGINSWITH: // "beginswith"
-        case symbol_kind::S_ENDSWITH:   // "endswith"
-        case symbol_kind::S_CONTAINS:   // "contains"
-        case symbol_kind::S_LIKE:       // "like"
-        case symbol_kind::S_path_elem:  // path_elem
-        case symbol_kind::S_id:         // id
+        case symbol_kind::SYM_ID:         // "identifier"
+        case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_INFINITY:   // "infinity"
+        case symbol_kind::SYM_NAN:        // "NaN"
+        case symbol_kind::SYM_NATURAL0:   // "natural0"
+        case symbol_kind::SYM_NUMBER:     // "number"
+        case symbol_kind::SYM_FLOAT:      // "float"
+        case symbol_kind::SYM_TIMESTAMP:  // "date"
+        case symbol_kind::SYM_UUID:       // "UUID"
+        case symbol_kind::SYM_OID:        // "ObjectId"
+        case symbol_kind::SYM_ARG:        // "argument"
+        case symbol_kind::SYM_BEGINSWITH: // "beginswith"
+        case symbol_kind::SYM_ENDSWITH:   // "endswith"
+        case symbol_kind::SYM_CONTAINS:   // "contains"
+        case symbol_kind::SYM_LIKE:       // "like"
+        case symbol_kind::SYM_path_elem:  // path_elem
+        case symbol_kind::SYM_id:         // id
             value.move<std::string>(that.value);
             break;
 
@@ -508,372 +508,372 @@ void parser::yy_print_(std::ostream& yyo, const basic_symbol<Base>& yysym) const
         symbol_kind_type yykind = yysym.kind();
         yyo << (yykind < YYNTOKENS ? "token" : "nterm") << ' ' << yysym.name() << " (";
         switch (yykind) {
-            case symbol_kind::S_YYEOF: // "end of file"
+            case symbol_kind::SYM_YYEOF: // "end of file"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_TRUEPREDICATE: // "truepredicate"
+            case symbol_kind::SYM_TRUEPREDICATE: // "truepredicate"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_FALSEPREDICATE: // "falsepredicate"
+            case symbol_kind::SYM_FALSEPREDICATE: // "falsepredicate"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_SORT: // "sort"
+            case symbol_kind::SYM_SORT: // "sort"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_DISTINCT: // "distinct"
+            case symbol_kind::SYM_DISTINCT: // "distinct"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_LIMIT: // "limit"
+            case symbol_kind::SYM_LIMIT: // "limit"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_ASCENDING: // "ascending"
+            case symbol_kind::SYM_ASCENDING: // "ascending"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_DESCENDING: // "descending"
+            case symbol_kind::SYM_DESCENDING: // "descending"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_TRUE: // "true"
+            case symbol_kind::SYM_TRUE: // "true"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_FALSE: // "false"
+            case symbol_kind::SYM_FALSE: // "false"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_NULL_VAL: // "null"
+            case symbol_kind::SYM_NULL_VAL: // "null"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_EQUAL: // "=="
+            case symbol_kind::SYM_EQUAL: // "=="
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_NOT_EQUAL: // "!="
+            case symbol_kind::SYM_NOT_EQUAL: // "!="
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_LESS: // "<"
+            case symbol_kind::SYM_LESS: // "<"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_GREATER: // ">"
+            case symbol_kind::SYM_GREATER: // ">"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_GREATER_EQUAL: // ">="
+            case symbol_kind::SYM_GREATER_EQUAL: // ">="
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_LESS_EQUAL: // "<="
+            case symbol_kind::SYM_LESS_EQUAL: // "<="
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_CASE: // "[c]"
+            case symbol_kind::SYM_CASE: // "[c]"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_ANY: // "any"
+            case symbol_kind::SYM_ANY: // "any"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_ALL: // "all"
+            case symbol_kind::SYM_ALL: // "all"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_NONE: // "none"
+            case symbol_kind::SYM_NONE: // "none"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_SIZE: // "@size"
+            case symbol_kind::SYM_SIZE: // "@size"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_COUNT: // "@count"
+            case symbol_kind::SYM_COUNT: // "@count"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_MAX: // "@max"
+            case symbol_kind::SYM_MAX: // "@max"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_MIN: // "@min"
+            case symbol_kind::SYM_MIN: // "@min"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_SUM: // "@sun"
+            case symbol_kind::SYM_SUM: // "@sun"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_AVG: // "@average"
+            case symbol_kind::SYM_AVG: // "@average"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_AND: // "&&"
+            case symbol_kind::SYM_AND: // "&&"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_OR: // "||"
+            case symbol_kind::SYM_OR: // "||"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_NOT: // "!"
+            case symbol_kind::SYM_NOT: // "!"
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_ID: // "identifier"
+            case symbol_kind::SYM_ID: // "identifier"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_STRING: // "string"
+            case symbol_kind::SYM_STRING: // "string"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_INFINITY: // "infinity"
+            case symbol_kind::SYM_INFINITY: // "infinity"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_NAN: // "NaN"
+            case symbol_kind::SYM_NAN: // "NaN"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_NATURAL0: // "natural0"
+            case symbol_kind::SYM_NATURAL0: // "natural0"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_NUMBER: // "number"
+            case symbol_kind::SYM_NUMBER: // "number"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_FLOAT: // "float"
+            case symbol_kind::SYM_FLOAT: // "float"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_TIMESTAMP: // "date"
+            case symbol_kind::SYM_TIMESTAMP: // "date"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_UUID: // "UUID"
+            case symbol_kind::SYM_UUID: // "UUID"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_OID: // "ObjectId"
+            case symbol_kind::SYM_OID: // "ObjectId"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_ARG: // "argument"
+            case symbol_kind::SYM_ARG: // "argument"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_BEGINSWITH: // "beginswith"
+            case symbol_kind::SYM_BEGINSWITH: // "beginswith"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_ENDSWITH: // "endswith"
+            case symbol_kind::SYM_ENDSWITH: // "endswith"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_CONTAINS: // "contains"
+            case symbol_kind::SYM_CONTAINS: // "contains"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_LIKE: // "like"
+            case symbol_kind::SYM_LIKE: // "like"
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_47_: // '('
+            case symbol_kind::SYM_47_: // '('
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_48_: // ')'
+            case symbol_kind::SYM_48_: // ')'
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_49_: // '.'
+            case symbol_kind::SYM_49_: // '.'
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_50_: // ','
+            case symbol_kind::SYM_50_: // ','
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_query: // query
+            case symbol_kind::SYM_query: // query
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_pred: // pred
+            case symbol_kind::SYM_pred: // pred
             {
                 yyo << yysym.value.template as<OrNode*>();
             } break;
 
-            case symbol_kind::S_and_pred: // and_pred
+            case symbol_kind::SYM_and_pred: // and_pred
             {
                 yyo << yysym.value.template as<AndNode*>();
             } break;
 
-            case symbol_kind::S_atom_pred: // atom_pred
+            case symbol_kind::SYM_atom_pred: // atom_pred
             {
                 yyo << yysym.value.template as<AtomPredNode*>();
             } break;
 
-            case symbol_kind::S_value: // value
+            case symbol_kind::SYM_value: // value
             {
                 yyo << yysym.value.template as<ValueNode*>();
             } break;
 
-            case symbol_kind::S_prop: // prop
+            case symbol_kind::SYM_prop: // prop
             {
                 yyo << yysym.value.template as<PropertyNode*>();
             } break;
 
-            case symbol_kind::S_pred_suffix: // pred_suffix
+            case symbol_kind::SYM_pred_suffix: // pred_suffix
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_atom_suffix: // atom_suffix
+            case symbol_kind::SYM_atom_suffix: // atom_suffix
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_distinct: // distinct
+            case symbol_kind::SYM_distinct: // distinct
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_distinct_param: // distinct_param
+            case symbol_kind::SYM_distinct_param: // distinct_param
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_sort: // sort
+            case symbol_kind::SYM_sort: // sort
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_sort_param: // sort_param
+            case symbol_kind::SYM_sort_param: // sort_param
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_limit: // limit
+            case symbol_kind::SYM_limit: // limit
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_direction: // direction
+            case symbol_kind::SYM_direction: // direction
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::S_constant: // constant
+            case symbol_kind::SYM_constant: // constant
             {
                 yyo << yysym.value.template as<ConstantNode*>();
             } break;
 
-            case symbol_kind::S_boolexpr: // boolexpr
+            case symbol_kind::SYM_boolexpr: // boolexpr
             {
                 yyo << yysym.value.template as<TrueOrFalseNode*>();
             } break;
 
-            case symbol_kind::S_comp_type: // comp_type
+            case symbol_kind::SYM_comp_type: // comp_type
             {
                 yyo << yysym.value.template as<int>();
             } break;
 
-            case symbol_kind::S_post_op: // post_op
+            case symbol_kind::SYM_post_op: // post_op
             {
                 yyo << yysym.value.template as<PostOpNode*>();
             } break;
 
-            case symbol_kind::S_aggr_op: // aggr_op
+            case symbol_kind::SYM_aggr_op: // aggr_op
             {
                 yyo << yysym.value.template as<AggrNode*>();
             } break;
 
-            case symbol_kind::S_equality: // equality
+            case symbol_kind::SYM_equality: // equality
             {
                 yyo << yysym.value.template as<int>();
             } break;
 
-            case symbol_kind::S_relational: // relational
+            case symbol_kind::SYM_relational: // relational
             {
                 yyo << yysym.value.template as<int>();
             } break;
 
-            case symbol_kind::S_stringop: // stringop
+            case symbol_kind::SYM_stringop: // stringop
             {
                 yyo << yysym.value.template as<int>();
             } break;
 
-            case symbol_kind::S_path: // path
+            case symbol_kind::SYM_path: // path
             {
                 yyo << yysym.value.template as<PathNode*>();
             } break;
 
-            case symbol_kind::S_path_elem: // path_elem
+            case symbol_kind::SYM_path_elem: // path_elem
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::S_id: // id
+            case symbol_kind::SYM_id: // id
             {
                 yyo << yysym.value.template as<std::string>();
             } break;
@@ -1029,12 +1029,12 @@ int parser::parse()
         }
         YY_SYMBOL_PRINT("Next token is", yyla);
 
-        if (yyla.kind() == symbol_kind::S_YYerror) {
+        if (yyla.kind() == symbol_kind::SYM_YYerror) {
             // The scanner already issued an error message, process directly
             // to error recovery.  But do not keep the error token as
             // lookahead, it is too special and may lead us to an endless
             // loop in error recovery. */
-            yyla.kind_ = symbol_kind::S_YYUNDEF;
+            yyla.kind_ = symbol_kind::SYM_YYUNDEF;
             goto yyerrlab1;
         }
 
@@ -1085,70 +1085,70 @@ int parser::parse()
                correct type. The default '$$ = $1' action is NOT applied
                when using variants.  */
             switch (yyr1_[yyn]) {
-                case symbol_kind::S_aggr_op: // aggr_op
+                case symbol_kind::SYM_aggr_op: // aggr_op
                     yylhs.value.emplace<AggrNode*>();
                     break;
 
-                case symbol_kind::S_and_pred: // and_pred
+                case symbol_kind::SYM_and_pred: // and_pred
                     yylhs.value.emplace<AndNode*>();
                     break;
 
-                case symbol_kind::S_atom_pred: // atom_pred
+                case symbol_kind::SYM_atom_pred: // atom_pred
                     yylhs.value.emplace<AtomPredNode*>();
                     break;
 
-                case symbol_kind::S_constant: // constant
+                case symbol_kind::SYM_constant: // constant
                     yylhs.value.emplace<ConstantNode*>();
                     break;
 
-                case symbol_kind::S_pred: // pred
+                case symbol_kind::SYM_pred: // pred
                     yylhs.value.emplace<OrNode*>();
                     break;
 
-                case symbol_kind::S_path: // path
+                case symbol_kind::SYM_path: // path
                     yylhs.value.emplace<PathNode*>();
                     break;
 
-                case symbol_kind::S_post_op: // post_op
+                case symbol_kind::SYM_post_op: // post_op
                     yylhs.value.emplace<PostOpNode*>();
                     break;
 
-                case symbol_kind::S_prop: // prop
+                case symbol_kind::SYM_prop: // prop
                     yylhs.value.emplace<PropertyNode*>();
                     break;
 
-                case symbol_kind::S_boolexpr: // boolexpr
+                case symbol_kind::SYM_boolexpr: // boolexpr
                     yylhs.value.emplace<TrueOrFalseNode*>();
                     break;
 
-                case symbol_kind::S_value: // value
+                case symbol_kind::SYM_value: // value
                     yylhs.value.emplace<ValueNode*>();
                     break;
 
-                case symbol_kind::S_comp_type:  // comp_type
-                case symbol_kind::S_equality:   // equality
-                case symbol_kind::S_relational: // relational
-                case symbol_kind::S_stringop:   // stringop
+                case symbol_kind::SYM_comp_type:  // comp_type
+                case symbol_kind::SYM_equality:   // equality
+                case symbol_kind::SYM_relational: // relational
+                case symbol_kind::SYM_stringop:   // stringop
                     yylhs.value.emplace<int>();
                     break;
 
-                case symbol_kind::S_ID:         // "identifier"
-                case symbol_kind::S_STRING:     // "string"
-                case symbol_kind::S_INFINITY:   // "infinity"
-                case symbol_kind::S_NAN:        // "NaN"
-                case symbol_kind::S_NATURAL0:   // "natural0"
-                case symbol_kind::S_NUMBER:     // "number"
-                case symbol_kind::S_FLOAT:      // "float"
-                case symbol_kind::S_TIMESTAMP:  // "date"
-                case symbol_kind::S_UUID:       // "UUID"
-                case symbol_kind::S_OID:        // "ObjectId"
-                case symbol_kind::S_ARG:        // "argument"
-                case symbol_kind::S_BEGINSWITH: // "beginswith"
-                case symbol_kind::S_ENDSWITH:   // "endswith"
-                case symbol_kind::S_CONTAINS:   // "contains"
-                case symbol_kind::S_LIKE:       // "like"
-                case symbol_kind::S_path_elem:  // path_elem
-                case symbol_kind::S_id:         // id
+                case symbol_kind::SYM_ID:         // "identifier"
+                case symbol_kind::SYM_STRING:     // "string"
+                case symbol_kind::SYM_INFINITY:   // "infinity"
+                case symbol_kind::SYM_NAN:        // "NaN"
+                case symbol_kind::SYM_NATURAL0:   // "natural0"
+                case symbol_kind::SYM_NUMBER:     // "number"
+                case symbol_kind::SYM_FLOAT:      // "float"
+                case symbol_kind::SYM_TIMESTAMP:  // "date"
+                case symbol_kind::SYM_UUID:       // "UUID"
+                case symbol_kind::SYM_OID:        // "ObjectId"
+                case symbol_kind::SYM_ARG:        // "argument"
+                case symbol_kind::SYM_BEGINSWITH: // "beginswith"
+                case symbol_kind::SYM_ENDSWITH:   // "endswith"
+                case symbol_kind::SYM_CONTAINS:   // "contains"
+                case symbol_kind::SYM_LIKE:       // "like"
+                case symbol_kind::SYM_path_elem:  // path_elem
+                case symbol_kind::SYM_id:         // id
                     yylhs.value.emplace<std::string>();
                     break;
 
@@ -1560,7 +1560,7 @@ int parser::parse()
                error, discard it.  */
 
             // Return failure if at end of input.
-            if (yyla.kind() == symbol_kind::S_YYEOF)
+            if (yyla.kind() == symbol_kind::SYM_YYEOF)
                 YYABORT;
             else if (!yyla.empty()) {
                 yy_destroy_("Error: discarding", yyla);
@@ -1598,8 +1598,8 @@ int parser::parse()
         for (;;) {
             yyn = yypact_[+yystack_[0].state];
             if (!yy_pact_value_is_default_(yyn)) {
-                yyn += symbol_kind::S_YYerror;
-                if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == symbol_kind::S_YYerror) {
+                yyn += symbol_kind::SYM_YYerror;
+                if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == symbol_kind::SYM_YYerror) {
                     yyn = yytable_[yyn];
                     if (0 < yyn)
                         break;
@@ -1747,7 +1747,7 @@ int parser::context::expected_tokens(symbol_kind_type yyarg[], int yyargn) const
         int yychecklim = yylast_ - yyn + 1;
         int yyxend = yychecklim < YYNTOKENS ? yychecklim : YYNTOKENS;
         for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
-            if (yycheck_[yyx + yyn] == yyx && yyx != symbol_kind::S_YYerror &&
+            if (yycheck_[yyx + yyn] == yyx && yyx != symbol_kind::SYM_YYerror &&
                 !yy_table_value_is_error_(yytable_[yyx + yyn])) {
                 if (!yyarg)
                     ++yycount;
@@ -1759,7 +1759,7 @@ int parser::context::expected_tokens(symbol_kind_type yyarg[], int yyargn) const
     }
 
     if (yyarg && yycount == 0 && 0 < yyargn)
-        yyarg[0] = symbol_kind::S_YYEMPTY;
+        yyarg[0] = symbol_kind::SYM_YYEMPTY;
     return yycount;
 }
 
@@ -1983,10 +1983,10 @@ const char* const parser::yytname_[] = {"\"end of file\"",
 
 #if YYDEBUG
 const unsigned char parser::yyrline_[] = {
-    0,   118, 118, 121, 122, 125, 126, 129, 130, 135, 136, 137, 142, 143, 144, 147, 148, 151, 152, 153,
-    154, 157, 158, 161, 162, 163, 165, 168, 169, 171, 174, 175, 177, 180, 181, 184, 185, 186, 187, 188,
-    189, 190, 191, 192, 193, 194, 195, 196, 199, 200, 203, 204, 205, 208, 209, 210, 213, 214, 215, 216,
-    219, 220, 223, 224, 225, 226, 229, 230, 231, 232, 235, 236, 239, 242, 243, 244, 245, 246};
+    0,   120, 120, 123, 124, 127, 128, 131, 132, 137, 138, 139, 144, 145, 146, 149, 150, 153, 154, 155,
+    156, 159, 160, 163, 164, 165, 167, 170, 171, 173, 176, 177, 179, 182, 183, 186, 187, 188, 189, 190,
+    191, 192, 193, 194, 195, 196, 197, 198, 201, 202, 205, 206, 207, 210, 211, 212, 215, 216, 217, 218,
+    221, 222, 225, 226, 227, 228, 231, 232, 233, 234, 237, 238, 241, 244, 245, 246, 247, 248};
 
 void parser::yy_stack_print_() const
 {

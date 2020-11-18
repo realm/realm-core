@@ -1,3 +1,6 @@
+%top{
+#include <stdint.h>
+}
 %{ /* -*- C++ -*- */
 # include <cerrno>
 # include <climits>
@@ -8,7 +11,7 @@
 # include "realm/parser/query_bison.hpp"
 %}
 
-%option noyywrap nounput noinput batch debug
+%option nounistd never-interactive noyywrap nounput noinput batch debug
 
 hex     [0-9a-fA-F]
 unicode "\\u"{hex}{4}

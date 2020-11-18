@@ -40,7 +40,7 @@
 using namespace realm;
 using namespace realm::query_parser;
 }
-
+%define api.symbol.prefix {SYM_}
 %define api.token.prefix {TOK_}
 %token
   END  0  "end of file"
@@ -103,6 +103,8 @@ using namespace realm::query_parser;
 %type  <AndNode*> and_pred
 %type  <PathNode*> path
 %type  <std::string> path_elem id
+
+%destructor { } <int>
 
 %printer { yyo << $$; } <*>;
 %printer { yyo << "<>"; } <>;

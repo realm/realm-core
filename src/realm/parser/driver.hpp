@@ -12,6 +12,9 @@
 // ... and declare it for the parser's sake.
 YY_DECL;
 
+#undef FALSE
+#undef TRUE
+
 namespace realm {
 
 namespace query_parser {
