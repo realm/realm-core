@@ -137,7 +137,7 @@ util::Optional<Mixed> Set::average(ColKey col) const
     return count == 0 ? none : util::make_optional(result);
 }
 
-bool Set::operator==(const Set& rhs) const noexcept
+bool Set::operator==(const Set&) const noexcept
 {
     REALM_TERMINATE("Not implemented yet");
 }

@@ -19,15 +19,17 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
-#include <realm/object-store/sync/auth_request_client.hpp>
-#include <realm/object-store/sync/app_service_client.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
-#include <realm/object-store/sync/push_client.hpp>
+#include <realm/object-store/sync/app_service_client.hpp>
+#include <realm/object-store/sync/auth_request_client.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/sync/push_client.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
 #include <realm/object_id.hpp>
 #include <realm/util/optional.hpp>
+
+#include <mutex>
 
 namespace realm {
 
@@ -66,10 +68,8 @@ public:
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
     App(const Config& config);
-    App(const App&) = default;
     App(App&&) noexcept = default;
-    App& operator=(App const&) = default;
-    App& operator=(App&&) = default;
+    App& operator=(App&&) noexcept = default;
 
     const Config& config() const
     {
@@ -341,6 +341,7 @@ private:
     friend class OnlyForTesting;
 
     Config m_config;
+    mutable std::unique_ptr<std::mutex> m_route_mutex = std::make_unique<std::mutex>();
     std::string m_base_url;
     std::string m_base_route;
     std::string m_app_route;

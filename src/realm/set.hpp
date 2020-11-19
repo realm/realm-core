@@ -878,15 +878,15 @@ struct CountingOutputIterator {
     using reference = void;
 
     explicit CountingOutputIterator(size_t& num)
-        : num(num)
+        : num(&num)
     {
     }
 
-    size_t& num;
+    size_t* num = nullptr;
 
     CountingOutputIterator& operator=(const T&)
     {
-        ++num;
+        ++*num;
         return *this;
     }
 
