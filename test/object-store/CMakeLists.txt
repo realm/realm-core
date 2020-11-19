@@ -112,7 +112,7 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     if(LibUV_FOUND)
         set(libuv_target LibUV::LibUV)
     elseif(REALM_FETCH_MISSING_DEPENDENCIES)
-        # download and include libuv
+        message(STATUS "LibUV not found, building from source with FetchContent")
         include(FetchContent)
         FetchContent_Declare(
             libuv
