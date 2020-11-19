@@ -4,6 +4,7 @@
 * New data types: Mixed, UUID and TypedLink.
 * New collection types: Set and Dictionary 
 * Enable mixed comparison queries between two columns of arbitrary types according to the Mixed::compare rules. ([#4018](https://github.com/realm/realm-core/pull/4018))
+* Added`TableView::update_query()`
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

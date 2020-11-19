@@ -231,6 +231,11 @@ public:
         return m_query;
     }
 
+    // Change the TableView to be backed by another query
+    // only works if the TableView is already backed by a query, and both
+    // queries points to the same Table
+    void update_query(const Query& q);
+
     std::unique_ptr<ConstTableView> clone() const
     {
         return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
