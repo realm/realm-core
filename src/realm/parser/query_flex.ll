@@ -70,9 +70,11 @@ blank   [ \t\r]
 ("T"{sint}":"{sint})|({int}"-"{int}"-"{int}[@T]{int}":"{int}":"{int}(":"{int})?) return yy::parser::make_TIMESTAMP(yytext);
 {int}                       return yy::parser::make_NATURAL0 (yytext);
 "$"{int}                    return yy::parser::make_ARG(yytext); 
-[+-]?{int}{exp}?            return yy::parser::make_NUMBER (yytext);
+[+-]?{int}                  return yy::parser::make_NUMBER (yytext);
 "0"[xX]{hex}+               return yy::parser::make_NUMBER (yytext);
+[+-]?{int}{exp}?            return yy::parser::make_FLOAT (yytext);
 [+-]?(({int}"."{optint})|({optint}"."{int})){exp}? return yy::parser::make_FLOAT (yytext);
+("B64\""[a-zA-Z0-9/\+=]*\")  return yy::parser::make_BASE64(yytext);
 ('({chars}|{escape}|{unicode})*')            return yy::parser::make_STRING (yytext);
 (\"({chars}|{escape}|{unicode})*\")            return yy::parser::make_STRING (yytext);
 {id}                        return yy::parser::make_ID (yytext);

@@ -222,6 +222,7 @@ parser::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that)
 
         case symbol_kind::SYM_ID:         // "identifier"
         case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_BASE64:     // "base64"
         case symbol_kind::SYM_INFINITY:   // "infinity"
         case symbol_kind::SYM_NAN:        // "NaN"
         case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -303,6 +304,7 @@ parser::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_ty
 
         case symbol_kind::SYM_ID:         // "identifier"
         case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_BASE64:     // "base64"
         case symbol_kind::SYM_INFINITY:   // "infinity"
         case symbol_kind::SYM_NAN:        // "NaN"
         case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -383,6 +385,7 @@ parser::stack_symbol_type& parser::stack_symbol_type::operator=(const stack_symb
 
         case symbol_kind::SYM_ID:         // "identifier"
         case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_BASE64:     // "base64"
         case symbol_kind::SYM_INFINITY:   // "infinity"
         case symbol_kind::SYM_NAN:        // "NaN"
         case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -461,6 +464,7 @@ parser::stack_symbol_type& parser::stack_symbol_type::operator=(stack_symbol_typ
 
         case symbol_kind::SYM_ID:         // "identifier"
         case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_BASE64:     // "base64"
         case symbol_kind::SYM_INFINITY:   // "infinity"
         case symbol_kind::SYM_NAN:        // "NaN"
         case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -668,6 +672,11 @@ void parser::yy_print_(std::ostream& yyo, const basic_symbol<Base>& yysym) const
                 yyo << yysym.value.template as<std::string>();
             } break;
 
+            case symbol_kind::SYM_BASE64: // "base64"
+            {
+                yyo << yysym.value.template as<std::string>();
+            } break;
+
             case symbol_kind::SYM_INFINITY: // "infinity"
             {
                 yyo << yysym.value.template as<std::string>();
@@ -733,22 +742,22 @@ void parser::yy_print_(std::ostream& yyo, const basic_symbol<Base>& yysym) const
                 yyo << yysym.value.template as<std::string>();
             } break;
 
-            case symbol_kind::SYM_47_: // '('
+            case symbol_kind::SYM_48_: // '('
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::SYM_48_: // ')'
+            case symbol_kind::SYM_49_: // ')'
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::SYM_49_: // '.'
+            case symbol_kind::SYM_50_: // '.'
             {
                 yyo << "<>";
             } break;
 
-            case symbol_kind::SYM_50_: // ','
+            case symbol_kind::SYM_51_: // ','
             {
                 yyo << "<>";
             } break;
@@ -1019,7 +1028,8 @@ int parser::parse()
                 yyla.move(yylookahead);
             }
 #if YY_EXCEPTIONS
-            catch (const syntax_error& yyexc) {
+            catch (const syntax_error& yyexc)
+            {
                 YYCDEBUG << "Caught exception: " << yyexc.what() << '\n';
                 error(yyexc);
                 goto yyerrlab1;
@@ -1133,6 +1143,7 @@ int parser::parse()
 
                 case symbol_kind::SYM_ID:         // "identifier"
                 case symbol_kind::SYM_STRING:     // "string"
+                case symbol_kind::SYM_BASE64:     // "base64"
                 case symbol_kind::SYM_INFINITY:   // "infinity"
                 case symbol_kind::SYM_NAN:        // "NaN"
                 case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -1319,201 +1330,207 @@ int parser::parse()
                             ConstantNode::STRING, yystack_[0].value.as<std::string>());
                     } break;
 
-                    case 40: // constant: "float"
+                    case 40: // constant: "base64"
+                    {
+                        yylhs.value.as<ConstantNode*>() = drv.m_parse_nodes.create<ConstantNode>(
+                            ConstantNode::BASE64, yystack_[0].value.as<std::string>());
+                    } break;
+
+                    case 41: // constant: "float"
                     {
                         yylhs.value.as<ConstantNode*>() = drv.m_parse_nodes.create<ConstantNode>(
                             ConstantNode::FLOAT, yystack_[0].value.as<std::string>());
                     } break;
 
-                    case 41: // constant: "date"
+                    case 42: // constant: "date"
                     {
                         yylhs.value.as<ConstantNode*>() = drv.m_parse_nodes.create<ConstantNode>(
                             ConstantNode::TIMESTAMP, yystack_[0].value.as<std::string>());
                     } break;
 
-                    case 42: // constant: "UUID"
+                    case 43: // constant: "UUID"
                     {
                         yylhs.value.as<ConstantNode*>() = drv.m_parse_nodes.create<ConstantNode>(
                             ConstantNode::UUID_T, yystack_[0].value.as<std::string>());
                     } break;
 
-                    case 43: // constant: "ObjectId"
+                    case 44: // constant: "ObjectId"
                     {
                         yylhs.value.as<ConstantNode*>() = drv.m_parse_nodes.create<ConstantNode>(
                             ConstantNode::OID, yystack_[0].value.as<std::string>());
                     } break;
 
-                    case 44: // constant: "true"
+                    case 45: // constant: "true"
                     {
                         yylhs.value.as<ConstantNode*>() =
                             drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, "");
                     } break;
 
-                    case 45: // constant: "false"
+                    case 46: // constant: "false"
                     {
                         yylhs.value.as<ConstantNode*>() =
                             drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, "");
                     } break;
 
-                    case 46: // constant: "null"
+                    case 47: // constant: "null"
                     {
                         yylhs.value.as<ConstantNode*>() =
                             drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, "");
                     } break;
 
-                    case 47: // constant: "argument"
+                    case 48: // constant: "argument"
                     {
                         yylhs.value.as<ConstantNode*>() = drv.m_parse_nodes.create<ConstantNode>(
                             ConstantNode::ARG, yystack_[0].value.as<std::string>());
                     } break;
 
-                    case 48: // boolexpr: "truepredicate"
+                    case 49: // boolexpr: "truepredicate"
                     {
                         yylhs.value.as<TrueOrFalseNode*>() = drv.m_parse_nodes.create<TrueOrFalseNode>(true);
                     } break;
 
-                    case 49: // boolexpr: "falsepredicate"
+                    case 50: // boolexpr: "falsepredicate"
                     {
                         yylhs.value.as<TrueOrFalseNode*>() = drv.m_parse_nodes.create<TrueOrFalseNode>(false);
                     } break;
 
-                    case 50: // comp_type: "any"
+                    case 51: // comp_type: "any"
                     {
                         yylhs.value.as<int>() = int(ExpressionComparisonType::Any);
                     } break;
 
-                    case 51: // comp_type: "all"
+                    case 52: // comp_type: "all"
                     {
                         yylhs.value.as<int>() = int(ExpressionComparisonType::All);
                     } break;
 
-                    case 52: // comp_type: "none"
+                    case 53: // comp_type: "none"
                     {
                         yylhs.value.as<int>() = int(ExpressionComparisonType::None);
                     } break;
 
-                    case 53: // post_op: %empty
+                    case 54: // post_op: %empty
                     {
                         yylhs.value.as<PostOpNode*>() = nullptr;
                     } break;
 
-                    case 54: // post_op: '.' "@count"
+                    case 55: // post_op: '.' "@count"
                     {
                         yylhs.value.as<PostOpNode*>() = drv.m_parse_nodes.create<PostOpNode>(PostOpNode::COUNT);
                     } break;
 
-                    case 55: // post_op: '.' "@size"
+                    case 56: // post_op: '.' "@size"
                     {
                         yylhs.value.as<PostOpNode*>() = drv.m_parse_nodes.create<PostOpNode>(PostOpNode::SIZE);
                     } break;
 
-                    case 56: // aggr_op: "@max"
+                    case 57: // aggr_op: "@max"
                     {
                         yylhs.value.as<AggrNode*>() = drv.m_parse_nodes.create<AggrNode>(AggrNode::MAX);
                     } break;
 
-                    case 57: // aggr_op: "@min"
+                    case 58: // aggr_op: "@min"
                     {
                         yylhs.value.as<AggrNode*>() = drv.m_parse_nodes.create<AggrNode>(AggrNode::MIN);
                     } break;
 
-                    case 58: // aggr_op: "@sun"
+                    case 59: // aggr_op: "@sun"
                     {
                         yylhs.value.as<AggrNode*>() = drv.m_parse_nodes.create<AggrNode>(AggrNode::SUM);
                     } break;
 
-                    case 59: // aggr_op: "@average"
+                    case 60: // aggr_op: "@average"
                     {
                         yylhs.value.as<AggrNode*>() = drv.m_parse_nodes.create<AggrNode>(AggrNode::AVG);
                     } break;
 
-                    case 60: // equality: "=="
+                    case 61: // equality: "=="
                     {
                         yylhs.value.as<int>() = CompareNode::EQUAL;
                     } break;
 
-                    case 61: // equality: "!="
+                    case 62: // equality: "!="
                     {
                         yylhs.value.as<int>() = CompareNode::NOT_EQUAL;
                     } break;
 
-                    case 62: // relational: "<"
+                    case 63: // relational: "<"
                     {
                         yylhs.value.as<int>() = CompareNode::LESS;
                     } break;
 
-                    case 63: // relational: "<="
+                    case 64: // relational: "<="
                     {
                         yylhs.value.as<int>() = CompareNode::LESS_EQUAL;
                     } break;
 
-                    case 64: // relational: ">"
+                    case 65: // relational: ">"
                     {
                         yylhs.value.as<int>() = CompareNode::GREATER;
                     } break;
 
-                    case 65: // relational: ">="
+                    case 66: // relational: ">="
                     {
                         yylhs.value.as<int>() = CompareNode::GREATER_EQUAL;
                     } break;
 
-                    case 66: // stringop: "beginswith"
+                    case 67: // stringop: "beginswith"
                     {
                         yylhs.value.as<int>() = CompareNode::BEGINSWITH;
                     } break;
 
-                    case 67: // stringop: "endswith"
+                    case 68: // stringop: "endswith"
                     {
                         yylhs.value.as<int>() = CompareNode::ENDSWITH;
                     } break;
 
-                    case 68: // stringop: "contains"
+                    case 69: // stringop: "contains"
                     {
                         yylhs.value.as<int>() = CompareNode::CONTAINS;
                     } break;
 
-                    case 69: // stringop: "like"
+                    case 70: // stringop: "like"
                     {
                         yylhs.value.as<int>() = CompareNode::LIKE;
                     } break;
 
-                    case 70: // path: %empty
+                    case 71: // path: %empty
                     {
                         yylhs.value.as<PathNode*>() = drv.m_parse_nodes.create<PathNode>();
                     } break;
 
-                    case 71: // path: path path_elem
+                    case 72: // path: path path_elem
                     {
                         yystack_[1].value.as<PathNode*>()->path_elems.push_back(yystack_[0].value.as<std::string>());
                         yylhs.value.as<PathNode*>() = yystack_[1].value.as<PathNode*>();
                     } break;
 
-                    case 72: // path_elem: id '.'
+                    case 73: // path_elem: id '.'
                     {
                         yylhs.value.as<std::string>() = yystack_[1].value.as<std::string>();
                     } break;
 
-                    case 73: // id: "identifier"
+                    case 74: // id: "identifier"
                     {
                         yylhs.value.as<std::string>() = yystack_[0].value.as<std::string>();
                     } break;
 
-                    case 74: // id: "beginswith"
+                    case 75: // id: "beginswith"
                     {
                         yylhs.value.as<std::string>() = yystack_[0].value.as<std::string>();
                     } break;
 
-                    case 75: // id: "endswith"
+                    case 76: // id: "endswith"
                     {
                         yylhs.value.as<std::string>() = yystack_[0].value.as<std::string>();
                     } break;
 
-                    case 76: // id: "contains"
+                    case 77: // id: "contains"
                     {
                         yylhs.value.as<std::string>() = yystack_[0].value.as<std::string>();
                     } break;
 
-                    case 77: // id: "like"
+                    case 78: // id: "like"
                     {
                         yylhs.value.as<std::string>() = yystack_[0].value.as<std::string>();
                     } break;
@@ -1524,7 +1541,8 @@ int parser::parse()
                 }
             }
 #if YY_EXCEPTIONS
-            catch (const syntax_error& yyexc) {
+            catch (const syntax_error& yyexc)
+            {
                 YYCDEBUG << "Caught exception: " << yyexc.what() << '\n';
                 error(yyexc);
                 YYERROR;
@@ -1658,7 +1676,8 @@ int parser::parse()
         return yyresult;
     }
 #if YY_EXCEPTIONS
-    catch (...) {
+    catch (...)
+    {
         YYCDEBUG << "Exception caught: cleaning lookahead and stack\n";
         // Do not try to display the values of the reclaimed symbols,
         // as their printers might throw an exception.
@@ -1836,62 +1855,63 @@ std::string parser::yysyntax_error_(const context& yyctx) const
 }
 
 
-const signed char parser::yypact_ninf_ = -50;
+const signed char parser::yypact_ninf_ = -51;
 
 const signed char parser::yytable_ninf_ = -1;
 
 const short parser::yypact_[] = {
-    52,  -50, -50, -50, -50, -50, -50, -50, -50, 52,  -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, 52,  11,  -11,
-    -1,  -50, -8,  -50, -50, -50, -50, -12, -50, -18, -50, 52,  16,  52,  -50, -50, -50, -50, -50, -50, -50, -50, -50,
-    -50, 85,  151, 118, -12, -50, -50, -50, -50, -50, -50, -25, -50, -1,  10,  12,  13,  -50, -50, -50, -50, -50, 151,
-    -50, -50, 151, -50, -9,  -10, -50, -50, -50, 6,   -50, -50, -50, -50, -50, -50, -50, -50, -50, 17,  2,   -12, 3,
-    -12, 20,  -12, -50, -50, -5,  -50, -50, -9,  -50, -50, -12, -50, -50, -50, -12, -5,  -9,  -50};
+    52,  -51, -51, -51, -51, -51, -51, -51, -51, 52,  -51, -51, -51, -51, -51, -51, -51, -51, -51, -51, -51, 52,  23,
+    -2,  5,   -51, -9,  -51, -51, -51, -51, -14, -51, -20, -51, 52,  14,  52,  -51, -51, -51, -51, -51, -51, -51, -51,
+    -51, -51, 86,  154, 120, -14, -51, -51, -51, -51, -51, -51, -10, -51, 5,   3,   9,   11,  -51, -51, -51, -51, -51,
+    154, -51, -51, 154, -51, -8,  -11, -51, -51, -51, 16,  -51, -51, -51, -51, -51, -51, -51, -51, -51, 10,  -27, -14,
+    1,   -14, 12,  -14, -51, -51, -6,  -51, -51, -8,  -51, -51, -14, -51, -51, -51, -14, -6,  -8,  -51};
 
 const signed char parser::yydefact_[] = {
-    70, 48, 49, 44, 45, 46, 50, 51, 52, 70, 39, 37, 38, 35, 36, 40, 41, 42, 43, 47, 70, 0,  21, 3,  5,  0,  16, 15,
-    14, 70, 0,  12, 0,  1,  70, 2,  70, 60, 61, 62, 64, 65, 63, 66, 67, 68, 69, 70, 70, 70, 0,  73, 74, 75, 76, 77,
-    71, 53, 13, 4,  0,  0,  0,  22, 24, 23, 25, 6,  70, 7,  9,  70, 10, 17, 72, 18, 70, 70, 0,  8,  11, 72, 55, 54,
-    56, 57, 58, 59, 20, 0,  0,  0,  0,  0,  0,  29, 70, 0,  26, 70, 27, 32, 19, 0,  33, 34, 30, 0,  0,  28, 31};
+    71, 49, 50, 45, 46, 47, 51, 52, 53, 71, 39, 40, 37, 38, 35, 36, 41, 42, 43, 44, 48, 71, 0,  21, 3,  5,  0,  16,
+    15, 14, 71, 0,  12, 0,  1,  71, 2,  71, 61, 62, 63, 65, 66, 64, 67, 68, 69, 70, 71, 71, 71, 0,  74, 75, 76, 77,
+    78, 72, 54, 13, 4,  0,  0,  0,  22, 24, 23, 25, 6,  71, 7,  9,  71, 10, 17, 73, 18, 71, 71, 0,  8,  11, 73, 56,
+    55, 57, 58, 59, 60, 20, 0,  0,  0,  0,  0,  0,  29, 71, 0,  26, 71, 27, 32, 19, 0,  33, 34, 30, 0,  0,  28, 31};
 
-const signed char parser::yypgoto_[] = {-50, -50, 19,  27,  -7,  -22, -50, -50, -50, -50, -50, -50, -50,
-                                        -50, -43, -50, -50, -50, -50, -50, -50, -50, -50, -29, -50, -49};
+const signed char parser::yypgoto_[] = {-51, -51, 44,  31,  2,   -23, -51, -51, -51, -51, -51, -51, -51,
+                                        -51, -41, -51, -51, -51, -51, -51, -51, -51, -51, -30, -51, -50};
 
-const signed char parser::yydefgoto_[] = {-1, 21,  22, 23, 24, 25, 26, 35, 63, 64, 91, 65, 89,
-                                          66, 106, 27, 28, 29, 75, 88, 47, 48, 49, 30, 56, 57};
+const signed char parser::yydefgoto_[] = {-1, 22,  23, 24, 25, 26, 27, 36, 64, 65, 92, 66, 90,
+                                          67, 107, 28, 29, 30, 76, 89, 48, 49, 50, 31, 57, 58};
 
 const signed char parser::yytable_[] = {
-    50, 73, 31, 104, 105, 37, 38, 39, 40,  41, 42, 33, 34, 82, 83, 84,  85, 86,  87,  34, 51,  60, 61, 62, 74,
-    69, 70, 72, 36,  67,  58, 52, 53, 54,  55, 43, 44, 45, 46, 32, 81,  97, 93,  100, 81, 102, 79, 90, 92, 80,
-    95, 98, 96, 99,  108, 1,  2,  76, 109, 77, 78, 59, 3,  4,  5,  110, 94, 103, 101, 0,  107, 0,  6,  7,  8,
-    0,  0,  0,  0,   0,   0,  0,  0,  9,   0,  10, 11, 12, 13, 14, 15,  16, 17,  18,  19, 3,   4,  5,  0,  20,
-    0,  0,  0,  0,   68,  6,  7,  8,  0,   0,  0,  0,  0,  0,  0,  0,   0,  0,   10,  11, 12,  13, 14, 15, 16,
-    17, 18, 19, 3,   4,   5,  0,  0,  0,   0,  0,  0,  71, 6,  7,  8,   0,  0,   0,   0,  0,   0,  0,  0,  0,
-    0,  10, 11, 12,  13,  14, 15, 16, 17,  18, 19, 3,  4,  5,  0,  0,   0,  0,   0,   0,  0,   6,  7,  8,  0,
-    0,  0,  0,  0,   0,   0,  0,  0,  0,   10, 11, 12, 13, 14, 15, 16,  17, 18,  19};
+    51, 74, 105, 106, 38,  39, 40, 41, 42,  43, 35, 32,  83, 84, 85, 86, 87, 88,  52,  61, 62,  63, 96, 34, 97,
+    70, 71, 73,  35,  59,  53, 54, 55, 56,  37, 44, 45,  46, 47, 68, 75, 98, 82,  101, 82, 103, 80, 91, 93, 81,
+    99, 77, 100, 94,  109, 1,  2,  78, 110, 79, 95, 102, 3,  4,  5,  33, 60, 104, 111, 0,  108, 0,  6,  7,  8,
+    0,  0,  0,   0,   0,   0,  0,  0,  9,   0,  10, 11,  12, 13, 14, 15, 16, 17,  18,  19, 20,  3,  4,  5,  0,
+    21, 0,  0,   0,   0,   69, 6,  7,  8,   0,  0,  0,   0,  0,  0,  0,  0,  0,   0,   10, 11,  12, 13, 14, 15,
+    16, 17, 18,  19,  20,  3,  4,  5,  0,   0,  0,  0,   0,  0,  72, 6,  7,  8,   0,   0,  0,   0,  0,  0,  0,
+    0,  0,  0,   10,  11,  12, 13, 14, 15,  16, 17, 18,  19, 20, 3,  4,  5,  0,   0,   0,  0,   0,  0,  0,  6,
+    7,  8,  0,   0,   0,   0,  0,  0,  0,   0,  0,  0,   10, 11, 12, 13, 14, 15,  16,  17, 18,  19, 20};
 
 const signed char parser::yycheck_[] = {
-    29, 50, 9,   8,  9,  13, 14, 15, 16, 17,  18, 0,  30, 23, 24, 25, 26, 27, 28, 30, 32, 5,  6,  7,  49, 47, 48,  49,
-    29, 36, 48,  43, 44, 45, 46, 43, 44, 45,  46, 20, 49, 90, 36, 92, 49, 94, 68, 76, 77, 71, 48, 48, 50, 50, 103, 3,
-    4,  47, 107, 47, 47, 34, 10, 11, 12, 108, 49, 96, 48, -1, 99, -1, 20, 21, 22, -1, -1, -1, -1, -1, -1, -1, -1,  31,
-    -1, 33, 34,  35, 36, 37, 38, 39, 40, 41,  42, 10, 11, 12, -1, 47, -1, -1, -1, -1, 19, 20, 21, 22, -1, -1, -1,  -1,
-    -1, -1, -1,  -1, -1, -1, 33, 34, 35, 36,  37, 38, 39, 40, 41, 42, 10, 11, 12, -1, -1, -1, -1, -1, -1, 19, 20,  21,
-    22, -1, -1,  -1, -1, -1, -1, -1, -1, -1,  -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 10, 11, 12, -1, -1, -1,  -1,
-    -1, -1, -1,  20, 21, 22, -1, -1, -1, -1,  -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42};
+    30, 51, 8,  9,  13,  14, 15, 16, 17,  18, 30, 9,  23, 24, 25, 26, 27, 28, 32,  5,  6,   7,  49, 0,  51,
+    48, 49, 50, 30, 49,  44, 45, 46, 47,  29, 44, 45, 46, 47, 37, 50, 91, 50, 93,  50, 95,  69, 77, 78, 72,
+    49, 48, 51, 37, 104, 3,  4,  48, 108, 48, 50, 49, 10, 11, 12, 21, 35, 97, 109, -1, 100, -1, 20, 21, 22,
+    -1, -1, -1, -1, -1,  -1, -1, -1, 31,  -1, 33, 34, 35, 36, 37, 38, 39, 40, 41,  42, 43,  10, 11, 12, -1,
+    48, -1, -1, -1, -1,  19, 20, 21, 22,  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  33, 34,  35, 36, 37, 38,
+    39, 40, 41, 42, 43,  10, 11, 12, -1,  -1, -1, -1, -1, -1, 19, 20, 21, 22, -1,  -1, -1,  -1, -1, -1, -1,
+    -1, -1, -1, 33, 34,  35, 36, 37, 38,  39, 40, 41, 42, 43, 10, 11, 12, -1, -1,  -1, -1,  -1, -1, -1, 20,
+    21, 22, -1, -1, -1,  -1, -1, -1, -1,  -1, -1, -1, 33, 34, 35, 36, 37, 38, 39,  40, 41,  42, 43};
 
 const signed char parser::yystos_[] = {
-    0,  3,  4,  10, 11, 12, 20, 21, 22, 31, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 47, 52, 53, 54, 55, 56, 57, 66,
-    67, 68, 74, 55, 53, 0,  30, 58, 29, 13, 14, 15, 16, 17, 18, 43, 44, 45, 46, 71, 72, 73, 74, 32, 43, 44, 45, 46,
-    75, 76, 48, 54, 5,  6,  7,  59, 60, 62, 64, 55, 19, 56, 56, 19, 56, 76, 49, 69, 47, 47, 47, 56, 56, 49, 23, 24,
-    25, 26, 27, 28, 70, 63, 74, 61, 74, 36, 49, 48, 50, 76, 48, 50, 76, 48, 76, 74, 8,  9,  65, 74, 76, 76, 65};
+    0,  3,  4,  10, 11, 12, 20, 21, 22, 31, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 48, 53, 54, 55, 56, 57, 58,
+    67, 68, 69, 75, 56, 54, 0,  30, 59, 29, 13, 14, 15, 16, 17, 18, 44, 45, 46, 47, 72, 73, 74, 75, 32, 44, 45, 46,
+    47, 76, 77, 49, 55, 5,  6,  7,  60, 61, 63, 65, 56, 19, 57, 57, 19, 57, 77, 50, 70, 48, 48, 48, 57, 57, 50, 23,
+    24, 25, 26, 27, 28, 71, 64, 75, 62, 75, 37, 50, 49, 51, 77, 49, 51, 77, 49, 77, 75, 8,  9,  66, 75, 77, 77, 66};
 
-const signed char parser::yyr1_[] = {0,  51, 52, 53, 53, 54, 54, 55, 55, 55, 55, 55, 55, 55, 55, 56, 56, 57, 57, 57,
-                                     57, 58, 58, 59, 59, 59, 60, 61, 61, 62, 63, 63, 64, 65, 65, 66, 66, 66, 66, 66,
-                                     66, 66, 66, 66, 66, 66, 66, 66, 67, 67, 68, 68, 68, 69, 69, 69, 70, 70, 70, 70,
-                                     71, 71, 72, 72, 72, 72, 73, 73, 73, 73, 74, 74, 75, 76, 76, 76, 76, 76};
+const signed char parser::yyr1_[] = {0,  52, 53, 54, 54, 55, 55, 56, 56, 56, 56, 56, 56, 56, 56, 57, 57, 58, 58, 58,
+                                     58, 59, 59, 60, 60, 60, 61, 62, 62, 63, 64, 64, 65, 66, 66, 67, 67, 67, 67, 67,
+                                     67, 67, 67, 67, 67, 67, 67, 67, 67, 68, 68, 69, 69, 69, 70, 70, 70, 71, 71, 71,
+                                     71, 72, 72, 73, 73, 73, 73, 74, 74, 74, 74, 75, 75, 76, 77, 77, 77, 77, 77};
 
-const signed char parser::yyr2_[] = {0, 2, 2, 1, 3, 1, 3, 3, 4, 3, 3, 4, 2, 3, 1, 1, 1, 3, 3, 6, 4, 0, 2, 1, 1, 1,
-                                     4, 2, 4, 4, 3, 5, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                                     1, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 1};
+const signed char parser::yyr2_[] = {0, 2, 2, 1, 3, 1, 3, 3, 4, 3, 3, 4, 2, 3, 1, 1, 1, 3, 3, 6, 4, 0, 2, 1, 1, 1, 4,
+                                     2, 4, 4, 3, 5, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                                     0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 1, 1, 1, 1, 1};
 
 
 #if YYDEBUG || 1
@@ -1931,6 +1951,7 @@ const char* const parser::yytname_[] = {"\"end of file\"",
                                         "\"!\"",
                                         "\"identifier\"",
                                         "\"string\"",
+                                        "\"base64\"",
                                         "\"infinity\"",
                                         "\"NaN\"",
                                         "\"natural0\"",
@@ -1980,10 +2001,10 @@ const char* const parser::yytname_[] = {"\"end of file\"",
 
 #if YYDEBUG
 const unsigned char parser::yyrline_[] = {
-    0,   120, 120, 123, 124, 127, 128, 131, 132, 137, 138, 139, 144, 145, 146, 149, 150, 153, 154, 155,
-    156, 159, 160, 163, 164, 165, 167, 170, 171, 173, 176, 177, 179, 182, 183, 186, 187, 188, 189, 190,
-    191, 192, 193, 194, 195, 196, 197, 198, 201, 202, 205, 206, 207, 210, 211, 212, 215, 216, 217, 218,
-    221, 222, 225, 226, 227, 228, 231, 232, 233, 234, 237, 238, 241, 244, 245, 246, 247, 248};
+    0,   121, 121, 124, 125, 128, 129, 132, 133, 138, 139, 140, 145, 146, 147, 150, 151, 154, 155, 156,
+    157, 160, 161, 164, 165, 166, 168, 171, 172, 174, 177, 178, 180, 183, 184, 187, 188, 189, 190, 191,
+    192, 193, 194, 195, 196, 197, 198, 199, 200, 203, 204, 207, 208, 209, 212, 213, 214, 217, 218, 219,
+    220, 223, 224, 227, 228, 229, 230, 233, 234, 235, 236, 239, 240, 243, 246, 247, 248, 249, 250};
 
 void parser::yy_stack_print_() const
 {

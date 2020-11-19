@@ -421,6 +421,7 @@ public:
 
             // "identifier"
             // "string"
+            // "base64"
             // "infinity"
             // "NaN"
             // "natural0"
@@ -511,19 +512,20 @@ public:
             TOK_NOT = 286,            // "!"
             TOK_ID = 287,             // "identifier"
             TOK_STRING = 288,         // "string"
-            TOK_INFINITY = 289,       // "infinity"
-            TOK_NAN = 290,            // "NaN"
-            TOK_NATURAL0 = 291,       // "natural0"
-            TOK_NUMBER = 292,         // "number"
-            TOK_FLOAT = 293,          // "float"
-            TOK_TIMESTAMP = 294,      // "date"
-            TOK_UUID = 295,           // "UUID"
-            TOK_OID = 296,            // "ObjectId"
-            TOK_ARG = 297,            // "argument"
-            TOK_BEGINSWITH = 298,     // "beginswith"
-            TOK_ENDSWITH = 299,       // "endswith"
-            TOK_CONTAINS = 300,       // "contains"
-            TOK_LIKE = 301            // "like"
+            TOK_BASE64 = 289,         // "base64"
+            TOK_INFINITY = 290,       // "infinity"
+            TOK_NAN = 291,            // "NaN"
+            TOK_NATURAL0 = 292,       // "natural0"
+            TOK_NUMBER = 293,         // "number"
+            TOK_FLOAT = 294,          // "float"
+            TOK_TIMESTAMP = 295,      // "date"
+            TOK_UUID = 296,           // "UUID"
+            TOK_OID = 297,            // "ObjectId"
+            TOK_ARG = 298,            // "argument"
+            TOK_BEGINSWITH = 299,     // "beginswith"
+            TOK_ENDSWITH = 300,       // "endswith"
+            TOK_CONTAINS = 301,       // "contains"
+            TOK_LIKE = 302            // "like"
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -538,7 +540,7 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 51, ///< Number of tokens.
+            YYNTOKENS = 52, ///< Number of tokens.
             SYM_YYEMPTY = -2,
             SYM_YYEOF = 0,           // "end of file"
             SYM_YYerror = 1,         // error
@@ -574,49 +576,50 @@ public:
             SYM_NOT = 31,            // "!"
             SYM_ID = 32,             // "identifier"
             SYM_STRING = 33,         // "string"
-            SYM_INFINITY = 34,       // "infinity"
-            SYM_NAN = 35,            // "NaN"
-            SYM_NATURAL0 = 36,       // "natural0"
-            SYM_NUMBER = 37,         // "number"
-            SYM_FLOAT = 38,          // "float"
-            SYM_TIMESTAMP = 39,      // "date"
-            SYM_UUID = 40,           // "UUID"
-            SYM_OID = 41,            // "ObjectId"
-            SYM_ARG = 42,            // "argument"
-            SYM_BEGINSWITH = 43,     // "beginswith"
-            SYM_ENDSWITH = 44,       // "endswith"
-            SYM_CONTAINS = 45,       // "contains"
-            SYM_LIKE = 46,           // "like"
-            SYM_47_ = 47,            // '('
-            SYM_48_ = 48,            // ')'
-            SYM_49_ = 49,            // '.'
-            SYM_50_ = 50,            // ','
-            SYM_YYACCEPT = 51,       // $accept
-            SYM_query = 52,          // query
-            SYM_pred = 53,           // pred
-            SYM_and_pred = 54,       // and_pred
-            SYM_atom_pred = 55,      // atom_pred
-            SYM_value = 56,          // value
-            SYM_prop = 57,           // prop
-            SYM_pred_suffix = 58,    // pred_suffix
-            SYM_atom_suffix = 59,    // atom_suffix
-            SYM_distinct = 60,       // distinct
-            SYM_distinct_param = 61, // distinct_param
-            SYM_sort = 62,           // sort
-            SYM_sort_param = 63,     // sort_param
-            SYM_limit = 64,          // limit
-            SYM_direction = 65,      // direction
-            SYM_constant = 66,       // constant
-            SYM_boolexpr = 67,       // boolexpr
-            SYM_comp_type = 68,      // comp_type
-            SYM_post_op = 69,        // post_op
-            SYM_aggr_op = 70,        // aggr_op
-            SYM_equality = 71,       // equality
-            SYM_relational = 72,     // relational
-            SYM_stringop = 73,       // stringop
-            SYM_path = 74,           // path
-            SYM_path_elem = 75,      // path_elem
-            SYM_id = 76              // id
+            SYM_BASE64 = 34,         // "base64"
+            SYM_INFINITY = 35,       // "infinity"
+            SYM_NAN = 36,            // "NaN"
+            SYM_NATURAL0 = 37,       // "natural0"
+            SYM_NUMBER = 38,         // "number"
+            SYM_FLOAT = 39,          // "float"
+            SYM_TIMESTAMP = 40,      // "date"
+            SYM_UUID = 41,           // "UUID"
+            SYM_OID = 42,            // "ObjectId"
+            SYM_ARG = 43,            // "argument"
+            SYM_BEGINSWITH = 44,     // "beginswith"
+            SYM_ENDSWITH = 45,       // "endswith"
+            SYM_CONTAINS = 46,       // "contains"
+            SYM_LIKE = 47,           // "like"
+            SYM_48_ = 48,            // '('
+            SYM_49_ = 49,            // ')'
+            SYM_50_ = 50,            // '.'
+            SYM_51_ = 51,            // ','
+            SYM_YYACCEPT = 52,       // $accept
+            SYM_query = 53,          // query
+            SYM_pred = 54,           // pred
+            SYM_and_pred = 55,       // and_pred
+            SYM_atom_pred = 56,      // atom_pred
+            SYM_value = 57,          // value
+            SYM_prop = 58,           // prop
+            SYM_pred_suffix = 59,    // pred_suffix
+            SYM_atom_suffix = 60,    // atom_suffix
+            SYM_distinct = 61,       // distinct
+            SYM_distinct_param = 62, // distinct_param
+            SYM_sort = 63,           // sort
+            SYM_sort_param = 64,     // sort_param
+            SYM_limit = 65,          // limit
+            SYM_direction = 66,      // direction
+            SYM_constant = 67,       // constant
+            SYM_boolexpr = 68,       // boolexpr
+            SYM_comp_type = 69,      // comp_type
+            SYM_post_op = 70,        // post_op
+            SYM_aggr_op = 71,        // aggr_op
+            SYM_equality = 72,       // equality
+            SYM_relational = 73,     // relational
+            SYM_stringop = 74,       // stringop
+            SYM_path = 75,           // path
+            SYM_path_elem = 76,      // path_elem
+            SYM_id = 77              // id
         };
     };
 
@@ -699,6 +702,7 @@ public:
 
                 case symbol_kind::SYM_ID:         // "identifier"
                 case symbol_kind::SYM_STRING:     // "string"
+                case symbol_kind::SYM_BASE64:     // "base64"
                 case symbol_kind::SYM_INFINITY:   // "infinity"
                 case symbol_kind::SYM_NAN:        // "NaN"
                 case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -992,6 +996,7 @@ public:
 
                 case symbol_kind::SYM_ID:         // "identifier"
                 case symbol_kind::SYM_STRING:     // "string"
+                case symbol_kind::SYM_BASE64:     // "base64"
                 case symbol_kind::SYM_INFINITY:   // "infinity"
                 case symbol_kind::SYM_NAN:        // "NaN"
                 case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -1534,6 +1539,17 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_BASE64(std::string v)
+    {
+        return symbol_type(token::TOK_BASE64, std::move(v));
+    }
+#else
+    static symbol_type make_BASE64(const std::string& v)
+    {
+        return symbol_type(token::TOK_BASE64, v);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_INFINITY(std::string v)
     {
         return symbol_type(token::TOK_INFINITY, std::move(v));
@@ -1996,9 +2012,9 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 193, ///< Last index in yytable_.
+        yylast_ = 197, ///< Last index in yytable_.
         yynnts_ = 26,  ///< Number of nonterminal symbols.
-        yyfinal_ = 33  ///< Termination state number.
+        yyfinal_ = 34  ///< Termination state number.
     };
 
 
@@ -2012,7 +2028,7 @@ inline parser::symbol_kind_type parser::yytranslate_(int t)
     // TOKEN-NUM as returned by yylex.
     static const signed char translate_table[] = {
         0,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-        2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  47, 48, 2,  2,  50, 2,  49, 2,  2,  2,  2,  2,
+        2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  48, 49, 2,  2,  51, 2,  50, 2,  2,  2,  2,  2,
         2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
         2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
         2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
@@ -2022,9 +2038,9 @@ inline parser::symbol_kind_type parser::yytranslate_(int t)
         2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
         2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  1,  2,  3,  4,
         5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-        31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46};
+        31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47};
     // Last valid token kind.
-    const int code_max = 301;
+    const int code_max = 302;
 
     if (t <= 0)
         return symbol_kind::SYM_YYEOF;
@@ -2090,6 +2106,7 @@ parser::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
 
         case symbol_kind::SYM_ID:         // "identifier"
         case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_BASE64:     // "base64"
         case symbol_kind::SYM_INFINITY:   // "infinity"
         case symbol_kind::SYM_NAN:        // "NaN"
         case symbol_kind::SYM_NATURAL0:   // "natural0"
@@ -2180,6 +2197,7 @@ void parser::basic_symbol<Base>::move(basic_symbol& s)
 
         case symbol_kind::SYM_ID:         // "identifier"
         case symbol_kind::SYM_STRING:     // "string"
+        case symbol_kind::SYM_BASE64:     // "base64"
         case symbol_kind::SYM_INFINITY:   // "infinity"
         case symbol_kind::SYM_NAN:        // "NaN"
         case symbol_kind::SYM_NATURAL0:   // "natural0"

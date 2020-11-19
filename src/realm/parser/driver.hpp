@@ -134,7 +134,21 @@ public:
 
 class ConstantNode : public ParserNode {
 public:
-    enum Type { NUMBER, INFINITY_VAL, NAN_VAL, FLOAT, STRING, TIMESTAMP, UUID_T, OID, NULL_VAL, TRUE, FALSE, ARG };
+    enum Type {
+        NUMBER,
+        INFINITY_VAL,
+        NAN_VAL,
+        FLOAT,
+        STRING,
+        BASE64,
+        TIMESTAMP,
+        UUID_T,
+        OID,
+        NULL_VAL,
+        TRUE,
+        FALSE,
+        ARG
+    };
 
     Type type;
     std::string text;
@@ -332,6 +346,8 @@ public:
     }
 
     template <class T>
+    Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
+    template <class T>
     Query simple_query(int op, ColKey col_key, T val);
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
 
@@ -345,6 +361,18 @@ private:
 
     static NoArguments s_default_args;
 };
+
+template <class T>
+Query ParserDriver::simple_query(int op, ColKey col_key, T val, bool case_sensitive)
+{
+    switch (op) {
+        case CompareNode::EQUAL:
+            return m_base_table->where().equal(col_key, val, case_sensitive);
+        case CompareNode::NOT_EQUAL:
+            return m_base_table->where().not_equal(col_key, val, case_sensitive);
+    }
+    return m_base_table->where();
+}
 
 template <class T>
 Query ParserDriver::simple_query(int op, ColKey col_key, T val)

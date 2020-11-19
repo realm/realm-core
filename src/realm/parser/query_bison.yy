@@ -77,6 +77,7 @@ using namespace realm::query_parser;
 
 %token <std::string> ID "identifier"
 %token <std::string> STRING "string"
+%token <std::string> BASE64 "base64"
 %token <std::string> INFINITY "infinity"
 %token <std::string> NAN "NaN"
 %token <std::string> NATURAL0 "natural0"
@@ -188,6 +189,7 @@ constant
     | INFINITY                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::INFINITY_VAL, $1); }
     | NAN                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NAN_VAL, $1); }
     | STRING                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::STRING, $1); }
+    | BASE64                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::BASE64, $1); }
     | FLOAT                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FLOAT, $1); }
     | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
     | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }

@@ -891,7 +891,7 @@ TEST(Parser_Timestamps)
     CHECK_THROW_ANY(verify_query(test_context, t, "birthday == 1970-1-10:0:0:0:0", 0));
 }
 
-#if 0
+
 TEST(Parser_NullableBinaries)
 {
     Group g;
@@ -946,15 +946,14 @@ TEST(Parser_NullableBinaries)
     verify_query(test_context, items, "nullable_data ENDSWITH[c] NULL", 5);
     verify_query(test_context, items, "nullable_data LIKE[c] NULL", 2);
 
-    // these operators are not commutative
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL CONTAINS nullable_data", 5));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL BEGINSWITH nullable_data", 5));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL ENDSWITH nullable_data", 5));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL LIKE nullable_data", 2));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL CONTAINS[c] nullable_data", 5));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL BEGINSWITH[c] nullable_data", 5));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL ENDSWITH[c] nullable_data", 5));
-    CHECK_THROW_ANY(verify_query(test_context, items, "NULL LIKE[c] nullable_data", 2));
+    verify_query(test_context, items, "NULL CONTAINS nullable_data", 0);
+    verify_query(test_context, items, "NULL BEGINSWITH nullable_data", 0);
+    verify_query(test_context, items, "NULL ENDSWITH nullable_data", 0);
+    verify_query(test_context, items, "NULL LIKE nullable_data", 2);
+    verify_query(test_context, items, "NULL CONTAINS[c] nullable_data", 0);
+    verify_query(test_context, items, "NULL BEGINSWITH[c] nullable_data", 0);
+    verify_query(test_context, items, "NULL ENDSWITH[c] nullable_data", 0);
+    verify_query(test_context, items, "NULL LIKE[c] nullable_data", 2);
 
     // check across links
     verify_query(test_context, people, "fav_item.data == NULL", 0);
@@ -987,7 +986,7 @@ TEST(Parser_NullableBinaries)
                  "data contains NULL && data contains 'fo' && !(data contains 'asdfasdfasdf') && data contains 'rk'",
                  1);
 }
-#endif
+
 
 TEST(Parser_OverColumnIndexChanges)
 {
@@ -1311,7 +1310,6 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "paid = $11", args, num_args, 1);
     verify_query_sub(test_context, t, "time == $5", args, num_args, 1);
     verify_query_sub(test_context, t, "time == $3", args, num_args, 4);
-#if 0
     verify_query_sub(test_context, t, "binary == $6", args, num_args, 1);
     verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "floats == $7", args, num_args, 1);
@@ -1320,6 +1318,7 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "nuldouble == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
 
+#if 0
     // substitutions through collection aggregates is a different code path
     verify_query_sub(test_context, t, "list.@min.age < $0", args, num_args, 2);
     verify_query_sub(test_context, t, "list.@max.age >= $0", args, num_args, 1);
@@ -1415,7 +1414,6 @@ TEST(Parser_substitution)
 #endif
 }
 
-#if 0
 TEST(Parser_string_binary_encoding)
 {
     Group g;
@@ -1636,7 +1634,7 @@ TEST(Parser_string_binary_encoding)
     }
 }
 
-
+#if 0
 TEST(Parser_collection_aggregates)
 {
     Group g;
