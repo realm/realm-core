@@ -231,7 +231,7 @@ public:
     {
         return m_query;
     }
-    
+
     // Change the TableView to be backed by another query
     // only works if the TableView is already backed by a query, and both
     // queries points to the same Table

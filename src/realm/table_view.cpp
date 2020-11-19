@@ -462,7 +462,7 @@ void ConstTableView::update_query(const Query& q)
 {
     REALM_ASSERT(m_query.m_table);
     REALM_ASSERT(m_query.m_table == q.m_table);
-    
+
     m_query = q;
     do_sync();
 }

@@ -2944,7 +2944,7 @@ TEST(TableView_UpdateQuery)
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(1, v[0].get<Int>(col));
-    
+
     // Create new query and update tableview to show this instead
     Query q2 = table.where().equal(col, 3);
     v.update_query(q2);
