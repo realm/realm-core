@@ -1,5 +1,5 @@
 %skeleton "lalr1.cc" /* -*- C++ -*- */
-%require "3.4"
+%require "3.7.4"
 %defines
 %no-lines
 
