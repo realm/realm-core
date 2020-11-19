@@ -73,12 +73,10 @@ class TableFriend;
 namespace metrics {
 class QueryInfo;
 }
-namespace query_builder {
+namespace query_parser {
 class Arguments;
-}
-namespace parser {
 class KeyPathMapping;
-}
+} // namespace query_parser
 
 class Table {
 public:
@@ -530,8 +528,8 @@ public:
     }
 
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
-    Query query(const std::string& query_string, query_builder::Arguments& arguments,
-                const parser::KeyPathMapping&) const;
+    Query query(const std::string& query_string, query_parser::Arguments& arguments,
+                const query_parser::KeyPathMapping&) const;
 
     //@{
     /// WARNING: The link() and backlink() methods will alter a state on the Table object and return a reference

@@ -1069,7 +1069,7 @@ public:
 template <>
 class Subexpr2<Link> : public Subexpr {
 public:
-    DataType get_type() const final
+    DataType get_type() const
     {
         return type_Link;
     }
@@ -2634,6 +2634,7 @@ public:
         : Subexpr2<Link>(other)
         , m_link_map(other.m_link_map)
         , m_comparison_type(other.m_comparison_type)
+        , m_is_list(other.m_is_list)
     {
     }
 
@@ -2679,6 +2680,11 @@ public:
         return m_link_map;
     }
 
+    DataType get_type() const override
+    {
+        return m_is_list ? type_LinkList : type_Link;
+    }
+
     ConstTableRef get_base_table() const override
     {
         return m_link_map.get_base_table();
@@ -2720,6 +2726,7 @@ public:
 private:
     LinkMap m_link_map;
     ExpressionComparisonType m_comparison_type;
+    bool m_is_list;
     friend class Table;
     friend class LinkChain;
 
@@ -2727,8 +2734,8 @@ private:
             ExpressionComparisonType type = ExpressionComparisonType::Any)
         : m_link_map(table, links)
         , m_comparison_type(type)
+        , m_is_list(column_key.is_list())
     {
-        static_cast<void>(column_key);
     }
 };
 

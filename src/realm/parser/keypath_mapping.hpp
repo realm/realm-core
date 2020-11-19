@@ -21,13 +21,21 @@
 
 #include <realm/table.hpp>
 
-#include "parser_utils.hpp"
+// #include "parser_utils.hpp"
 
 #include <unordered_map>
 #include <string>
 
 namespace realm {
-namespace parser {
+
+namespace util {
+using KeyPath = std::vector<std::string>;
+KeyPath key_path_from_string(const std::string& s);
+StringData get_printable_table_name(StringData name);
+StringData get_printable_table_name(const Table& table);
+} // namespace util
+
+namespace query_parser {
 
 struct KeyPathElement {
     ConstTableRef table;
@@ -52,7 +60,6 @@ struct TableAndColHash {
     std::size_t operator()(const std::pair<ConstTableRef, std::string>& p) const;
 };
 
-
 // This class holds state which allows aliasing variable names in key paths used in queries.
 // It is used to allow variable naming in subqueries such as 'SUBQUERY(list, $obj, $obj.intCol = 5).@count'
 // It can also be used to allow querying named backlinks if bindings provide the mappings themselves.
@@ -70,8 +77,6 @@ public:
         return m_allow_backlinks;
     }
     void set_backlink_class_prefix(std::string prefix);
-    static LinkChain link_chain_getter(ConstTableRef table, const std::vector<KeyPathElement>& links,
-                                       ExpressionComparisonType type = ExpressionComparisonType::Any);
 
 protected:
     bool m_allow_backlinks = true;
@@ -79,10 +84,8 @@ protected:
     std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;
 };
 
-std::vector<KeyPathElement> generate_link_chain_from_string(Query& q, const std::string& key_path_string,
-                                                            KeyPathMapping& mapping);
 
-} // namespace parser
+} // namespace query_parser
 } // namespace realm
 
 #endif // REALM_KEYPATH_MAPPING_HPP
