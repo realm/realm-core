@@ -343,3 +343,122 @@ TEST(Set_LnkSetUnresolved)
     CHECK_EQUAL(found.size(), 1);
     CHECK_EQUAL(found[0], 1);
 }
+
+TEST(Set_Union)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    set1.assign_union(set2);
+    CHECK_EQUAL(set1.size(), 5);
+    CHECK_EQUAL(set1.get(0), 1);
+    CHECK_EQUAL(set1.get(1), 2);
+    CHECK_EQUAL(set1.get(2), 3);
+    CHECK_EQUAL(set1.get(3), 4);
+    CHECK_EQUAL(set1.get(4), 5);
+}
+
+TEST(Set_Intersection)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    CHECK(set1.intersects(set2));
+    CHECK(set2.intersects(set1));
+    CHECK(!set1.is_subset_of(set2));
+    CHECK(!set2.is_subset_of(set1));
+    CHECK(!set1.is_superset_of(set2));
+    CHECK(!set2.is_superset_of(set1));
+    std::vector<int64_t> superset{{1, 2, 3, 4, 5}};
+    std::vector<int64_t> subset{{1, 2}};
+    CHECK(set1.is_subset_of(superset));
+    CHECK(set1.is_superset_of(subset));
+
+    set1.assign_intersection(set2);
+    CHECK_EQUAL(set1.size(), 2);
+    CHECK_EQUAL(set1.get(0), 4);
+    CHECK_EQUAL(set1.get(1), 5);
+}
+
+TEST(Set_Difference)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    set1.assign_difference(set2);
+    CHECK_EQUAL(set1.size(), 2);
+    CHECK_EQUAL(set1.get(0), 1);
+    CHECK_EQUAL(set1.get(1), 2);
+}
+
+TEST(Set_SymmetricDifference)
+{
+    Group g;
+    auto foos = g.add_table("class_Foo");
+    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+
+    auto obj1 = foos->create_object();
+    auto obj2 = foos->create_object();
+
+    auto set1 = obj1.get_set<int64_t>(col_ints);
+    auto set2 = obj2.get_set<int64_t>(col_ints);
+
+    for (int64_t x : {1, 2, 4, 5}) {
+        set1.insert(x);
+    }
+
+    for (int64_t x : {3, 4, 5}) {
+        set2.insert(x);
+    }
+
+    set1.assign_symmetric_difference(set2);
+    CHECK_EQUAL(set1.size(), 3);
+    CHECK_EQUAL(set1.get(0), 1);
+    CHECK_EQUAL(set1.get(1), 2);
+    CHECK_EQUAL(set1.get(2), 3);
+}
