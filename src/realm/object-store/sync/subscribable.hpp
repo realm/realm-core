@@ -79,20 +79,12 @@ struct Subscribable {
     Subscribable() = default;
     Subscribable(const Subscribable& other)
     {
-        if (&other == this) {
-            return;
-        }
-        std::lock_guard<std::mutex> lock(m_mutex);
-        std::lock_guard<std::mutex> other_lock(other.m_mutex);
+        std::scoped_lock lock(m_mutex, other.m_mutex);
         m_subscribers = other.m_subscribers;
     }
     Subscribable(Subscribable&& other) noexcept
     {
-        if (&other == this) {
-            return;
-        }
-        std::lock_guard<std::mutex> lock(m_mutex);
-        std::lock_guard<std::mutex> other_lock(other.m_mutex);
+        std::scoped_lock lock(m_mutex, other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
     }
     Subscribable& operator=(const Subscribable& other)
@@ -100,8 +92,7 @@ struct Subscribable {
         if (&other == this) {
             return *this;
         }
-        std::lock_guard<std::mutex> lock(m_mutex);
-        std::lock_guard<std::mutex> other_lock(other.m_mutex);
+        std::scoped_lock lock(m_mutex, other.m_mutex);
         m_subscribers = other.m_subscribers;
         return *this;
     }
@@ -110,8 +101,7 @@ struct Subscribable {
         if (&other == this) {
             return *this;
         }
-        std::lock_guard<std::mutex> lock(m_mutex);
-        std::lock_guard<std::mutex> other_lock(other.m_mutex);
+        std::scoped_lock lock(m_mutex, other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
         return *this;
     }
