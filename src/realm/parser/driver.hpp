@@ -2,10 +2,8 @@
 #define DRIVER_HH
 #include <string>
 #include <map>
-#include <external/mpark/variant.hpp>
 #include "realm/parser/query_bison.hpp"
 #include "realm/parser/query_parser.hpp"
-#include "realm/util/any.hpp"
 
 // Give Flex the prototype of yylex we want ...
 #define YY_DECL yy::parser::symbol_type yylex(realm::query_parser::ParserDriver&)
@@ -22,7 +20,6 @@ namespace query_parser {
 class ParserNode {
 public:
     virtual ~ParserNode();
-    virtual util::Any visit(ParserDriver*) = 0;
 };
 
 class OrNode : public ParserNode {
@@ -33,7 +30,7 @@ public:
     {
         and_preds.emplace_back(node);
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*);
 };
 
 class AndNode : public ParserNode {
@@ -44,12 +41,13 @@ public:
     {
         atom_preds.emplace_back(node);
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*);
 };
 
 class AtomPredNode : public ParserNode {
 public:
     ~AtomPredNode() override;
+    virtual Query visit(ParserDriver*) = 0;
 };
 
 class NotNode : public AtomPredNode {
@@ -60,7 +58,7 @@ public:
         : atom_pred(expr)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*) override;
 };
 
 class ParensNode : public AtomPredNode {
@@ -71,7 +69,7 @@ public:
         : pred(expr)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*) override;
 };
 
 class CompareNode : public AtomPredNode {
@@ -100,7 +98,7 @@ public:
         values.emplace_back(left);
         values.emplace_back(right);
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*) override;
 };
 
 class RelationalNode : public CompareNode {
@@ -114,7 +112,7 @@ public:
         values.emplace_back(left);
         values.emplace_back(right);
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*) override;
 };
 
 class StringOpsNode : public CompareNode {
@@ -129,7 +127,33 @@ public:
         values.emplace_back(left);
         values.emplace_back(right);
     }
-    util::Any visit(ParserDriver*) override;
+    Query visit(ParserDriver*) override;
+};
+
+class TrueOrFalseNode : public AtomPredNode {
+public:
+    bool true_or_false;
+
+    TrueOrFalseNode(bool type)
+        : true_or_false(type)
+    {
+    }
+    Query visit(ParserDriver*);
+};
+
+class ValueNode : public ParserNode {
+public:
+    ConstantNode* constant = nullptr;
+    PropertyNode* prop = nullptr;
+
+    ValueNode(ConstantNode* node)
+        : constant(node)
+    {
+    }
+    ValueNode(PropertyNode* node)
+        : prop(node)
+    {
+    }
 };
 
 class ConstantNode : public ParserNode {
@@ -144,7 +168,7 @@ public:
         , text(str)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
 };
 
 class PostOpNode : public ParserNode {
@@ -157,7 +181,7 @@ public:
         : type(t)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
 };
 
 class AggrNode : public ParserNode {
@@ -170,10 +194,12 @@ public:
         : type(t)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
 };
 
 class PropertyNode : public ParserNode {
+public:
+    virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
 };
 
 class ListAggrNode : public PropertyNode {
@@ -188,7 +214,7 @@ public:
         , aggr_op(aggr)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
 };
 
 class LinkAggrNode : public PropertyNode {
@@ -205,7 +231,7 @@ public:
         , prop(id2)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
 };
 
 class PropNode : public PropertyNode {
@@ -227,40 +253,12 @@ public:
         , post_op(po_node)
     {
     }
-    util::Any visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
 };
-
-class ValueNode : public ParserNode {
-public:
-    ConstantNode* constant = nullptr;
-    PropertyNode* prop = nullptr;
-
-    ValueNode(ConstantNode* node)
-        : constant(node)
-    {
-    }
-    ValueNode(PropertyNode* node)
-        : prop(node)
-    {
-    }
-    util::Any visit(ParserDriver*) override;
-};
-
-class TrueOrFalseNode : public AtomPredNode {
-public:
-    bool true_or_false;
-
-    TrueOrFalseNode(bool type)
-        : true_or_false(type)
-    {
-    }
-    util::Any visit(ParserDriver*) override;
-};
-
 
 class PathNode : public ParserNode {
 public:
-    util::Any visit(ParserDriver*) override;
+    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
 
     std::vector<std::string> path_elems;
 };
@@ -268,7 +266,6 @@ public:
 // Conducting the whole scanning and parsing of Calc++.
 class ParserDriver {
 public:
-    using Values = mpark::variant<ExpressionComparisonType, Subexpr*, DataType>;
     class ParserNodeStore {
     public:
         template <typename T, typename... Args>
@@ -301,7 +298,7 @@ public:
     {
     }
 
-    ParserNode* result = nullptr;
+    OrNode* result = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
     ParserNodeStore m_parse_nodes;
@@ -319,18 +316,6 @@ public:
         parse_error = true;
     }
 
-    void push(const Values& val)
-    {
-        m_values.emplace_back(val);
-    }
-    Values pop()
-    {
-        REALM_ASSERT(!m_values.empty());
-        auto ret = m_values.back();
-        m_values.pop_back();
-        return ret;
-    }
-
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
@@ -341,7 +326,6 @@ private:
     std::string error_string;
     void* scan_buffer = nullptr;
     bool parse_error = false;
-    std::vector<Values> m_values;
 
     static NoArguments s_default_args;
 };
