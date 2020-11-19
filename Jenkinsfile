@@ -488,7 +488,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                     docker.image('tracer0tong/android-emulator').withRun("-e ARCH=${abi}") { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             runAndCollectWarnings(
-                                script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}", 
+                                script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_ENABLE_SYNC=OFF", 
                                 name: "android-armeabi-${abi}-${buildType}",
                                 filters: warningFilters,
                             )
