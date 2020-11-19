@@ -5,3 +5,7 @@ query_flex.cpp: query_flex.ll
 
 query_bison.cpp: query_bison.yy
 	bison --defines=query_bison.hpp -o $@ $<
+
+.PHONY: clean
+clean:
+	-rm query_bison.cpp query_flex.cpp

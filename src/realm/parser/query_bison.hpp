@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.7.
+// A Bison parser, made by GNU Bison 3.7.4.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
@@ -726,7 +726,7 @@ public:
         /// Copy constructor.
         basic_symbol(const basic_symbol& that);
 
-        /// Constructor for valueless symbols, and symbols from each type.
+        /// Constructors for typed symbols.
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t)
             : Base(t)
@@ -738,6 +738,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, AggrNode*&& v)
             : Base(t)
@@ -751,6 +752,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, AndNode*&& v)
             : Base(t)
@@ -764,6 +766,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, AtomPredNode*&& v)
             : Base(t)
@@ -777,6 +780,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, ConstantNode*&& v)
             : Base(t)
@@ -790,6 +794,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, OrNode*&& v)
             : Base(t)
@@ -803,6 +808,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, PathNode*&& v)
             : Base(t)
@@ -816,6 +822,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, PostOpNode*&& v)
             : Base(t)
@@ -829,6 +836,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, PropertyNode*&& v)
             : Base(t)
@@ -842,6 +850,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, TrueOrFalseNode*&& v)
             : Base(t)
@@ -855,6 +864,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, ValueNode*&& v)
             : Base(t)
@@ -868,6 +878,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, int&& v)
             : Base(t)
@@ -881,6 +892,7 @@ public:
         {
         }
 #endif
+
 #if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, std::string&& v)
             : Base(t)
@@ -1082,59 +1094,24 @@ public:
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok)
             : super_type(token_type(tok))
-        {
-            YY_ASSERT(tok == token::TOK_END || tok == token::TOK_YYerror || tok == token::TOK_YYUNDEF ||
-                      tok == token::TOK_TRUEPREDICATE || tok == token::TOK_FALSEPREDICATE || tok == token::TOK_SORT ||
-                      tok == token::TOK_DISTINCT || tok == token::TOK_LIMIT || tok == token::TOK_ASCENDING ||
-                      tok == token::TOK_DESCENDING || tok == token::TOK_TRUE || tok == token::TOK_FALSE ||
-                      tok == token::TOK_NULL_VAL || tok == token::TOK_EQUAL || tok == token::TOK_NOT_EQUAL ||
-                      tok == token::TOK_LESS || tok == token::TOK_GREATER || tok == token::TOK_GREATER_EQUAL ||
-                      tok == token::TOK_LESS_EQUAL || tok == token::TOK_CASE || tok == token::TOK_ANY ||
-                      tok == token::TOK_ALL || tok == token::TOK_NONE || tok == token::TOK_SIZE ||
-                      tok == token::TOK_COUNT || tok == token::TOK_MAX || tok == token::TOK_MIN ||
-                      tok == token::TOK_SUM || tok == token::TOK_AVG || tok == token::TOK_AND ||
-                      tok == token::TOK_OR || tok == token::TOK_NOT || tok == 40 || tok == 41 || tok == 46 ||
-                      tok == 44);
-        }
 #else
         symbol_type(int tok)
             : super_type(token_type(tok))
-        {
-            YY_ASSERT(tok == token::TOK_END || tok == token::TOK_YYerror || tok == token::TOK_YYUNDEF ||
-                      tok == token::TOK_TRUEPREDICATE || tok == token::TOK_FALSEPREDICATE || tok == token::TOK_SORT ||
-                      tok == token::TOK_DISTINCT || tok == token::TOK_LIMIT || tok == token::TOK_ASCENDING ||
-                      tok == token::TOK_DESCENDING || tok == token::TOK_TRUE || tok == token::TOK_FALSE ||
-                      tok == token::TOK_NULL_VAL || tok == token::TOK_EQUAL || tok == token::TOK_NOT_EQUAL ||
-                      tok == token::TOK_LESS || tok == token::TOK_GREATER || tok == token::TOK_GREATER_EQUAL ||
-                      tok == token::TOK_LESS_EQUAL || tok == token::TOK_CASE || tok == token::TOK_ANY ||
-                      tok == token::TOK_ALL || tok == token::TOK_NONE || tok == token::TOK_SIZE ||
-                      tok == token::TOK_COUNT || tok == token::TOK_MAX || tok == token::TOK_MIN ||
-                      tok == token::TOK_SUM || tok == token::TOK_AVG || tok == token::TOK_AND ||
-                      tok == token::TOK_OR || tok == token::TOK_NOT || tok == 40 || tok == 41 || tok == 46 ||
-                      tok == 44);
-        }
 #endif
+        {
+            YY_ASSERT(tok == token::TOK_END || (token::TOK_YYerror <= tok && tok <= token::TOK_NOT) ||
+                      (40 <= tok && tok <= 41) || tok == 46 || tok == 44);
+        }
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, std::string v)
             : super_type(token_type(tok), std::move(v))
-        {
-            YY_ASSERT(tok == token::TOK_ID || tok == token::TOK_STRING || tok == token::TOK_INFINITY ||
-                      tok == token::TOK_NAN || tok == token::TOK_NATURAL0 || tok == token::TOK_NUMBER ||
-                      tok == token::TOK_FLOAT || tok == token::TOK_TIMESTAMP || tok == token::TOK_UUID ||
-                      tok == token::TOK_OID || tok == token::TOK_ARG || tok == token::TOK_BEGINSWITH ||
-                      tok == token::TOK_ENDSWITH || tok == token::TOK_CONTAINS || tok == token::TOK_LIKE);
-        }
 #else
         symbol_type(int tok, const std::string& v)
             : super_type(token_type(tok), v)
-        {
-            YY_ASSERT(tok == token::TOK_ID || tok == token::TOK_STRING || tok == token::TOK_INFINITY ||
-                      tok == token::TOK_NAN || tok == token::TOK_NATURAL0 || tok == token::TOK_NUMBER ||
-                      tok == token::TOK_FLOAT || tok == token::TOK_TIMESTAMP || tok == token::TOK_UUID ||
-                      tok == token::TOK_OID || tok == token::TOK_ARG || tok == token::TOK_BEGINSWITH ||
-                      tok == token::TOK_ENDSWITH || tok == token::TOK_CONTAINS || tok == token::TOK_LIKE);
-        }
 #endif
+        {
+            YY_ASSERT((token::TOK_ID <= tok && tok <= token::TOK_LIKE));
+        }
     };
 
     /// Build a parser object.

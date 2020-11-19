@@ -372,13 +372,6 @@ TEST(Parser_invalid_queries)
     }
 }
 
-/*
-TEST(Parser_grammar_analysis)
-{
-    CHECK(realm::parser::analyze_grammar() == 0);
-}
-*/
-
 Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
                    size_t num_results, query_parser::KeyPathMapping mapping = {})
 {
@@ -776,15 +769,15 @@ TEST(Parser_StringOperations)
     verify_query(test_context, t, "name LIKE NULL", 1);
     verify_query(test_context, t, "name LIKE[c] NULL", 1);
 
-    // string operators are not commutative
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL CONTAINS name", 6));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL CONTAINS[c] name", 6));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL BEGINSWITH name", 6));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL BEGINSWITH[c] name", 6));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL ENDSWITH name", 6));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL ENDSWITH[c] name", 6));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL LIKE name", 1));
-    CHECK_THROW_ANY(verify_query(test_context, t, "NULL LIKE[c] name", 1));
+    // querying in the other direction is also allowed
+    verify_query(test_context, t, "NULL CONTAINS name", 0);
+    verify_query(test_context, t, "NULL CONTAINS[c] name", 0);
+    verify_query(test_context, t, "NULL BEGINSWITH name", 0);
+    verify_query(test_context, t, "NULL BEGINSWITH[c] name", 0);
+    verify_query(test_context, t, "NULL ENDSWITH name", 0);
+    verify_query(test_context, t, "NULL ENDSWITH[c] name", 0);
+    verify_query(test_context, t, "NULL LIKE name", 1);
+    verify_query(test_context, t, "NULL LIKE[c] name", 1);
 }
 
 
@@ -1077,7 +1070,6 @@ TEST(Parser_TwoColumnExpressionBasics)
     CHECK_THROW_ANY(verify_query(test_context, table, "objectids == ints", 0));
 }
 
-#if 0
 TEST(Parser_TwoColumnAggregates)
 {
     Group g;
@@ -1169,9 +1161,9 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, t, "items.@min.price > items.@count", 1);
     verify_query(test_context, t, "items.@min.price > items.@size", 1);
 
-    // double vs string/binary count/size is not supported due to a core implementation limitation
-    CHECK_THROW_ANY(verify_query(test_context, items, "name.@count > price", 3));
-    CHECK_THROW_ANY(verify_query(test_context, items, "price < name.@size", 3));
+    // double vs string/binary count/size; len("oranges") > 4.0
+    verify_query(test_context, items, "name.@count > price", 1);
+    verify_query(test_context, items, "price < name.@size", 1);
 
     // double vs double
     verify_query(test_context, t, "items.@sum.price == 25.5", 2);  // person0, person2
@@ -1214,8 +1206,9 @@ TEST(Parser_TwoColumnAggregates)
 
     verify_query(test_context, t, "items.@count < account_balance", 3); // linklist count vs double
     verify_query(test_context, t, "items.@count > 3", 2);               // linklist count vs literal int
-    // linklist count vs literal double, integer promotion done here so this is true!
-    verify_query(test_context, t, "items.@count == 3.1", 1);
+    // linklist count vs literal double
+    verify_query(test_context, t, "items.@count == 3.0", 1);
+    verify_query(test_context, t, "items.@count == 3.1", 0); // no integer promotion
 
     // two string counts is allowed (int comparison)
     verify_query(test_context, items, "discount.promotion.@count > name.@count", 3);
@@ -1236,7 +1229,6 @@ TEST(Parser_TwoColumnAggregates)
     verify_query(test_context, items, "discount.promotion ENDSWITH[c] name", 0);
     verify_query(test_context, items, "discount.promotion LIKE[c] name", 0);
 }
-#endif
 
 void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
                       const util::Any* arg_list, size_t num_args, size_t num_results)
