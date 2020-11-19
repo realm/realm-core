@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.7.
+// A Bison parser, made by GNU Bison 3.7.4.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
@@ -1019,8 +1019,7 @@ int parser::parse()
                 yyla.move(yylookahead);
             }
 #if YY_EXCEPTIONS
-            catch (const syntax_error& yyexc)
-            {
+            catch (const syntax_error& yyexc) {
                 YYCDEBUG << "Caught exception: " << yyexc.what() << '\n';
                 error(yyexc);
                 goto yyerrlab1;
@@ -1525,8 +1524,7 @@ int parser::parse()
                 }
             }
 #if YY_EXCEPTIONS
-            catch (const syntax_error& yyexc)
-            {
+            catch (const syntax_error& yyexc) {
                 YYCDEBUG << "Caught exception: " << yyexc.what() << '\n';
                 error(yyexc);
                 YYERROR;
@@ -1660,8 +1658,7 @@ int parser::parse()
         return yyresult;
     }
 #if YY_EXCEPTIONS
-    catch (...)
-    {
+    catch (...) {
         YYCDEBUG << "Exception caught: cleaning lookahead and stack\n";
         // Do not try to display the values of the reclaimed symbols,
         // as their printers might throw an exception.

@@ -5,7 +5,20 @@ set(REALM_PARSER_SOURCES
     query_bison.cpp
 ) # REALM_PARSER_SOURCES
 
-add_library(QueryParser STATIC ${REALM_PARSER_SOURCES})
+set(REALM_PARSER_HEADERS
+    driver.hpp
+    query_bison.hpp
+    query_flex.hpp
+    query_parser.hpp
+)
+
+# Add these files so that they appear in cmake generated projects for IDE
+set(REALM_PARSER_EXTRAS
+    query_bison.yy
+    query_flex.ll
+)
+
+add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS} ${REALM_PARSER_EXTRAS})
 add_library(realm-parser ALIAS QueryParser)
 add_library(Realm::QueryParser ALIAS QueryParser)
 target_link_libraries(QueryParser PUBLIC Storage)

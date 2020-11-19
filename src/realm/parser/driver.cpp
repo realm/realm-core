@@ -285,23 +285,26 @@ util::Any StringOpsNode::visit(ParserDriver* drv)
     auto [left, right] = drv->cmp(values);
 
     auto string_expr = dynamic_cast<ConstantStringValue*>(right.get());
-    if (!string_expr) {
-        throw std::runtime_error("Right side must be a string");
+    auto string_col = dynamic_cast<Columns<StringData>*>(right.get());
+    if (!string_expr && !string_col) {
+        throw std::runtime_error("Right side must be a string value or string column");
     }
-    StringData val = string_expr->get_mixed().get_string();
+    if (string_expr) {
+        StringData val = string_expr->get_mixed().get_string();
 
-    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && left->get_type() == type_String) {
-        auto col_key = prop->column_key();
-        switch (op) {
-            case CompareNode::BEGINSWITH:
-                return drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
-            case CompareNode::ENDSWITH:
-                return drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
-            case CompareNode::CONTAINS:
-                return drv->m_base_table->where().contains(col_key, val, case_sensitive);
-            case CompareNode::LIKE:
-                return drv->m_base_table->where().like(col_key, val, case_sensitive);
+        const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
+        if (prop && !prop->links_exist() && left->get_type() == type_String) {
+            auto col_key = prop->column_key();
+            switch (op) {
+                case CompareNode::BEGINSWITH:
+                    return drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
+                case CompareNode::ENDSWITH:
+                    return drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
+                case CompareNode::CONTAINS:
+                    return drv->m_base_table->where().contains(col_key, val, case_sensitive);
+                case CompareNode::LIKE:
+                    return drv->m_base_table->where().like(col_key, val, case_sensitive);
+            }
         }
     }
 
