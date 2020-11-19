@@ -100,5 +100,5 @@ else
                -configuration "${BUILD_TYPE}" \
                -target install \
                ONLY_ACTIVE_ARCH=NO
-    tar -cvzf "realm-core-${BUILD_TYPE}-${VERSION}-${OS}-devel.tar.gz" -C install lib include
+    tar -cvzf "realm-${BUILD_TYPE}-${VERSION}-${OS}-devel.tar.gz" -C install lib include
 fi

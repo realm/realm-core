@@ -55,7 +55,7 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
     printf("\n");
     for (size_t row = begin; row < end; row++) {
         printf("%5zu ", row);
-        ConstObj obj = table->get_object(row);
+        Obj obj = table->get_object(row);
         printf(" %20zx", obj.get_key().value);
         for (auto col : col_keys) {
             auto col_type = table->get_column_type(col);

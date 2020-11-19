@@ -82,6 +82,12 @@ const char* type_to_str<Decimal128>()
     return "Decimal128";
 }
 
+template <>
+const char* type_to_str<UUID>()
+{
+    return "UUID";
+}
+
 const char* data_type_to_str(DataType type)
 {
     switch (type) {
@@ -107,12 +113,16 @@ const char* data_type_to_str(DataType type)
             return "ObjectId";
         case type_OldTable:
             return "Table";
-        case type_OldMixed:
+        case type_Mixed:
             return "Mixed";
         case type_Link:
             return "Link";
+        case type_TypedLink:
+            return "TypedLink";
         case type_LinkList:
             return "LinkList";
+        case type_UUID:
+            return "UUID";
     }
     return "type_Unknown"; // LCOV_EXCL_LINE
 }

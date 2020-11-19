@@ -1,0 +1,25 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/inspector-dbg.a
+/inspector.a
+/inspector.libdeps
+
+/realm-inspect-server-realm
+/realm-inspect-server-realm-dbg
+
+/realm-merge-changeset-into-realm
+/realm-merge-changeset-into-realm-dbg
+
+/realm-print-changeset
+/realm-print-changeset-dbg
+
+/dump-changeset
+/dump-changeset-dbg
+
+/realm-perform-partial-sync
+/realm-perform-partial-sync-dbg

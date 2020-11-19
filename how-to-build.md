@@ -2,11 +2,11 @@ This file explains how to build and install the Realm core library.
 
 ## Prerequisites
 
-To build the Realm core library, you need CMake 3.4 or newer and a
+To build the Realm core library, you need CMake 3.15 or newer and a
 standard set of build tools. This includes a C/C++ compiler and a
 build system like GNU make. Realm is thoroughly tested with both GCC
-and Clang. It is known to work with GCC 4.9 and newer, as well as with
-Clang 3.9 (Apple Clang 8.0) and newer. Your compiler must support C++14.
+and Clang. It is known to work with GCC 8.3 and newer, as well as with
+Clang 9 and newer. Your compiler must support C++17.
 
 To run the benchmarking suite (make benchmark) on Linux, you will need
 the development part of the 'procps' library.
@@ -14,26 +14,15 @@ the development part of the 'procps' library.
 The following is a suggestion of how to install the prerequisites on
 each of our major platforms:
 
-### Linux Mint 18-18.2, Ubuntu 16.04
+### Linux Mint 19, Ubuntu 18.04
 
     sudo apt-get install build-essential
-    sudo apt-get install libprocps4-dev
+    sudo apt-get install libcurl4-openssl-dev 
+    sudo apt-get install libuv1-dev
+    sudo apt-get install libprocps-dev
     sudo apt-get install libssl-dev
+    sudo apt-get install zlib1g-dev
     sudo apt-get install cmake
-
-### Linux Mint 17-17.3, Ubuntu 14.04
-
-    sudo apt-get install build-essential
-    sudo apt-get install libprocps3-dev
-    sudo apt-get install libssl-dev
-    sudo apt-get install cmake3
-
-### Fedora 24, 25, 26
-
-    sudo dnf install gcc-c++
-    sudo dnf install procps-devel
-    sudo dnf install openssl-devel
-    sudo dnf install cmake
 
 ### OS X 10.10, 10.11, 10.12
 
@@ -51,7 +40,7 @@ package manager called brew. See https://brew.sh for install instructions.
 On Windows, navigate to the following websites in your browser
 to download the appropriate installers.
 
-- Visual Studio 2017: https://www.visualstudio.com/
+- Visual Studio 2019: https://www.visualstudio.com/
 - CMake: https://cmake.org/download/
 
 ## Configure, build & test
@@ -92,17 +81,9 @@ of the name of the tarball produced - it's optional.
 
 The core library comes with a suite of unit tests. You can run the unit tests like this:
 
-    cd build-dir/test
-    ./realm-tests
+    cd build.debug
+    ctest
     
-or run both unit tests and performance tests with just:
-
-    ctest
-
-or run both unit tests and performance tests with just:
-
-    ctest
-
 There are a number of environment variable that can be use the customize the
 execution. For example, here is how to run only the `Foo` test and those whose
 names start with `Bar`, then how run all tests whose names start with `Foo`,
@@ -162,6 +143,40 @@ These are the available variables:
  - Set `UNITTEST_ABORT_ON_FAILURE` to a non-empty value to termination of the
    testing process as soon as a check fails or an unexpected exception is thrown
    in a test.
+
+## Running [app] tests against a local MongoDB Stitch
+
+Stitch images are published to our private Github CI. Follow the steps here to
+set up authorization from docker to your Github account https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
+Once authorized, run the following docker command from the top directory to start a local instance:
+
+```
+export MDBREALM_TEST_SERVER_TAG=$(grep MDBREALM_TEST_SERVER_TAG dependencies.list |cut -f 2 -d=)
+docker run --rm -v $(pwd)/test/object-store/mongodb:/apps/os-integration-tests -p 9090:9090 -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
+```
+
+This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
+Once logged in, you can make changes to the integration-tests app and those changes will be persisted to your disk, because the docker image
+has a mapped volume to the `tests/mongodb` directory.
+
+To run the [app] tests against the local image, you need to configure a build with some cmake options to tell the tests where to point to.
+```
+mkdir build.sync.ninja
+cmake -B build.sync.ninja -G Ninja -DREALM_ENABLE_AUTH_TESTS=1 -DREALM_MONGODB_ENDPOINT=http://localhost:9090 -DREALM_STITCH_CONFIG=$(pwd)/test/object-store/mongodb/stitch.json
+cmake --build build.sync.ninja --target tests
+./build.sync.ninja/test/object-store/realm-object-store-tests -d=1
+```
+### Developing inside a container
+
+The `.devcontainer` folders contains configuration for the [Visual Stuio Code Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension, which allows you to develop inside the same Docker container that CI runs in, which is especially useful because it also sets up the MongoDB Realm Test Server container. Make sure you have the `Remote - Containers` extension installed (it's part of the recommended extensions list for this repository) and run the `Remote-Containers: Reopen in Container` (or `Rebuild and Reopen in Container`) command. VSCode will build the image described in `Dockerfile`, spin up a container group using Docker Compose, and reopen the workspace from inside the container.
+
+#### `ssh-agent` forwarding
+
+The dev container needs your SSH key to clone the realm-sync repository during build. Make sure your agent is running and configured as described [here](https://developer.github.com/v3/guides/using-ssh-agent-forwarding/#your-local-ssh-agent-must-be-running).
+
+#### Docker resources
+
+Assign more memory and CPU to Docker for faster builds. The link step may fail inside the container if there's not enough memory, too.
 
 ### Memory debugging:
 

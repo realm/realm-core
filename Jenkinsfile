@@ -5,6 +5,7 @@
 cocoaStashes = []
 androidStashes = []
 publishingStashes = []
+dependencies = null
 
 tokens = "${env.JOB_NAME}".tokenize('/')
 org = tokens[tokens.size()-3]
@@ -93,37 +94,54 @@ jobWrapper {
             }
         }
     }
-    def armhfQemuTestOptions = [
-        emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
-    ]
-    def armhfNativeTestOptions = [
-        nativeNode: 'docker-arm',
-        nativeDocker: 'armhf-native.Dockerfile',
-        nativeDockerPlatform: 'linux/arm/v7',
-    ]
+
     stage('Checking') {
+        def buildOptions = [
+            buildType : "Debug",
+            maxBpNodeSize: "1000",
+            enableEncryption: "ON",
+            enableSync: "OFF",
+            runTests: true,
+        ]
+        def linuxOptionsNoEncrypt = [
+            buildType : "Debug",
+            maxBpNodeSize: "4",
+            enableEncryption: "OFF",
+            enableSync: "OFF",
+        ]
+        def armhfQemuTestOptions = [
+            emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
+        ]
+        def armhfNativeTestOptions = [
+            nativeNode: 'docker-arm',
+            nativeDocker: 'armhf-native.Dockerfile',
+            nativeDockerPlatform: 'linux/arm/v7',
+        ]
+
         parallelExecutors = [
-            checkLinuxDebug         : doCheckInDocker('Debug'),
-            checkLinuxRelease       : doCheckInDocker('Release'),
-            checkLinuxDebugNoEncryp : doCheckInDocker('Debug', '4', 'OFF'),
-            checkMacOsRelease       : doBuildMacOs('Release', true),
-            checkWin32Release       : doBuildWindows('Release', false, 'Win32', true),
-            checkWin32DebugUWP      : doBuildWindows('Debug', true, 'Win32', true),
-            iosDebug                : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
-            androidArm64Debug       : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            checkLinuxDebug         : doCheckInDocker(buildOptions),
+            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: "4", buildType : "Release"]),
+            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync : "ON"]),
+            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: "OFF"]),
+            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
+            checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
+            checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
+            buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
+            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+            buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
+            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity('Debug', '1000', 'thread'),
-            addressSanitizer        : doCheckSanity('Debug', '1000', 'address'),
+            threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
+            addressSanitizer        : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "address"]),
             performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
-                checkLinuxRelease             : doCheckInDocker('Release'),
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
                 checkMacOsDebug               : doBuildMacOs('Debug', true),
-                buildUwpx64Debug              : doBuildWindows('Debug', true, 'x64', false),
+                buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
                 androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
                 coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
@@ -135,9 +153,14 @@ jobWrapper {
 
     if (isPublishingRun) {
         stage('BuildPackages') {
+            def buildOptions = [
+                enableSync: "ON",
+                runTests: false,
+            ]
+
             parallelExecutors = [
-                buildMacOsDebug     : doBuildMacOs('MinSizeDebug', false),
-                buildMacOsRelease   : doBuildMacOs('Release', false),
+                buildMacOsDebug     : doBuildMacOs(buildOptions + [buildType : "MinSizeDebug"]),
+                buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
                 buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
@@ -197,10 +220,12 @@ jobWrapper {
                             unstash name: cocoaStash
                         }
                         sh 'tools/build-cocoa.sh -x'
+                        archiveArtifacts('realm-*-cocoa*.tar.gz')
                         archiveArtifacts('realm-*-cocoa*.tar.xz')
-                        def stashName = 'cocoa'
-                        stash includes: 'realm-*-cocoa*.tar.xz', name: stashName
-                        publishingStashes << stashName
+                        stash includes: 'realm-*-cocoa*.tar.xz', name: "cocoa-xz"
+                        stash includes: 'realm-*-cocoa*.tar.gz', name: "cocoa-gz"
+                        publishingStashes << "cocoa-xz"
+                        publishingStashes << "cocoa-gz"
                     }
                 },
                 android: {
@@ -226,56 +251,108 @@ jobWrapper {
     }
 }
 
-def doCheckInDocker(String buildType, String maxBpNodeSize = '1000', String enableEncryption = 'ON') {
+def doCheckInDocker(Map options = [:]) {
+    def cmakeOptions = [
+        CMAKE_BUILD_TYPE: options.buildType,
+        REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
+        REALM_ENABLE_ENCRYPTION: options.enableEncryption,
+        REALM_ENABLE_SYNC: options.enableSync,
+    ]
+    if (options.enableSync == "ON") {
+        cmakeOptions << [
+            REALM_ENABLE_AUTH_TESTS: "ON",
+            REALM_MONGODB_ENDPOINT: "http://mongodb-realm:9090",
+        ]
+    }
+    if (longRunningTests) {
+        cmakeOptions << [
+            CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
+        ]
+    }
+
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+
     return {
         node('docker') {
             getArchive()
+            def sourcesDir = pwd()
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
-            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
             environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                buildEnv.inside() {
-                    try {
-                        dir('build-dir') {
-                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType}${cxx_flags} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} -DREALM_ENABLE_ENCRYPTION=${enableEncryption} -G Ninja .."
-                            runAndCollectWarnings(script: "ninja", name: "linux-${buildType}-encrypt${enableEncryption}-BPNODESIZE_${maxBpNodeSize}")
-                            sh "./test/realm-tests"
+
+            cmakeDefinitions += " -DREALM_STITCH_CONFIG=\"${sourcesDir}/test/object-store/mongodb/stitch.json\""
+
+            def buildSteps = { String dockerArgs = "" ->
+                withEnv(environment) {
+                    buildEnv.inside("${dockerArgs}") {
+                        try {
+                            dir('build-dir') {
+                                sh "cmake ${cmakeDefinitions} -G Ninja .."
+                                runAndCollectWarnings(script: "ninja", name: "linux-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}")
+                                sh 'ctest --output-on-failure'
+                            }
+                        } finally {
+                            recordTests("Linux-${options.buildType}")
                         }
-                    } finally {
-                        recordTests("Linux-${buildType}")
                     }
                 }
+            }
+            
+            if (options.enableSync == "ON") {
+                // stitch images are auto-published every day to our CI
+                // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
+                // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
+                // if there's really a new feature you need from the latest stitch, upgrade this manually
+                withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/test/object-store/mongodb"]) { networkName ->
+                    buildSteps("--network=${networkName}")
+                }
+            } else {
+                buildSteps("")
             }
         }
     }
 }
 
-def doCheckSanity(String buildType, String maxBpNodeSize = '1000', String sanitizeMode='') {
+def doCheckSanity(Map options = [:]) {
+    def privileged = '';
+
+    def cmakeOptions = [
+        CMAKE_BUILD_TYPE: options.buildType,
+        REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
+        REALM_ENABLE_SYNC: options.enableSync,
+    ]
+
+    if (options.sanitizeMode.contains('thread')) {
+        cmakeOptions << [
+            REALM_TSAN: "ON",
+        ]
+    }
+    else if (options.sanitizeMode.contains('address')) {
+        privileged = '--privileged'
+        cmakeOptions << [
+            REALM_ASAN: "ON",
+        ]
+    }
+
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+
     return {
         node('docker') {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
-            def sanitizeFlags = ''
-            def privileged = '';
             environment << 'UNITTEST_PROGRESS=1'
-            if (sanitizeMode.contains('thread')) {
-                sanitizeFlags = '-D REALM_TSAN=ON'
-            } else if (sanitizeMode.contains('address')) {
-                privileged = '--privileged'
-                sanitizeFlags = '-D REALM_ASAN=ON'
-            }
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
                         dir('build-dir') {
-                            sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -D REALM_MAX_BPNODE_SIZE=${maxBpNodeSize} ${sanitizeFlags} -G Ninja .."
-                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}-${maxBpNodeSize}-${sanitizeMode}")
-                            sh "./test/realm-tests"
+                            sh "cmake ${cmakeDefinitions} -G Ninja .."
+                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${options.buildType}-${options.sanitizeMode}")
+                            sh 'ctest --output-on-failure'
                         }
+
                     } finally {
-                        recordTests("Linux-${buildType}")
+                        recordTests("Linux-${options.buildType}")
                     }
                 }
             }
@@ -290,7 +367,6 @@ def doBuildLinux(String buildType) {
 
             docker.build('realm-core-generic:gcc-8', '-f generic.Dockerfile .').inside {
                 sh """
-                   cmake --help
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
@@ -375,7 +451,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_NO_TESTS=1"
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -388,7 +464,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}", name: "android-armeabi-${abi}-${buildType}")
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_ENABLE_SYNC=0", name: "android-armeabi-${abi}-${buildType}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
@@ -426,25 +502,51 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
-    def cmakeDefinitions;
     def warningFilters = [];
-    if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0'
-      // warning on benchmark binaries that we don't care about
+    def cpackSystemName = "${isUWP ? 'UWP' : 'Windows'}-${platform}"
+    def arch = platform.toLowerCase()
+    if (arch == 'win32') {
+      arch = 'x86'
+    }
+    if (arch == 'win64') {
+      arch = 'x64'
+    }
+    def triplet = "${arch}-${isUWP ? 'uwp' : 'windows'}-static"
+
+    def cmakeOptions = [
+      CMAKE_GENERATOR_PLATFORM: platform,
+      CMAKE_BUILD_TYPE: buildType,
+      REALM_ENABLE_SYNC: "ON",
+      CPACK_SYSTEM_NAME: cpackSystemName,
+      CMAKE_TOOLCHAIN_FILE: "c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+      VCPKG_TARGET_TRIPLET: triplet,
+    ]
+
+     if (isUWP) {
+      cmakeOptions << [
+        CMAKE_SYSTEM_NAME: 'WindowsStore',
+        CMAKE_SYSTEM_VERSION: '10.0',
+      ]
       warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
     } else {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+      cmakeOptions << [
+        CMAKE_SYSTEM_VERSION: '8.1',
+      ]
     }
     if (!runTests) {
-      cmakeDefinitions += ' -DREALM_NO_TESTS=1'
+      cmakeOptions << [
+        REALM_NO_TESTS: '1',
+      ]
     }
+    
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
         node('windows') {
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
+                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(
                         parser: 'msbuild',
@@ -455,9 +557,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
+                archiveArtifacts('*.tar.gz')
                 if (gitTag) {
                     def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
-                    archiveArtifacts('*.tar.gz')
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -470,6 +572,8 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         bat '''
                           mkdir %TMP%
                           realm-tests.exe --no-error-exit-code
+                          realm-sync-tests.exe --no-error-exit-code
+                          copy unit-test-report.xml ..
                           rmdir /Q /S %TMP%
                         '''
                     }
@@ -543,14 +647,32 @@ def buildPerformance() {
     }
 }
 
-def doBuildMacOs(String buildType, boolean runTests) {
+def doBuildMacOs(Map options = [:]) {
+    def buildType = options.buildType;
     def sdk = 'macosx'
+
+    def cmakeOptions = [
+        CMAKE_BUILD_TYPE: options.buildType,
+        CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
+        REALM_ENABLE_SYNC: options.enableSync,
+        OSX_ARM64: 'ON',
+    ]
+    if (!options.runTests) {
+        cmakeOptions << [
+            REALM_NO_TESTS: "ON",
+        ]
+    }
+    if (longRunningTests) {
+        cmakeOptions << [
+            CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
+        ]
+    }
+
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+
     return {
         node('osx') {
             getArchive()
-
-            def buildTests = runTests ? '' : ' -DREALM_NO_TESTS=1'
-            def cxx_flags = longRunningTests ? ' -D CMAKE_CXX_FLAGS="-DTEST_DURATION=1"' : ''
 
             dir("build-macosx-${buildType}") {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
@@ -560,21 +682,18 @@ def doBuildMacOs(String buildType, boolean runTests) {
                     retry(3) {
                         timeout(time: 2, unit: 'MINUTES') {
                             sh """
-                                    rm -rf *
-                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macosx.toolchain.cmake \\
-                                          -D CMAKE_BUILD_TYPE=${buildType} \\
-                                          -D REALM_VERSION=${gitDescribeVersion} \\
-                                          -D OSX_ARM64=1 \\
-                                          ${buildTests}${cxx_flags} -G Ninja ..
-                                """
+                                rm -rf *
+                                cmake ${cmakeDefinitions} -D REALM_VERSION=${gitDescribeVersion} -G Ninja ..
+                            """
                         }
                     }
 
                     runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-clang-${buildType}")
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
                 runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build', name: "osx-clang-xcrun-swift-${buildType}")
+                sh 'xcrun swift run ObjectStoreTests'
             }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
@@ -584,11 +703,14 @@ def doBuildMacOs(String buildType, boolean runTests) {
             cocoaStashes << stashName
             publishingStashes << stashName
 
-            if (runTests) {
+            if (options.runTests) {
                 try {
+                    def environment = environment()
+                    environment << 'UNITTEST_PROGRESS=1'
+                    environment << 'CTEST_OUTPUT_ON_FAILURE=1'
                     dir("build-macosx-${buildType}") {
-                        withEnv(environment()) {
-                            sh 'UNITTEST_PROGRESS=1 ./test/realm-tests'
+                        withEnv(environment) {
+                            sh 'ctest'
                         }
                     }
                 } finally {

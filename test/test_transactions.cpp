@@ -30,6 +30,7 @@
 #include <realm/history.hpp>
 #include <realm/util/file.hpp>
 #include <realm/db.hpp>
+#include <realm/list.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"
@@ -39,8 +40,8 @@
 
 using namespace realm;
 using namespace realm::util;
-using test_util::unit_test::TestContext;
 using realm::test_util::crypt_key;
+using test_util::unit_test::TestContext;
 
 
 // Test independence and thread-safety
@@ -164,9 +165,9 @@ TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
         util::File f(path, util::File::mode_Update);
         util::File::Map<Header> headerMap(f, util::File::access_ReadWrite);
         auto* header = headerMap.get_addr();
-        // at least one of the versions in the header must be 11.
-        CHECK(header->m_file_format[1] == 11 || header->m_file_format[0] == 11);
-        header->m_file_format[1] = header->m_file_format[0] = 9; // downgrade (both) to previous version
+        // at least one of the versions in the header must be 20.
+        CHECK(header->m_file_format[1] == 20 || header->m_file_format[0] == 20);
+        header->m_file_format[1] = header->m_file_format[0] = 11; // downgrade (both) to previous version
         headerMap.sync();
     }
     sg = DB::create(path); // triggers idempotent upgrade - but importantly for this test, uses compat mapping
@@ -335,7 +336,7 @@ void verifier_thread_advance(TestContext& test_context, int limit, DBRef db, Tab
         done = (a >= limit);
     }
 }
-}
+} // namespace
 
 TEST(Transactions_Threaded)
 {
@@ -361,8 +362,12 @@ TEST(Transactions_Threaded)
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        verifiers[i] = std::thread([&] { verifier_thread(test_context, num_threads * num_iterations, db, tk); });
-        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, db, tk); });
+        verifiers[i] = std::thread([&] {
+            verifier_thread(test_context, num_threads * num_iterations, db, tk);
+        });
+        writers[i] = std::thread([&] {
+            writer_thread(test_context, num_iterations, db, tk);
+        });
     }
     for (int i = 0; i < num_threads; ++i) {
         writers[i].join();
@@ -394,9 +399,12 @@ TEST(Transactions_ThreadedAdvanceRead)
     std::thread writers[num_threads];
     std::thread verifiers[num_threads];
     for (int i = 0; i < num_threads; ++i) {
-        verifiers[i] =
-            std::thread([&] { verifier_thread_advance(test_context, num_threads * num_iterations, db, tk); });
-        writers[i] = std::thread([&] { writer_thread(test_context, num_iterations, db, tk); });
+        verifiers[i] = std::thread([&] {
+            verifier_thread_advance(test_context, num_threads * num_iterations, db, tk);
+        });
+        writers[i] = std::thread([&] {
+            writer_thread(test_context, num_iterations, db, tk);
+        });
     }
     for (int i = 0; i < num_threads; ++i) {
         writers[i].join();
@@ -435,7 +443,6 @@ TEST(Transactions_ListOfBinary)
         rt->verify();
     }
 }
-
 
 
 TEST(Transactions_RollbackCreateObject)

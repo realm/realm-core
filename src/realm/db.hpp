@@ -594,12 +594,12 @@ public:
     _impl::History* get_history() const;
 
     // direct handover of accessor instances
-    Obj import_copy_of(const ConstObj& original); // slicing is OK for Obj/ConstObj
+    Obj import_copy_of(const Obj& original);
     TableRef import_copy_of(const ConstTableRef original);
-    LnkLst import_copy_of(const ConstLnkLst& original);
+    LnkLst import_copy_of(const LnkLst& original);
     LstBasePtr import_copy_of(const LstBase& original);
+    CollectionBasePtr import_copy_of(const CollectionBase& original);
     LnkLstPtr import_copy_of(const LnkLstPtr& original);
-    LnkLstPtr import_copy_of(const ConstLnkLstPtr& original);
 
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);

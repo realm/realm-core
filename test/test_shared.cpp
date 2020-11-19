@@ -456,7 +456,7 @@ TEST(Shared_CompactingOnTheFly)
                 std::this_thread::yield();
                 ReadTransaction rt(sg);
                 auto t1 = rt.get_table("test");
-                ConstObj obj = t1->get_object(ObjKey(41));
+                const Obj obj = t1->get_object(ObjKey(41));
                 waiting = obj.get<Int>(cols[0]) == 0;
                 // std::cerr << t1->get_int(0, 41) << std::endl;
             }
@@ -753,7 +753,7 @@ TEST(Shared_Initial2)
             auto t1 = rt.get_table("test");
             auto cols = t1->get_column_keys();
             CHECK_EQUAL(1, t1->size());
-            ConstObj obj = t1->get_object(ObjKey(7));
+            const Obj obj = t1->get_object(ObjKey(7));
             CHECK_EQUAL(1, obj.get<Int>(cols[0]));
             CHECK_EQUAL(2, obj.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
@@ -799,7 +799,7 @@ TEST(Shared_Initial2_Mem)
             auto t1 = rt.get_table("test");
             auto cols = t1->get_column_keys();
             CHECK_EQUAL(1, t1->size());
-            ConstObj obj = t1->get_object(ObjKey(7));
+            const Obj obj = t1->get_object(ObjKey(7));
             CHECK_EQUAL(1, obj.get<Int>(cols[0]));
             CHECK_EQUAL(2, obj.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
@@ -833,7 +833,7 @@ TEST(Shared_1)
             // Verify that last set of changes are commited
             auto t2 = rt.get_table("test");
             CHECK(t2->size() == 1);
-            ConstObj obj = t2->get_object(ObjKey(7));
+            const Obj obj = t2->get_object(ObjKey(7));
             CHECK_EQUAL(1, obj.get<Int>(cols[0]));
             CHECK_EQUAL(2, obj.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
@@ -884,14 +884,14 @@ TEST(Shared_1)
             auto t3 = rt.get_table("test");
 
             CHECK(t3->size() == 3);
-            ConstObj obj7 = t3->get_object(ObjKey(7));
+            const Obj obj7 = t3->get_object(ObjKey(7));
             CHECK_EQUAL(1, obj7.get<Int>(cols[0]));
             CHECK_EQUAL(2, obj7.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj7.get<Bool>(cols[2]));
             CHECK_EQUAL("test", obj7.get<String>(cols[3]));
             CHECK_EQUAL(first_timestamp_value, obj7.get<Timestamp>(cols[4]));
 
-            ConstObj obj8 = t3->get_object(ObjKey(8));
+            const Obj obj8 = t3->get_object(ObjKey(8));
             CHECK_EQUAL(2, obj8.get<Int>(cols[0]));
             CHECK_EQUAL(3, obj8.get<Int>(cols[1]));
             CHECK_EQUAL(true, obj8.get<Bool>(cols[2]));
@@ -899,7 +899,7 @@ TEST(Shared_1)
             Timestamp second_timestamp_value{2, 2};
             CHECK_EQUAL(second_timestamp_value, obj8.get<Timestamp>(cols[4]));
 
-            ConstObj obj9 = t3->get_object(ObjKey(9));
+            const Obj obj9 = t3->get_object(ObjKey(9));
             CHECK_EQUAL(0, obj9.get<Int>(cols[0]));
             CHECK_EQUAL(1, obj9.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj9.get<Bool>(cols[2]));
@@ -1027,7 +1027,7 @@ TEST(Shared_Rollback)
             rt.get_group().verify();
             auto t = rt.get_table("test");
             CHECK(t->size() == 1);
-            ConstObj obj = t->get_object(ObjKey(7));
+            const Obj obj = t->get_object(ObjKey(7));
             CHECK_EQUAL(1, obj.get<Int>(cols[0]));
             CHECK_EQUAL(2, obj.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
@@ -1049,7 +1049,7 @@ TEST(Shared_Rollback)
             rt.get_group().verify();
             auto t = rt.get_table("test");
             CHECK(t->size() == 1);
-            ConstObj obj = t->get_object(ObjKey(7));
+            const Obj obj = t->get_object(ObjKey(7));
             CHECK_EQUAL(1, obj.get<Int>(cols[0]));
             CHECK_EQUAL(2, obj.get<Int>(cols[1]));
             CHECK_EQUAL(false, obj.get<Bool>(cols[2]));
@@ -1735,7 +1735,7 @@ TEST(Shared_Notifications)
         rt.get_group().verify();
         auto t1 = rt.get_table("test");
         CHECK_EQUAL(1, t1->size());
-        ConstObj obj = t1->get_object(ObjKey(7));
+        const Obj obj = t1->get_object(ObjKey(7));
         auto cols = t1->get_column_keys();
         CHECK_EQUAL(1, obj.get<Int>(cols[0]));
         CHECK_EQUAL(2, obj.get<Int>(cols[1]));
@@ -1770,7 +1770,7 @@ TEST(Shared_FromSerialized)
         rt.get_group().verify();
         auto t1 = rt.get_table("test");
         CHECK_EQUAL(1, t1->size());
-        ConstObj obj = t1->get_object(ObjKey(7));
+        const Obj obj = t1->get_object(ObjKey(7));
         auto cols = t1->get_column_keys();
         CHECK_EQUAL(1, obj.get<Int>(cols[0]));
         CHECK_EQUAL(2, obj.get<Int>(cols[1]));
@@ -1916,7 +1916,7 @@ TEST(Shared_ClearColumnWithLinksToSelf)
     {
         WriteTransaction wt(sg);
         TableRef test = wt.add_table("Test");
-        auto col = test->add_column_link(type_Link, "foo", *test);
+        auto col = test->add_column(*test, "foo");
         test->add_column(type_Int, "bar");
         ObjKeys keys;
         test->create_objects(400, keys);             // Ensure non root clusters
@@ -3721,7 +3721,7 @@ TEST(Shared_ConstObject)
 
     TransactionRef reader = sg_w->start_read();
     ConstTableRef t2 = reader->get_table("Foo");
-    ConstObj obj = t2->get_object(ObjKey(47));
+    const Obj obj = t2->get_object(ObjKey(47));
     CHECK_EQUAL(obj.get<int64_t>(c), 5);
 }
 
@@ -3791,7 +3791,7 @@ TEST(Shared_ConstList)
 
     TransactionRef reader = sg->start_read();
     ConstTableRef t2 = reader->get_table("Foo");
-    ConstObj obj = t2->get_object(ObjKey(47));
+    const Obj obj = t2->get_object(ObjKey(47));
     auto list1 = obj.get_list<int64_t>(list_col);
 
     CHECK_EQUAL(list1.get(0), 47);
@@ -3913,7 +3913,7 @@ TEST(Shared_RemoveTableWithEnumAndLinkColumns)
         tk = table->get_key();
         auto col_key = table->add_column(DataType(2), "string_3", false);
         table->enumerate_string_column(col_key);
-        table->add_column_link(type_Link, "link_5", *table);
+        table->add_column(*table, "link_5");
         table->add_search_index(col_key);
         wt->commit();
     }
@@ -4062,7 +4062,7 @@ TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
         auto t = wt->add_table("Table_0");
         // Create more object that can be held in a single cluster
         t->create_objects(267, keys);
-        auto col = t->add_column_link(type_Link, "link_0", *wt->get_table("Table_0"));
+        auto col = t->add_column(*wt->get_table("Table_0"), "link_0");
 
         // Create two links
         Obj obj = t->get_object(keys[48]);

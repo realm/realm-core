@@ -403,7 +403,7 @@ TEST(Group_AddTableWithLinks)
     TableRef a = group.add_table("a");
     TableRef b = group.add_table("b");
     auto c0 = a->add_column(type_Int, "foo");
-    auto c1 = b->add_column_link(type_Link, "bar", *a);
+    auto c1 = b->add_column(*a, "bar");
 
     auto a_key = a->get_key();
     CHECK_EQUAL(b->get_opposite_table_key(c1), a_key);
@@ -579,10 +579,10 @@ TEST(Group_RemoveTableWithColumns)
     CHECK_EQUAL(5, group.size());
 
     alpha->add_column(type_Int, "alpha-1");
-    auto col_link = beta->add_column_link(type_Link, "beta-1", *delta);
-    gamma->add_column_link(type_Link, "gamma-1", *gamma);
+    auto col_link = beta->add_column(*delta, "beta-1");
+    gamma->add_column(*gamma, "gamma-1");
     delta->add_column(type_Int, "delta-1");
-    epsilon->add_column_link(type_Link, "epsilon-1", *delta);
+    epsilon->add_column(*delta, "epsilon-1");
 
     Obj obj = delta->create_object();
     ObjKey k = obj.get_key();
@@ -639,13 +639,13 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     TableRef third = group.add_table("gamma");
     TableRef fourth = group.add_table("delta");
 
-    auto one = first->add_column_link(type_Link, "one", *third);
+    auto one = first->add_column(*third, "one");
 
-    auto two = third->add_column_link(type_Link, "two", *fourth);
-    auto three = third->add_column_link(type_Link, "three", *third);
+    auto two = third->add_column(*fourth, "two");
+    auto three = third->add_column(*third, "three");
 
-    auto four = fourth->add_column_link(type_Link, "four", *first);
-    auto five = fourth->add_column_link(type_Link, "five", *third);
+    auto four = fourth->add_column(*first, "four");
+    auto five = fourth->add_column(*third, "five");
 
     std::vector<ObjKey> first_keys;
     std::vector<ObjKey> third_keys;
@@ -731,14 +731,14 @@ TEST(Group_RemoveLinkTable)
 {
     Group group;
     TableRef table = group.add_table("table");
-    table->add_column_link(type_Link, "link", *table);
+    table->add_column(*table, "link");
     group.remove_table(table->get_key());
     CHECK(group.is_empty());
     CHECK(!table);
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
     target->add_column(type_Int, "int");
-    origin->add_column_link(type_Link, "link", *target);
+    origin->add_column(*target, "link");
     CHECK_THROW(group.remove_table(target->get_key()), CrossTableLinkTarget);
     group.remove_table(origin->get_key());
     CHECK_EQUAL(1, group.size());
@@ -1313,7 +1313,7 @@ TEST(Group_CommitLinkListChange)
     Group group(path, crypt_key(), Group::mode_ReadWrite);
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
-    auto col_link = origin->add_column_link(type_LinkList, "links", *target);
+    auto col_link = origin->add_column_list(*target, "links");
     target->add_column(type_Int, "integers");
     auto k = target->create_object().get_key();
     origin->create_object().get_linklist(col_link).add(k);
@@ -1356,8 +1356,8 @@ TEST(Group_CascadeNotify_SimpleWeak)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *t);
-    auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
+    auto col_link = origin->add_column(*t, "link");
+    auto col_link_list = origin->add_column_list(*t, "linklist");
 
     std::vector<ObjKey> t_keys;
     t->create_objects(100, t_keys);
@@ -1455,8 +1455,8 @@ TEST(Group_CascadeNotify_TableClearWeak)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *t);
-    auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
+    auto col_link = origin->add_column(*t, "link");
+    auto col_link_list = origin->add_column_list(*t, "linklist");
 
     std::vector<ObjKey> t_keys, o_keys;
     t->create_objects(10, t_keys);
@@ -1514,8 +1514,8 @@ TEST(Group_CascadeNotify_TableViewClearWeak)
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
     TableRef origin = g.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *t);
-    auto col_link_list = origin->add_column_link(type_LinkList, "linklist", *t);
+    auto col_link = origin->add_column(*t, "link");
+    auto col_link_list = origin->add_column_list(*t, "linklist");
 
     std::vector<ObjKey> t_keys, o_keys;
     t->create_objects(10, t_keys);
@@ -1577,9 +1577,9 @@ TEST(Group_CascadeNotify_TreeCascade)
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_embedded_table("table");
     TableRef parent = g.add_table("parent");
-    auto left = t->add_column_link(type_Link, "left", *t);
-    auto right = t->add_column_link(type_Link, "right", *t);
-    auto col = parent->add_column_link(type_Link, "root", *t);
+    auto left = t->add_column(*t, "left");
+    auto right = t->add_column(*t, "right");
+    auto col = parent->add_column(*t, "root");
     auto outer_root = parent->create_object();
     auto root = outer_root.create_and_set_linked_object(col);
     make_tree(*t, root, left, right, 0);
@@ -1605,7 +1605,7 @@ TEST(Group_ChangeEmbeddedness)
     Group g;
     TableRef t = g.add_table("table");
     TableRef parent = g.add_table("parent");
-    auto col = parent->add_column_link(type_Link, "child", *t);
+    auto col = parent->add_column(*t, "child");
     auto p1 = parent->create_object();
     auto p2 = parent->create_object();
     auto p3 = parent->create_object();
@@ -1806,8 +1806,8 @@ TEST(Group_RemoveRecursive)
     TableKey target_key = target->get_key();
 
     target->add_column(type_Int, "integers", true);
-    auto link_col_t = target->add_column_link(type_Link, "links", *target);
-    auto link_col_o = origin->add_column_link(type_Link, "links", *target);
+    auto link_col_t = target->add_column(*target, "links");
+    auto link_col_o = origin->add_column(*target, "links");
 
     // Delete one at a time
     ObjKey key_target = target->create_object().get_key();
@@ -1917,8 +1917,8 @@ TEST(Group_StringPrimaryKeyCol)
     g.validate_primary_columns();
 
     auto table1 = g.add_table("class_bar");
-    auto col_link = table1->add_column_link(type_Link, "link", *table);
-    auto col_linklist = table1->add_column_link(type_LinkList, "linklist", *table);
+    auto col_link = table1->add_column(*table, "link");
+    auto col_linklist = table1->add_column_list(*table, "linklist");
     Obj origin_obj = table1->create_object();
     origin_obj.set(col_link, k);
     auto ll = origin_obj.get_linklist(col_linklist);
@@ -1987,8 +1987,8 @@ TEST(Group_SetColumnWithNullPrimaryKeyy)
 
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
-    table->get_object(keys[0]).set(string_col, {"first"});
-    table->get_object(keys[1]).set(string_col, {});
+    table->get_object(keys[0]).set_any(string_col, {"first"});
+    table->get_object(keys[1]).set_any(string_col, {});
     CHECK(!table->get_object(keys[0]).is_null(string_col));
     CHECK_EQUAL(table->get_object(keys[0]).get<StringData>(string_col), "first");
     CHECK(table->get_object(keys[1]).is_null(string_col));

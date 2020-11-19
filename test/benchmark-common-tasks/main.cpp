@@ -346,7 +346,7 @@ struct BenchmarkQueryStringOverLinks : BenchmarkWithStringsFewDup {
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
         TableRef strings = tr.get_table(name());
-        link_col_ndx = t->add_column_link(type_Link, "myLink", *strings);
+        link_col_ndx = t->add_column(*strings, "myLink");
         const size_t num_links = strings->size();
 
 #ifdef REALM_CLUSTER_IF
@@ -532,7 +532,7 @@ struct BenchmarkQueryTimestampGreaterOverLinks : BenchmarkQueryTimestampGreater 
         TableRef t = tr.add_table("Links");
         id_col_ndx = t->add_column(type_Int, "id");
         TableRef timestamps = tr.get_table(name());
-        link_col_ndx = t->add_column_link(type_Link, "myLink", *timestamps);
+        link_col_ndx = t->add_column(*timestamps, "myLink");
         const size_t num_timestamps = timestamps->size();
 #ifdef REALM_CLUSTER_IF
         auto target = timestamps->begin();
@@ -1169,7 +1169,7 @@ struct BenchmarkQueryChainedOrStrings : BenchmarkWithStringsTableForIn {
         ConstTableRef table = m_table;
         Query query = table->where();
         for (size_t i = 0; i < values_to_query.size(); ++i) {
-            query.Or().equal(m_col, values_to_query[i]);
+            query.Or().equal(m_col, StringData(values_to_query[i]));
         }
         TableView results = query.find_all();
         REALM_ASSERT_EX(results.size() == num_queried_matches, results.size(), num_queried_matches,
@@ -1441,7 +1441,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         ConstTableRef table = m_tr->get_table(name());
         size_t target_row = rand() % table->size();
 #ifdef REALM_CLUSTER_IF
-        ConstObj obj = table->get_object(m_keys[target_row]);
+        Obj obj = table->get_object(m_keys[target_row]);
         StringData target_str = obj.get<String>(m_col);
 #else
         StringData target_str = table->get_string(0, target_row);
@@ -1557,7 +1557,7 @@ struct BenchmarkGetLinkList : Benchmark {
         std::string n = std::string(name()) + "_Destination";
         TableRef destination_table = tr.add_table(n);
         TableRef table = tr.add_table(name());
-        m_col_link = table->add_column_link(type_LinkList, "linklist", *destination_table);
+        m_col_link = table->add_column_list(*destination_table, "linklist");
 #ifdef REALM_CLUSTER_IF
         table->create_objects(rows, m_keys);
 #else
@@ -1570,7 +1570,7 @@ struct BenchmarkGetLinkList : Benchmark {
     {
         ConstTableRef table = m_table;
 #ifdef REALM_CLUSTER_IF
-        std::vector<ConstLnkLstPtr> linklists(rows);
+        std::vector<LnkLstPtr> linklists(rows);
         for (size_t i = 0; i < rows; ++i) {
             auto obj = table->get_object(m_keys[i]);
             linklists[i] = obj.get_linklist_ptr(m_col_link);
@@ -1614,7 +1614,7 @@ struct BenchmarkNonInitiatorOpen : Benchmark {
         return "NonInitiatorOpen";
     }
     // the shared realm will be removed after the benchmark finishes
-    std::unique_ptr<realm::test_util::SharedGroupTestPathGuard> path;
+    std::unique_ptr<realm::test_util::DBTestPathGuard> path;
     DBRef initiator;
 
     DBRef do_open()
@@ -1637,7 +1637,7 @@ struct BenchmarkNonInitiatorOpen : Benchmark {
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
 
-        path = std::unique_ptr<realm::test_util::SharedGroupTestPathGuard>(new realm::test_util::SharedGroupTestPathGuard(ident));
+        path = std::make_unique<realm::test_util::DBTestPathGuard>(ident);
 
         // open once - session initiation
         initiator = do_open();
@@ -1855,7 +1855,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
-        realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
+        realm::test_util::DBTestPathGuard realm_path("benchmark_common_tasks" + ident);
         DBRef group;
         group = create_new_shared_group(realm_path, level, key);
         benchmark.before_all(group);

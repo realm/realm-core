@@ -572,7 +572,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     bool create_group_when_missing = true;
     bool writable = create_group_when_missing;
     attach(top_ref, writable, create_group_when_missing); // Throws
-    dg.release();                               // Do not detach after all
+    dg.release();                                         // Do not detach after all
 }
 
 void Group::open(const std::string& file_path, const char* encryption_key, OpenMode mode)
@@ -693,7 +693,7 @@ void Group::attach(ref_type top_ref, bool writable, bool create_group_when_missi
 {
     REALM_ASSERT(!m_top.is_attached());
     if (create_group_when_missing)
-    	REALM_ASSERT(writable);
+        REALM_ASSERT(writable);
 
     // If this function throws, it must leave the group accesor in a the
     // unattached state.
@@ -952,8 +952,8 @@ Table* Group::create_table_accessor(size_t table_ndx)
         table->init(ref, this, table_ndx, m_is_writable, is_frozen());
     }
     else {
-        std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));             // Throws
-        new_table->init(ref, this, table_ndx, m_is_writable, is_frozen());            // Throws
+        std::unique_ptr<Table> new_table(new Table(get_repl(), m_alloc));  // Throws
+        new_table->init(ref, this, table_ndx, m_is_writable, is_frozen()); // Throws
         table = new_table.release();
     }
     // must be atomic to allow concurrent probing of the m_table_accessors vector.
@@ -1068,6 +1068,30 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
     m_table_names.set(table_ndx, new_name);
     if (Replication* repl = *get_repl())
         repl->rename_group_level_table(key, new_name); // Throws
+}
+
+Obj Group::get_object(ObjLink link)
+{
+    auto target_table = get_table(link.get_table_key());
+    ObjKey key = link.get_obj_key();
+    TableClusterTree* ct = key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+    return ct->get(key);
+}
+
+void Group::validate(ObjLink link) const
+{
+    if (auto tk = link.get_table_key()) {
+        auto target_key = link.get_obj_key();
+        auto target_table = get_table(tk);
+        const ClusterTree* ct =
+            target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
+        if (!ct->is_valid(target_key)) {
+            throw LogicError(LogicError::target_row_index_out_of_range);
+        }
+        if (target_table->is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+    }
 }
 
 class Group::DefaultTableWriter : public Group::TableWriter {
@@ -1392,6 +1416,69 @@ bool Group::operator==(const Group& g) const
     }
     return true;
 }
+void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "[" << std::endl;
+
+    auto keys = get_table_keys();
+    int sz = int(keys.size());
+    for (int i = 0; i < sz; ++i) {
+        auto key = keys[i];
+        ConstTableRef table = get_table(key);
+
+        table->schema_to_json(out, renames);
+        if (i < sz - 1)
+            out << ",";
+        out << std::endl;
+    }
+
+    out << "]" << std::endl;
+}
+
+void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
+                    JSONOutputMode output_mode) const
+{
+    if (!is_attached())
+        throw LogicError(LogicError::detached_accessor);
+
+    std::map<std::string, std::string> renames;
+    if (opt_renames) {
+        renames = *opt_renames;
+    }
+
+    out << "{" << std::endl;
+
+    auto keys = get_table_keys();
+    bool first = true;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        auto key = keys[i];
+        StringData name = get_table_name(key);
+        if (renames[name] != "")
+            name = renames[name];
+
+        ConstTableRef table = get_table(key);
+
+        if (!table->is_embedded()) {
+            if (!first)
+                out << ",";
+            out << "\"" << name << "\"";
+            out << ":";
+            table->to_json(out, link_depth, renames, output_mode);
+            out << std::endl;
+            first = false;
+        }
+    }
+
+    out << "}" << std::endl;
+}
 
 namespace {
 
@@ -1407,7 +1494,7 @@ size_t size_of_tree_from_ref(ref_type ref, Allocator& alloc)
     else
         return 0;
 }
-}
+} // namespace
 
 size_t Group::compute_aggregated_byte_size(SizeAggregateControl ctrl) const noexcept
 {
@@ -1541,7 +1628,7 @@ public:
         return true; // No-op
     }
 
-    bool select_list(ColKey, ObjKey) noexcept
+    bool select_collection(ColKey, ObjKey) noexcept
     {
         return true; // No-op
     }
@@ -1557,6 +1644,32 @@ public:
     }
 
     bool list_clear(size_t) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool dictionary_insert(Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_erase(Mixed)
+    {
+        return true; // No-op
+    }
+    bool dictionary_clear(size_t)
+    {
+        return true; // No-op
+    }
+
+    bool set_insert(size_t)
+    {
+        return true; // No-op
+    }
+    bool set_erase(size_t)
+    {
+        return true; // No-op
+    }
+    bool set_clear(size_t)
     {
         return true; // No-op
     }
@@ -1670,10 +1783,10 @@ void Group::advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream& in,
         parser.parse(in, advancer); // Throws
     }
 
-    m_top.detach();                                 // Soft detach
-    bool create_group_when_missing = false;         // See Group::attach_shared().
+    m_top.detach();                                           // Soft detach
+    bool create_group_when_missing = false;                   // See Group::attach_shared().
     attach(new_top_ref, writable, create_group_when_missing); // Throws
-    refresh_dirty_accessors();                      // Throws
+    refresh_dirty_accessors();                                // Throws
 
     if (schema_changed)
         send_schema_change_notification();
@@ -1687,9 +1800,9 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         while (m_top.size() < s_hist_type_ndx) {
             m_top.add(0); // Throws
         }
-        ref_type history_ref = 0; // No history yet
-        m_top.add(RefOrTagged::make_tagged(history_type)); // Throws
-        m_top.add(RefOrTagged::make_ref(history_ref)); // Throws
+        ref_type history_ref = 0;                                    // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type));           // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref));               // Throws
         m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
         m_top.add(RefOrTagged::make_tagged(file_ident));             // Throws
     }
@@ -1773,7 +1886,7 @@ public:
                 ref_type prev_ref_end = i_1->ref + i_1->size;
                 REALM_ASSERT_3(prev_ref_end, <=, i_2->ref);
                 if (i_2->ref == prev_ref_end) { // in-file
-                    i_1->size += i_2->size; // Merge
+                    i_1->size += i_2->size;     // Merge
                 }
                 else {
                     *++i_1 = *i_2;
@@ -1923,7 +2036,9 @@ void Group::verify() const
 
     // Check the consistency of the allocation of the mutable memory that has
     // been marked as free
-    m_alloc.for_all_free_entries([&](ref_type ref, size_t sz) { mem_usage_2.add_mutable(ref, sz); });
+    m_alloc.for_all_free_entries([&](ref_type ref, size_t sz) {
+        mem_usage_2.add_mutable(ref, sz);
+    });
     mem_usage_2.canonicalize();
     mem_usage_1.add(mem_usage_2);
     mem_usage_1.canonicalize();

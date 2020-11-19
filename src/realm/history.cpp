@@ -21,6 +21,7 @@
 #include <realm/db.hpp>
 #include <realm/replication.hpp>
 #include <realm/history.hpp>
+#include <realm/array_key.hpp>
 
 using namespace realm;
 

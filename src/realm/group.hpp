@@ -348,6 +348,9 @@ public:
     void rename_table(TableKey key, StringData new_name, bool require_unique_name = true);
     void rename_table(StringData name, StringData new_name, bool require_unique_name = true);
 
+    Obj get_object(ObjLink link);
+    void validate(ObjLink link) const;
+
     //@}
 
     // Serialization
@@ -505,8 +508,9 @@ public:
     //@}
 
     // Conversion
-    template <class S>
-    void to_json(S& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr) const;
+    void schema_to_json(std::ostream& out, std::map<std::string, std::string>* renames = nullptr) const;
+    void to_json(std::ostream& out, size_t link_depth = 0, std::map<std::string, std::string>* renames = nullptr,
+                 JSONOutputMode output_mode = output_mode_json) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
     /// only if, they contain the same tables in the same order, that
@@ -1044,42 +1048,6 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-template <class S>
-void Group::to_json(S& out, size_t link_depth, std::map<std::string, std::string>* renames) const
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-
-    std::map<std::string, std::string> renames2;
-    renames = renames ? renames : &renames2;
-
-    out << "{" << std::endl;
-
-    auto keys = get_table_keys();
-    bool first = true;
-    for (size_t i = 0; i < keys.size(); ++i) {
-        auto key = keys[i];
-        StringData name = get_table_name(key);
-        std::map<std::string, std::string>& m = *renames;
-        if (m[name] != "")
-            name = m[name];
-
-        ConstTableRef table = get_table(key);
-
-        if (!table->is_embedded()) {
-            if (!first)
-                out << ",";
-            out << "\"" << name << "\"";
-            out << ":";
-            table->to_json(out, link_depth, renames);
-            out << std::endl;
-            first = false;
-        }
-    }
-
-    out << "}" << std::endl;
-}
-
 inline void Group::init_array_parents() noexcept
 {
     m_table_names.set_parent(&m_top, 0);
@@ -1307,7 +1275,7 @@ public:
         /// The target row index which is being removed. Mostly relevant for
         /// LinkList (to know which entries are being removed), but also
         /// valid for Link.
-        ObjKey old_target_key;
+        ObjLink old_target_link;
     };
 
     CascadeState(Mode mode = Mode::Strong, Group* g = nullptr) noexcept
@@ -1351,17 +1319,17 @@ public:
         return false;
     }
 
-    void enqueue_for_nullification(Table& src_table, ColKey src_col_key, ObjKey origin_key, ObjKey target_key)
+    void enqueue_for_nullification(Table& src_table, ColKey src_col_key, ObjKey origin_key, ObjLink target_link)
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
             Obj obj = src_table.get_object(origin_key);
-            obj.nullify_link(src_col_key, target_key);
+            obj.nullify_link(src_col_key, target_link);
             return;
         }
 
         // Otherwise enqueue it
-        m_to_be_nullified.push_back({src_table.get_key(), src_col_key, origin_key, target_key});
+        m_to_be_nullified.push_back({src_table.get_key(), src_col_key, origin_key, target_link});
     }
 
     void send_notifications()
@@ -1373,7 +1341,8 @@ public:
         for (auto& o : m_to_be_deleted)
             notification.rows.emplace_back(o.first, o.second);
         for (auto& l : m_to_be_nullified)
-            notification.links.emplace_back(l.origin_table, l.origin_col_key, l.origin_key, l.old_target_key);
+            notification.links.emplace_back(l.origin_table, l.origin_col_key, l.origin_key,
+                                            l.old_target_link.get_obj_key());
         send_notifications(notification);
     }
 };

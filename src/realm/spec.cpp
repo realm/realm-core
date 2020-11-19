@@ -201,7 +201,7 @@ bool Spec::convert_column_attributes()
         }
         ColumnType type = ColumnType(m_types.get(column_ndx));
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
-        switch (type) {
+        switch (int(type)) {
             case col_type_OldTable: {
                 Array subspecs(m_top.get_alloc());
                 subspecs.set_parent(&m_top, 3);
@@ -219,7 +219,7 @@ bool Spec::convert_column_attributes()
                 changes = true;
                 break;
             }
-            case col_type_OldStringEnum: {
+            case /*col_type_OldStringEnum */ 3: {
                 m_types.set(column_ndx, col_type_String);
                 // We need to padd zeroes into the m_enumkeys so that the index in
                 // m_enumkeys matches the column index.
@@ -470,15 +470,6 @@ ColKey Spec::find_backlink_column(TableKey origin_table_key, size_t spec_ndx) co
     return ColKey{m_keys.get(col_ndx)};
 }
 
-DataType Spec::get_public_column_type(size_t ndx) const noexcept
-{
-    REALM_ASSERT(ndx < get_column_count());
-
-    ColumnType type = get_column_type(ndx);
-
-    return DataType(type);
-}
-
 namespace {
 
 template <class T>
@@ -510,6 +501,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
         ColumnType col_type = ColumnType(m_types.get(col_ndx));
         switch (col_type) {
             case col_type_Link:
+            case col_type_TypedLink:
             case col_type_LinkList: {
                 // In addition to name and attributes, the link target table must also be compared
                 REALM_ASSERT(false); // We can no longer compare specs - in fact we don't want to
@@ -525,9 +517,8 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Bool:
             case col_type_Binary:
             case col_type_String:
-            case col_type_OldStringEnum:
             case col_type_OldTable:
-            case col_type_OldMixed:
+            case col_type_Mixed:
             case col_type_OldDateTime:
             case col_type_Timestamp:
             case col_type_Float:
@@ -535,6 +526,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Decimal:
             case col_type_BackLink:
             case col_type_ObjectId:
+            case col_type_UUID:
                 // All other column types are compared as before
                 if (m_types.get(col_ndx) != spec.m_types.get(col_ndx))
                     return false;

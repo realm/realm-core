@@ -26,6 +26,8 @@
 
 namespace realm {
 
+class Obj;
+
 struct TableKey {
     static constexpr uint32_t null_value = uint32_t(-1) >> 1; // free top bit
 
@@ -54,6 +56,11 @@ struct TableKey {
     {
         return value < rhs.value;
     }
+    bool operator>(const TableKey& rhs) const noexcept
+    {
+        return value > rhs.value;
+    }
+
     explicit operator bool() const noexcept
     {
         return value != null_value;
@@ -103,7 +110,7 @@ struct ColKey {
         : value(val)
     {
     }
-    explicit ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, uint64_t tag) noexcept
+    constexpr ColKey(Idx index, ColumnType type, ColumnAttrMask attrs, uint64_t tag) noexcept
         : ColKey((index.val & 0xFFFFUL) | ((type & 0x3FUL) << 16) | ((attrs.m_value & 0xFFUL) << 22) |
                  ((tag & 0xFFFFFFFFUL) << 30))
     {
@@ -115,6 +122,18 @@ struct ColKey {
     bool is_list() const
     {
         return get_attrs().test(col_attr_List);
+    }
+    bool is_set() const
+    {
+        return get_attrs().test(col_attr_Set);
+    }
+    bool is_dictionary() const
+    {
+        return get_attrs().test(col_attr_Dictionary);
+    }
+    bool is_collection()
+    {
+        return get_attrs().test(col_attr_Collection);
     }
     ColKey& operator=(int64_t val) noexcept
     {
@@ -225,6 +244,12 @@ private:
     operator int64_t() const = delete;
 };
 
+inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
+{
+    ostr << "ObjKey(" << key.value << ")";
+    return ostr;
+}
+
 class ObjKeys : public std::vector<ObjKey> {
 public:
     ObjKeys(const std::vector<int64_t>& init)
@@ -239,13 +264,72 @@ public:
     }
 };
 
+struct ObjLink {
+public:
+    ObjLink() {}
+    ObjLink(TableKey table_key, ObjKey obj_key)
+        : m_obj_key(obj_key)
+        , m_table_key(table_key)
+    {
+    }
+    explicit operator bool() const
+    {
+        return bool(m_table_key) && bool(m_obj_key);
+    }
+    bool is_null() const
+    {
+        return !bool(*this);
+    }
+    bool is_unresolved() const
+    {
+        return m_obj_key.is_unresolved();
+    }
+    bool operator==(const ObjLink& other) const
+    {
+        return m_obj_key == other.m_obj_key && m_table_key == other.m_table_key;
+    }
+    bool operator!=(const ObjLink& other) const
+    {
+        return m_obj_key != other.m_obj_key || m_table_key != other.m_table_key;
+    }
+    bool operator<(const ObjLink& rhs) const
+    {
+        if (m_table_key < rhs.m_table_key) {
+            return true;
+        }
+        else if (m_table_key == rhs.m_table_key) {
+            return m_obj_key < rhs.m_obj_key;
+        }
+        else {
+            // m_table_key >= rhs.m_table_key
+            return false;
+        }
+    }
+    bool operator>(const ObjLink& rhs) const
+    {
+        return (*this != rhs) && !(*this < rhs);
+    }
+    TableKey get_table_key() const
+    {
+        return m_table_key;
+    }
+    ObjKey get_obj_key() const
+    {
+        return m_obj_key;
+    }
 
-inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
+private:
+    // Having ObjKey first ensures that there will be no uninitialized space
+    // in the first 12 bytes. This is important when generating a hash
+    ObjKey m_obj_key;
+    TableKey m_table_key;
+};
+
+inline std::ostream& operator<<(std::ostream& os, ObjLink link)
 {
-    ostr << "ObjKey(" << key.value << ")";
-    return ostr;
+    os << '{' << link.get_table_key() << ',' << link.get_obj_key() << '}';
+    return os;
 }
-
 constexpr ObjKey null_key;
 
 namespace util {

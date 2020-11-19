@@ -54,6 +54,21 @@ inline bool TestValueGenerator::convert_for_test<bool>(int64_t v)
 }
 
 template <>
+inline UUID TestValueGenerator::convert_for_test<UUID>(int64_t v)
+{
+    union {
+        struct {
+            int64_t upper;
+            int64_t lower;
+        } ints;
+        UUID::UUIDBytes bytes;
+    } u;
+    u.ints.upper = v;
+    u.ints.lower = 0;
+    return UUID{u.bytes};
+}
+
+template <>
 inline Timestamp TestValueGenerator::convert_for_test<Timestamp>(int64_t v)
 {
     return Timestamp{v, 0};
@@ -136,9 +151,6 @@ struct Prop<T, state,
     using underlying_type = T;
     static type default_value()
     {
-        if constexpr (realm::is_any_v<type, util::Optional<float>, util::Optional<double>>) {
-            return type(); // optional float/double would return NaN and for consistency we want to operate on null
-        }
         return ColumnTypeTraits<type>::cluster_leaf_type::default_value(is_nullable);
     }
     static underlying_type default_non_nullable_value()

@@ -91,6 +91,10 @@ public:
     /// you need to get multiple values, then this method will be
     /// slower.
     static T get(const char* header, size_t ndx) noexcept;
+    Mixed get_any(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
+    }
 
     size_t lower_bound(T value) const noexcept;
     size_t upper_bound(T value) const noexcept;
@@ -131,9 +135,9 @@ class BasicArrayNull : public BasicArray<T> {
 public:
     using BasicArray<T>::BasicArray;
 
-    static T default_value(bool nullable)
+    static util::Optional<T> default_value(bool nullable)
     {
-        return nullable ? null::get_null_float<T>() : T(0.0);
+        return nullable ? util::Optional<T>() : util::Optional<T>(0.0);
     }
     void set(size_t ndx, util::Optional<T> value)
     {
@@ -173,6 +177,10 @@ public:
     {
         T val = BasicArray<T>::get(ndx);
         return null::is_null_float(val) ? util::none : util::make_optional(val);
+    }
+    Mixed get_any(size_t ndx) const override
+    {
+        return Mixed(get(ndx));
     }
     size_t find_first(util::Optional<T> value, size_t begin = 0, size_t end = npos) const
     {

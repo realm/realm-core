@@ -24,6 +24,8 @@
 #include <vector>
 #include <chrono>
 
+using namespace std::chrono;
+
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/array_bool.hpp>
@@ -33,11 +35,23 @@
 #include <realm/query_expression.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using namespace std::chrono;
+
+// #include <valgrind/callgrind.h>
+
+#ifndef CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION
+#endif
+
+#ifndef CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
+#endif
+
+// valgrind --tool=callgrind --instr-atstart=no realm-tests
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -125,29 +139,23 @@ TEST(Query_Count)
     }
 }
 
-TEST(Query_NextGenSyntaxTypedString)
+TEST(Query_Parser)
 {
     Table books;
-    books.add_column(type_String, "1");
-    auto c1 = books.add_column(type_String, "2");
-    auto c2 = books.add_column(type_Int, "3");
+    books.add_column(type_String, "title");
+    books.add_column(type_String, "author");
+    books.add_column(type_Int, "pages");
 
     Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
     Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
     Obj obj3 = books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
-    Query q = books.column<Int>(c2) >= 200 && books.column<String>(c1) == "David Griffiths";
+    Query q = books.query("pages >= $0 && author == $1", {{200, "David Griffiths"}});
     auto match = q.find();
     CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:
-    match = (books.column<Int>(c2) >= 200 && books.column<String>(c1) == "David Griffiths").find();
-    CHECK_EQUAL(obj2.get_key(), match);
-
-    // You can also create column objects and use them in expressions:
-    Columns<Int> pages = books.column<Int>(c2);
-    Columns<String> author = books.column<String>(c1);
-    match = (pages >= 200 && author == "David Griffiths").find();
+    match = books.query("pages >= 200 && author == \"David Griffiths\"").find();
     CHECK_EQUAL(obj2.get_key(), match);
 }
 
@@ -496,7 +504,7 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(cnt, 1);
 
     TableRef table3 = group.add_table(StringData("table3"));
-    auto col_link1 = table3->add_column_link(type_Link, "link1", *table2);
+    auto col_link1 = table3->add_column(*table2, "link1");
 
     table3->create_object().set(col_link1, key_2_0);
     table3->create_object().set(col_link1, key_2_1);
@@ -1438,18 +1446,15 @@ TEST(Query_Expressions0)
     match = (power(second) < 9.001 && power(second) > 8.999).find();
     CHECK_EQUAL(key0, match);
 
-    // For `float < int_column` we had a bug where the float truncated to int, and the int_column remained int
-    // (correct behaviour would be that the float remained float and int_column converted to float). This test
-    // exposes such a bug because 1000000001 should convert to the nearest float value which is `1000000000.`
-    // (gap between floats is bigger than 1 and cannot represent 1000000001).
+    // For `float < int_column` we had a bug where int was promoted to float instead of double.
     table.clear();
-    table.create_object().set(col_int, 1000000001);
+    auto k = table.create_object().set(col_int, 1000000001).get_key();
 
     match = (1000000000.f < first).find();
-    CHECK_EQUAL(match, null_key);
+    CHECK_EQUAL(match, k);
 
     match = (first > 1000000000.f).find();
-    CHECK_EQUAL(match, null_key);
+    CHECK_EQUAL(match, k);
 }
 
 TEST(Query_StrIndexCrash)
@@ -1522,7 +1527,7 @@ TEST(Query_IntIndex)
     CHECK_EQUAL(cnt, eights);
 
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    auto col_link = origin->add_column(*table, "link");
     for (auto&& o : *table) {
         origin->create_object().set(col_link, o.get_key());
     }
@@ -1558,7 +1563,7 @@ TEST(Query_StringIndexNull)
     }
 
     TableRef origin = group.add_table("origin");
-    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    auto col_link = origin->add_column(*table, "link");
     for (auto&& o : *table) {
         origin->create_object().set(col_link, o.get_key());
     }
@@ -1578,8 +1583,8 @@ TEST(Query_Links)
 
     auto int_col = target2->add_column(type_Int, "integers");
     auto str_col = target1->add_column(type_String, "strings");
-    auto linklist_col = target1->add_column_link(type_LinkList, "linklist", *target2);
-    auto link_col = origin->add_column_link(type_Link, "link", *target1);
+    auto linklist_col = target1->add_column_list(*target2, "linklist");
+    auto link_col = origin->add_column(*target1, "link");
     auto double_col = origin->add_column(type_Double, "doubles");
 
     std::vector<ObjKey> origin_keys;
@@ -1638,12 +1643,12 @@ TEST(Query_size)
     auto string_col = table1->add_column(type_String, "strings");
     auto bin_col = table1->add_column(type_Binary, "binaries", true);
     auto int_list_col = table1->add_column_list(type_Int, "intlist");
-    auto linklist_col = table1->add_column_link(type_LinkList, "linklist", *table2);
+    auto linklist_col = table1->add_column_list(*table2, "linklist");
 
     auto int_col = table2->add_column(type_Int, "integers");
 
-    auto link_col = table3->add_column_link(type_Link, "link", *table1);
-    auto linklist_col1 = table3->add_column_link(type_LinkList, "linklist", *table1);
+    auto link_col = table3->add_column(*table1, "link");
+    auto linklist_col1 = table3->add_column_list(*table1, "linklist");
 
     std::vector<ObjKey> table1_keys;
     table1->create_objects(10, table1_keys);
@@ -1849,8 +1854,8 @@ TEST(Query_ListOfPrimitives)
     CHECK_EQUAL(tv.get_key(1), keys[1]);
 
     TableRef baa = g.add_table("baa");
-    auto col_link = baa->add_column_link(type_Link, "link", *table);
-    auto col_linklist = baa->add_column_link(type_LinkList, "linklist", *table);
+    auto col_link = baa->add_column(*table, "link");
+    auto col_linklist = baa->add_column_list(*table, "linklist");
     Obj obj0 = baa->create_object().set(col_link, keys[1]);
     Obj obj1 = baa->create_object().set(col_link, keys[0]);
 
@@ -2008,12 +2013,12 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
             doubles.push_back(key);
     }
 
-    realm::TableView t1 = table.where().equal_int(col_int0, col_int1).find_all();
-    realm::TableView t2 = table.where().equal_int(col_int2, col_int3).find_all();
-    realm::TableView t3 = table.where().equal_int(col_int4, col_int5).find_all();
+    realm::TableView t1 = table.where().equal(col_int0, col_int1).find_all();
+    realm::TableView t2 = table.where().equal(col_int2, col_int3).find_all();
+    realm::TableView t3 = table.where().equal(col_int4, col_int5).find_all();
 
-    realm::TableView t4 = table.where().equal_float(col_float6, col_float7).find_all();
-    realm::TableView t5 = table.where().equal_double(col_double8, col_double9).find_all();
+    realm::TableView t4 = table.where().equal(col_float6, col_float7).find_all();
+    realm::TableView t5 = table.where().equal(col_double8, col_double9).find_all();
 
 
     CHECK_EQUAL(ints1.size(), t1.size());
@@ -2056,26 +2061,26 @@ TEST(Query_TwoColsVaryOperators)
     Obj obj1 = table.create_object().set_all(10, 5, 10.0f, 5.0f, 10.0, 5.0);
     Obj obj2 = table.create_object().set_all(-10, -5, -10.0f, -5.0f, -10.0, -5.0);
 
-    CHECK_EQUAL(null_key, table.where().equal_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().not_equal_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal_int(col_int0, col_int1).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_equal_int(col_int0, col_int1).find());
+    CHECK_EQUAL(null_key, table.where().equal(col_int0, col_int1).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_int0, col_int1).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less(col_int0, col_int1).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater(col_int0, col_int1).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal(col_int0, col_int1).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less_equal(col_int0, col_int1).find());
 
-    CHECK_EQUAL(null_key, table.where().equal_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().not_equal_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal_float(col_float2, col_float3).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_equal_float(col_float2, col_float3).find());
+    CHECK_EQUAL(null_key, table.where().equal(col_float2, col_float3).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_float2, col_float3).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less(col_float2, col_float3).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater(col_float2, col_float3).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal(col_float2, col_float3).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less_equal(col_float2, col_float3).find());
 
-    CHECK_EQUAL(null_key, table.where().equal_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().not_equal_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal_double(col_double4, col_double5).find());
-    CHECK_EQUAL(obj0.get_key(), table.where().less_equal_double(col_double4, col_double5).find());
+    CHECK_EQUAL(null_key, table.where().equal(col_double4, col_double5).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().not_equal(col_double4, col_double5).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less(col_double4, col_double5).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater(col_double4, col_double5).find());
+    CHECK_EQUAL(obj1.get_key(), table.where().greater_equal(col_double4, col_double5).find());
+    CHECK_EQUAL(obj0.get_key(), table.where().less_equal(col_double4, col_double5).find());
 }
 
 
@@ -2090,10 +2095,10 @@ TEST(Query_TwoCols0)
         table.create_object();
     }
 
-    realm::TableView t1 = table.where().equal_int(col0, col1).find_all();
+    realm::TableView t1 = table.where().equal(col0, col1).find_all();
     CHECK_EQUAL(50, t1.size());
 
-    realm::TableView t2 = table.where().less_int(col0, col1).find_all();
+    realm::TableView t2 = table.where().less(col0, col1).find_all();
     CHECK_EQUAL(0, t2.size());
 }
 
@@ -2137,6 +2142,310 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(2, q6.count());
 }
 
+void construct_all_types_table(Table& table)
+{
+    table.add_column(type_Int, "int");
+    table.add_column(type_Bool, "bool");
+    table.add_column(type_String, "string");
+    table.add_column(type_Binary, "binary");
+    table.add_column(type_Mixed, "mixed");
+    table.add_column(type_Timestamp, "timestamp");
+    table.add_column(type_Float, "float");
+    table.add_column(type_Double, "double");
+    table.add_column(type_Decimal, "decimal128");
+    table.add_column(type_ObjectId, "objectId");
+    table.add_column(type_UUID, "uuid");
+
+    table.add_column(type_Int, "int?", true);
+    table.add_column(type_Bool, "bool?", true);
+    table.add_column(type_String, "string?", true);
+    table.add_column(type_Binary, "binary?", true);
+    table.add_column(type_Mixed, "mixed?", true);
+    table.add_column(type_Timestamp, "timestamp?", true);
+    table.add_column(type_Float, "float?", true);
+    table.add_column(type_Double, "double?", true);
+    table.add_column(type_Decimal, "decimal128?", true);
+    table.add_column(type_ObjectId, "objectId?", true);
+    table.add_column(type_UUID, "uuid?", true);
+}
+
+TEST(Query_TwoColumnsCrossTypes)
+{
+    Table table;
+    construct_all_types_table(table);
+    TestValueGenerator gen;
+
+    constexpr size_t num_rows = 10;
+    for (size_t i = 0; i < num_rows; ++i) {
+        std::string str = util::format("foo %1", i);
+        Timestamp ts{int64_t(i), 0};
+        BinaryData bd(str.c_str(), str.size() + 1); // include the terminal null so comparison against strings work
+        ObjectId oid(ts, int(i), int(i));
+        UUID uuid = gen.convert_for_test<UUID>(i);
+        table.create_object()
+            .set_all(int64_t(i), i % 2 == 1, StringData(str), bd, Mixed(str), ts, float(i), double(i),
+                     Decimal128(int64_t(i)), oid, uuid, int64_t(i), i % 2 == 1, StringData(str), bd, Mixed(str), ts,
+                     float(i), double(i), Decimal128(int64_t(i)), oid, uuid)
+            .get_key();
+    }
+
+    ColKeys columns = table.get_column_keys();
+    for (size_t i = 0; i < columns.size(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            ColKey lhs = columns[i];
+            ColKey rhs = columns[j];
+            DataType lhs_type = DataType(lhs.get_type());
+            DataType rhs_type = DataType(rhs.get_type());
+            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type);
+            size_t num_expected_matches = are_comparable ? num_rows : 0;
+            bool bool_vs_numeric_comparison = false;
+            if (are_comparable && ((lhs_type == type_Bool && rhs_type != type_Bool) ||
+                                   (lhs_type != type_Bool && rhs_type == type_Bool))) {
+                num_expected_matches = 2; // bool only stores two values so only matches the first two numerics
+                bool_vs_numeric_comparison = true;
+            }
+            else if ((lhs_type == type_Mixed || rhs_type == type_Mixed) &&
+                     ((lhs_type == type_String || rhs_type == type_String) ||
+                      (lhs_type == type_Binary || rhs_type == type_Binary))) {
+                num_expected_matches = num_rows; // mixed was set to the same string/binary value
+            }
+            {
+                size_t actual_matches = table.where().equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " == " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            // select some typed query expressions to test as well
+            if (lhs_type == type_Int && rhs_type == type_Double) {
+                size_t actual_matches = (table.column<Int>(lhs) == table.column<Double>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            if (lhs_type == type_String && rhs_type == type_Binary) {
+                size_t actual_matches = (table.column<String>(lhs) == table.column<Binary>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            {
+                size_t actual_matches = table.where().not_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_rows - num_expected_matches, actual_matches);
+                if (actual_matches != num_rows - num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " != " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                if (bool_vs_numeric_comparison && rhs_type == type_Bool) {
+                    num_expected_matches = num_rows;
+                }
+                size_t actual_matches = table.where().greater_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " >= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                if (bool_vs_numeric_comparison) {
+                    num_expected_matches = (rhs_type == type_Bool) ? 2 : num_rows;
+                }
+                size_t actual_matches = table.where().less_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " <= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                num_expected_matches = 0;
+                if (bool_vs_numeric_comparison && rhs_type == type_Bool) {
+                    num_expected_matches = num_rows - 2;
+                }
+                size_t actual_matches = table.where().greater(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " > "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                num_expected_matches = 0;
+                if (bool_vs_numeric_comparison) {
+                    num_expected_matches = (lhs_type == type_Bool) ? num_rows - 2 : 0;
+                }
+                size_t actual_matches = table.where().less(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " < "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+        }
+    }
+}
+
+TEST(Query_TwoColumnsCrossTypesNullability)
+{
+    Table table;
+    construct_all_types_table(table);
+    TestValueGenerator gen;
+
+    constexpr size_t num_rows = 1;
+    table.create_object(); // add one row of default values, null or zero
+
+    ColKeys columns = table.get_column_keys();
+    for (size_t i = 0; i < columns.size(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            ColKey lhs = columns[i];
+            ColKey rhs = columns[j];
+            DataType lhs_type = DataType(lhs.get_type());
+            DataType rhs_type = DataType(rhs.get_type());
+            bool both_non_nullable = !lhs.is_nullable() && !rhs.is_nullable();
+            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type);
+            size_t num_expected_matches = 0;
+            if (lhs.is_nullable() && rhs.is_nullable()) {
+                num_expected_matches = 1; // both default to null
+            }
+            else if (!lhs.is_nullable() && !rhs.is_nullable()) {
+                if (are_comparable) {
+                    num_expected_matches = 1; // numerics are 0
+                }
+                if ((lhs_type == type_Binary && rhs_type == type_String) ||
+                    (lhs_type == type_String && rhs_type == type_Binary)) {
+                    num_expected_matches =
+                        0; // although comparable, the defaults differ from String: "\0" and Binary: ""
+                }
+            }
+            {
+                size_t actual_matches = table.where().equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " == " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            // select some typed query expressions to test as well
+            if (lhs_type == type_Int && rhs_type == type_Double) {
+                size_t actual_matches = (table.column<Int>(lhs) == table.column<Double>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            if (lhs_type == type_String && rhs_type == type_Binary) {
+                size_t actual_matches = (table.column<String>(lhs) == table.column<Binary>(rhs)).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+            }
+            {
+                size_t actual_matches = table.where().not_equal(lhs, rhs).count();
+                CHECK_EQUAL(num_rows - num_expected_matches, actual_matches);
+                if (actual_matches != num_rows - num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " != " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_gte = num_expected_matches;
+                if (both_non_nullable && lhs_type == type_String && rhs_type == type_Binary) {
+                    expected_gte = num_rows;
+                }
+                size_t actual_matches = table.where().greater_equal(lhs, rhs).count();
+                CHECK_EQUAL(expected_gte, actual_matches);
+                if (actual_matches != expected_gte) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " >= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_le = num_expected_matches;
+                if (both_non_nullable && lhs_type == type_Binary && rhs_type == type_String) {
+                    expected_le = num_rows;
+                }
+                size_t actual_matches = table.where().less_equal(lhs, rhs).count();
+                CHECK_EQUAL(expected_le, actual_matches);
+                if (actual_matches != expected_le) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " <= " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_greater = 0;
+                if (both_non_nullable && lhs_type == type_String && rhs_type == type_Binary) {
+                    expected_greater = num_rows;
+                }
+                size_t actual_matches = table.where().greater(lhs, rhs).count();
+                CHECK_EQUAL(expected_greater, actual_matches);
+                if (actual_matches != expected_greater) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " > "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+            {
+                size_t expected_less = 0;
+                if (both_non_nullable && lhs_type == type_Binary && rhs_type == type_String) {
+                    expected_less = num_rows;
+                }
+                size_t actual_matches = table.where().less(lhs, rhs).count();
+                CHECK_EQUAL(expected_less, actual_matches);
+                if (actual_matches != expected_less) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs) << " < "
+                              << table.get_column_name(rhs) << std::endl;
+                }
+            }
+        }
+    }
+}
+
+TEST(Query_TwoColumnsCrossTypesNaN)
+{
+    // across double/float nullable/non-nullable combinations
+    // verify query comparisons for: NaN == NaN, null == null, NaN != null
+    Table table;
+    table.add_column(type_Float, "float");
+    table.add_column(type_Double, "double");
+    table.add_column(type_Float, "float?", true);
+    table.add_column(type_Double, "double?", true);
+
+    CHECK(std::numeric_limits<double>::has_quiet_NaN);
+    CHECK(std::numeric_limits<float>::has_quiet_NaN);
+    double nan_d = std::numeric_limits<double>::quiet_NaN();
+    float nan_f = std::numeric_limits<float>::quiet_NaN();
+    util::Optional<double> null_d;
+    util::Optional<float> null_f;
+    table.create_object().set_all(nan_f, nan_d, null_f, null_d);
+    table.create_object().set_all(nan_f, nan_d, nan_f, nan_d);
+    ColKeys columns = table.get_column_keys();
+    for (size_t i = 0; i < columns.size(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            ColKey lhs = columns[i];
+            ColKey rhs = columns[j];
+            bool same_nullablity = lhs.is_nullable() == rhs.is_nullable();
+            size_t num_expected_matches = same_nullablity ? 2 : 1;
+            {
+                size_t actual_matches = table.where().equal(lhs, rhs).count();
+                CHECK_EQUAL(num_expected_matches, actual_matches);
+                if (actual_matches != num_expected_matches) {
+                    std::cout << "failure comparing columns: " << table.get_column_name(lhs)
+                              << " == " << table.get_column_name(rhs) << std::endl;
+                }
+            }
+        }
+    }
+}
+
+TEST(Query_TwoColumnsDifferentTables)
+{
+    Group g;
+    auto table_a = g.add_table("table a");
+    auto table_b = g.add_table("table b");
+    ColKey col_a = table_a->add_column(type_Float, "float");
+    ColKey col_b = table_b->add_column(type_Float, "float");
+    ColKey col_c = table_b->add_column(type_Float, "another float");
+    table_a->create_object();
+    table_a->create_object();
+    table_b->create_object();
+
+    CHECK_THROW_ANY(table_a->where().equal(col_a, col_b).count());
+    CHECK_THROW_ANY(table_a->where().equal(col_b, col_c).count());
+    CHECK_THROW_ANY((table_a->column<Float>(col_a) == table_b->column<Float>(col_b)).count());
+}
 
 TEST(Query_DateTest)
 {
@@ -2159,8 +2468,8 @@ TEST(Query_TwoColsNoRows)
     auto col0 = table.add_column(type_Int, "first1");
     auto col1 = table.add_column(type_Int, "second1");
 
-    CHECK_EQUAL(null_key, table.where().equal_int(col0, col1).find());
-    CHECK_EQUAL(null_key, table.where().not_equal_int(col0, col1).find());
+    CHECK_EQUAL(null_key, table.where().equal(col0, col1).find());
+    CHECK_EQUAL(null_key, table.where().not_equal(col0, col1).find());
 }
 
 
@@ -3479,10 +3788,10 @@ TEST(Query_SortLinks)
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_string");
-    auto t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_to_t2", *t2);
+    auto t1_link_t2_col = t1->add_column(*t2, "t1_link_to_t2");
     t2->add_column(type_Int, "t2_int");
     t2->add_column(type_String, "t2_string");
-    t2->add_column_link(type_Link, "t2_link_to_t1", *t1);
+    t2->add_column(*t1, "t2_link_to_t1");
 
     std::vector<ObjKey> t1_keys;
     std::vector<ObjKey> t2_keys;
@@ -3531,10 +3840,10 @@ TEST(Query_SortLinkChains)
     TableRef t3 = g.add_table("t3");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
 
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    auto t2_link_col = t2->add_column(*t3, "t2_link_t3");
 
     auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
     auto t3_str_col = t3->add_column(type_String, "t3_str");
@@ -3672,9 +3981,9 @@ TEST(Query_LinkChainSortErrors)
     TableRef t2 = g.add_table("t2");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_linklist_col = t1->add_column_link(type_LinkList, "t1_linklist", *t2);
+    auto t1_linklist_col = t1->add_column_list(*t2, "t1_linklist");
     auto t2_string_col = t2->add_column(type_String, "t2_string");
-    t2->add_column_link(type_Link, "t2_link_t1", *t1); // add a backlink to t1
+    t2->add_column(*t1, "t2_link_t1"); // add a backlink to t1
 
     t1->create_object();
 
@@ -3794,7 +4103,7 @@ TEST(Query_DescriptorsWillApply)
     TableRef t1 = g.add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
+    auto t1_link_col = t1->add_column(*t1, "t1_link");
 
     t1->create_object();
 
@@ -4161,7 +4470,7 @@ TEST(Query_DistinctAndSort)
     TableRef t2 = g.add_table("t2");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
 
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5});
@@ -4281,7 +4590,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
     TableRef t1 = g->add_table("t1");
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t1_str_col = t1->add_column(type_String, "t1_str");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link", *t1);
+    auto t1_link_col = t1->add_column(*t1, "t1_link");
 
     ObjKey k0 = t1->create_object().set_all(100, "A").get_key();
     ObjKey k1 = t1->create_object().set_all(200, "A").get_key();
@@ -4520,10 +4829,10 @@ TEST(Query_DistinctThroughLinks)
     TableRef t3 = g.add_table("t3");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
 
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_link_col = t2->add_column_link(type_Link, "t2_link_t3", *t3);
+    auto t2_link_col = t2->add_column(*t3, "t2_link_t3");
 
     auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
     auto t3_str_col = t3->add_column(type_String, "t3_str");
@@ -4696,7 +5005,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
     TableRef t1 = g.add_table("t1");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_self_col = t1->add_column_link(type_Link, "t1_link_self", *t1);
+    auto t1_link_self_col = t1->add_column(*t1, "t1_link_self");
 
     ObjKeys obj_keys;
     t1->create_objects(7, obj_keys);
@@ -4812,7 +5121,7 @@ TEST(Query_IncludeDescriptorOtherLinks)
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_link_t1_col = t2->add_column_link(type_Link, "t2_link_t1", *t1);
+    auto t2_link_t1_col = t2->add_column(*t1, "t2_link_t1");
 
     ObjKeys obj_keys;
     t1->create_objects(7, obj_keys);
@@ -4884,7 +5193,7 @@ TEST(Query_IncludeDescriptorOtherLists)
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_list_t1_col = t2->add_column_link(type_LinkList, "t2_list_t1", *t1);
+    auto t2_list_t1_col = t2->add_column_list(*t1, "t2_list_t1");
 
     ObjKeys obj_keys;
     t1->create_objects(7, obj_keys);
@@ -4968,12 +5277,12 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
     TableRef t4 = g.add_table("t4");
 
     auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_link_t2_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    auto t1_link_t2_col = t1->add_column(*t2, "t1_link_t2");
     auto t2_int_col = t2->add_column(type_Int, "t2_int");
-    auto t2_list_t3_col = t2->add_column_link(type_LinkList, "t2_list_t3", *t3);
+    auto t2_list_t3_col = t2->add_column_list(*t3, "t2_list_t3");
     auto t3_int_col = t3->add_column(type_Int, "t3_int");
     auto t4_int_col = t4->add_column(type_Int, "t4_int");
-    auto t4_link_t3_col = t4->add_column_link(type_Link, "t4_link_t3", *t3);
+    auto t4_link_t3_col = t4->add_column(*t3, "t4_link_t3");
 
     ObjKeys t1_keys;
     ObjKeys t2_keys;
@@ -5352,6 +5661,70 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
     }
 }
 
+TEST(Query_Performance)
+{
+    Group g;
+    auto foo = g.add_table("Foo");
+    auto bar = g.add_table("Bar");
+
+    auto col_double = foo->add_column(type_Double, "doubles");
+    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
+
+    for (int i = 0; i < 10000; i++) {
+        auto obj = foo->create_object();
+        obj.set(col_double, double(i % 19));
+        obj.set(col_int, 30 - (i % 19));
+    }
+    auto it = foo->begin();
+    for (int i = 0; i < 1000; i++) {
+        auto obj = bar->create_object();
+        obj.set(col_link, it->get_key());
+        auto ll = obj.get_linklist(col_linklist);
+        for (size_t j = 0; j < 10; j++) {
+            ll.add(it->get_key());
+            ++it;
+        }
+    }
+
+    auto t1 = steady_clock::now();
+
+    size_t cnt = (foo->column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 4208);
+
+    auto t2 = steady_clock::now();
+    CHECK(t2 > t1);
+
+    cnt = (bar->link(col_link).column<double>(col_double) > 10).count();
+    CHECK_EQUAL(cnt, 421);
+
+    auto t3 = steady_clock::now();
+    CHECK(t3 > t2);
+    CALLGRIND_START_INSTRUMENTATION;
+
+    cnt = (bar->link(col_linklist).column<double>(col_double) > 15).count();
+    CHECK_EQUAL(cnt, 630);
+
+    CALLGRIND_STOP_INSTRUMENTATION;
+    auto t4 = steady_clock::now();
+    CHECK(t4 > t3);
+
+    cnt = (foo->column<double>(col_double) > foo->column<Int>(col_int)).count();
+    CHECK_EQUAL(cnt, 1578);
+
+    auto t5 = steady_clock::now();
+    CHECK(t5 > t4);
+
+    /*
+    std::cout << "Row against constant: " << duration_cast<microseconds>(t2 - t1).count() << " us" << std::endl;
+    std::cout << "Linked row against constant: " << duration_cast<microseconds>(t3 - t2).count() << " us"
+              << std::endl;
+    std::cout << "List row against constant: " << duration_cast<microseconds>(t4 - t3).count() << " us" << std::endl;
+    std::cout << "Row against row: " << duration_cast<microseconds>(t5 - t4).count() << " us" << std::endl;
+    */
+}
+
 TEST(Query_AllocatorBug)
 {
     // At some point this test failed when cluster node size was 4.
@@ -5361,8 +5734,8 @@ TEST(Query_AllocatorBug)
 
     auto col_double = foo->add_column(type_Double, "doubles");
     auto col_int = foo->add_column(type_Int, "ints");
-    auto col_link = bar->add_column_link(type_Link, "links", *foo);
-    auto col_linklist = bar->add_column_link(type_LinkList, "linklists", *foo);
+    auto col_link = bar->add_column(*foo, "links");
+    auto col_linklist = bar->add_column_list(*foo, "linklists");
 
     for (int i = 0; i < 10000; i++) {
         auto obj = foo->create_object();
