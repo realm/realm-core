@@ -1634,7 +1634,6 @@ TEST(Parser_string_binary_encoding)
     }
 }
 
-#if 0
 TEST(Parser_collection_aggregates)
 {
     Group g;
@@ -1838,6 +1837,8 @@ TEST(Parser_NegativeAgg)
     verify_query(test_context, t, "items.@sum.price_decimal == -25.5", 2);  // person0, person2
     verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
 }
+
+#if 0
 
 TEST(Parser_list_of_primitive_ints)
 {

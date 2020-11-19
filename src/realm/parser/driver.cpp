@@ -16,6 +16,56 @@ static bool trace_scanning = false;
 
 namespace {
 
+const char* data_type_to_str(DataType type)
+{
+    switch (type) {
+        case type_Int:
+            return "Int";
+        case type_Bool:
+            return "Bool";
+        case type_Float:
+            return "Float";
+        case type_Double:
+            return "Double";
+        case type_String:
+            return "String";
+        case type_Binary:
+            return "Binary";
+        case type_OldDateTime:
+            return "DateTime";
+        case type_Timestamp:
+            return "Timestamp";
+        case type_Decimal:
+            return "Decimal";
+        case type_ObjectId:
+            return "ObjectId";
+        case type_OldTable:
+            return "Table";
+        case type_Mixed:
+            return "Mixed";
+        case type_Link:
+            return "Link";
+        case type_TypedLink:
+            return "TypedLink";
+        case type_LinkList:
+            return "LinkList";
+        case type_UUID:
+            return "UUID";
+    }
+    return "type_Unknown"; // LCOV_EXCL_LINE
+}
+
+const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
+{
+    switch (type) {
+        case realm::query_parser::PostOpNode::COUNT:
+            return ".@count";
+        case realm::query_parser::PostOpNode::SIZE:
+            return ".@size";
+    }
+    return "";
+}
+
 class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
@@ -389,10 +439,17 @@ util::Any PostOpNode::visit(ParserDriver* drv)
     if (auto s = dynamic_cast<Columns<StringData>*>(subexpr.get())) {
         return s->size().clone().release();
     }
+    if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr.get())) {
+        return s->size().clone().release();
+    }
     if (auto s = dynamic_cast<Columns<Link>*>(subexpr.get())) {
         return s->count().clone().release();
     }
-
+    if (subexpr) {
+        throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'",
+                                              post_op_type_to_str(this->type),
+                                              data_type_to_str(DataType(subexpr->get_type()))));
+    }
     REALM_UNREACHABLE();
     return {};
 }
@@ -404,13 +461,15 @@ util::Any LinkAggrNode::visit(ParserDriver* drv)
     auto subexpr = std::unique_ptr<Subexpr>(link_chain.column(link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
-        std::string msg = "Property '"s + link + "' is not a linklist"s;
-        throw std::runtime_error(msg);
+        throw std::runtime_error(util::format("Property '%1' is not a linklist", link));
     }
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
 
     std::unique_ptr<Subexpr> sub_column;
     switch (col_key.get_type()) {
+        case col_type_Int:
+            sub_column = link_prop->column<Int>(col_key).clone();
+            break;
         case col_type_Float:
             sub_column = link_prop->column<float>(col_key).clone();
             break;
@@ -420,8 +479,21 @@ util::Any LinkAggrNode::visit(ParserDriver* drv)
         case col_type_Decimal:
             sub_column = link_prop->column<Decimal>(col_key).clone();
             break;
-        default:
-            break;
+        case col_type_Bool:
+        case col_type_String:
+        case col_type_Binary:
+        case col_type_Mixed:
+        case col_type_Timestamp:
+        case col_type_ObjectId:
+        case col_type_UUID:
+        case col_type_TypedLink:
+        case col_type_Link:
+        case col_type_LinkList:
+        case col_type_BackLink:
+        case col_type_OldTable:
+        case col_type_OldDateTime:
+            throw std::runtime_error(util::format("collection aggregate not supported for type '%1'",
+                                                  data_type_to_str(DataType(col_key.get_type()))));
     }
     drv->push(sub_column.get());
     return aggr_op->visit(drv);
