@@ -13,8 +13,8 @@ repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
 warningFilters = [
-    excludeFile('external/**/*'), // submodules and external libraries
-    excludeFile('libuv-src/**/*'), // libuv, where it was downloaded and built inside cmake
+    excludeFile('/external/*'), // submodules and external libraries
+    excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
 ]
 
 jobWrapper {
