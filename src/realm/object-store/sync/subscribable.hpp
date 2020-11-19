@@ -80,7 +80,7 @@ struct Subscribable {
     Subscribable(const Subscribable& other)
     {
         if (&other == this) {
-            return *this;
+            return;
         }
         std::lock_guard<std::mutex> lock(m_mutex);
         std::lock_guard<std::mutex> other_lock(other.m_mutex);
@@ -89,7 +89,7 @@ struct Subscribable {
     Subscribable(Subscribable&& other) noexcept
     {
         if (&other == this) {
-            return *this;
+            return;
         }
         std::lock_guard<std::mutex> lock(m_mutex);
         std::lock_guard<std::mutex> other_lock(other.m_mutex);
