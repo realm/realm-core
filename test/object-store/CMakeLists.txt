@@ -104,10 +104,14 @@ add_custom_command(TARGET ObjectStoreTests POST_BUILD
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build
 if(NOT APPLE AND NOT WINDOWS_STORE)
-    find_package(LibUV)
+    if(REALM_FETCH_MISSING_DEPENDENCIES)
+        find_package(LibUV)
+    else()
+        find_package(LibUV REQUIRED)
+    endif()
     if(LibUV_FOUND)
         set(libuv_target LibUV::LibUV)
-    else()
+    elseif(REALM_FETCH_MISSING_DEPENDENCIES)
         # download and include libuv
         include(FetchContent)
         FetchContent_Declare(
