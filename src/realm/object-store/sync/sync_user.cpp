@@ -309,6 +309,8 @@ void SyncUser::log_out()
                 metadata->remove();
         });
     }
+
+    emit_change_to_subscribers(*this);
 }
 
 bool SyncUser::is_logged_in() const

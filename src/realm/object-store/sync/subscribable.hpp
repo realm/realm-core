@@ -79,23 +79,39 @@ struct Subscribable {
     Subscribable() = default;
     Subscribable(const Subscribable& other)
     {
-        std::lock_guard<std::mutex> lock(other.m_mutex);
+        if (&other == this) {
+            return *this;
+        }
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> other_lock(other.m_mutex);
         m_subscribers = other.m_subscribers;
     }
     Subscribable(Subscribable&& other) noexcept
     {
-        std::lock_guard<std::mutex> lock(other.m_mutex);
+        if (&other == this) {
+            return *this;
+        }
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> other_lock(other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
     }
     Subscribable& operator=(const Subscribable& other)
     {
-        std::lock_guard<std::mutex> lock(other.m_mutex);
+        if (&other == this) {
+            return *this;
+        }
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> other_lock(other.m_mutex);
         m_subscribers = other.m_subscribers;
         return *this;
     }
     Subscribable& operator=(Subscribable&& other) noexcept
     {
-        std::lock_guard<std::mutex> lock(other.m_mutex);
+        if (&other == this) {
+            return *this;
+        }
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> other_lock(other.m_mutex);
         m_subscribers = std::move(other.m_subscribers);
         return *this;
     }
@@ -107,9 +123,9 @@ struct Subscribable {
     [[nodiscard]] Token subscribe(Observer&& observer)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        static std::atomic<uint64_t> m_token = 0;
-        m_subscribers.insert({m_token, std::move(observer)});
-        return Token{this, m_token++};
+        static std::atomic<uint64_t> s_token = 0;
+        m_subscribers.insert({s_token, std::move(observer)});
+        return Token{this, s_token++};
     }
 
     /// Unsubscribe to notifications for this Subscribable using the

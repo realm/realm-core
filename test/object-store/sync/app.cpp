@@ -2631,6 +2631,7 @@ TEST_CASE("app: user_semantics", "[app]") {
     SECTION("current user is populated") {
         const auto user1 = login_user_anonymous();
         CHECK(app->current_user()->identity() == user1->identity());
+        CHECK(event_processed == 1);
     }
 
     SECTION("current user is updated on login") {
