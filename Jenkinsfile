@@ -131,11 +131,11 @@ jobWrapper {
             checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
-            checkAndroidarmeabiDebug: doAndroidBuildInDocker('armeabi-v7a', 'Debug', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
             buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
-            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
+            buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
@@ -147,7 +147,8 @@ jobWrapper {
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
                 checkMacOsDebug               : doBuildMacOs('Debug', true),
-                checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', true),
+                checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
+                checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
                 coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
             ]
@@ -461,8 +462,7 @@ def doCheckValgrind() {
     }
 }
 
-def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator) {
-    def cores = 4
+def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestAction.None) {
     return {
         node('docker') {
             getArchive()
@@ -471,58 +471,64 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                if(!runTestsInEmulator) {
-                    buildEnv.inside {
-                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_NO_TESTS=1"
-                        dir(buildDir) {
-                            archiveArtifacts('realm-*.tar.gz')
-                        }
-                        stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
-                        androidStashes << stashName
-                        if (gitTag) {
-                            publishingStashes << stashName
-                        }
-                    }
-                } else {
-                    docker.image('tracer0tong/android-emulator').withRun("-e ARCH=${abi}") { emulator ->
-                        buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(
-                                script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_ENABLE_SYNC=OFF", 
-                                name: "android-armeabi-${abi}-${buildType}",
-                                filters: warningFilters,
-                            )
-                            dir(buildDir) {
-                                archiveArtifacts('realm-*.tar.gz')
-                            }
-                            stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
-                            androidStashes << stashName
-                            if (gitTag) {
-                                publishingStashes << stashName
-                            }
-                            try {
-                                sh '''
-                                   cd $(find . -type d -maxdepth 1 -name build-android*)
-                                   adb connect emulator
-                                   timeout 10m adb wait-for-device
-                                   adb push test/realm-tests /data/local/tmp
-                                   find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
-                                   ! grep __ADB_FAIL__ adb.log
-                               '''
-                            } finally {
-                                sh '''
-                                   mkdir -p build-dir/test
-                                   cd build-dir/test
-                                   adb pull /data/local/tmp/unit-test-report.xml
-                                '''
-                                recordTests('android')
-                            }
+            def cmakeArgs = ''
+            if (test == TestAction.None) {
+                cmakeArgs = '-DREALM_NO_TESTS=ON'
+            } else if (test.hasValue(TestAction.Build)) {
+                // TODO: should we build sync tests, too?
+                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON'
+            }
+
+            def doBuild = {
+                buildEnv.inside {
+                    runAndCollectWarnings(
+                        parser: 'clang',
+                        script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f \"${cmakeArgs}\"", 
+                        name: "android-armeabi-${abi}-${buildType}",
+                        filters: warningFilters,
+                    )
+                }
+                dir(buildDir) {
+                    archiveArtifacts('realm-*.tar.gz')
+                    stash includes: 'realm-*.tar.gz', name: stashName
+                }
+                androidStashes << stashName
+                if (gitTag) {
+                    publishingStashes << stashName
+                }
+            }
+
+            // if we want to run tests, let's spin up the emulator docker image first
+            // it takes a while to warm up so we might as build in the mean time
+            // otherwise, just run the build as is
+            if (test.hasValue(TestAction.Run)) {
+                docker.image('tracer0tong/android-emulator').withRun("-e ARCH=${abi}") { emulator ->
+                    doBuild()
+                    buildEnv.inside("--link ${emulator.id}:emulator") {
+                        try {
+                            sh """
+                                cd ${buildDir}
+                                adb connect emulator
+                                timeout 10m adb wait-for-device
+                                adb push test/realm-tests /data/local/tmp
+                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                adb shell 'cd /data/local/tmp; ${environment.join(' ')} ./realm-tests || echo __ADB_FAIL__' | tee adb.log
+                                ! grep __ADB_FAIL__ adb.log
+                            """
+                        } finally {
+                            sh '''
+                                mkdir -p build-dir/test
+                                cd build-dir/test
+                                adb pull /data/local/tmp/unit-test-report.xml
+                            '''
+                            recordTests('android')
                         }
                     }
                 }
+            } else {
+                doBuild()
             }
         }
     }
@@ -1008,4 +1014,20 @@ def getSourceArchive() {
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )
+}
+
+enum TestAction {
+    None(0x0),
+    Build(0x1),
+    Run(0x3); // build and run
+
+    private final long value;
+
+    TestAction(long value) {
+        this.value = value;
+    }
+
+    public boolean hasValue(TestAction value) {
+        return (this.value & value.value) == value.value;
+    }
 }
