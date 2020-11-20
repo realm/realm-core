@@ -956,9 +956,9 @@ Table* Group::create_table_accessor(size_t table_ndx)
         new_table->init(ref, this, table_ndx, m_is_writable, is_frozen()); // Throws
         table = new_table.release();
     }
+    table->refresh_index_accessors();
     // must be atomic to allow concurrent probing of the m_table_accessors vector.
     store_atomic(m_table_accessors[table_ndx], table, std::memory_order_release);
-    table->refresh_index_accessors();
     return table;
 }
 
