@@ -16,45 +16,6 @@ static bool trace_scanning = false;
 
 namespace {
 
-const char* data_type_to_str(DataType type)
-{
-    switch (type) {
-        case type_Int:
-            return "Int";
-        case type_Bool:
-            return "Bool";
-        case type_Float:
-            return "Float";
-        case type_Double:
-            return "Double";
-        case type_String:
-            return "String";
-        case type_Binary:
-            return "Binary";
-        case type_OldDateTime:
-            return "DateTime";
-        case type_Timestamp:
-            return "Timestamp";
-        case type_Decimal:
-            return "Decimal";
-        case type_ObjectId:
-            return "ObjectId";
-        case type_OldTable:
-            return "Table";
-        case type_Mixed:
-            return "Mixed";
-        case type_Link:
-            return "Link";
-        case type_TypedLink:
-            return "TypedLink";
-        case type_LinkList:
-            return "LinkList";
-        case type_UUID:
-            return "UUID";
-    }
-    return "type_Unknown"; // LCOV_EXCL_LINE
-}
-
 const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
 {
     switch (type) {
@@ -358,7 +319,7 @@ util::Any StringOpsNode::visit(ParserDriver* drv)
     if (right_type != type_String && right_type != type_Binary) {
         throw std::runtime_error(util::format(
             "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
-            opstr[op], data_type_to_str(right_type)));
+            opstr[op], get_data_type_name(right_type)));
     }
 
     if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
@@ -465,7 +426,7 @@ util::Any PostOpNode::visit(ParserDriver* drv)
     if (subexpr) {
         throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'",
                                               post_op_type_to_str(this->type),
-                                              data_type_to_str(DataType(subexpr->get_type()))));
+                                              get_data_type_name(DataType(subexpr->get_type()))));
     }
     REALM_UNREACHABLE();
     return {};
@@ -497,21 +458,9 @@ util::Any LinkAggrNode::visit(ParserDriver* drv)
         case col_type_Decimal:
             sub_column = link_prop->column<Decimal>(col_key).clone();
             break;
-        case col_type_Bool:
-        case col_type_String:
-        case col_type_Binary:
-        case col_type_Mixed:
-        case col_type_Timestamp:
-        case col_type_ObjectId:
-        case col_type_UUID:
-        case col_type_TypedLink:
-        case col_type_Link:
-        case col_type_LinkList:
-        case col_type_BackLink:
-        case col_type_OldTable:
-        case col_type_OldDateTime:
+        default:
             throw std::runtime_error(util::format("collection aggregate not supported for type '%1'",
-                                                  data_type_to_str(DataType(col_key.get_type()))));
+                                                  get_data_type_name(DataType(col_key.get_type()))));
     }
     drv->push(sub_column.get());
     return aggr_op->visit(drv);
@@ -798,7 +747,7 @@ util::Any ConstantNode::visit(ParserDriver* drv)
     if (!ret) {
         throw std::runtime_error(
             util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
-                         data_type_to_str(hint), text));
+                         get_data_type_name(hint), text));
     }
     return ret;
 }
@@ -855,13 +804,11 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
             left.reset(util::any_cast<Subexpr*>(left_prop->visit(this)));
         }
     }
-    if (auto left_list = dynamic_cast<ColumnListBase*>(left.get())) {
-        if (auto right_list = dynamic_cast<ColumnListBase*>(right.get())) {
-            util::serializer::SerialisationState state;
-            throw std::runtime_error(
-                util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
-                             left->description(state), right->description(state)));
-        }
+    if (dynamic_cast<ColumnListBase*>(left.get()) && dynamic_cast<ColumnListBase*>(right.get())) {
+        util::serializer::SerialisationState state;
+        throw std::runtime_error(
+            util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
+                         left->description(state), right->description(state)));
     }
     return {std::move(left), std::move(right)};
 }

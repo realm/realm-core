@@ -2033,20 +2033,20 @@ TEST(Parser_list_of_primitive_ints)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like 0", 0), message);
     CHECK_EQUAL(
         message,
-        "Unsupported comparison operator 'like' against type 'Int', right side must be a string or binary type");
+        "Unsupported comparison operator 'like' against type 'int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains[c] 0", 0), message);
     CHECK_EQUAL(
         message,
-        "Unsupported comparison operator 'contains' against type 'Int', right side must be a string or binary type");
+        "Unsupported comparison operator 'contains' against type 'int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith 0", 0), message);
-    CHECK_EQUAL(message, "Unsupported comparison operator 'beginswith' against type 'Int', right side must be a "
+    CHECK_EQUAL(message, "Unsupported comparison operator 'beginswith' against type 'int', right side must be a "
                          "string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers ENDSWITH 0", 0), message);
     CHECK_EQUAL(
         message,
-        "Unsupported comparison operator 'endswith' against type 'Int', right side must be a string or binary type");
+        "Unsupported comparison operator 'endswith' against type 'int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
-    CHECK_EQUAL(message, "Unsupported comparison between property of type 'Int' and constant value ''string''");
+    CHECK_EQUAL(message, "Unsupported comparison between property of type 'int' and constant value ''string''");
 }
 #if 0
 
