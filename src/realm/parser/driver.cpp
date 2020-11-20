@@ -4,6 +4,7 @@
 #include "realm/parser/query_parser.hpp"
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
+#include "realm/util/base64.hpp"
 
 using namespace realm;
 using namespace std::string_literals;
@@ -172,8 +173,10 @@ util::Any EqualitylNode::visit(ParserDriver* drv)
             case type_Bool:
                 return drv->simple_query(op, col_key, val.get_bool());
             case type_String:
+                return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
                 break;
             case type_Binary:
+                return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
                 break;
             case type_Timestamp:
                 return drv->simple_query(op, col_key, val.get<Timestamp>());
@@ -284,17 +287,32 @@ util::Any StringOpsNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
-    auto string_expr = dynamic_cast<ConstantStringValue*>(right.get());
-    auto string_col = dynamic_cast<Columns<StringData>*>(right.get());
-    if (!string_expr && !string_col) {
-        throw std::runtime_error("Right side must be a string value or string column");
-    }
-    if (string_expr) {
-        StringData val = string_expr->get_mixed().get_string();
+    auto right_type = right->get_type();
+    const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
-        const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-        if (prop && !prop->links_exist() && left->get_type() == type_String) {
-            auto col_key = prop->column_key();
+    if (right_type != type_String && right_type != type_Binary) {
+        throw std::runtime_error("Right side must be a string or binary type");
+    }
+
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
+        auto col_key = prop->column_key();
+        if (right_type == type_String) {
+            StringData val = right->get_mixed().get_string();
+
+            switch (op) {
+                case CompareNode::BEGINSWITH:
+                    return drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
+                case CompareNode::ENDSWITH:
+                    return drv->m_base_table->where().ends_with(col_key, val, case_sensitive);
+                case CompareNode::CONTAINS:
+                    return drv->m_base_table->where().contains(col_key, val, case_sensitive);
+                case CompareNode::LIKE:
+                    return drv->m_base_table->where().like(col_key, val, case_sensitive);
+            }
+        }
+        else if (right_type == type_Binary) {
+            BinaryData val = right->get_mixed().get_binary();
+
             switch (op) {
                 case CompareNode::BEGINSWITH:
                     return drv->m_base_table->where().begins_with(col_key, val, case_sensitive);
@@ -465,21 +483,27 @@ util::Any ConstantNode::visit(ParserDriver* drv)
     Subexpr* ret = nullptr;
     auto hint = mpark::get<DataType>(drv->pop());
     switch (type) {
-        case Type::NUMBER:
-        case Type::FLOAT: {
+        case Type::NUMBER: {
             if (hint == type_Decimal) {
-                Decimal128 d(text);
-                ret = new Value<Decimal128>(d);
+                ret = new Value<Decimal128>(Decimal128(text));
             }
             else {
-                if (text.find_first_of(".eE") < text.length()) {
-                    double d = strtod(text.c_str(), nullptr);
-                    ret = new Value<double>(d);
+                ret = new Value<int64_t>(strtol(text.c_str(), nullptr, 0));
+            }
+            break;
+        }
+        case Type::FLOAT: {
+            switch (hint) {
+                case type_Float: {
+                    ret = new Value<float>(strtof(text.c_str(), nullptr));
+                    break;
                 }
-                else {
-                    int64_t n = strtol(text.c_str(), nullptr, 0);
-                    ret = new Value<int64_t>(n);
-                }
+                case type_Decimal:
+                    ret = new Value<Decimal128>(Decimal128(text));
+                    break;
+                default:
+                    ret = new Value<double>(strtod(text.c_str(), nullptr));
+                    break;
             }
             break;
         }
@@ -524,7 +548,38 @@ util::Any ConstantNode::visit(ParserDriver* drv)
         }
         case Type::STRING: {
             std::string str = text.substr(1, text.size() - 2);
-            ret = new ConstantStringValue(str);
+            if (hint == type_String) {
+                ret = new ConstantStringValue(str);
+            }
+            if (hint == type_Binary) {
+                drv->m_args.buffer_space.push_back({});
+                auto& decode_buffer = drv->m_args.buffer_space.back();
+                decode_buffer.append(str);
+
+                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+            }
+            break;
+        }
+        case Type::BASE64: {
+            const size_t encoded_size = text.size() - 5;
+            size_t buffer_size = util::base64_decoded_size(encoded_size);
+            drv->m_args.buffer_space.push_back({});
+            auto& decode_buffer = drv->m_args.buffer_space.back();
+            decode_buffer.resize(buffer_size);
+            StringData window(text.c_str() + 4, encoded_size);
+            util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
+            if (!decoded_size) {
+                throw std::runtime_error("Invalid base64 value");
+            }
+            REALM_ASSERT_DEBUG_EX(*decoded_size <= encoded_size, *decoded_size, encoded_size);
+            decode_buffer.resize(*decoded_size); // truncate
+
+            if (hint == type_String) {
+                ret = new ConstantStringValue(StringData(decode_buffer.data(), decode_buffer.size()));
+            }
+            if (hint == type_Binary) {
+                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+            }
             break;
         }
         case Type::TIMESTAMP: {
@@ -578,6 +633,9 @@ util::Any ConstantNode::visit(ParserDriver* drv)
             if (hint == type_String) {
                 ret = new ConstantStringValue(StringData()); // Null string
             }
+            else if (hint == type_Binary) {
+                ret = new Value<Binary>(BinaryData()); // Null string
+            }
             else if (hint == type_LinkList) {
                 throw std::runtime_error("Cannot compare linklist with NULL");
             }
@@ -603,6 +661,9 @@ util::Any ConstantNode::visit(ParserDriver* drv)
                         break;
                     case type_String:
                         ret = new ConstantStringValue(drv->m_args.string_for_argument(arg_no));
+                        break;
+                    case type_Binary:
+                        ret = new Value<BinaryData>(drv->m_args.binary_for_argument(arg_no));
                         break;
                     case type_Bool:
                         ret = new Value<Bool>(drv->m_args.bool_for_argument(arg_no));
@@ -759,6 +820,8 @@ Subexpr* LinkChain::column(std::string col)
                 return new Columns<Lst<Bool>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_String:
                 return new Columns<Lst<String>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+            case col_type_Binary:
+                return new Columns<Lst<Binary>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_Float:
                 return new Columns<Lst<Float>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_Double:
@@ -788,6 +851,8 @@ Subexpr* LinkChain::column(std::string col)
                 return new Columns<Bool>(col_key, m_base_table, m_link_cols);
             case col_type_String:
                 return new Columns<String>(col_key, m_base_table, m_link_cols);
+            case col_type_Binary:
+                return new Columns<Binary>(col_key, m_base_table, m_link_cols);
             case col_type_Float:
                 return new Columns<Float>(col_key, m_base_table, m_link_cols);
             case col_type_Double:
