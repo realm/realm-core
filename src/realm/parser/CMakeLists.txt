@@ -18,6 +18,10 @@ set(REALM_PARSER_EXTRAS
     query_flex.ll
 )
 
+if(NOT MSVC)
+    set_source_files_properties(query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code")
+endif()
+
 add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS} ${REALM_PARSER_EXTRAS})
 add_library(realm-parser ALIAS QueryParser)
 add_library(Realm::QueryParser ALIAS QueryParser)
