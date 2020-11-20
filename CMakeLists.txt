@@ -189,6 +189,8 @@ endif()
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(BISON 3.7.4)
+find_package(FLEX 2.6.4)
 
 set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
 if(UNIX AND NOT APPLE)

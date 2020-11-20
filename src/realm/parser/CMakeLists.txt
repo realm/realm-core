@@ -1,3 +1,20 @@
+if(BISON_FOUND)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/query_bison.cpp ${CMAKE_CURRENT_SOURCE_DIR}/query_bison.hpp
+        MAIN_DEPENDENCY query_bison.yy
+        COMMAND bison --defines=query_bison.hpp -o query_bison.cpp query_bison.yy
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endif()
+if(FLEX_FOUND)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/query_flex.cpp ${CMAKE_CURRENT_SOURCE_DIR}/query_flex.hpp
+        MAIN_DEPENDENCY query_flex.ll
+        COMMAND flex --noline --header-file=query_flex.hpp -oquery_flex.cpp query_flex.ll
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endif()
+
 set(REALM_PARSER_SOURCES
     driver.cpp
     keypath_mapping.cpp
