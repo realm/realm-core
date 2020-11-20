@@ -1266,7 +1266,7 @@ TEST(Parser_substitution)
     ColKey link_col = t->add_column(*t, "links");
     ColKey list_col = t->add_column_list(*t, "list");
     std::vector<std::string> names = {"Billy", "Bob", "Joe", "Jane", "Joel"};
-    std::vector<double> fees = {2.0, 2.23, 2.22, 2.25, 3.73};
+    std::vector<double> fees = {2.0, 2.23, 2.25, 2.22, 3.73};
     std::vector<ObjKey> obj_keys;
     t->create_objects(names.size(), obj_keys);
 
@@ -1297,7 +1297,7 @@ TEST(Parser_substitution)
     LnkLst list_1 = t->get_object(obj_keys[1]).get_linklist(list_col);
     list_1.add(obj_keys[0]);
 
-    util::Any args[] = {Int(2), Double(2.22), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
+    util::Any args[] = {Int(2), Double(2.25), String("oe"), realm::null{}, Bool(true), Timestamp(1512130073, 505),
                         bd0,    Float(2.33),  Int(1),       Int(3),        Int(4),     Bool(false)};
     size_t num_args = 12;
     verify_query_sub(test_context, t, "age > $0", args, num_args, 2);
@@ -1318,7 +1318,6 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "nuldouble == $3", args, num_args, 3);
     verify_query_sub(test_context, t, "links == $3", args, num_args, 3);
 
-#if 0
     // substitutions through collection aggregates is a different code path
     verify_query_sub(test_context, t, "list.@min.age < $0", args, num_args, 2);
     verify_query_sub(test_context, t, "list.@max.age >= $0", args, num_args, 1);
@@ -1354,29 +1353,29 @@ TEST(Parser_substitution)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
-    // invalid types
+    // Mixed types
     // int
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $1", args, num_args, 0));
+    verify_query_sub(test_context, t, "age > $1", args, num_args, 2);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $2", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $3", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $4", args, num_args, 0));
+    verify_query_sub(test_context, t, "age > $4", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $6", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "age > $7", args, num_args, 0));
+    verify_query_sub(test_context, t, "age > $7", args, num_args, 2);
     // double
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $0", args, num_args, 0));
+    verify_query_sub(test_context, t, "fees > $0", args, num_args, 4);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $2", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $3", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $4", args, num_args, 0));
+    verify_query_sub(test_context, t, "fees > $4", args, num_args, 5);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $6", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "fees > $7", args, num_args, 0));
+    verify_query_sub(test_context, t, "fees > $7", args, num_args, 1);
     // float
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $0", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $1", args, num_args, 0));
+    verify_query_sub(test_context, t, "floats > $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "floats > $1", args, num_args, 1);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $2", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $3", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $4", args, num_args, 0));
+    verify_query_sub(test_context, t, "floats > $4", args, num_args, 2);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "floats > $6", args, num_args, 0));
     // string
@@ -1385,16 +1384,16 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "name == $3", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $5", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $6", args, num_args, 0));
+    verify_query_sub(test_context, t, "name == $6", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "name == $7", args, num_args, 0));
     // bool
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $0", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $1", args, num_args, 0));
+    verify_query_sub(test_context, t, "paid == $0", args, num_args, 0);
+    verify_query_sub(test_context, t, "paid == $1", args, num_args, 0);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $2", args, num_args, 0));
     verify_query_sub(test_context, t, "paid == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $6", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "paid == $7", args, num_args, 0));
+    verify_query_sub(test_context, t, "paid == $7", args, num_args, 0);
     // timestamp
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "time == $1", args, num_args, 0));
@@ -1406,12 +1405,11 @@ TEST(Parser_substitution)
     // binary
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $0", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $1", args, num_args, 0));
-    CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $2", args, num_args, 0));
+    verify_query_sub(test_context, t, "binary == $2", args, num_args, 1);
     verify_query_sub(test_context, t, "binary == $3", args, num_args, 3);
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $4", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $5", args, num_args, 0));
     CHECK_THROW_ANY(verify_query_sub(test_context, t, "binary == $7", args, num_args, 0));
-#endif
 }
 
 TEST(Parser_string_binary_encoding)
@@ -1580,10 +1578,7 @@ TEST(Parser_string_binary_encoding)
                 if (!it->second.should_be_replaced) {
                     bool validate = string_description.find(base64_prefix) == std::string::npos &&
                                     string_description.find(base64_suffix) == std::string::npos &&
-                                    binary_description.find(base64_prefix) == std::string::npos &&
-                                    binary_description.find(base64_suffix) == std::string::npos &&
-                                    string_description.find(it->first) != std::string::npos &&
-                                    binary_description.find(it->first) != std::string::npos;
+                                    string_description.find(it->first) != std::string::npos;
                     CHECK(validate);
                     if (!validate) {
                         std::stringstream ss;
@@ -2046,7 +2041,7 @@ TEST(Parser_list_of_primitive_ints)
         message,
         "Unsupported comparison operator 'endswith' against type 'int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
-    CHECK_EQUAL(message, "Unsupported comparison between property of type 'int' and constant value ''string''");
+    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
 }
 #if 0
 

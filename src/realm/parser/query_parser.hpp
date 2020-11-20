@@ -47,6 +47,44 @@ struct AnyContext {
         }
         return false;
     }
+    DataType get_type_of(const util::Any& wrapper)
+    {
+        const std::type_info& type{wrapper.type()};
+        if (type == typeid(int64_t)) {
+            return type_Int;
+        }
+        if (type == typeid(StringData)) {
+            return type_String;
+        }
+        if (type == typeid(Timestamp)) {
+            return type_Timestamp;
+        }
+        if (type == typeid(double)) {
+            return type_Double;
+        }
+        if (type == typeid(bool)) {
+            return type_Bool;
+        }
+        if (type == typeid(float)) {
+            return type_Float;
+        }
+        if (type == typeid(BinaryData)) {
+            return type_Binary;
+        }
+        if (type == typeid(ObjKey)) {
+            return type_Link;
+        }
+        if (type == typeid(ObjectId)) {
+            return type_ObjectId;
+        }
+        if (type == typeid(Decimal128)) {
+            return type_Decimal;
+        }
+        if (type == typeid(UUID)) {
+            return type_UUID;
+        }
+        return DataType(-1);
+    }
 };
 
 class Arguments {
@@ -64,6 +102,7 @@ public:
     virtual Decimal128 decimal128_for_argument(size_t argument_index) = 0;
     virtual UUID uuid_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
+    virtual DataType type_for_argument(size_t argument_index) = 0;
 
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
@@ -151,6 +190,11 @@ private:
         return m_arguments[index];
     }
 
+    DataType type_for_argument(size_t i) override
+    {
+        return m_ctx.get_type_of(at(i));
+    }
+
     template <typename T>
     T get(size_t index) const
     {
@@ -213,6 +257,10 @@ public:
         throw NoArgsError();
     }
     bool is_argument_null(size_t)
+    {
+        throw NoArgsError();
+    }
+    DataType type_for_argument(size_t)
     {
         throw NoArgsError();
     }

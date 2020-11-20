@@ -96,6 +96,10 @@ public:
     {
         return m_args.at(n).is_null();
     }
+    DataType type_for_argument(size_t n)
+    {
+        return m_args.at(n).get_type();
+    }
 
 private:
     const std::vector<Mixed>& m_args;
@@ -177,8 +181,8 @@ Query EqualitylNode::visit(ParserDriver* drv)
     auto right_type = right->get_type();
 
     if (left_type >= 0 && right_type >= 0 && !Mixed::data_types_are_comparable(left_type, right_type)) {
-        throw std::runtime_error(
-            util::format("Cannot compare %1 to %2", get_data_type_name(left_type), get_data_type_name(right_type)));
+        throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                              get_data_type_name(left_type), get_data_type_name(right_type)));
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
@@ -259,14 +263,22 @@ Query RelationalNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
-    if (left->get_type() == type_UUID) {
+    auto left_type = left->get_type();
+    auto right_type = right->get_type();
+
+    if (left_type == type_UUID) {
         throw std::logic_error(util::format(
             "Unsupported operator %1 in query. Only equal (==) and not equal (!=) are supported for this type.",
             opstr[op]));
     }
 
+    if (left_type < 0 || right_type < 0 || !Mixed::data_types_are_comparable(left_type, right_type)) {
+        throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                              get_data_type_name(left_type), get_data_type_name(right_type)));
+    }
+
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right->get_type()) {
+    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left_type == right_type) {
         auto col_key = prop->column_key();
         switch (left->get_type()) {
             case type_Int:
@@ -581,16 +593,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
         case Type::STRING: {
             std::string str = text.substr(1, text.size() - 2);
-            if (hint == type_String) {
-                ret = new ConstantStringValue(str);
-            }
-            if (hint == type_Binary) {
-                drv->m_args.buffer_space.push_back({});
-                auto& decode_buffer = drv->m_args.buffer_space.back();
-                decode_buffer.append(str);
-
-                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
-            }
+            ret = new ConstantStringValue(str);
             break;
         }
         case Type::BASE64: {
@@ -688,7 +691,8 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 ret = new Value<null>(realm::null());
             }
             else {
-                switch (hint) {
+                auto type = drv->m_args.type_for_argument(arg_no);
+                switch (type) {
                     case type_Int:
                         ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
                         break;
