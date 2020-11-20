@@ -57,7 +57,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     m_commit_available.set_shared_part(m_condvar_shared.get(), 
         normalize_realm_path_for_windows_kernel_object_name(parent.get_path()),
         "ExternalCommitHelper_CommitCondVar",
-        std::filesystem::temp_directory_path().u8string());
+        normalize_realm_path_for_windows_kernel_object_name(std::filesystem::temp_directory_path().u8string()));
 
     m_thread = std::async(std::launch::async, [this]() { listen(); });
 }
