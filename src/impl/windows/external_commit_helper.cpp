@@ -86,7 +86,9 @@ void ExternalCommitHelper::listen()
     while (m_keep_listening) {
         m_commit_available.wait(m_mutex, nullptr);
         if (m_keep_listening) {
+            m_mutex.unlock();
 			m_parent.on_change();
+            m_mutex.lock();
         }
     }
 }
