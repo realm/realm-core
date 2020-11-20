@@ -1838,7 +1838,6 @@ TEST(Parser_NegativeAgg)
     verify_query(test_context, t, "items.@avg.price_decimal == -6.375", 1); // person0
 }
 
-#if 0
 
 TEST(Parser_list_of_primitive_ints)
 {
@@ -1999,11 +1998,12 @@ TEST(Parser_list_of_primitive_ints)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers.@min.no_property == 0", 0), message);
-    CHECK_EQUAL(message, "An extraneous property 'no_property' was found for operation '@min' when applied to a list "
-                         "of primitive values 'integers'");
+    CHECK_EQUAL(message, "Operation '.@min' cannot apply to property 'integers' because it is not a list");
+#if 0 // FIXME: enable when subqueries are supported
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(integers, $x, $x == 1).@count > 0", 0),
                                 message);
     CHECK_EQUAL(message, "A subquery can not operate on a list of primitive values (property 'integers')");
+#endif
     // list vs list is not implemented yet
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == integers", 0), message);
     CHECK_EQUAL(message,
@@ -2031,16 +2031,24 @@ TEST(Parser_list_of_primitive_ints)
                 "Ordered comparison between two primitive lists is not implemented yet ('integers' and 'integers')");
     // string operators are not supported on an integer column
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers like 0", 0), message);
-    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_EQUAL(
+        message,
+        "Unsupported comparison operator 'like' against type 'Int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers contains[c] 0", 0), message);
-    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_EQUAL(
+        message,
+        "Unsupported comparison operator 'contains' against type 'Int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers beginswith 0", 0), message);
-    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_EQUAL(message, "Unsupported comparison operator 'beginswith' against type 'Int', right side must be a "
+                         "string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers ENDSWITH 0", 0), message);
-    CHECK_EQUAL(message, "Unsupported operator for numeric queries.");
+    CHECK_EQUAL(
+        message,
+        "Unsupported comparison operator 'endswith' against type 'Int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
-    CHECK_EQUAL(message, "Cannot convert string 'string'");
+    CHECK_EQUAL(message, "Unsupported comparison between property of type 'Int' and constant value ''string''");
 }
+#if 0
 
 TEST(Parser_list_of_primitive_strings)
 {
@@ -2193,6 +2201,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
     CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
 }
+#endif
 
 TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
            Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
@@ -2256,6 +2265,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     }
 }
 
+#if 0
 TEST(Parser_SortAndDistinctSerialisation)
 {
     Group g;

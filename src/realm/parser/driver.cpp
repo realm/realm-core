@@ -66,6 +66,21 @@ const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
     return "";
 }
 
+const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
+{
+    switch (type) {
+        case realm::query_parser::AggrNode::MAX:
+            return ".@max";
+        case realm::query_parser::AggrNode::MIN:
+            return ".@min";
+        case realm::query_parser::AggrNode::SUM:
+            return ".@sum";
+        case realm::query_parser::AggrNode::AVG:
+            return ".@avg";
+    }
+    return "";
+}
+
 class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
@@ -341,7 +356,9 @@ util::Any StringOpsNode::visit(ParserDriver* drv)
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
     if (right_type != type_String && right_type != type_Binary) {
-        throw std::runtime_error("Right side must be a string or binary type");
+        throw std::runtime_error(util::format(
+            "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
+            opstr[op], data_type_to_str(right_type)));
     }
 
     if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
@@ -461,7 +478,8 @@ util::Any LinkAggrNode::visit(ParserDriver* drv)
     auto subexpr = std::unique_ptr<Subexpr>(link_chain.column(link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
-        throw std::runtime_error(util::format("Property '%1' is not a linklist", link));
+        throw std::runtime_error(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
+                                              agg_op_type_to_str(aggr_op->type), link));
     }
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
 
@@ -777,7 +795,11 @@ util::Any ConstantNode::visit(ParserDriver* drv)
             break;
         }
     }
-    REALM_ASSERT(ret);
+    if (!ret) {
+        throw std::runtime_error(
+            util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
+                         data_type_to_str(hint), text));
+    }
     return ret;
 }
 
@@ -831,6 +853,14 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
         }
         else {
             left.reset(util::any_cast<Subexpr*>(left_prop->visit(this)));
+        }
+    }
+    if (auto left_list = dynamic_cast<ColumnListBase*>(left.get())) {
+        if (auto right_list = dynamic_cast<ColumnListBase*>(right.get())) {
+            util::serializer::SerialisationState state;
+            throw std::runtime_error(
+                util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
+                             left->description(state), right->description(state)));
         }
     }
     return {std::move(left), std::move(right)};
@@ -903,7 +933,7 @@ Subexpr* LinkChain::column(std::string col)
             case col_type_Decimal:
                 return new Columns<Lst<Decimal>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_UUID:
-                return new Columns<Lst<Timestamp>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return new Columns<Lst<UUID>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_ObjectId:
                 return new Columns<Lst<ObjectId>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_Mixed:
