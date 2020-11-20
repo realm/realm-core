@@ -82,31 +82,35 @@ Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
 namespace {
 
 struct CheckObjectPath {
-    const ObjectSchema& object;
-    std::string path;
+    const ObjectSchema& object; // the schema to check
+    std::string path; // a printable path for error messaging
+    std::unordered_set<std::string> visited; // the list of object types encountered along this path so far
 };
 
-// a non-recursive search that returns a path to any embedded object that has multiple paths from the start
+// a non-recursive search that returns a property path to the first embedded object cycle detected
 std::string do_check(Schema const& schema, const ObjectSchema& start)
 {
     std::queue<CheckObjectPath> to_visit;
-    std::unordered_set<std::string> visited;
-    to_visit.push(CheckObjectPath{start, start.name});
+    to_visit.push(CheckObjectPath{start, start.name, {start.name}});
 
     while (to_visit.size() > 0) {
         auto current = to_visit.front();
-        visited.insert(current.object.name);
         for (auto& prop : current.object.persisted_properties) {
             if (prop.type == PropertyType::Object) {
                 auto it = schema.find(prop.object_type);
                 REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
-                auto next_path = current.path + "." + prop.name;
-                if (visited.find(prop.object_type) == visited.end()) {
-                    to_visit.push(CheckObjectPath{*it, next_path});
+                if (!it->is_embedded) {
+                    // the server does support links to top level objects (serialized as a PK)
+                    // so if we encounter this type of link, no need to check further along this path
+                    continue;
                 }
-                else if (it->is_embedded) {
+                auto next_path = current.path + "." + prop.name;
+                if (current.visited.find(prop.object_type) != current.visited.end()) {
                     return next_path;
                 }
+                auto visited_copy = current.visited;
+                visited_copy.insert(current.object.name);
+                to_visit.push(CheckObjectPath{*it, next_path, std::move(visited_copy)});
             }
         }
         to_visit.pop();
@@ -116,6 +120,9 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
 
 void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions)
 {
+    // A prerequisite for an embedded object loop is that there are links orginating from an embedded object
+    // so we only need to run this check from embedded objects. This is an optimization to exclude entire
+    // object graphs which do not contain embedded objects.
     for (auto const& object : schema) {
         if (object.is_embedded) {
             std::string loop = do_check(schema, object);
