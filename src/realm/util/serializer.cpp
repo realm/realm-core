@@ -41,15 +41,7 @@ std::string print_value<>(BinaryData data)
     if (data.is_null()) {
         return "NULL";
     }
-    std::string out;
-    const char* start = data.data();
-    const size_t len = data.size();
-    util::StringBuffer encode_buffer;
-    encode_buffer.resize(util::base64_encoded_size(len));
-    util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-    out = "B64\"" + encode_buffer.str() + "\"";
-
-    return out;
+    return print_value<StringData>(StringData(data.data(), data.size()));
 }
 
 template <>

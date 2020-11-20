@@ -838,10 +838,7 @@ Subexpr* LinkChain::column(std::string col)
 {
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
-        std::string err = m_current_table->get_name();
-        err += " has no property: ";
-        err += col;
-        throw std::runtime_error(err);
+        throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
     }
 
     if (col_key.is_list()) {

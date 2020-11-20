@@ -1280,8 +1280,10 @@ TEST(Parser_substitution)
     t->get_object(obj_keys[1]).set(bool_col, false);
     t->get_object(obj_keys[1])
         .set(time_col, Timestamp(1512130073, 505)); // 2017/12/02 @ 12:47am (UTC) + 505 nanoseconds
-    BinaryData bd0("oe");
-    BinaryData bd1("eo");
+    std::string str_oe("oe");
+    std::string str_eo("eo");
+    BinaryData bd0(str_oe);
+    BinaryData bd1(str_eo);
     t->get_object(obj_keys[0]).set(binary_col, bd0);
     t->get_object(obj_keys[1]).set(binary_col, bd1);
     t->get_object(obj_keys[0]).set(float_col, 2.33f);
@@ -1327,8 +1329,8 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "list.@size > $0", args, num_args, 1);
     verify_query_sub(test_context, t, "name.@count > $0", args, num_args, 5);
     verify_query_sub(test_context, t, "name.@size > $0", args, num_args, 5);
-    verify_query_sub(test_context, t, "binary.@count > $0", args, num_args, 2);
-    verify_query_sub(test_context, t, "binary.@size > $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "binary.@count >= $0", args, num_args, 2);
+    verify_query_sub(test_context, t, "binary.@size >= $0", args, num_args, 2);
 
     // reusing properties, mixing order
     verify_query_sub(test_context, t, "(age > $0 || fees == $1) && age == $0", args, num_args, 1);
@@ -1611,7 +1613,8 @@ TEST(Parser_string_binary_encoding)
             }
         }
 
-        // std::cerr << "original: " << buff << "\tdescribed: " << string_description << "\n";
+        // std::cerr << "original: " << buff << "\tdescribed: " << string_description << " : " << binary_description
+        // << "\n";
 
         Query qstr2 = t->query(string_description);
         CHECK_EQUAL(qstr2.count(), num_results);
