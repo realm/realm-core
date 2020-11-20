@@ -16,6 +16,32 @@ static bool trace_scanning = false;
 
 namespace {
 
+const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
+{
+    switch (type) {
+        case realm::query_parser::PostOpNode::COUNT:
+            return ".@count";
+        case realm::query_parser::PostOpNode::SIZE:
+            return ".@size";
+    }
+    return "";
+}
+
+const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
+{
+    switch (type) {
+        case realm::query_parser::AggrNode::MAX:
+            return ".@max";
+        case realm::query_parser::AggrNode::MIN:
+            return ".@min";
+        case realm::query_parser::AggrNode::SUM:
+            return ".@sum";
+        case realm::query_parser::AggrNode::AVG:
+            return ".@avg";
+    }
+    return "";
+}
+
 class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
@@ -100,50 +126,50 @@ ParserNode::~ParserNode() {}
 
 AtomPredNode::~AtomPredNode() {}
 
-util::Any NotNode::visit(ParserDriver* drv)
+Query NotNode::visit(ParserDriver* drv)
 {
-    Query query = util::any_cast<Query>(atom_pred->visit(drv));
+    Query query = atom_pred->visit(drv);
     Query q = drv->m_base_table->where();
     q.Not();
     q.and_query(query);
     return {q};
 }
 
-util::Any ParensNode::visit(ParserDriver* drv)
+Query ParensNode::visit(ParserDriver* drv)
 {
     return pred->visit(drv);
 }
 
-util::Any OrNode::visit(ParserDriver* drv)
+Query OrNode::visit(ParserDriver* drv)
 {
     if (and_preds.size() == 1) {
         return and_preds[0]->visit(drv);
     }
     auto it = and_preds.begin();
-    auto q = util::any_cast<Query>((*it)->visit(drv));
+    auto q = (*it)->visit(drv);
     q.Or();
 
     ++it;
     while (it != and_preds.end()) {
-        q.and_query(util::any_cast<Query>((*it)->visit(drv)));
+        q.and_query((*it)->visit(drv));
         ++it;
     }
     return q;
 }
 
-util::Any AndNode::visit(ParserDriver* drv)
+Query AndNode::visit(ParserDriver* drv)
 {
     if (atom_preds.size() == 1) {
         return atom_preds[0]->visit(drv);
     }
     Query q(drv->m_base_table);
     for (auto it : atom_preds) {
-        q.and_query(util::any_cast<Query>(it->visit(drv)));
+        q.and_query(it->visit(drv));
     }
     return q;
 }
 
-util::Any EqualitylNode::visit(ParserDriver* drv)
+Query EqualitylNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -229,7 +255,7 @@ static std::map<int, std::string> opstr = {
     {CompareNode::LIKE, "like"},
 };
 
-util::Any RelationalNode::visit(ParserDriver* drv)
+Query RelationalNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -283,7 +309,7 @@ util::Any RelationalNode::visit(ParserDriver* drv)
     return {};
 }
 
-util::Any StringOpsNode::visit(ParserDriver* drv)
+Query StringOpsNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -291,7 +317,9 @@ util::Any StringOpsNode::visit(ParserDriver* drv)
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
 
     if (right_type != type_String && right_type != type_Binary) {
-        throw std::runtime_error("Right side must be a string or binary type");
+        throw std::runtime_error(util::format(
+            "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
+            opstr[op], get_data_type_name(right_type)));
     }
 
     if (prop && !prop->links_exist() && right->has_constant_evaluation() && left->get_type() == right_type) {
@@ -356,61 +384,70 @@ util::Any StringOpsNode::visit(ParserDriver* drv)
     return {};
 }
 
-util::Any ValueNode::visit(ParserDriver* drv)
+Query TrueOrFalseNode::visit(ParserDriver* drv)
 {
-    if (prop) {
-        return prop->visit(drv);
+    Query q = drv->m_base_table->where();
+    if (true_or_false) {
+        q.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
     }
-    REALM_ASSERT(constant);
-    return constant->visit(drv);
+    else {
+        q.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
+    }
+    return q;
 }
 
-util::Any PropNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 {
-    drv->push(comp_type);
-    Subexpr* subexpr = util::any_cast<LinkChain>(path->visit(drv)).column(identifier);
+    std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
 
     if (post_op) {
-        drv->push(subexpr);
-        return post_op->visit(drv);
+        return post_op->visit(drv, subexpr.get());
     }
     return subexpr;
 }
 
-util::Any PostOpNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
 {
-    std::unique_ptr<realm::Subexpr> subexpr(mpark::get<Subexpr*>(drv->pop()));
-    if (auto s = dynamic_cast<Columns<Link>*>(subexpr.get())) {
-        return s->count().clone().release();
+    if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
+        return s->count().clone();
     }
-    if (auto s = dynamic_cast<ColumnListBase*>(subexpr.get())) {
-        return s->size().clone().release();
+    if (auto s = dynamic_cast<ColumnListBase*>(subexpr)) {
+        return s->size().clone();
     }
-    if (auto s = dynamic_cast<Columns<StringData>*>(subexpr.get())) {
-        return s->size().clone().release();
+    if (auto s = dynamic_cast<Columns<StringData>*>(subexpr)) {
+        return s->size().clone();
     }
-    if (auto s = dynamic_cast<Columns<Link>*>(subexpr.get())) {
-        return s->count().clone().release();
+    if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
+        return s->size().clone();
     }
-
+    if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
+        return s->count().clone();
+    }
+    if (subexpr) {
+        throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'",
+                                              post_op_type_to_str(this->type),
+                                              get_data_type_name(DataType(subexpr->get_type()))));
+    }
     REALM_UNREACHABLE();
     return {};
 }
 
-util::Any LinkAggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
 {
-    drv->push(ExpressionComparisonType::Any);
-    auto link_chain = util::any_cast<LinkChain>(path->visit(drv));
+    auto link_chain = path->visit(drv);
     auto subexpr = std::unique_ptr<Subexpr>(link_chain.column(link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
-        std::string msg = "Property '"s + link + "' is not a linklist"s;
-        throw std::runtime_error(msg);
+        throw std::runtime_error(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
+                                              agg_op_type_to_str(aggr_op->type), link));
     }
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
 
     std::unique_ptr<Subexpr> sub_column;
     switch (col_key.get_type()) {
+        case col_type_Int:
+            sub_column = link_prop->column<Int>(col_key).clone();
+            break;
         case col_type_Float:
             sub_column = link_prop->column<float>(col_key).clone();
             break;
@@ -421,37 +458,34 @@ util::Any LinkAggrNode::visit(ParserDriver* drv)
             sub_column = link_prop->column<Decimal>(col_key).clone();
             break;
         default:
-            break;
+            throw std::runtime_error(util::format("collection aggregate not supported for type '%1'",
+                                                  get_data_type_name(DataType(col_key.get_type()))));
     }
-    drv->push(sub_column.get());
-    return aggr_op->visit(drv);
+    return aggr_op->visit(drv, sub_column.get());
 }
 
-util::Any ListAggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv)
 {
-    drv->push(ExpressionComparisonType::Any);
-    auto link_chain = util::any_cast<LinkChain>(path->visit(drv));
-    auto subexpr = link_chain.column(identifier);
-    drv->push(subexpr);
-    return aggr_op->visit(drv);
+    auto link_chain = path->visit(drv);
+    std::unique_ptr<Subexpr> subexpr{link_chain.column(identifier)};
+    return aggr_op->visit(drv, subexpr.get());
 }
 
-util::Any AggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
 {
-    auto subexpr = mpark::get<Subexpr*>(drv->pop());
     if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr)) {
         switch (type) {
             case MAX:
-                return list_prop->max_of().release();
+                return list_prop->max_of();
                 break;
             case MIN:
-                return list_prop->min_of().release();
+                return list_prop->min_of();
                 break;
             case SUM:
-                return list_prop->sum_of().release();
+                return list_prop->sum_of();
                 break;
             case AVG:
-                return list_prop->avg_of().release();
+                return list_prop->avg_of();
                 break;
         }
     }
@@ -460,16 +494,16 @@ util::Any AggrNode::visit(ParserDriver* drv)
     if (auto prop = dynamic_cast<SubColumnBase*>(subexpr)) {
         switch (type) {
             case MAX:
-                return prop->max_of().release();
+                return prop->max_of();
                 break;
             case MIN:
-                return prop->min_of().release();
+                return prop->min_of();
                 break;
             case SUM:
-                return prop->sum_of().release();
+                return prop->sum_of();
                 break;
             case AVG:
-                return prop->avg_of().release();
+                return prop->avg_of();
                 break;
         }
     }
@@ -478,10 +512,9 @@ util::Any AggrNode::visit(ParserDriver* drv)
     return {};
 }
 
-util::Any ConstantNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     Subexpr* ret = nullptr;
-    auto hint = mpark::get<DataType>(drv->pop());
     switch (type) {
         case Type::NUMBER: {
             if (hint == type_Decimal) {
@@ -705,25 +738,16 @@ util::Any ConstantNode::visit(ParserDriver* drv)
             break;
         }
     }
-    REALM_ASSERT(ret);
-    return ret;
+    if (!ret) {
+        throw std::runtime_error(
+            util::format("Unsupported comparison between property of type '%1' and constant value '%2'",
+                         get_data_type_name(hint), text));
+    }
+    return std::unique_ptr<Subexpr>{ret};
 }
 
-util::Any TrueOrFalseNode::visit(ParserDriver* drv)
+LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
-    Query q = drv->m_base_table->where();
-    if (true_or_false) {
-        q.and_query(std::unique_ptr<realm::Expression>(new TrueExpression));
-    }
-    else {
-        q.and_query(std::unique_ptr<realm::Expression>(new FalseExpression));
-    }
-    return q;
-}
-
-util::Any PathNode::visit(ParserDriver* drv)
-{
-    auto comp_type = mpark::get<ExpressionComparisonType>(drv->pop());
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (auto path_elem : path_elems) {
         link_chain.link(path_elem);
@@ -747,19 +771,23 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
 
     if (right_constant) {
         // Take left first - it cannot be a constant
-        left.reset(util::any_cast<Subexpr*>(left_prop->visit(this)));
-        push(left->get_type());
-        right.reset(util::any_cast<Subexpr*>(right_constant->visit(this)));
+        left = left_prop->visit(this);
+        right = right_constant->visit(this, left->get_type());
     }
     else {
-        right.reset(util::any_cast<Subexpr*>(right_prop->visit(this)));
+        right = right_prop->visit(this);
         if (left_constant) {
-            push(right->get_type());
-            left.reset(util::any_cast<Subexpr*>(left_constant->visit(this)));
+            left = left_constant->visit(this, right->get_type());
         }
         else {
-            left.reset(util::any_cast<Subexpr*>(left_prop->visit(this)));
+            left = left_prop->visit(this);
         }
+    }
+    if (dynamic_cast<ColumnListBase*>(left.get()) && dynamic_cast<ColumnListBase*>(right.get())) {
+        util::serializer::SerialisationState state;
+        throw std::runtime_error(
+            util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
+                         left->description(state), right->description(state)));
     }
     return {std::move(left), std::move(right)};
 }
@@ -799,7 +827,7 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args);
     driver.parse(query_string);
-    return util::any_cast<Query>(driver.result->visit(&driver));
+    return driver.result->visit(&driver);
 }
 
 Subexpr* LinkChain::column(std::string col)
@@ -831,7 +859,7 @@ Subexpr* LinkChain::column(std::string col)
             case col_type_Decimal:
                 return new Columns<Lst<Decimal>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_UUID:
-                return new Columns<Lst<Timestamp>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return new Columns<Lst<UUID>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_ObjectId:
                 return new Columns<Lst<ObjectId>>(col_key, m_base_table, m_link_cols, m_comparison_type);
             case col_type_Mixed:
