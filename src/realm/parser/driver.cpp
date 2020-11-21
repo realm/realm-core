@@ -42,6 +42,13 @@ const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
     return "";
 }
 
+bool is_length_suffix(const std::string& s)
+{
+    return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
+           (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T') &&
+           (s[5] == 'h' || s[5] == 'H');
+}
+
 class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
@@ -410,6 +417,29 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 {
+    // if this appears to be the element lenth operator, try it out and if it fails attempt
+    // the normal property flow so that we still support properties named "length"
+    if (!post_op && path && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+        try {
+            LinkChain link_chain(drv->m_base_table, comp_type);
+            for (size_t i = 0; i < path->path_elems.size() - 1; ++i) {
+                link_chain.link(path->path_elems[i]);
+            }
+            ColKey col =
+                link_chain.get_current_table()->get_column_key(path->path_elems[path->path_elems.size() - 1]);
+            if (col && col.is_list()) {
+                if (col.get_type() == col_type_String) {
+                    return link_chain.column<Lst<StringData>>(col).element_lengths().clone();
+                }
+                else if (col.get_type() == col_type_Binary) {
+                    return link_chain.column<Lst<BinaryData>>(col).element_lengths().clone();
+                }
+            }
+        }
+        catch (const std::exception&) {
+            // ignore exception try normal path
+        }
+    }
     std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
 
     if (post_op) {
@@ -485,43 +515,45 @@ std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
 {
+    std::unique_ptr<Subexpr> agg;
     if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr)) {
         switch (type) {
             case MAX:
-                return list_prop->max_of();
+                agg = list_prop->max_of();
                 break;
             case MIN:
-                return list_prop->min_of();
+                agg = list_prop->min_of();
                 break;
             case SUM:
-                return list_prop->sum_of();
+                agg = list_prop->sum_of();
                 break;
             case AVG:
-                return list_prop->avg_of();
+                agg = list_prop->avg_of();
                 break;
         }
     }
-
-
-    if (auto prop = dynamic_cast<SubColumnBase*>(subexpr)) {
+    else if (auto prop = dynamic_cast<SubColumnBase*>(subexpr)) {
         switch (type) {
             case MAX:
-                return prop->max_of();
+                agg = prop->max_of();
                 break;
             case MIN:
-                return prop->min_of();
+                agg = prop->min_of();
                 break;
             case SUM:
-                return prop->sum_of();
+                agg = prop->sum_of();
                 break;
             case AVG:
-                return prop->avg_of();
+                agg = prop->avg_of();
                 break;
         }
     }
+    if (!agg) {
+        throw std::runtime_error(
+            util::format("Cannot use aggregate '%1' for this type of property", agg_op_type_to_str(type)));
+    }
 
-    throw std::runtime_error("Cannot aggregate");
-    return {};
+    return agg;
 }
 
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
