@@ -1,5 +1,5 @@
 #include "realm/parser/driver.hpp"
-#include "realm/parser/query_bison.hpp"
+#include "realm/parser/generated/query_bison.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
 #include <realm/decimal128.hpp>
