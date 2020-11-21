@@ -8,7 +8,7 @@
 # include <cstring> // strerror
 # include <string>
 # include "realm/parser/driver.hpp"
-# include "realm/parser/query_bison.hpp"
+# include "realm/parser/generated/query_bison.hpp"
 %}
 
 %option nounistd never-interactive noyywrap nounput noinput batch debug noyylineno

@@ -2,7 +2,7 @@
 #define DRIVER_HH
 #include <string>
 #include <map>
-#include "realm/parser/query_bison.hpp"
+#include "realm/parser/generated/query_bison.hpp"
 #include "realm/parser/query_parser.hpp"
 
 // Give Flex the prototype of yylex we want ...
