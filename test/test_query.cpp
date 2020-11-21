@@ -2179,7 +2179,7 @@ TEST(Query_TwoColumnsCrossTypes)
     for (size_t i = 0; i < num_rows; ++i) {
         std::string str = util::format("foo %1", i);
         Timestamp ts{int64_t(i), 0};
-        BinaryData bd(str.c_str(), str.size() + 1); // include the terminal null so comparison against strings work
+        BinaryData bd(str.c_str(), str.size());
         ObjectId oid(ts, int(i), int(i));
         UUID uuid = gen.convert_for_test<UUID>(i);
         table.create_object()
@@ -2310,11 +2310,6 @@ TEST(Query_TwoColumnsCrossTypesNullability)
                 if (are_comparable) {
                     num_expected_matches = 1; // numerics are 0
                 }
-                if ((lhs_type == type_Binary && rhs_type == type_String) ||
-                    (lhs_type == type_String && rhs_type == type_Binary)) {
-                    num_expected_matches =
-                        0; // although comparable, the defaults differ from String: "\0" and Binary: ""
-                }
             }
             {
                 size_t actual_matches = table.where().equal(lhs, rhs).count();
@@ -2367,9 +2362,6 @@ TEST(Query_TwoColumnsCrossTypesNullability)
             }
             {
                 size_t expected_greater = 0;
-                if (both_non_nullable && lhs_type == type_String && rhs_type == type_Binary) {
-                    expected_greater = num_rows;
-                }
                 size_t actual_matches = table.where().greater(lhs, rhs).count();
                 CHECK_EQUAL(expected_greater, actual_matches);
                 if (actual_matches != expected_greater) {
@@ -2379,9 +2371,6 @@ TEST(Query_TwoColumnsCrossTypesNullability)
             }
             {
                 size_t expected_less = 0;
-                if (both_non_nullable && lhs_type == type_Binary && rhs_type == type_String) {
-                    expected_less = num_rows;
-                }
                 size_t actual_matches = table.where().less(lhs, rhs).count();
                 CHECK_EQUAL(expected_less, actual_matches);
                 if (actual_matches != expected_less) {
