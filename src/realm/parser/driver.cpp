@@ -417,35 +417,30 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 {
-    // if this appears to be the element lenth operator, try it out and if it fails attempt
-    // the normal property flow so that we still support properties named "length"
-    if (!post_op && path && is_length_suffix(identifier) && path->path_elems.size() > 0) {
-        try {
-            LinkChain link_chain(drv->m_base_table, comp_type);
-            for (size_t i = 0; i < path->path_elems.size() - 1; ++i) {
-                link_chain.link(path->path_elems[i]);
-            }
-            ColKey col =
-                link_chain.get_current_table()->get_column_key(path->path_elems[path->path_elems.size() - 1]);
-            if (col && col.is_list()) {
-                if (col.get_type() == col_type_String) {
-                    return link_chain.column<Lst<StringData>>(col).element_lengths().clone();
-                }
-                else if (col.get_type() == col_type_Binary) {
-                    return link_chain.column<Lst<BinaryData>>(col).element_lengths().clone();
-                }
+    try {
+        std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
+        if (post_op) {
+            return post_op->visit(drv, subexpr.get());
+        }
+        return subexpr;
+    }
+    catch (const std::runtime_error& e) {
+        // Is 'identifier' perhaps length operator?
+        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+            // If 'length' is the operator, the last id in the path must be the name
+            // of a list property
+            auto prop = path->path_elems.back();
+            path->path_elems.pop_back();
+            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
+            if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+                if (auto length_expr = list->get_element_length())
+                    return length_expr;
             }
         }
-        catch (const std::exception&) {
-            // ignore exception try normal path
-        }
+        throw e;
     }
-    std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
-
-    if (post_op) {
-        return post_op->visit(drv, subexpr.get());
-    }
-    return subexpr;
+    REALM_UNREACHABLE();
+    return {};
 }
 
 std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
