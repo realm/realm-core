@@ -66,6 +66,7 @@ using namespace realm::query_parser;
   ANY     "any"
   ALL     "all"
   NONE    "none"
+  BACKLINK "@link"
   SIZE    "@size"
   COUNT   "@count"
   MAX     "@max"
@@ -246,6 +247,7 @@ path_elem
 
 id  
     : ID                        { $$ = $1; }
+    | BACKLINK '.' ID '.' ID    { $$ = std::string("@links.") + $3 + "." + $5; }
     | BEGINSWITH                { $$ = $1; }
     | ENDSWITH                  { $$ = $1; }
     | CONTAINS                  { $$ = $1; }

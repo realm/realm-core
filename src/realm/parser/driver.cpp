@@ -457,9 +457,6 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
     if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
         return s->size().clone();
     }
-    if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
-        return s->count().clone();
-    }
     if (subexpr) {
         throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'",
                                               post_op_type_to_str(this->type),
@@ -781,7 +778,12 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (auto path_elem : path_elems) {
-        link_chain.link(path_elem);
+        if (path_elem.find("@links.") == 0) {
+            link_chain.backlink(path_elem);
+        }
+        else {
+            link_chain.link(path_elem);
+        }
     }
     return link_chain;
 }
@@ -909,8 +911,25 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
+LinkChain& LinkChain::backlink(const std::string& path_elem)
+{
+    auto table_column_pair = path_elem.substr(7);
+    auto dot_pos = table_column_pair.find('.');
+    auto table_name = table_column_pair.substr(0, dot_pos);
+    auto column_name = table_column_pair.substr(dot_pos + 1);
+    auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
+    auto origin_column = origin_table->get_column_key(column_name);
+    return backlink(*origin_table, origin_column);
+}
+
+
 Subexpr* LinkChain::column(std::string col)
 {
+    if (col.find("@links.") == 0) {
+        backlink(col);
+        return new Columns<Link>(ColKey(), m_base_table, m_link_cols, m_comparison_type);
+    }
+
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
         throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));

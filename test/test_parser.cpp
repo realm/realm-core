@@ -233,11 +233,11 @@ static std::vector<std::string> valid_queries = {
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
     "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count == SUBQUERY(items, $x, $x.price < 10).@count",
+     */
 
     // backlinks
     "p.@links.class.prop.@count > 2",
     "p.@links.class.prop.@sum.prop2 > 2",
-     */
 };
 
 static std::vector<std::string> invalid_queries = {
@@ -2740,7 +2740,7 @@ TEST(Parser_IncludeDescriptor)
     CHECK_EQUAL(message, "No property 'account' found in type 'person' which links to type 'person'");
 }
 
-/*
+
 TEST(Parser_IncludeDescriptorMultiple)
 {
     Group g;
@@ -2959,7 +2959,7 @@ TEST(Parser_IncludeDescriptorDeepLinks)
     expected_include_names = {"John", "Mark", "Jonathan", "Eli"};
     includes.report_included_backlinks(people, tv.get_key(0), reporter);
 }
-*/
+#endif
 
 TEST(Parser_Backlinks)
 {
@@ -3037,7 +3037,7 @@ TEST(Parser_Backlinks)
 
     // items purchased more than twice
     verify_query(test_context, items, "@links.class_Person.items.@count > 2", 2);
-    verify_query(test_context, items, "@LINKS.class_Person.items.@size > 2", 2);
+    verify_query(test_context, items, "@links.class_Person.items.@size > 2", 2);
     // items bought by people with only $10 in their account
     verify_query(test_context, items, "@links.class_Person.items.@min.account_balance <= 10", 4);
     // items bought by people with more than $10 in their account
@@ -3045,7 +3045,7 @@ TEST(Parser_Backlinks)
     // items bought where the sum of the account balance of purchasers is more than $20
     verify_query(test_context, items, "@links.class_Person.items.@sum.account_balance > 20", 3);
     verify_query(test_context, items, "@links.class_Person.items.@avg.account_balance > 20", 1);
-
+#if 0
     // subquery over backlinks
     verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2",
                  1);
@@ -3109,9 +3109,10 @@ TEST(Parser_Backlinks)
         verify_query(test_context, items, "purchasers.@max.capital >= 20", 3, mapping_with_prefix), message);
     CHECK_EQUAL(message, "Substitution loop detected while processing property 'capital' -> 'capital' found in type "
                          "'Person'. Check property aliases.");
+#endif
 }
 
-
+#if 0
 TEST(Parser_BacklinkCount)
 {
     Group g;

@@ -544,31 +544,32 @@ namespace yy {
     TOK_ANY = 275,                 // "any"
     TOK_ALL = 276,                 // "all"
     TOK_NONE = 277,                // "none"
-    TOK_SIZE = 278,                // "@size"
-    TOK_COUNT = 279,               // "@count"
-    TOK_MAX = 280,                 // "@max"
-    TOK_MIN = 281,                 // "@min"
-    TOK_SUM = 282,                 // "@sun"
-    TOK_AVG = 283,                 // "@average"
-    TOK_AND = 284,                 // "&&"
-    TOK_OR = 285,                  // "||"
-    TOK_NOT = 286,                 // "!"
-    TOK_ID = 287,                  // "identifier"
-    TOK_STRING = 288,              // "string"
-    TOK_BASE64 = 289,              // "base64"
-    TOK_INFINITY = 290,            // "infinity"
-    TOK_NAN = 291,                 // "NaN"
-    TOK_NATURAL0 = 292,            // "natural0"
-    TOK_NUMBER = 293,              // "number"
-    TOK_FLOAT = 294,               // "float"
-    TOK_TIMESTAMP = 295,           // "date"
-    TOK_UUID = 296,                // "UUID"
-    TOK_OID = 297,                 // "ObjectId"
-    TOK_ARG = 298,                 // "argument"
-    TOK_BEGINSWITH = 299,          // "beginswith"
-    TOK_ENDSWITH = 300,            // "endswith"
-    TOK_CONTAINS = 301,            // "contains"
-    TOK_LIKE = 302                 // "like"
+    TOK_BACKLINK = 278,            // "@link"
+    TOK_SIZE = 279,                // "@size"
+    TOK_COUNT = 280,               // "@count"
+    TOK_MAX = 281,                 // "@max"
+    TOK_MIN = 282,                 // "@min"
+    TOK_SUM = 283,                 // "@sun"
+    TOK_AVG = 284,                 // "@average"
+    TOK_AND = 285,                 // "&&"
+    TOK_OR = 286,                  // "||"
+    TOK_NOT = 287,                 // "!"
+    TOK_ID = 288,                  // "identifier"
+    TOK_STRING = 289,              // "string"
+    TOK_BASE64 = 290,              // "base64"
+    TOK_INFINITY = 291,            // "infinity"
+    TOK_NAN = 292,                 // "NaN"
+    TOK_NATURAL0 = 293,            // "natural0"
+    TOK_NUMBER = 294,              // "number"
+    TOK_FLOAT = 295,               // "float"
+    TOK_TIMESTAMP = 296,           // "date"
+    TOK_UUID = 297,                // "UUID"
+    TOK_OID = 298,                 // "ObjectId"
+    TOK_ARG = 299,                 // "argument"
+    TOK_BEGINSWITH = 300,          // "beginswith"
+    TOK_ENDSWITH = 301,            // "endswith"
+    TOK_CONTAINS = 302,            // "contains"
+    TOK_LIKE = 303                 // "like"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -585,7 +586,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 52, ///< Number of tokens.
+        YYNTOKENS = 53, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -610,60 +611,61 @@ namespace yy {
         SYM_ANY = 20,                            // "any"
         SYM_ALL = 21,                            // "all"
         SYM_NONE = 22,                           // "none"
-        SYM_SIZE = 23,                           // "@size"
-        SYM_COUNT = 24,                          // "@count"
-        SYM_MAX = 25,                            // "@max"
-        SYM_MIN = 26,                            // "@min"
-        SYM_SUM = 27,                            // "@sun"
-        SYM_AVG = 28,                            // "@average"
-        SYM_AND = 29,                            // "&&"
-        SYM_OR = 30,                             // "||"
-        SYM_NOT = 31,                            // "!"
-        SYM_ID = 32,                             // "identifier"
-        SYM_STRING = 33,                         // "string"
-        SYM_BASE64 = 34,                         // "base64"
-        SYM_INFINITY = 35,                       // "infinity"
-        SYM_NAN = 36,                            // "NaN"
-        SYM_NATURAL0 = 37,                       // "natural0"
-        SYM_NUMBER = 38,                         // "number"
-        SYM_FLOAT = 39,                          // "float"
-        SYM_TIMESTAMP = 40,                      // "date"
-        SYM_UUID = 41,                           // "UUID"
-        SYM_OID = 42,                            // "ObjectId"
-        SYM_ARG = 43,                            // "argument"
-        SYM_BEGINSWITH = 44,                     // "beginswith"
-        SYM_ENDSWITH = 45,                       // "endswith"
-        SYM_CONTAINS = 46,                       // "contains"
-        SYM_LIKE = 47,                           // "like"
-        SYM_48_ = 48,                            // '('
-        SYM_49_ = 49,                            // ')'
-        SYM_50_ = 50,                            // '.'
-        SYM_51_ = 51,                            // ','
-        SYM_YYACCEPT = 52,                       // $accept
-        SYM_query = 53,                          // query
-        SYM_pred = 54,                           // pred
-        SYM_and_pred = 55,                       // and_pred
-        SYM_atom_pred = 56,                      // atom_pred
-        SYM_value = 57,                          // value
-        SYM_prop = 58,                           // prop
-        SYM_pred_suffix = 59,                    // pred_suffix
-        SYM_distinct = 60,                       // distinct
-        SYM_distinct_param = 61,                 // distinct_param
-        SYM_sort = 62,                           // sort
-        SYM_sort_param = 63,                     // sort_param
-        SYM_limit = 64,                          // limit
-        SYM_direction = 65,                      // direction
-        SYM_constant = 66,                       // constant
-        SYM_boolexpr = 67,                       // boolexpr
-        SYM_comp_type = 68,                      // comp_type
-        SYM_post_op = 69,                        // post_op
-        SYM_aggr_op = 70,                        // aggr_op
-        SYM_equality = 71,                       // equality
-        SYM_relational = 72,                     // relational
-        SYM_stringop = 73,                       // stringop
-        SYM_path = 74,                           // path
-        SYM_path_elem = 75,                      // path_elem
-        SYM_id = 76                              // id
+        SYM_BACKLINK = 23,                       // "@link"
+        SYM_SIZE = 24,                           // "@size"
+        SYM_COUNT = 25,                          // "@count"
+        SYM_MAX = 26,                            // "@max"
+        SYM_MIN = 27,                            // "@min"
+        SYM_SUM = 28,                            // "@sun"
+        SYM_AVG = 29,                            // "@average"
+        SYM_AND = 30,                            // "&&"
+        SYM_OR = 31,                             // "||"
+        SYM_NOT = 32,                            // "!"
+        SYM_ID = 33,                             // "identifier"
+        SYM_STRING = 34,                         // "string"
+        SYM_BASE64 = 35,                         // "base64"
+        SYM_INFINITY = 36,                       // "infinity"
+        SYM_NAN = 37,                            // "NaN"
+        SYM_NATURAL0 = 38,                       // "natural0"
+        SYM_NUMBER = 39,                         // "number"
+        SYM_FLOAT = 40,                          // "float"
+        SYM_TIMESTAMP = 41,                      // "date"
+        SYM_UUID = 42,                           // "UUID"
+        SYM_OID = 43,                            // "ObjectId"
+        SYM_ARG = 44,                            // "argument"
+        SYM_BEGINSWITH = 45,                     // "beginswith"
+        SYM_ENDSWITH = 46,                       // "endswith"
+        SYM_CONTAINS = 47,                       // "contains"
+        SYM_LIKE = 48,                           // "like"
+        SYM_49_ = 49,                            // '('
+        SYM_50_ = 50,                            // ')'
+        SYM_51_ = 51,                            // '.'
+        SYM_52_ = 52,                            // ','
+        SYM_YYACCEPT = 53,                       // $accept
+        SYM_query = 54,                          // query
+        SYM_pred = 55,                           // pred
+        SYM_and_pred = 56,                       // and_pred
+        SYM_atom_pred = 57,                      // atom_pred
+        SYM_value = 58,                          // value
+        SYM_prop = 59,                           // prop
+        SYM_pred_suffix = 60,                    // pred_suffix
+        SYM_distinct = 61,                       // distinct
+        SYM_distinct_param = 62,                 // distinct_param
+        SYM_sort = 63,                           // sort
+        SYM_sort_param = 64,                     // sort_param
+        SYM_limit = 65,                          // limit
+        SYM_direction = 66,                      // direction
+        SYM_constant = 67,                       // constant
+        SYM_boolexpr = 68,                       // boolexpr
+        SYM_comp_type = 69,                      // comp_type
+        SYM_post_op = 70,                        // post_op
+        SYM_aggr_op = 71,                        // aggr_op
+        SYM_equality = 72,                       // equality
+        SYM_relational = 73,                     // relational
+        SYM_stringop = 74,                       // stringop
+        SYM_path = 75,                           // path
+        SYM_path_elem = 76,                      // path_elem
+        SYM_id = 77                              // id
       };
     };
 
@@ -1607,6 +1609,21 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
+      make_BACKLINK ()
+      {
+        return symbol_type (token::TOK_BACKLINK);
+      }
+#else
+      static
+      symbol_type
+      make_BACKLINK ()
+      {
+        return symbol_type (token::TOK_BACKLINK);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
       make_SIZE ()
       {
         return symbol_type (token::TOK_SIZE);
@@ -2307,7 +2324,7 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 196,     ///< Last index in yytable_.
+      yylast_ = 204,     ///< Last index in yytable_.
       yynnts_ = 25,  ///< Number of nonterminal symbols.
       yyfinal_ = 34 ///< Termination state number.
     };
@@ -2332,7 +2349,7 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      48,    49,     2,     2,    51,     2,    50,     2,     2,     2,
+      49,    50,     2,     2,    52,     2,    51,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2358,10 +2375,10 @@ switch (yykind)
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
-      45,    46,    47
+      45,    46,    47,    48
     };
     // Last valid token kind.
-    const int code_max = 302;
+    const int code_max = 303;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
