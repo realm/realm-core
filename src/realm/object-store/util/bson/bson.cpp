@@ -118,6 +118,9 @@ Bson& Bson::operator=(Bson&& v) noexcept
         case Type::Array:
             new (&array_val) std::unique_ptr<BsonArray>{std::move(v.array_val)};
             break;
+        case Type::Uuid:
+            uuid_val = v.uuid_val;
+            break;
     }
 
     return *this;
@@ -180,6 +183,9 @@ Bson& Bson::operator=(const Bson& v)
         case Type::Array: {
             new (&array_val) std::unique_ptr<BsonArray>(new BsonArray(*v.array_val));
             break;
+        case Type::Uuid:
+            uuid_val = v.uuid_val;
+            break;
         }
     }
 
@@ -237,6 +243,8 @@ bool Bson::operator==(const Bson& other) const
             return *document_val == *other.document_val;
         case Type::Array:
             return *array_val == *other.array_val;
+        case Type::Uuid:
+            return uuid_val == other.uuid_val;
     }
 
     return false;
@@ -482,6 +490,12 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
                 out << b;
             }
             out << "]";
+            break;
+        }
+        case Bson::Type::Uuid: {
+            out << "{"
+                << "\"$uuid\""
+                << ":" << '"' << static_cast<UUID>(b) << '"' << "}";
             break;
         }
     }
