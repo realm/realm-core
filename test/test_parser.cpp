@@ -2259,6 +2259,16 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args,
                          3); // obj2, obj3, obj4
     }
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing.length == 2", 0), message);
+    CHECK_EQUAL(message, "'table' has no property: 'missing'");
+    if constexpr (realm::is_any_v<underlying_type, StringData, BinaryData>) {
+        verify_query(test_context, t, "values.length == 0", 1);
+    }
+    else {
+        CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
+        CHECK_EQUAL(message, "table.values is not a link column");
+    }
 }
 
 #if 0
