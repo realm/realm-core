@@ -2,6 +2,7 @@
 #include "realm/parser/generated/query_bison.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
+#include "realm/sort_descriptor.hpp"
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
 #include "realm/util/base64.hpp"
@@ -126,7 +127,6 @@ Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
 }
 
 ParserNode::~ParserNode() {}
-
 
 AtomPredNode::~AtomPredNode() {}
 
@@ -759,6 +759,54 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
     return link_chain;
 }
 
+DescriptorNode::~DescriptorNode() {}
+
+DescriptorOrderingNode::~DescriptorOrderingNode() {}
+
+std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* drv)
+{
+    auto target = drv->m_base_table;
+    std::unique_ptr<DescriptorOrdering> ordering;
+    for (auto cur_ordering : orderings) {
+        if (!ordering)
+            ordering = std::make_unique<DescriptorOrdering>();
+        if (cur_ordering->get_type() == DescriptorNode::LIMIT) {
+            ordering->append_limit(LimitDescriptor(cur_ordering->limit));
+        }
+        else {
+            bool is_distinct = cur_ordering->get_type() == DescriptorNode::DISTINCT;
+            std::vector<std::vector<ColKey>> property_columns;
+            for (auto& col_names : cur_ordering->columns) {
+                std::vector<ColKey> columns;
+                ConstTableRef cur_table = target;
+                for (size_t ndx_in_path = 0; ndx_in_path < col_names.size(); ++ndx_in_path) {
+                    ColKey col_key = cur_table->get_column_key(col_names[ndx_in_path]);
+                    if (!col_key) {
+                        throw std::runtime_error(util::format(
+                            "No property '%1' found on object type '%2' specified in '%3' clause",
+                            col_names[ndx_in_path], cur_table->get_name(), is_distinct ? "distinct" : "sort"));
+                    }
+                    columns.push_back(col_key);
+                    if (ndx_in_path < col_names.size() - 1) {
+                        cur_table = cur_table->get_link_target(col_key);
+                    }
+                }
+                property_columns.push_back(columns);
+            }
+
+            if (is_distinct) {
+                ordering->append_distinct(DistinctDescriptor(property_columns));
+            }
+            else {
+                ordering->append_sort(SortDescriptor(property_columns, cur_ordering->ascending),
+                                      SortDescriptor::MergeMode::prepend);
+            }
+        }
+    }
+
+    return ordering;
+}
+
 std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(const std::vector<ValueNode*>& values)
 {
     std::unique_ptr<Subexpr> left;
@@ -831,7 +879,7 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args);
     driver.parse(query_string);
-    return driver.result->visit(&driver);
+    return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
 Subexpr* LinkChain::column(std::string col)

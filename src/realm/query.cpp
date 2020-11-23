@@ -81,6 +81,7 @@ Query::Query(const Query& source)
     : error_code(source.error_code)
     , m_groups(source.m_groups)
     , m_table(source.m_table)
+    , m_ordering(source.m_ordering)
 {
     if (source.m_owned_source_table_view) {
         m_owned_source_table_view = source.m_owned_source_table_view->clone();
@@ -127,6 +128,7 @@ Query& Query::operator=(const Query& source)
         else {
             m_view = m_source_link_list.get();
         }
+        m_ordering = source.m_ordering;
     }
     return *this;
 }
@@ -1387,6 +1389,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 #endif
 
     TableView ret(m_table, *this, start, end, limit);
+    if (m_ordering) {
+        ret.apply_descriptor_ordering(*m_ordering);
+    }
     ret.do_sync();
     return ret;
 }
@@ -1693,6 +1698,12 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     // An empty query returns all results and one way to indicate this
     // is to serialise TRUEPREDICATE which is functionally equivilent
     return "TRUEPREDICATE";
+}
+
+Query& Query::set_ordering(std::unique_ptr<DescriptorOrdering> ordering)
+{
+    m_ordering = std::move(ordering);
+    return *this;
 }
 
 std::string Query::get_description() const

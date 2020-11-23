@@ -277,6 +277,53 @@ public:
     std::vector<std::string> path_elems;
 };
 
+class DescriptorNode : public ParserNode {
+public:
+    enum Type { SORT, DISTINCT, LIMIT };
+    std::vector<std::vector<std::string>> columns;
+    std::vector<bool> ascending;
+    size_t limit = size_t(-1);
+    Type type;
+
+    DescriptorNode(Type t)
+        : type(t)
+    {
+    }
+    DescriptorNode(Type t, const std::string& str)
+        : type(t)
+    {
+        limit = size_t(strtol(str.c_str(), nullptr, 0));
+    }
+    ~DescriptorNode() override;
+    Type get_type()
+    {
+        return type;
+    }
+    void add(const std::vector<std::string>& path, const std::string& id)
+    {
+        columns.push_back(path);
+        columns.back().push_back(id);
+    }
+    void add(const std::vector<std::string>& path, const std::string& id, bool direction)
+    {
+        add(path, id);
+        ascending.push_back(direction);
+    }
+};
+
+class DescriptorOrderingNode : public ParserNode {
+public:
+    std::vector<DescriptorNode*> orderings;
+
+    DescriptorOrderingNode() = default;
+    ~DescriptorOrderingNode() override;
+    void add_descriptor(DescriptorNode* n)
+    {
+        orderings.push_back(n);
+    }
+    std::unique_ptr<DescriptorOrdering> visit(ParserDriver* drv);
+};
+
 // Conducting the whole scanning and parsing of Calc++.
 class ParserDriver {
 public:
@@ -313,6 +360,7 @@ public:
     }
 
     OrNode* result = nullptr;
+    DescriptorOrderingNode* ordering;
     TableRef m_base_table;
     Arguments& m_args;
     ParserNodeStore m_parse_nodes;
