@@ -2046,7 +2046,6 @@ TEST(Parser_list_of_primitive_ints)
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
     CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
 }
-#if 0
 
 TEST(Parser_list_of_primitive_strings)
 {
@@ -2174,7 +2173,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
         verify_query(test_context, t, util::format("%1link == null", path), 0);
         verify_query(test_context, t, util::format("%1values == null", path), 1);
 
-        std::vector<std::string> any_prefix = {"", "ANY", "SOME", "aNy", "sOME"};
+        std::vector<std::string> any_prefix = {"", "ANY", "SOME", "any", "some"};
         for (auto prefix : any_prefix) {
             verify_query(test_context, t, util::format("0 IN %1 %2values.length", prefix, path), 2);
             verify_query(test_context, t, util::format("%1 %2values.length == 0", prefix, path), 2);
@@ -2197,9 +2196,8 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.len == 2", 0), message);
-    CHECK_EQUAL(message, "Property 'values' is not a link in object of type 'table'");
+    CHECK_EQUAL(message, "table.values is not a link column");
 }
-#endif
 
 TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bool>, Float, Optional<Float>, Double,
            Optional<Double>, Decimal128, ObjectId, Optional<ObjectId>, UUID, Optional<UUID>)
@@ -2260,6 +2258,16 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
         verify_query_sub(test_context, t, util::format("NONE %1values == $0", path), args, num_args, 2); // obj2, obj5
         verify_query_sub(test_context, t, util::format("NONE %1values != $0", path), args, num_args,
                          3); // obj2, obj3, obj4
+    }
+    std::string message;
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "missing.length == 2", 0), message);
+    CHECK_EQUAL(message, "'table' has no property: 'missing'");
+    if constexpr (realm::is_any_v<underlying_type, StringData, BinaryData>) {
+        verify_query(test_context, t, "values.length == 0", 1);
+    }
+    else {
+        CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "values.length == 2", 0), message);
+        CHECK_EQUAL(message, "table.values is not a link column");
     }
 }
 

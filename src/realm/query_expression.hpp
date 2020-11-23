@@ -2786,6 +2786,7 @@ public:
     }
 
     virtual SizeOperator<int64_t> size() = 0;
+    virtual std::unique_ptr<Subexpr> get_element_length() = 0;
     virtual std::unique_ptr<Subexpr> max_of() = 0;
     virtual std::unique_ptr<Subexpr> min_of() = 0;
     virtual std::unique_ptr<Subexpr> sum_of() = 0;
@@ -2922,6 +2923,16 @@ public:
     {
         if constexpr (realm::is_any_v<T, Int, Float, Double, Decimal128>) {
             return average().clone();
+        }
+        else {
+            return {};
+        }
+    }
+
+    std::unique_ptr<Subexpr> get_element_length() override
+    {
+        if constexpr (realm::is_any_v<T, StringData, BinaryData>) {
+            return element_lengths().clone();
         }
         else {
             return {};
