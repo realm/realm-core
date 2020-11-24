@@ -240,7 +240,7 @@ stringop
 
 path
     : %empty                    { $$ = drv.m_parse_nodes.create<PathNode>(); }
-    | path path_elem            { $1->path_elems.push_back($2); $$ = $1; }
+    | path path_elem            { $1->add_element($2); $$ = $1; }
 
 path_elem
     : id '.'                    { $$ = $1; }

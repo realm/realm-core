@@ -17,6 +17,16 @@ static bool trace_scanning = false;
 
 namespace {
 
+StringData get_printable_table_name(StringData name)
+{
+    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
+    static const std::string prefix = "class_";
+    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
+    }
+    return name;
+}
+
 const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
 {
     switch (type) {
@@ -918,7 +928,15 @@ LinkChain& LinkChain::backlink(const std::string& path_elem)
     auto table_name = table_column_pair.substr(0, dot_pos);
     auto column_name = table_column_pair.substr(dot_pos + 1);
     auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
-    auto origin_column = origin_table->get_column_key(column_name);
+    ColKey origin_column;
+    if (origin_table) {
+        origin_column = origin_table->get_column_key(column_name);
+    }
+    if (!origin_column) {
+        throw std::runtime_error(util::format("No property '%1' found in type '%2' which links to type '%3'",
+                                              column_name, get_printable_table_name(table_name),
+                                              get_printable_table_name(m_current_table->get_name())));
+    }
     return backlink(*origin_table, origin_column);
 }
 

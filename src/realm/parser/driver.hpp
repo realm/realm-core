@@ -272,9 +272,13 @@ public:
 
 class PathNode : public ParserNode {
 public:
-    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
-
     std::vector<std::string> path_elems;
+
+    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
+    void add_element(const std::string& str)
+    {
+        path_elems.push_back(str);
+    }
 };
 
 class DescriptorNode : public ParserNode {
@@ -360,7 +364,7 @@ public:
     }
 
     OrNode* result = nullptr;
-    DescriptorOrderingNode* ordering;
+    DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
     ParserNodeStore m_parse_nodes;

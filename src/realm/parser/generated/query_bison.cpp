@@ -1507,7 +1507,7 @@ namespace yy {
     break;
 
   case 71: // path: path path_elem
-                                { yystack_[1].value.as < PathNode* > ()->path_elems.push_back(yystack_[0].value.as < std::string > ()); yylhs.value.as < PathNode* > () = yystack_[1].value.as < PathNode* > (); }
+                                { yystack_[1].value.as < PathNode* > ()->add_element(yystack_[0].value.as < std::string > ()); yylhs.value.as < PathNode* > () = yystack_[1].value.as < PathNode* > (); }
     break;
 
   case 72: // path_elem: id '.'
