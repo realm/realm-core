@@ -58,6 +58,8 @@ public:
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
     Set& operator=(Set&& other) noexcept;
+    using Base::operator==;
+    using Base::operator!=;
 
     SetBasePtr clone() const final
     {
@@ -228,6 +230,8 @@ public:
     LnkSet(LnkSet&&) = default;
     LnkSet& operator=(const LnkSet&) = default;
     LnkSet& operator=(LnkSet&&) = default;
+    bool operator==(const LnkSet& other) const;
+    bool operator!=(const LnkSet& other) const;
 
     ObjKey get(size_t ndx) const;
     size_t find(ObjKey) const;
@@ -994,6 +998,15 @@ void Set<T>::assign_symmetric_difference(It1 first, It2 last)
     }
 }
 
+inline bool LnkSet::operator==(const LnkSet& other) const
+{
+    return m_set == other.m_set;
+}
+
+inline bool LnkSet::operator!=(const LnkSet& other) const
+{
+    return m_set != other.m_set;
+}
 
 inline ObjKey LnkSet::get(size_t ndx) const
 {
