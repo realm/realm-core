@@ -24,6 +24,7 @@
 #include <realm/util/features.h>
 #include <realm/obj_list.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 
 namespace realm {
 
@@ -171,6 +172,7 @@ public:
     ConstTableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t limit);
     ConstTableView(ConstTableRef parent, ColKey column, const Obj& obj);
     ConstTableView(ConstTableRef parent, LnkLstPtr link_list);
+    ConstTableView(ConstTableRef parent, LnkSetPtr link_list);
 
     /// Copy constructor.
     ConstTableView(const ConstTableView&);
@@ -387,6 +389,8 @@ protected:
 
     // If this TableView was created from a LnkLst, then this reference points to it. Otherwise it's 0
     mutable LnkLstPtr m_linklist_source;
+    // If this TableView was created from a LnkSet, then this reference points to it. Otherwise it's 0
+    mutable LnkSetPtr m_linkset_source;
 
     // Stores the ordering criteria of applied sort and distinct operations.
     DescriptorOrdering m_descriptor_ordering;
@@ -535,12 +539,25 @@ inline ConstTableView::ConstTableView(ConstTableRef parent, LnkLstPtr link_list)
     }
 }
 
+inline ConstTableView::ConstTableView(ConstTableRef parent, LnkSetPtr link_set)
+    : m_table(parent) // Throws
+    , m_linkset_source(std::move(link_set))
+    , m_key_values(Allocator::get_default())
+{
+    REALM_ASSERT(m_linkset_source);
+    m_key_values.create();
+    if (m_table) {
+        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
+    }
+}
+
 inline ConstTableView::ConstTableView(const ConstTableView& tv)
     : m_table(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
     , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{})
+    , m_linkset_source(tv.m_linkset_source ? tv.m_linkset_source->clone_linkset() : LnkSetPtr{})
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
@@ -558,6 +575,7 @@ inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
     , m_linklist_source(std::move(tv.m_linklist_source))
+    , m_linkset_source(std::move(tv.m_linkset_source))
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
     , m_start(tv.m_start)
@@ -586,6 +604,7 @@ inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
     m_linklist_source = std::move(tv.m_linklist_source);
+    m_linkset_source = std::move(tv.m_linkset_source);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
 
     return *this;
@@ -608,6 +627,7 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
     m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{};
+    m_linkset_source = tv.m_linkset_source ? tv.m_linkset_source->clone_linkset() : LnkSetPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
 
     return *this;
