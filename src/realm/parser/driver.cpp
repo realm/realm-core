@@ -427,27 +427,36 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 {
-    try {
-        std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
-        if (post_op) {
-            return post_op->visit(drv, subexpr.get());
-        }
-        return subexpr;
+    if (identifier == "@links") {
+        // This is a backlink aggregate query
+        auto link_chain = path->visit(drv, comp_type);
+        auto sub = link_chain.get_backlink_count<Int>();
+        return sub.clone();
     }
-    catch (const std::runtime_error& e) {
-        // Is 'identifier' perhaps length operator?
-        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
-            // If 'length' is the operator, the last id in the path must be the name
-            // of a list property
-            auto prop = path->path_elems.back();
-            path->path_elems.pop_back();
-            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
-            if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
-                if (auto length_expr = list->get_element_length())
-                    return length_expr;
+    else {
+        try {
+            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
+
+            if (post_op) {
+                return post_op->visit(drv, subexpr.get());
             }
+            return subexpr;
         }
-        throw e;
+        catch (const std::runtime_error& e) {
+            // Is 'identifier' perhaps length operator?
+            if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+                // If 'length' is the operator, the last id in the path must be the name
+                // of a list property
+                auto prop = path->path_elems.back();
+                path->path_elems.pop_back();
+                std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
+                if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+                    if (auto length_expr = list->get_element_length())
+                        return length_expr;
+                }
+            }
+            throw e;
+        }
     }
     REALM_UNREACHABLE();
     return {};

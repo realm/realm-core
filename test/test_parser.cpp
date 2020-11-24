@@ -3112,7 +3112,6 @@ TEST(Parser_Backlinks)
 #endif
 }
 
-#if 0
 TEST(Parser_BacklinkCount)
 {
     Group g;
@@ -3218,10 +3217,10 @@ TEST(Parser_BacklinkCount)
     std::string message;
     // backlink count requires comparison to a numeric type
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 'string'", -1), message);
-    CHECK_EQUAL(message, "Cannot convert string 'string'");
+    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1),
                                 message);
-    CHECK_EQUAL(message, "Attempting to compare a numeric property to a non-numeric value");
+    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'timestamp'");
 
     // no suffix after @links.@count is allowed
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.@count.item_id == 0", -1));
@@ -3239,6 +3238,7 @@ TEST(Parser_BacklinkCount)
 }
 
 
+#if 0
 TEST(Parser_SubqueryVariableNames)
 {
     Group g;

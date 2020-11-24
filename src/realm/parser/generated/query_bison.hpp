@@ -544,7 +544,7 @@ namespace yy {
     TOK_ANY = 275,                 // "any"
     TOK_ALL = 276,                 // "all"
     TOK_NONE = 277,                // "none"
-    TOK_BACKLINK = 278,            // "@link"
+    TOK_BACKLINK = 278,            // "@links"
     TOK_SIZE = 279,                // "@size"
     TOK_COUNT = 280,               // "@count"
     TOK_MAX = 281,                 // "@max"
@@ -611,7 +611,7 @@ namespace yy {
         SYM_ANY = 20,                            // "any"
         SYM_ALL = 21,                            // "all"
         SYM_NONE = 22,                           // "none"
-        SYM_BACKLINK = 23,                       // "@link"
+        SYM_BACKLINK = 23,                       // "@links"
         SYM_SIZE = 24,                           // "@size"
         SYM_COUNT = 25,                          // "@count"
         SYM_MAX = 26,                            // "@max"
@@ -2324,7 +2324,7 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 204,     ///< Last index in yytable_.
+      yylast_ = 206,     ///< Last index in yytable_.
       yynnts_ = 25,  ///< Number of nonterminal symbols.
       yyfinal_ = 34 ///< Termination state number.
     };
