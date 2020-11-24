@@ -103,6 +103,9 @@ public:
     template <typename T = Obj>
     T get(size_t index) REQUIRES(!m_mutex);
 
+    // Get an element in a list
+    Mixed get_any(size_t index) REQUIRES(!m_mutex);
+
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
     template <typename Context>

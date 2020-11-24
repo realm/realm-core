@@ -316,6 +316,24 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
     return util::none;
 }
 
+Mixed Results::get_any(size_t ndx)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    validate_read();
+    if (m_mode == Mode::List) {
+        evaluate_sort_and_distinct_on_list();
+        if (m_list_indices) {
+            if (ndx < m_list_indices->size())
+                return m_collection->get_any((*m_list_indices)[ndx]);
+        }
+        else {
+            if (ndx < m_collection->size())
+                return m_collection->get_any(ndx);
+        }
+    }
+    return {};
+}
+
 template <typename T>
 T Results::get(size_t row_ndx)
 {
