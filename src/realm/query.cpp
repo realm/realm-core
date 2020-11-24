@@ -1689,15 +1689,22 @@ std::string Query::validate()
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
+    std::string description;
     if (root_node()) {
         if (m_view) {
             throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
         }
-        return root_node()->describe_expression(state);
+        description = root_node()->describe_expression(state);
     }
-    // An empty query returns all results and one way to indicate this
-    // is to serialise TRUEPREDICATE which is functionally equivilent
-    return "TRUEPREDICATE";
+    else {
+        // An empty query returns all results and one way to indicate this
+        // is to serialise TRUEPREDICATE which is functionally equivilent
+        description = "TRUEPREDICATE";
+    }
+    if (this->m_ordering) {
+        description += " " + m_ordering->get_description(m_table);
+    }
+    return description;
 }
 
 Query& Query::set_ordering(std::unique_ptr<DescriptorOrdering> ordering)

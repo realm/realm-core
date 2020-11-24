@@ -2332,7 +2332,11 @@ TEST(Parser_SortAndDistinctSerialisation)
 TableView get_sorted_view(TableRef t, std::string query_string)
 {
     Query q = t->query(query_string);
-    return q.find_all();
+
+    std::string query_description = q.get_description();
+    Query q2 = t->query(query_description);
+
+    return q2.find_all();
 }
 
 TEST(Parser_SortAndDistinct)
