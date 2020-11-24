@@ -259,7 +259,7 @@ def doCheckInDocker(Map options = [:]) {
     ]
     if (options.enableSync) {
         cmakeOptions << [
-            REALM_ENABLE_SYNC: 'ON'
+            REALM_ENABLE_SYNC: 'ON',
             REALM_ENABLE_AUTH_TESTS: 'ON',
             REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
         ]
