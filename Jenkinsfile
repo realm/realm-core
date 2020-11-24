@@ -284,7 +284,7 @@ def doCheckInDocker(Map options = [:]) {
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {
-                    buildEnv.inside("${dockerArgs}") {
+                    buildEnv.inside(dockerArgs) {
                         try {
                             dir('build-dir') {
                                 sh "cmake ${cmakeDefinitions} -G Ninja .."
