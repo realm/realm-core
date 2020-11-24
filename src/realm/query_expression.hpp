@@ -141,6 +141,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/index_string.hpp>
 #include <realm/query.hpp>
 #include <realm/list.hpp>
+#include <realm/set.hpp>
 #include <realm/metrics/query_info.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/serializer.hpp>
@@ -2910,6 +2911,126 @@ private:
     }
 };
 
+template <typename T>
+class Columns<Set<T>> : public Subexpr2<T>, public ColumnListBase {
+public:
+    Columns(const Columns<Set<T>>& other)
+        : Subexpr2<T>(other)
+        , ColumnListBase(other)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
+    {
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Set<T>>>(*this);
+    }
+
+    ConstTableRef get_base_table() const override
+    {
+        return m_link_map.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_link_map.set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        ColumnListBase::set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_link_map.collect_dependencies(tables);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        if constexpr (realm::is_any_v<T, ObjectId, Int, Bool, UUID>) {
+            if (m_is_nullable_storage) {
+                evaluate<util::Optional<T>>(index, destination);
+                return;
+            }
+        }
+        evaluate<T>(index, destination);
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return ColumnListBase::description(state);
+    }
+
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        return ColumnListBase::m_comparison_type;
+    }
+
+    SizeOperator<int64_t> size();
+
+    ColumnListElementLength<T> element_lengths() const
+    {
+        return {*this};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
+    {
+        return {m_column_key, *this};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
+    {
+        return {m_column_key, *this};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
+    {
+        return {m_column_key, *this};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
+    {
+        return {m_column_key, *this};
+    }
+    const bool m_is_nullable_storage;
+
+private:
+    friend class Table;
+    friend class LinkChain;
+
+    template <typename StorageType>
+    void evaluate(size_t index, ValueBase& destination)
+    {
+        Allocator& alloc = get_base_table()->get_alloc();
+        Value<int64_t> list_refs;
+        get_lists(index, list_refs, 1);
+        const bool is_from_list = true;
+
+        std::vector<StorageType> values;
+        for (auto&& i : list_refs) {
+            ref_type list_ref = to_ref(i.get_int());
+            if (list_ref) {
+                BPlusTree<StorageType> list(alloc);
+                list.init_from_ref(list_ref);
+                size_t s = list.size();
+                for (size_t j = 0; j < s; j++) {
+                    values.push_back(list.get(j));
+                }
+            }
+        }
+        destination.init(is_from_list, values.size());
+        destination.set(values.begin(), values.end());
+    }
+
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnListBase(column_key, table, links, type)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
+    {
+    }
+};
+
 template <>
 class Columns<LnkLst> : public Columns<Lst<ObjKey>> {
 public:
@@ -2918,6 +3039,17 @@ public:
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<LnkLst>>(*this);
+    }
+};
+
+template <>
+class Columns<LnkSet> : public Columns<Set<ObjKey>> {
+public:
+    using Columns<Set<ObjKey>>::Columns;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<LnkSet>>(*this);
     }
 };
 

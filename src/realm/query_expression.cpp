@@ -37,7 +37,8 @@ void LinkMap::set_base_table(ConstTableRef table)
         // Link column can be either LinkList or single Link
         ColumnType type = link_column_key.get_type();
         REALM_ASSERT(Table::is_link_type(type) || type == col_type_BackLink);
-        if (type == col_type_LinkList || type == col_type_BackLink) {
+        if (type == col_type_LinkList || type == col_type_BackLink ||
+            (type == col_type_Link && link_column_key.is_collection())) {
             m_only_unary_links = false;
         }
 
@@ -127,7 +128,9 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
 
     bool last = (column + 1 == m_link_column_keys.size());
     ColumnType type = m_link_types[column];
-    if (type == col_type_Link) {
+    ColKey column_key = m_link_column_keys[column];
+    if (type == col_type_Link && !column_key.is_set()) {
+        REALM_ASSERT(!column_key.is_collection());
         if (ObjKey k = static_cast<const ArrayKey*>(m_leaf_ptr)->get(row)) {
             if (!k.is_unresolved()) {
                 if (last)
@@ -137,7 +140,8 @@ void LinkMap::map_links(size_t column, size_t row, LinkMapFunction& lm) const
             }
         }
     }
-    else if (type == col_type_LinkList) {
+    // Note: Link lists and link sets have compatible storage.
+    else if (type == col_type_LinkList || (type == col_type_Link && column_key.is_set())) {
         if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(row)) {
             BPlusTree<ObjKey> links(get_base_table()->get_alloc());
             links.init_from_ref(ref);
@@ -534,4 +538,4 @@ Query Subexpr2<BinaryData>::like(const Subexpr2<BinaryData>& col, bool case_sens
 {
     return binary_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
-}
+} // namespace realm
