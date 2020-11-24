@@ -2639,6 +2639,15 @@ LstBasePtr Transaction::import_copy_of(const LstBase& original)
     return {};
 }
 
+SetBasePtr Transaction::import_copy_of(const SetBase& original)
+{
+    if (Obj obj = import_copy_of(original.get_obj())) {
+        ColKey ck = original.get_col_key();
+        return obj.get_setbase_ptr(ck);
+    }
+    return {};
+}
+
 CollectionBasePtr Transaction::import_copy_of(const CollectionBase& original)
 {
     if (Obj obj = import_copy_of(original.get_obj())) {
