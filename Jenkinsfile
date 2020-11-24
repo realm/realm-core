@@ -256,10 +256,10 @@ def doCheckInDocker(Map options = [:]) {
         CMAKE_BUILD_TYPE: options.buildType,
         REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
         REALM_ENABLE_ENCRYPTION: options.enableEncryption ? 'ON' : 'OFF',
+        REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
     ]
     if (options.enableSync) {
         cmakeOptions << [
-            REALM_ENABLE_SYNC: 'ON',
             REALM_ENABLE_AUTH_TESTS: 'ON',
             REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
         ]
