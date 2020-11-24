@@ -591,6 +591,11 @@ inline LnkSet Obj::get_linkset(ColKey col_key) const
     return LnkSet{*this, col_key};
 }
 
+inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
+{
+    return std::make_unique<LnkSet>(*this, col_key);
+}
+
 template <class T>
 size_t Set<T>::find(T value) const
 {

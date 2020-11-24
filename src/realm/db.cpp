@@ -40,6 +40,7 @@
 #include <realm/table_view.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/set.hpp>
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -2656,6 +2657,17 @@ LnkLstPtr Transaction::import_copy_of(const LnkLstPtr& original)
         return obj.get_linklist_ptr(ck);
     }
     return std::make_unique<LnkLst>();
+}
+
+LnkSetPtr Transaction::import_copy_of(const LnkSetPtr& original)
+{
+    if (!original)
+        return nullptr;
+    if (Obj obj = import_copy_of(original->get_obj())) {
+        ColKey ck = original->get_col_key();
+        return obj.get_linkset_ptr(ck);
+    }
+    return std::make_unique<LnkSet>();
 }
 
 std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy policy)
