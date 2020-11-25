@@ -2794,6 +2794,12 @@ class ColumnListElementLength;
 template <typename T>
 class ColumnsCollection : public Subexpr2<T>, public ColumnListBase {
 public:
+    ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+                      ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnListBase(column_key, table, links, type)
+        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
+    {
+    }
     ColumnsCollection(const ColumnsCollection& other)
         : Subexpr2<T>(other)
         , ColumnListBase(other)
@@ -2875,9 +2881,6 @@ public:
     const bool m_is_nullable_storage;
 
 private:
-    friend class Table;
-    friend class LinkChain;
-
     template <typename StorageType>
     void evaluate(size_t index, ValueBase& destination)
     {
@@ -2901,13 +2904,6 @@ private:
         destination.init(is_from_list, values.size());
         destination.set(values.begin(), values.end());
     }
-
-    ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
-                      ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : ColumnListBase(column_key, table, links, type)
-        , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
-    {
-    }
 };
 
 template <typename T>
@@ -2918,6 +2914,8 @@ public:
     {
         return make_subexpr<Columns<Lst<T>>>(*this);
     }
+    friend class Table;
+    friend class LinkChain;
 };
 
 template <typename T>
