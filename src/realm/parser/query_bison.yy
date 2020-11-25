@@ -22,6 +22,8 @@
     class AndNode;
     class AtomPredNode;
     class PathNode;
+    class DescriptorOrderingNode;
+    class DescriptorNode;
   }  
   using namespace realm::query_parser;
 }
@@ -91,6 +93,7 @@ using namespace realm::query_parser;
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
 %token <std::string> LIKE    "like"
+%type  <bool> direction
 %type  <int> equality relational stringop
 %type  <ConstantNode*> constant
 %type  <PropertyNode*> prop
@@ -103,6 +106,8 @@ using namespace realm::query_parser;
 %type  <AtomPredNode*> atom_pred
 %type  <AndNode*> and_pred
 %type  <PathNode*> path
+%type  <DescriptorOrderingNode*> pred_suffix
+%type  <DescriptorNode*> sort sort_param distinct distinct_param limit
 %type  <std::string> path_elem id
 
 %destructor { } <int>
@@ -118,7 +123,7 @@ using namespace realm::query_parser;
 %right NOT;
 
 query
-    : pred pred_suffix { drv.result = $1; };
+    : pred pred_suffix { drv.result = $1; drv.ordering = $2; };
 
 pred
     : and_pred                  { $$ = drv.m_parse_nodes.create<OrNode>($1); }
@@ -157,31 +162,28 @@ prop
     | path id '.' aggr_op       { $$ = drv.m_parse_nodes.create<ListAggrNode>($1, $2, $4); }
 
 pred_suffix
-    : %empty
-    | pred_suffix atom_suffix
+    : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}
+    | pred_suffix sort          { $1->add_descriptor($2); $$ = $1; }
+    | pred_suffix distinct      { $1->add_descriptor($2); $$ = $1; }
+    | pred_suffix limit         { $1->add_descriptor($2); $$ = $1; }
 
-atom_suffix
-    : sort
-    | distinct
-    | limit
-
-distinct: DISTINCT '(' distinct_param ')'
+distinct: DISTINCT '(' distinct_param ')' { $$ = $3; }
 
 distinct_param
-    : path id
-    | distinct_param ',' path id
+    : path id                   { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::DISTINCT); $$->add($1->path_elems, $2);}
+    | distinct_param ',' path id { $1->add($3->path_elems, $4); $$ = $1; }
 
-sort: SORT '(' sort_param ')'
+sort: SORT '(' sort_param ')'    { $$ = $3; }
 
 sort_param
-    : path id direction
-    | sort_param ',' path id direction
+    : path id direction         { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT); $$->add($1->path_elems, $2, $3);}
+    | sort_param ',' path id direction  { $1->add($3->path_elems, $4, $5); $$ = $1; }
 
-limit: LIMIT '(' NATURAL0 ')'
+limit: LIMIT '(' NATURAL0 ')'   { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::LIMIT, $3); }
 
 direction
-    : ASCENDING
-    | DESCENDING
+    : ASCENDING                 { $$ = true; }
+    | DESCENDING                { $$ = false; }
     
 constant
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }

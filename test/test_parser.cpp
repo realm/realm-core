@@ -2271,7 +2271,6 @@ TEST_TYPES(Parser_list_of_primitive_types, Int, Optional<Int>, Bool, Optional<Bo
     }
 }
 
-#if 0
 TEST(Parser_SortAndDistinctSerialisation)
 {
     Group g;
@@ -2341,30 +2340,11 @@ TEST(Parser_SortAndDistinctSerialisation)
 TableView get_sorted_view(TableRef t, std::string query_string)
 {
     Query q = t->query(query_string);
-    return q.find_all();
-    /*
-    query_builder::NoArguments args;
 
-    parser::ParserResult result = realm::parser::parse(query_string);
-    realm::query_builder::apply_predicate(q, result.predicate, args);
-    DescriptorOrdering ordering;
-    realm::query_builder::apply_ordering(ordering, t, result.ordering);
     std::string query_description = q.get_description();
-    std::string ordering_description = ordering.get_description(t);
-    std::string combined = query_description + " " + ordering_description;
+    Query q2 = t->query(query_description);
 
-    // std::cerr << "original: " << query_string << "\tdescribed: " << combined << "\n";
-    Query q2 = t->where();
-
-    parser::ParserResult result2 = realm::parser::parse(combined);
-    realm::query_builder::apply_predicate(q2, result2.predicate, args);
-    DescriptorOrdering ordering2;
-    realm::query_builder::apply_ordering(ordering2, t, result2.ordering);
-
-    TableView tv = q2.find_all();
-    tv.apply_descriptor_ordering(ordering2);
-    return tv;
-    */
+    return q2.find_all();
 }
 
 TEST(Parser_SortAndDistinct)
@@ -2688,6 +2668,7 @@ TEST(Parser_Limit)
 }
 
 
+#if 0
 TEST(Parser_IncludeDescriptor)
 {
     Group g;

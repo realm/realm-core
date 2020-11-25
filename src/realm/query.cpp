@@ -81,6 +81,7 @@ Query::Query(const Query& source)
     : error_code(source.error_code)
     , m_groups(source.m_groups)
     , m_table(source.m_table)
+    , m_ordering(source.m_ordering)
 {
     if (source.m_owned_source_table_view) {
         m_owned_source_table_view = source.m_owned_source_table_view->clone();
@@ -127,6 +128,7 @@ Query& Query::operator=(const Query& source)
         else {
             m_view = m_source_link_list.get();
         }
+        m_ordering = source.m_ordering;
     }
     return *this;
 }
@@ -1387,6 +1389,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 #endif
 
     TableView ret(m_table, *this, start, end, limit);
+    if (m_ordering) {
+        ret.apply_descriptor_ordering(*m_ordering);
+    }
     ret.do_sync();
     return ret;
 }
@@ -1684,15 +1689,28 @@ std::string Query::validate()
 
 std::string Query::get_description(util::serializer::SerialisationState& state) const
 {
+    std::string description;
     if (root_node()) {
         if (m_view) {
             throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
         }
-        return root_node()->describe_expression(state);
+        description = root_node()->describe_expression(state);
     }
-    // An empty query returns all results and one way to indicate this
-    // is to serialise TRUEPREDICATE which is functionally equivilent
-    return "TRUEPREDICATE";
+    else {
+        // An empty query returns all results and one way to indicate this
+        // is to serialise TRUEPREDICATE which is functionally equivilent
+        description = "TRUEPREDICATE";
+    }
+    if (this->m_ordering) {
+        description += " " + m_ordering->get_description(m_table);
+    }
+    return description;
+}
+
+Query& Query::set_ordering(std::unique_ptr<DescriptorOrdering> ordering)
+{
+    m_ordering = std::move(ordering);
+    return *this;
 }
 
 std::string Query::get_description() const
