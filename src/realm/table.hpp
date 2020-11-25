@@ -953,6 +953,8 @@ public:
         return link(backlink_col_key);
     }
 
+    LinkChain& backlink(const std::string&);
+
     Subexpr* column(std::string col_name);
 
     template <class T>

@@ -66,6 +66,7 @@ using namespace realm::query_parser;
   ANY     "any"
   ALL     "all"
   NONE    "none"
+  BACKLINK "@links"
   SIZE    "@size"
   COUNT   "@count"
   MAX     "@max"
@@ -158,6 +159,7 @@ value
 prop
     : comp_type path id         { $$ = drv.m_parse_nodes.create<PropNode>($2, $3, ExpressionComparisonType($1)); }
     | path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
+    | path BACKLINK post_op     { $$ = drv.m_parse_nodes.create<PropNode>($1, "@links", $3); }
     | path id '.' aggr_op '.'  id   { $$ = drv.m_parse_nodes.create<LinkAggrNode>($1, $2, $4, $6); }
     | path id '.' aggr_op       { $$ = drv.m_parse_nodes.create<ListAggrNode>($1, $2, $4); }
 
@@ -239,13 +241,14 @@ stringop
 
 path
     : %empty                    { $$ = drv.m_parse_nodes.create<PathNode>(); }
-    | path path_elem            { $1->path_elems.push_back($2); $$ = $1; }
+    | path path_elem            { $1->add_element($2); $$ = $1; }
 
 path_elem
     : id '.'                    { $$ = $1; }
 
 id  
     : ID                        { $$ = $1; }
+    | BACKLINK '.' ID '.' ID    { $$ = std::string("@links.") + $3 + "." + $5; }
     | BEGINSWITH                { $$ = $1; }
     | ENDSWITH                  { $$ = $1; }
     | CONTAINS                  { $$ = $1; }

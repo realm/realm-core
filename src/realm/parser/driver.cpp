@@ -17,6 +17,16 @@ static bool trace_scanning = false;
 
 namespace {
 
+StringData get_printable_table_name(StringData name)
+{
+    // the "class_" prefix is an implementation detail of the object store that shouldn't be exposed to users
+    static const std::string prefix = "class_";
+    if (name.size() > prefix.size() && strncmp(name.data(), prefix.data(), prefix.size()) == 0) {
+        name = StringData(name.data() + prefix.size(), name.size() - prefix.size());
+    }
+    return name;
+}
+
 const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
 {
     switch (type) {
@@ -417,27 +427,36 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
 
 std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
 {
-    try {
-        std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
-        if (post_op) {
-            return post_op->visit(drv, subexpr.get());
-        }
-        return subexpr;
+    if (identifier == "@links") {
+        // This is a backlink aggregate query
+        auto link_chain = path->visit(drv, comp_type);
+        auto sub = link_chain.get_backlink_count<Int>();
+        return sub.clone();
     }
-    catch (const std::runtime_error& e) {
-        // Is 'identifier' perhaps length operator?
-        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
-            // If 'length' is the operator, the last id in the path must be the name
-            // of a list property
-            auto prop = path->path_elems.back();
-            path->path_elems.pop_back();
-            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
-            if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
-                if (auto length_expr = list->get_element_length())
-                    return length_expr;
+    else {
+        try {
+            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
+
+            if (post_op) {
+                return post_op->visit(drv, subexpr.get());
             }
+            return subexpr;
         }
-        throw e;
+        catch (const std::runtime_error& e) {
+            // Is 'identifier' perhaps length operator?
+            if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+                // If 'length' is the operator, the last id in the path must be the name
+                // of a list property
+                auto prop = path->path_elems.back();
+                path->path_elems.pop_back();
+                std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
+                if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
+                    if (auto length_expr = list->get_element_length())
+                        return length_expr;
+                }
+            }
+            throw e;
+        }
     }
     REALM_UNREACHABLE();
     return {};
@@ -456,9 +475,6 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
     }
     if (auto s = dynamic_cast<Columns<BinaryData>*>(subexpr)) {
         return s->size().clone();
-    }
-    if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
-        return s->count().clone();
     }
     if (subexpr) {
         throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'",
@@ -781,7 +797,12 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (auto path_elem : path_elems) {
-        link_chain.link(path_elem);
+        if (path_elem.find("@links.") == 0) {
+            link_chain.backlink(path_elem);
+        }
+        else {
+            link_chain.link(path_elem);
+        }
     }
     return link_chain;
 }
@@ -909,8 +930,33 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
+LinkChain& LinkChain::backlink(const std::string& path_elem)
+{
+    auto table_column_pair = path_elem.substr(7);
+    auto dot_pos = table_column_pair.find('.');
+    auto table_name = table_column_pair.substr(0, dot_pos);
+    auto column_name = table_column_pair.substr(dot_pos + 1);
+    auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
+    ColKey origin_column;
+    if (origin_table) {
+        origin_column = origin_table->get_column_key(column_name);
+    }
+    if (!origin_column) {
+        throw std::runtime_error(util::format("No property '%1' found in type '%2' which links to type '%3'",
+                                              column_name, get_printable_table_name(table_name),
+                                              get_printable_table_name(m_current_table->get_name())));
+    }
+    return backlink(*origin_table, origin_column);
+}
+
+
 Subexpr* LinkChain::column(std::string col)
 {
+    if (col.find("@links.") == 0) {
+        backlink(col);
+        return new Columns<Link>(ColKey(), m_base_table, m_link_cols, m_comparison_type);
+    }
+
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
         throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
