@@ -2929,4 +2929,26 @@ TEST(TableView_TimestampMaxRemoveRow)
     CHECK_EQUAL(tv.maximum_timestamp(col_date), Timestamp(8, 0));
 }
 
+TEST(TableView_UpdateQuery)
+{
+    Table table;
+    auto col = table.add_column(type_Int, "first");
+    table.create_object().set(col, 1);
+    table.create_object().set(col, 2);
+    table.create_object().set(col, 3);
+    table.create_object().set(col, 3);
+
+    Query q = table.where().equal(col, 1);
+    TableView v = q.find_all();
+    CHECK_EQUAL(1, v.size());
+    CHECK_EQUAL(1, v[0].get<Int>(col));
+
+    // Create new query and update tableview to show this instead
+    Query q2 = table.where().equal(col, 3);
+    v.update_query(q2);
+    CHECK_EQUAL(2, v.size());
+    CHECK_EQUAL(3, v[0].get<Int>(col));
+    CHECK_EQUAL(3, v[1].get<Int>(col));
+}
+
 #endif // TEST_TABLE_VIEW

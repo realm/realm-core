@@ -621,6 +621,7 @@ void SyncSession::create_sync_session()
     // Configure the sync transaction callback.
     auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
         if (auto self = weak_self.lock()) {
+            std::lock_guard l(m_state_mutex);
             if (m_sync_transact_callback) {
                 m_sync_transact_callback(old_version, new_version);
             }
@@ -673,6 +674,7 @@ void SyncSession::create_sync_session()
 
 void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
 {
+    std::lock_guard l(m_state_mutex);
     m_sync_transact_callback = std::move(callback);
 }
 
