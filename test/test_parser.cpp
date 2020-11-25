@@ -3049,6 +3049,7 @@ TEST(Parser_Backlinks)
     // subquery over backlinks
     verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2",
                  1);
+#endif
 
     // backlinks over link
     // people having a favourite item which is also the favourite item of another person
@@ -3058,10 +3059,10 @@ TEST(Parser_Backlinks)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.items == NULL", 1), message);
-    CHECK_EQUAL(message, "Comparing linking object properties to 'null' is not supported");
+    CHECK_EQUAL(message, "Cannot compare linklist with NULL");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Person.fav_item == NULL", 1),
                                 message);
-    CHECK_EQUAL(message, "Comparing linking object properties to 'null' is not supported");
+    CHECK_EQUAL(message, "Cannot compare linklist with NULL");
     CHECK_THROW_ANY(verify_query(test_context, items, "@links.attr. > 0", 1));
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.class_Factory.items > 0", 1), message);
     CHECK_EQUAL(message, "No property 'items' found in type 'Factory' which links to type 'Items'");
@@ -3075,7 +3076,7 @@ TEST(Parser_Backlinks)
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
-
+#if 0
     // disable parsing backlink queries
     mapping.set_allow_backlinks(false);
     {
@@ -3084,6 +3085,7 @@ TEST(Parser_Backlinks)
                     "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
                     "of property 'items' on type 'Person'");
     }
+#endif
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
@@ -3096,20 +3098,20 @@ TEST(Parser_Backlinks)
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
+#if 0
     // double substitution via subquery "$x"->"" and "money"->"account_balance"
     verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
+#endif
     // double indirection is allowed
     verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
     // infinite loops are detected
     CHECK_THROW_ANY_GET_MESSAGE(
         verify_query(test_context, items, "purchasers.@max.banknotes >= 20", 3, mapping_with_prefix), message);
-    CHECK_EQUAL(message, "Substitution loop detected while processing property 'finances' -> 'banknotes' found in "
-                         "type 'Person'. Check property aliases.");
+    CHECK_EQUAL(message,
+                "Substitution loop detected while processing 'finances' -> 'banknotes' found in type 'Person'");
     CHECK_THROW_ANY_GET_MESSAGE(
         verify_query(test_context, items, "purchasers.@max.capital >= 20", 3, mapping_with_prefix), message);
-    CHECK_EQUAL(message, "Substitution loop detected while processing property 'capital' -> 'capital' found in type "
-                         "'Person'. Check property aliases.");
-#endif
+    CHECK_EQUAL(message, "Substitution loop detected while processing 'capital' -> 'capital' found in type 'Person'");
 }
 
 TEST(Parser_BacklinkCount)

@@ -130,6 +130,7 @@ namespace realm {
 namespace query_parser {
 
 NoArguments ParserDriver::s_default_args;
+query_parser::KeyPathMapping ParserDriver::s_default_mapping;
 
 Arguments::~Arguments() {}
 
@@ -435,7 +436,8 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
     }
     else {
         try {
-            std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(identifier)};
+            auto link_chain = path->visit(drv, comp_type);
+            std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
 
             if (post_op) {
                 return post_op->visit(drv, subexpr.get());
@@ -488,12 +490,13 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
 std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
 {
     auto link_chain = path->visit(drv);
-    auto subexpr = std::unique_ptr<Subexpr>(link_chain.column(link));
+    auto subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
         throw std::runtime_error(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
                                               agg_op_type_to_str(aggr_op->type), link));
     }
+    drv->translate(link_chain, prop);
     auto col_key = link_chain.get_current_table()->get_column_key(prop);
 
     std::unique_ptr<Subexpr> sub_column;
@@ -520,7 +523,7 @@ std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
 std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv)
 {
     auto link_chain = path->visit(drv);
-    std::unique_ptr<Subexpr> subexpr{link_chain.column(identifier)};
+    std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
     return aggr_op->visit(drv, subexpr.get());
 }
 
@@ -796,9 +799,10 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
-    for (auto path_elem : path_elems) {
+    for (std::string path_elem : path_elems) {
+        drv->translate(link_chain, path_elem);
         if (path_elem.find("@links.") == 0) {
-            link_chain.backlink(path_elem);
+            drv->backlink(link_chain, path_elem);
         }
         else {
             link_chain.link(path_elem);
@@ -892,6 +896,59 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
     return {std::move(left), std::move(right)};
 }
 
+Subexpr* ParserDriver::column(LinkChain& link_chain, std::string identifier)
+{
+    translate(link_chain, identifier);
+
+    if (identifier.find("@links.") == 0) {
+        backlink(link_chain, identifier);
+        return link_chain.create_subexpr<Link>(ColKey());
+    }
+
+    return link_chain.column(identifier);
+}
+
+void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier)
+{
+    auto table_column_pair = identifier.substr(7);
+    auto dot_pos = table_column_pair.find('.');
+
+    auto table_name = table_column_pair.substr(0, dot_pos);
+    if (table_name.find(m_mapping.get_backlink_class_prefix()) != 0) {
+        table_name = m_mapping.get_backlink_class_prefix() + table_name;
+    }
+    auto column_name = table_column_pair.substr(dot_pos + 1);
+    auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
+    ColKey origin_column;
+    if (origin_table) {
+        origin_column = origin_table->get_column_key(column_name);
+    }
+    if (!origin_column) {
+        auto current_table_name = link_chain.get_current_table()->get_name();
+        throw std::runtime_error(util::format("No property '%1' found in type '%2' which links to type '%3'",
+                                              column_name, get_printable_table_name(table_name),
+                                              get_printable_table_name(current_table_name)));
+    }
+    link_chain.backlink(*origin_table, origin_column);
+}
+
+void ParserDriver::translate(LinkChain& link_chain, std::string& identifier)
+{
+    constexpr size_t max_substitutions_allowed = 50;
+    size_t substitutions = 0;
+    auto table = link_chain.get_current_table();
+    auto tk = table->get_key();
+    while (auto mapped = m_mapping.get_mapping(tk, identifier)) {
+        if (substitutions > max_substitutions_allowed) {
+            throw std::runtime_error(
+                util::format("Substitution loop detected while processing '%1' -> '%2' found in type '%3'",
+                             identifier, *mapped, get_printable_table_name(table->get_name())));
+        }
+        identifier = *mapped;
+        substitutions++;
+    }
+}
+
 int ParserDriver::parse(const std::string& str)
 {
     // std::cout << str << std::endl;
@@ -923,40 +980,15 @@ Query Table::query(const std::string& query_string, const std::vector<Mixed>& ar
 }
 
 Query Table::query(const std::string& query_string, query_parser::Arguments& args,
-                   const query_parser::KeyPathMapping&) const
+                   const query_parser::KeyPathMapping& mapping) const
 {
-    ParserDriver driver(m_own_ref, args);
+    ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
-LinkChain& LinkChain::backlink(const std::string& path_elem)
+Subexpr* LinkChain::column(const std::string& col)
 {
-    auto table_column_pair = path_elem.substr(7);
-    auto dot_pos = table_column_pair.find('.');
-    auto table_name = table_column_pair.substr(0, dot_pos);
-    auto column_name = table_column_pair.substr(dot_pos + 1);
-    auto origin_table = m_base_table->get_parent_group()->get_table(table_name);
-    ColKey origin_column;
-    if (origin_table) {
-        origin_column = origin_table->get_column_key(column_name);
-    }
-    if (!origin_column) {
-        throw std::runtime_error(util::format("No property '%1' found in type '%2' which links to type '%3'",
-                                              column_name, get_printable_table_name(table_name),
-                                              get_printable_table_name(m_current_table->get_name())));
-    }
-    return backlink(*origin_table, origin_column);
-}
-
-
-Subexpr* LinkChain::column(std::string col)
-{
-    if (col.find("@links.") == 0) {
-        backlink(col);
-        return new Columns<Link>(ColKey(), m_base_table, m_link_cols, m_comparison_type);
-    }
-
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
         throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
@@ -965,30 +997,30 @@ Subexpr* LinkChain::column(std::string col)
     if (col_key.is_list()) {
         switch (col_key.get_type()) {
             case col_type_Int:
-                return new Columns<Lst<Int>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Int>>(col_key);
             case col_type_Bool:
-                return new Columns<Lst<Bool>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Bool>>(col_key);
             case col_type_String:
-                return new Columns<Lst<String>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<String>>(col_key);
             case col_type_Binary:
-                return new Columns<Lst<Binary>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Binary>>(col_key);
             case col_type_Float:
-                return new Columns<Lst<Float>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Float>>(col_key);
             case col_type_Double:
-                return new Columns<Lst<Double>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Double>>(col_key);
             case col_type_Timestamp:
-                return new Columns<Lst<Timestamp>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Timestamp>>(col_key);
             case col_type_Decimal:
-                return new Columns<Lst<Decimal>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Decimal>>(col_key);
             case col_type_UUID:
-                return new Columns<Lst<UUID>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<UUID>>(col_key);
             case col_type_ObjectId:
-                return new Columns<Lst<ObjectId>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<ObjectId>>(col_key);
             case col_type_Mixed:
-                return new Columns<Lst<Mixed>>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Lst<Mixed>>(col_key);
             case col_type_LinkList:
                 add(col_key);
-                return new Columns<Link>(col_key, m_base_table, m_link_cols, m_comparison_type);
+                return create_subexpr<Link>(col_key);
             default:
                 break;
         }
@@ -996,30 +1028,30 @@ Subexpr* LinkChain::column(std::string col)
     else {
         switch (col_key.get_type()) {
             case col_type_Int:
-                return new Columns<Int>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Int>(col_key);
             case col_type_Bool:
-                return new Columns<Bool>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Bool>(col_key);
             case col_type_String:
-                return new Columns<String>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<String>(col_key);
             case col_type_Binary:
-                return new Columns<Binary>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Binary>(col_key);
             case col_type_Float:
-                return new Columns<Float>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Float>(col_key);
             case col_type_Double:
-                return new Columns<Double>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Double>(col_key);
             case col_type_Timestamp:
-                return new Columns<Timestamp>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Timestamp>(col_key);
             case col_type_Decimal:
-                return new Columns<Decimal128>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Decimal>(col_key);
             case col_type_UUID:
-                return new Columns<UUID>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<UUID>(col_key);
             case col_type_ObjectId:
-                return new Columns<ObjectId>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<ObjectId>(col_key);
             case col_type_Mixed:
-                return new Columns<Mixed>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Mixed>(col_key);
             case col_type_Link:
                 add(col_key);
-                return new Columns<Link>(col_key, m_base_table, m_link_cols);
+                return create_subexpr<Link>(col_key);
             default:
                 break;
         }
