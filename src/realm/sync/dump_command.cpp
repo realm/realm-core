@@ -529,9 +529,6 @@ int main(int argc, char* argv[])
                             case type_LinkList:
                                 formatter.format_column<type_LinkList>(*table, col_ndx, col);
                                 break;
-                            case type_OldDateTime:
-                            case type_OldTable:
-                                break;
                         }
                     }
                     columns.push_back(std::move(col));

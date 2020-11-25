@@ -34,9 +34,9 @@ static const int sorting_rank[19] = {
     1, // type_String = 2,
     -1,
     1,  // type_Binary = 4,
-    -1, // type_OldTable = 5,
+    -1, // s_deprecated_type_table = 5,
     -1, // type_Mixed = 6,
-    -1, // type_OldDateTime = 7,
+    -1, // s_deprecated_type_datetime = 7,
     2,  // type_Timestamp = 8,
     0,  // type_Float = 9,
     0,  // type_Double = 10,
@@ -417,8 +417,6 @@ size_t Mixed::hash() const
             hash = murmur2_or_cityhash(unsigned_data, 12);
             break;
         }
-        case type_OldDateTime:
-        case type_OldTable:
         case type_Mixed:
         case type_Link:
         case type_LinkList:
@@ -475,8 +473,6 @@ std::ostream& operator<<(std::ostream& out, const Mixed& m)
             case type_UUID:
                 out << m.get<UUID>();
                 break;
-            case type_OldDateTime:
-            case type_OldTable:
             case type_Mixed:
             case type_LinkList:
                 REALM_ASSERT(false);

@@ -103,12 +103,9 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
         case type_LinkList:
             return get_linklist_ptr(col_key);
         case type_Link:
-        case type_OldDateTime:
-        case type_OldTable:
-            REALM_ASSERT(false);
             break;
     }
-    return {};
+    REALM_TERMINATE("Unsupported column type");
 }
 
 /****************************** Lst aggregates *******************************/

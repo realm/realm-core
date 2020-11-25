@@ -48,9 +48,7 @@ enum DataType {
     type_Bool = 1,
     type_String = 2,
     type_Binary = 4,
-    type_OldTable = 5,
     type_Mixed = 6,
-    type_OldDateTime = 7,
     type_Timestamp = 8,
     type_Float = 9,
     type_Double = 10,
@@ -61,6 +59,9 @@ enum DataType {
     type_TypedLink = 16,
     type_UUID = 17
 };
+
+static constexpr int s_deprecated_type_table = 5;
+static constexpr int s_deprecated_type_datetime = 7;
 
 const char* get_data_type_name(DataType type) noexcept;
 

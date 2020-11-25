@@ -98,14 +98,9 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
             return std::make_unique<LnkSet>(*this, col_key);
         }
         case type_LinkList:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
-        case type_OldTable:
-            REALM_ASSERT(false);
             break;
     }
-    return {};
+    REALM_TERMINATE("Unsupported column type.");
 }
 
 void SetBase::insert_repl(Replication* repl, size_t index, Mixed value) const

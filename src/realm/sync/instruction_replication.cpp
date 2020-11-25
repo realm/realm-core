@@ -87,10 +87,6 @@ Instruction::Payload SyncReplication::as_payload(Mixed value)
         }
         case type_Mixed:
             [[fallthrough]];
-        case type_OldTable:
-            [[fallthrough]];
-        case type_OldDateTime:
-            [[fallthrough]];
         case type_LinkList: {
             REALM_TERMINATE("Invalid payload type");
             break;
@@ -184,11 +180,8 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
             return Type::UUID;
         case type_Mixed:
             return Type::Null;
-        case type_OldTable:
-            [[fallthrough]];
-        case type_OldDateTime:
-            unsupported_instruction();
     }
+    unsupported_instruction();
     return Type::Int; // Make compiler happy
 }
 

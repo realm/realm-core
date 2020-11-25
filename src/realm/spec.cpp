@@ -23,9 +23,7 @@
 #include <realm/group.hpp>
 using namespace realm;
 
-Spec::~Spec() noexcept
-{
-}
+Spec::~Spec() noexcept {}
 
 void Spec::detach() noexcept
 {
@@ -202,7 +200,7 @@ bool Spec::convert_column_attributes()
         ColumnType type = ColumnType(m_types.get(column_ndx));
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
         switch (int(type)) {
-            case col_type_OldTable: {
+            case s_deprecated_type_table: {
                 Array subspecs(m_top.get_alloc());
                 subspecs.set_parent(&m_top, 3);
                 subspecs.init_from_parent();
@@ -307,7 +305,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         m_num_public_columns++;
     }
 
-    m_types.insert(column_ndx, type);     // Throws
+    m_types.insert(column_ndx, type); // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
     m_keys.insert(column_ndx, col_key.value);
@@ -351,8 +349,8 @@ void Spec::erase_column(size_t column_ndx)
     }
 
     // Delete the entries common for all columns
-    m_types.erase(column_ndx);     // Throws
-    m_attr.erase(column_ndx);      // Throws
+    m_types.erase(column_ndx); // Throws
+    m_attr.erase(column_ndx);  // Throws
     m_keys.erase(column_ndx);
 
     update_internals();
@@ -368,8 +366,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == col_type_Link ||
                  get_column_type(column_ndx) == col_type_LinkList ||
-                 get_column_type(column_ndx) == col_type_BackLink ||
-                 get_column_type(column_ndx) == col_type_OldTable);
+                 get_column_type(column_ndx) == col_type_BackLink);
 
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
@@ -517,9 +514,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
             case col_type_Bool:
             case col_type_Binary:
             case col_type_String:
-            case col_type_OldTable:
             case col_type_Mixed:
-            case col_type_OldDateTime:
             case col_type_Timestamp:
             case col_type_Float:
             case col_type_Double:

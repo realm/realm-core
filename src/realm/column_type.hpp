@@ -30,9 +30,7 @@ enum ColumnType {
     col_type_Bool = 1,
     col_type_String = 2,
     col_type_Binary = 4,
-    col_type_OldTable = 5,
     col_type_Mixed = 6,
-    col_type_OldDateTime = 7,
     col_type_Timestamp = 8,
     col_type_Float = 9,
     col_type_Double = 10,
@@ -44,6 +42,9 @@ enum ColumnType {
     col_type_TypedLink = 16,
     col_type_UUID = 17
 };
+
+static constexpr int s_deprecated_col_type_table = 5;
+static constexpr int s_deprecated_col_type_datetime = 7;
 
 
 // Column attributes can be combined using bitwise or.
