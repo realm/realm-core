@@ -320,15 +320,43 @@ Mixed Results::get_any(size_t ndx)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
-    if (m_mode == Mode::List) {
-        evaluate_sort_and_distinct_on_list();
-        if (m_list_indices) {
-            if (ndx < m_list_indices->size())
-                return m_collection->get_any((*m_list_indices)[ndx]);
-        }
-        else {
-            if (ndx < m_collection->size())
-                return m_collection->get_any(ndx);
+    switch (m_mode) {
+        case Mode::Empty:
+            break;
+        case Mode::List:
+            evaluate_sort_and_distinct_on_list();
+            if (m_list_indices) {
+                if (ndx < m_list_indices->size())
+                    return m_collection->get_any((*m_list_indices)[ndx]);
+            }
+            else {
+                if (ndx < m_collection->size())
+                    return m_collection->get_any(ndx);
+            }
+            break;
+        case Mode::Table:
+            if (ndx < m_table->size())
+                return m_table_iterator.get(*m_table, ndx);
+            break;
+        case Mode::LinkList:
+            if (update_linklist()) {
+                if (ndx < m_link_list->size()) {
+                    auto obj_key = m_link_list->get(ndx);
+                    auto table_key = m_link_list->get_target_table()->get_key();
+                    return Mixed(ObjLink(table_key, obj_key));
+                }
+                break;
+            }
+            REALM_FALLTHROUGH;
+        case Mode::Query:
+        case Mode::TableView: {
+            do_evaluate_query_if_needed();
+            if (ndx >= m_table_view.size())
+                break;
+            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(ndx))
+                return {};
+            auto obj_key = m_table_view.get_key(ndx);
+            return Mixed(ObjLink(m_table->get_key(), obj_key));
         }
     }
     return {};
