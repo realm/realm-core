@@ -4,6 +4,7 @@
 #include <map>
 #include "realm/parser/generated/query_bison.hpp"
 #include "realm/parser/query_parser.hpp"
+#include "realm/parser/keypath_mapping.hpp"
 
 // Give Flex the prototype of yylex we want ...
 #define YY_DECL yy::parser::symbol_type yylex(realm::query_parser::ParserDriver&)
@@ -267,6 +268,27 @@ public:
         , post_op(po_node)
     {
     }
+    PropNode(PathNode* node, std::string id)
+        : path(node)
+        , identifier(id)
+        , comp_type(ExpressionComparisonType::Any)
+    {
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+};
+
+class SubqueryNode : public PropertyNode {
+public:
+    PropNode* prop = nullptr;
+    std::string variable_name;
+    OrNode* subquery = nullptr;
+
+    SubqueryNode(PropNode* node, std::string var_name, OrNode* query)
+        : prop(node)
+        , variable_name(var_name)
+        , subquery(query)
+    {
+    }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;
 };
 
@@ -369,7 +391,7 @@ public:
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
-    const query_parser::KeyPathMapping& m_mapping;
+    query_parser::KeyPathMapping m_mapping;
     ParserNodeStore m_parse_nodes;
 
     // Run the parser on file F.  Return 0 on success.

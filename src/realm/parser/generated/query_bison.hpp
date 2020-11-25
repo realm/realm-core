@@ -62,7 +62,9 @@
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
-  }  
+    class PropNode;
+    class SubqueryNode;
+  }
   using namespace realm::query_parser;
 
 
@@ -442,23 +444,29 @@ namespace yy {
       // post_op
       char dummy9[sizeof (PostOpNode*)];
 
+      // simple_prop
+      char dummy10[sizeof (PropNode*)];
+
       // prop
-      char dummy10[sizeof (PropertyNode*)];
+      char dummy11[sizeof (PropertyNode*)];
+
+      // subquery
+      char dummy12[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy11[sizeof (TrueOrFalseNode*)];
+      char dummy13[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy12[sizeof (ValueNode*)];
+      char dummy14[sizeof (ValueNode*)];
 
       // direction
-      char dummy13[sizeof (bool)];
+      char dummy15[sizeof (bool)];
 
       // comp_type
       // equality
       // relational
       // stringop
-      char dummy14[sizeof (int)];
+      char dummy16[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -478,7 +486,7 @@ namespace yy {
       // "like"
       // path_elem
       // id
-      char dummy15[sizeof (std::string)];
+      char dummy17[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -531,45 +539,46 @@ namespace yy {
     TOK_LIMIT = 262,               // "limit"
     TOK_ASCENDING = 263,           // "ascending"
     TOK_DESCENDING = 264,          // "descending"
-    TOK_TRUE = 265,                // "true"
-    TOK_FALSE = 266,               // "false"
-    TOK_NULL_VAL = 267,            // "null"
-    TOK_EQUAL = 268,               // "=="
-    TOK_NOT_EQUAL = 269,           // "!="
-    TOK_LESS = 270,                // "<"
-    TOK_GREATER = 271,             // ">"
-    TOK_GREATER_EQUAL = 272,       // ">="
-    TOK_LESS_EQUAL = 273,          // "<="
-    TOK_CASE = 274,                // "[c]"
-    TOK_ANY = 275,                 // "any"
-    TOK_ALL = 276,                 // "all"
-    TOK_NONE = 277,                // "none"
-    TOK_BACKLINK = 278,            // "@links"
-    TOK_SIZE = 279,                // "@size"
-    TOK_COUNT = 280,               // "@count"
-    TOK_MAX = 281,                 // "@max"
-    TOK_MIN = 282,                 // "@min"
-    TOK_SUM = 283,                 // "@sun"
-    TOK_AVG = 284,                 // "@average"
-    TOK_AND = 285,                 // "&&"
-    TOK_OR = 286,                  // "||"
-    TOK_NOT = 287,                 // "!"
-    TOK_ID = 288,                  // "identifier"
-    TOK_STRING = 289,              // "string"
-    TOK_BASE64 = 290,              // "base64"
-    TOK_INFINITY = 291,            // "infinity"
-    TOK_NAN = 292,                 // "NaN"
-    TOK_NATURAL0 = 293,            // "natural0"
-    TOK_NUMBER = 294,              // "number"
-    TOK_FLOAT = 295,               // "float"
-    TOK_TIMESTAMP = 296,           // "date"
-    TOK_UUID = 297,                // "UUID"
-    TOK_OID = 298,                 // "ObjectId"
-    TOK_ARG = 299,                 // "argument"
-    TOK_BEGINSWITH = 300,          // "beginswith"
-    TOK_ENDSWITH = 301,            // "endswith"
-    TOK_CONTAINS = 302,            // "contains"
-    TOK_LIKE = 303                 // "like"
+    TOK_SUBQUERY = 265,            // "subquery"
+    TOK_TRUE = 266,                // "true"
+    TOK_FALSE = 267,               // "false"
+    TOK_NULL_VAL = 268,            // "null"
+    TOK_EQUAL = 269,               // "=="
+    TOK_NOT_EQUAL = 270,           // "!="
+    TOK_LESS = 271,                // "<"
+    TOK_GREATER = 272,             // ">"
+    TOK_GREATER_EQUAL = 273,       // ">="
+    TOK_LESS_EQUAL = 274,          // "<="
+    TOK_CASE = 275,                // "[c]"
+    TOK_ANY = 276,                 // "any"
+    TOK_ALL = 277,                 // "all"
+    TOK_NONE = 278,                // "none"
+    TOK_BACKLINK = 279,            // "@links"
+    TOK_SIZE = 280,                // "@size"
+    TOK_COUNT = 281,               // "@count"
+    TOK_MAX = 282,                 // "@max"
+    TOK_MIN = 283,                 // "@min"
+    TOK_SUM = 284,                 // "@sun"
+    TOK_AVG = 285,                 // "@average"
+    TOK_AND = 286,                 // "&&"
+    TOK_OR = 287,                  // "||"
+    TOK_NOT = 288,                 // "!"
+    TOK_ID = 289,                  // "identifier"
+    TOK_STRING = 290,              // "string"
+    TOK_BASE64 = 291,              // "base64"
+    TOK_INFINITY = 292,            // "infinity"
+    TOK_NAN = 293,                 // "NaN"
+    TOK_NATURAL0 = 294,            // "natural0"
+    TOK_NUMBER = 295,              // "number"
+    TOK_FLOAT = 296,               // "float"
+    TOK_TIMESTAMP = 297,           // "date"
+    TOK_UUID = 298,                // "UUID"
+    TOK_OID = 299,                 // "ObjectId"
+    TOK_ARG = 300,                 // "argument"
+    TOK_BEGINSWITH = 301,          // "beginswith"
+    TOK_ENDSWITH = 302,            // "endswith"
+    TOK_CONTAINS = 303,            // "contains"
+    TOK_LIKE = 304                 // "like"
       };
       /// Backward compatibility alias (Bison 3.6).
       typedef token_kind_type yytokentype;
@@ -586,7 +595,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 53, ///< Number of tokens.
+        YYNTOKENS = 54, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -598,74 +607,77 @@ namespace yy {
         SYM_LIMIT = 7,                           // "limit"
         SYM_ASCENDING = 8,                       // "ascending"
         SYM_DESCENDING = 9,                      // "descending"
-        SYM_TRUE = 10,                           // "true"
-        SYM_FALSE = 11,                          // "false"
-        SYM_NULL_VAL = 12,                       // "null"
-        SYM_EQUAL = 13,                          // "=="
-        SYM_NOT_EQUAL = 14,                      // "!="
-        SYM_LESS = 15,                           // "<"
-        SYM_GREATER = 16,                        // ">"
-        SYM_GREATER_EQUAL = 17,                  // ">="
-        SYM_LESS_EQUAL = 18,                     // "<="
-        SYM_CASE = 19,                           // "[c]"
-        SYM_ANY = 20,                            // "any"
-        SYM_ALL = 21,                            // "all"
-        SYM_NONE = 22,                           // "none"
-        SYM_BACKLINK = 23,                       // "@links"
-        SYM_SIZE = 24,                           // "@size"
-        SYM_COUNT = 25,                          // "@count"
-        SYM_MAX = 26,                            // "@max"
-        SYM_MIN = 27,                            // "@min"
-        SYM_SUM = 28,                            // "@sun"
-        SYM_AVG = 29,                            // "@average"
-        SYM_AND = 30,                            // "&&"
-        SYM_OR = 31,                             // "||"
-        SYM_NOT = 32,                            // "!"
-        SYM_ID = 33,                             // "identifier"
-        SYM_STRING = 34,                         // "string"
-        SYM_BASE64 = 35,                         // "base64"
-        SYM_INFINITY = 36,                       // "infinity"
-        SYM_NAN = 37,                            // "NaN"
-        SYM_NATURAL0 = 38,                       // "natural0"
-        SYM_NUMBER = 39,                         // "number"
-        SYM_FLOAT = 40,                          // "float"
-        SYM_TIMESTAMP = 41,                      // "date"
-        SYM_UUID = 42,                           // "UUID"
-        SYM_OID = 43,                            // "ObjectId"
-        SYM_ARG = 44,                            // "argument"
-        SYM_BEGINSWITH = 45,                     // "beginswith"
-        SYM_ENDSWITH = 46,                       // "endswith"
-        SYM_CONTAINS = 47,                       // "contains"
-        SYM_LIKE = 48,                           // "like"
-        SYM_49_ = 49,                            // '('
-        SYM_50_ = 50,                            // ')'
-        SYM_51_ = 51,                            // '.'
-        SYM_52_ = 52,                            // ','
-        SYM_YYACCEPT = 53,                       // $accept
-        SYM_query = 54,                          // query
-        SYM_pred = 55,                           // pred
-        SYM_and_pred = 56,                       // and_pred
-        SYM_atom_pred = 57,                      // atom_pred
-        SYM_value = 58,                          // value
-        SYM_prop = 59,                           // prop
-        SYM_pred_suffix = 60,                    // pred_suffix
-        SYM_distinct = 61,                       // distinct
-        SYM_distinct_param = 62,                 // distinct_param
-        SYM_sort = 63,                           // sort
-        SYM_sort_param = 64,                     // sort_param
-        SYM_limit = 65,                          // limit
-        SYM_direction = 66,                      // direction
-        SYM_constant = 67,                       // constant
-        SYM_boolexpr = 68,                       // boolexpr
-        SYM_comp_type = 69,                      // comp_type
-        SYM_post_op = 70,                        // post_op
-        SYM_aggr_op = 71,                        // aggr_op
-        SYM_equality = 72,                       // equality
-        SYM_relational = 73,                     // relational
-        SYM_stringop = 74,                       // stringop
-        SYM_path = 75,                           // path
-        SYM_path_elem = 76,                      // path_elem
-        SYM_id = 77                              // id
+        SYM_SUBQUERY = 10,                       // "subquery"
+        SYM_TRUE = 11,                           // "true"
+        SYM_FALSE = 12,                          // "false"
+        SYM_NULL_VAL = 13,                       // "null"
+        SYM_EQUAL = 14,                          // "=="
+        SYM_NOT_EQUAL = 15,                      // "!="
+        SYM_LESS = 16,                           // "<"
+        SYM_GREATER = 17,                        // ">"
+        SYM_GREATER_EQUAL = 18,                  // ">="
+        SYM_LESS_EQUAL = 19,                     // "<="
+        SYM_CASE = 20,                           // "[c]"
+        SYM_ANY = 21,                            // "any"
+        SYM_ALL = 22,                            // "all"
+        SYM_NONE = 23,                           // "none"
+        SYM_BACKLINK = 24,                       // "@links"
+        SYM_SIZE = 25,                           // "@size"
+        SYM_COUNT = 26,                          // "@count"
+        SYM_MAX = 27,                            // "@max"
+        SYM_MIN = 28,                            // "@min"
+        SYM_SUM = 29,                            // "@sun"
+        SYM_AVG = 30,                            // "@average"
+        SYM_AND = 31,                            // "&&"
+        SYM_OR = 32,                             // "||"
+        SYM_NOT = 33,                            // "!"
+        SYM_ID = 34,                             // "identifier"
+        SYM_STRING = 35,                         // "string"
+        SYM_BASE64 = 36,                         // "base64"
+        SYM_INFINITY = 37,                       // "infinity"
+        SYM_NAN = 38,                            // "NaN"
+        SYM_NATURAL0 = 39,                       // "natural0"
+        SYM_NUMBER = 40,                         // "number"
+        SYM_FLOAT = 41,                          // "float"
+        SYM_TIMESTAMP = 42,                      // "date"
+        SYM_UUID = 43,                           // "UUID"
+        SYM_OID = 44,                            // "ObjectId"
+        SYM_ARG = 45,                            // "argument"
+        SYM_BEGINSWITH = 46,                     // "beginswith"
+        SYM_ENDSWITH = 47,                       // "endswith"
+        SYM_CONTAINS = 48,                       // "contains"
+        SYM_LIKE = 49,                           // "like"
+        SYM_50_ = 50,                            // '('
+        SYM_51_ = 51,                            // ')'
+        SYM_52_ = 52,                            // '.'
+        SYM_53_ = 53,                            // ','
+        SYM_YYACCEPT = 54,                       // $accept
+        SYM_query = 55,                          // query
+        SYM_pred = 56,                           // pred
+        SYM_and_pred = 57,                       // and_pred
+        SYM_atom_pred = 58,                      // atom_pred
+        SYM_value = 59,                          // value
+        SYM_prop = 60,                           // prop
+        SYM_simple_prop = 61,                    // simple_prop
+        SYM_subquery = 62,                       // subquery
+        SYM_pred_suffix = 63,                    // pred_suffix
+        SYM_distinct = 64,                       // distinct
+        SYM_distinct_param = 65,                 // distinct_param
+        SYM_sort = 66,                           // sort
+        SYM_sort_param = 67,                     // sort_param
+        SYM_limit = 68,                          // limit
+        SYM_direction = 69,                      // direction
+        SYM_constant = 70,                       // constant
+        SYM_boolexpr = 71,                       // boolexpr
+        SYM_comp_type = 72,                      // comp_type
+        SYM_post_op = 73,                        // post_op
+        SYM_aggr_op = 74,                        // aggr_op
+        SYM_equality = 75,                       // equality
+        SYM_relational = 76,                     // relational
+        SYM_stringop = 77,                       // stringop
+        SYM_path = 78,                           // path
+        SYM_path_elem = 79,                      // path_elem
+        SYM_id = 80                              // id
       };
     };
 
@@ -740,8 +752,16 @@ namespace yy {
         value.move< PostOpNode* > (std::move (that.value));
         break;
 
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.move< PropNode* > (std::move (that.value));
+        break;
+
       case symbol_kind::SYM_prop: // prop
         value.move< PropertyNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.move< SubqueryNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr
@@ -914,12 +934,36 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, PropNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const PropNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, PropertyNode*&& v)
         : Base (t)
         , value (std::move (v))
       {}
 #else
       basic_symbol (typename Base::kind_type t, const PropertyNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, SubqueryNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const SubqueryNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1063,8 +1107,16 @@ switch (yykind)
         value.template destroy< PostOpNode* > ();
         break;
 
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.template destroy< PropNode* > ();
+        break;
+
       case symbol_kind::SYM_prop: // prop
         value.template destroy< PropertyNode* > ();
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.template destroy< SubqueryNode* > ();
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr
@@ -1409,6 +1461,21 @@ switch (yykind)
       make_DESCENDING ()
       {
         return symbol_type (token::TOK_DESCENDING);
+      }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+      static
+      symbol_type
+      make_SUBQUERY ()
+      {
+        return symbol_type (token::TOK_SUBQUERY);
+      }
+#else
+      static
+      symbol_type
+      make_SUBQUERY ()
+      {
+        return symbol_type (token::TOK_SUBQUERY);
       }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2024,7 +2091,7 @@ switch (yykind)
 
 
     /// Stored state numbers (used for stacks).
-    typedef signed char state_type;
+    typedef unsigned char state_type;
 
     /// The arguments of the error message.
     int yy_syntax_error_arguments_ (const context& yyctx,
@@ -2080,7 +2147,7 @@ switch (yykind)
     // YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
     // positive, shift that token.  If negative, reduce the rule whose
     // number is the opposite.  If YYTABLE_NINF, syntax error.
-    static const signed char yytable_[];
+    static const unsigned char yytable_[];
 
     static const signed char yycheck_[];
 
@@ -2097,7 +2164,7 @@ switch (yykind)
 
 #if YYDEBUG
     // YYRLINE[YYN] -- Source line where rule number YYN was defined.
-    static const unsigned char yyrline_[];
+    static const short yyrline_[];
     /// Report on the debug stream that the rule \a r is going to be reduced.
     virtual void yy_reduce_print_ (int r) const;
     /// Print the state stack on the debug stream.
@@ -2324,9 +2391,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 206,     ///< Last index in yytable_.
-      yynnts_ = 25,  ///< Number of nonterminal symbols.
-      yyfinal_ = 34 ///< Termination state number.
+      yylast_ = 222,     ///< Last index in yytable_.
+      yynnts_ = 27,  ///< Number of nonterminal symbols.
+      yyfinal_ = 37 ///< Termination state number.
     };
 
 
@@ -2349,7 +2416,7 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      49,    50,     2,     2,    52,     2,    51,     2,     2,     2,
+      50,    51,     2,     2,    53,     2,    52,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2375,10 +2442,10 @@ switch (yykind)
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
       35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
-      45,    46,    47,    48
+      45,    46,    47,    48,    49
     };
     // Last valid token kind.
-    const int code_max = 303;
+    const int code_max = 304;
 
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
@@ -2436,8 +2503,16 @@ switch (yykind)
         value.copy< PostOpNode* > (YY_MOVE (that.value));
         break;
 
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.copy< PropNode* > (YY_MOVE (that.value));
+        break;
+
       case symbol_kind::SYM_prop: // prop
         value.copy< PropertyNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.copy< SubqueryNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr
@@ -2549,8 +2624,16 @@ switch (yykind)
         value.move< PostOpNode* > (YY_MOVE (s.value));
         break;
 
+      case symbol_kind::SYM_simple_prop: // simple_prop
+        value.move< PropNode* > (YY_MOVE (s.value));
+        break;
+
       case symbol_kind::SYM_prop: // prop
         value.move< PropertyNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_subquery: // subquery
+        value.move< SubqueryNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_boolexpr: // boolexpr

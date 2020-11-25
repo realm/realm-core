@@ -917,17 +917,17 @@ enum class ExpressionComparisonType : unsigned char {
 class LinkChain {
 public:
     LinkChain(ConstTableRef t = {}, ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_current_table(t ? t.unchecked_ptr() : nullptr)
+        : m_current_table(t)
         , m_base_table(t)
         , m_comparison_type(type)
     {
     }
-    const Table* get_base_table()
+    ConstTableRef get_base_table()
     {
-        return m_base_table.unchecked_ptr();
+        return m_base_table;
     }
 
-    const Table* get_current_table() const
+    ConstTableRef get_current_table() const
     {
         return m_current_table;
     }
@@ -955,6 +955,7 @@ public:
     }
 
     Subexpr* column(const std::string&);
+    Subexpr* subquery(Query subquery);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)
@@ -1016,7 +1017,7 @@ private:
     friend class query_parser::ParserDriver;
 
     std::vector<ColKey> m_link_cols;
-    const Table* m_current_table;
+    ConstTableRef m_current_table;
     ConstTableRef m_base_table;
     ExpressionComparisonType m_comparison_type;
 
@@ -1026,7 +1027,7 @@ private:
         REALM_ASSERT(m_current_table->valid_column(ck));
         ColumnType type = ck.get_type();
         if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
-            m_current_table = m_current_table->get_opposite_table(ck).unchecked_ptr();
+            m_current_table = m_current_table->get_opposite_table(ck);
         }
         else {
             // Only last column in link chain is allowed to be non-link

@@ -227,13 +227,12 @@ static std::vector<std::string> valid_queries = {
     "a=b && c=d || e=f INCLUDE(g)",
     "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) INCLUDE(links1, links2)",
     "a=b INCLUDE(links1, links2) LIMIT(5) SORT(age ASC) DISTINCT(name)",
-
+     */
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
     "SUBQUERY(items, $x, $x.allergens.@min.population_affected < 0.10).@count > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count == SUBQUERY(items, $x, $x.price < 10).@count",
-     */
 
     // backlinks
     "p.@links.class.prop.@count > 2",
@@ -1997,11 +1996,9 @@ TEST(Parser_list_of_primitive_ints)
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers.@min.no_property == 0", 0), message);
     CHECK_EQUAL(message, "Operation '.@min' cannot apply to property 'integers' because it is not a list");
-#if 0 // FIXME: enable when subqueries are supported
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(integers, $x, $x == 1).@count > 0", 0),
                                 message);
     CHECK_EQUAL(message, "A subquery can not operate on a list of primitive values (property 'integers')");
-#endif
     // list vs list is not implemented yet
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == integers", 0), message);
     CHECK_EQUAL(message,
@@ -3045,11 +3042,9 @@ TEST(Parser_Backlinks)
     // items bought where the sum of the account balance of purchasers is more than $20
     verify_query(test_context, items, "@links.class_Person.items.@sum.account_balance > 20", 3);
     verify_query(test_context, items, "@links.class_Person.items.@avg.account_balance > 20", 1);
-#if 0
     // subquery over backlinks
     verify_query(test_context, items, "SUBQUERY(@links.class_Person.items, $x, $x.account_balance >= 20).@count > 2",
                  1);
-#endif
 
     // backlinks over link
     // people having a favourite item which is also the favourite item of another person
@@ -3098,10 +3093,8 @@ TEST(Parser_Backlinks)
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping_with_prefix);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping_with_prefix);
-#if 0
     // double substitution via subquery "$x"->"" and "money"->"account_balance"
     verify_query(test_context, items, "SUBQUERY(purchasers, $x, $x.money >= 20).@count > 2", 1, mapping_with_prefix);
-#endif
     // double indirection is allowed
     verify_query(test_context, items, "purchasers.@max.funds >= 20", 3, mapping_with_prefix);
     // infinite loops are detected
@@ -3240,7 +3233,6 @@ TEST(Parser_BacklinkCount)
 }
 
 
-#if 0
 TEST(Parser_SubqueryVariableNames)
 {
     Group g;
@@ -3263,7 +3255,6 @@ TEST(Parser_SubqueryVariableNames)
 
     CHECK_EQUAL(unique_variable, "$xb");
 }
-
 
 TEST(Parser_Subquery)
 {
@@ -3444,12 +3435,13 @@ TEST(Parser_Subquery)
     // target property must be a list
     CHECK_THROW_ANY_GET_MESSAGE(
         verify_query(test_context, t, "SUBQUERY(account_balance, $x, TRUEPREDICATE).@count > 0", 3), message);
-    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'account_balance' is type 'Double'");
+    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'account_balance' is type 'double'");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SUBQUERY(fav_item, $x, TRUEPREDICATE).@count > 0", 3),
                                 message);
-    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'Link'");
+    CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'link'");
 }
 
+#if 0
 
 TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
 {

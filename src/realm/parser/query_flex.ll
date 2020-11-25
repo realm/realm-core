@@ -53,6 +53,7 @@ blank   [ \t\r]
 (?i:limit)                  return yy::parser::make_LIMIT();
 (?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING();
 (?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING();
+(?i:subquery)               return yy::parser::make_SUBQUERY();
 "@size"                     return yy::parser::make_SIZE    ();
 "@count"                    return yy::parser::make_COUNT    ();
 "@max"                      return yy::parser::make_MAX    ();

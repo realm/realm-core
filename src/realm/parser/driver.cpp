@@ -464,6 +464,47 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
     return {};
 }
 
+std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
+{
+    if (variable_name.size() < 2 || variable_name[0] != '$') {
+        throw std::runtime_error(util::format("The subquery variable '%1' is invalid. The variable must start with "
+                                              "'$' and cannot be empty; for example '$x'.",
+                                              variable_name));
+    }
+    LinkChain lc = prop->path->visit(drv, prop->comp_type);
+    drv->translate(lc, prop->identifier);
+
+    if (prop->identifier.find("@links") == 0) {
+        drv->backlink(lc, prop->identifier);
+    }
+    else {
+        ColKey col_key = lc.get_current_table()->get_column_key(prop->identifier);
+        if (col_key.is_list() && col_key.get_type() != col_type_LinkList) {
+            throw std::runtime_error(util::format(
+                "A subquery can not operate on a list of primitive values (property '%1')", prop->identifier));
+        }
+        if (col_key.get_type() != col_type_LinkList) {
+            throw std::runtime_error(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
+                                                  prop->identifier,
+                                                  realm::get_data_type_name(DataType(col_key.get_type()))));
+        }
+        lc.link(prop->identifier);
+    }
+    TableRef previous_table = drv->m_base_table;
+    drv->m_base_table = lc.get_current_table().cast_away_const();
+    bool did_add = drv->m_mapping.add_mapping(drv->m_base_table, variable_name, "");
+    if (!did_add) {
+        throw std::runtime_error(util::format("Unable to create a subquery expression with variable '%1' since an "
+                                              "identical variable already exists in this context",
+                                              variable_name));
+    }
+    Query sub = subquery->visit(drv);
+    drv->m_mapping.remove_mapping(drv->m_base_table, variable_name);
+    drv->m_base_table = previous_table;
+    lc.get_current_table();
+    return std::unique_ptr<Subexpr>(lc.subquery(sub));
+}
+
 std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
 {
     if (auto s = dynamic_cast<Columns<Link>*>(subexpr)) {
@@ -804,6 +845,9 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
         }
+        else if (path_elem.empty()) {
+            continue; // this element has been removed, this happens in subqueries
+        }
         else {
             link_chain.link(path_elem);
         }
@@ -1059,4 +1103,19 @@ Subexpr* LinkChain::column(const std::string& col)
     REALM_UNREACHABLE();
     return nullptr;
 }
+
+Subexpr* LinkChain::subquery(Query subquery)
+{
+    REALM_ASSERT(m_link_cols.size() > 0);
+    auto col_key = m_link_cols.back();
+    return new SubQueryCount(subquery, Columns<Link>(col_key, m_base_table, m_link_cols).link_map());
+}
+
+template <class T>
+SubQuery<T> column(const Table& origin, ColKey origin_col_key, Query subquery)
+{
+    static_assert(std::is_same<T, BackLink>::value, "A subquery must involve a link list or backlink column");
+    return SubQuery<T>(column<T>(origin, origin_col_key), std::move(subquery));
+}
+
 } // namespace realm
