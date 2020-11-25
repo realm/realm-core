@@ -57,7 +57,7 @@ public:
 };
 
 struct TableAndColHash {
-    std::size_t operator()(const std::pair<ConstTableRef, std::string>& p) const;
+    std::size_t operator()(const std::pair<TableKey, std::string>& p) const;
 };
 
 // This class holds state which allows aliasing variable names in key paths used in queries.
@@ -69,19 +69,23 @@ public:
     // returns true if added, false if duplicate key already exists
     bool add_mapping(ConstTableRef table, std::string name, std::string alias);
     void remove_mapping(ConstTableRef table, std::string name);
-    bool has_mapping(ConstTableRef table, std::string name);
-    KeyPathElement process_next_path(ConstTableRef table, util::KeyPath& path, size_t& index);
+    bool has_mapping(ConstTableRef table, const std::string& name) const;
+    util::Optional<std::string> get_mapping(TableKey table_key, const std::string& name) const;
     void set_allow_backlinks(bool allow);
     bool backlinks_allowed() const
     {
         return m_allow_backlinks;
     }
     void set_backlink_class_prefix(std::string prefix);
+    const std::string& get_backlink_class_prefix() const
+    {
+        return m_backlink_class_prefix;
+    }
 
 protected:
     bool m_allow_backlinks = true;
     std::string m_backlink_class_prefix;
-    std::unordered_map<std::pair<ConstTableRef, std::string>, std::string, TableAndColHash> m_mapping;
+    std::unordered_map<std::pair<TableKey, std::string>, std::string, TableAndColHash> m_mapping;
 };
 
 

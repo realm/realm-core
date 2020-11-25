@@ -25,18 +25,18 @@ namespace query_parser {
 
 using namespace realm::util;
 
-std::size_t TableAndColHash::operator()(const std::pair<ConstTableRef, std::string>& p) const
+std::size_t TableAndColHash::operator()(const std::pair<TableKey, std::string>& p) const
 {
-    // in practice, table names are unique between tables and column names are unique within a table
-    std::string combined = std::string(p.first->get_name()) + p.second;
-    return std::hash<std::string>{}(combined);
+    auto h1 = std::hash<std::string>{}(p.second);
+    return h1 ^ p.first.value;
 }
 
 
 bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::string alias)
 {
-    if (m_mapping.find({table, name}) == m_mapping.end()) {
-        m_mapping[{table, name}] = alias;
+    auto table_key = table->get_key();
+    if (m_mapping.find({table_key, name}) == m_mapping.end()) {
+        m_mapping[{table_key, name}] = alias;
         return true;
     }
     return false;
@@ -44,14 +44,27 @@ bool KeyPathMapping::add_mapping(ConstTableRef table, std::string name, std::str
 
 void KeyPathMapping::remove_mapping(ConstTableRef table, std::string name)
 {
-    auto it = m_mapping.find({table, name});
+    auto table_key = table->get_key();
+    auto it = m_mapping.find({table_key, name});
     REALM_ASSERT_DEBUG(it != m_mapping.end());
     m_mapping.erase(it);
 }
 
-bool KeyPathMapping::has_mapping(ConstTableRef table, std::string name)
+bool KeyPathMapping::has_mapping(ConstTableRef table, const std::string& name) const
 {
-    return m_mapping.find({table, name}) != m_mapping.end();
+    return (m_mapping.size() > 0) && m_mapping.find({table->get_key(), name}) != m_mapping.end();
+}
+
+util::Optional<std::string> KeyPathMapping::get_mapping(TableKey table_key, const std::string& name) const
+{
+    util::Optional<std::string> ret;
+    if (m_mapping.size() > 0) {
+        auto it = m_mapping.find({table_key, name});
+        if (it != m_mapping.end()) {
+            ret = it->second;
+        }
+    }
+    return ret;
 }
 
 // This may be premature optimisation, but it'll be super fast and it doesn't

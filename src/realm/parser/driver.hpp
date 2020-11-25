@@ -354,12 +354,14 @@ public:
 
     ParserDriver()
         : m_args(s_default_args)
+        , m_mapping(s_default_mapping)
     {
     }
 
-    ParserDriver(TableRef t, Arguments& args)
+    ParserDriver(TableRef t, Arguments& args, const query_parser::KeyPathMapping& mapping)
         : m_base_table(t)
         , m_args(args)
+        , m_mapping(mapping)
     {
     }
 
@@ -367,6 +369,7 @@ public:
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
+    const query_parser::KeyPathMapping& m_mapping;
     ParserNodeStore m_parse_nodes;
 
     // Run the parser on file F.  Return 0 on success.
@@ -387,6 +390,9 @@ public:
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
+    Subexpr* column(LinkChain&, std::string);
+    void backlink(LinkChain&, const std::string&);
+    void translate(LinkChain&, std::string&);
 
 private:
     // The string being parsed.
@@ -396,6 +402,7 @@ private:
     bool parse_error = false;
 
     static NoArguments s_default_args;
+    static query_parser::KeyPathMapping s_default_mapping;
 };
 
 template <class T>

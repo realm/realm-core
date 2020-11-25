@@ -76,6 +76,7 @@ class QueryInfo;
 namespace query_parser {
 class Arguments;
 class KeyPathMapping;
+class ParserDriver;
 } // namespace query_parser
 
 class Table {
@@ -953,9 +954,7 @@ public:
         return link(backlink_col_key);
     }
 
-    LinkChain& backlink(const std::string&);
-
-    Subexpr* column(std::string col_name);
+    Subexpr* column(const std::string&);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)
@@ -1014,6 +1013,7 @@ public:
 
 private:
     friend class Table;
+    friend class query_parser::ParserDriver;
 
     std::vector<ColKey> m_link_cols;
     const Table* m_current_table;
@@ -1034,6 +1034,12 @@ private:
                                                   m_current_table->get_column_name(ck)));
         }
         m_link_cols.push_back(ck);
+    }
+
+    template <class T>
+    Subexpr* create_subexpr(ColKey col_key)
+    {
+        return new Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
 };
 
