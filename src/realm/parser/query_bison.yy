@@ -24,7 +24,9 @@
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
-  }  
+    class PropNode;
+    class SubqueryNode;
+  }
   using namespace realm::query_parser;
 }
 
@@ -53,6 +55,7 @@ using namespace realm::query_parser;
   LIMIT "limit"
   ASCENDING "ascending"
   DESCENDING "descending"
+  SUBQUERY "subquery"
   TRUE    "true"
   FALSE   "false"
   NULL_VAL "null"
@@ -67,8 +70,6 @@ using namespace realm::query_parser;
   ALL     "all"
   NONE    "none"
   BACKLINK "@links"
-  SIZE    "@size"
-  COUNT   "@count"
   MAX     "@max"
   MIN     "@min"
   SUM     "@sun"
@@ -94,6 +95,7 @@ using namespace realm::query_parser;
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
 %token <std::string> LIKE    "like"
+%token <std::string> SIZE "@size"
 %type  <bool> direction
 %type  <int> equality relational stringop
 %type  <ConstantNode*> constant
@@ -109,7 +111,9 @@ using namespace realm::query_parser;
 %type  <PathNode*> path
 %type  <DescriptorOrderingNode*> pred_suffix
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
+%type  <SubqueryNode*> subquery
 %type  <std::string> path_elem id
+%type  <PropNode*> simple_prop
 
 %destructor { } <int>
 
@@ -162,6 +166,13 @@ prop
     | path BACKLINK post_op     { $$ = drv.m_parse_nodes.create<PropNode>($1, "@links", $3); }
     | path id '.' aggr_op '.'  id   { $$ = drv.m_parse_nodes.create<LinkAggrNode>($1, $2, $4, $6); }
     | path id '.' aggr_op       { $$ = drv.m_parse_nodes.create<ListAggrNode>($1, $2, $4); }
+    | subquery                  { $$ = $1; }
+
+simple_prop
+    : path id                   { $$ = drv.m_parse_nodes.create<PropNode>($1, $2); }
+
+subquery
+    : SUBQUERY '(' simple_prop ',' id ',' pred ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
 
 pred_suffix
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}
@@ -214,8 +225,7 @@ comp_type
 
 post_op
     : %empty                    { $$ = nullptr; }
-    | '.' COUNT                 { $$ = drv.m_parse_nodes.create<PostOpNode>(PostOpNode::COUNT);}
-    | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>(PostOpNode::SIZE);}
+    | '.' SIZE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2);}
 
 aggr_op
     : MAX                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::MAX);}
