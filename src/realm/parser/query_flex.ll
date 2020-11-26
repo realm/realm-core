@@ -54,8 +54,7 @@ blank   [ \t\r]
 (?i:ascending)|(?i:asc)     return yy::parser::make_ASCENDING();
 (?i:descending)|(?i:desc)   return yy::parser::make_DESCENDING();
 (?i:subquery)               return yy::parser::make_SUBQUERY();
-"@size"                     return yy::parser::make_SIZE    ();
-"@count"                    return yy::parser::make_COUNT    ();
+("@size"|"@count")          return yy::parser::make_SIZE(yytext);
 "@max"                      return yy::parser::make_MAX    ();
 "@min"                      return yy::parser::make_MIN    ();
 "@sum"                      return yy::parser::make_SUM    ();

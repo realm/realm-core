@@ -27,17 +27,6 @@ StringData get_printable_table_name(StringData name)
     return name;
 }
 
-const char* post_op_type_to_str(query_parser::PostOpNode::Type type)
-{
-    switch (type) {
-        case realm::query_parser::PostOpNode::COUNT:
-            return ".@count";
-        case realm::query_parser::PostOpNode::SIZE:
-            return ".@size";
-    }
-    return "";
-}
-
 const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
 {
     switch (type) {
@@ -501,7 +490,7 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
     Query sub = subquery->visit(drv);
     drv->m_mapping.remove_mapping(drv->m_base_table, variable_name);
     drv->m_base_table = previous_table;
-    lc.get_current_table();
+
     return std::unique_ptr<Subexpr>(lc.subquery(sub));
 }
 
@@ -520,8 +509,7 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
         return s->size().clone();
     }
     if (subexpr) {
-        throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'",
-                                              post_op_type_to_str(this->type),
+        throw std::runtime_error(util::format("Operation '%1' is not supported on property of type '%2'", op_name,
                                               get_data_type_name(DataType(subexpr->get_type()))));
     }
     REALM_UNREACHABLE();

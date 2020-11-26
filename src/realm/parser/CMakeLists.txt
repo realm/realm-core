@@ -2,7 +2,7 @@ if(BISON_FOUND)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_bison.cpp ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_bison.hpp
         MAIN_DEPENDENCY query_bison.yy
-        COMMAND ${BSON_EXECUTABLE} --defines=generated/query_bison.hpp -o generated/query_bison.cpp query_bison.yy
+        COMMAND ${BISON_EXECUTABLE} --defines=generated/query_bison.hpp -o generated/query_bison.cpp query_bison.yy
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 endif()

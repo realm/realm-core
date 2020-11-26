@@ -188,12 +188,10 @@ public:
 
 class PostOpNode : public ParserNode {
 public:
-    enum Type { COUNT, SIZE };
+    std::string op_name;
 
-    Type type;
-
-    PostOpNode(Type t)
-        : type(t)
+    PostOpNode(const std::string op)
+        : op_name(op)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
