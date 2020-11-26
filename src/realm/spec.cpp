@@ -82,7 +82,7 @@ void Spec::update_internals() noexcept
     m_num_public_columns = 0;
     size_t n = m_types.size();
     for (size_t i = 0; i < n; ++i) {
-        if (m_types.get(i) == col_type_BackLink) {
+        if (m_types.get(i) == int(col_type_BackLink)) {
             // Now we have no more public columns
             return;
         }
@@ -199,35 +199,7 @@ bool Spec::convert_column_attributes()
         }
         ColumnType type = ColumnType(m_types.get(column_ndx));
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
-        switch (int(type)) {
-            case s_deprecated_type_table: {
-                Array subspecs(m_top.get_alloc());
-                subspecs.set_parent(&m_top, 3);
-                subspecs.init_from_parent();
-
-                Spec sub_spec(get_alloc());
-                size_t subspec_ndx = get_subspec_ndx(column_ndx);
-                ref_type ref = to_ref(subspecs.get(subspec_ndx)); // Throws
-                sub_spec.init(ref);
-                m_types.set(column_ndx, sub_spec.get_column_type(0));
-                m_attr.set(column_ndx, m_attr.get(column_ndx) | sub_spec.m_attr.get(0) | col_attr_List);
-                sub_spec.destroy();
-
-                subspecs.erase(subspec_ndx);
-                changes = true;
-                break;
-            }
-            case /*col_type_OldStringEnum */ 3: {
-                m_types.set(column_ndx, col_type_String);
-                // We need to padd zeroes into the m_enumkeys so that the index in
-                // m_enumkeys matches the column index.
-                for (size_t i = enumkey_ndx; i < column_ndx; i++) {
-                    m_enumkeys.insert(i, 0);
-                }
-                enumkey_ndx = column_ndx + 1;
-                changes = true;
-                break;
-            }
+        switch (type) {
             case col_type_Link:
                 if (!attr.test(col_attr_Nullable)) {
                     attr.set(col_attr_Nullable);
@@ -243,6 +215,32 @@ bool Spec::convert_column_attributes()
                 }
                 break;
             default:
+                if (type == col_type_OldTable) {
+                    Array subspecs(m_top.get_alloc());
+                    subspecs.set_parent(&m_top, 3);
+                    subspecs.init_from_parent();
+
+                    Spec sub_spec(get_alloc());
+                    size_t subspec_ndx = get_subspec_ndx(column_ndx);
+                    ref_type ref = to_ref(subspecs.get(subspec_ndx)); // Throws
+                    sub_spec.init(ref);
+                    m_types.set(column_ndx, int(sub_spec.get_column_type(0)));
+                    m_attr.set(column_ndx, m_attr.get(column_ndx) | sub_spec.m_attr.get(0) | col_attr_List);
+                    sub_spec.destroy();
+
+                    subspecs.erase(subspec_ndx);
+                    changes = true;
+                }
+                else if (type == col_type_OldStringEnum) {
+                    m_types.set(column_ndx, int(col_type_String));
+                    // We need to padd zeroes into the m_enumkeys so that the index in
+                    // m_enumkeys matches the column index.
+                    for (size_t i = enumkey_ndx; i < column_ndx; i++) {
+                        m_enumkeys.insert(i, 0);
+                    }
+                    enumkey_ndx = column_ndx + 1;
+                    changes = true;
+                }
                 break;
         }
     }
@@ -305,7 +303,7 @@ void Spec::insert_column(size_t column_ndx, ColKey col_key, ColumnType type, Str
         m_num_public_columns++;
     }
 
-    m_types.insert(column_ndx, type); // Throws
+    m_types.insert(column_ndx, int(type)); // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
     m_keys.insert(column_ndx, col_key.value);
@@ -368,7 +366,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
                  get_column_type(column_ndx) == col_type_LinkList ||
                  get_column_type(column_ndx) == col_type_BackLink ||
                  // col_type_OldTable is used when migrating from file format 9 to 10.
-                 int(get_column_type(column_ndx)) == s_deprecated_col_type_table);
+                 get_column_type(column_ndx) == col_type_OldTable);
 
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
@@ -538,15 +536,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
 ColKey Spec::get_key(size_t column_ndx) const
 {
     auto key = ColKey(m_keys.get(column_ndx));
-
-    auto int_type = int(key.get_type());
-    if (int_type == s_deprecated_col_type_table)
-        REALM_TERMINATE("col_type_OldTable is deprecated");
-    if (int_type == s_deprecated_col_type_datetime)
-        REALM_TERMINATE("col_type_OldDateTime is deprecated");
-
-    REALM_ASSERT(valid_column_type(key.get_type()));
-
+    REALM_ASSERT(key.get_type().is_valid());
     return key;
 }
 
