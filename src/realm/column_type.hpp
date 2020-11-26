@@ -117,6 +117,28 @@ private:
     }
 };
 
+inline bool valid_column_type(ColumnType col_type) noexcept
+{
+    switch (col_type) {
+        case col_type_Int:
+        case col_type_Bool:
+        case col_type_String:
+        case col_type_Binary:
+        case col_type_Mixed:
+        case col_type_Timestamp:
+        case col_type_Float:
+        case col_type_Double:
+        case col_type_Decimal:
+        case col_type_Link:
+        case col_type_LinkList:
+        case col_type_BackLink:
+        case col_type_ObjectId:
+        case col_type_TypedLink:
+        case col_type_UUID:
+            return true;
+    }
+    return false;
+}
 
 } // namespace realm
 

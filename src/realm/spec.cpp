@@ -366,7 +366,9 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == col_type_Link ||
                  get_column_type(column_ndx) == col_type_LinkList ||
-                 get_column_type(column_ndx) == col_type_BackLink);
+                 get_column_type(column_ndx) == col_type_BackLink ||
+                 // col_type_OldTable is used when migrating from file format 9 to 10.
+                 int(get_column_type(column_ndx)) == s_deprecated_col_type_table);
 
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
@@ -535,7 +537,17 @@ bool Spec::operator==(const Spec& spec) const noexcept
 
 ColKey Spec::get_key(size_t column_ndx) const
 {
-    return ColKey(m_keys.get(column_ndx));
+    auto key = ColKey(m_keys.get(column_ndx));
+
+    auto int_type = int(key.get_type());
+    if (int_type == s_deprecated_col_type_table)
+        REALM_TERMINATE("col_type_OldTable is deprecated");
+    if (int_type == s_deprecated_col_type_datetime)
+        REALM_TERMINATE("col_type_OldDateTime is deprecated");
+
+    REALM_ASSERT(valid_column_type(key.get_type()));
+
+    return key;
 }
 
 void Spec::verify() const
