@@ -79,7 +79,7 @@ struct ColumnType {
     // FIXME: Remove this
     constexpr explicit operator DataType() const noexcept
     {
-        return DataType(m_type);
+        return DataType(int(m_type));
     }
 
     constexpr explicit operator util::Printable() const noexcept;
@@ -132,6 +132,9 @@ static constexpr ColumnType col_type_UUID = ColumnType{ColumnType::Type::UUID};
 static constexpr ColumnType col_type_OldStringEnum = ColumnType{3};
 static constexpr ColumnType col_type_OldTable = ColumnType{5};
 static constexpr ColumnType col_type_OldDateTime = ColumnType{7};
+static_assert(!col_type_OldStringEnum.is_valid());
+static_assert(!col_type_OldTable.is_valid());
+static_assert(!col_type_OldDateTime.is_valid());
 
 
 // Column attributes can be combined using bitwise or.
@@ -247,7 +250,7 @@ constexpr inline ColumnType::operator util::Printable() const noexcept
     if (*this == col_type_OldStringEnum) {
         return "col_type_OldStringEnum";
     }
-    return "col_type_UNKNOWN";
+    return int(m_type);
 }
 
 template <class O>
@@ -256,6 +259,11 @@ constexpr inline O& operator<<(O& os, const ColumnType& col_type) noexcept
     util::Printable printable{col_type};
     printable.print(os, false);
     return os;
+}
+
+constexpr inline DataType::operator ColumnType() const noexcept
+{
+    return ColumnType(int(*this));
 }
 
 } // namespace realm
