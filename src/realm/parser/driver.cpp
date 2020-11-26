@@ -109,11 +109,6 @@ inline const char* get_type_name<double>()
 {
     return "floating point number";
 }
-template <>
-inline const char* get_type_name<Decimal128>()
-{
-    return "decimal number";
-}
 
 template <typename T>
 inline T string_to(const std::string& s)
@@ -124,7 +119,7 @@ inline T string_to(const std::string& s)
     iss >> value;
     if (iss.fail()) {
         if (!try_parse_specials(s, value)) {
-            throw std::invalid_argument(util::format("Cannot convert '%1'to a %2", s, get_type_name<T>()));
+            throw std::invalid_argument(util::format("Cannot convert '%1' to a %2", s, get_type_name<T>()));
         }
     }
     return value;
