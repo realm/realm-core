@@ -97,17 +97,17 @@ jobWrapper {
 
     stage('Checking') {
         def buildOptions = [
-            buildType : "Debug",
-            maxBpNodeSize: "1000",
-            enableEncryption: "ON",
-            enableSync: "OFF",
+            buildType : 'Debug',
+            maxBpNodeSize: 1000,
+            enableEncryption: true,
+            enableSync: false,
             runTests: true,
         ]
         def linuxOptionsNoEncrypt = [
-            buildType : "Debug",
-            maxBpNodeSize: "4",
-            enableEncryption: "OFF",
-            enableSync: "OFF",
+            buildType : 'Debug',
+            maxBpNodeSize: 4,
+            enableEncryption: false,
+            enableSync: false,
         ]
         def armhfQemuTestOptions = [
             emulator: 'LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib qemu-arm -cpu cortex-a7',
@@ -120,10 +120,10 @@ jobWrapper {
 
         parallelExecutors = [
             checkLinuxDebug         : doCheckInDocker(buildOptions),
-            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: "4", buildType : "Release"]),
-            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync : "ON"]),
-            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: "OFF"]),
-            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType : "Release", enableSync : "ON"]),
+            checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
+            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
+            checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
+            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
@@ -132,8 +132,8 @@ jobWrapper {
             buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
-            threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
-            addressSanitizer        : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "address"]),
+            threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
+            addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
             performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
@@ -255,14 +255,17 @@ def doCheckInDocker(Map options = [:]) {
     def cmakeOptions = [
         CMAKE_BUILD_TYPE: options.buildType,
         REALM_MAX_BPNODE_SIZE: options.maxBpNodeSize,
-        REALM_ENABLE_ENCRYPTION: options.enableEncryption,
-        REALM_ENABLE_SYNC: options.enableSync,
+        REALM_ENABLE_ENCRYPTION: options.enableEncryption ? 'ON' : 'OFF',
+        REALM_ENABLE_SYNC: options.enableSync ? 'ON' : 'OFF',
     ]
-    if (options.enableSync == "ON") {
+    if (options.enableSync) {
+        echo 'FIXME: Skipping stitch tests because of a breaking change in the sync client'
+        /*
         cmakeOptions << [
-            REALM_ENABLE_AUTH_TESTS: "ON",
-            REALM_MONGODB_ENDPOINT: "http://mongodb-realm:9090",
+            REALM_ENABLE_AUTH_TESTS: 'ON',
+            REALM_MONGODB_ENDPOINT: 'http://mongodb-realm:9090',
         ]
+        */
     }
     if (longRunningTests) {
         cmakeOptions << [
@@ -284,7 +287,7 @@ def doCheckInDocker(Map options = [:]) {
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {
-                    buildEnv.inside("${dockerArgs}") {
+                    buildEnv.inside(dockerArgs) {
                         try {
                             dir('build-dir') {
                                 sh "cmake ${cmakeDefinitions} -G Ninja .."
@@ -298,7 +301,7 @@ def doCheckInDocker(Map options = [:]) {
                 }
             }
             
-            if (options.enableSync == "ON") {
+            if (options.enableSync) {
                 // stitch images are auto-published every day to our CI
                 // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
                 // we refrain from using "latest" here to optimise docker pull cost due to a new image being built every day
@@ -306,8 +309,30 @@ def doCheckInDocker(Map options = [:]) {
                 withRealmCloud(version: dependencies.MDBREALM_TEST_SERVER_TAG, appsToImport: ['auth-integration-tests': "${env.WORKSPACE}/test/object-store/mongodb"]) { networkName ->
                     buildSteps("--network=${networkName}")
                 }
+
+                if (options.dumpChangesetTransform) {
+                    buildEnv.inside {
+                        dir('build-dir/test') {
+                            withEnv([
+                                'UNITTEST_PROGRESS=1',
+                                'UNITTEST_FILTER=Array_Example Transform_* EmbeddedObjects_*',
+                                'UNITTEST_DUMP_TRANSFORM=changeset_dump',
+                            ]) {
+                                sh '''
+                                    ./realm-sync-tests
+                                    tar -zcvf changeset_dump.tgz changeset_dump
+                                '''
+                            }
+                            withAWS(credentials: 'stitch-sync-s3', region: 'us-east-1') {
+                                retry(20) {
+                                    s3Upload file: 'changeset_dump.tgz', bucket: 'realm-test-artifacts', acl: 'PublicRead', path: "sync-transform-corpuses/${gitSha}/"
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
-                buildSteps("")
+                buildSteps()
             }
         }
     }
