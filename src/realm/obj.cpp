@@ -902,9 +902,9 @@ void out_mixed_xjson(std::ostream& out, const Mixed& val)
             out << "\"}";
             break;
         case type_UUID:
-            out << "{\"$binary\": \"";
+            out << "{\"$uuid\": \"";
             out << val.get<UUID>();
-            out << "\", \"subType\": \"04\"}}";
+            out << "\"}";
             break;
         case type_TypedLink: {
             out_mixed_xjson(out, val.get<ObjLink>().get_obj_key());
