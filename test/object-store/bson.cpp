@@ -103,7 +103,7 @@ TEST_CASE("canonical_extjson_fragments", "[bson]") {
         boolean = static_cast<bool>(b);
         CHECK(!boolean);
     }
-    
+
     SECTION("UUID") {
         auto a = bson::parse("{ \"$uuid\" : \"c8edabc3-f738-4ca3-b68d-ab92a91478a3\"}");
         auto b = bson::parse("{ \"$binary\" : {\"base64\" : \"yO2rw/c4TKO2jauSqRR4ow==\", \"subType\" : \"04\"}}");
@@ -164,12 +164,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         }
 
         SECTION("subtype 0x04 (UUID)") {
-            run_corpus<UUID>(
-                             "u", {
-                "{\"u\" : { \"$uuid\" : \"01234567-89ab-cdef-edcb-a98765432101\"}}", [](auto val) {
-                    auto uuid = UUID("01234567-89ab-cdef-edcb-a98765432101");
-                    CHECK((val == uuid));
-                }});
+            run_corpus<UUID>("u", {"{\"u\" : { \"$uuid\" : \"01234567-89ab-cdef-edcb-a98765432101\"}}", [](auto val) {
+                                       auto uuid = UUID("01234567-89ab-cdef-edcb-a98765432101");
+                                       CHECK((val == uuid));
+                                   }});
         }
     }
 

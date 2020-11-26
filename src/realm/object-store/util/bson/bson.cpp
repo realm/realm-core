@@ -184,10 +184,10 @@ Bson& Bson::operator=(const Bson& v)
         case Type::Array: {
             new (&array_val) std::unique_ptr<BsonArray>(new BsonArray(*v.array_val));
             break;
+        }
         case Type::Uuid:
             uuid_val = v.uuid_val;
             break;
-        }
     }
 
     return *this;
@@ -734,10 +734,10 @@ static constexpr std::pair<std::string_view, FancyParser> bson_fancy_parsers[] =
          return Bson(MongoTimestamp(*t, *i));
      }},
     {"$uuid",
-        +[](const Json& json) {
-            std::string uuid = json.get<std::string>();
-            return Bson(UUID(uuid));
-    }},
+     +[](const Json& json) {
+         std::string uuid = json.get<std::string>();
+         return Bson(UUID(uuid));
+     }},
 };
 
 constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& lhs,
