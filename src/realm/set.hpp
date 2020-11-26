@@ -868,48 +868,24 @@ bool Set<T>::intersects(const Rhs& rhs) const
     return intersects(std::begin(rhs), std::end(rhs));
 }
 
-namespace _impl {
-template <class T>
-struct CountingOutputIterator {
-    using iterator_category = std::output_iterator_tag;
-    using value_type = void;
-    using difference_type = void;
-    using pointer = void;
-    using reference = void;
-
-    explicit CountingOutputIterator(size_t& num)
-        : num(&num)
-    {
-    }
-
-    size_t* num = nullptr;
-
-    CountingOutputIterator& operator=(const T&)
-    {
-        ++*num;
-        return *this;
-    }
-
-    CountingOutputIterator& operator*()
-    {
-        return *this;
-    }
-
-    CountingOutputIterator& operator++()
-    {
-        return *this;
-    }
-};
-} // namespace _impl
-
 template <class T>
 template <class It1, class It2>
 bool Set<T>::intersects(It1 first, It2 last) const
 {
-    size_t count = 0;
-    std::set_intersection(begin(), end(), first, last, _impl::CountingOutputIterator<T>{count},
-                          SetElementLessThan<T>{});
-    return count != 0;
+    SetElementLessThan<T> less;
+    auto it = begin();
+    while (it != end() && first != last) {
+        if (less(*it, *first)) {
+            ++it;
+        }
+        else if (less(*first, *it)) {
+            ++first;
+        }
+        else {
+            return true;
+        }
+    }
+    return false;
 }
 
 template <class T>
