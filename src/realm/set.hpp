@@ -300,6 +300,8 @@ public:
 
     std::unique_ptr<LnkSet> clone_linkset() const
     {
+        // FIXME: The copy constructor requires this.
+        update_if_needed();
         return std::make_unique<LnkSet>(*this);
     }
 

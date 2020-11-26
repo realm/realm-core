@@ -317,6 +317,8 @@ public:
 
     std::unique_ptr<LnkLst> clone_linklist() const
     {
+        // FIXME: The copy constructor requires this.
+        update_if_needed();
         return std::make_unique<LnkLst>(*this);
     }
 
