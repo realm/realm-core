@@ -66,8 +66,6 @@ using namespace realm::test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-extern UUID generate_random_uuid();
-
 namespace {
 
 const bool generate_all = false;
@@ -100,7 +98,6 @@ void setup_multi_table(Table& table, size_t rows)
     ColKey col_int_list = table.add_column_list(type_Int, "integers");         //  12
     ColKey col_string_list = table.add_column_list(type_String, "strings");    //  13
     ColKey col_dict = table.add_column_dictionary(type_Int, "dictionary");     //  14
-    ColKey col_uuid = table.add_column(type_UUID, "uuid");
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -140,7 +137,6 @@ void setup_multi_table(Table& table, size_t rows)
         obj.set(col_binary, BinaryData("binary", 7));
         obj.set(col_oid, ObjectId());
         obj.set(col_decimal, Decimal128("1.2345"));
-        obj.set(col_uuid, generate_random_uuid());
         auto int_list = obj.get_list<Int>(col_int_list);
         auto str_list = obj.get_list<String>(col_string_list);
         for (size_t n = 0; n < i % 5; n++) {
