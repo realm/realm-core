@@ -49,6 +49,87 @@ bool is_length_suffix(const std::string& s)
            (s[5] == 'h' || s[5] == 'H');
 }
 
+// Converts ascii c-locale uppercase characters to lower case,
+// leaves other char values unchanged.
+inline char toLowerAscii(char c)
+{
+    if (isascii(c) && isupper(c)) {
+#if REALM_ANDROID
+        return tolower(c); // _tolower is not supported on all ABI levels
+#else
+        return _tolower(c);
+#endif
+    }
+    return c;
+}
+
+template <typename T>
+inline bool try_parse_specials(std::string str, T& ret)
+{
+    if constexpr (realm::is_any<T, float, double>::value || std::numeric_limits<T>::is_iec559) {
+        std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
+        if (std::numeric_limits<T>::has_quiet_NaN && (str == "nan" || str == "+nan")) {
+            ret = std::numeric_limits<T>::quiet_NaN();
+            return true;
+        }
+        else if (std::numeric_limits<T>::has_quiet_NaN && (str == "-nan")) {
+            ret = -std::numeric_limits<T>::quiet_NaN();
+            return true;
+        }
+        else if (std::numeric_limits<T>::has_infinity &&
+                 (str == "+infinity" || str == "infinity" || str == "+inf" || str == "inf")) {
+            ret = std::numeric_limits<T>::infinity();
+            return true;
+        }
+        else if (std::numeric_limits<T>::has_infinity && (str == "-infinity" || str == "-inf")) {
+            ret = -std::numeric_limits<T>::infinity();
+            return true;
+        }
+    }
+    return false;
+}
+
+template <typename T>
+inline const char* get_type_name()
+{
+    return "unknown";
+}
+template <>
+inline const char* get_type_name<int64_t>()
+{
+    return "number";
+}
+template <>
+inline const char* get_type_name<float>()
+{
+    return "floating point number";
+}
+template <>
+inline const char* get_type_name<double>()
+{
+    return "floating point number";
+}
+template <>
+inline const char* get_type_name<Decimal128>()
+{
+    return "decimal number";
+}
+
+template <typename T>
+inline T string_to(const std::string& s)
+{
+    std::istringstream iss(s);
+    iss.imbue(std::locale::classic());
+    T value;
+    iss >> value;
+    if (iss.fail()) {
+        if (!try_parse_specials(s, value)) {
+            throw std::invalid_argument(util::format("Cannot convert '%1'to a %2", s, get_type_name<T>()));
+        }
+    }
+    return value;
+}
+
 class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
@@ -156,15 +237,15 @@ Query OrNode::visit(ParserDriver* drv)
     if (and_preds.size() == 1) {
         return and_preds[0]->visit(drv);
     }
-    auto it = and_preds.begin();
-    auto q = (*it)->visit(drv);
-    q.Or();
 
-    ++it;
-    while (it != and_preds.end()) {
-        q.and_query((*it)->visit(drv));
-        ++it;
+    Query q(drv->m_base_table);
+    q.group();
+    for (auto it : and_preds) {
+        q.Or();
+        q.and_query(it->visit(drv));
     }
+    q.end_group();
+
     return q;
 }
 
@@ -668,7 +749,23 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         }
         case Type::STRING: {
             std::string str = text.substr(1, text.size() - 2);
-            ret = new ConstantStringValue(str);
+            switch (hint) {
+                case type_Int:
+                    ret = new Value<int64_t>(string_to<int64_t>(str));
+                    break;
+                case type_Float:
+                    ret = new Value<float>(string_to<float>(str));
+                    break;
+                case type_Double:
+                    ret = new Value<double>(string_to<double>(str));
+                    break;
+                case type_Decimal:
+                    ret = new Value<Decimal128>(Decimal128(str.c_str()));
+                    break;
+                default:
+                    ret = new ConstantStringValue(str);
+                    break;
+            }
             break;
         }
         case Type::BASE64: {

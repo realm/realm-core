@@ -2041,7 +2041,7 @@ TEST(Parser_list_of_primitive_ints)
         message,
         "Unsupported comparison operator 'endswith' against type 'int', right side must be a string or binary type");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "integers == 'string'", 0), message);
-    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
+    CHECK_EQUAL(message, "Cannot convert 'string'to a number");
 }
 
 TEST(Parser_list_of_primitive_strings)
@@ -3212,7 +3212,7 @@ TEST(Parser_BacklinkCount)
     std::string message;
     // backlink count requires comparison to a numeric type
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 'string'", -1), message);
-    CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'string'");
+    CHECK_EQUAL(message, "Cannot convert 'string'to a number");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, items, "@links.@count == 2018-04-09@14:21:0", -1),
                                 message);
     CHECK_EQUAL(message, "Unsupported comparison between type 'int' and type 'timestamp'");
@@ -3786,6 +3786,7 @@ TEST(Parser_Between)
     CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the "
                        "expression using '>' and '<'.") != std::string::npos);
 }
+#endif
 
 TEST(Parser_ChainedStringEqualQueries)
 {
@@ -3891,7 +3892,6 @@ TEST(Parser_ChainedIntEqualQueries)
     default_obj.remove();
     verify_query(test_context, table, query, populated_data.size());
 }
-#endif
 
 TEST(Parser_TimestampNullable)
 {
