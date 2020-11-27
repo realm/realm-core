@@ -3071,16 +3071,7 @@ TEST(Parser_Backlinks)
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
-#if 0
-    // disable parsing backlink queries
-    mapping.set_allow_backlinks(false);
-    {
-        CHECK_THROW_ANY_GET_MESSAGE(q = items->query("purchasers.@max.money >= 20"), message);
-        CHECK_EQUAL(message,
-                    "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
-                    "of property 'items' on type 'Person'");
-    }
-#endif
+
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
