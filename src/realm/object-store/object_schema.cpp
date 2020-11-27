@@ -238,6 +238,9 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
     else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_collection(prop.type)) {
         exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
+    else if (prop.type == PropertyType::Mixed && !is_nullable(prop.type) && !is_collection(prop.type)) {
+        exceptions.emplace_back("Property '%1.%2' of type 'Mixed' must be nullable.", object_name, prop.name);
+    }
 
     // check primary keys
     if (prop.is_primary) {

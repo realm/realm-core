@@ -69,9 +69,11 @@ set(CORE_TEST_SOURCES
     test_util_any.cpp
     test_util_backtrace.cpp
     test_util_base64.cpp
+    test_util_cli_args.cpp
     test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
+    test_util_from_chars.cpp
     test_util_inspect.cpp
     test_util_logger.cpp
     test_util_memory_stream.cpp

@@ -66,6 +66,7 @@ set(UTIL_SOURCES
     util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
+    util/cli_args.cpp
     util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
     util/file.cpp

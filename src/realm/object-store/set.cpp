@@ -47,6 +47,15 @@ Set::Set(std::shared_ptr<Realm> r, const SetBase& set)
 {
 }
 
+Query Set::get_query() const
+{
+    verify_attached();
+    if (m_type == PropertyType::Object) {
+        return static_cast<LnkSet&>(*m_set_base).get_target_table()->where(as<Obj>());
+    }
+    throw std::runtime_error("not implemented");
+}
+
 ConstTableRef Set::get_target_table() const
 {
     auto table = m_set_base->get_table();
@@ -137,9 +146,11 @@ util::Optional<Mixed> Set::average(ColKey col) const
     return count == 0 ? none : util::make_optional(result);
 }
 
-bool Set::operator==(const Set&) const noexcept
+bool Set::operator==(const Set& rgt) const noexcept
 {
-    REALM_TERMINATE("Not implemented yet");
+    return m_set_base->get_table() == rgt.m_set_base->get_table() &&
+           m_set_base->get_key() == rgt.m_set_base->get_key() &&
+           m_set_base->get_col_key() == rgt.m_set_base->get_col_key();
 }
 
 Results Set::snapshot() const
@@ -151,9 +162,7 @@ Results Set::sort(SortDescriptor order) const
 {
     verify_attached();
     if ((m_type == PropertyType::Object)) {
-        REALM_TERMINATE("Not implemented yet");
-        //        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none,
-        //        std::move(order));
+        return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), util::none, std::move(order));
     }
     else {
         DescriptorOrdering o;
@@ -169,16 +178,13 @@ Results Set::sort(const std::vector<std::pair<std::string, bool>>& keypaths) con
 
 Results Set::filter(Query q) const
 {
-    static_cast<void>(q);
-    REALM_TERMINATE("Not implemented yet");
-    return {};
+    verify_attached();
+    return Results(m_realm, std::dynamic_pointer_cast<LnkSet>(m_set_base), get_query().and_query(std::move(q)));
 }
 
-Set Set::freeze(const std::shared_ptr<Realm>& realm) const
+Set Set::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-    static_cast<void>(realm);
-    REALM_TERMINATE("Not implemented yet");
-    return *this;
+    return Set(frozen_realm, *frozen_realm->import_copy_of(*m_set_base));
 }
 
 NotificationToken Set::add_notification_callback(CollectionChangeCallback cb) &

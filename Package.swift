@@ -39,6 +39,7 @@ let syncServerSources = [
 ]
 
 let syncCommandSources = [
+    "realm/sync/apply_to_state_command.cpp",
     "realm/sync/encrypt/encryption_transformer_command.cpp",
     "realm/sync/inspector",
     "realm/sync/noinst/vacuum_command.cpp",

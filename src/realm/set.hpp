@@ -33,7 +33,6 @@ public:
 
     virtual ~SetBase() {}
     virtual SetBasePtr clone() const = 0;
-    virtual size_t find_any(Mixed) const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
@@ -58,6 +57,8 @@ public:
     Set(Set&& other) noexcept;
     Set& operator=(const Set& other);
     Set& operator=(Set&& other) noexcept;
+    using Base::operator==;
+    using Base::operator!=;
 
     SetBasePtr clone() const final
     {
@@ -228,6 +229,8 @@ public:
     LnkSet(LnkSet&&) = default;
     LnkSet& operator=(const LnkSet&) = default;
     LnkSet& operator=(LnkSet&&) = default;
+    bool operator==(const LnkSet& other) const;
+    bool operator!=(const LnkSet& other) const;
 
     ObjKey get(size_t ndx) const;
     size_t find(ObjKey) const;
@@ -583,6 +586,11 @@ inline LnkSet Obj::get_linkset(ColKey col_key) const
     return LnkSet{*this, col_key};
 }
 
+inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
+{
+    return std::make_unique<LnkSet>(*this, col_key);
+}
+
 template <class T>
 size_t Set<T>::find(T value) const
 {
@@ -860,48 +868,24 @@ bool Set<T>::intersects(const Rhs& rhs) const
     return intersects(std::begin(rhs), std::end(rhs));
 }
 
-namespace _impl {
-template <class T>
-struct CountingOutputIterator {
-    using iterator_category = std::output_iterator_tag;
-    using value_type = void;
-    using difference_type = void;
-    using pointer = void;
-    using reference = void;
-
-    explicit CountingOutputIterator(size_t& num)
-        : num(&num)
-    {
-    }
-
-    size_t* num = nullptr;
-
-    CountingOutputIterator& operator=(const T&)
-    {
-        ++*num;
-        return *this;
-    }
-
-    CountingOutputIterator& operator*()
-    {
-        return *this;
-    }
-
-    CountingOutputIterator& operator++()
-    {
-        return *this;
-    }
-};
-} // namespace _impl
-
 template <class T>
 template <class It1, class It2>
 bool Set<T>::intersects(It1 first, It2 last) const
 {
-    size_t count = 0;
-    std::set_intersection(begin(), end(), first, last, _impl::CountingOutputIterator<T>{count},
-                          SetElementLessThan<T>{});
-    return count != 0;
+    SetElementLessThan<T> less;
+    auto it = begin();
+    while (it != end() && first != last) {
+        if (less(*it, *first)) {
+            ++it;
+        }
+        else if (less(*first, *it)) {
+            ++first;
+        }
+        else {
+            return true;
+        }
+    }
+    return false;
 }
 
 template <class T>
@@ -981,6 +965,15 @@ void Set<T>::assign_symmetric_difference(It1 first, It2 last)
     }
 }
 
+inline bool LnkSet::operator==(const LnkSet& other) const
+{
+    return m_set == other.m_set;
+}
+
+inline bool LnkSet::operator!=(const LnkSet& other) const
+{
+    return m_set != other.m_set;
+}
 
 inline ObjKey LnkSet::get(size_t ndx) const
 {

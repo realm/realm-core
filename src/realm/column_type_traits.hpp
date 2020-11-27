@@ -60,6 +60,8 @@ class BasicArrayNull;
 struct Link;
 template <class>
 class Lst;
+template <class>
+class Set;
 struct SizeOfList;
 
 template <class T>
@@ -289,6 +291,11 @@ using ColumnAverageType = typename ColumnTypeTraits<T>::average_type;
 
 template <class T>
 struct ColumnTypeTraits<Lst<T>> {
+    static constexpr const ColumnType column_id = ColumnTypeTraits<T>::column_id;
+};
+
+template <class T>
+struct ColumnTypeTraits<Set<T>> {
     static constexpr const ColumnType column_id = ColumnTypeTraits<T>::column_id;
 };
 

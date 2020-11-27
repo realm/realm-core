@@ -186,6 +186,31 @@ void List::set(size_t row_ndx, T value)
     as<T>().set(row_ndx, value);
 }
 
+void List::insert_any(size_t row_ndx, Mixed value)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx, true);
+    m_list_base->insert_any(row_ndx, value);
+}
+
+void List::set_any(size_t row_ndx, Mixed value)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx);
+    m_list_base->set_any(row_ndx, value);
+}
+
+Mixed List::get_any(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    return m_list_base->get_any(row_ndx);
+}
+
+size_t List::find_any(Mixed value) const
+{
+    return m_list_base->find_any(value);
+}
+
 template <>
 void List::set(size_t row_ndx, Obj o)
 {
