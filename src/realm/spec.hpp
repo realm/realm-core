@@ -223,8 +223,7 @@ inline size_t Spec::get_public_column_count() const noexcept
 inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
-    ColumnType type = ColumnType(m_types.get(ndx));
-    return type;
+    return ColumnType(int(m_types.get(ndx)));
 }
 
 inline ColumnAttrMask Spec::get_column_attr(size_t ndx) const noexcept
