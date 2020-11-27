@@ -13,11 +13,4 @@ LIBRARY/src/bid_from_int.c
 LIBRARY/src/bid_round.c
 )
 
-# silence all warnings
-if(MSVC)
-    add_compile_options(/w)
-else()
-    add_compile_options(-w)
-endif()
-
 add_library(Bid OBJECT ${BID_SOURCES})

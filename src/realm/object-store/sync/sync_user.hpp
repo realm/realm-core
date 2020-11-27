@@ -22,6 +22,7 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
+#include <realm/object-store/sync/subscribable.hpp>
 
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
@@ -122,7 +123,7 @@ struct SyncUserIdentity {
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
-class SyncUser : public std::enable_shared_from_this<SyncUser> {
+class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscribable<SyncUser> {
     friend class SyncSession;
 
 public:

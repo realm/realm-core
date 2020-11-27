@@ -528,6 +528,12 @@ public:
         return Query(m_own_ref, list);
     }
 
+    // Perform queries on a LnkSet. The returned Query holds a reference to set.
+    Query where(const LnkSet& set) const
+    {
+        return Query(m_own_ref, set);
+    }
+
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
     Query query(const std::string& query_string, query_builder::Arguments& arguments,
                 const parser::KeyPathMapping&) const;

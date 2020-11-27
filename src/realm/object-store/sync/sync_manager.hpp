@@ -201,16 +201,19 @@ public:
 
     void set_sync_route(std::string sync_route)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         m_sync_route = std::move(sync_route);
     }
 
     const std::string sync_route() const
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         return m_sync_route;
     }
 
     std::weak_ptr<app::App> app() const
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         return m_app;
     }
 

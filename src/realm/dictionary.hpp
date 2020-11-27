@@ -59,6 +59,7 @@ public:
     size_t size() const final;
     bool is_null(size_t ndx) const final;
     Mixed get_any(size_t ndx) const final;
+    size_t find_any(Mixed value) const final;
 
     Mixed min(size_t* return_ndx = nullptr) const final;
     Mixed max(size_t* return_ndx = nullptr) const final;

@@ -101,6 +101,29 @@ Mixed Dictionary::get_any(size_t ndx) const
     return do_get(m_clusters->get(ndx, k));
 }
 
+size_t Dictionary::find_any(Mixed value) const
+{
+    size_t ret = realm::not_found;
+    ArrayMixed leaf(m_obj.get_alloc());
+    size_t start_ndx = 0;
+
+    m_clusters->traverse([&](const Cluster* cluster) {
+        size_t e = cluster->node_size();
+        cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
+        for (size_t i = 0; i < e; i++) {
+            if (leaf.get(i) == value) {
+                ret = start_ndx + i;
+                return true;
+            }
+        }
+        start_ndx += e;
+        // Continue
+        return false;
+    });
+
+    return ret;
+}
+
 Mixed Dictionary::min(size_t* return_ndx) const
 {
     Mixed m;

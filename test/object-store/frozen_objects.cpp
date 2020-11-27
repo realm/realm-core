@@ -184,6 +184,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
+            REQUIRE(frozen_res.get_any(0).is_null());
         });
     }
 
@@ -192,7 +193,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Results frozen_res = results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
+            auto any = frozen_res.get_any(0);
             REQUIRE(obj.is_valid());
+            REQUIRE(any.get_link() == obj.get_link());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 2);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 2);
@@ -226,7 +229,9 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Results frozen_res = query_results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);
+            auto any = frozen_res.get_any(0);
             REQUIRE(obj.is_valid());
+            REQUIRE(any.get_link() == obj.get_link());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
             REQUIRE(frozen_res.get(0).get<Int>(value_col) == 9);
             REQUIRE(frozen_res.first()->get<Int>(value_col) == 9);
@@ -242,8 +247,11 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         auto obj = query_results.get(0);
         Results frozen_res = query_results.freeze(frozen_realm);
         JoiningThread thread([&] {
+            auto obj = frozen_res.get(0);
+            auto any = frozen_res.get_any(0);
+            REQUIRE(any.get_link() == obj.get_link());
             REQUIRE(frozen_res.is_frozen());
-            REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 3);
+            REQUIRE(obj.get<int64_t>(value_col) == 3);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 3);
         });
     }
@@ -256,7 +264,8 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
-            Object o = Object(frozen_realm, frozen_res.get(0));
+            auto any = frozen_res.get_any(0);
+            Object o = Object(frozen_realm, any.get_link());
             REQUIRE(o.is_frozen());
             REQUIRE(o.get_column_value<Int>("value") == 10);
             REQUIRE(frozen_res.get(0).get<Int>(linked_object_value_col) == 10);

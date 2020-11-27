@@ -119,6 +119,14 @@ Object::Object(SharedRealm r, StringData object_type, size_t index)
                  (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
+Object::Object(std::shared_ptr<Realm> r, ObjLink link)
+    : m_realm(std::move(r))
+    , m_obj(m_realm->read_group().get_object(link))
+{
+    m_object_schema =
+        &*m_realm->schema().find(ObjectStore::object_type_for_table_name(m_obj.get_table()->get_name()));
+}
+
 Object::Object() = default;
 Object::~Object() = default;
 Object::Object(Object const&) = default;

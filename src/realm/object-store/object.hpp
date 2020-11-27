@@ -75,6 +75,7 @@ public:
     Object(std::shared_ptr<Realm> r, ObjectSchema const& s, Obj const& o);
     Object(std::shared_ptr<Realm> r, StringData object_type, ObjKey key);
     Object(std::shared_ptr<Realm> r, StringData object_type, size_t index);
+    Object(std::shared_ptr<Realm> r, ObjLink link);
 
     Object(Object const&);
     Object(Object&&);
