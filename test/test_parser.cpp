@@ -3441,8 +3441,6 @@ TEST(Parser_Subquery)
     CHECK_EQUAL(message, "A subquery must operate on a list property, but 'fav_item' is type 'link'");
 }
 
-#if 0
-
 TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
 {
     Group g;
@@ -3599,26 +3597,22 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "NONE items.name == fav_item.name",
                  1); // only person 1 has items which are not their favourite
 
+    // ANY/SOME is not necessary but accepted
+    verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1);
+    verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1);
+
+    // multiple lists in path is supported
+    verify_query(test_context, t, "ANY items.allergens.name == 'dairy'", 3);
+    verify_query(test_context, t, "SOME items.allergens.name == 'dairy'", 3);
+    verify_query(test_context, t, "ALL items.allergens.name == 'dairy'", 1);
+    verify_query(test_context, t, "NONE items.allergens.name == 'dairy'", 0);
+
     std::string message;
     // no list in path should throw
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'ALL' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'NONE' must contain a list");
-
-    // multiple lists in path should throw
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY items.allergens.name == 'dairy'", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain only one list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME items.allergens.name == 'dairy'", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'ANY' or 'SOME' must contain only one list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL items.allergens.name == 'dairy'", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'ALL' must contain only one list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE items.allergens.name == 'dairy'", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'NONE' must contain only one list");
 
     // the expression following ANY/SOME/ALL/NONE must be a keypath list
     // currently this is restricted by the parser syntax so it is a predicate error
@@ -3628,6 +3622,7 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
 }
 
+#if 0
 
 TEST(Parser_OperatorIN)
 {

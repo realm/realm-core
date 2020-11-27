@@ -42,6 +42,19 @@ const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
     return "";
 }
 
+const char* expression_cmp_type_to_str(ExpressionComparisonType type)
+{
+    switch (type) {
+        case ExpressionComparisonType::Any:
+            return "ANY";
+        case ExpressionComparisonType::All:
+            return "ALL";
+        case ExpressionComparisonType::None:
+            return "NONE";
+    }
+    return "";
+}
+
 bool is_length_suffix(const std::string& s)
 {
     return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
@@ -983,6 +996,16 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
     return ordering;
 }
 
+void verify_conditions(Subexpr* left, Subexpr* right)
+{
+    if (dynamic_cast<ColumnListBase*>(left) && dynamic_cast<ColumnListBase*>(right)) {
+        util::serializer::SerialisationState state;
+        throw std::runtime_error(
+            util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
+                         left->description(state), right->description(state)));
+    }
+}
+
 std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(const std::vector<ValueNode*>& values)
 {
     std::unique_ptr<Subexpr> left;
@@ -1011,12 +1034,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
             left = left_prop->visit(this);
         }
     }
-    if (dynamic_cast<ColumnListBase*>(left.get()) && dynamic_cast<ColumnListBase*>(right.get())) {
-        util::serializer::SerialisationState state;
-        throw std::runtime_error(
-            util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
-                         left->description(state), right->description(state)));
-    }
+    verify_conditions(left.get(), right.get());
     return {std::move(left), std::move(right)};
 }
 
@@ -1117,6 +1135,12 @@ Subexpr* LinkChain::column(const std::string& col)
     if (!col_key) {
         throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
     }
+    size_t list_count = 0;
+    for (ColKey link_key : m_link_cols) {
+        if (link_key.get_type() == col_type_LinkList || link_key.get_type() == col_type_BackLink) {
+            list_count++;
+        }
+    }
 
     if (col_key.is_list()) {
         switch (col_key.get_type()) {
@@ -1150,6 +1174,11 @@ Subexpr* LinkChain::column(const std::string& col)
         }
     }
     else {
+        if (m_comparison_type != ExpressionComparisonType::Any && list_count == 0) {
+            throw std::runtime_error(util::format("The keypath following '%1' must contain a list",
+                                                  expression_cmp_type_to_str(m_comparison_type)));
+        }
+
         switch (col_key.get_type()) {
             case col_type_Int:
                 return create_subexpr<Int>(col_key);
