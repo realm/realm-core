@@ -197,7 +197,7 @@ bool Spec::convert_column_attributes()
                 changes = true;
             }
         }
-        ColumnType type = ColumnType(m_types.get(column_ndx));
+        ColumnType type = ColumnType(int(m_types.get(column_ndx)));
         ColumnAttrMask attr = ColumnAttrMask(m_attr.get(column_ndx));
         switch (type) {
             case col_type_Link:
@@ -319,7 +319,7 @@ void Spec::erase_column(size_t column_ndx)
 {
     REALM_ASSERT(column_ndx < m_types.size());
 
-    if (ColumnType(m_types.get(column_ndx)) != col_type_BackLink) {
+    if (ColumnType(int(m_types.get(column_ndx))) != col_type_BackLink) {
         if (is_string_enum_type(column_ndx)) {
             // Enum columns do also have a separate key list
             ref_type keys_ref = m_enumkeys.get_as_ref(column_ndx);
@@ -370,7 +370,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 
     size_t subspec_ndx = 0;
     for (size_t i = 0; i != column_ndx; ++i) {
-        ColumnType type = ColumnType(m_types.get(i));
+        ColumnType type = ColumnType(int(m_types.get(i)));
         if (type == col_type_Link || type == col_type_LinkList) {
             subspec_ndx += 1; // index of dest column
         }
@@ -495,7 +495,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
     // check each column's type
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
-        ColumnType col_type = ColumnType(m_types.get(col_ndx));
+        ColumnType col_type = ColumnType(int(m_types.get(col_ndx)));
         switch (col_type) {
             case col_type_Link:
             case col_type_TypedLink:
