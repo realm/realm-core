@@ -734,6 +734,14 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
             REQUIRE(list.get<T>(i) == values[i]);
             REQUIRE(results.get<T>(i) == values[i]);
         }
+        for (size_t i = 0; i < values.size(); ++i) {
+            CAPTURE(i);
+            auto rev = values.size() - i - 1;
+            Mixed val(values[rev]);
+            list.set_any(i, val);
+            REQUIRE(list.get_any(i) == val);
+            REQUIRE(results.get_any(i) == val);
+        }
 
         REQUIRE_THROWS(list.set(list.size(), static_cast<T>(values[0])));
     }
@@ -742,6 +750,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         for (size_t i = 0; i < values.size(); ++i) {
             CAPTURE(i);
             REQUIRE(list.find<T>(values[i]) == i);
+            REQUIRE(list.find_any(Mixed(values[i])) == i);
             REQUIRE(results.index_of<T>(values[i]) == i);
 
             REQUIRE(list.find(ctx, TestType::to_any(values[i])) == i);

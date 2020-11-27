@@ -58,6 +58,9 @@ public:
     /// the collection.
     virtual void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const = 0;
 
+    // Return index of the first occurrence of 'value'
+    virtual size_t find_any(Mixed value) const = 0;
+
     /// True if `size()` returns 0.
     virtual bool is_empty() const final
     {

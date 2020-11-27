@@ -33,7 +33,6 @@ public:
 
     virtual ~SetBase() {}
     virtual SetBasePtr clone() const = 0;
-    virtual size_t find_any(Mixed) const = 0;
     virtual std::pair<size_t, bool> insert_null() = 0;
     virtual std::pair<size_t, bool> erase_null() = 0;
     virtual std::pair<size_t, bool> insert_any(Mixed value) = 0;
