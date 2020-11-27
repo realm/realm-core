@@ -54,6 +54,11 @@ set_target_properties(RealmFFI PROPERTIES
     OUTPUT_NAME "realm-ffi"
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
+
+    # FIXME: Not building by default because of the link-time dependency on
+    # libuv. This should be fixed by refactoring Scheduler to be a dynamic
+    # interface with an implementation selected at runtime.
+    EXCLUDE_FROM_ALL ON
 )
 
 set_target_properties(RealmFFIStatic PROPERTIES
@@ -62,5 +67,7 @@ set_target_properties(RealmFFIStatic PROPERTIES
     VISIBILITY_INLINES_HIDDEN ON
 )
 
-install(TARGETS RealmFFI DESTINATION lib COMPONENT devel)
+# install(TARGETS RealmFFI DESTINATION lib COMPONENT devel)
+
+install(TARGETS RealmFFIStatic DESTINATION lib COMPONENT devel)
 install(FILES ../../realm.h DESTINATION include/realm COMPONENT devel)
