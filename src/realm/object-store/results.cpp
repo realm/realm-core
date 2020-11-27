@@ -352,8 +352,9 @@ Mixed Results::get_any(size_t ndx)
     switch (m_mode) {
         case Mode::Empty:
             break;
+        case Mode::Set:
         case Mode::List:
-            evaluate_sort_and_distinct_on_list();
+            evaluate_sort_and_distinct_on_collection();
             if (m_list_indices) {
                 if (ndx < m_list_indices->size())
                     return m_collection->get_any((*m_list_indices)[ndx]);
@@ -367,8 +368,9 @@ Mixed Results::get_any(size_t ndx)
             if (ndx < m_table->size())
                 return m_table_iterator.get(*m_table, ndx);
             break;
+        case Mode::LinkSet:
         case Mode::LinkList:
-            if (update_linklist()) {
+            if (update_link_collection()) {
                 if (ndx < m_link_list->size()) {
                     auto obj_key = m_link_list->get(ndx);
                     auto table_key = m_link_list->get_target_table()->get_key();
