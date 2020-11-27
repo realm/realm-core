@@ -30,7 +30,7 @@ class SortDescriptor;
 class ConstTableRef;
 class Group;
 
-enum class DescriptorType { Sort, Distinct, Limit};
+enum class DescriptorType { Sort, Distinct, Limit };
 
 struct LinkPathPart {
     // Constructor for forward links
