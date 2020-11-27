@@ -82,7 +82,7 @@ void Spec::update_internals() noexcept
     m_num_public_columns = 0;
     size_t n = m_types.size();
     for (size_t i = 0; i < n; ++i) {
-        if (m_types.get(i) == int(col_type_BackLink)) {
+        if (ColumnType(int(m_types.get(i))) == col_type_BackLink) {
             // Now we have no more public columns
             return;
         }
