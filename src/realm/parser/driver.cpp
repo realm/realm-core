@@ -277,8 +277,8 @@ Query EqualityNode::visit(ParserDriver* drv)
     auto right_type = right->get_type();
 
     if (left_type >= 0 && right_type >= 0 && !Mixed::data_types_are_comparable(left_type, right_type)) {
-        throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
-                                              get_data_type_name(left_type), get_data_type_name(right_type)));
+        throw std::invalid_argument(util::format("Unsupported comparison between type '%1' and type '%2'",
+                                                 get_data_type_name(left_type), get_data_type_name(right_type)));
     }
 
     if (op == CompareNode::IN) {
@@ -289,46 +289,61 @@ Query EqualityNode::visit(ParserDriver* drv)
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
-    if (prop && !prop->links_exist() && right->has_constant_evaluation() && left_type == right_type) {
-        auto col_key = prop->column_key();
+    if (right->has_constant_evaluation() && left_type == right_type) {
         Mixed val = right->get_mixed();
-        if (val.is_null()) {
-            switch (op) {
-                case CompareNode::EQUAL:
-                    return drv->m_base_table->where().equal(col_key, realm::null());
-                case CompareNode::NOT_EQUAL:
-                    return drv->m_base_table->where().not_equal(col_key, realm::null());
+        if (prop && !prop->links_exist()) {
+            auto col_key = prop->column_key();
+            if (val.is_null()) {
+                switch (op) {
+                    case CompareNode::EQUAL:
+                    case CompareNode::IN:
+                        return drv->m_base_table->where().equal(col_key, realm::null());
+                    case CompareNode::NOT_EQUAL:
+                        return drv->m_base_table->where().not_equal(col_key, realm::null());
+                }
+            }
+            switch (left->get_type()) {
+                case type_Int:
+                    return drv->simple_query(op, col_key, val.get_int());
+                case type_Bool:
+                    return drv->simple_query(op, col_key, val.get_bool());
+                case type_String:
+                    return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
+                    break;
+                case type_Binary:
+                    return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
+                    break;
+                case type_Timestamp:
+                    return drv->simple_query(op, col_key, val.get<Timestamp>());
+                case type_Float:
+                    return drv->simple_query(op, col_key, val.get_float());
+                    break;
+                case type_Double:
+                    return drv->simple_query(op, col_key, val.get_double());
+                    break;
+                case type_Decimal:
+                    return drv->simple_query(op, col_key, val.get<Decimal128>());
+                    break;
+                case type_ObjectId:
+                    break;
+                case type_UUID:
+                    return drv->simple_query(op, col_key, val.get<UUID>());
+                    break;
+                default:
+                    break;
             }
         }
-        switch (left->get_type()) {
-            case type_Int:
-                return drv->simple_query(op, col_key, val.get_int());
-            case type_Bool:
-                return drv->simple_query(op, col_key, val.get_bool());
-            case type_String:
-                return drv->simple_query(op, col_key, val.get_string(), case_sensitive);
-                break;
-            case type_Binary:
-                return drv->simple_query(op, col_key, val.get_binary(), case_sensitive);
-                break;
-            case type_Timestamp:
-                return drv->simple_query(op, col_key, val.get<Timestamp>());
-            case type_Float:
-                return drv->simple_query(op, col_key, val.get_float());
-                break;
-            case type_Double:
-                return drv->simple_query(op, col_key, val.get_double());
-                break;
-            case type_Decimal:
-                return drv->simple_query(op, col_key, val.get<Decimal128>());
-                break;
-            case type_ObjectId:
-                break;
-            case type_UUID:
-                return drv->simple_query(op, col_key, val.get<UUID>());
-                break;
-            default:
-                break;
+        else if (left_type == type_Link) {
+            auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
+            if (link_column && link_column->link_map().get_nb_hops() == 1) {
+                // We can fall back to Query::links_to for != and == operations on links, but only
+                // for == on link lists. This is because negating query.links_to() is equivalent to
+                // to "ALL linklist != row" rather than the "ANY linklist != row" semantics we're after.
+                if (op == CompareNode::EQUAL) {
+                    return drv->m_base_table->where().links_to(link_column->link_map().get_first_column_key(),
+                                                               val.get<ObjKey>());
+                }
+            }
         }
     }
     if (case_sensitive) {
@@ -854,6 +869,10 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::OID:
             ret = new Value<ObjectId>(ObjectId(text.substr(4, text.size() - 5).c_str()));
             break;
+        case Type::LINK: {
+            ret = new Value<ObjKey>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
+            break;
+        }
         case Type::NULL_VAL:
             if (hint == type_String) {
                 ret = new ConstantStringValue(StringData()); // Null string

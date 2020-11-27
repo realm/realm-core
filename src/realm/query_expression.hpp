@@ -1699,6 +1699,12 @@ public:
         return m_link_column_keys.size() > 0;
     }
 
+    ColKey get_first_column_key() const
+    {
+        REALM_ASSERT(has_links());
+        return m_link_column_keys[0];
+    }
+
     void set_base_table(ConstTableRef table);
 
     void set_cluster(const Cluster* cluster)

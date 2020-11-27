@@ -71,6 +71,7 @@ blank   [ \t\r]
 "uuid("{hex}{8}"-"{hex}{4}"-"{hex}{4}"-"{hex}{4}"-"{hex}{12}")" return yy::parser::make_UUID(yytext); 
 "oid("{hex}{24}")"          return yy::parser::make_OID(yytext); 
 ("T"{sint}":"{sint})|({int}"-"{int}"-"{int}[@T]{int}":"{int}":"{int}(":"{int})?) return yy::parser::make_TIMESTAMP(yytext);
+"O"{int}                    return yy::parser::make_LINK (yytext);
 {int}                       return yy::parser::make_NATURAL0 (yytext);
 "$"{int}                    return yy::parser::make_ARG(yytext); 
 [+-]?{int}                  return yy::parser::make_NUMBER (yytext);

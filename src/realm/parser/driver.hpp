@@ -171,6 +171,7 @@ public:
         TIMESTAMP,
         UUID_T,
         OID,
+        LINK,
         NULL_VAL,
         TRUE,
         FALSE,
