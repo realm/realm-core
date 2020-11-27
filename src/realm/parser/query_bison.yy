@@ -43,6 +43,12 @@
 #include <realm/table.hpp>
 using namespace realm;
 using namespace realm::query_parser;
+
+#ifdef _MSC_VER
+// ignore msvc warnings in this file (poped at end)
+// do this by setting the warning level to 1 (permissive)
+#pragma warning( push, 1 )
+#endif
 }
 %define api.symbol.prefix {SYM_}
 %define api.token.prefix {TOK_}
@@ -286,3 +292,7 @@ yy::parser::error (const std::string& m)
 {
     drv.error(m);
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop ) // restore normal warning levels
+#endif
