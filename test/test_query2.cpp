@@ -72,8 +72,8 @@ using namespace realm::test_util;
 TEST(Query_BigString)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(1, "a");
     ObjKey res1 = ttt.where().equal(col_str, "a").find();
@@ -94,9 +94,9 @@ TEST(Query_BigString)
 TEST(Query_Limit)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a"); //
@@ -144,9 +144,9 @@ TEST(Query_Limit)
 TEST(Query_FindAll1)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -170,9 +170,9 @@ TEST(Query_FindAll1)
 TEST(Query_FindAll2)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -191,9 +191,9 @@ TEST(Query_FindAll2)
 TEST(Query_FindAllBetween)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -216,9 +216,9 @@ TEST(Query_FindAllBetween)
 TEST(Query_FindAllOr)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -251,9 +251,9 @@ TEST(Query_FindAllOr)
 TEST(Query_FindAllParens1)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -274,9 +274,9 @@ TEST(Query_FindAllParens1)
 TEST(Query_FindAllOrParan)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -300,9 +300,9 @@ TEST(Query_FindAllOrParan)
 TEST(Query_FindAllOrNested0)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -324,9 +324,9 @@ TEST(Query_FindAllOrNested0)
 TEST(Query_FindAllOrNested)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -357,9 +357,9 @@ TEST(Query_FindAllOrNested)
 TEST(Query_FindAllOrNestedInnerGroup)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "a");
     ttt.create_object().set_all(1, 2, "a");
@@ -392,9 +392,9 @@ TEST(Query_FindAllOrNestedInnerGroup)
 TEST(Query_FindAllOrPHP)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, 1, "Joe");
     ttt.create_object().set_all(1, 2, "Sara");
@@ -413,8 +413,8 @@ TEST(Query_FindAllOrPHP)
 TEST(Query_FindAllParens2)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
+    auto col_id = ttt.add_column(col_type_Int, "id");
+    auto col_int = ttt.add_column(col_type_Int, "1");
 
     ttt.create_object().set_all(0, 1);
     ttt.create_object().set_all(1, 2);
@@ -455,8 +455,8 @@ TEST(Query_FindAllParens2)
 TEST(Query_FindAllBool)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_bool = table.add_column(type_Bool, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_bool = table.add_column(col_type_Bool, "2");
 
     table.create_object().set_all(0, true);
     table.create_object().set_all(1, false);
@@ -477,8 +477,8 @@ TEST(Query_FindAllBool)
 TEST(Query_FindAllBegins)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, "fo");
     table.create_object().set_all(1, "foo");
@@ -494,8 +494,8 @@ TEST(Query_FindAllBegins)
 TEST(Query_FindAllEnds)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, "barfo");
     table.create_object().set_all(1, "barfoo");
@@ -511,8 +511,8 @@ TEST(Query_FindAllEnds)
 TEST(Query_FindAllContains)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, "foo");
     table.create_object().set_all(1, "foobar");
@@ -545,7 +545,7 @@ TEST(Query_FindAllLikeStackOverflow)
     StringData sd(str);
 
     Table table;
-    auto col = table.add_column(type_String, "strings");
+    auto col = table.add_column(col_type_String, "strings");
     ObjKey k = table.create_object().set(col, sd).get_key();
 
     auto res = table.where().like(col, sd).find();
@@ -555,8 +555,8 @@ TEST(Query_FindAllLikeStackOverflow)
 TEST(Query_FindAllLikeCaseInsensitive)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, "Foo");
     table.create_object().set_all(1, "FOOBAR");
@@ -578,8 +578,8 @@ TEST(Query_FindAllLikeCaseInsensitive)
 TEST(Query_Binary)
 {
     Table t;
-    t.add_column(type_Int, "1");
-    auto c1 = t.add_column(type_Binary, "2");
+    t.add_column(col_type_Int, "1");
+    auto c1 = t.add_column(col_type_Binary, "2");
 
     const char bin[64] = {6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4, 5, 7, 9, 5, 7, 1,
                           1, 2, 0, 8, 3, 8, 0, 9, 6, 8, 4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4,
@@ -655,8 +655,8 @@ TEST(Query_Binary)
 TEST(Query_Enums)
 {
     Table table;
-    auto col_int = table.add_column(type_Int, "1");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_int = table.add_column(col_type_Int, "1");
+    auto col_str = table.add_column(col_type_String, "2");
 
 
     for (size_t i = 0; i < 5; ++i) {
@@ -686,7 +686,7 @@ TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
     constexpr bool nullable = TEST_TYPE::value;
 
     Table ttt;
-    auto col = ttt.add_column(type_String, "2", nullable);
+    auto col = ttt.add_column(col_type_String, "2", nullable);
 
     ObjKey k = ttt.create_object().set(col, "BLAAbaergroed").get_key();
     ttt.create_object().set(col, "BLAAbaergroedandMORE");
@@ -725,8 +725,8 @@ TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 TEST(Query_Unicode2)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, uY);
     table.create_object().set_all(1, uYd);
@@ -755,8 +755,8 @@ TEST(Query_Unicode2)
 TEST(Query_Unicode3)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, uA);
     table.create_object().set_all(1, uAd);
@@ -792,8 +792,8 @@ TEST(Query_Unicode3)
 TEST(Query_FindAllBeginsUnicode)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, uad "fo");
     table.create_object().set_all(1, uad "foo");
@@ -810,8 +810,8 @@ TEST(Query_FindAllBeginsUnicode)
 TEST(Query_FindAllEndsUnicode)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, "barfo");
     table.create_object().set_all(1, "barfoo" uad);
@@ -832,8 +832,8 @@ TEST(Query_FindAllEndsUnicode)
 TEST(Query_FindAllContainsUnicode)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_id = table.add_column(col_type_Int, "id");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(0, uad "foo");
     table.create_object().set_all(1, uad "foobar");
@@ -863,8 +863,8 @@ TEST(Query_FindAllContainsUnicode)
 TEST(Query_SyntaxCheck)
 {
     Table table;
-    auto col_int = table.add_column(type_Int, "1");
-    table.add_column(type_String, "2");
+    auto col_int = table.add_column(col_type_Int, "1");
+    table.add_column(col_type_String, "2");
 
     std::string s;
 
@@ -912,8 +912,8 @@ TEST(Query_TestTV_where)
 {
     // When using .where(&tv), tv can have any order, and the resulting view will retain its order
     Table table;
-    auto col_int = table.add_column(type_Int, "1");
-    auto col_str = table.add_column(type_String, "2");
+    auto col_int = table.add_column(col_type_Int, "1");
+    auto col_str = table.add_column(col_type_String, "2");
 
     table.create_object().set_all(1, "a");
     table.create_object().set_all(2, "a");
@@ -936,10 +936,10 @@ TEST(Query_SumMinMaxAvg)
 {
     Table t;
 
-    auto int_col = t.add_column(type_Int, "1");
-    auto date_col = t.add_column(type_Timestamp, "3");
-    auto float_col = t.add_column(type_Float, "4");
-    auto double_col = t.add_column(type_Double, "5");
+    auto int_col = t.add_column(col_type_Int, "1");
+    auto date_col = t.add_column(col_type_Timestamp, "3");
+    auto float_col = t.add_column(col_type_Float, "4");
+    auto double_col = t.add_column(col_type_Double, "5");
 
     std::vector<ObjKey> keys;
     t.create_objects(9, keys);
@@ -1007,7 +1007,7 @@ TEST(Query_SumMinMaxAvg)
 TEST(Query_Avg)
 {
     Table t;
-    auto col = t.add_column(type_Int, "1");
+    auto col = t.add_column(col_type_Int, "1");
 
     t.create_object().set(col, 10);
     CHECK_EQUAL(10, t.where().average_int(col));
@@ -1018,8 +1018,8 @@ TEST(Query_Avg)
 TEST(Query_Avg2)
 {
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
-    auto col_str = t.add_column(type_String, "2");
+    auto col_int = t.add_column(col_type_Int, "1");
+    auto col_str = t.add_column(col_type_String, "2");
 
     size_t cnt;
 
@@ -1042,8 +1042,8 @@ TEST(Query_Avg2)
 TEST(Query_OfByOne)
 {
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
-    t.add_column(type_String, "2");
+    auto col_int = t.add_column(col_type_Int, "1");
+    t.add_column(col_type_String, "2");
     size_t cluster_size = (REALM_MAX_BPNODE_SIZE > 256) ? 256 : 4;
     for (size_t i = 0; i < cluster_size * 2; ++i) {
         t.create_object().set_all(1, "a");
@@ -1085,14 +1085,14 @@ TEST(Query_AllTypesDynamicallyTyped)
         bool n = (nullable == 1);
 
         Table table;
-        auto col_boo = table.add_column(type_Bool, "boo", n);
-        auto col_int = table.add_column(type_Int, "int", n);
-        auto col_flt = table.add_column(type_Float, "flt", n);
-        auto col_dbl = table.add_column(type_Double, "dbl", n);
-        auto col_str = table.add_column(type_String, "str", n);
-        auto col_bin = table.add_column(type_Binary, "bin", n);
-        auto col_dat = table.add_column(type_Timestamp, "dat", n);
-        auto col_lst = table.add_column_list(type_Int, "int_list");
+        auto col_boo = table.add_column(col_type_Bool, "boo", n);
+        auto col_int = table.add_column(col_type_Int, "int", n);
+        auto col_flt = table.add_column(col_type_Float, "flt", n);
+        auto col_dbl = table.add_column(col_type_Double, "dbl", n);
+        auto col_str = table.add_column(col_type_String, "str", n);
+        auto col_bin = table.add_column(col_type_Binary, "bin", n);
+        auto col_dat = table.add_column(col_type_Timestamp, "dat", n);
+        auto col_lst = table.add_column_list(col_type_Int, "int_list");
 
         const char bin[4] = {0, 1, 2, 3};
         BinaryData bin1(bin, sizeof bin / 2);
@@ -1156,7 +1156,7 @@ TEST(Query_AllTypesDynamicallyTyped)
 TEST(Query_AggregateSortedView)
 {
     Table table;
-    auto col = table.add_column(type_Double, "col");
+    auto col = table.add_column(col_type_Double, "col");
 
     const int count = REALM_MAX_BPNODE_SIZE * 2;
     for (int i = 0; i < count; ++i)
@@ -1177,9 +1177,9 @@ TEST(Query_DeepCopy)
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
-    auto col_str = t.add_column(type_String, "2");
-    auto col_dbl = t.add_column(type_Double, "3");
+    auto col_int = t.add_column(col_type_Int, "1");
+    auto col_str = t.add_column(col_type_String, "2");
+    auto col_dbl = t.add_column(col_type_Double, "3");
 
     ObjKey k0 = t.create_object().set_all(1, "1", 1.1).get_key();
     t.create_object().set_all(2, "2", 2.2);
@@ -1264,7 +1264,7 @@ TEST(Query_DeepCopy)
 TEST(Query_TableViewMoveAssign1)
 {
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
+    auto col_int = t.add_column(col_type_Int, "1");
 
     t.create_object().set(col_int, 1);
     t.create_object().set(col_int, 2);
@@ -1286,9 +1286,9 @@ TEST(Query_TableViewMoveAssign1)
 TEST(Query_TableViewMoveAssignLeak2)
 {
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
-    auto col_str = t.add_column(type_String, "2");
-    auto col_dbl = t.add_column(type_Double, "3");
+    auto col_int = t.add_column(col_type_Int, "1");
+    auto col_str = t.add_column(col_type_String, "2");
+    auto col_dbl = t.add_column(col_type_Double, "3");
 
     Query q = t.column<Int>(col_int) < t.column<double>(col_dbl) && t.column<String>(col_str) == "4";
     TableView tv = q.find_all();
@@ -1342,8 +1342,8 @@ TEST(Query_DeepCopyLeak1)
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
-    auto col_dbl = t.add_column(type_Double, "3");
+    auto col_int = t.add_column(col_type_Int, "1");
+    auto col_dbl = t.add_column(col_type_Double, "3");
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
     Query q =
@@ -1358,7 +1358,7 @@ TEST(Query_DeepCopyTest)
     // If Query::first vector was relocated because of push_back, then Query would crash, because referenced
     // pointers were pointing into it.
     Table table;
-    table.add_column(type_Int, "first");
+    table.add_column(col_type_Int, "first");
 
     Query q1 = table.where();
 
@@ -1373,7 +1373,7 @@ TEST(Query_StringIndexCrash)
     // Test for a crash which occured when a query testing for equality on a
     // string index was deep-copied after being run
     Table table;
-    auto col = table.add_column(type_String, "s", true);
+    auto col = table.add_column(col_type_String, "s", true);
     table.add_search_index(col);
 
     Query q = table.where().equal(col, StringData(""));
@@ -1384,7 +1384,7 @@ TEST(Query_StringIndexCrash)
 TEST(Query_NullStrings)
 {
     Table table;
-    auto col = table.add_column(type_String, "s", true);
+    auto col = table.add_column(col_type_String, "s", true);
 
     Query q;
     TableView v;
@@ -1451,7 +1451,7 @@ TEST(Query_Nulls_Fuzzy)
 
         for (size_t t = 0; t < 10; t++) {
             Table table;
-            auto col = table.add_column(type_String, "string", true);
+            auto col = table.add_column(col_type_String, "string", true);
 
             if (attributes == 0) {
             }
@@ -1566,7 +1566,7 @@ TEST(Query_Nulls_Fuzzy)
 TEST(Query_BinaryNull)
 {
     Table table;
-    auto col = table.add_column(type_Binary, "first", true);
+    auto col = table.add_column(col_type_Binary, "first", true);
 
     auto k0 = table.create_object().set(col, BinaryData()).get_key();
     auto k1 = table.create_object()
@@ -1662,9 +1662,9 @@ TEST(Query_IntegerNullOldQueryEngine)
           null    null      4
     */
     Table table;
-    auto c0 = table.add_column(type_Int, "first", true);
-    auto c1 = table.add_column(type_Int, "second", true);
-    auto c2 = table.add_column(type_Int, "third", false);
+    auto c0 = table.add_column(col_type_Int, "first", true);
+    auto c1 = table.add_column(col_type_Int, "second", true);
+    auto c2 = table.add_column(col_type_Int, "third", false);
 
     auto k0 = table.create_object(ObjKey(4), {/*      */ {c1, 100}, {c2, 1}}).get_key();
     auto k1 = table.create_object(ObjKey(5), {{c0, 0}, /*        */ {c2, 2}}).get_key();
@@ -1714,7 +1714,7 @@ TEST(Query_IntegerNullOldQueryEngine)
 TEST(Query_IntegerNonNull)
 {
     Table table;
-    auto col = table.add_column(type_Int, "first", false);
+    auto col = table.add_column(col_type_Int, "first", false);
 
     table.create_object().set(col, 123);
     table.create_object().set(col, 456);
@@ -1732,8 +1732,8 @@ TEST(Query_64BitValues)
     Group g;
     ObjKey m;
     TableRef table = g.add_table("table");
-    auto c0 = table->add_column(type_Int, "key");
-    auto c1 = table->add_column(type_Int, "16bit");
+    auto c0 = table->add_column(col_type_Int, "key");
+    auto c1 = table->add_column(col_type_Int, "16bit");
 
     const int64_t start = 4485019129LL;
     const int64_t count = 20; // First 16 SSE-searched, four fallback
@@ -1786,13 +1786,13 @@ namespace {
 
 void create_columns(TableRef table, bool nullable = true)
 {
-    table->add_column(type_Int, "Price", nullable);
-    table->add_column(type_Float, "Shipping", nullable);
-    table->add_column(type_String, "Description", nullable);
-    table->add_column(type_Double, "Rating", nullable);
-    table->add_column(type_Bool, "Stock", nullable);
-    table->add_column(type_Timestamp, "Delivery date", nullable);
-    table->add_column(type_Binary, "Photo", nullable);
+    table->add_column(col_type_Int, "Price", nullable);
+    table->add_column(col_type_Float, "Shipping", nullable);
+    table->add_column(col_type_String, "Description", nullable);
+    table->add_column(col_type_Double, "Rating", nullable);
+    table->add_column(col_type_Bool, "Stock", nullable);
+    table->add_column(col_type_Timestamp, "Delivery date", nullable);
+    table->add_column(col_type_Binary, "Photo", nullable);
 }
 
 bool equals(TableView& tv, const std::vector<int64_t>& keys)
@@ -2605,14 +2605,14 @@ TEST(Query_LinkCounts)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_str = table1->add_column(type_String, "str");
+    auto col_str = table1->add_column(col_type_String, "str");
 
     auto k0 = table1->create_object().set(col_str, "abc").get_key();
     auto k1 = table1->create_object().set(col_str, "def").get_key();
     auto k2 = table1->create_object().set(col_str, "ghi").get_key();
 
     TableRef table2 = group.add_table("table2");
-    auto col_int = table2->add_column(type_Int, "int");
+    auto col_int = table2->add_column(col_type_Int, "int");
     auto col_link = table2->add_column(*table1, "link");
     auto col_linklist = table2->add_column_list(*table1, "linklist");
 
@@ -2670,9 +2670,9 @@ TEST(Query_Link_Minimum)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
-    auto col_float = table1->add_column(type_Float, "float", /* nullable */ true);
-    auto col_double = table1->add_column(type_Double, "double", /* nullable */ true);
+    auto col_int = table1->add_column(col_type_Int, "int", /* nullable */ true);
+    auto col_float = table1->add_column(col_type_Float, "float", /* nullable */ true);
+    auto col_double = table1->add_column(col_type_Double, "double", /* nullable */ true);
 
     // table1
     // 0: 789 789.0f 789.0
@@ -2752,9 +2752,9 @@ TEST(Query_Link_Minimum_Set)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
-    auto col_float = table1->add_column(type_Float, "float", /* nullable */ true);
-    auto col_double = table1->add_column(type_Double, "double", /* nullable */ true);
+    auto col_int = table1->add_column(col_type_Int, "int", /* nullable */ true);
+    auto col_float = table1->add_column(col_type_Float, "float", /* nullable */ true);
+    auto col_double = table1->add_column(col_type_Double, "double", /* nullable */ true);
 
     // table1
     // 0: 789 789.0f 789.0
@@ -2834,9 +2834,9 @@ TEST(Query_Link_MaximumSumAverage)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
-    auto col_flt = table1->add_column(type_Float, "float", /* nullable */ true);
-    auto col_dbl = table1->add_column(type_Double, "double", /* nullable */ true);
+    auto col_int = table1->add_column(col_type_Int, "int", /* nullable */ true);
+    auto col_flt = table1->add_column(col_type_Float, "float", /* nullable */ true);
+    auto col_dbl = table1->add_column(col_type_Double, "double", /* nullable */ true);
 
     // table1
     // 0: 123 123.0f 123.0
@@ -2852,7 +2852,7 @@ TEST(Query_Link_MaximumSumAverage)
     (++it)->set_all(789, 789.f, 789.);
 
     TableRef table2 = group.add_table("table2");
-    auto col_double = table2->add_column(type_Double, "double");
+    auto col_double = table2->add_column(col_type_Double, "double");
     auto col_link = table2->add_column(*table1, "link");
     auto col_linklist = table2->add_column_list(*table1, "linklist");
 
@@ -3044,9 +3044,9 @@ TEST(Query_Link_MaximumSumAverage_Set)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
-    auto col_flt = table1->add_column(type_Float, "float", /* nullable */ true);
-    auto col_dbl = table1->add_column(type_Double, "double", /* nullable */ true);
+    auto col_int = table1->add_column(col_type_Int, "int", /* nullable */ true);
+    auto col_flt = table1->add_column(col_type_Float, "float", /* nullable */ true);
+    auto col_dbl = table1->add_column(col_type_Double, "double", /* nullable */ true);
 
     // table1
     // 0: 123 123.0f 123.0
@@ -3062,7 +3062,7 @@ TEST(Query_Link_MaximumSumAverage_Set)
     (++it)->set_all(789, 789.f, 789.);
 
     TableRef table2 = group.add_table("table2");
-    auto col_double = table2->add_column(type_Double, "double");
+    auto col_double = table2->add_column(col_type_Double, "double");
     auto col_link = table2->add_column(*table1, "link");
     auto col_linkset = table2->add_column_set(*table1, "linkset");
 
@@ -3254,8 +3254,8 @@ TEST(Query_OperatorsOverLink)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int");
-    auto col_dbl = table1->add_column(type_Double, "double");
+    auto col_int = table1->add_column(col_type_Int, "int");
+    auto col_dbl = table1->add_column(col_type_Double, "double");
 
     // table1
     // 0: 2 2.0
@@ -3267,7 +3267,7 @@ TEST(Query_OperatorsOverLink)
     table1->get_object(keys[1]).set_all(3, 3.0);
 
     TableRef table2 = group.add_table("table2");
-    auto col_int2 = table2->add_column(type_Int, "int");
+    auto col_int2 = table2->add_column(col_type_Int, "int");
     auto col_linklist = table2->add_column_list(*table1, "linklist");
 
     // table2
@@ -3364,8 +3364,8 @@ TEST(Query_OperatorsOverLink_Set)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int");
-    auto col_dbl = table1->add_column(type_Double, "double");
+    auto col_int = table1->add_column(col_type_Int, "int");
+    auto col_dbl = table1->add_column(col_type_Double, "double");
 
     // table1
     // 0: 2 2.0
@@ -3377,7 +3377,7 @@ TEST(Query_OperatorsOverLink_Set)
     table1->get_object(keys[1]).set_all(3, 3.0);
 
     TableRef table2 = group.add_table("table2");
-    auto col_int2 = table2->add_column(type_Int, "int");
+    auto col_int2 = table2->add_column(col_type_Int, "int");
     auto col_linkset = table2->add_column_set(*table1, "linkset");
 
     // table2
@@ -3474,8 +3474,8 @@ TEST(Query_CompareLinkedColumnVsColumn)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int");
-    auto col_dbl = table1->add_column(type_Double, "double");
+    auto col_int = table1->add_column(col_type_Int, "int");
+    auto col_dbl = table1->add_column(col_type_Double, "double");
 
     // table1
     // 0: 2 2.0
@@ -3487,7 +3487,7 @@ TEST(Query_CompareLinkedColumnVsColumn)
     table1->get_object(keys[1]).set_all(3, 3.0);
 
     TableRef table2 = group.add_table("table2");
-    auto col_int2 = table2->add_column(type_Int, "int");
+    auto col_int2 = table2->add_column(col_type_Int, "int");
     auto col_link1 = table2->add_column(*table1, "link1");
     auto col_link2 = table2->add_column(*table1, "link2");
 
@@ -3525,9 +3525,9 @@ TEST(Query_CompareThroughUnaryLinks)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int");
-    auto col_dbl = table1->add_column(type_Double, "double");
-    auto col_str = table1->add_column(type_String, "string");
+    auto col_int = table1->add_column(col_type_Int, "int");
+    auto col_dbl = table1->add_column(col_type_Double, "double");
+    auto col_str = table1->add_column(col_type_String, "string");
 
     // table1
     // 0: 2 2.0 "abc"
@@ -3593,8 +3593,8 @@ TEST(Query_DeepLink)
 
     Group group;
     TableRef table = group.add_table("test");
-    table->add_column(type_Int, "int");
-    auto col_bool = table->add_column(type_Bool, "bool");
+    table->add_column(col_type_Int, "int");
+    auto col_bool = table->add_column(col_type_Bool, "bool");
     auto col_linklist = table->add_column_list(*table, "list");
 
     for (int j = 0; j < N; ++j) {
@@ -3621,7 +3621,7 @@ TEST(Query_LinksToDeletedOrMovedRow)
     TableRef target = group.add_table("target");
 
     auto col_link = source->add_column(*target, "link");
-    auto col_name = target->add_column(type_String, "name");
+    auto col_name = target->add_column(col_type_String, "name");
 
     ObjKeys keys({4, 6, 8});
     target->create_objects(keys);
@@ -3662,7 +3662,7 @@ TEST(Query_BrokenFindGT)
 {
     Group group;
     TableRef table = group.add_table("test");
-    auto col = table->add_column(type_Int, "int");
+    auto col = table->add_column(col_type_Int, "int");
 
     const size_t rows = 12;
     for (size_t i = 0; i < rows; ++i) {
@@ -3695,7 +3695,7 @@ TEST(Query_FuzzyFind)
     for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++) {
         Group group;
         TableRef table = group.add_table("test");
-        auto col = table->add_column(type_Int, "int");
+        auto col = table->add_column(col_type_Int, "int");
 
         // The bug happened when values were stored in 4 bits or less. So create a table full of such random values
         const size_t rows = 18;
@@ -3735,9 +3735,9 @@ TEST(Query_FuzzyFind)
 TEST(Query_AverageNullableColumns)
 {
     Table table;
-    auto col_int = table.add_column(type_Int, "int", true);
-    auto col_float = table.add_column(type_Float, "float", true);
-    auto col_double = table.add_column(type_Double, "double", true);
+    auto col_int = table.add_column(col_type_Int, "int", true);
+    auto col_float = table.add_column(col_type_Float, "float", true);
+    auto col_double = table.add_column(col_type_Double, "double", true);
 
     CHECK_EQUAL(0, table.where().average_int(col_int));
     CHECK_EQUAL(0, table.where().average_float(col_float));
@@ -3772,7 +3772,7 @@ TEST(Query_NegativeNumbers)
     for (size_t nullable = 0; nullable < 2; ++nullable) {
         Group group;
         TableRef table = group.add_table("test");
-        auto c0 = table->add_column(type_Int, "int", nullable == 0);
+        auto c0 = table->add_column(col_type_Int, "int", nullable == 0);
 
         int64_t id = -1;
         for (size_t i = 0; i < 10; ++i) {
@@ -3823,7 +3823,7 @@ TEST_TYPES(Query_EqualityInts, int64_t, util::Optional<int64_t>)
 {
     Group group;
     TableRef table = group.add_table("test");
-    auto col_ndx = table->add_column(type_Int, "int", std::is_same<TEST_TYPE, util::Optional<int64_t>>::value);
+    auto col_ndx = table->add_column(col_type_Int, "int", std::is_same<TEST_TYPE, util::Optional<int64_t>>::value);
 
     int64_t id = -1;
     int64_t sum = 0;
@@ -3859,9 +3859,9 @@ TEST(Query_MaximumSumAverage)
         bool n = (nullable == 1);
         Group group;
         TableRef table1 = group.add_table("table1");
-        ColKey c0 = table1->add_column(type_Int, "int1", /* nullable */ n);
-        ColKey c1 = table1->add_column(type_Int, "int2", /* nullable */ n);
-        ColKey c2 = table1->add_column(type_Double, "d", /* nullable */ n);
+        ColKey c0 = table1->add_column(col_type_Int, "int1", /* nullable */ n);
+        ColKey c1 = table1->add_column(col_type_Int, "int2", /* nullable */ n);
+        ColKey c2 = table1->add_column(col_type_Double, "d", /* nullable */ n);
 
         // Create three identical columns with values: For the nullable case:
         //      3, 4, null
@@ -4180,7 +4180,7 @@ TEST(Query_ReferDeletedLinkView)
     Group group;
     TableRef table = group.add_table("table");
     auto col_link = table->add_column_list(*table, "children");
-    auto col_int = table->add_column(type_Int, "age");
+    auto col_int = table->add_column(col_type_Int, "age");
     auto links = table->create_object().set(col_int, 123).get_linklist(col_link);
     Query q = table->where(links);
     TableView tv = q.find_all();
@@ -4237,8 +4237,8 @@ TEST(Query_SubQueries)
     TableRef target = group.add_table("target");
 
     // add some more columns to origin and target
-    auto col_int_t = target->add_column(type_Int, "integers");
-    auto col_string_t = target->add_column(type_String, "strings");
+    auto col_int_t = target->add_column(col_type_Int, "integers");
+    auto col_string_t = target->add_column(col_type_String, "strings");
     // in order to use set_all, columns involved in set_all must be inserted first.
     auto col_link_o = origin->add_column_list(*target, "link");
 
@@ -4335,8 +4335,8 @@ TEST(Query_Timestamp)
     ObjKey match;
     size_t cnt;
     Table table;
-    auto col_first = table.add_column(type_Timestamp, "first", true);
-    auto col_second = table.add_column(type_Timestamp, "second", true);
+    auto col_first = table.add_column(col_type_Timestamp, "first", true);
+    auto col_second = table.add_column(col_type_Timestamp, "second", true);
     Columns<Timestamp> first = table.column<Timestamp>(col_first);
     Columns<Timestamp> second = table.column<Timestamp>(col_second);
 
@@ -4477,7 +4477,7 @@ TEST(Query_Timestamp)
 TEST(Query_TimestampCount)
 {
     Table table;
-    auto col_date = table.add_column(type_Timestamp, "date", true);
+    auto col_date = table.add_column(col_type_Timestamp, "date", true);
     for (int i = 0; i < 10; i++) {
         table.create_object().set(col_date, Timestamp(i / 4, i % 4));
     }
@@ -4504,8 +4504,8 @@ TEST(Query_Timestamp_Null)
     Table table;
     ObjKey match;
 
-    auto col0 = table.add_column(type_Timestamp, "first", false);
-    auto col1 = table.add_column(type_Timestamp, "second", true);
+    auto col0 = table.add_column(col_type_Timestamp, "first", false);
+    auto col1 = table.add_column(col_type_Timestamp, "second", true);
     ObjKey k0 = table.create_object().get_key();
 
     Columns<Timestamp> first = table.column<Timestamp>(col0);
@@ -4554,7 +4554,7 @@ TEST(Query_SyncViewIfNeeded)
     TableRef target = group.add_table("target");
 
     auto col_links = source->add_column_list(*target, "link");
-    auto col_id = target->add_column(type_Int, "id");
+    auto col_id = target->add_column(col_type_Int, "id");
 
     auto reset_table_contents = [&] {
         source->clear();
@@ -4650,7 +4650,7 @@ TEST(Query_SyncViewIfNeeded)
 TEST(Query_CombineWithEmptyQueryDoesntCrash)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
+    auto col_id = table.add_column(col_type_Int, "id");
 
     table.create_object().set(col_id, 0);
     table.create_object().set(col_id, 1);
@@ -4706,7 +4706,7 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
 TEST(Query_AccountForRestrictingViews)
 {
     Table table;
-    auto col_id = table.add_column(type_Int, "id");
+    auto col_id = table.add_column(col_type_Int, "id");
 
     table.create_object().set(col_id, 42);
     table.create_object().set(col_id, 43);
@@ -4733,7 +4733,7 @@ TEST(Query_UTF8_Contains)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    table1->add_column(type_String, "str1");
+    table1->add_column(col_type_String, "str1");
     table1->add_empty_row();
     table1->set_string(0, 0, StringData("\x0ff\x000", 2));
     size_t m = table1->column<String>(0).contains(StringData("\x0ff\x000", 2), false).count();
@@ -4744,7 +4744,7 @@ TEST(Query_UTF8_Contains)
 TEST(Query_UTF8_Contains_Fuzzy)
 {
     Table table;
-    table.add_column(type_String, "str1");
+    table.add_column(col_type_String, "str1");
     table.add_empty_row();
 
     for (size_t t = 0; t < 10000; t++) {
@@ -4776,8 +4776,8 @@ TEST(Query_ArrayLeafRelocate)
         TableRef contact = group.add_table("contact");
         TableRef contact_type = group.add_table("contact_type");
 
-        auto col_int = contact_type->add_column(type_Int, "id");
-        auto col_str = contact_type->add_column(type_String, "str");
+        auto col_int = contact_type->add_column(col_type_Int, "id");
+        auto col_str = contact_type->add_column(col_type_String, "str");
         auto col_link = contact->add_column_list(*contact_type, "link");
 
         std::vector<ObjKey> contact_type_keys;
@@ -4797,8 +4797,8 @@ TEST(Query_ArrayLeafRelocate)
         TableView tv4 = q4.find_all();
         TableView tv5 = q5.find_all();
 
-        contact->add_column(type_Float, "extra");
-        contact_type->add_column(type_Float, "extra");
+        contact->add_column(col_type_Float, "extra");
+        contact_type->add_column(col_type_Float, "extra");
 
         for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE + 1; t++) {
             Obj contact_obj = contact->create_object();
@@ -4823,8 +4823,8 @@ TEST(Query_ArrayLeafRelocate)
 TEST(Query_ColumnDeletionSimple)
 {
     Table foo;
-    auto col_int0 = foo.add_column(type_Int, "a");
-    auto col_int1 = foo.add_column(type_Int, "b");
+    auto col_int0 = foo.add_column(col_type_Int, "a");
+    auto col_int1 = foo.add_column(col_type_Int, "b");
 
     std::vector<ObjKey> keys;
     foo.create_objects(10, keys);
@@ -4870,13 +4870,13 @@ TEST(Query_ColumnDeletionSimple)
 TEST(Query_ColumnDeletionExpression)
 {
     Table foo;
-    auto col_int0 = foo.add_column(type_Int, "a");
-    auto col_int1 = foo.add_column(type_Int, "b");
-    auto col_date2 = foo.add_column(type_Timestamp, "c");
-    auto col_date3 = foo.add_column(type_Timestamp, "d");
-    auto col_str4 = foo.add_column(type_String, "e");
-    auto col_float5 = foo.add_column(type_Float, "f");
-    auto col_bin6 = foo.add_column(type_Binary, "g");
+    auto col_int0 = foo.add_column(col_type_Int, "a");
+    auto col_int1 = foo.add_column(col_type_Int, "b");
+    auto col_date2 = foo.add_column(col_type_Timestamp, "c");
+    auto col_date3 = foo.add_column(col_type_Timestamp, "d");
+    auto col_str4 = foo.add_column(col_type_String, "e");
+    auto col_float5 = foo.add_column(col_type_Float, "f");
+    auto col_bin6 = foo.add_column(col_type_Binary, "g");
 
     Obj obj0 = foo.create_object();
     Obj obj1 = foo.create_object();
@@ -4962,9 +4962,9 @@ TEST(Query_ColumnDeletionLinks)
     TableRef bar = g.add_table("bar");
     TableRef foobar = g.add_table("foobar");
 
-    auto col_int0 = foobar->add_column(type_Int, "int");
+    auto col_int0 = foobar->add_column(col_type_Int, "int");
 
-    auto col_int1 = bar->add_column(type_Int, "int");
+    auto col_int1 = bar->add_column(col_type_Int, "int");
     auto col_link0 = bar->add_column(*foobar, "link");
 
     auto col_link1 = foo->add_column(*bar, "link");
@@ -5011,7 +5011,7 @@ TEST(Query_ColumnDeletionLinks)
 TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
 {
     Table table;
-    auto col_ndx = table.add_column(type_String, "id");
+    auto col_ndx = table.add_column(col_type_String, "id");
     table.add_search_index(col_ndx);
 
     ObjKey key0 = table.create_object().set(col_ndx, "111111111111111111111111").get_key();
@@ -5030,7 +5030,7 @@ TEST_TYPES(Query_CaseInsensitiveNullable, std::true_type, std::false_type)
     Table table;
     bool nullable = true;
     constexpr bool with_index = TEST_TYPE::value;
-    auto col_ndx = table.add_column(type_String, "id", nullable);
+    auto col_ndx = table.add_column(col_type_String, "id", nullable);
     if (with_index) {
         table.add_search_index(col_ndx);
     }
@@ -5074,7 +5074,7 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
     constexpr bool nullable = TEST_TYPE::value;
 
     Table table;
-    auto col = table.add_column(type_String, "name", nullable);
+    auto col = table.add_column(col_type_String, "name", nullable);
     table.add_search_index(col);
 
     table.create_object().set(col, "ROVER");
@@ -5089,7 +5089,7 @@ TEST_TYPES(Query_Rover, std::true_type, std::false_type)
 TEST(Query_StringPrimaryKey)
 {
     Table table;
-    auto col = table.add_column(type_String, "name");
+    auto col = table.add_column(col_type_String, "name");
     table.set_primary_key_column(col);
 
     table.create_object_with_primary_key("RASMUS");
@@ -5104,8 +5104,8 @@ TEST(Query_StringPrimaryKey)
 TEST(Query_IntOnly)
 {
     Table table;
-    auto c0 = table.add_column(type_Int, "i1");
-    auto c1 = table.add_column(type_Int, "i2");
+    auto c0 = table.add_column(col_type_Int, "i1");
+    auto c1 = table.add_column(col_type_Int, "i2");
 
     table.create_object(ObjKey(7)).set_all(7, 6);
     table.create_object(ObjKey(19)).set_all(19, 9);
@@ -5222,13 +5222,13 @@ TEST(Query_Group_bug)
     TableRef profile_table = g.add_table("profile");
     TableRef person_table = g.add_table("person");
 
-    auto col_service_id = service_table->add_column(type_String, "id");
+    auto col_service_id = service_table->add_column(col_type_String, "id");
     auto col_service_link = service_table->add_column_list(*profile_table, "profiles");
 
-    auto col_profile_id = profile_table->add_column(type_String, "role");
+    auto col_profile_id = profile_table->add_column(col_type_String, "role");
     auto col_profile_link = profile_table->add_column(*service_table, "services");
 
-    auto col_person_id = person_table->add_column(type_String, "id");
+    auto col_person_id = person_table->add_column(col_type_String, "id");
     auto col_person_link = person_table->add_column_list(*service_table, "services");
 
     auto sk0 = service_table->create_object().set(col_service_id, "service_1").get_key();
@@ -5297,8 +5297,8 @@ TEST(Query_TwoColumnUnaligned)
 {
     Group g;
     TableRef table = g.add_table("table");
-    ColKey a_col_ndx = table->add_column(type_Int, "a");
-    ColKey b_col_ndx = table->add_column(type_Int, "b");
+    ColKey a_col_ndx = table->add_column(col_type_Int, "a");
+    ColKey b_col_ndx = table->add_column(col_type_Int, "b");
 
     // Adding 1001 rows causes arrays in the 2 columns to be aligned differently
     // (on a 0 and on an 8 address resp)
@@ -5325,17 +5325,20 @@ TEST(Query_IntOrQueryOptimisation)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_optype = table->add_column(type_String, "optype");
-    auto col_active = table->add_column(type_Bool, "active");
-    auto col_id = table->add_column(type_Int, "id");
+    auto col_optype = table->add_column(col_type_String, "optype");
+    auto col_active = table->add_column(col_type_Bool, "active");
+    auto col_id = table->add_column(col_type_Int, "id");
 
     for (int i = 0; i < 100; i++) {
         auto obj = table->create_object();
         obj.set<bool>(col_active, (i % 10) != 0);
         obj.set<int>(col_id, i);
-        if (i == 0) obj.set(col_optype, "CREATE");
-        if (i == 1) obj.set(col_optype, "DELETE");
-        if (i == 2) obj.set(col_optype, "CREATE");
+        if (i == 0)
+            obj.set(col_optype, "CREATE");
+        if (i == 1)
+            obj.set(col_optype, "DELETE");
+        if (i == 2)
+            obj.set(col_optype, "CREATE");
     }
     auto optype = table->column<String>(col_optype);
     auto active = table->column<Bool>(col_active);
@@ -5359,8 +5362,8 @@ TEST_IF(Query_IntOrQueryPerformance, TEST_DURATION > 0)
 
     Group g;
     TableRef table = g.add_table("table");
-    auto ints_col_key = table->add_column(type_Int, "ints");
-    auto nullable_ints_col_key = table->add_column(type_Int, "nullable_ints", true);
+    auto ints_col_key = table->add_column(col_type_Int, "ints");
+    auto nullable_ints_col_key = table->add_column(col_type_Int, "nullable_ints", true);
 
     const int null_frequency = 1000;
     int num_nulls_added = 0;
@@ -5417,7 +5420,7 @@ TEST(Query_IntIndexed)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_id = table->add_column(type_Int, "id");
+    auto col_id = table->add_column(col_type_Int, "id");
 
     for (int i = 0; i < 100; i++) {
         table->create_object().set_all(i % 10);
@@ -5432,7 +5435,7 @@ TEST(Query_IntFindInNextLeaf)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_id = table->add_column(type_Int, "id");
+    auto col_id = table->add_column(col_type_Int, "id");
 
     // num_misses > MAX_BPNODE_SIZE to check results on other leafs
     constexpr int num_misses = 1000 * 2 + 10;
@@ -5459,7 +5462,7 @@ TEST(Query_IntIndexOverLinkViewNotInTableOrder)
     Group g;
 
     TableRef child_table = g.add_table("child");
-    auto col_child_id = child_table->add_column(type_Int, "id");
+    auto col_child_id = child_table->add_column(col_type_Int, "id");
     child_table->add_search_index(col_child_id);
 
     auto k0 = child_table->create_object().set(col_child_id, 3).get_key();
@@ -5490,8 +5493,8 @@ TEST(Query_MixedTypeQuery)
 {
     Group g;
     auto table = g.add_table("Foo");
-    auto col_int = table->add_column(type_Int, "int");
-    auto col_double = table->add_column(type_Double, "double");
+    auto col_int = table->add_column(col_type_Int, "int");
+    auto col_double = table->add_column(col_type_Double, "double");
     for (int64_t i = 0; i < 100; i++) {
         table->create_object().set(col_int, i).set(col_double, 100. - i);
     }
@@ -5507,7 +5510,7 @@ TEST(Query_LinkListIntPastOneIsNull)
     Group g;
     auto table_foo = g.add_table("Foo");
     auto table_bar = g.add_table("Bar");
-    auto col_int = table_foo->add_column(type_Int, "int", true);
+    auto col_int = table_foo->add_column(col_type_Int, "int", true);
     auto col_list = table_bar->add_column_list(*table_foo, "foo_link");
     std::vector<util::Optional<int64_t>> values = {{0}, {1}, {2}, {util::none}};
     auto bar_obj = table_bar->create_object();
@@ -5527,7 +5530,7 @@ TEST(Query_LinkListIntPastOneIsNull)
 TEST(Query_LinkView_StrIndex)
 {
     Group g;
-    auto table_foo = g.add_table_with_primary_key("class_Foo", type_String, "id");
+    auto table_foo = g.add_table_with_primary_key("class_Foo", col_type_String, "id");
     auto col_id = table_foo->get_column_key("id");
 
     auto table_bar = g.add_table("class_Bar");
@@ -5546,7 +5549,7 @@ TEST(Query_StringOrShortStrings)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_value = table->add_column(type_String, "value");
+    auto col_value = table->add_column(col_type_String, "value");
 
     std::string strings[] = {"0", "1", "2"};
     for (auto& str : strings) {
@@ -5568,7 +5571,7 @@ TEST(Query_StringOrMediumStrings)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_value = table->add_column(type_String, "value");
+    auto col_value = table->add_column(col_type_String, "value");
 
     std::string strings[] = {"0", "1", "2"};
     for (auto& str : strings) {
@@ -5591,7 +5594,7 @@ TEST(Query_StringOrLongStrings)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_value = table->add_column(type_String, "value");
+    auto col_value = table->add_column(col_type_String, "value");
 
     std::string strings[] = {"0", "1", "2"};
     for (auto& str : strings) {
@@ -5615,8 +5618,8 @@ TEST(Query_LinkViewAnd)
     Group g;
 
     TableRef child_table = g.add_table("child");
-    auto col_child_id = child_table->add_column(type_Int, "id");
-    auto col_child_name = child_table->add_column(type_String, "name");
+    auto col_child_id = child_table->add_column(col_type_Int, "id");
+    auto col_child_name = child_table->add_column(col_type_String, "name");
 
     auto k0 = child_table->create_object().set(col_child_id, 3).set(col_child_name, "Adam").get_key();
     auto k1 = child_table->create_object().set(col_child_id, 2).set(col_child_name, "Jeff").get_key();
@@ -5642,15 +5645,15 @@ TEST(Query_LinksWithIndex)
     Group g;
 
     TableRef target = g.add_table("target");
-    auto col_value = target->add_column(type_String, "value");
-    auto col_date = target->add_column(type_Timestamp, "date");
+    auto col_value = target->add_column(col_type_String, "value");
+    auto col_date = target->add_column(col_type_Timestamp, "date");
     target->add_search_index(col_value);
     target->add_search_index(col_date);
 
     TableRef foo = g.add_table("foo");
     auto col_foo = foo->add_column_list(*target, "linklist");
-    auto col_location = foo->add_column(type_String, "location");
-    auto col_score = foo->add_column(type_Int, "score");
+    auto col_location = foo->add_column(col_type_String, "location");
+    auto col_score = foo->add_column(col_type_Int, "score");
     foo->add_search_index(col_location);
     foo->add_search_index(col_score);
 
@@ -5698,9 +5701,9 @@ TEST(Query_LinksWithIndex)
 
     Query q1 =
         origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<String>(col_location) == "Fyn";
-    CHECK_EQUAL(q1.find(),  obj0.get_key());
+    CHECK_EQUAL(q1.find(), obj0.get_key());
     Query q2 = origin->link(col_linklist).link(col_link).backlink(*foo, col_foo).column<Int>(col_score) == 5;
-    CHECK_EQUAL(q2.find(),  obj0.get_key());
+    CHECK_EQUAL(q2.find(), obj0.get_key());
 
     // Make sure that changes in the table are reflected in the query result
     middle->get_object(m3).set(col_link, target->find_first(col_value, strings[1]));
@@ -5716,7 +5719,7 @@ TEST(Query_NotImmediatelyBeforeKnownRange)
     TableRef parent = g.add_table("parent");
     TableRef child = g.add_table("child");
     auto col_link = parent->add_column_list(*child, "list");
-    auto col_str = child->add_column(type_String, "value");
+    auto col_str = child->add_column(col_type_String, "value");
     child->add_search_index(col_str);
 
     Obj obj = parent->create_object();
@@ -5735,8 +5738,8 @@ TEST(Query_Mixed)
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
-    auto col_any = table->add_column(type_Mixed, "any");
-    auto col_int = table->add_column(type_Int, "int");
+    auto col_any = table->add_column(col_type_Mixed, "any");
+    auto col_int = table->add_column(col_type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
     size_t int_over_50 = 0;
@@ -5837,8 +5840,8 @@ TEST(Query_ListOfMixed)
     Group g;
     auto table = g.add_table("Foo");
     auto origin = g.add_table("Origin");
-    auto col_any = table->add_column_list(type_Mixed, "any");
-    auto col_int = origin->add_column(type_Int, "int");
+    auto col_any = table->add_column_list(col_type_Mixed, "any");
+    auto col_int = origin->add_column(col_type_Int, "int");
     auto col_link = origin->add_column(*table, "link");
     auto col_links = origin->add_column_list(*table, "links");
     size_t expected = 0;
@@ -5889,7 +5892,7 @@ TEST(Query_Dictionary)
     Group g;
     auto foo = g.add_table("foo");
     auto origin = g.add_table("origin");
-    auto col_dict = foo->add_column_dictionary(type_Mixed, "dict");
+    auto col_dict = foo->add_column_dictionary(col_type_Mixed, "dict");
     auto col_link = origin->add_column(*foo, "link");
     auto col_links = origin->add_column_list(*foo, "links");
     size_t expected = 0;
@@ -5953,10 +5956,10 @@ TEST(Query_DictionaryTypedLinks)
     auto dog = g.add_table("dog");
     auto cat = g.add_table("cat");
     auto person = g.add_table("person");
-    auto col_data = person->add_column_dictionary(type_Mixed, "data");
-    auto col_dog_name = dog->add_column(type_String, "Name");
+    auto col_data = person->add_column_dictionary(col_type_Mixed, "data");
+    auto col_dog_name = dog->add_column(col_type_String, "Name");
     auto col_dog_parent = dog->add_column(*dog, "Parent");
-    auto col_cat_name = cat->add_column(type_String, "Name");
+    auto col_cat_name = cat->add_column(col_type_String, "Name");
 
     auto fido = dog->create_object().set(col_dog_name, "Fido");
     auto pluto = dog->create_object().set(col_dog_name, "Pluto");

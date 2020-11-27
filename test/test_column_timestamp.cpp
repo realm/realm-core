@@ -78,8 +78,8 @@ TEST(TimestampColumn_Basic_Nulls)
 
     // Test that default value is null() for nullable column and non-null for non-nullable column
     Table t;
-    auto col_non_nullable = t.add_column(type_Timestamp, "date", non_nullable);
-    auto col_nullable = t.add_column(type_Timestamp, "date_null", nullable);
+    auto col_non_nullable = t.add_column(col_type_Timestamp, "date", non_nullable);
+    auto col_nullable = t.add_column(col_type_Timestamp, "date_null", nullable);
 
     Obj obj = t.create_object();
     CHECK(!obj.is_null(col_non_nullable));
@@ -97,7 +97,7 @@ TEST(TimestampColumn_Relocate)
 
     // Fill so much data in a column that it relocates, to check if relocation propagates up correctly
     Table t;
-    auto col = t.add_column(type_Timestamp, "date", nullable);
+    auto col = t.add_column(col_type_Timestamp, "date", nullable);
 
     for (unsigned int i = 0; i < 10000; i++) {
         t.create_object().set<Timestamp>(col, Timestamp(i, i));
@@ -129,7 +129,7 @@ TEST(TimestampColumn_SwapRows)
 TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
 {
     Table t;
-    auto col = t.add_column(type_Timestamp, "date", true);
+    auto col = t.add_column(col_type_Timestamp, "date", true);
     Obj obj = t.create_object();
 
     obj.set(col, Timestamp{-1934556340879361, 0});
@@ -265,8 +265,8 @@ TEST(TimestampColumn_FindFirst)
     constexpr bool non_nullable = false;
 
     Table t;
-    auto col_nullable = t.add_column(type_Timestamp, "date_null", nullable);
-    auto col_non_nullable = t.add_column(type_Timestamp, "date", non_nullable);
+    auto col_nullable = t.add_column(col_type_Timestamp, "date_null", nullable);
+    auto col_non_nullable = t.add_column(col_type_Timestamp, "date", non_nullable);
 
     std::vector<ObjKey> keys;
     t.create_objects(10, keys);
@@ -299,13 +299,13 @@ TEST(TimestampColumn_AddColumnAfterRows)
     constexpr bool non_nullable = false;
 
     Table t;
-    auto col_0 = t.add_column(type_Int, "1", non_nullable);
+    auto col_0 = t.add_column(col_type_Int, "1", non_nullable);
     std::vector<ObjKey> keys;
     t.create_objects(REALM_MAX_BPNODE_SIZE * 2 + 1, keys);
     t.get_object(keys[0]).set<Int>(col_0, 100);
 
-    auto col_1 = t.add_column(type_Timestamp, "2", non_nullable);
-    auto col_2 = t.add_column(type_Timestamp, "3", nullable);
+    auto col_1 = t.add_column(col_type_Timestamp, "2", non_nullable);
+    auto col_2 = t.add_column(col_type_Timestamp, "3", nullable);
     CHECK_EQUAL(t.get_object(keys[0]).get<Timestamp>(col_1).get_seconds(), 0);
     CHECK_EQUAL(t.get_object(keys[0]).get<Timestamp>(col_1).get_nanoseconds(), 0);
     CHECK(t.get_object(keys[0]).get<Timestamp>(col_2).is_null());
@@ -320,7 +320,7 @@ TEST(TimestampColumn_AggregateBug)
     TableView tv;
     Timestamp ts;
 
-    auto col = t.add_column(type_Timestamp, "ts", true);
+    auto col = t.add_column(col_type_Timestamp, "ts", true);
     std::vector<ObjKey> keys;
     t.create_objects(4, keys);
     tv = t.where().find_all();

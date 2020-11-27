@@ -113,7 +113,7 @@ TEST(Replication_GroupWriteWithoutHistory)
     {
         WriteTransaction wt(sg_1);
         auto table = wt.add_table("Table");
-        auto col = table->add_column(type_String, "strings");
+        auto col = table->add_column(col_type_String, "strings");
         auto obj = table->create_object();
         obj.set(col, "Hello");
         wt.commit();
@@ -194,7 +194,7 @@ TEST(Replication_WriteWithoutHistory)
         WriteTransaction wt(sg_2);
         auto table = wt.get_table("Table");
         CHECK(table);
-        table->add_column(type_Int, "int");
+        table->add_column(col_type_Int, "int");
         wt.commit();
     }
 }

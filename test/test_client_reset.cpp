@@ -46,7 +46,7 @@ TEST(ClientReset_NoLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
-        table->add_column(type_Int, "int");
+        table->add_column(col_type_Int, "int");
         create_object(wt, *table).set_all(123);
         session.nonsync_transact_notify(wt.commit());
         session.wait_for_upload_complete_or_client_stopped();
@@ -194,7 +194,7 @@ TEST(ClientReset_InitialLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
-        table->add_column(type_Int, "int");
+        table->add_column(col_type_Int, "int");
         create_object(wt, *table).set_all(123);
         session_1.nonsync_transact_notify(wt.commit());
     }
@@ -207,7 +207,7 @@ TEST(ClientReset_InitialLocalChanges)
 
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
-        table->add_column(type_Int, "int");
+        table->add_column(col_type_Int, "int");
         create_object(wt, *table).set_all(456);
         wt.commit();
     }
@@ -320,7 +320,7 @@ TEST(ClientReset_LocalChangesWhenOffline)
 
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, "class_table");
-        col_int = table->add_column(type_Int, "int");
+        col_int = table->add_column(col_type_Int, "int");
         table->create_object().set(col_int, 123);
         session_1.nonsync_transact_notify(wt.commit());
         session_1.wait_for_upload_complete_or_client_stopped();
@@ -401,17 +401,17 @@ TEST(ClientReset_ThreeClients)
 
     auto create_schema = [&](Transaction& group) {
         TableRef table_0 = create_table(group, "class_table_0");
-        table_0->add_column(type_Int, "int");
-        table_0->add_column(type_Bool, "bool");
-        table_0->add_column(type_Float, "float");
-        table_0->add_column(type_Double, "double");
-        table_0->add_column(type_Timestamp, "timestamp");
+        table_0->add_column(col_type_Int, "int");
+        table_0->add_column(col_type_Bool, "bool");
+        table_0->add_column(col_type_Float, "float");
+        table_0->add_column(col_type_Double, "double");
+        table_0->add_column(col_type_Timestamp, "timestamp");
 
         TableRef table_1 = create_table_with_primary_key(group, "class_table_1", type_Int, "pk_int");
-        table_1->add_column(type_String, "String");
+        table_1->add_column(col_type_String, "String");
 
         TableRef table_2 = create_table_with_primary_key(group, "class_table_2", type_String, "pk_string");
-        table_2->add_column_list(type_String, "array_string");
+        table_2->add_column_list(col_type_String, "array_string");
     };
 
     // First we make changesets. Then we upload them.
@@ -705,7 +705,7 @@ TEST(ClientReset_StateRealmCompactableServerVersion)
             WriteTransaction wt{sg};
             std::string table_name = "class_table_" + util::to_string(i);
             TableRef table = create_table(wt, table_name);
-            auto col_key = table->add_column(type_Int, "int");
+            auto col_key = table->add_column(col_type_Int, "int");
             for (int j = 0; j < 100; ++j) {
                 create_object(wt, *table).set(col_key, j);
             }
@@ -762,7 +762,7 @@ TEST(ClientReset_RecoverSchema)
         WriteTransaction wt{sg};
         std::string table_name = "class_table";
         TableRef table = create_table(wt, table_name);
-        auto col_key = table->add_column(type_Float, "float");
+        auto col_key = table->add_column(col_type_Float, "float");
         create_object(wt, *table).set(col_key, 123.456f);
         wt.commit();
         Session session = fixture.make_session(path_1);
@@ -854,7 +854,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         WriteTransaction wt{sg};
         std::string table_name = "class_table";
         TableRef table = create_table(wt, table_name);
-        auto col_key = table->add_column(type_Float, "float");
+        auto col_key = table->add_column(col_type_Float, "float");
         table->create_object().set(col_key, 123.456f);
         wt.commit();
         Session session = fixture.make_session(path_1);
@@ -929,7 +929,7 @@ TEST(ClientReset_PinnedVersion)
     {
         WriteTransaction wt{sg};
         TableRef table = create_table(wt, table_name);
-        table->add_column(type_Float, "float");
+        table->add_column(col_type_Float, "float");
         table->create_object();
         wt.commit();
 

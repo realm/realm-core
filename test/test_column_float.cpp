@@ -508,12 +508,12 @@ TEST(DoubleColumn_SwapRows)
 TEST(DoubleColumn_InitOfEmptyColumn)
 {
     Table t;
-    auto col_0 = t.add_column(type_Double, "works");
-    auto col_1 = t.add_column(type_Double, "works also");
+    auto col_0 = t.add_column(col_type_Double, "works");
+    auto col_1 = t.add_column(col_type_Double, "works also");
     t.create_object().set_all(1.1, 2.2);
     t.remove_column(col_1);
     Obj obj = t.create_object();
-    t.add_column(type_Double, "doesn't work");
+    t.add_column(col_type_Double, "doesn't work");
     CHECK_EQUAL(0.0, obj.get<Double>(col_0));
 }
 
@@ -522,10 +522,10 @@ TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::fal
 {
     constexpr bool nullable_toggle = TEST_TYPE::value;
     Table t;
-    t.add_column(type_Int, "unused");
+    t.add_column(col_type_Int, "unused");
     Obj obj = t.create_object();
-    auto col_0 = t.add_column(type_Double, "d", nullable_toggle);
-    auto col_1 = t.add_column(type_Float, "f", nullable_toggle);
+    auto col_0 = t.add_column(col_type_Double, "d", nullable_toggle);
+    auto col_1 = t.add_column(col_type_Float, "f", nullable_toggle);
     CHECK(obj.is_null(col_0) == nullable_toggle);
     CHECK(obj.is_null(col_1) == nullable_toggle);
     if (nullable_toggle) {
@@ -539,60 +539,60 @@ TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::fal
 TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_Float, "works");
-    auto col_1 = t.add_column(type_Float, "works also");
+    t.add_column(col_type_Float, "works");
+    auto col_1 = t.add_column(col_type_Float, "works also");
     t.create_object().set_all(1.1f, 2.2f);
     t.remove_column(col_1);
     Obj obj = t.create_object();
-    auto col_2 = t.add_column(type_Float, "doesn't work");
+    auto col_2 = t.add_column(col_type_Float, "doesn't work");
     CHECK_EQUAL(0.0, obj.get<Float>(col_2));
 }
 
 TEST(ColumnInt_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_Int, "works");
-    auto col_1 = t.add_column(type_Int, "works also");
+    t.add_column(col_type_Int, "works");
+    auto col_1 = t.add_column(col_type_Int, "works also");
     t.create_object().set_all(1, 2);
     t.remove_column(col_1);
     Obj obj = t.create_object();
-    auto col_2 = t.add_column(type_Int, "doesn't work");
+    auto col_2 = t.add_column(col_type_Int, "doesn't work");
     CHECK_EQUAL(0, obj.get<Int>(col_2));
 }
 
 TEST(ColumnString_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_String, "works");
-    auto col_1 = t.add_column(type_String, "works also", false);
+    t.add_column(col_type_String, "works");
+    auto col_1 = t.add_column(col_type_String, "works also", false);
     t.create_object().set_all("yellow", "very bright");
     t.remove_column(col_1);
     Obj obj = t.create_object();
-    auto col_2 = t.add_column(type_String, "doesn't work");
+    auto col_2 = t.add_column(col_type_String, "doesn't work");
     CHECK_EQUAL("", obj.get<String>(col_2));
 }
 
 TEST(ColumnBinary_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_Binary, "works");
-    auto col_1 = t.add_column(type_Binary, "works also");
+    t.add_column(col_type_Binary, "works");
+    auto col_1 = t.add_column(col_type_Binary, "works also");
     t.create_object().set_all(BinaryData("yellow"), BinaryData("very bright"));
     t.remove_column(col_1);
     Obj obj = t.create_object();
-    auto col_2 = t.add_column(type_Binary, "doesn't work");
+    auto col_2 = t.add_column(col_type_Binary, "doesn't work");
     CHECK_NOT_EQUAL(BinaryData(), obj.get<Binary>(col_2));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)
 {
     Table t;
-    t.add_column(type_Bool, "works");
-    auto col_1 = t.add_column(type_Bool, "works also");
+    t.add_column(col_type_Bool, "works");
+    auto col_1 = t.add_column(col_type_Bool, "works also");
     t.create_object().set_all(true, true);
     t.remove_column(col_1);
     Obj obj = t.create_object();
-    auto col_2 = t.add_column(type_Bool, "doesn't work");
+    auto col_2 = t.add_column(col_type_Bool, "doesn't work");
     CHECK_EQUAL(false, obj.get<Bool>(col_2));
 }
 

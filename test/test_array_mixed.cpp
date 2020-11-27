@@ -102,7 +102,7 @@ TEST(ArrayMixed_Basics)
     arr.erase(5); // Erase string
     CHECK_EQUAL(arr.get(5).get_binary(), BinaryData(bin.data(), bin.size()));
 
-    arr.insert(2, Mixed());    // null
+    arr.insert(2, Mixed());             // null
     arr.insert(2, int64_t(4500000000)); // Requires more than 32 bit
 
     CHECK_EQUAL(arr.get(2).get_int(), 4500000000);
@@ -153,7 +153,7 @@ TEST(ArrayMixed_Basics)
 TEST(Mixed_Table)
 {
     Table t;
-    auto col_data = t.add_column(type_Mixed, "data");
+    auto col_data = t.add_column(col_type_Mixed, "data");
     auto obj0 = t.create_object().set(col_data, Mixed(5));
     auto obj1 = t.create_object().set(col_data, Mixed("Hello"));
     CHECK_EQUAL(obj0.get_any(col_data), Mixed(5));
@@ -164,7 +164,7 @@ TEST(Mixed_Table)
 TEST(Mixed_SortNumeric)
 {
     Table t;
-    auto col_data = t.add_column(type_Mixed, "data");
+    auto col_data = t.add_column(col_type_Mixed, "data");
     t.create_object().set(col_data, Mixed(5));
     t.create_object().set(col_data, Mixed(false));
     t.create_object().set(col_data, Mixed(-258));

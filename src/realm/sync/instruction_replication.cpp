@@ -185,6 +185,11 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
     return Type::Int; // Make compiler happy
 }
 
+Instruction::Payload::Type SyncReplication::get_payload_type(ColumnType type) const
+{
+    return get_payload_type(DataType(type));
+}
+
 void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
 {
     TrivialReplication::add_class(tk, name, is_embedded);
@@ -210,8 +215,8 @@ void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
     }
 }
 
-void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, DataType pk_type, StringData pk_field,
-                                                 bool nullable)
+void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, ColumnType pk_type,
+                                                 StringData pk_field, bool nullable)
 {
     TrivialReplication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable);
 
@@ -332,7 +337,7 @@ void SyncReplication::rename_group_level_table(TableKey, StringData)
     unsupported_instruction();
 }
 
-void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType type, StringData name,
+void SyncReplication::insert_column(const Table* table, ColKey col_key, ColumnType type, StringData name,
                                     Table* target_table)
 {
     TrivialReplication::insert_column(table, col_key, type, name, target_table);
@@ -351,13 +356,13 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
         else if (col_key.is_dictionary()) {
             instr.collection_type = CollectionType::Dictionary;
             auto key_type = table->get_dictionary_key_type(col_key);
-            REALM_ASSERT(key_type == type_String);
+            REALM_ASSERT(key_type == col_type_String);
             instr.key_type = get_payload_type(key_type);
         }
         else if (col_key.is_set()) {
             instr.collection_type = CollectionType::Set;
             auto value_type = table->get_column_type(col_key);
-            REALM_ASSERT(value_type != type_LinkList);
+            REALM_ASSERT(value_type != col_type_LinkList);
             instr.type = get_payload_type(value_type);
             instr.key_type = Instruction::Payload::Type::Null;
         }
@@ -699,27 +704,27 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
     ColKey pk_col = table.get_primary_key_column();
     const Obj obj = table.get_object(key);
     if (pk_col) {
-        DataType pk_type = table.get_column_type(pk_col);
+        ColumnType pk_type = table.get_column_type(pk_col);
         if (obj.is_null(pk_col)) {
             return mpark::monostate{};
         }
 
-        if (pk_type == type_Int) {
+        if (pk_type == col_type_Int) {
             return obj.get<int64_t>(pk_col);
         }
 
-        if (pk_type == type_String) {
+        if (pk_type == col_type_String) {
             StringData str = obj.get<StringData>(pk_col);
             auto interned = m_encoder.intern_string(str);
             return interned;
         }
 
-        if (pk_type == type_ObjectId) {
+        if (pk_type == col_type_ObjectId) {
             ObjectId id = obj.get<ObjectId>(pk_col);
             return id;
         }
 
-        if (pk_type == type_UUID) {
+        if (pk_type == col_type_UUID) {
             UUID id = obj.get<UUID>(pk_col);
             return id;
         }

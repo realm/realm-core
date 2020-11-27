@@ -52,7 +52,7 @@ TEST_IF(ClientResetQueryBased_1, false)
 
             WriteTransaction wt{sg};
             TableRef table = create_table(wt, "class_values");
-            auto col_ndx = table->add_column(type_Int, "value");
+            auto col_ndx = table->add_column(col_type_Int, "value");
             for (int i = 0; i < 3; ++i) {
                 create_object(wt, *table).set(col_ndx, 1000 + i * 100);
             }

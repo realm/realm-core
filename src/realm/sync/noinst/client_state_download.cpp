@@ -211,7 +211,7 @@ void ClientStateDownload::initialize_from_new()
     Group& group = wt.get_group();
 
     TableRef table_integers = group.add_table(table_name_integers);
-    auto col_ints = table_integers->add_column(type_Int, "value");
+    auto col_ints = table_integers->add_column(col_type_Int, "value");
     // The inserted values are 0, but using the variable names makes the
     // interpretation clear.
     table_integers->create_object(s_server_version).set<Int>(col_ints, m_server_version.version);

@@ -83,21 +83,21 @@ const bool generate_all = false;
 void setup_multi_table(Table& table, size_t rows)
 {
     // Create table with all column types
-    table.add_column(type_Int, "int");                                     //  0
-    table.add_column(type_Bool, "bool");                                   //  1
-    table.add_column(type_Timestamp, "date");                              //  2
-    table.add_column(type_Float, "float");                                 //  3
-    table.add_column(type_Double, "double");                               //  4
-    table.add_column(type_String, "string");                               //  5
-    table.add_column(type_String, "string_long");                          //  6
-    ColKey col_string_big = table.add_column(type_String, "string_big_blobs"); //  7
-    ColKey col_string_enum = table.add_column(type_String, "string_enum");     //  8 - becomes StringEnumColumn
-    ColKey col_binary = table.add_column(type_Binary, "binary");               //  9
-    ColKey col_oid = table.add_column(type_ObjectId, "oid");                   //  10
-    ColKey col_decimal = table.add_column(type_Decimal, "decimal");            //  11
-    ColKey col_int_list = table.add_column_list(type_Int, "integers");         //  12
-    ColKey col_string_list = table.add_column_list(type_String, "strings");    //  13
-    ColKey col_dict = table.add_column_dictionary(type_Int, "dictionary");     //  14
+    table.add_column(col_type_Int, "int");                                         //  0
+    table.add_column(col_type_Bool, "bool");                                       //  1
+    table.add_column(col_type_Timestamp, "date");                                  //  2
+    table.add_column(col_type_Float, "float");                                     //  3
+    table.add_column(col_type_Double, "double");                                   //  4
+    table.add_column(col_type_String, "string");                                   //  5
+    table.add_column(col_type_String, "string_long");                              //  6
+    ColKey col_string_big = table.add_column(col_type_String, "string_big_blobs"); //  7
+    ColKey col_string_enum = table.add_column(col_type_String, "string_enum");     //  8 - becomes StringEnumColumn
+    ColKey col_binary = table.add_column(col_type_Binary, "binary");               //  9
+    ColKey col_oid = table.add_column(col_type_ObjectId, "oid");                   //  10
+    ColKey col_decimal = table.add_column(col_type_Decimal, "decimal");            //  11
+    ColKey col_int_list = table.add_column_list(col_type_Int, "integers");         //  12
+    ColKey col_string_list = table.add_column_list(col_type_String, "strings");    //  13
+    ColKey col_dict = table.add_column_dictionary(col_type_Int, "dictionary");     //  14
 
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -263,14 +263,14 @@ TEST(Json_LinkList1)
     TableRef table3 = group.add_table("table3");
 
     // add some more columns to table1 and table2
-    table1->add_column(type_Int, "col1");
-    table1->add_column(type_String, "str1");
+    table1->add_column(col_type_Int, "col1");
+    table1->add_column(col_type_String, "str1");
 
-    table2->add_column(type_Int, "col1");
-    table2->add_column(type_String, "str2");
+    table2->add_column(col_type_Int, "col1");
+    table2->add_column(col_type_String, "str2");
 
-    table3->add_column(type_Int, "col1");
-    table3->add_column(type_String, "str2");
+    table3->add_column(col_type_Int, "col1");
+    table3->add_column(col_type_String, "str2");
 
     // add some rows
     auto obj0 = table1->create_object().set_all(100, "foo");
@@ -340,8 +340,8 @@ TEST(Json_LinkListCycle)
     TableRef table1 = group.add_table("table1");
     TableRef table2 = group.add_table("table2");
 
-    table1->add_column(type_String, "str1");
-    table2->add_column(type_String, "str2");
+    table1->add_column(col_type_String, "str1");
+    table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto t10 = table1->create_object().set_all("hello");
@@ -396,8 +396,8 @@ TEST(Json_LinkCycles)
     TableRef table1 = group.add_table("table1");
     TableRef table2 = group.add_table("table2");
 
-    table1->add_column(type_String, "str1");
-    table2->add_column(type_String, "str2");
+    table1->add_column(col_type_String, "str1");
+    table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto t10 = table1->create_object().set_all("hello");
@@ -463,12 +463,12 @@ TEST(Xjson_LinkList1)
     // Basic non-cyclic LinkList test that also tests column and table renaming
     Group group;
 
-    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
-    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+    TableRef table1 = group.add_table_with_primary_key("table1", col_type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", col_type_String, "primaryKey");
 
     // add some more columns to table1 and table2
-    ColKey table1Coll = table1->add_column(type_Int, "int1");
-    ColKey table2Coll = table2->add_column(type_Int, "int2");
+    ColKey table1Coll = table1->add_column(col_type_Int, "int1");
+    ColKey table2Coll = table2->add_column(col_type_Int, "int2");
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
@@ -519,11 +519,11 @@ TEST(Xjson_LinkCycles)
     // Cycle in Link
     Group group;
 
-    TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
-    TableRef table2 = group.add_table_with_primary_key("table2", type_String, "primaryKey");
+    TableRef table1 = group.add_table_with_primary_key("table1", col_type_String, "primaryKey");
+    TableRef table2 = group.add_table_with_primary_key("table2", col_type_String, "primaryKey");
 
-    ColKey table1Coll = table1->add_column(type_String, "str1");
-    ColKey table2Coll = table2->add_column(type_String, "str2");
+    ColKey table1Coll = table1->add_column(col_type_String, "str1");
+    ColKey table2Coll = table2->add_column(col_type_String, "str2");
 
     // add some rows
     auto t10 = table1->create_object_with_primary_key("t1o1").set(table1Coll, "hello");
@@ -556,10 +556,10 @@ TEST(Json_Nulls)
     TableRef table1 = group.add_table("table1");
 
     constexpr bool is_nullable = true;
-    ColKey str_col_ndx = table1->add_column(type_String, "str_col", is_nullable);
-    ColKey bool_col_ndx = table1->add_column(type_Bool, "bool_col", is_nullable);
-    ColKey int_col_ndx = table1->add_column(type_Int, "int_col", is_nullable);
-    ColKey timestamp_col_ndx = table1->add_column(type_Timestamp, "timestamp_col", is_nullable);
+    ColKey str_col_ndx = table1->add_column(col_type_String, "str_col", is_nullable);
+    ColKey bool_col_ndx = table1->add_column(col_type_Bool, "bool_col", is_nullable);
+    ColKey int_col_ndx = table1->add_column(col_type_Int, "int_col", is_nullable);
+    ColKey timestamp_col_ndx = table1->add_column(col_type_Timestamp, "timestamp_col", is_nullable);
 
     // add one row, populated manually
     auto obj = table1->create_object();
@@ -583,12 +583,12 @@ TEST(Json_Schema)
     TableRef dogs = group.add_embedded_table("dog");
 
     constexpr bool is_nullable = true;
-    persons->add_column(type_String, "name");
-    persons->add_column(type_Bool, "isMarried");
-    persons->add_column(type_Int, "age", is_nullable);
-    persons->add_column_list(type_Timestamp, "dates");
+    persons->add_column(col_type_String, "name");
+    persons->add_column(col_type_Bool, "isMarried");
+    persons->add_column(col_type_Int, "age", is_nullable);
+    persons->add_column_list(col_type_Timestamp, "dates");
     persons->add_column_list(*dogs, "pet");
-    dogs->add_column(type_String, "name");
+    dogs->add_column(col_type_String, "name");
 
     std::stringstream ss;
     group.schema_to_json(ss);

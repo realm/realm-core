@@ -82,7 +82,7 @@ TEST(Sync_Multiserver_Replicate)
         {
             WriteTransaction wt{sg_1};
             TableRef table = sync::create_table(wt, "class_foo");
-            table->add_column(type_Int, "i");
+            table->add_column(col_type_Int, "i");
             version_type new_version = wt.commit();
             session_1.nonsync_transact_notify(new_version);
         }
@@ -125,7 +125,7 @@ TEST(Sync_Multiserver_Merge)
     auto create_schema = [](DBRef sg) {
         WriteTransaction wt{sg};
         TableRef table = sync::create_table(wt, "class_foo");
-        table->add_column(type_Int, "i");
+        table->add_column(col_type_Int, "i");
         wt.commit();
     };
     create_schema(sg_1);
@@ -229,7 +229,7 @@ TEST(Sync_Multiserver_MultipleClientsPer2ndtierServer)
             WriteTransaction wt{sg};
             if (!wt.has_table("class_foo")) {
                 TableRef table = sync::create_table(wt, "class_foo");
-                table->add_column(type_Int, "i");
+                table->add_column(col_type_Int, "i");
                 wt.commit();
             }
         }
@@ -348,7 +348,7 @@ TEST(Sync_Multiserver_ManyTiers)
             WriteTransaction wt{sg};
             if (!wt.has_table("class_foo")) {
                 TableRef table = sync::create_table(wt, "class_foo");
-                table->add_column(type_Int, "i");
+                table->add_column(col_type_Int, "i");
                 wt.commit();
             }
         }
@@ -472,15 +472,15 @@ TEST(Sync_Multiserver_PartialSync)
             TableRef table = wt.get_table("class_foo");
             if (!table) {
                 table = sync::create_table(wt, "class_foo");
-                table->add_column(type_Int, "i");
+                table->add_column(col_type_Int, "i");
             }
             TableRef result_sets = create_table(wt, table_name_result_sets);
             ColKey col_ndx_result_set_query = result_sets->get_column_key("query");
             if (!col_ndx_result_set_query)
-                col_ndx_result_set_query = result_sets->add_column(type_String, "query");
+                col_ndx_result_set_query = result_sets->add_column(col_type_String, "query");
             ColKey col_ndx_result_set_matches_property = result_sets->get_column_key("matches_property");
             if (!col_ndx_result_set_matches_property)
-                col_ndx_result_set_matches_property = result_sets->add_column(type_String, "matches_property");
+                col_ndx_result_set_matches_property = result_sets->add_column(col_type_String, "matches_property");
             // 0 = uninitialized, 1 = initialized, -1 = query parsing failed
             result_sets->add_column_list(*table, "matches");
             Obj result_set = create_object(wt, *result_sets);
@@ -642,7 +642,7 @@ TEST(Sync_Multiserver_ServerSideModify)
             WriteTransaction wt{sg};
             if (!wt.has_table("class_foo")) {
                 TableRef table = sync::create_table(wt, "class_foo");
-                table->add_column(type_Int, "i");
+                table->add_column(col_type_Int, "i");
                 wt.commit();
             }
         }
@@ -663,7 +663,7 @@ TEST(Sync_Multiserver_ServerSideModify)
             WriteTransaction wt{sg};
             if (!wt.has_table("class_foo")) {
                 TableRef table = sync::create_table(wt, "class_foo");
-                table->add_column(type_Int, "i");
+                table->add_column(col_type_Int, "i");
                 wt.commit();
             }
         }

@@ -222,7 +222,7 @@ void make_data_in_realm(const std::string& realm_path, size_t data_size,
 
     WriteTransaction wt{sg};
     TableRef tr = sync::create_table(wt, "class_table");
-    tr->add_column(type_Binary, "binary column");
+    tr->add_column(col_type_Binary, "binary column");
     std::unique_ptr<char[]> data = generate_non_compressible_data(data_size);
     BinaryData bd(data.get(), data_size);
     tr->create_object().set_all(bd);

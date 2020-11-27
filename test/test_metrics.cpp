@@ -83,7 +83,7 @@ TEST(Metrics_HasNoReportsWhenDisabled)
     CHECK(!sg->get_metrics());
     auto wt = sg->start_write();
     auto table = wt->add_table("table");
-    auto col = table->add_column(type_Int, "first");
+    auto col = table->add_column(col_type_Int, "first");
     std::vector<ObjKey> keys;
     table->create_objects(10, keys);
     wt->commit();
@@ -106,7 +106,7 @@ TEST(Metrics_HasReportsWhenEnabled)
     CHECK(sg->get_metrics());
     auto wt = sg->start_write();
     auto table = wt->add_table("table");
-    auto col = table->add_column(type_Int, "first");
+    auto col = table->add_column(col_type_Int, "first");
     std::vector<ObjKey> keys;
     table->create_objects(10, keys);
     wt->commit();
@@ -132,10 +132,10 @@ TEST(Metrics_QueryTypes)
     CHECK(sg->get_metrics());
     auto wt = sg->start_write();
     auto table = wt->add_table("table");
-    auto int_col = table->add_column(type_Int, "col_int");
-    auto double_col = table->add_column(type_Double, "col_double");
-    auto float_col = table->add_column(type_Float, "col_float");
-    auto timestamp_col = table->add_column(type_Timestamp, "col_timestamp");
+    auto int_col = table->add_column(col_type_Int, "col_int");
+    auto double_col = table->add_column(col_type_Double, "col_double");
+    auto float_col = table->add_column(col_type_Float, "col_float");
+    auto timestamp_col = table->add_column(col_type_Timestamp, "col_timestamp");
     std::vector<ObjKey> keys;
     table->create_objects(10, keys);
     wt->commit();
@@ -214,13 +214,13 @@ void populate(DBRef sg)
     auto wt = sg->start_write();
     auto person = wt->add_table("person");
     auto pet = wt->add_table("pet");
-    person->add_column(type_Int, "age");
-    person->add_column(type_Double, "paid");
-    person->add_column(type_Float, "weight");
-    person->add_column(type_Timestamp, "date_of_birth");
-    person->add_column(type_String, "name");
-    person->add_column(type_Bool, "account_overdue");
-    person->add_column(type_Binary, "data");
+    person->add_column(col_type_Int, "age");
+    person->add_column(col_type_Double, "paid");
+    person->add_column(col_type_Float, "weight");
+    person->add_column(col_type_Timestamp, "date_of_birth");
+    person->add_column(col_type_String, "name");
+    person->add_column(col_type_Bool, "account_overdue");
+    person->add_column(col_type_Binary, "data");
     auto owes_col = person->add_column_list(*person, "owes_coffee_to");
 
     auto create_person = [&](int age, double paid, float weight, Timestamp dob, std::string name, bool overdue,
@@ -240,10 +240,12 @@ void populate(DBRef sg)
     auto k3 = create_person(39, 22.72, 173.8f, Timestamp(39, 2), "Nathan", true, "h282l", {k1, k1, k0, k2});
     create_person(33, 29.28, 188.7f, Timestamp(33, 9), "Riley", false, "a208s", {k3, k3, k2, k1});
 
-    pet->add_column(type_String, "name");
+    pet->add_column(col_type_String, "name");
     pet->add_column(*person, "owner");
 
-    auto create_pet = [&](std::string name, ObjKey owner) { pet->create_object().set_all(name, owner); };
+    auto create_pet = [&](std::string name, ObjKey owner) {
+        pet->create_object().set_all(name, owner);
+    };
 
     create_pet("Fido", k0);
     create_pet("Max", k1);
@@ -649,9 +651,9 @@ TEST(Metrics_SubQueries)
 
     TableRef table = wt->add_table(table_name);
 
-    auto col_list_int = table->add_column_list(type_Int, int_col_name);
-    auto col_list_string = table->add_column_list(type_String, str_col_name, true);
-    auto col_other = table->add_column(type_String, "other");
+    auto col_list_int = table->add_column_list(col_type_Int, int_col_name);
+    auto col_list_string = table->add_column_list(col_type_String, str_col_name, true);
+    auto col_other = table->add_column(col_type_String, "other");
 
     std::vector<ObjKey> keys;
     table->create_objects(4, keys);
@@ -732,7 +734,7 @@ TEST(Metrics_TransactionTimings)
     {
         auto wt = sg->start_write();
         auto table = wt->add_table("table");
-        col = table->add_column(type_Int, "first");
+        col = table->add_column(col_type_Int, "first");
         std::vector<ObjKey> keys;
         table->create_objects(10, keys);
         wt->commit();
@@ -952,7 +954,7 @@ TEST(Metrics_MaxNumQueriesIsNotExceeded)
     {
         auto tr = sg->start_write();
         auto table = tr->add_table("table");
-        table->add_column(type_Int, "col_int");
+        table->add_column(col_type_Int, "col_int");
         for (int i = 0; i < 10; i++) {
             table->create_object();
         }
@@ -985,7 +987,9 @@ public:
 
     std::function<int64_t()> current_target_getter(size_t) override
     {
-        return []() { return realm::util::PageReclaimGovernor::no_match; };
+        return []() {
+            return realm::util::PageReclaimGovernor::no_match;
+        };
     }
 
     void report_target_result(int64_t) override
@@ -1021,7 +1025,9 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
         // the remainder of the test suite should use the default.
-        auto on_exit = make_scope_exit([]() noexcept { realm::util::set_page_reclaim_governor_to_default(); });
+        auto on_exit = make_scope_exit([]() noexcept {
+            realm::util::set_page_reclaim_governor_to_default();
+        });
         CHECK(gov.has_run_twice.valid());
         REALM_ASSERT_RELEASE(gov.has_run_twice.wait_for(std::chrono::seconds(30)) == std::future_status::ready);
 #endif
@@ -1066,7 +1072,9 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
         NoPageReclaimGovernor gov;
         realm::util::set_page_reclaim_governor(&gov);
         // the remainder of the test suite should use the default.
-        auto on_exit = make_scope_exit([]() noexcept { realm::util::set_page_reclaim_governor_to_default(); });
+        auto on_exit = make_scope_exit([]() noexcept {
+            realm::util::set_page_reclaim_governor_to_default();
+        });
         CHECK(gov.has_run_twice.valid());
         REALM_ASSERT_RELEASE(gov.has_run_twice.wait_for(std::chrono::seconds(30)) == std::future_status::ready);
 #endif
@@ -1133,7 +1141,7 @@ TEST(Metrics_APIAvailability)
     {
         auto tr = sg->start_write();
         auto table = tr->add_table("table");
-        table->add_column(type_Int, "first");
+        table->add_column(col_type_Int, "first");
         for (int i = 0; i < 10; i++) {
             table->create_object();
         }

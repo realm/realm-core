@@ -67,13 +67,13 @@ public:
 
     // TransactLogConvenientEncoder interface:
     void add_class(TableKey tk, StringData table_name, bool is_embedded) override;
-    void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
+    void add_class_with_primary_key(TableKey tk, StringData table_name, ColumnType pk_type, StringData pk_field,
                                     bool nullable) override;
     void create_object(const Table*, GlobalKey) override;
     void create_object_with_primary_key(const Table*, GlobalKey, Mixed) override;
     void erase_group_level_table(TableKey table_key, size_t num_tables) override;
     void rename_group_level_table(TableKey table_key, StringData new_name) override;
-    void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table) override;
+    void insert_column(const Table*, ColKey col_key, ColumnType type, StringData name, Table* target_table) override;
     void erase_column(const Table*, ColKey col_key) override;
     void rename_column(const Table*, ColKey col_key, StringData name) override;
 
@@ -137,6 +137,7 @@ private:
 
     InternString emit_class_name(StringData table_name);
     InternString emit_class_name(const Table& table);
+    Instruction::Payload::Type get_payload_type(ColumnType) const;
     Instruction::Payload::Type get_payload_type(DataType) const;
 
     Instruction::Payload as_payload(Mixed value);

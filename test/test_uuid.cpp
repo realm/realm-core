@@ -268,8 +268,8 @@ TEST_TYPES(UUID_Table, WithIndex, WithoutIndex)
     const char str1[] = "3b241101-e2bb-4255-8caf-4136c566a961";
 
     Table t;
-    auto col_id = t.add_column(type_UUID, "id");
-    auto col_id_null = t.add_column(type_UUID, "id_null", true);
+    auto col_id = t.add_column(col_type_UUID, "id");
+    auto col_id_null = t.add_column(col_type_UUID, "id_null", true);
     auto obj0 = t.create_object().set(col_id, UUID(str0)).set(col_id_null, UUID(str0));
     auto obj1 = t.create_object().set(col_id, UUID(str1)).set(col_id_null, UUID(str1));
     auto obj2 = t.create_object();
@@ -312,7 +312,7 @@ TEST(UUID_PrimaryKey)
     ObjKey key;
     {
         auto wt = db->start_write();
-        auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id");
+        auto table = wt->add_table_with_primary_key("Foo", col_type_UUID, "id");
         table->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
         key = table->create_object_with_primary_key(id).get_key();
         wt->commit();
@@ -335,7 +335,7 @@ TEST(UUID_PrimaryKeyNullable)
     ObjKey key2;
     {
         auto wt = db->start_write();
-        auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id", true);
+        auto table = wt->add_table_with_primary_key("Foo", col_type_UUID, "id", true);
         key0 = table->create_object_with_primary_key(UUID()).get_key();
         key1 = table->create_object_with_primary_key(id).get_key();
         key2 = table->create_object_with_primary_key(util::Optional<UUID>{}).get_key();
@@ -362,7 +362,7 @@ TEST(UUID_Commit)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        col = table->add_column(type_UUID, "id");
+        col = table->add_column(col_type_UUID, "id");
         wt->commit();
     }
     {
@@ -392,7 +392,7 @@ TEST_TYPES(UUID_GrowAndShrink, UUID, util::Optional<UUID>)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        col = table->add_column(type_UUID, "id", is_optional);
+        col = table->add_column(col_type_UUID, "id", is_optional);
         wt->commit();
     }
     constexpr size_t num_insertions = 2000;
@@ -509,10 +509,10 @@ TEST_TYPES(UUID_Query, WithIndex, WithoutIndex)
 
         auto target = wt->add_table("Target");
         auto origin = wt->add_table("Origin");
-        auto table = wt->add_table_with_primary_key("Foo", type_UUID, "id");
+        auto table = wt->add_table_with_primary_key("Foo", col_type_UUID, "id");
 
-        col_id = table->add_column(type_UUID, "alternative_id", true);
-        col_int = table->add_column(type_Int, "int");
+        col_id = table->add_column(col_type_UUID, "alternative_id", true);
+        col_int = table->add_column(col_type_Int, "int");
         col_has = table->add_column(*target, "Has");
         col_owns = origin->add_column(*table, "Owns");
 
@@ -614,7 +614,7 @@ TEST(UUID_Distinct)
         std::vector<UUID> ids{generate_random_uuid(), generate_random_uuid(), generate_random_uuid()};
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_id = table->add_column(type_UUID, "id", true);
+        auto col_id = table->add_column(col_type_UUID, "id", true);
         for (int i = 1; i < 10; i++) {
             auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
         }

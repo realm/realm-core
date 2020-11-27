@@ -214,8 +214,8 @@ private:
                     std::cerr << "type_Int";
                 std::cerr << ", \"pk\");\n";
             }
-            sync::create_table_with_primary_key(*client.group, table_name, is_string_pk ? type_String : type_Int,
-                                                "pk");
+            sync::create_table_with_primary_key(*client.group, table_name,
+                                                is_string_pk ? col_type_String : col_type_Int, "pk");
         }
         else {
             if (m_trace) {
@@ -258,12 +258,12 @@ private:
         // but with different types / nullability (there is no non-destructive way
         // to merge them).
         const char* column_names[] = {"a", "b", "c", "d"};
-        const DataType column_types[] = {type_Int, type_Int, type_String, type_String};
+        const ColumnType column_types[] = {col_type_Int, col_type_Int, col_type_String, col_type_String};
         const bool column_nullable[] = {false, true, false, true};
 
         size_t which = draw_int_mod(4);
         const char* name = column_names[which];
-        DataType type = column_types[which];
+        ColumnType type = column_types[which];
         bool nullable = column_nullable[which];
 
         TableRef table = client.selected_table;
@@ -272,11 +272,11 @@ private:
 
         if (m_trace) {
             const char* type_name;
-            if (type == type_Int) {
-                type_name = "type_Int";
+            if (type == col_type_Int) {
+                type_name = "col_type_Int";
             }
-            else if (type == type_String) {
-                type_name = "type_String";
+            else if (type == col_type_String) {
+                type_name = "col_type_String";
             }
             else {
                 REALM_TERMINATE("Missing trace support for column type.");
@@ -342,11 +342,11 @@ private:
         REALM_ASSERT(count_classes(client) >= 1);
 
         const char* column_names[] = {"g", "h"};
-        const DataType column_types[] = {type_Int, type_String};
+        const ColumnType column_types[] = {col_type_Int, col_type_String};
 
         size_t which = draw_int_max(1);
         const char* name = column_names[which];
-        DataType type = column_types[which];
+        ColumnType type = column_types[which];
         bool nullable = false;
 
         TableRef table = client.selected_table;
@@ -355,11 +355,11 @@ private:
 
         if (m_trace) {
             const char* type_name;
-            if (type == type_Int) {
-                type_name = "type_Int";
+            if (type == col_type_Int) {
+                type_name = "col_type_Int";
             }
-            else if (type == type_String) {
-                type_name = "type_String";
+            else if (type == col_type_String) {
+                type_name = "col_type_String";
             }
             else {
                 REALM_TERMINATE("Missing trace support for column type.");
@@ -380,12 +380,12 @@ private:
         size_t num_rows = client.selected_table->size();
         size_t row_ndx = draw_int_mod(num_rows);
         ObjKey row_key = (client.selected_table->begin() + row_ndx)->get_key();
-        DataType type = client.selected_table->get_column_type(col_key);
+        ColumnType type = client.selected_table->get_column_type(col_key);
         bool nullable = client.selected_table->is_nullable(col_key);
 
         Obj obj = client.selected_table->get_object(row_key);
 
-        if (type == type_Int) {
+        if (type == col_type_Int) {
             int_fast64_t value = next_value();
             if (nullable && value % 7 == 0) {
                 bool is_default = (value % 21 == 0);
@@ -416,7 +416,7 @@ private:
             }
         }
 
-        if (type == type_String) {
+        if (type == col_type_String) {
             int_fast64_t ival = next_value();
 
             if (nullable && ival % 7 == 0) {
@@ -443,7 +443,7 @@ private:
             }
         }
 
-        if (type == type_Link) {
+        if (type == col_type_Link) {
             TableRef target_table = client.selected_table->get_link_target(col_key);
             size_t value = draw_int_mod(target_table->size() + 1);
             if (value == target_table->size()) {
@@ -478,7 +478,7 @@ private:
         }
         else {
             char string_buffer[2] = {0};
-            bool is_string_pk = (client.selected_table->get_column_type(pk_col_key) == type_String);
+            bool is_string_pk = (client.selected_table->get_column_type(pk_col_key) == col_type_String);
             int_fast64_t pk_int = 0;
             StringData pk_string;
             if (is_string_pk) {
@@ -584,9 +584,9 @@ private:
     void array_set(Peer& client)
     {
         size_t num_elements = client.selected_array->size();
-        DataType type = client.selected_array->get_table()->get_column_type(client.selected_array->get_col_key());
+        ColumnType type = client.selected_array->get_table()->get_column_type(client.selected_array->get_col_key());
         size_t ndx = draw_int_max(num_elements - 1);
-        if (type == type_Int) {
+        if (type == col_type_Int) {
             int_fast64_t value = draw_int_max(1000);
             if (m_trace) {
                 std::cerr << trace_selected_int_array(client) << "->set(" << ndx << ", " << value << ");\n";
@@ -605,15 +605,15 @@ private:
     void array_insert(Peer& client)
     {
         size_t num_elements = client.selected_array->size();
-        DataType type = client.selected_array->get_table()->get_column_type(client.selected_array->get_col_key());
+        ColumnType type = client.selected_array->get_table()->get_column_type(client.selected_array->get_col_key());
         size_t ndx = draw_int_max(num_elements);
-        if (type == type_Int) {
+        if (type == col_type_Int) {
             if (m_trace) {
                 std::cerr << trace_selected_int_array(client) << "->insert(" << ndx << ", 0);\n";
             }
             static_cast<Lst<int64_t>*>(client.selected_array.get())->insert(ndx, 0);
         }
-        else if (type == type_String) {
+        else if (type == col_type_String) {
             if (m_trace) {
                 std::cerr << trace_selected_string_array(client) << "->insert(" << ndx << ", \"\");\n";
             }
@@ -858,8 +858,8 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                     for (ColKey key : table->get_column_keys()) {
                         if (table->get_column_name(key) == "pk")
                             continue; // don't make normal modifications to primary keys
-                        DataType type = table->get_column_type(key);
-                        if (type == type_LinkList) {
+                        ColumnType type = table->get_column_type(key);
+                        if (type == col_type_LinkList) {
                             // Only consider LinkList columns that target tables
                             // with rows in them.
                             if (table->get_link_target(key)->size() != 0) {
@@ -898,8 +898,8 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                         ObjKey row_key = (table->begin() + row_ndx)->get_key();
 
                         if (is_array) {
-                            DataType type = table->get_column_type(col_key);
-                            if (type == type_Int) {
+                            ColumnType type = table->get_column_type(col_key);
+                            if (type == col_type_Int) {
                                 LstPtr<int64_t> array = table->get_object(row_key).get_list_ptr<int64_t>(col_key);
                                 if (m_trace) {
                                     std::cerr << trace_selected_array(client) << " = " << trace_selected_table(client)
@@ -908,7 +908,7 @@ void FuzzTester<S>::round(unit_test::TestContext& test_context, std::string path
                                 }
                                 client.selected_array = std::move(array);
                             }
-                            else if (type == type_String) {
+                            else if (type == col_type_String) {
                                 LstPtr<StringData> array =
                                     table->get_object(row_key).get_list_ptr<StringData>(col_key);
                                 if (m_trace) {

@@ -86,21 +86,21 @@ TEST(ClientResetDiff_TransferGroup)
 
         {
             TableRef table = create_table(wt, "class_table_1");
-            table->add_column(type_Int, "integer");
-            table->add_column(type_String, "string");
+            table->add_column(col_type_Int, "integer");
+            table->add_column(col_type_String, "string");
             sync::create_object(wt, *table).set_all(456, "abc");
         }
 
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_2", type_Int, "pk_int");
-            auto col_ndx_0 = table->add_column(type_Bool, "bool");
+            auto col_ndx_0 = table->add_column(col_type_Bool, "bool");
             sync::create_object_with_primary_key(wt, *table, 111).set(col_ndx_0, true);
         }
 
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_5", type_Int, "pk_int");
             {
-                auto col_ndx = table->add_column_list(type_Int, "array_int");
+                auto col_ndx = table->add_column_list(col_type_Int, "array_int");
                 auto list = sync::create_object_with_primary_key(wt, *table, 666).get_list<Int>(col_ndx);
                 list.add(10);
                 list.add(11);
@@ -113,7 +113,7 @@ TEST(ClientResetDiff_TransferGroup)
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_6", type_String, "pk_string");
             auto col_ndx = table->add_column_list(*table, "target<ObjKey>");
-            table->add_column(type_Bool, "something");
+            table->add_column(col_type_Bool, "something");
 
             Obj obj_a = sync::create_object_with_primary_key(wt, *table, "aaa");
             Obj obj_b = sync::create_object_with_primary_key(wt, *table, "bbb");
@@ -143,20 +143,20 @@ TEST(ClientResetDiff_TransferGroup)
 
         {
             TableRef table = create_table(wt, "class_table_0");
-            table->add_column(type_Int, "integer");
+            table->add_column(col_type_Int, "integer");
             sync::create_object(wt, *table).set_all(123);
         }
 
         {
             TableRef table = create_table(wt, "class_table_1");
-            table->add_column(type_Int, "integer");
-            table->add_column(type_String, "string");
+            table->add_column(col_type_Int, "integer");
+            table->add_column(col_type_String, "string");
             sync::create_object(wt, *table).set_all(123, "def");
         }
 
         {
             TableRef table = create_table(wt, "class_table_2");
-            table->add_column(type_Int, "integer");
+            table->add_column(col_type_Int, "integer");
             sync::create_object(wt, *table).set_all(123);
         }
 
@@ -185,7 +185,7 @@ TEST(ClientResetDiff_TransferGroup)
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_5", type_Int, "pk_int");
             {
-                auto col_ndx = table->add_column_list(type_Int, "array_int");
+                auto col_ndx = table->add_column_list(col_type_Int, "array_int");
                 auto array = sync::create_object_with_primary_key(wt, *table, 666).get_list<Int>(col_ndx);
                 array.add(10);
                 array.add(8888);
@@ -198,7 +198,7 @@ TEST(ClientResetDiff_TransferGroup)
 
         {
             TableRef table = create_table_with_primary_key(wt, "class_table_6", type_String, "pk_string");
-            table->add_column(type_Int, "something");
+            table->add_column(col_type_Int, "something");
             auto col_ndx = table->add_column_list(*table, "target_link");
 
             // Opposite order such that the row indices are different.
@@ -268,13 +268,13 @@ TEST(ClientResetDiff_1)
         WriteTransaction wt{sg};
         {
             TableRef table = create_table(wt, "class_table_0");
-            auto col_ndx_0 = table->add_column(type_Int, "integer");
-            auto col_ndx_1 = table->add_column(type_Bool, "bool");
-            auto col_ndx_2 = table->add_column_list(type_String, "array_string");
-            auto col_ndx_3 = table->add_column_list(type_Double, "array_double");
-            auto col_ndx_4 = table->add_column(type_Float, "float");
-            auto col_ndx_5 = table->add_column(type_Timestamp, "timestamp");
-            auto col_ndx_6 = table->add_column_list(type_Int, "array_integer", true);
+            auto col_ndx_0 = table->add_column(col_type_Int, "integer");
+            auto col_ndx_1 = table->add_column(col_type_Bool, "bool");
+            auto col_ndx_2 = table->add_column_list(col_type_String, "array_string");
+            auto col_ndx_3 = table->add_column_list(col_type_Double, "array_double");
+            auto col_ndx_4 = table->add_column(col_type_Float, "float");
+            auto col_ndx_5 = table->add_column(col_type_Timestamp, "timestamp");
+            auto col_ndx_6 = table->add_column_list(col_type_Int, "array_integer", true);
 
             Obj obj_0 = sync::create_object(wt, *table);
             Obj obj_1 = sync::create_object(wt, *table);
@@ -332,7 +332,7 @@ TEST(ClientResetDiff_2)
         WriteTransaction wt{sg};
 
         TableRef table = create_table_with_primary_key(wt, "class_table_0", type_String, "pk_string");
-        auto col_ndx = table->add_column(type_Int, "int", true);
+        auto col_ndx = table->add_column(col_type_Int, "int", true);
         sync::create_object_with_primary_key(wt, *table, "aaa").set(col_ndx, 1);
         sync::create_object_with_primary_key(wt, *table, "bbb").set(col_ndx, 2);
 
@@ -346,7 +346,7 @@ TEST(ClientResetDiff_2)
         WriteTransaction wt{sg};
 
         TableRef table = create_table_with_primary_key(wt, "class_table_0", type_String, "pk_string");
-        auto col_ndx = table->add_column(type_Int, "int", true);
+        auto col_ndx = table->add_column(col_type_Int, "int", true);
         auto obj_a = sync::create_object_with_primary_key(wt, *table, "aaa").set<util::Optional<Int>>(col_ndx, 6);
         sync::create_object_with_primary_key(wt, *table, "ccc").set<util::Optional<Int>>(col_ndx, 3);
         sync::create_object_with_primary_key(wt, *table, "ddd").set_null(col_ndx);
@@ -506,12 +506,12 @@ TEST(ClientResetDiff_FailedLocalRecovery)
         TableRef table_0 = create_table_with_primary_key(wt, "class_table_0", type_String, "pk_string");
 
         TableRef table_2 = create_table(wt, "class_table_2");
-        table_2->add_column(type_Int, "int");
+        table_2->add_column(col_type_Int, "int");
         CHECK_EQUAL(table_2->get_column_count(), 1);
 
         TableRef table_3 = create_table_with_primary_key(wt, "class_table_3", type_String, "pk_string");
         table_3->add_column(*table_0, "links");
-        table_3->add_column_list(type_Int, "array_int");
+        table_3->add_column_list(col_type_Int, "array_int");
 
         // The target table differs for the same column in remote and local.
         table_0->add_column_list(*table_2, "linklist");
@@ -577,9 +577,9 @@ TEST(ClientResetDiff_ClientVersion)
 
     auto create_schema_and_objects = [&](Transaction& wt) {
         TableRef table = create_table_with_primary_key(wt, "class_table", type_String, "pk_string");
-        auto col_int = table->add_column(type_Int, "int");
+        auto col_int = table->add_column(col_type_Int, "int");
         auto col_ll = table->add_column_list(*table, "linklist");
-        table->add_column_list(type_String, "array");
+        table->add_column_list(col_type_String, "array");
 
         Obj obj_a = create_object_with_primary_key(wt, *table, "aaa").set(col_int, 100);
         Obj obj_b = create_object_with_primary_key(wt, *table, "bbb").set(col_int, 200);
@@ -790,8 +790,8 @@ TEST(ClientResetDiff_PrimitiveArrays)
     auto create_schema = [&](Transaction& wt) {
         TableRef table = create_table_with_primary_key(wt, "class_table", type_String, "pk_string");
 
-        table->add_column_list(type_Int, "array_int");
-        table->add_column_list(type_String, "array_string", true);
+        table->add_column_list(col_type_Int, "array_int");
+        table->add_column_list(col_type_String, "array_string", true);
 
         sync::create_object_with_primary_key(wt, *table, "abc");
     };
@@ -975,7 +975,7 @@ TEST(ClientResetDiff_NonSyncTables)
         Group& group = wt.get_group();
 
         TableRef table = group.add_table("nonsync_table");
-        table->add_column(type_Int, "integer");
+        table->add_column(col_type_Int, "integer");
         table->create_object();
         table->create_object();
         wt.commit();
@@ -1058,7 +1058,7 @@ TEST(ClientResetDiff_Links)
         auto col_link_00 = table_0->add_column(*table_0, "link_0");
         auto col_link_01 = table_0->add_column(*table_1, "link_1");
         auto col_link_02 = table_0->add_column(*table_2, "link_2");
-        auto col_str_0 = table_0->add_column(type_String, "string");
+        auto col_str_0 = table_0->add_column(col_type_String, "string");
 
         auto col_link_10 = table_1->add_column(*table_0, "link_0");
         auto col_link_11 = table_1->add_column(*table_1, "link_1");
@@ -1131,7 +1131,7 @@ TEST(ClientResetDiff_Links)
         // Same columns in different order.
         auto col_link_01 = table_0->add_column(*table_1, "link_1");
         auto col_link_00 = table_0->add_column(*table_0, "link_0");
-        auto col_str_0 = table_0->add_column(type_String, "string");
+        auto col_str_0 = table_0->add_column(col_type_String, "string");
         auto col_link_02 = table_0->add_column(*table_2, "link_2");
 
         auto col_link_11 = table_1->add_column(*table_1, "link_1");

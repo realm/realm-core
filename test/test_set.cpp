@@ -33,9 +33,9 @@ TEST(Set_Basics)
     Group g;
 
     auto t = g.add_table("foo");
-    auto col_int = t->add_column_set(type_Int, "ints");
-    auto col_str = t->add_column_set(type_String, "strings");
-    auto col_any = t->add_column_set(type_Mixed, "any");
+    auto col_int = t->add_column_set(col_type_Int, "ints");
+    auto col_str = t->add_column_set(col_type_String, "strings");
+    auto col_any = t->add_column_set(col_type_Mixed, "any");
     CHECK(col_int.is_set());
     CHECK(col_str.is_set());
     CHECK(col_any.is_set());
@@ -95,7 +95,7 @@ TEST(Set_Mixed)
     Group g;
 
     auto t = g.add_table("foo");
-    t->add_column_set(type_Mixed, "mixeds");
+    t->add_column_set(col_type_Mixed, "mixeds");
     auto obj = t->create_object();
 
     auto set = obj.get_set<Mixed>("mixeds");
@@ -139,8 +139,8 @@ TEST(Set_Links)
     auto cabs = g.add_table("class_Cab");
 
     ColKey col_links = foos->add_column_set(*bars, "links");
-    ColKey col_typed_links = foos->add_column_set(type_TypedLink, "typed_links");
-    ColKey col_mixeds = foos->add_column_set(type_Mixed, "mixeds");
+    ColKey col_typed_links = foos->add_column_set(col_type_TypedLink, "typed_links");
+    ColKey col_mixeds = foos->add_column_set(col_type_Mixed, "mixeds");
 
     auto foo = foos->create_object();
 
@@ -246,7 +246,7 @@ TEST_TYPES(Set_Types, Prop<Int>, Prop<String>, Prop<Float>, Prop<Double>, Prop<T
     Group g;
 
     auto t = g.add_table("foo");
-    auto col = t->add_column_set(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
+    auto col = t->add_column_set(TEST_TYPE::column_type, "values", TEST_TYPE::is_nullable);
     CHECK(col.is_set());
 
     auto obj = t->create_object();
@@ -348,7 +348,7 @@ TEST(Set_Union)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_ints = foos->add_column_set(col_type_Int, "ints");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
@@ -377,7 +377,7 @@ TEST(Set_Intersection)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_ints = foos->add_column_set(col_type_Int, "ints");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
@@ -414,7 +414,7 @@ TEST(Set_Difference)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_ints = foos->add_column_set(col_type_Int, "ints");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();
@@ -440,7 +440,7 @@ TEST(Set_SymmetricDifference)
 {
     Group g;
     auto foos = g.add_table("class_Foo");
-    ColKey col_ints = foos->add_column_set(type_Int, "ints");
+    ColKey col_ints = foos->add_column_set(col_type_Int, "ints");
 
     auto obj1 = foos->create_object();
     auto obj2 = foos->create_object();

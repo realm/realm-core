@@ -85,7 +85,7 @@ using namespace realm::test_util;
 TEST(Query_NoConditions)
 {
     Table table;
-    table.add_column(type_Int, "i");
+    table.add_column(col_type_Int, "i");
     {
         Query query(table.where());
         CHECK_EQUAL(null_key, query.find());
@@ -119,7 +119,7 @@ TEST(Query_Count)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int j = 0; j < 100; j++) {
         Table table;
-        auto col_ndx = table.add_column(type_Int, "i");
+        auto col_ndx = table.add_column(col_type_Int, "i");
 
         size_t matching = 0;
         size_t not_matching = 0;
@@ -142,9 +142,9 @@ TEST(Query_Count)
 TEST(Query_Parser)
 {
     Table books;
-    books.add_column(type_String, "title");
-    books.add_column(type_String, "author");
-    books.add_column(type_Int, "pages");
+    books.add_column(col_type_String, "title");
+    books.add_column(col_type_String, "author");
+    books.add_column(col_type_Int, "pages");
 
     Obj obj1 = books.create_object().set_all("Computer Architecture and Organization", "B. Govindarajalu", 752);
     Obj obj2 = books.create_object().set_all("Introduction to Quantum Mechanics", "David Griffiths", 480);
@@ -166,11 +166,11 @@ TEST(Query_NextGenSyntax)
 
     // Setup untyped table
     Table untyped;
-    auto c0 = untyped.add_column(type_Int, "firs1");
-    auto c1 = untyped.add_column(type_Float, "second");
-    auto c2 = untyped.add_column(type_Double, "third");
-    auto c3 = untyped.add_column(type_Bool, "third2");
-    auto c4 = untyped.add_column(type_String, "fourth");
+    auto c0 = untyped.add_column(col_type_Int, "firs1");
+    auto c1 = untyped.add_column(col_type_Float, "second");
+    auto c2 = untyped.add_column(col_type_Double, "third");
+    auto c3 = untyped.add_column(col_type_Bool, "third2");
+    auto c4 = untyped.add_column(col_type_String, "fourth");
     ObjKey k0 = untyped.create_object().set_all(20, 19.9f, 3.0, true, "hello").get_key();
     ObjKey k1 = untyped.create_object().set_all(20, 20.1f, 4.0, false, "world").get_key();
 
@@ -337,8 +337,8 @@ TEST(Query_NextGen_StringConditions)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_str1 = table1->add_column(type_String, "str1");
-    auto col_str2 = table1->add_column(type_String, "str2");
+    auto col_str1 = table1->add_column(col_type_String, "str1");
+    auto col_str2 = table1->add_column(col_type_String, "str2");
 
     // add some rows
     ObjKey key_1_0 = table1->create_object().set_all("foo", "F").get_key();
@@ -437,7 +437,7 @@ TEST(Query_NextGen_StringConditions)
 
     // Test various compare operations with null
     TableRef table2 = group.add_table("table2");
-    auto col_str3 = table2->add_column(type_String, "str3", true);
+    auto col_str3 = table2->add_column(col_type_String, "str3", true);
 
     ObjKey key_2_0 = table2->create_object().set(col_str3, "foo").get_key();
     ObjKey key_2_1 = table2->create_object().set(col_str3, "!").get_key();
@@ -611,9 +611,9 @@ TEST(Query_NextGenSyntaxMonkey0)
         Table table;
 
         // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
-        auto col_int = table.add_column(type_Int, "first");
-        auto col_float = table.add_column(type_Float, "second");
-        auto col_str = table.add_column(type_String, "third");
+        auto col_int = table.add_column(col_type_Int, "first");
+        auto col_float = table.add_column(col_type_Float, "second");
+        auto col_str = table.add_column(col_type_String, "third");
 
         for (size_t r = 0; r < rows; r++) {
             Obj obj = table.create_object();
@@ -665,13 +665,12 @@ TEST(Query_NextGenSyntaxMonkey)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 +
-                            random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
-                                                        (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows = 1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
+                                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
-        auto col_int0 = table.add_column(type_Int, "first");
-        auto col_int1 = table.add_column(type_Int, "second");
-        auto col_int2 = table.add_column(type_Int, "third");
+        auto col_int0 = table.add_column(col_type_Int, "first");
+        auto col_int1 = table.add_column(col_type_Int, "second");
+        auto col_int2 = table.add_column(col_type_Int, "third");
 
         for (size_t r = 0; r < rows; r++) {
             Obj obj = table.create_object();
@@ -823,8 +822,8 @@ TEST(Query_MergeQueriesOverloads)
 {
     // Tests && and || overloads of Query class
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first");
-    auto col_int1 = table.add_column(type_Int, "second");
+    auto col_int0 = table.add_column(col_type_Int, "first");
+    auto col_int1 = table.add_column(col_type_Int, "second");
 
     table.create_object().set_all(20, 20);
     table.create_object().set_all(20, 30);
@@ -873,8 +872,8 @@ TEST(Query_MergeQueries)
 {
     // test OR vs AND precedence
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first");
-    auto col_int1 = table.add_column(type_Int, "second");
+    auto col_int0 = table.add_column(col_type_Int, "first");
+    auto col_int1 = table.add_column(col_type_Int, "second");
 
     table.create_object().set_all(10, 20);
     table.create_object().set_all(20, 30);
@@ -892,7 +891,7 @@ TEST(Query_Not)
 {
     // test Not vs And, Or, Groups.
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first");
+    auto col_int0 = table.add_column(col_type_Int, "first");
 
     table.create_object().set(col_int0, 10);
     table.create_object().set(col_int0, 20);
@@ -969,9 +968,9 @@ TEST(Query_MergeQueriesMonkey)
     for (int iter = 0; iter < 5; iter++) {
         const size_t rows = REALM_MAX_BPNODE_SIZE * 4;
         Table table;
-        auto col_int0 = table.add_column(type_Int, "first");
-        auto col_int1 = table.add_column(type_Int, "second");
-        auto col_int2 = table.add_column(type_Int, "third");
+        auto col_int0 = table.add_column(col_type_Int, "first");
+        auto col_int1 = table.add_column(col_type_Int, "second");
+        auto col_int2 = table.add_column(col_type_Int, "third");
 
         for (size_t r = 0; r < rows; r++) {
             Obj obj = table.create_object();
@@ -1144,9 +1143,9 @@ TEST(Query_MergeQueriesMonkeyOverloads)
     for (int iter = 0; iter < 5; iter++) {
         const size_t rows = REALM_MAX_BPNODE_SIZE * 4;
         Table table;
-        auto col_int0 = table.add_column(type_Int, "first");
-        auto col_int1 = table.add_column(type_Int, "second");
-        auto col_int2 = table.add_column(type_Int, "third");
+        auto col_int0 = table.add_column(col_type_Int, "first");
+        auto col_int1 = table.add_column(col_type_Int, "second");
+        auto col_int2 = table.add_column(col_type_Int, "third");
 
         for (size_t r = 0; r < rows; r++) {
             Obj obj = table.create_object();
@@ -1255,9 +1254,9 @@ TEST(Query_Expressions0)
     Many of them are combined and tested together in equality classes below
     */
     Table table;
-    auto col_int = table.add_column(type_Int, "first1");
-    auto col_float = table.add_column(type_Float, "second1");
-    auto col_double = table.add_column(type_Double, "third");
+    auto col_int = table.add_column(col_type_Int, "first1");
+    auto col_float = table.add_column(col_type_Float, "second1");
+    auto col_double = table.add_column(col_type_Double, "third");
 
 
     ObjKey match;
@@ -1465,7 +1464,7 @@ TEST(Query_StrIndexCrash)
     for (int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.add_table("test");
-        auto col = table->add_column(type_String, "first");
+        auto col = table->add_column(col_type_String, "first");
 
         size_t eights = 0;
 
@@ -1496,7 +1495,7 @@ TEST(Query_IntIndex)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     Group group;
     TableRef table = group.add_table("test");
-    auto col = table->add_column(type_Int, "first", true);
+    auto col = table->add_column(col_type_Int, "first", true);
     table->add_search_index(col);
 
     size_t eights = 0;
@@ -1546,7 +1545,7 @@ TEST(Query_StringIndexNull)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     Group group;
     TableRef table = group.add_table("test");
-    auto col = table->add_column(type_String, "first", true);
+    auto col = table->add_column(col_type_String, "first", true);
     table->add_search_index(col);
 
     size_t nulls = 0;
@@ -1581,11 +1580,11 @@ TEST(Query_Links)
     TableRef target1 = g.add_table("target1");
     TableRef target2 = g.add_table("target2");
 
-    auto int_col = target2->add_column(type_Int, "integers");
-    auto str_col = target1->add_column(type_String, "strings");
+    auto int_col = target2->add_column(col_type_Int, "integers");
+    auto str_col = target1->add_column(col_type_String, "strings");
     auto linklist_col = target1->add_column_list(*target2, "linklist");
     auto link_col = origin->add_column(*target1, "link");
-    auto double_col = origin->add_column(type_Double, "doubles");
+    auto double_col = origin->add_column(col_type_Double, "doubles");
 
     std::vector<ObjKey> origin_keys;
     origin->create_objects(10, origin_keys);
@@ -1640,12 +1639,12 @@ TEST(Query_size)
     TableRef table2 = g.add_table("secondary");
     TableRef table3 = g.add_table("top");
 
-    auto string_col = table1->add_column(type_String, "strings");
-    auto bin_col = table1->add_column(type_Binary, "binaries", true);
-    auto int_list_col = table1->add_column_list(type_Int, "intlist");
+    auto string_col = table1->add_column(col_type_String, "strings");
+    auto bin_col = table1->add_column(col_type_Binary, "binaries", true);
+    auto int_list_col = table1->add_column_list(col_type_Int, "intlist");
     auto linklist_col = table1->add_column_list(*table2, "linklist");
 
-    auto int_col = table2->add_column(type_Int, "integers");
+    auto int_col = table2->add_column(col_type_Int, "integers");
 
     auto link_col = table3->add_column(*table1, "link");
     auto linklist_col1 = table3->add_column_list(*table1, "linklist");
@@ -1772,9 +1771,9 @@ TEST(Query_ListOfPrimitives)
 
     TableRef table = g.add_table("foo");
 
-    auto col_int_list = table->add_column_list(type_Int, "integers");
-    auto col_string_list = table->add_column_list(type_String, "strings");
-    auto col_string = table->add_column(type_String, "other");
+    auto col_int_list = table->add_column_list(col_type_Int, "integers");
+    auto col_string_list = table->add_column_list(col_type_String, "strings");
+    auto col_string = table->add_column(col_type_String, "other");
     std::vector<ObjKey> keys;
 
     table->create_objects(4, keys);
@@ -1891,7 +1890,7 @@ TEST(Query_SetOfPrimitives)
 
     TableRef table = g.add_table("foo");
 
-    auto col_int_set = table->add_column_set(type_Int, "integers");
+    auto col_int_set = table->add_column_set(col_type_Int, "integers");
     std::vector<ObjKey> keys;
 
     table->create_objects(4, keys);
@@ -1927,7 +1926,7 @@ TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
     TableRef table = group.add_table("test");
-    auto col_str = table->add_column(type_String, "first");
+    auto col_str = table->add_column(col_type_String, "first");
     table->add_search_index(col_str);
     if (TEST_TYPE::value == true) {
         table->enumerate_string_column(col_str);
@@ -1993,19 +1992,19 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
     std::vector<ObjKey> doubles;
 
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first1");
-    auto col_int1 = table.add_column(type_Int, "second1");
+    auto col_int0 = table.add_column(col_type_Int, "first1");
+    auto col_int1 = table.add_column(col_type_Int, "second1");
 
-    auto col_int2 = table.add_column(type_Int, "first2");
-    auto col_int3 = table.add_column(type_Int, "second2");
+    auto col_int2 = table.add_column(col_type_Int, "first2");
+    auto col_int3 = table.add_column(col_type_Int, "second2");
 
-    auto col_int4 = table.add_column(type_Int, "first3");
-    auto col_int5 = table.add_column(type_Int, "second3");
+    auto col_int4 = table.add_column(col_type_Int, "first3");
+    auto col_int5 = table.add_column(col_type_Int, "second3");
 
-    auto col_float6 = table.add_column(type_Float, "third");
-    auto col_float7 = table.add_column(type_Float, "fourth");
-    auto col_double8 = table.add_column(type_Double, "fifth");
-    auto col_double9 = table.add_column(type_Double, "sixth");
+    auto col_float6 = table.add_column(col_type_Float, "third");
+    auto col_float7 = table.add_column(col_type_Float, "fourth");
+    auto col_double8 = table.add_column(col_type_Double, "fifth");
+    auto col_double9 = table.add_column(col_type_Double, "sixth");
 
 #ifdef REALM_DEBUG
     for (int i = 0; i < REALM_MAX_BPNODE_SIZE * 5; i++) {
@@ -2087,13 +2086,13 @@ TEST(Query_TwoColsVaryOperators)
     std::vector<size_t> doubles;
 
     Table table;
-    auto col_int0 = table.add_column(type_Int, "first1");
-    auto col_int1 = table.add_column(type_Int, "second1");
+    auto col_int0 = table.add_column(col_type_Int, "first1");
+    auto col_int1 = table.add_column(col_type_Int, "second1");
 
-    auto col_float2 = table.add_column(type_Float, "third");
-    auto col_float3 = table.add_column(type_Float, "fourth");
-    auto col_double4 = table.add_column(type_Double, "fifth");
-    auto col_double5 = table.add_column(type_Double, "sixth");
+    auto col_float2 = table.add_column(col_type_Float, "third");
+    auto col_float3 = table.add_column(col_type_Float, "fourth");
+    auto col_double4 = table.add_column(col_type_Double, "fifth");
+    auto col_double5 = table.add_column(col_type_Double, "sixth");
 
     Obj obj0 = table.create_object().set_all(5, 10, 5.0f, 10.0f, 5.0, 10.0);
     Obj obj1 = table.create_object().set_all(10, 5, 10.0f, 5.0f, 10.0, 5.0);
@@ -2125,8 +2124,8 @@ TEST(Query_TwoColsVaryOperators)
 TEST(Query_TwoCols0)
 {
     Table table;
-    auto col0 = table.add_column(type_Int, "first1");
-    auto col1 = table.add_column(type_Int, "second1");
+    auto col0 = table.add_column(col_type_Int, "first1");
+    auto col1 = table.add_column(col_type_Int, "second1");
 
 
     for (int i = 0; i < 50; i++) {
@@ -2144,12 +2143,12 @@ TEST(Query_TwoCols0)
 TEST(Query_TwoSameCols)
 {
     Table table;
-    auto col_bool0 = table.add_column(type_Bool, "first1");
-    auto col_bool1 = table.add_column(type_Bool, "first2");
-    auto col_date2 = table.add_column(type_Timestamp, "second1");
-    auto col_date3 = table.add_column(type_Timestamp, "second2");
-    auto col_str4 = table.add_column(type_String, "third1");
-    auto col_str5 = table.add_column(type_String, "third2");
+    auto col_bool0 = table.add_column(col_type_Bool, "first1");
+    auto col_bool1 = table.add_column(col_type_Bool, "first2");
+    auto col_date2 = table.add_column(col_type_Timestamp, "second1");
+    auto col_date3 = table.add_column(col_type_Timestamp, "second2");
+    auto col_str4 = table.add_column(col_type_String, "third1");
+    auto col_str5 = table.add_column(col_type_String, "third2");
 
     Timestamp d1(200, 0);
     Timestamp d2(300, 0);
@@ -2182,29 +2181,29 @@ TEST(Query_TwoSameCols)
 
 void construct_all_types_table(Table& table)
 {
-    table.add_column(type_Int, "int");
-    table.add_column(type_Bool, "bool");
-    table.add_column(type_String, "string");
-    table.add_column(type_Binary, "binary");
-    table.add_column(type_Mixed, "mixed");
-    table.add_column(type_Timestamp, "timestamp");
-    table.add_column(type_Float, "float");
-    table.add_column(type_Double, "double");
-    table.add_column(type_Decimal, "decimal128");
-    table.add_column(type_ObjectId, "objectId");
-    table.add_column(type_UUID, "uuid");
+    table.add_column(col_type_Int, "int");
+    table.add_column(col_type_Bool, "bool");
+    table.add_column(col_type_String, "string");
+    table.add_column(col_type_Binary, "binary");
+    table.add_column(col_type_Mixed, "mixed");
+    table.add_column(col_type_Timestamp, "timestamp");
+    table.add_column(col_type_Float, "float");
+    table.add_column(col_type_Double, "double");
+    table.add_column(col_type_Decimal, "decimal128");
+    table.add_column(col_type_ObjectId, "objectId");
+    table.add_column(col_type_UUID, "uuid");
 
-    table.add_column(type_Int, "int?", true);
-    table.add_column(type_Bool, "bool?", true);
-    table.add_column(type_String, "string?", true);
-    table.add_column(type_Binary, "binary?", true);
-    table.add_column(type_Mixed, "mixed?", true);
-    table.add_column(type_Timestamp, "timestamp?", true);
-    table.add_column(type_Float, "float?", true);
-    table.add_column(type_Double, "double?", true);
-    table.add_column(type_Decimal, "decimal128?", true);
-    table.add_column(type_ObjectId, "objectId?", true);
-    table.add_column(type_UUID, "uuid?", true);
+    table.add_column(col_type_Int, "int?", true);
+    table.add_column(col_type_Bool, "bool?", true);
+    table.add_column(col_type_String, "string?", true);
+    table.add_column(col_type_Binary, "binary?", true);
+    table.add_column(col_type_Mixed, "mixed?", true);
+    table.add_column(col_type_Timestamp, "timestamp?", true);
+    table.add_column(col_type_Float, "float?", true);
+    table.add_column(col_type_Double, "double?", true);
+    table.add_column(col_type_Decimal, "decimal128?", true);
+    table.add_column(col_type_ObjectId, "objectId?", true);
+    table.add_column(col_type_UUID, "uuid?", true);
 }
 
 TEST(Query_TwoColumnsCrossTypes)
@@ -2436,10 +2435,10 @@ TEST(Query_TwoColumnsCrossTypesNaN)
     // across double/float nullable/non-nullable combinations
     // verify query comparisons for: NaN == NaN, null == null, NaN != null
     Table table;
-    table.add_column(type_Float, "float");
-    table.add_column(type_Double, "double");
-    table.add_column(type_Float, "float?", true);
-    table.add_column(type_Double, "double?", true);
+    table.add_column(col_type_Float, "float");
+    table.add_column(col_type_Double, "double");
+    table.add_column(col_type_Float, "float?", true);
+    table.add_column(col_type_Double, "double?", true);
 
     CHECK(std::numeric_limits<double>::has_quiet_NaN);
     CHECK(std::numeric_limits<float>::has_quiet_NaN);
@@ -2473,9 +2472,9 @@ TEST(Query_TwoColumnsDifferentTables)
     Group g;
     auto table_a = g.add_table("table a");
     auto table_b = g.add_table("table b");
-    ColKey col_a = table_a->add_column(type_Float, "float");
-    ColKey col_b = table_b->add_column(type_Float, "float");
-    ColKey col_c = table_b->add_column(type_Float, "another float");
+    ColKey col_a = table_a->add_column(col_type_Float, "float");
+    ColKey col_b = table_b->add_column(col_type_Float, "float");
+    ColKey col_c = table_b->add_column(col_type_Float, "another float");
     table_a->create_object();
     table_a->create_object();
     table_b->create_object();
@@ -2488,7 +2487,7 @@ TEST(Query_TwoColumnsDifferentTables)
 TEST(Query_DateTest)
 {
     Table table;
-    auto col_date = table.add_column(type_Timestamp, "second1");
+    auto col_date = table.add_column(col_type_Timestamp, "second1");
 
     for (int i = 0; i < 9; i++) {
         table.create_object().set(col_date, Timestamp(i * 1000, i));
@@ -2503,8 +2502,8 @@ TEST(Query_DateTest)
 TEST(Query_TwoColsNoRows)
 {
     Table table;
-    auto col0 = table.add_column(type_Int, "first1");
-    auto col1 = table.add_column(type_Int, "second1");
+    auto col0 = table.add_column(col_type_Int, "first1");
+    auto col1 = table.add_column(col_type_Int, "second1");
 
     CHECK_EQUAL(null_key, table.where().equal(col0, col1).find());
     CHECK_EQUAL(null_key, table.where().not_equal(col0, col1).find());
@@ -2530,9 +2529,9 @@ TEST(Query_Huge)
         random.seed(N + 123);
 
         Table tt;
-        auto col_str0 = tt.add_column(type_String, "1");
-        auto col_str1 = tt.add_column(type_String, "2");
-        auto col_int2 = tt.add_column(type_Int, "3");
+        auto col_str0 = tt.add_column(col_type_String, "1");
+        auto col_str1 = tt.add_column(col_type_String, "2");
+        auto col_int2 = tt.add_column(col_type_Int, "3");
 
         TableView v;
         bool long1 = false;
@@ -2746,7 +2745,7 @@ TEST(Query_OnTableView_where)
     for (int iter = 0; iter < 50 * (1 + TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
         Table oti;
-        auto col = oti.add_column(type_Int, "1");
+        auto col = oti.add_column(col_type_Int, "1");
 
         size_t cnt1 = 0;
         size_t cnt0 = 0;
@@ -2794,8 +2793,8 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
     for (int N = 0; N < 20; N++) {
 #endif
         Table ttt;
-        auto col_int = ttt.add_column(type_Int, "1");
-        auto col_str = ttt.add_column(type_String, "2");
+        auto col_int = ttt.add_column(col_type_Int, "1");
+        auto col_str = ttt.add_column(col_type_String, "2");
 
         std::vector<ObjKey> vec;
 
@@ -2882,8 +2881,8 @@ TEST_IF(Query_StrIndex3, TEST_DURATION > 0)
 TEST(Query_StrIndex2)
 {
     Table ttt;
-    ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     int64_t s;
 
@@ -2907,8 +2906,8 @@ TEST(Query_StrEnum)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     Table ttt;
-    ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     int aa;
     int64_t s;
@@ -2948,8 +2947,8 @@ TEST(Query_StrIndex)
 
     for (size_t i = 0; i < itera; i++) {
         Table ttt;
-        ttt.add_column(type_Int, "1");
-        auto str_col = ttt.add_column(type_String, "2");
+        ttt.add_column(col_type_Int, "1");
+        auto str_col = ttt.add_column(col_type_String, "2");
 
         aa = 0;
         for (size_t t = 0; t < iterb; t++) {
@@ -2983,7 +2982,7 @@ TEST(Query_StrIndexUpdating)
     auto group = sg->start_write();
 
     auto t = group->add_table("table");
-    auto col = t->add_column(type_String, "value");
+    auto col = t->add_column(col_type_String, "value");
     t->add_search_index(col);
     TableView tv = t->where().equal(col, "").find_all();
     TableView tv_ins = t->where().equal(col, "", false).find_all();
@@ -3063,11 +3062,11 @@ TEST(Query_GA_Crash)
     {
         Group g;
         TableRef t = g.add_table("firstevents");
-        auto col_str0 = t->add_column(type_String, "1");
-        auto col_str1 = t->add_column(type_String, "2");
-        auto col_str2 = t->add_column(type_String, "3");
-        t->add_column(type_Int, "4");
-        t->add_column(type_Int, "5");
+        auto col_str0 = t->add_column(col_type_String, "1");
+        auto col_str1 = t->add_column(col_type_String, "2");
+        auto col_str2 = t->add_column(col_type_String, "3");
+        t->add_column(col_type_Int, "4");
+        t->add_column(col_type_Int, "5");
 
         for (size_t i = 0; i < 100; ++i) {
             int64_t r1 = random.draw_int_mod(100);
@@ -3102,9 +3101,9 @@ TEST(Query_GA_Crash)
 TEST(Query_Float3)
 {
     Table t;
-    auto col_float = t.add_column(type_Float, "1");
-    auto col_double = t.add_column(type_Double, "2");
-    auto col_int = t.add_column(type_Int, "3");
+    auto col_float = t.add_column(col_type_Float, "1");
+    auto col_double = t.add_column(col_type_Double, "2");
+    auto col_int = t.add_column(col_type_Int, "3");
 
     t.create_object().set_all(float(1.1), double(2.1), 1);
     t.create_object().set_all(float(1.2), double(2.2), 2);
@@ -3154,9 +3153,9 @@ TEST(Query_Float3_where)
 {
     // Sum on query on tableview
     Table t;
-    auto col_float = t.add_column(type_Float, "1");
-    auto col_double = t.add_column(type_Double, "2");
-    auto col_int = t.add_column(type_Int, "3");
+    auto col_float = t.add_column(col_type_Float, "1");
+    auto col_double = t.add_column(col_type_Double, "2");
+    auto col_int = t.add_column(col_type_Int, "3");
 
     t.create_object().set_all(float(1.1), double(2.1), 1);
     t.create_object().set_all(float(1.2), double(2.2), 2);
@@ -3207,7 +3206,7 @@ TEST(Query_TableViewSum)
 {
     Table t;
 
-    auto col_int = t.add_column(type_Int, "3");
+    auto col_int = t.add_column(col_type_Int, "3");
 
     for (int i = 0; i < 10; i++) {
         t.create_object().set(col_int, i + 1);
@@ -3224,9 +3223,9 @@ TEST(Query_JavaMinimumCrash)
     // Test that triggers a bug that was discovered through Java intnerface and has been fixed
     Table ttt;
 
-    auto col_str = ttt.add_column(type_String, "1");
-    ttt.add_column(type_String, "2");
-    auto col_int = ttt.add_column(type_Int, "3");
+    auto col_str = ttt.add_column(col_type_String, "1");
+    ttt.add_column(col_type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "3");
 
     ttt.create_object().set_all("Joe", "John", 1);
     ttt.create_object().set_all("Jane", "Doe", 2);
@@ -3242,9 +3241,9 @@ TEST(Query_Float4)
 {
     Table t;
 
-    auto col_float = t.add_column(type_Float, "1");
-    auto col_double = t.add_column(type_Double, "2");
-    t.add_column(type_Int, "3");
+    auto col_float = t.add_column(col_type_Float, "1");
+    auto col_double = t.add_column(col_type_Double, "2");
+    t.add_column(col_type_Int, "3");
 
     t.create_object().set_all(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
     t.create_object().set_all(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
@@ -3268,8 +3267,8 @@ TEST(Query_Float4)
 TEST(Query_Float)
 {
     Table t;
-    auto col_float = t.add_column(type_Float, "1");
-    auto col_double = t.add_column(type_Double, "2");
+    auto col_float = t.add_column(col_type_Float, "1");
+    auto col_double = t.add_column(col_type_Double, "2");
 
     ObjKey k0 = t.create_object().set_all(1.10f, 2.20).get_key();
     ObjKey k1 = t.create_object().set_all(1.13f, 2.21).get_key();
@@ -3376,8 +3375,8 @@ TEST(Query_DoubleCoordinates)
     Group group;
     TableRef table = group.add_table("test");
 
-    auto col0 = table->add_column(type_Double, "name");
-    auto col1 = table->add_column(type_Double, "age");
+    auto col0 = table->add_column(col_type_Double, "name");
+    auto col1 = table->add_column(col_type_Double, "age");
 
     size_t expected = 0;
 
@@ -3403,8 +3402,8 @@ TEST(Query_DoubleCoordinates)
 TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     for (size_t t = 0; t < 10; t++) {
         ttt.create_object().set_all(1, "a");
@@ -3437,8 +3436,8 @@ TEST_TYPES(Query_StrIndexed, std::true_type, std::false_type)
 TEST(Query_FindAllContains2_2)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(0, "foo");
     ttt.create_object().set_all(1, "foobar");
@@ -3472,7 +3471,7 @@ TEST(Query_SumNewAggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
+    auto col_int = t.add_column(col_type_Int, "1");
     for (size_t i = 0; i < 1000; i++) {
         t.create_object().set(col_int, 1);
         t.create_object().set(col_int, 2);
@@ -3490,8 +3489,8 @@ TEST(Query_SumNewAggregates)
 TEST(Query_SumMinMaxAvgForeignCol)
 {
     Table t;
-    auto col_int0 = t.add_column(type_Int, "1");
-    auto col_int1 = t.add_column(type_Int, "2");
+    auto col_int0 = t.add_column(col_type_Int, "1");
+    auto col_int1 = t.add_column(col_type_Int, "2");
 
     t.create_object().set_all(1, 10);
     t.create_object().set_all(2, 20);
@@ -3504,7 +3503,7 @@ TEST(Query_SumMinMaxAvgForeignCol)
 TEST(Query_AggregateSingleCond)
 {
     Table t;
-    auto col_int = t.add_column(type_Int, "1");
+    auto col_int = t.add_column(col_type_Int, "1");
 
     t.create_object().set(col_int, 1);
     t.create_object().set(col_int, 2);
@@ -3529,8 +3528,8 @@ TEST(Query_AggregateSingleCond)
 TEST(Query_FindAllRange1)
 {
     Table ttt;
-    ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(1, "a");
     ttt.create_object().set_all(4, "a");
@@ -3560,8 +3559,8 @@ TEST(Query_FindAllRangeOrMonkey2)
 
     for (size_t u = 0; u < ITER; u++) {
         Table tit;
-        auto col_int0 = tit.add_column(type_Int, "1");
-        auto col_int1 = tit.add_column(type_Int, "2");
+        auto col_int0 = tit.add_column(col_type_Int, "1");
+        auto col_int1 = tit.add_column(col_type_Int, "2");
 
         std::vector<ObjKey> a;
         std::vector<ObjKey> keys;
@@ -3598,8 +3597,8 @@ TEST(Query_FindAllRangeOrMonkey2)
 TEST(Query_FindAllRangeOr)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(1, "b");
     ttt.create_object().set_all(2, "a"); //// match
@@ -3615,10 +3614,10 @@ TEST(Query_FindAllRangeOr)
     TableView tv1 = q1.find_all(1, 8);
     CHECK_EQUAL(4, tv1.size());
 
-    TableView  tv2 = q1.find_all(2, 8);
+    TableView tv2 = q1.find_all(2, 8);
     CHECK_EQUAL(3, tv2.size());
 
-    TableView  tv3 = q1.find_all(1, 7);
+    TableView tv3 = q1.find_all(1, 7);
     CHECK_EQUAL(3, tv3.size());
 }
 
@@ -3626,8 +3625,8 @@ TEST(Query_FindAllRangeOr)
 TEST(Query_SimpleStr)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(1, "X");
     ttt.create_object().set_all(2, "a");
@@ -3657,8 +3656,8 @@ TEST(Query_SimpleStr)
 TEST(Query_Simple)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ObjKey k0 = ttt.create_object().set_all(1, "a").get_key();
     ObjKey k1 = ttt.create_object().set_all(2, "a").get_key();
@@ -3686,8 +3685,8 @@ TEST(Query_Simple)
 TEST(Query_Sort1)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(1, "a"); // 0
     ttt.create_object().set_all(2, "a"); // 1
@@ -3742,8 +3741,8 @@ TEST(Query_SortAscending)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    ttt.add_column(col_type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
         ttt.create_object().set_all(random.draw_int_mod(1100), "a"); // 0
@@ -3763,8 +3762,8 @@ TEST(Query_SortDescending)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    ttt.add_column(col_type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
         ttt.create_object().set_all(random.draw_int_mod(1100), "a"); // 0
@@ -3783,7 +3782,7 @@ TEST(Query_SortDescending)
 TEST(Query_SortDates)
 {
     Table table;
-    auto col_date = table.add_column(type_Timestamp, "first");
+    auto col_date = table.add_column(col_type_Timestamp, "first");
 
     table.create_object().set(col_date, Timestamp(1000, 0));
     table.create_object().set(col_date, Timestamp(3000, 0));
@@ -3802,7 +3801,7 @@ TEST(Query_SortDates)
 TEST(Query_SortBools)
 {
     Table table;
-    auto col = table.add_column(type_Bool, "first");
+    auto col = table.add_column(col_type_Bool, "first");
 
     table.create_object().set(col, true);
     table.create_object().set(col, false);
@@ -3824,11 +3823,11 @@ TEST(Query_SortLinks)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_str_col = t1->add_column(type_String, "t1_string");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(col_type_String, "t1_string");
     auto t1_link_t2_col = t1->add_column(*t2, "t1_link_to_t2");
-    t2->add_column(type_Int, "t2_int");
-    t2->add_column(type_String, "t2_string");
+    t2->add_column(col_type_Int, "t2_int");
+    t2->add_column(col_type_String, "t2_string");
     t2->add_column(*t1, "t2_link_to_t1");
 
     std::vector<ObjKey> t1_keys;
@@ -3877,14 +3876,14 @@ TEST(Query_SortLinkChains)
     TableRef t2 = g.add_table("t2");
     TableRef t3 = g.add_table("t3");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
     auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
 
-    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_int_col = t2->add_column(col_type_Int, "t2_int");
     auto t2_link_col = t2->add_column(*t3, "t2_link_t3");
 
-    auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
-    auto t3_str_col = t3->add_column(type_String, "t3_str");
+    auto t3_int_col = t3->add_column(col_type_Int, "t3_int", true);
+    auto t3_str_col = t3->add_column(col_type_String, "t3_str");
 
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
     ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
@@ -4018,9 +4017,9 @@ TEST(Query_LinkChainSortErrors)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
     auto t1_linklist_col = t1->add_column_list(*t2, "t1_linklist");
-    auto t2_string_col = t2->add_column(type_String, "t2_string");
+    auto t2_string_col = t2->add_column(col_type_String, "t2_string");
     t2->add_column(*t1, "t2_link_t1"); // add a backlink to t1
 
     t1->create_object();
@@ -4040,7 +4039,7 @@ TEST(Query_EmptyDescriptors)
     Group g;
     TableRef t1 = g.add_table("t1");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
 
     t1->create_object().set(t1_int_col, 4);
     t1->create_object().set(t1_int_col, 3);
@@ -4049,21 +4048,21 @@ TEST(Query_EmptyDescriptors)
 
     std::vector<size_t> results = {4, 3, 2, 3}; // original order
 
-    {   // Sorting with an empty sort descriptor is a no-op
+    { // Sorting with an empty sort descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Distinct with an empty descriptor is a no-op
+    { // Distinct with an empty descriptor is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor());
         for (size_t i = 0; i < results.size(); ++i) {
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty sort, empty distinct is still a no-op
+    { // Empty sort, empty distinct is still a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.distinct(DistinctDescriptor());
@@ -4071,7 +4070,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Arbitrary compounded empty sort and distinct is still a no-op
+    { // Arbitrary compounded empty sort and distinct is still a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor());
@@ -4084,7 +4083,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty distinct compounded on a valid distinct is a no-op
+    { // Empty distinct compounded on a valid distinct is a no-op
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor());
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4094,7 +4093,7 @@ TEST(Query_EmptyDescriptors)
             CHECK_EQUAL(tv[i].get<Int>(t1_int_col), results[i]);
         }
     }
-    {   // Empty sort compounded on a valid sort is a no-op
+    { // Empty sort compounded on a valid sort is a no-op
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor());
         tv.sort(SortDescriptor({{t1_int_col}}));
@@ -4111,8 +4110,8 @@ TEST(Query_AllowEmptyDescriptors)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
-    t1->add_column(type_Int, "t1_int");
-    t1->add_column(type_String, "t1_str");
+    t1->add_column(col_type_Int, "t1_int");
+    t1->add_column(col_type_String, "t1_str");
     t1->create_object();
 
     DescriptorOrdering ordering;
@@ -4139,8 +4138,8 @@ TEST(Query_DescriptorsWillApply)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(col_type_String, "t1_str");
     auto t1_link_col = t1->add_column(*t1, "t1_link");
 
     t1->create_object();
@@ -4248,8 +4247,8 @@ TEST(Query_FindWithDescriptorOrdering)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(col_type_String, "t1_str");
 
     auto k0 = t1->create_object().set_all(1, "A").get_key();
     auto k1 = t1->create_object().set_all(1, "A").get_key();
@@ -4417,8 +4416,8 @@ TEST(Query_FindWithDescriptorOrderingOverTableviewSync)
 {
     Group g;
     TableRef t1 = g.add_table("t1");
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(col_type_String, "t1_str");
 
     auto init_table = [&]() {
         t1->clear();
@@ -4506,10 +4505,10 @@ TEST(Query_DistinctAndSort)
     Group g;
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(col_type_String, "t1_str");
     auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
-    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_int_col = t2->add_column(col_type_Int, "t2_int");
 
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5});
     ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
@@ -4541,7 +4540,7 @@ TEST(Query_DistinctAndSort)
     // 5 | 2        "A"      4           | 2       |
 
     using ResultList = std::vector<std::pair<size_t, ObjKey>>; // value, key
-    {   // distinct with no sort keeps original order
+    {                                                          // distinct with no sort keeps original order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.distinct(t1_int_col);
@@ -4551,7 +4550,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a sorted view retains sorted order
+    { // distinct on a sorted view retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}));
@@ -4562,7 +4561,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a view sorted descending retains sorted order
+    { // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[2]}};
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {false /* descending */, false /* descending */}));
@@ -4573,7 +4572,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a sorted view (different from table order) retains sorted order
+    { // distinct on a sorted view (different from table order) retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, t1_keys[3]}, {1, t1_keys[0]}};
         tv.sort(t1_int_col, false /* descending */);
@@ -4584,7 +4583,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct across links on an unsorted view retains original order
+    { // distinct across links on an unsorted view retains original order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.distinct(DistinctDescriptor({{t1_link_col, t2_int_col}}));
@@ -4594,7 +4593,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct on a view sorted across links retains sorted order
+    { // distinct on a view sorted across links retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {2, t1_keys[3]}};
         tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}));
@@ -4605,7 +4604,7 @@ TEST(Query_DistinctAndSort)
             CHECK_EQUAL(tv.get_key(i), expected[i].second);
         }
     }
-    {   // distinct across links and sort across links
+    { // distinct across links and sort across links
         TableView tv = t1->where().find_all();
         ResultList expected = {{1, t1_keys[0]}, {1, t1_keys[2]}, {2, t1_keys[4]}};
         tv.sort(SortDescriptor({{t1_link_col, t2_int_col}}));
@@ -4626,8 +4625,8 @@ TEST(Query_SortDistinctOrderThroughHandover)
     auto g = sg_w->start_write();
 
     TableRef t1 = g->add_table("t1");
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t1_str_col = t1->add_column(type_String, "t1_str");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t1_str_col = t1->add_column(col_type_String, "t1_str");
     auto t1_link_col = t1->add_column(*t1, "t1_link");
 
     ObjKey k0 = t1->create_object().set_all(100, "A").get_key();
@@ -4658,7 +4657,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
     // 3 | 300        "A"      |
     // 4 | 400        "A"      |
 
-    {   // sort descending then distinct
+    { // sort descending then distinct
         TableView tv = t1->where().find_all();
         ResultList results = {{"A", k4}};
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
@@ -4696,7 +4695,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // distinct then sort descending
+    { // distinct then sort descending
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k0}};
         tv.distinct(DistinctDescriptor({{t1_str_col}}));
@@ -4710,7 +4709,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // sort descending then multicolumn distinct
+    { // sort descending then multicolumn distinct
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
@@ -4724,7 +4723,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         auto tv2 = tr->import_copy_of(tv, PayloadPolicy::Stay);
         check_across_handover(results, std::move(tv2));
     }
-    {   // multicolumn distinct then sort descending
+    { // multicolumn distinct then sort descending
         TableView tv = t1->where().find_all();
         std::vector<std::pair<std::string, ObjKey>> results = {{"A", k4}, {"A", k2}, {"A", k1}, {"A", k0}};
         tv.distinct(DistinctDescriptor({{t1_str_col}, {t1_int_col}}));
@@ -4740,15 +4739,16 @@ TEST(Query_SortDistinctOrderThroughHandover)
     }
 }
 
-TEST(Query_CompoundDescriptors) {
+TEST(Query_CompoundDescriptors)
+{
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
 
     TableRef t1 = g->add_table("t1");
-    ColKey t1_int_col = t1->add_column(type_Int, "t1_int");
-    ColKey t1_str_col = t1->add_column(type_String, "t1_str");
+    ColKey t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    ColKey t1_str_col = t1->add_column(col_type_String, "t1_str");
 
     ObjKey k0 = t1->create_object().set_all(1, "A").get_key();
     ObjKey k1 = t1->create_object().set_all(1, "A").get_key();
@@ -4780,7 +4780,7 @@ TEST(Query_CompoundDescriptors) {
     // 4 | 2        "A"     |
     // 5 | 2        "A"     |
 
-    {   // sorting twice should the same as a single sort with both criteria
+    { // sorting twice should the same as a single sort with both criteria
         // but reversed: sort(a).sort(b) == sort(b, a)
         ResultList results = {{2, k3}, {1, k2}, {2, k4}, {2, k5}, {1, k0}, {1, k1}};
         TableView tv = t1->where().find_all();
@@ -4806,7 +4806,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // two distincts are not the same as a single distinct with both criteria
+    { // two distincts are not the same as a single distinct with both criteria
         ResultList results = {{1, k0}, {2, k3}};
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4832,7 +4832,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // check results of sort-distinct-sort-distinct
+    { // check results of sort-distinct-sort-distinct
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor({{t1_str_col}, {t1_int_col}}, {true, true}));
         tv.distinct(DistinctDescriptor({{t1_int_col}}));
@@ -4866,14 +4866,14 @@ TEST(Query_DistinctThroughLinks)
     TableRef t2 = g.add_table("t2");
     TableRef t3 = g.add_table("t3");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
     auto t1_link_col = t1->add_column(*t2, "t1_link_t2");
 
-    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_int_col = t2->add_column(col_type_Int, "t2_int");
     auto t2_link_col = t2->add_column(*t3, "t2_link_t3");
 
-    auto t3_int_col = t3->add_column(type_Int, "t3_int", true);
-    auto t3_str_col = t3->add_column(type_String, "t3_str");
+    auto t3_int_col = t3->add_column(col_type_Int, "t3_int", true);
+    auto t3_str_col = t3->add_column(col_type_String, "t3_str");
 
     ObjKeyVector t1_keys({0, 1, 2, 3, 4, 5, 6});
     ObjKeyVector t2_keys({10, 11, 12, 13, 14, 15});
@@ -5042,7 +5042,7 @@ TEST(Query_IncludeDescriptorSelfLinks)
     Group g;
     TableRef t1 = g.add_table("t1");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
     auto t1_link_self_col = t1->add_column(*t1, "t1_link_self");
 
     ObjKeys obj_keys;
@@ -5157,8 +5157,8 @@ TEST(Query_IncludeDescriptorOtherLinks)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t2_int_col = t2->add_column(col_type_Int, "t2_int");
     auto t2_link_t1_col = t2->add_column(*t1, "t2_link_t1");
 
     ObjKeys obj_keys;
@@ -5229,8 +5229,8 @@ TEST(Query_IncludeDescriptorOtherLists)
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
-    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
+    auto t2_int_col = t2->add_column(col_type_Int, "t2_int");
     auto t2_list_t1_col = t2->add_column_list(*t1, "t2_list_t1");
 
     ObjKeys obj_keys;
@@ -5314,12 +5314,12 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
     TableRef t3 = g.add_table("t3");
     TableRef t4 = g.add_table("t4");
 
-    auto t1_int_col = t1->add_column(type_Int, "t1_int");
+    auto t1_int_col = t1->add_column(col_type_Int, "t1_int");
     auto t1_link_t2_col = t1->add_column(*t2, "t1_link_t2");
-    auto t2_int_col = t2->add_column(type_Int, "t2_int");
+    auto t2_int_col = t2->add_column(col_type_Int, "t2_int");
     auto t2_list_t3_col = t2->add_column_list(*t3, "t2_list_t3");
-    auto t3_int_col = t3->add_column(type_Int, "t3_int");
-    auto t4_int_col = t4->add_column(type_Int, "t4_int");
+    auto t3_int_col = t3->add_column(col_type_Int, "t3_int");
+    auto t4_int_col = t4->add_column(col_type_Int, "t4_int");
     auto t4_link_t3_col = t4->add_column(*t3, "t4_link_t3");
 
     ObjKeys t1_keys;
@@ -5433,8 +5433,8 @@ TEST(Query_IncludeDescriptorLinkAndListTranslation)
 TEST(Query_Sort_And_Requery_Typed1)
 {
     Table ttt;
-    auto col_int = ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
+    auto col_int = ttt.add_column(col_type_Int, "1");
+    auto col_str = ttt.add_column(col_type_String, "2");
 
     ttt.create_object().set_all(1, "a"); // 0 *
     ttt.create_object().set_all(2, "a"); // 1
@@ -5487,8 +5487,8 @@ TEST(Query_Sort_And_Requery_Typed1)
 TEST(Query_Sort_And_Requery_FindFirst)
 {
     Table ttt;
-    auto col_int0 = ttt.add_column(type_Int, "1");
-    auto col_int1 = ttt.add_column(type_Int, "2");
+    auto col_int0 = ttt.add_column(col_type_Int, "1");
+    auto col_int1 = ttt.add_column(col_type_Int, "2");
 
     ttt.create_object().set_all(1, 60);
     ttt.create_object().set_all(2, 50); // **
@@ -5514,8 +5514,8 @@ TEST(Query_Sort_And_Requery)
 {
     // New where(tableview) method
     Table table;
-    auto col_int = table.add_column(type_Int, "first1");
-    auto col_str = table.add_column(type_String, "second1");
+    auto col_int = table.add_column(col_type_Int, "first1");
+    auto col_str = table.add_column(col_type_String, "second1");
 
     table.create_object().set_all(1, "a");
     table.create_object().set_all(2, "a");
@@ -5593,8 +5593,8 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
     for (int iter = 0; iter < 1; iter++) {
         size_t b;
         Table table;
-        auto col_int0 = table.add_column(type_Int, "first1");
-        auto col_int1 = table.add_column(type_Int, "second1");
+        auto col_int0 = table.add_column(col_type_Int, "first1");
+        auto col_int1 = table.add_column(col_type_Int, "second1");
 
         // Add random data to table
         for (size_t t = 0; t < 2 * REALM_MAX_BPNODE_SIZE; t++) {
@@ -5705,8 +5705,8 @@ TEST(Query_Performance)
     auto foo = g.add_table("Foo");
     auto bar = g.add_table("Bar");
 
-    auto col_double = foo->add_column(type_Double, "doubles");
-    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_double = foo->add_column(col_type_Double, "doubles");
+    auto col_int = foo->add_column(col_type_Int, "ints");
     auto col_link = bar->add_column(*foo, "links");
     auto col_linklist = bar->add_column_list(*foo, "linklists");
 
@@ -5770,8 +5770,8 @@ TEST(Query_AllocatorBug)
     auto foo = g.add_table("Foo");
     auto bar = g.add_table("Bar");
 
-    auto col_double = foo->add_column(type_Double, "doubles");
-    auto col_int = foo->add_column(type_Int, "ints");
+    auto col_double = foo->add_column(col_type_Double, "doubles");
+    auto col_int = foo->add_column(col_type_Int, "ints");
     auto col_link = bar->add_column(*foo, "links");
     auto col_linklist = bar->add_column_list(*foo, "linklists");
 
@@ -5806,8 +5806,8 @@ TEST(Query_StringNodeEqualBaseBug)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col_type = table->add_column(type_String, "type");
-    auto col_tags = table->add_column(type_String, "tags");
+    auto col_type = table->add_column(col_type_String, "type");
+    auto col_tags = table->add_column(col_type_String, "tags");
     table->add_search_index(col_type);
 
     // Create 2 clusters
@@ -5828,8 +5828,8 @@ TEST(Query_OptimalNode)
     const char* types[9] = {"todo", "task", "issue", "report", "test", "item", "epic", "story", "flow"};
     Group g;
     TableRef table = g.add_table("table");
-    auto col_type = table->add_column(type_String, "type");
-    auto col_tags = table->add_column(type_String, "tags");
+    auto col_type = table->add_column(col_type_String, "type");
+    auto col_tags = table->add_column(col_type_String, "tags");
     table->add_search_index(col_type);
 
     for (int i = 0; i < 10000; i++) {

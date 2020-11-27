@@ -330,7 +330,7 @@ private:
 
     template <typename AggregateFunction>
     util::Optional<Mixed> aggregate(ColKey column, const char* name, AggregateFunction&& func) REQUIRES(!m_mutex);
-    DataType prepare_for_aggregate(ColKey column, const char* name) REQUIRES(m_mutex);
+    ColumnType prepare_for_aggregate(ColKey column, const char* name) REQUIRES(m_mutex);
 
     template <typename Fn>
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);

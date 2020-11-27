@@ -53,7 +53,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 if (!is_valid_key_type(spec.type)) {
                     bad_transaction_log("Invalid primary key type");
                 }
-                DataType pk_type = get_data_type(spec.type);
+                ColumnType pk_type = get_column_type(spec.type);
                 StringData pk_field = get_string(spec.field);
                 bool nullable = spec.nullable;
                 log("sync::create_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
@@ -112,7 +112,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 if (!pk_col) {
                     bad_transaction_log("CreateObject(Int) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_Int) {
+                if (table->get_column_type(pk_col) != col_type_Int) {
                     bad_transaction_log("CreateObject(Int) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
@@ -123,7 +123,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 if (!pk_col) {
                     bad_transaction_log("CreateObject(String) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_String) {
+                if (table->get_column_type(pk_col) != col_type_String) {
                     bad_transaction_log("CreateObject(String) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
@@ -136,7 +136,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 if (!pk_col) {
                     bad_transaction_log("CreateObject(ObjectId) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_ObjectId) {
+                if (table->get_column_type(pk_col) != col_type_ObjectId) {
                     bad_transaction_log("CreateObject(ObjectId) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
@@ -147,7 +147,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
                 if (!pk_col) {
                     bad_transaction_log("CreateObject(UUID) on table without a primary key");
                 }
-                if (table->get_column_type(pk_col) != type_UUID) {
+                if (table->get_column_type(pk_col) != col_type_UUID) {
                     bad_transaction_log("CreateObject(UUID) on a table with primary key type %1",
                                         table->get_column_type(pk_col));
                 }
@@ -246,14 +246,14 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             auto table = obj.get_table();
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
-            auto data_type = DataType(col.get_type());
+            auto col_type = col.get_type();
 
             auto visitor = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_Mixed || data_type == type_TypedLink) {
+                    if (col_type == col_type_Mixed || col_type == col_type_TypedLink) {
                         obj.set_any(col, link, instr.is_default);
                     }
-                    else if (data_type == type_Link) {
+                    else if (col_type == col_type_Link) {
                         // Validate target table.
                         auto target_table = table->get_link_target(col);
                         if (target_table->get_key() != link.get_table_key()) {
@@ -277,7 +277,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                             bad_transaction_log("Update: NULL in non-nullable field '%2.%1'", field_name, table_name);
                         }
                     }
-                    else if (data_type == type_Mixed || value.get_type() == data_type) {
+                    else if (col_type == col_type_Mixed || ColumnType(value.get_type()) == col_type) {
                         obj.set_any(col, value, instr.is_default);
                     }
                     else {
@@ -301,24 +301,24 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             // Update of list element.
 
             auto col = list.get_col_key();
-            auto data_type = DataType(col.get_type());
+            auto col_type = col.get_type();
             auto table = list.get_table();
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
             auto visitor = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
+                    if (col_type == col_type_TypedLink) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
                         link_list.set(index, link);
                     }
-                    else if (data_type == type_Mixed) {
+                    else if (col_type == col_type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.set(index, link);
                     }
-                    else if (data_type == type_LinkList || data_type == type_Link) {
+                    else if (col_type == col_type_LinkList || col_type == col_type_Link) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
@@ -332,7 +332,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                     }
                     else {
                         bad_transaction_log("Update: Type mismatch in list at '%2.%1' (expected link type, was %3)",
-                                            field_name, table_name, data_type);
+                                            field_name, table_name, col_type);
                     }
                 },
                 [&](Mixed value) {
@@ -345,12 +345,12 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
                         }
                     }
                     else {
-                        if (data_type == type_Mixed || value.get_type() == data_type) {
+                        if (col_type == col_type_Mixed || ColumnType(value.get_type()) == col_type) {
                             list.set_any(index, value);
                         }
                         else {
                             bad_transaction_log("Update: Type mismatch in list at '%2.%1' (expected %3, got %4)",
-                                                field_name, table_name, data_type, value.get_type());
+                                                field_name, table_name, col_type, value.get_type());
                         }
                     }
                 },
@@ -433,9 +433,9 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     auto col_name = get_string(instr.field);
 
     if (ColKey existing_key = table->get_column_key(col_name)) {
-        DataType new_type = get_data_type(instr.type);
-        if (existing_key.get_type() != ColumnType(new_type) &&
-            !(new_type == type_Link && existing_key.get_type() == col_type_LinkList)) {
+        ColumnType new_type = get_column_type(instr.type);
+        if (existing_key.get_type() != new_type &&
+            !(new_type == col_type_Link && existing_key.get_type() == col_type_LinkList)) {
             bad_transaction_log("AddColumn: Schema mismatch for existing column in '%1.%2' (expected %3, got %4)",
                                 table->get_name(), col_name, existing_key.get_type(), new_type);
         }
@@ -452,7 +452,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                                 table->get_name(), col_name, existing_is_dict ? "" : " not",
                                 existing_is_dict ? " not" : "");
         }
-        if (new_type == type_Link) {
+        if (new_type == col_type_Link) {
             TableNameBuffer buffer;
             auto target_table_name = class_name_to_table_name(get_string(instr.link_target_table), buffer);
             if (target_table_name != table->get_link_target(existing_key)->get_name()) {
@@ -473,7 +473,7 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
     }
 
     if (instr.type != Type::Link) {
-        DataType type = (instr.type == Type::Null) ? type_Mixed : get_data_type(instr.type);
+        ColumnType type = (instr.type == Type::Null) ? col_type_Mixed : get_column_type(instr.type);
         switch (instr.collection_type) {
             case CollectionType::Single: {
                 table->add_column(type, col_name, instr.nullable);
@@ -484,7 +484,8 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
                 break;
             }
             case CollectionType::Dictionary: {
-                DataType key_type = (instr.key_type == Type::Null) ? type_Mixed : get_data_type(instr.key_type);
+                ColumnType key_type =
+                    (instr.key_type == Type::Null) ? col_type_Mixed : get_column_type(instr.key_type);
                 table->add_column_dictionary(type, col_name, key_type);
                 break;
             }
@@ -513,11 +514,11 @@ void InstructionApplier::operator()(const Instruction::AddColumn& instr)
         }
         else {
             if (instr.collection_type == CollectionType::List) {
-                table->add_column_list(type_TypedLink, col_name);
+                table->add_column_list(col_type_TypedLink, col_name);
             }
             else {
                 REALM_ASSERT(instr.collection_type == CollectionType::Single);
-                table->add_column(type_TypedLink, col_name);
+                table->add_column(col_type_TypedLink, col_name);
             }
         }
     }
@@ -541,7 +542,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
     auto callback = util::overload{
         [&](LstBase& list, size_t index) {
             auto col = list.get_col_key();
-            auto data_type = DataType(col.get_type());
+            auto col_type = col.get_type();
             auto table = list.get_table();
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
@@ -562,17 +563,17 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
+                    if (col_type == col_type_TypedLink) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjLink>*>(&list));
                         auto& link_list = static_cast<Lst<ObjLink>&>(list);
                         link_list.insert(index, link);
                     }
-                    else if (data_type == type_Mixed) {
+                    else if (col_type == col_type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Lst<Mixed>*>(&list));
                         auto& mixed_list = static_cast<Lst<Mixed>&>(list);
                         mixed_list.insert(index, link);
                     }
-                    else if (data_type == type_LinkList || data_type == type_Link) {
+                    else if (col_type == col_type_LinkList || col_type == col_type_Link) {
                         REALM_ASSERT(dynamic_cast<Lst<ObjKey>*>(&list));
                         auto& link_list = static_cast<Lst<ObjKey>&>(list);
                         // Validate the target.
@@ -587,7 +588,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                     else {
                         bad_transaction_log(
                             "ArrayInsert: Type mismatch in list at '%2.%1' (expected link type, was %3)", field_name,
-                            table_name, data_type);
+                            table_name, col_type);
                     }
                 },
                 [&](Mixed value) {
@@ -601,12 +602,12 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
                         }
                     }
                     else {
-                        if (data_type == type_Mixed || value.get_type() == data_type) {
+                        if (col_type == col_type_Mixed || ColumnType(value.get_type()) == col_type) {
                             list.insert_any(index, value);
                         }
                         else {
                             bad_transaction_log("ArrayInsert: Type mismatch in list at '%2.%1' (expected %3, got %4)",
-                                                field_name, table_name, data_type, value.get_type());
+                                                field_name, table_name, col_type, value.get_type());
                         }
                     }
                 },
@@ -721,24 +722,24 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
     auto callback = util::overload{
         [&](SetBase& set) {
             auto col = set.get_col_key();
-            auto data_type = DataType(col.get_type());
+            auto col_type = col.get_type();
             auto table = set.get_table();
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
+                    if (col_type == col_type_TypedLink) {
                         REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
                         auto& link_set = static_cast<Set<ObjLink>&>(set);
                         link_set.insert(link);
                     }
-                    else if (data_type == type_Mixed) {
+                    else if (col_type == col_type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.insert(link);
                     }
-                    else if (data_type == type_Link) {
+                    else if (col_type == col_type_Link) {
                         REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
                         auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
@@ -751,7 +752,7 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                     }
                     else {
                         bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected link type, was %3)",
-                                            field_name, table_name, data_type);
+                                            field_name, table_name, col_type);
                     }
                 },
                 [&](Mixed value) {
@@ -759,12 +760,12 @@ void InstructionApplier::operator()(const Instruction::SetInsert& instr)
                         bad_transaction_log("SetInsert: NULL in non-nullable set '%2.%1'", field_name, table_name);
                     }
 
-                    if (data_type == type_Mixed || value.get_type() == data_type) {
+                    if (col_type == col_type_Mixed || ColumnType(value.get_type()) == col_type) {
                         set.insert_any(value);
                     }
                     else {
                         bad_transaction_log("SetInsert: Type mismatch in set at '%2.%1' (expected %3, got %4)",
-                                            field_name, table_name, data_type, value.get_type());
+                                            field_name, table_name, col_type, value.get_type());
                     }
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
@@ -793,24 +794,24 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
     auto callback = util::overload{
         [&](SetBase& set) {
             auto col = set.get_col_key();
-            auto data_type = DataType(col.get_type());
+            auto col_type = col.get_type();
             auto table = set.get_table();
             auto table_name = table->get_name();
             auto field_name = table->get_column_name(col);
 
             auto inserter = util::overload{
                 [&](const ObjLink& link) {
-                    if (data_type == type_TypedLink) {
+                    if (col_type == col_type_TypedLink) {
                         REALM_ASSERT(dynamic_cast<Set<ObjLink>*>(&set));
                         auto& link_set = static_cast<Set<ObjLink>&>(set);
                         link_set.erase(link);
                     }
-                    else if (data_type == type_Mixed) {
+                    else if (col_type == col_type_Mixed) {
                         REALM_ASSERT(dynamic_cast<Set<Mixed>*>(&set));
                         auto& mixed_set = static_cast<Set<Mixed>&>(set);
                         mixed_set.erase(link);
                     }
-                    else if (data_type == type_Link) {
+                    else if (col_type == col_type_Link) {
                         REALM_ASSERT(dynamic_cast<Set<ObjKey>*>(&set));
                         auto& link_set = static_cast<Set<ObjKey>&>(set);
                         // Validate the target.
@@ -823,7 +824,7 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                     }
                     else {
                         bad_transaction_log("SetErase: Type mismatch in set at '%2.%1' (expected link type, was %3)",
-                                            field_name, table_name, data_type);
+                                            field_name, table_name, col_type);
                     }
                 },
                 [&](Mixed value) {
@@ -831,12 +832,12 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
                         bad_transaction_log("SetErase: NULL in non-nullable set '%2.%1'", field_name, table_name);
                     }
 
-                    if (data_type == type_Mixed || value.get_type() == data_type) {
+                    if (col_type == col_type_Mixed || ColumnType(value.get_type()) == col_type) {
                         set.erase_any(value);
                     }
                     else {
                         bad_transaction_log("SetErase: Type mismatch in set at '%2.%1' (expected %3, got %4)",
-                                            field_name, table_name, data_type, value.get_type());
+                                            field_name, table_name, col_type, value.get_type());
                     }
                 },
                 [&](const Instruction::Payload::ObjectValue&) {
@@ -1100,7 +1101,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
     StringData table_name = table.get_name();
     ColKey pk_col = table.get_primary_key_column();
     StringData pk_name = "";
-    DataType pk_type;
+    ColumnType pk_type;
     if (pk_col) {
         pk_name = table.get_column_name(pk_col);
         pk_type = table.get_column_type(pk_col);
@@ -1127,7 +1128,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                                         "a primary key column",
                                         name, pk, table_name);
                 }
-                if (pk_type != type_Int) {
+                if (pk_type != col_type_Int) {
                     bad_transaction_log(
                         "%1 instruction with integer primary key (%2), but '%3.%4' has primary keys of type '%5'",
                         name, pk, table_name, pk_name, pk_type);
@@ -1142,7 +1143,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                                         "have a primary key column",
                                         name, pk, table_name);
                 }
-                if (pk_type != type_String) {
+                if (pk_type != col_type_String) {
                     bad_transaction_log(
                         "%1 instruction with string primary key (\"%2\"), but '%3.%4' has primary keys of type '%5'",
                         name, pk, table_name, pk_name, pk_type);
@@ -1165,7 +1166,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                                         "have a primary key column",
                                         name, pk, table_name);
                 }
-                if (pk_type != type_ObjectId) {
+                if (pk_type != col_type_ObjectId) {
                     bad_transaction_log(
                         "%1 instruction with ObjectId primary key (%2), but '%3.%4' has primary keys of type '%5'",
                         name, pk, table_name, pk_name, pk_type);
@@ -1179,7 +1180,7 @@ ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::Prima
                                         "have a primary key column",
                                         name, pk, table_name);
                 }
-                if (pk_type != type_UUID) {
+                if (pk_type != col_type_UUID) {
                     bad_transaction_log(
                         "%1 instruction with UUID primary key (%2), but '%3.%4' has primary keys of type '%5'", name,
                         pk, table_name, pk_name, pk_type);

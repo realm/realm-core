@@ -102,8 +102,8 @@ ONLY(Query_QuickSort2)
 
                                                 // Triggers QuickSort because range > len
     Table ttt;
-    auto ints = ttt.add_column(type_Int, "1");
-    auto strings = ttt.add_column(type_String, "2");
+    auto ints = ttt.add_column(col_type_Int, "1");
+    auto strings = ttt.add_column(col_type_String, "2");
 
     for (size_t t = 0; t < 10000; t++) {
         Obj o = ttt.create_object();
@@ -183,11 +183,11 @@ namespace {
 std::vector<ColKey> test_table_add_columns(TableRef t)
 {
     std::vector<ColKey> res;
-    res.push_back(t->add_column(type_Int, "first"));
-    res.push_back(t->add_column(type_Int, "second"));
-    res.push_back(t->add_column(type_Bool, "third"));
-    res.push_back(t->add_column(type_String, "fourth"));
-    res.push_back(t->add_column(type_Timestamp, "fifth"));
+    res.push_back(t->add_column(col_type_Int, "first"));
+    res.push_back(t->add_column(col_type_Int, "second"));
+    res.push_back(t->add_column(col_type_Bool, "third"));
+    res.push_back(t->add_column(col_type_String, "fourth"));
+    res.push_back(t->add_column(col_type_Timestamp, "fifth"));
     return res;
 }
 } // namespace
@@ -382,7 +382,7 @@ ONLY(Shared_DiskSpace)
         t1->verify();
 
         if (t1->size() == 0) {
-            t1->add_column(type_String, "name");
+            t1->add_column(col_type_String, "name");
         }
 
         std::string str(fastrand(3000), 'a');
@@ -508,7 +508,7 @@ TEST(Shared_ReadAfterCompact)
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
-        table->add_column(type_Int, "col");
+        table->add_column(col_type_Int, "col");
         table->create_object().set_all(1);
         wt.commit();
     }
@@ -532,7 +532,7 @@ TEST(Shared_ReadOverRead)
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
-        table->add_column(type_Int, "col");
+        table->add_column(col_type_Int, "col");
         table->create_object().set_all(1);
         wt.commit();
     }
@@ -555,7 +555,7 @@ TEST(Shared_ReadOverReadAfterCompact)
     {
         WriteTransaction wt(sg);
         auto table = wt.add_table("table");
-        table->add_column(type_Int, "col");
+        table->add_column(col_type_Int, "col");
         table->create_object().set_all(1);
         wt.commit();
     }
@@ -591,7 +591,7 @@ TEST(Shared_ReadOverRead2)
         {
             WriteTransaction wt(sg);
             auto table = wt.add_table("table");
-            table->add_column(type_Int, "col");
+            table->add_column(col_type_Int, "col");
             table->create_object().set_all(1);
             wt.commit();
         }
@@ -930,7 +930,7 @@ TEST(Shared_try_begin_write)
         }
         cv.notify_one();
         TableRef t = tr->add_table(StringData("table"));
-        t->add_column(type_String, StringData("string_col"));
+        t->add_column(col_type_String, StringData("string_col"));
         std::vector<ObjKey> keys;
         t->create_objects(1000, keys);
         thread_obtains_write_lock.lock();
@@ -944,7 +944,9 @@ TEST(Shared_try_begin_write)
 
     // wait for the thread to start a write transaction
     std::unique_lock<std::mutex> lock(cv_lock);
-    cv.wait(lock, [&] { return init_complete; });
+    cv.wait(lock, [&] {
+        return init_complete;
+    });
 
     // Try to also obtain a write lock. This should fail but not block.
     auto tr = sg->start_write(true);
@@ -1148,12 +1150,12 @@ TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
             bool was_added = false;
             TableRef test_1 = wt.get_or_add_table("test_1", &was_added);
             if (was_added) {
-                col_int = test_1->add_column(type_Int, "i");
+                col_int = test_1->add_column(col_type_Int, "i");
             }
             test_1->create_object().set(col_int, 0);
             TableRef test_2 = wt.get_or_add_table("test_2", &was_added);
             if (was_added) {
-                col_bin = test_2->add_column(type_Binary, "b");
+                col_bin = test_2->add_column(col_type_Binary, "b");
             }
             wt.commit();
         }
@@ -1398,7 +1400,7 @@ TEST(Many_ConcurrentReaders)
     DBRef sg_w = DB::create(path_str);
     WriteTransaction wt(sg_w);
     TableRef t = wt.add_table("table");
-    auto col_ndx = t->add_column(type_String, "column");
+    auto col_ndx = t->add_column(col_type_String, "column");
     t->create_object().set(col_ndx, StringData("string"));
     wt.commit();
     sg_w->close();
@@ -1440,7 +1442,7 @@ TEST(Shared_WritesSpecialOrder)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         auto table = wt.add_table("test");
-        auto col = table->add_column(type_Int, "first");
+        auto col = table->add_column(col_type_Int, "first");
         for (int i = 0; i < num_rows; ++i) {
             table->create_object(ObjKey(i)).set(col, 0);
         }
@@ -1535,7 +1537,9 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (int i = 0; i < thread_count; ++i)
-            threads[i].start([this, &sg, i] { writer_threads_thread(test_context, sg, ObjKey(i)); });
+            threads[i].start([this, &sg, i] {
+                writer_threads_thread(test_context, sg, ObjKey(i));
+            });
 
         // Wait for all threads to complete
         for (int i = 0; i < thread_count; ++i)
@@ -1615,7 +1619,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             wt.get_group().verify();
             TableRef table = wt.get_or_add_table("beta");
             if (table->is_empty()) {
-                col_int = table->add_column(type_Int, "i");
+                col_int = table->add_column(col_type_Int, "i");
                 table->create_object().set(col_int, 0);
             }
             add_int(*table, col_int, 1);
@@ -1663,7 +1667,7 @@ TEST(Shared_SpaceOveruse)
 
         if (table->is_empty()) {
             REALM_ASSERT(table);
-            table->add_column(type_String, "text");
+            table->add_column(col_type_String, "text");
         }
         auto cols = table->get_column_keys();
 
@@ -1787,7 +1791,7 @@ TEST_IF(Shared_StringIndexBug1, TEST_DURATION >= 1)
     {
         auto tr = db->start_write();
         TableRef table = tr->add_table("users");
-        auto col = table->add_column(type_String, "username");
+        auto col = table->add_column(col_type_String, "username");
         table->add_search_index(col);
         for (int i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
             table->create_object();
@@ -1814,7 +1818,7 @@ TEST(Shared_StringIndexBug2)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         TableRef table = wt.add_table("a");
-        auto col = table->add_column(type_String, "b");
+        auto col = table->add_column(col_type_String, "b");
         table->add_search_index(col); // Not adding index makes it work
         table->create_object();
         wt.commit();
@@ -1845,7 +1849,7 @@ TEST(Shared_StringIndexBug3)
     {
         auto tr = db->start_write();
         TableRef table = tr->add_table("users");
-        col = table->add_column(type_String, "username");
+        col = table->add_column(col_type_String, "username");
         table->add_search_index(col); // Disabling index makes it work
         tr->commit();
     }
@@ -1894,7 +1898,7 @@ TEST(Shared_ClearColumnWithBasicArrayRootLeaf)
         DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
         WriteTransaction wt(sg);
         TableRef test = wt.add_table("Test");
-        auto col = test->add_column(type_Double, "foo");
+        auto col = test->add_column(col_type_Double, "foo");
         test->clear();
         test->create_object(ObjKey(7)).set(col, 727.2);
         wt.commit();
@@ -1917,7 +1921,7 @@ TEST(Shared_ClearColumnWithLinksToSelf)
         WriteTransaction wt(sg);
         TableRef test = wt.add_table("Test");
         auto col = test->add_column(*test, "foo");
-        test->add_column(type_Int, "bar");
+        test->add_column(col_type_Int, "bar");
         ObjKeys keys;
         test->create_objects(400, keys);             // Ensure non root clusters
         test->get_object(keys[3]).set(col, keys[8]); // Link must be even
@@ -2099,8 +2103,9 @@ void multiprocess_threaded(TestContext& test_context, std::string path, int64_t 
 
     // Start threads
     for (int64_t i = 0; i != num_threads; ++i) {
-        threads[i].start(
-            [&test_context, &path, base, i] { multiprocess_thread(test_context, path, ObjKey(base + i)); });
+        threads[i].start([&test_context, &path, base, i] {
+            multiprocess_thread(test_context, path, ObjKey(base + i));
+        });
     }
 
     // Wait for threads to finish
@@ -2244,7 +2249,7 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
         if (g.size() == 1) {
             g.remove_table("data");
             TableRef table = g.add_table("data");
-            auto col = table->add_column(type_Int, "ints");
+            auto col = table->add_column(col_type_Int, "ints");
             table->create_object().set(col, 0);
         }
         tr->commit();
@@ -2797,10 +2802,10 @@ TEST(Shared_MovingSearchIndex)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("foo");
-        padding_col = table->add_column(type_Int, "padding");
-        int_col = table->add_column(type_Int, "int");
-        str_col = table->add_column(type_String, "regular");
-        enum_col = table->add_column(type_String, "enum");
+        padding_col = table->add_column(col_type_Int, "padding");
+        int_col = table->add_column(col_type_Int, "int");
+        str_col = table->add_column(col_type_String, "regular");
+        enum_col = table->add_column(col_type_String, "enum");
 
         table->create_objects(64, obj_keys);
         for (int i = 0; i < 64; ++i) {
@@ -2996,7 +3001,7 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        table->add_column(type_String, "string_col");
+        table->add_column(col_type_String, "string_col");
         std::string long_string(string_length, 'a');
         table->add_empty_row();
         table->set_string(0, 0, long_string);
@@ -3127,7 +3132,7 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         WriteTransaction wt(sg);
         Group& group = wt.get_group();
         TableRef t = group.add_table("table");
-        t->add_column(type_String, "string_col", true);
+        t->add_column(col_type_String, "string_col", true);
         t->add_empty_row(num_rows);
         wt.commit();
     }
@@ -3181,7 +3186,7 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.add_table("table");
-        table->add_column(type_String, "string_col");
+        table->add_column(col_type_String, "string_col");
         wt.commit();
     }
     {
@@ -3218,7 +3223,7 @@ TEST_IF(Shared_CompactEncrypt, REALM_ENABLE_ENCRYPTION)
         auto db = DB::create(path, false, DBOptions(key1));
         auto tr = db->start_write();
         TableRef t = tr->add_table("table");
-        auto col = t->add_column(type_String, "Strings");
+        auto col = t->add_column(col_type_String, "Strings");
         for (size_t i = 0; i < 10000; i++) {
             std::string str = "Shared_CompactEncrypt" + util::to_string(i);
             t->create_object().set(col, StringData(str));
@@ -3267,7 +3272,7 @@ NONCONCURRENT_TEST(Shared_BigAllocationsMinimized)
         {
             WriteTransaction wt(sg);
             TableRef table = wt.add_table("table");
-            table->add_column(type_String, "string_col");
+            table->add_column(col_type_String, "string_col");
             auto cols = table->get_column_keys();
             table->create_object(ObjKey(0)).set(cols[0], long_string.c_str());
             wt.commit();
@@ -3304,7 +3309,7 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
         TransactionRef writer = sg->start_write();
 
         TableRef t = writer->add_table("foo");
-        t->add_column(type_Double, "doubles");
+        t->add_column(col_type_Double, "doubles");
         std::vector<ObjKey> keys;
         t->create_objects(241, keys);
         writer->commit();
@@ -3331,7 +3336,7 @@ TEST(Shared_Bptree_insert_failure)
     TransactionRef writer = sg_w->start_write();
 
     auto tk = writer->add_table("")->get_key();
-    writer->get_table(tk)->add_column(type_Double, "dgrpn", true);
+    writer->get_table(tk)->add_column(col_type_Double, "dgrpn", true);
     std::vector<ObjKey> keys;
     writer->get_table(tk)->create_objects(246, keys);
     writer->commit();
@@ -3715,7 +3720,7 @@ TEST(Shared_ConstObject)
     DBRef sg_w = DB::create(path);
     TransactionRef writer = sg_w->start_write();
     TableRef t = writer->add_table("Foo");
-    auto c = t->add_column(type_Int, "integers");
+    auto c = t->add_column(col_type_Int, "integers");
     t->create_object(ObjKey(47)).set(c, 5);
     writer->commit();
 
@@ -3733,7 +3738,7 @@ TEST(Shared_ConstObjectIterator)
     {
         TransactionRef writer = sg->start_write();
         TableRef t = writer->add_table("Foo");
-        col = t->add_column(type_Int, "integers");
+        col = t->add_column(col_type_Int, "integers");
         t->create_object(ObjKey(47)).set(col, 5);
         t->create_object(ObjKey(99)).set(col, 8);
         writer->commit();
@@ -3785,7 +3790,7 @@ TEST(Shared_ConstList)
     TransactionRef writer = sg->start_write();
 
     TableRef t = writer->add_table("Foo");
-    auto list_col = t->add_column_list(type_Int, "int_list");
+    auto list_col = t->add_column_list(col_type_Int, "int_list");
     t->create_object(ObjKey(47)).get_list<int64_t>(list_col).add(47);
     writer->commit();
 
@@ -3817,7 +3822,7 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         auto rt = db->start_write();
         //Group& group = db.begin_write();
         TableRef table = rt->add_table("table");
-        auto c0 = table->add_column(type_String, "string");
+        auto c0 = table->add_column(col_type_String, "string");
         auto o1 = table->create_object();
         std::string s = std::string(size_t(1.5 * page_size()), 'a');
         o1.set(c0, s);
@@ -3911,7 +3916,7 @@ TEST(Shared_RemoveTableWithEnumAndLinkColumns)
         auto wt = db_w->start_write();
         auto table = wt->get_table("Table_2");
         tk = table->get_key();
-        auto col_key = table->add_column(DataType(2), "string_3", false);
+        auto col_key = table->add_column(ColumnType(2), "string_3", false);
         table->enumerate_string_column(col_key);
         table->add_column(*table, "link_5");
         table->add_search_index(col_key);
@@ -3959,7 +3964,7 @@ TEST(Shared_GenerateObjectIdAfterRollback)
         wt->get_table(TableKey(0))->create_objects(11, keys);
     }
     // table->m_next_key_value is now 11
-    wt->get_table(TableKey(0))->add_column(DataType(9), "float_1", false);
+    wt->get_table(TableKey(0))->add_column(ColumnType(9), "float_1", false);
     wt->rollback_and_continue_as_read();
 
     wt->promote_to_write();
@@ -3981,7 +3986,7 @@ TEST(Shared_UpgradeBinArray)
         auto table = wt->add_table("Table_0");
         std::vector<ObjKey> keys;
         table->create_objects(65, keys);
-        col = table->add_column(type_Binary, "binary_0", true);
+        col = table->add_column(col_type_Binary, "binary_0", true);
         Obj obj = table->get_object(keys[0]);
         // This will upgrade from small to big blobs. Parent should be updated.
         obj.set(col, BinaryData{"dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbtersepknglaqnckqbffehqfgjnr"});
@@ -4005,7 +4010,7 @@ TEST_IF(Shared_MoreVersionsInUse, REALM_ENABLE_ENCRYPTION)
         {
             auto wt = db->start_write();
             auto t = wt->add_table("Table_0");
-            col = t->add_column(type_Int, "Integers");
+            col = t->add_column(col_type_Int, "Integers");
             t->create_object();
             wt->add_table("Table_1");
             wt->commit();
@@ -4031,7 +4036,7 @@ TEST_IF(Shared_MoreVersionsInUse, REALM_ENABLE_ENCRYPTION)
             auto wt = db->start_write();
             auto t = wt->get_table("Table_1");
             // This will require extention of the mappings
-            t->add_column(type_String, "Strings");
+            t->add_column(col_type_String, "Strings");
             // Here the mappings no longer required will be purged
             // Before the fix, this would delete the mapping used by
             // table_r accessor
@@ -4099,8 +4104,8 @@ TEST(Shared_GetCommitSize)
         auto wt = db->start_write();
         size_before = wt->get_used_space();
         auto t = wt->add_table("foo");
-        auto col_int = t->add_column(type_Int, "Integers");
-        auto col_string = t->add_column(type_String, "Strings");
+        auto col_int = t->add_column(col_type_Int, "Integers");
+        auto col_string = t->add_column(col_type_String, "Strings");
         for (int i = 0; i < 10000; i++) {
             std::string str = "Shared_CompactEncrypt" + util::to_string(i);
             t->create_object().set(col_int, i + 0x10000).set(col_string, StringData(str));
@@ -4123,7 +4128,7 @@ TEST(Shared_GetCommitSize)
 TEST(Shared_TimestampQuery)
 {
     Table table;
-    auto col_date = table.add_column(type_Timestamp, "date", true);
+    auto col_date = table.add_column(col_type_Timestamp, "date", true);
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
@@ -4161,10 +4166,10 @@ TEST_IF(Shared_LargeFile, TEST_DURATION > 0 && !REALM_ANDROID)
     // always be able to hold 64 bit values.
     for (size_t i = 0; i < 20; i++) {
         std::string name = "Prop" + util::to_string(i);
-        foo->add_column(type_Int, name);
+        foo->add_column(col_type_Int, name);
     }
     auto bar = tr->add_table("bar");
-    auto col_str = bar->add_column(type_String, "str");
+    auto col_str = bar->add_column(col_type_String, "str");
 
     // Create enough objects to have a multi level cluster
     for (size_t i = 0; i < 400; i++) {
@@ -4216,7 +4221,7 @@ TEST(Shared_EncryptionBug)
         {
             WriteTransaction wt(db);
             auto foo = wt.add_table("foo");
-            auto col_str = foo->add_column(type_String, "str");
+            auto col_str = foo->add_column(col_type_String, "str");
             std::string string_1M(1024 * 1024, 'A');
             for (int i = 0; i < 64; i++) {
                 foo->create_object().set(col_str, string_1M);
@@ -4254,7 +4259,7 @@ TEST(Shared_ManyColumns)
     // expand from 16 to 32 bits within the minimum allocation of 128 bytes.
     for (size_t i = 0; i < 50; i++) {
         std::string name = "Prop" + util::to_string(i);
-        foo->add_column(type_Int, name);
+        foo->add_column(col_type_Int, name);
     }
     auto bar = tr->add_table("bar");
 

@@ -19,8 +19,8 @@ void populate(DBRef& sg)
 {
     WriteTransaction wt{sg};
     TableRef t = create_table(wt, "table");
-    t->add_column(type_String, "str_col");
-    t->add_column(type_Int, "int_col");
+    t->add_column(col_type_String, "str_col");
+    t->add_column(col_type_Int, "int_col");
     for (size_t i = 0; i < num_rows; ++i) {
         std::string payload(i, 'a');
         StringData payload_sg(payload);
@@ -156,8 +156,8 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         {
             WriteTransaction wt{reference_sg};
             TableRef persons = create_table(wt, "class_persons");
-            col_ndx_person_name = persons->add_column(type_String, "name");
-            col_ndx_person_age = persons->add_column(type_Int, "age");
+            col_ndx_person_name = persons->add_column(col_type_String, "name");
+            col_ndx_person_age = persons->add_column(col_type_Int, "age");
             persons->create_object().set_all("Adam", 28);
             persons->create_object().set_all("Frank", 30);
             persons->create_object().set_all("Ben", 28);

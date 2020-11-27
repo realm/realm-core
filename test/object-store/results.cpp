@@ -2019,7 +2019,7 @@ TEST_CASE("notifications: results") {
         SECTION("insert new column before link column") {
             write([&] {
                 linked_table->get_object(target_keys[1]).set(col, 5);
-                table->add_column(type_Int, "new col");
+                table->add_column(col_type_Int, "new col");
                 linked_table->get_object(target_keys[2]).set(col, 5);
             });
             REQUIRE_INDICES(change.modifications, 0, 1);

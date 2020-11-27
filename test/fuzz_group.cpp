@@ -81,9 +81,10 @@ enum INS {
     COUNT
 };
 
-DataType get_type(unsigned char c)
+ColumnType get_type(unsigned char c)
 {
-    DataType types[] = {type_Int, type_Bool, type_Float, type_Double, type_String, type_Binary, type_Timestamp};
+    ColumnType types[] = {col_type_Int,    col_type_Bool,   col_type_Float,    col_type_Double,
+                          col_type_String, col_type_Binary, col_type_Timestamp};
 
     unsigned char mod = c % (sizeof(types) / sizeof(DataType));
     return types[mod];
@@ -173,52 +174,54 @@ int table_index = 0;
 int column_index = 0;
 } // namespace
 
-std::string create_column_name(DataType t)
+std::string create_column_name(ColumnType t)
 {
     std::string str;
     switch (t) {
-        case type_Int:
+        case col_type_Int:
             str = "int_";
             break;
-        case type_Bool:
+        case col_type_Bool:
             str = "bool_";
             break;
-        case type_Float:
+        case col_type_Float:
             str = "float_";
             break;
-        case type_Double:
+        case col_type_Double:
             str = "double_";
             break;
-        case type_String:
+        case col_type_String:
             str = "string_";
             break;
-        case type_Binary:
+        case col_type_Binary:
             str = "binary_";
             break;
-        case type_Timestamp:
+        case col_type_Timestamp:
             str = "date_";
             break;
-        case type_Decimal:
+        case col_type_Decimal:
             str = "decimal_";
             break;
-        case type_ObjectId:
+        case col_type_ObjectId:
             str = "id_";
             break;
-        case type_Link:
+        case col_type_Link:
             str = "link_";
             break;
-        case type_TypedLink:
+        case col_type_TypedLink:
             str = "typed_link_";
             break;
-        case type_LinkList:
+        case col_type_LinkList:
             str = "link_list_";
             break;
-        case type_UUID:
+        case col_type_UUID:
             str = "uuid_";
             break;
-        case type_Mixed:
+        case col_type_Mixed:
             str = "any_";
             break;
+        case col_type_BackLink:
+            REALM_TERMINATE("");
     }
     return str + util::to_string(column_index++);
 }
@@ -351,7 +354,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             }
             else if (instr == ADD_COLUMN && wt->size() > 0) {
                 TableKey table_key = wt->get_table_keys()[get_next(s) % wt->size()];
-                DataType type = get_type(get_next(s));
+                ColumnType type = get_type(get_next(s));
                 std::string name = create_column_name(type);
                 // Mixed cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (get_next(s) % 2 == 0);
@@ -426,7 +429,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableKey table_key_2 = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t1 = wt->get_table(table_key_1);
                 TableRef t2 = wt->get_table(table_key_2);
-                std::string name = create_column_name(type_Link);
+                std::string name = create_column_name(col_type_Link);
                 if (log) {
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_Link, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
@@ -441,7 +444,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableKey table_key_2 = wt->get_table_keys()[get_next(s) % wt->size()];
                 TableRef t1 = wt->get_table(table_key_1);
                 TableRef t2 = wt->get_table(table_key_2);
-                std::string name = create_column_name(type_LinkList);
+                std::string name = create_column_name(col_type_LinkList);
                 if (log) {
                     *log << "wt->get_table(" << table_key_1 << ")->add_column_link(type_LinkList, \"" << name
                          << "\", *wt->get_table(" << table_key_2 << "));";
@@ -458,7 +461,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (!all_col_keys.empty() && t->size() > 0) {
                     ColKey col = all_col_keys[get_next(s) % all_col_keys.size()];
                     size_t row = get_next(s) % t->size();
-                    DataType type = t->get_column_type(col);
+                    ColumnType type = t->get_column_type(col);
                     Obj obj = t->get_object(row);
                     if (log) {
                         *log << "{\nObj obj = wt->get_table(" << table_key << ")->get_object(" << row << ");\n";
@@ -466,7 +469,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
                     // With equal probability, either set to null or to a value
                     if (get_next(s) % 2 == 0 && t->is_nullable(col)) {
-                        if (type == type_Link) {
+                        if (type == col_type_Link) {
                             if (log) {
                                 *log << "obj.set(" << col << ", null_key);\n";
                             }
@@ -480,14 +483,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         }
                     }
                     else {
-                        if (type == type_String) {
+                        if (type == col_type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
                                 *log << "obj.set(" << col << ", \"" << str << "\");\n";
                             }
                             obj.set(col, StringData(str));
                         }
-                        else if (type == type_Binary) {
+                        else if (type == col_type_Binary) {
                             std::string str = create_string(get_next(s));
                             if (log) {
                                 *log << "obj.set<Binary>(" << col << ", BinaryData{\"" << str << "\", " << str.size()
@@ -495,7 +498,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                             obj.set<Binary>(col, BinaryData(str));
                         }
-                        else if (type == type_Int) {
+                        else if (type == col_type_Int) {
                             bool add_int = get_next(s) % 2 == 0;
                             int64_t value = get_int64(s);
                             if (add_int) {
@@ -520,28 +523,28 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 obj.set<Int>(col, value);
                             }
                         }
-                        else if (type == type_Bool) {
+                        else if (type == col_type_Bool) {
                             bool value = get_next(s) % 2 == 0;
                             if (log) {
                                 *log << "obj.set<Bool>(" << col << ", " << (value ? "true" : "false") << ");\n";
                             }
                             obj.set<Bool>(col, value);
                         }
-                        else if (type == type_Float) {
+                        else if (type == col_type_Float) {
                             float value = get_next(s);
                             if (log) {
                                 *log << "obj.set<Float>(" << col << ", " << value << ");\n";
                             }
                             obj.set<Float>(col, value);
                         }
-                        else if (type == type_Double) {
+                        else if (type == col_type_Double) {
                             double value = get_next(s);
                             if (log) {
                                 *log << "obj.set<double>(" << col << ", " << value << ");\n";
                             }
                             obj.set<double>(col, value);
                         }
-                        else if (type == type_Link) {
+                        else if (type == col_type_Link) {
                             TableRef target = t->get_link_target(col);
                             if (target->size() > 0) {
                                 ObjKey target_key = target->get_object(get_next(s) % target->size()).get_key();
@@ -551,7 +554,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 obj.set(col, target_key);
                             }
                         }
-                        else if (type == type_LinkList) {
+                        else if (type == col_type_LinkList) {
                             TableRef target = t->get_link_target(col);
                             if (target->size() > 0) {
                                 LnkLst links = obj.get_linklist(col);
@@ -573,7 +576,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 }
                             }
                         }
-                        else if (type == type_Timestamp) {
+                        else if (type == col_type_Timestamp) {
                             std::pair<int64_t, int32_t> values = get_timestamp_values(s);
                             Timestamp value{values.first, values.second};
                             if (log) {

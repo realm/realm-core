@@ -547,9 +547,9 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(const_cast<Table&>(*m_table).get_object(row)) : not_found;
 }
 
-DataType Results::prepare_for_aggregate(ColKey column, const char* name)
+ColumnType Results::prepare_for_aggregate(ColKey column, const char* name)
 {
-    DataType type;
+    ColumnType type;
     switch (m_mode) {
         case Mode::Table:
             type = m_table->get_column_type(column);
@@ -574,11 +574,11 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
             REALM_COMPILER_HINT_UNREACHABLE();
     }
     switch (type) {
-        case type_Timestamp:
-        case type_Double:
-        case type_Float:
-        case type_Int:
-        case type_Decimal:
+        case col_type_Timestamp:
+        case col_type_Double:
+        case col_type_Float:
+        case col_type_Int:
+        case col_type_Decimal:
             break;
         default:
             throw UnsupportedColumnTypeException{column, *m_table, name};
@@ -761,18 +761,18 @@ struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
 };
 
 template <typename Table, typename Func>
-Mixed call_with_helper(Func&& func, Table&& table, DataType type)
+Mixed call_with_helper(Func&& func, Table&& table, ColumnType type)
 {
     switch (type) {
-        case type_Timestamp:
+        case col_type_Timestamp:
             return func(AggregateHelper<Timestamp, Table>{table});
-        case type_Double:
+        case col_type_Double:
             return func(AggregateHelper<double, Table>{table});
-        case type_Float:
+        case col_type_Float:
             return func(AggregateHelper<Float, Table>{table});
-        case type_Int:
+        case col_type_Int:
             return func(AggregateHelper<Int, Table>{table});
-        case type_Decimal:
+        case col_type_Decimal:
             return func(AggregateHelper<Decimal128, Table>{table});
         default:
             REALM_COMPILER_HINT_UNREACHABLE();

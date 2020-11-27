@@ -129,6 +129,7 @@ struct Prop {
     static constexpr bool is_nullable = col_state_is_nullable<state>;
     static constexpr bool is_indexed = col_state_is_indexed<state>;
     static constexpr DataType data_type = ColumnTypeTraits<T>::id;
+    static constexpr ColumnType column_type = ColumnTypeTraits<T>::column_id;
     using type = T;
     using underlying_type = type;
     static type default_value()
@@ -147,6 +148,7 @@ struct Prop<T, state,
     static constexpr bool is_nullable = col_state_is_nullable<state>;
     static constexpr bool is_indexed = col_state_is_indexed<state>;
     static constexpr DataType data_type = ColumnTypeTraits<T>::id;
+    static constexpr ColumnType column_type = ColumnTypeTraits<T>::column_id;
     using type = typename util::Optional<T>;
     using underlying_type = T;
     static type default_value()

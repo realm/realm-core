@@ -26,11 +26,11 @@
 namespace realm {
 
 // Dummy cluster to be used if dictionary has no cluster created and an iterator is requested
-static DictionaryClusterTree dummy_cluster(nullptr, type_Int, Allocator::get_default(), 0);
+static DictionaryClusterTree dummy_cluster(nullptr, col_type_Int, Allocator::get_default(), 0);
 
 /************************** DictionaryClusterTree ****************************/
 
-DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, DataType key_type, Allocator& alloc, size_t ndx)
+DictionaryClusterTree::DictionaryClusterTree(ArrayParent* owner, ColumnType key_type, Allocator& alloc, size_t ndx)
     : ClusterTree(alloc)
     , m_owner(owner)
     , m_ndx_in_cluster(ndx)
@@ -77,14 +77,14 @@ size_t Dictionary::size() const
     return m_clusters->size();
 }
 
-DataType Dictionary::get_key_data_type() const
+ColumnType Dictionary::get_key_data_type() const
 {
     return m_key_type;
 }
 
-DataType Dictionary::get_value_data_type() const
+ColumnType Dictionary::get_value_data_type() const
 {
-    return DataType(m_col_key.get_type());
+    return m_col_key.get_type();
 }
 
 bool Dictionary::is_null(size_t ndx) const
@@ -312,7 +312,7 @@ void Dictionary::create()
 
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
-    if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
+    if (m_key_type != col_type_Mixed && ColumnType(key.get_type()) != m_key_type) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
     if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
@@ -320,7 +320,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
             throw std::runtime_error("Dictionary::insert: Wrong object type");
         }
     }
-    else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
+    else if (m_col_key.get_type() != col_type_Mixed && ColumnType(value.get_type()) != m_col_key.get_type()) {
         throw LogicError(LogicError::collection_type_mismatch);
     }
 
@@ -526,14 +526,14 @@ auto Dictionary::Iterator::operator*() const -> value_type
     update();
     Mixed key;
     switch (m_key_type) {
-        case type_String: {
+        case col_type_String: {
             ArrayString keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);
             key = Mixed(keys.get(m_state.m_current_index));
             break;
         }
-        case type_Int: {
+        case col_type_Int: {
             ArrayInteger keys(m_tree.get_alloc());
             ref_type ref = to_ref(Array::get(m_leaf.get_mem().get_addr(), 1));
             keys.init_from_ref(ref);

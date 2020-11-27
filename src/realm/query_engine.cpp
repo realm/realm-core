@@ -86,23 +86,23 @@ bool ParentNode::match(const Obj& obj)
 }
 
 template <Action action>
-void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
+void ParentNode::aggregate_local_prepare(ColumnType col_id, bool nullable)
 {
     switch (col_id) {
-        case type_Int: {
+        case col_type_Int: {
             if (nullable)
                 m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayIntNull>;
             else
                 m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayInteger>;
             break;
         }
-        case type_Float:
+        case col_type_Float:
             m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayFloat>;
             break;
-        case type_Double:
+        case col_type_Double:
             m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDouble>;
             break;
-        case type_Decimal:
+        case col_type_Decimal:
             m_column_action_specializer = &ThisType::column_action_specialization<action, ArrayDecimal128>;
             break;
         default:
@@ -111,7 +111,7 @@ void ParentNode::aggregate_local_prepare(DataType col_id, bool nullable)
     }
 }
 
-void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
+void ParentNode::aggregate_local_prepare(Action TAction, ColumnType col_id, bool nullable)
 {
     switch (TAction) {
         case act_ReturnFirst: {

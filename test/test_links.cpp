@@ -38,10 +38,10 @@ enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 template <class T>
 void test_table_add_columns(T t)
 {
-    t->add_column(type_String, "first");
-    t->add_column(type_Int, "second");
-    t->add_column(type_Bool, "third");
-    t->add_column(type_Int, "fourth");
+    t->add_column(col_type_String, "first");
+    t->add_column(col_type_Int, "second");
+    t->add_column(col_type_Bool, "third");
+    t->add_column(col_type_Int, "fourth");
 }
 
 } // Anonymous namespace
@@ -59,8 +59,8 @@ TEST(Links_Columns)
     table2->add_column(*table1, "link");
 
     // add some more columns to table1 and table2
-    auto col_1 = table1->add_column(type_String, "col1");
-    table2->add_column(type_String, "col2");
+    auto col_1 = table1->add_column(col_type_String, "col1");
+    table2->add_column(col_type_String, "col2");
 
     // Use a key where the first has the the second most significant bit set.
     // When this is shifted up and down again, the most significant bit must
@@ -111,10 +111,10 @@ TEST(Links_Basic)
         Group group;
 
         auto table1 = group.add_table("table1");
-        table1->add_column(type_String, "first");
-        table1->add_column(type_Int, "second");
-        table1->add_column(type_Bool, "third");
-        table1->add_column(type_Int, "fourth");
+        table1->add_column(col_type_String, "first");
+        table1->add_column(col_type_Int, "second");
+        table1->add_column(col_type_Bool, "third");
+        table1->add_column(col_type_Int, "fourth");
 
         Obj obj0 = table1->create_object().set_all("test1", 1, true, int64_t(Mon));
         Obj obj1 = table1->create_object().set_all("test2", 2, false, int64_t(Tue));
@@ -205,7 +205,7 @@ TEST(Group_LinksToSameTable)
     Group g;
     TableRef table = g.add_table("target");
 
-    table->add_column(type_Int, "integers", true);
+    table->add_column(col_type_Int, "integers", true);
     auto link_col = table->add_column(*table, "links");
 
     // 3 rows linked together in a list
@@ -227,7 +227,7 @@ TEST(Links_SetLinkLogicErrors)
     TableRef origin = group.add_table("origin");
     TableRef target = group.add_table("target");
     auto col0 = origin->add_column(*target, "a");
-    origin->add_column(type_Int, "b");
+    origin->add_column(col_type_Int, "b");
     Obj obj = origin->create_object();
     target->create_object(ObjKey(10));
 
@@ -251,10 +251,10 @@ TEST(Links_Deletes)
     Group group;
 
     auto table1 = group.add_table("table1");
-    table1->add_column(type_String, "first");
-    table1->add_column(type_Int, "second");
-    table1->add_column(type_Bool, "third");
-    table1->add_column(type_Int, "fourth");
+    table1->add_column(col_type_String, "first");
+    table1->add_column(col_type_Int, "second");
+    table1->add_column(col_type_Bool, "third");
+    table1->add_column(col_type_Int, "fourth");
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
@@ -424,10 +424,10 @@ TEST(Links_LinkList_TableOps)
     Group group;
 
     auto target = group.add_table("target");
-    target->add_column(type_String, "first");
-    target->add_column(type_Int, "second");
-    target->add_column(type_Bool, "third");
-    target->add_column(type_Int, "fourth");
+    target->add_column(col_type_String, "first");
+    target->add_column(col_type_Int, "second");
+    target->add_column(col_type_Bool, "third");
+    target->add_column(col_type_Int, "fourth");
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
@@ -519,15 +519,15 @@ TEST(Links_LinkList_Basics)
     Group group;
 
     auto target = group.add_table("target");
-    target->add_column(type_String, "first");
-    target->add_column(type_Int, "second");
-    target->add_column(type_Bool, "third");
-    auto day_col = target->add_column(type_Int, "fourth");
+    target->add_column(col_type_String, "first");
+    target->add_column(col_type_Int, "second");
+    target->add_column(col_type_Bool, "third");
+    auto day_col = target->add_column(col_type_Int, "fourth");
 
     // create table with links to table1
     TableRef origin = group.add_table("origin");
     auto col_link = origin->add_column_list(*TableRef(target), "links");
-    origin->add_column(type_Int, "integers"); // Make sure the link column is not the only column
+    origin->add_column(col_type_Int, "integers"); // Make sure the link column is not the only column
     CHECK_EQUAL(target, origin->get_link_target(col_link));
 
     Obj obj0 = target->create_object().set_all("test1", 1, true, int64_t(Mon));
@@ -723,7 +723,7 @@ TEST(ListList_Clear)
     auto group = db->start_write();
 
     auto target = group->add_table("target");
-    target->add_column(type_Int, "value");
+    target->add_column(col_type_Int, "value");
 
     TableRef origin = group->add_table("origin");
     auto col_link = origin->add_column_list(*target, "links");
@@ -749,7 +749,7 @@ TEST(Links_AddBacklinkToTableWithEnumColumns)
 {
     Group g;
     auto table = g.add_table("fshno");
-    auto col = table->add_column(type_String, "strings", false);
+    auto col = table->add_column(col_type_String, "strings", false);
     table->create_object();
     table->add_column(*table, "link1");
     table->enumerate_string_column(col);
@@ -1010,11 +1010,11 @@ TEST(Links_Transactions)
 
         // Create dogs table
         TableRef dogs = group.add_table("dogs");
-        dogs->add_column(type_String, "dogName");
+        dogs->add_column(col_type_String, "dogName");
 
         // Create owners table
         TableRef owners = group.add_table("owners");
-        owners->add_column(type_String, "name");
+        owners->add_column(col_type_String, "name");
         dog_col = owners->add_column(*dogs, "dog");
 
         // Insert a single dog
@@ -1116,11 +1116,11 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
 
     // The extra columns beyond the first one increase the likelihood of
     // getting unambiguously bad ref
-    target->add_column(type_Int, "i1");
-    target->add_column(type_Int, "i2");
-    target->add_column(type_Int, "i3");
-    target->add_column(type_Int, "i4");
-    target->add_column(type_Int, "i5");
+    target->add_column(col_type_Int, "i1");
+    target->add_column(col_type_Int, "i2");
+    target->add_column(col_type_Int, "i3");
+    target->add_column(col_type_Int, "i4");
+    target->add_column(col_type_Int, "i5");
     Obj obj = target->create_object();
 
     auto col = origin->add_column_list(*target, "");
@@ -1155,7 +1155,7 @@ TEST(Links_FormerMemLeakCase)
         WriteTransaction wt(sg_w);
         TableRef origin = wt.add_table("origin");
         TableRef target = wt.add_table("target");
-        target->add_column(type_Int, "int");
+        target->add_column(col_type_Int, "int");
         auto k = target->create_object().get_key();
         auto col = origin->add_column(*target, "link");
         origin->create_object().set(col, k);
@@ -1182,7 +1182,7 @@ TEST(Links_CascadeRemove_ColumnLink)
         ColKey col_link;
         Fixture()
         {
-            target->add_column(type_Int, "t_1");
+            target->add_column(col_type_Int, "t_1");
             col_link = origin->add_column(*target, "o_1");
             for (int i = 0; i < 3; ++i) {
                 auto oo = origin->create_object();
@@ -1306,7 +1306,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
         ColKey col_link;
         Fixture()
         {
-            target->add_column(type_Int, "t_1");
+            target->add_column(col_type_Int, "t_1");
             col_link = origin->add_column_list(*target, "o_1");
             origin->create_objects(3, origin_keys);
             linklists.emplace_back(origin->get_object(origin_keys[0]).get_linklist_ptr(col_link));
@@ -1539,7 +1539,7 @@ TEST(Links_LinkList_Swap)
         Fixture()
         {
             auto col_link = origin->add_column_list(*target, "");
-            target->add_column(type_Int, "");
+            target->add_column(col_type_Int, "");
             origin->create_objects(2, okeys);
             target->create_objects(2, tkeys);
             link_list_1 = origin->get_object(okeys[0]).get_linklist_ptr(col_link);

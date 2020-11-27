@@ -95,11 +95,11 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
         std::this_thread::yield();
     }
     else if (r <= 254) {
-// Release current time slice and get time slice according to normal scheduling
+        // Release current time slice and get time slice according to normal scheduling
         millisleep(0);
     }
     else {
-// Release time slices for at least 200 ms
+        // Release time slices for at least 200 ms
         millisleep(200);
     }
 }
@@ -167,16 +167,20 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        auto col = table->add_column(type_Int, "row");
+        auto col = table->add_column(col_type_Int, "row");
         table->create_object().set(col, 0);
         wt.commit();
     }
 
     for (int i = 0; i < READERS1; ++i)
-        read_threads[i].start([&] { read_thread(test_context, path); });
+        read_threads[i].start([&] {
+            read_thread(test_context, path);
+        });
 
     for (int i = 0; i < WRITERS1; ++i)
-        write_threads[i].start([this, &path, i] { write_thread(test_context, path, i); });
+        write_threads[i].start([this, &path, i] {
+            write_thread(test_context, path, i);
+        });
 
     for (int i = 0; i < READERS1; ++i) {
         bool reader_has_thrown = read_threads[i].join();
@@ -334,7 +338,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        table->add_column(type_Int, "row");
+        table->add_column(col_type_Int, "row");
         wt.commit();
     }
 
@@ -416,7 +420,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
     {
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("table");
-        table->add_column(type_Int, "row");
+        table->add_column(col_type_Int, "row");
         table->insert_empty_row(0, 1);
         table->set_int(0, 0, 0);
         wt.commit();
@@ -426,7 +430,9 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         read_threads[i].start(read_thread);
 
     for (int i = 0; i < WRITERS; ++i)
-        write_threads[i].start([=] { write_thread(i); });
+        write_threads[i].start([=] {
+            write_thread(i);
+        });
 
     for (int i = 0; i < WRITERS; ++i) {
         bool writer_has_thrown = write_threads[i].join();

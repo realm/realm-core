@@ -95,7 +95,7 @@ inline TableRef create_table(Transaction& wt, StringData name)
 /// Object Store conventions.
 ///
 /// The Group must be in a write transaction.
-inline TableRef create_table_with_primary_key(Transaction& wt, StringData name, DataType pk_type,
+inline TableRef create_table_with_primary_key(Transaction& wt, StringData name, ColumnType pk_type,
                                               StringData pk_column_name, bool nullable = false)
 {
     if (TableRef table = wt.get_table(name)) {
@@ -125,7 +125,7 @@ void erase_table(Transaction&, TableRef);
 /// "!ARRAY_VALUE" of the specified element type and nullability.
 ///
 /// Return the column index of the inserted array column.
-ColKey add_array_column(Table&, DataType element_type, StringData column_name, bool is_nullable = false);
+ColKey add_array_column(Table&, ColumnType element_type, StringData column_name, bool is_nullable = false);
 
 
 /// Determine whether it is safe to call `object_id_for_row()` on tables without

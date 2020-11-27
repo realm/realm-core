@@ -314,16 +314,16 @@ const char* get_data_type_name(DataType type) noexcept
 
 // -- Table ---------------------------------------------------------------------------------
 
-ColKey Table::add_column(DataType type, StringData name, bool nullable)
+ColKey Table::add_column(ColumnType type, StringData name, bool nullable)
 {
     if (REALM_UNLIKELY(is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
 
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
-    if (nullable || type == type_Mixed)
+    if (nullable || type == col_type_Mixed)
         attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    ColKey col_key = generate_col_key(type, attr);
 
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
@@ -344,29 +344,29 @@ ColKey Table::add_column(Table& target, StringData name)
     attr.set(col_attr_Nullable);
     ColKey col_key = generate_col_key(col_type_Link, attr);
 
-    auto retval = do_insert_column(col_key, type_Link, name, &target); // Throws
+    auto retval = do_insert_column(col_key, col_type_Link, name, &target); // Throws
     return retval;
 }
 
-ColKey Table::add_column_list(DataType type, StringData name, bool nullable)
+ColKey Table::add_column_list(ColumnType type, StringData name, bool nullable)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_List);
-    if (nullable || type == type_Mixed)
+    if (nullable || type == col_type_Mixed)
         attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    ColKey col_key = generate_col_key(type, attr);
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
-ColKey Table::add_column_set(DataType type, StringData name, bool nullable)
+ColKey Table::add_column_set(ColumnType type, StringData name, bool nullable)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
     attr.set(col_attr_Set);
-    if (nullable || type == type_Mixed)
+    if (nullable || type == col_type_Mixed)
         attr.set(col_attr_Nullable);
-    ColKey col_key = generate_col_key(ColumnType(type), attr);
+    ColKey col_key = generate_col_key(type, attr);
     return do_insert_column(col_key, type, name, invalid_link); // Throws
 }
 
@@ -386,7 +386,7 @@ ColKey Table::add_column_list(Table& target, StringData name)
     attr.set(col_attr_List);
     ColKey col_key = generate_col_key(col_type_LinkList, attr);
 
-    return do_insert_column(col_key, type_LinkList, name, &target); // Throws
+    return do_insert_column(col_key, col_type_LinkList, name, &target); // Throws
 }
 
 ColKey Table::add_column_set(Table& target, StringData name)
@@ -404,24 +404,24 @@ ColKey Table::add_column_set(Table& target, StringData name)
     ColumnAttrMask attr;
     attr.set(col_attr_Set);
     ColKey col_key = generate_col_key(col_type_Link, attr);
-    return do_insert_column(col_key, type_Link, name, &target); // Throws
+    return do_insert_column(col_key, col_type_Link, name, &target); // Throws
 }
 
-ColKey Table::add_column_link(DataType type, StringData name, Table& target)
+ColKey Table::add_column_link(ColumnType type, StringData name, Table& target)
 {
     if (REALM_UNLIKELY(!is_link_type(ColumnType(type))))
         throw LogicError(LogicError::illegal_type);
 
-    if (type == type_LinkList) {
+    if (type == col_type_LinkList) {
         return add_column_list(target, name);
     }
     else {
-        REALM_ASSERT(type == type_Link);
+        REALM_ASSERT(type == col_type_Link);
         return add_column(target, name);
     }
 }
 
-ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key_type)
+ColKey Table::add_column_dictionary(ColumnType type, StringData name, ColumnType key_type)
 {
     Table* invalid_link = nullptr;
     ColumnAttrMask attr;
@@ -430,7 +430,7 @@ ColKey Table::add_column_dictionary(DataType type, StringData name, DataType key
     return do_insert_column(col_key, type, name, invalid_link, key_type); // Throws
 }
 
-ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key_type)
+ColKey Table::add_column_dictionary(Table& target, StringData name, ColumnType key_type)
 {
     // Both origin and target must be group-level tables, and in the same group.
     Group* origin_group = get_parent_group();
@@ -445,7 +445,7 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
     ColKey col_key = generate_col_key(ColumnType(col_type_Link), attr);
-    return do_insert_column(col_key, type_Link, name, &target, key_type); // Throws
+    return do_insert_column(col_key, col_type_Link, name, &target, key_type); // Throws
 }
 
 void Table::remove_recursive(CascadeState& cascade_state)
@@ -623,9 +623,10 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 }
 
 
-ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table, DataType key_type)
+ColKey Table::do_insert_column(ColKey col_key, ColumnType type, StringData name, Table* target_table,
+                               ColumnType key_type)
 {
-    col_key = do_insert_root_column(col_key, ColumnType(type), name, key_type); // Throws
+    col_key = do_insert_root_column(col_key, type, name, key_type); // Throws
 
     // When the inserted column is a link-type column, we must also add a
     // backlink column to the target table.
@@ -653,9 +654,9 @@ void Table::populate_search_index(ColKey col_key)
     // Insert ref to index
     for (auto o : *this) {
         ObjKey key = o.get_key();
-        DataType type = get_column_type(col_key);
+        ColumnType type = get_column_type(col_key);
 
-        if (type == type_Int) {
+        if (type == col_type_Int) {
             if (is_nullable(col_key)) {
                 Optional<int64_t> value = o.get<Optional<int64_t>>(col_key);
                 index->insert(key, value); // Throws
@@ -665,7 +666,7 @@ void Table::populate_search_index(ColKey col_key)
                 index->insert(key, value); // Throws
             }
         }
-        else if (type == type_Bool) {
+        else if (type == col_type_Bool) {
             if (is_nullable(col_key)) {
                 Optional<bool> value = o.get<Optional<bool>>(col_key);
                 index->insert(key, value); // Throws
@@ -675,15 +676,15 @@ void Table::populate_search_index(ColKey col_key)
                 index->insert(key, value); // Throws
             }
         }
-        else if (type == type_String) {
+        else if (type == col_type_String) {
             StringData value = o.get<StringData>(col_key);
             index->insert(key, value); // Throws
         }
-        else if (type == type_Timestamp) {
+        else if (type == col_type_Timestamp) {
             Timestamp value = o.get<Timestamp>(col_key);
             index->insert(key, value); // Throws
         }
-        else if (type == type_ObjectId) {
+        else if (type == col_type_ObjectId) {
             if (is_nullable(col_key)) {
                 Optional<ObjectId> value = o.get<Optional<ObjectId>>(col_key);
                 index->insert(key, value); // Throws
@@ -693,7 +694,7 @@ void Table::populate_search_index(ColKey col_key)
                 index->insert(key, value); // Throws
             }
         }
-        else if (type == type_UUID) {
+        else if (type == col_type_UUID) {
             if (is_nullable(col_key)) {
                 Optional<UUID> value = o.get<Optional<UUID>>(col_key);
                 index->insert(key, value); // Throws
@@ -823,7 +824,7 @@ void Table::add_search_index(ColKey col_key)
     if (m_index_accessors[column_ndx] != nullptr)
         return;
 
-    if (!StringIndex::type_supported(DataType(col_key.get_type())) || col_key.is_collection()) {
+    if (!StringIndex::type_supported(col_key.get_type()) || col_key.is_collection()) {
         // FIXME: This is what we used to throw, so keep throwing that for compatibility reasons, even though it
         // should probably be a type mismatch exception instead.
         throw LogicError(LogicError::illegal_combination);
@@ -919,7 +920,7 @@ void Table::erase_root_column(ColKey col_key)
 }
 
 
-ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, DataType key_type)
+ColKey Table::do_insert_root_column(ColKey col_key, ColumnType type, StringData name, ColumnType key_type)
 {
     // if col_key specifies a key, it must be unused
     REALM_ASSERT(!col_key || !valid_column(col_key));
@@ -1613,7 +1614,7 @@ bool Table::migrate_objects(ColKey pk_col_key)
     // the right target for links
     ColKey orig_row_ndx_col;
     if (pk_col_key) {
-        orig_row_ndx_col = add_column(type_Int, "!ROW_INDEX");
+        orig_row_ndx_col = add_column(col_type_Int, "!ROW_INDEX");
         add_search_index(orig_row_ndx_col);
     }
 
@@ -2614,7 +2615,7 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         else if (col_key.is_dictionary()) {
             out << ",\"isMap\":true";
             auto key_type = get_dictionary_key_type(col_key);
-            out << ",\"keyType\":\"" << get_data_type_name(key_type) << "\"";
+            out << ",\"keyType\":\"" << get_data_type_name(DataType(key_type)) << "\"";
         }
         if (col_key.is_nullable()) {
             out << ",\"isOptional\":true";
@@ -3713,11 +3714,11 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
 
 void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
 {
-    realm::DataType type_id = get_column_type(from);
+    realm::ColumnType type_id = get_column_type(from);
     bool _is_list = is_list(from);
     if (_is_list) {
         switch (type_id) {
-            case type_Int:
+            case col_type_Int:
                 if (is_nullable(from)) {
                     change_nullability_list<Optional<int64_t>, int64_t>(from, to, throw_on_null);
                 }
@@ -3725,25 +3726,25 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                     change_nullability_list<int64_t, Optional<int64_t>>(from, to, throw_on_null);
                 }
                 break;
-            case type_Float:
+            case col_type_Float:
                 change_nullability_list<float, float>(from, to, throw_on_null);
                 break;
-            case type_Double:
+            case col_type_Double:
                 change_nullability_list<double, double>(from, to, throw_on_null);
                 break;
-            case type_Bool:
+            case col_type_Bool:
                 change_nullability_list<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
                 break;
-            case type_String:
+            case col_type_String:
                 change_nullability_list<StringData, StringData>(from, to, throw_on_null);
                 break;
-            case type_Binary:
+            case col_type_Binary:
                 change_nullability_list<BinaryData, BinaryData>(from, to, throw_on_null);
                 break;
-            case type_Timestamp:
+            case col_type_Timestamp:
                 change_nullability_list<Timestamp, Timestamp>(from, to, throw_on_null);
                 break;
-            case type_ObjectId:
+            case col_type_ObjectId:
                 if (is_nullable(from)) {
                     change_nullability_list<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
                 }
@@ -3751,10 +3752,10 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                     change_nullability_list<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
                 }
                 break;
-            case type_Decimal:
+            case col_type_Decimal:
                 change_nullability_list<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
-            case type_UUID:
+            case col_type_UUID:
                 if (is_nullable(from)) {
                     change_nullability_list<Optional<UUID>, UUID>(from, to, throw_on_null);
                 }
@@ -3762,19 +3763,19 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                     change_nullability_list<UUID, Optional<UUID>>(from, to, throw_on_null);
                 }
                 break;
-            case type_Link:
-            case type_TypedLink:
-            case type_LinkList:
+            case col_type_Link:
+            case col_type_TypedLink:
+            case col_type_LinkList:
                 // Can't have lists of these types
-            case type_Mixed:
-                // These types are no longer supported at all
+            case col_type_Mixed:
+            case col_type_BackLink:
                 REALM_UNREACHABLE();
                 break;
         }
     }
     else {
         switch (type_id) {
-            case type_Int:
+            case col_type_Int:
                 if (is_nullable(from)) {
                     change_nullability<Optional<int64_t>, int64_t>(from, to, throw_on_null);
                 }
@@ -3782,25 +3783,25 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                     change_nullability<int64_t, Optional<int64_t>>(from, to, throw_on_null);
                 }
                 break;
-            case type_Float:
+            case col_type_Float:
                 change_nullability<float, float>(from, to, throw_on_null);
                 break;
-            case type_Double:
+            case col_type_Double:
                 change_nullability<double, double>(from, to, throw_on_null);
                 break;
-            case type_Bool:
+            case col_type_Bool:
                 change_nullability<Optional<bool>, Optional<bool>>(from, to, throw_on_null);
                 break;
-            case type_String:
+            case col_type_String:
                 change_nullability<StringData, StringData>(from, to, throw_on_null);
                 break;
-            case type_Binary:
+            case col_type_Binary:
                 change_nullability<BinaryData, BinaryData>(from, to, throw_on_null);
                 break;
-            case type_Timestamp:
+            case col_type_Timestamp:
                 change_nullability<Timestamp, Timestamp>(from, to, throw_on_null);
                 break;
-            case type_ObjectId:
+            case col_type_ObjectId:
                 if (is_nullable(from)) {
                     change_nullability<Optional<ObjectId>, ObjectId>(from, to, throw_on_null);
                 }
@@ -3808,10 +3809,10 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                     change_nullability<ObjectId, Optional<ObjectId>>(from, to, throw_on_null);
                 }
                 break;
-            case type_Decimal:
+            case col_type_Decimal:
                 change_nullability<Decimal128, Decimal128>(from, to, throw_on_null);
                 break;
-            case type_UUID:
+            case col_type_UUID:
                 if (is_nullable(from)) {
                     change_nullability<Optional<UUID>, UUID>(from, to, throw_on_null);
                 }
@@ -3819,12 +3820,13 @@ void Table::convert_column(ColKey from, ColKey to, bool throw_on_null)
                     change_nullability<UUID, Optional<UUID>>(from, to, throw_on_null);
                 }
                 break;
-            case type_TypedLink:
-            case type_Link:
+            case col_type_TypedLink:
+            case col_type_Link:
                 // Always nullable, so can't convert
-            case type_LinkList:
+            case col_type_LinkList:
+            case col_type_BackLink:
                 // Never nullable, so can't convert
-            case type_Mixed:
+            case col_type_Mixed:
                 // These types are no longer supported at all
                 REALM_UNREACHABLE();
                 break;

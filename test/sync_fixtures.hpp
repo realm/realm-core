@@ -1137,8 +1137,8 @@ namespace accounting {
 inline bool init(Transaction& tr, int account_identifier, std::int_fast64_t initial_balance)
 {
     TableRef account = sync::create_table(tr, "class_Account");
-    ColKey col_ndx_identifier = account->add_column(type_Int, "identifier");
-    ColKey col_ndx_balance = account->add_column(type_Int, "balance");
+    ColKey col_ndx_identifier = account->add_column(col_type_Int, "identifier");
+    ColKey col_ndx_balance = account->add_column(col_type_Int, "balance");
     account->create_object().set(col_ndx_identifier, account_identifier).set(col_ndx_balance, initial_balance);
     return true;
 }
@@ -1168,11 +1168,11 @@ inline TableRef find_or_create_result_sets_table(Transaction& g)
     TableRef result_sets = g.get_table(g_partial_sync_result_sets_table_name);
     if (!result_sets) {
         result_sets = sync::create_table(g, g_partial_sync_result_sets_table_name);
-        result_sets->add_column(type_String, "query");
-        result_sets->add_column(type_String, "matches_property");
-        result_sets->add_column(type_Int, "status");
-        result_sets->add_column(type_String, "error_message");
-        result_sets->add_column(type_Int, "query_parse_counter");
+        result_sets->add_column(col_type_String, "query");
+        result_sets->add_column(col_type_String, "matches_property");
+        result_sets->add_column(col_type_Int, "status");
+        result_sets->add_column(col_type_String, "error_message");
+        result_sets->add_column(col_type_Int, "query_parse_counter");
     }
     return result_sets;
 }
@@ -1183,7 +1183,7 @@ inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table, Stri
     // Find a match column for the table, or add one.
     ColKey matches_col;
     for (ColKey col_key : result_sets->get_column_keys()) {
-        if (result_sets->get_column_type(col_key) == type_LinkList &&
+        if (result_sets->get_column_type(col_key) == col_type_LinkList &&
             result_sets->get_link_target(col_key) == table) {
             matches_col = col_key;
         }

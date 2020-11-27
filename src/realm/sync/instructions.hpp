@@ -898,6 +898,11 @@ inline DataType get_data_type(Instruction::Payload::Type type) noexcept
     return type_Int; // Make compiler happy
 }
 
+inline ColumnType get_column_type(Instruction::Payload::Type type) noexcept
+{
+    return ColumnType(get_data_type(type));
+}
+
 // 0x3f is the largest value that fits in a single byte in the variable-length
 // encoded integer instruction format.
 static constexpr uint8_t InstrTypeInternString = 0x3f;

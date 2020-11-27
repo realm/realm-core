@@ -40,64 +40,65 @@ SetBasePtr Obj::get_setbase_ptr(ColKey col_key) const
     bool nullable = attr.test(col_attr_Nullable);
 
     switch (get_table()->get_column_type(col_key)) {
-        case type_Int: {
+        case col_type_Int: {
             if (nullable)
                 return std::make_unique<Set<util::Optional<Int>>>(*this, col_key);
             else
                 return std::make_unique<Set<Int>>(*this, col_key);
         }
-        case type_Bool: {
+        case col_type_Bool: {
             if (nullable)
                 return std::make_unique<Set<util::Optional<Bool>>>(*this, col_key);
             else
                 return std::make_unique<Set<Bool>>(*this, col_key);
         }
-        case type_Float: {
+        case col_type_Float: {
             if (nullable)
                 return std::make_unique<Set<util::Optional<Float>>>(*this, col_key);
             else
                 return std::make_unique<Set<Float>>(*this, col_key);
         }
-        case type_Double: {
+        case col_type_Double: {
             if (nullable)
                 return std::make_unique<Set<util::Optional<Double>>>(*this, col_key);
             else
                 return std::make_unique<Set<Double>>(*this, col_key);
         }
-        case type_String: {
+        case col_type_String: {
             return std::make_unique<Set<String>>(*this, col_key);
         }
-        case type_Binary: {
+        case col_type_Binary: {
             return std::make_unique<Set<Binary>>(*this, col_key);
         }
-        case type_Timestamp: {
+        case col_type_Timestamp: {
             return std::make_unique<Set<Timestamp>>(*this, col_key);
         }
-        case type_Decimal: {
+        case col_type_Decimal: {
             return std::make_unique<Set<Decimal128>>(*this, col_key);
         }
-        case type_ObjectId: {
+        case col_type_ObjectId: {
             if (nullable)
                 return std::make_unique<Set<util::Optional<ObjectId>>>(*this, col_key);
             else
                 return std::make_unique<Set<ObjectId>>(*this, col_key);
         }
-        case type_UUID: {
+        case col_type_UUID: {
             if (nullable)
                 return std::make_unique<Set<util::Optional<UUID>>>(*this, col_key);
             else
                 return std::make_unique<Set<UUID>>(*this, col_key);
         }
-        case type_TypedLink: {
+        case col_type_TypedLink: {
             return std::make_unique<Set<ObjLink>>(*this, col_key);
         }
-        case type_Mixed: {
+        case col_type_Mixed: {
             return std::make_unique<Set<Mixed>>(*this, col_key);
         }
-        case type_Link: {
+        case col_type_Link: {
             return std::make_unique<LnkSet>(*this, col_key);
         }
-        case type_LinkList:
+        case col_type_LinkList:
+        case col_type_BackLink:
             break;
     }
     REALM_TERMINATE("Unsupported column type.");

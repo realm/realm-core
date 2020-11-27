@@ -92,8 +92,8 @@ TEST(ServerHistory_Verify)
         WriteTransaction wt{sg};
         wt.get_group().verify();
         TableRef table = sync::create_table(wt, "class_table");
-        table->add_column(type_Int, "alpha");
-        table->add_column(type_Int, "beta");
+        table->add_column(col_type_Int, "alpha");
+        table->add_column(col_type_Int, "beta");
         table->create_object();
         wt.commit();
     }

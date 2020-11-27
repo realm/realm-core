@@ -224,8 +224,8 @@ TEST_TYPES(ObjectId_Table, WithIndex, WithoutIndex)
     const char str1[] = "deaddeaddeaddeaddeaddead";
 
     Table t;
-    auto col_id = t.add_column(type_ObjectId, "id");
-    auto col_id_null = t.add_column(type_ObjectId, "id_null", true);
+    auto col_id = t.add_column(col_type_ObjectId, "id");
+    auto col_id_null = t.add_column(col_type_ObjectId, "id_null", true);
     auto obj0 = t.create_object().set(col_id, ObjectId(str0)).set(col_id_null, ObjectId(str0));
     auto obj1 = t.create_object().set(col_id, ObjectId(str1)).set(col_id_null, ObjectId(str1));
     auto obj2 = t.create_object();
@@ -268,7 +268,7 @@ TEST(ObjectId_PrimaryKey)
     ObjKey key;
     {
         auto wt = db->start_write();
-        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        auto table = wt->add_table_with_primary_key("Foo", col_type_ObjectId, "id");
         table->create_object_with_primary_key(ObjectId(now, 0, 0));
         key = table->create_object_with_primary_key(id).get_key();
         wt->commit();
@@ -291,7 +291,7 @@ TEST(ObjectId_Commit)
     {
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        col = table->add_column(type_ObjectId, "id");
+        col = table->add_column(col_type_ObjectId, "id");
         wt->commit();
     }
     {
@@ -327,10 +327,10 @@ TEST_TYPES(ObjectId_Query, WithIndex, WithoutIndex)
 
         auto target = wt->add_table("Target");
         auto origin = wt->add_table("Origin");
-        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "id");
+        auto table = wt->add_table_with_primary_key("Foo", col_type_ObjectId, "id");
 
-        col_id = table->add_column(type_ObjectId, "alternative_id", true);
-        col_int = table->add_column(type_Int, "int");
+        col_id = table->add_column(col_type_ObjectId, "alternative_id", true);
+        col_int = table->add_column(col_type_Int, "int");
         col_has = table->add_column(*target, "Has");
         col_owns = origin->add_column(*table, "Owns");
 
@@ -413,8 +413,8 @@ TEST_TYPES(ObjectId_QueryTimestamp, std::true_type, std::false_type)
     {
         auto wt = db->start_write();
         constexpr bool nullable_oid = TEST_TYPE::value;
-        auto table = wt->add_table_with_primary_key("Foo", type_ObjectId, "oid", nullable_oid);
-        auto col_ts = table->add_column(type_Timestamp, "ts");
+        auto table = wt->add_table_with_primary_key("Foo", col_type_ObjectId, "oid", nullable_oid);
+        auto col_ts = table->add_column(col_type_Timestamp, "ts");
 
         for (size_t i = 0; i < times.size(); ++i) {
             auto obj = table->create_object_with_primary_key(ObjectId(times[i], 0, 0));
@@ -481,7 +481,7 @@ TEST(ObjectId_Distinct)
         std::vector<ObjectId> ids{"000004560000000000170232", "000004560000000000170233", "000004550000000000170232"};
         auto wt = db->start_write();
         auto table = wt->add_table("Foo");
-        auto col_id = table->add_column(type_ObjectId, "id", true);
+        auto col_id = table->add_column(col_type_ObjectId, "id", true);
         for (int i = 1; i < 10; i++) {
             auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
         }

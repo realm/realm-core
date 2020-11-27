@@ -485,8 +485,8 @@ TEST_IF(Sync_ServerHistoryCompaction_Benchmark, false)
                 Session session = fixture.make_bound_session(path, "/test");
                 {
                     WriteTransaction wt{sg};
-                    TableRef foo = sync::create_table_with_primary_key(wt, "class_Foo", type_Int, "pk");
-                    ColKey col = foo->add_column(type_String, "large");
+                    TableRef foo = sync::create_table_with_primary_key(wt, "class_Foo", col_type_Int, "pk");
+                    ColKey col = foo->add_column(col_type_String, "large");
                     for (int_fast64_t j = 0; j < 100; ++j) {
                         foo->create_object_with_primary_key(j).set(col, large_string);
                     }

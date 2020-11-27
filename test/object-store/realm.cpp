@@ -784,7 +784,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         auto r2 = Realm::get_shared_realm(config);
         auto test = [&] {
             r2->begin_transaction();
-            r2->read_group().get_table("class_object")->add_column(type_String, "new col");
+            r2->read_group().get_table("class_object")->add_column(col_type_String, "new col");
             r2->commit_transaction();
 
             auto& object_schema = *r1->schema().find("object");
@@ -819,7 +819,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
 
         SECTION("change property type") {
             table.remove_column(table.get_column_key("value 2"));
-            table.add_column(type_Float, "value 2");
+            table.add_column(col_type_Float, "value 2");
             wt.commit();
             REQUIRE_THROWS_WITH(
                 r->refresh(),
@@ -828,7 +828,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
 
         SECTION("make property optional") {
             table.remove_column(table.get_column_key("value 2"));
-            table.add_column(type_Int, "value 2", true);
+            table.add_column(col_type_Int, "value 2", true);
             wt.commit();
             REQUIRE_THROWS_WITH(r->refresh(),
                                 Catch::Matchers::Contains("Property 'object.value 2' has been made optional"));
@@ -836,7 +836,7 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
 
         SECTION("recreate column with no changes") {
             table.remove_column(table.get_column_key("value 2"));
-            table.add_column(type_Int, "value 2");
+            table.add_column(col_type_Int, "value 2");
             wt.commit();
             REQUIRE_NOTHROW(r->refresh());
         }
@@ -1271,7 +1271,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         r->read_group();
         external_write(config, [](auto& wt) {
             auto table = wt.add_table("class_object 2");
-            table->add_column(type_Int, "value");
+            table->add_column(col_type_Int, "value");
         });
 
         auto tv = cache_tv;
@@ -1287,7 +1287,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         r->read_group();
         external_write(config, [](auto& wt) {
             auto table = wt.add_table("class_object 2");
-            table->add_column(type_Int, "value");
+            table->add_column(col_type_Int, "value");
         });
 
         auto tv = cache_tv;
@@ -1319,7 +1319,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
             did_run = true;
 
             auto table = writer.wt.add_table("class_object 2");
-            table->add_column(type_Int, "value");
+            table->add_column(col_type_Int, "value");
             std::this_thread::sleep_for(wait_time * 2);
             writer.wt.commit();
         });
@@ -1453,7 +1453,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
         SECTION("Schema is changed by another Realm") {
             auto r2 = Realm::get_shared_realm(config);
             r2->begin_transaction();
-            r2->read_group().get_table("class_object1")->add_column(type_String, "new col");
+            r2->read_group().get_table("class_object1")->add_column(col_type_String, "new col");
             r2->commit_transaction();
             r1->refresh();
             REQUIRE(schema_changed_called == 1);
@@ -1463,7 +1463,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
         // This is not a valid use case. m_schema won't be refreshed.
         SECTION("Schema is changed by this Realm won't trigger") {
             r1->begin_transaction();
-            r1->read_group().get_table("class_object1")->add_column(type_String, "new col");
+            r1->read_group().get_table("class_object1")->add_column(col_type_String, "new col");
             r1->commit_transaction();
             REQUIRE(schema_changed_called == 0);
         }
@@ -1498,7 +1498,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
 
         SECTION("Schema is changed by another Realm") {
             r1->begin_transaction();
-            r1->read_group().get_table("class_object1")->add_column(type_String, "new col");
+            r1->read_group().get_table("class_object1")->add_column(col_type_String, "new col");
             r1->commit_transaction();
             r2->refresh();
             REQUIRE(dynamic_schema_changed_called == 1);

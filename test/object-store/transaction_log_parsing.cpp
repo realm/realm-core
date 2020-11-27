@@ -242,7 +242,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     SECTION("adding a table is allowed") {
         auto wt = db->start_write();
         TableRef table = wt->add_table("new table");
-        table->add_column(type_String, "new col");
+        table->add_column(col_type_String, "new col");
         wt->commit();
 
         REQUIRE_NOTHROW(r->refresh());
@@ -251,7 +251,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     SECTION("adding a column at the end of an existing table is allowed") {
         auto wt = db->start_write();
         TableRef table = wt->get_table("class_table");
-        table->add_column(type_String, "new col");
+        table->add_column(col_type_String, "new col");
         wt->commit();
 
         REQUIRE_NOTHROW(r->refresh());
