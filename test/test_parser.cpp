@@ -3746,6 +3746,7 @@ TEST(Parser_Object)
 
     CHECK_THROW_ANY(verify_query(test_context, table, "link == link", 3));
 }
+#endif
 
 TEST(Parser_Between)
 {
@@ -3765,10 +3766,9 @@ TEST(Parser_Between)
     // operator between is not supported yet, but we at least use a friendly error message.
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "age between {20, 25}", 1), message);
-    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the "
+    CHECK(message.find("The 'between' operator is not supported yet, please rewrite the "
                        "expression using '>' and '<'.") != std::string::npos);
 }
-#endif
 
 TEST(Parser_ChainedStringEqualQueries)
 {

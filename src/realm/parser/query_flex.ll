@@ -34,7 +34,7 @@ blank   [ \t\r]
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();
-[,()\.]                     return yytext[0];
+[,(){}\.]                     return yytext[0];
 ("<="|"=<")                 return yy::parser::make_LESS_EQUAL ();
 (">="|"=>")                 return yy::parser::make_GREATER_EQUAL ();
 &&|(?i:and)                 return yy::parser::make_AND    ();
@@ -47,6 +47,7 @@ blank   [ \t\r]
 (?i:endswith)               return yy::parser::make_ENDSWITH(yytext);
 (?i:contains)               return yy::parser::make_CONTAINS(yytext);
 (?i:like)                   return yy::parser::make_LIKE(yytext);
+(?i:between)                return yy::parser::make_BETWEEN(yytext);
 (?i:truepredicate)          return yy::parser::make_TRUEPREDICATE (); 
 (?i:falsepredicate)         return yy::parser::make_FALSEPREDICATE (); 
 (?i:sort)                   return yy::parser::make_SORT();

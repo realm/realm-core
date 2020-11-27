@@ -96,6 +96,7 @@ using namespace realm::query_parser;
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
 %token <std::string> LIKE    "like"
+%token <std::string> BETWEEN "between"
 %token <std::string> SIZE "@size"
 %type  <bool> direction
 %type  <int> equality relational stringop
@@ -153,6 +154,10 @@ atom_pred
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
                                 }
+    | value BETWEEN list        {
+                                    error("The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.");
+                                    YYERROR;
+                                }
     | NOT atom_pred             { $$ = drv.m_parse_nodes.create<NotNode>($2); }
     | '(' pred ')'              { $$ = drv.m_parse_nodes.create<ParensNode>($2); }
     | boolexpr                  { $$ =$1; }
@@ -198,7 +203,13 @@ limit: LIMIT '(' NATURAL0 ')'   { $$ = drv.m_parse_nodes.create<DescriptorNode>(
 direction
     : ASCENDING                 { $$ = true; }
     | DESCENDING                { $$ = false; }
-    
+
+list : '{' list_content '}'
+
+list_content
+    : constant
+    | list_content ',' constant
+
 constant
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
     | NUMBER                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
@@ -265,6 +276,7 @@ id
     | ENDSWITH                  { $$ = $1; }
     | CONTAINS                  { $$ = $1; }
     | LIKE                      { $$ = $1; }
+    | BETWEEN                   { $$ = $1; }
 %%
 
 void
