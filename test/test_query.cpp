@@ -1885,6 +1885,44 @@ TEST(Query_ListOfPrimitives)
     CHECK_EQUAL(tv.size(), 1);
 }
 
+TEST(Query_SetOfPrimitives)
+{
+    Group g;
+
+    TableRef table = g.add_table("foo");
+
+    auto col_int_set = table->add_column_set(type_Int, "integers");
+    std::vector<ObjKey> keys;
+
+    table->create_objects(4, keys);
+
+    auto set_values = [](Set<Int> set, const std::vector<Int>& value_list) {
+        for (auto val : value_list)
+            set.insert(val);
+    };
+
+    set_values(table->get_object(keys[0]).get_set<Int>(col_int_set), {0, 1});
+    set_values(table->get_object(keys[1]).get_set<Int>(col_int_set), {2, 3, 4, 5});
+    set_values(table->get_object(keys[2]).get_set<Int>(col_int_set), {6, 7, 100, 8, 9});
+    set_values(table->get_object(keys[3]).get_set<Int>(col_int_set), {3, 11, 7});
+
+    Query q = table->column<Set<Int>>(col_int_set) == 3;
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+    CHECK_EQUAL(tv.get_key(1), keys[3]);
+
+    q = table->column<Set<Int>>(col_int_set).size() == 4;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[1]);
+
+    q = table->column<Set<Int>>(col_int_set).max() == 100;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_key(0), keys[2]);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;

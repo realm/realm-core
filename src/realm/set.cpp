@@ -213,4 +213,19 @@ void Set<Mixed>::do_erase(size_t ndx)
     }
 }
 
+void LnkSet::remove_target_row(size_t link_ndx)
+{
+    // Deleting the object will automatically remove all links
+    // to it. So we do not have to manually remove the deleted link
+    ObjKey k = get(link_ndx);
+    get_target_table()->remove_object(k);
+}
+
+void LnkSet::remove_all_target_rows()
+{
+    if (is_attached()) {
+        _impl::TableFriend::batch_erase_rows(*get_target_table(), *m_set.m_tree);
+    }
+}
+
 } // namespace realm

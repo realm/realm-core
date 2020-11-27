@@ -53,6 +53,8 @@ public:
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {},
             SortDescriptor s = {});
+    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkSet> list, util::Optional<Query> q = {},
+            SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -188,8 +190,10 @@ public:
         Empty,     // Backed by nothing (for missing tables)
         Table,     // Backed directly by a Table
         List,      // Backed by a list-of-primitives that is not a link list.
+        Set,       // Backed by a set-of-primitives that is not a link set.
         Query,     // Backed by a query that has not yet been turned into a TableView
         LinkList,  // Backed directly by a LinkList
+        LinkSet,   // Backed directly by a LnkSet
         TableView, // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
@@ -298,6 +302,7 @@ private:
     ConstTableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<LnkLst> m_link_list;
+    std::shared_ptr<LnkSet> m_link_set;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
 
@@ -306,7 +311,7 @@ private:
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
 
-    bool update_linklist() REQUIRES(m_mutex);
+    bool update_link_collection() REQUIRES(m_mutex);
 
     void validate_read() const;
     void validate_write() const;
@@ -333,7 +338,7 @@ private:
     template <typename T>
     auto& list_as() const;
 
-    void evaluate_sort_and_distinct_on_list() REQUIRES(m_mutex);
+    void evaluate_sort_and_distinct_on_collection() REQUIRES(m_mutex);
     void do_evaluate_query_if_needed(bool wants_notifications = true) REQUIRES(m_mutex);
 
     class IteratorWrapper {

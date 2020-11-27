@@ -48,6 +48,8 @@ public:
     Set(Set&&);
     Set& operator=(Set&&);
 
+    Query get_query() const;
+
     template <class T>
     size_t find(const T&) const;
     template <class T>
