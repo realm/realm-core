@@ -241,7 +241,7 @@ inline void Spec::set_dictionary_key_type(size_t ndx, DataType key_type)
 inline DataType Spec::get_dictionary_key_type(size_t ndx) const
 {
     REALM_ASSERT(ndx < get_column_count());
-    return DataType(m_attr.get(ndx) >> 8);
+    return DataType(int(m_attr.get(ndx) >> 8));
 }
 
 inline void Spec::set_column_attr(size_t column_ndx, ColumnAttrMask attr)
