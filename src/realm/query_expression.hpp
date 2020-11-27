@@ -741,6 +741,11 @@ public:
         return false;
     }
 
+    virtual bool has_multiple_values() const
+    {
+        return false;
+    }
+
     virtual bool has_search_index() const
     {
         return false;
@@ -1878,6 +1883,11 @@ class ObjPropertyExpr : public Subexpr2<T>, public ObjPropertyBase {
 public:
     using ObjPropertyBase::ObjPropertyBase;
 
+    bool has_multiple_values() const override
+    {
+        return m_link_map.has_links() && !m_link_map.only_unary_links();
+    }
+
     ConstTableRef get_base_table() const final
     {
         return m_link_map.get_base_table();
@@ -2819,6 +2829,10 @@ public:
     {
     }
 
+    bool has_multiple_values() const override
+    {
+        return true;
+    }
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Lst<T>>>(*this);
@@ -3041,6 +3055,10 @@ public:
     ColumnListElementLength(const Columns<Lst<T>>& source)
         : m_list(source)
     {
+    }
+    bool has_multiple_values() const override
+    {
+        return true;
     }
     void evaluate(size_t index, ValueBase& destination) override
     {

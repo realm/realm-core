@@ -511,8 +511,8 @@ static void yynoreturn yy_fatal_error ( const char* msg  );
 /* %% [3.0] code to copy yytext_ptr to yytext[] goes here, if %array \ */\
 	(yy_c_buf_p) = yy_cp;
 /* %% [4.0] data tables for the DFA and the user's section 1 definitions go here */
-#define YY_NUM_RULES 54
-#define YY_END_OF_BUFFER 55
+#define YY_NUM_RULES 55
+#define YY_END_OF_BUFFER 56
 /* This struct is not used in this scanner,
    but its presence is necessary. */
 struct yy_trans_info
@@ -522,44 +522,44 @@ struct yy_trans_info
 	};
 static const flex_int16_t yy_accept[347] =
     {   0,
-        0,    0,   55,   53,    1,    2,   12,   53,   52,   53,
-       53,    7,   53,    7,   43,   43,    5,    3,    6,   53,
-       52,   52,   52,   52,   52,   52,   52,   52,   52,   52,
-       52,   52,   52,   53,   52,   52,   52,   52,   52,   52,
-       52,   52,   52,   53,    1,    2,    4,    0,   51,    0,
-       52,   44,   10,    0,   50,    0,    0,   45,    0,    0,
-       48,    0,   48,   43,    0,    0,    8,    3,    9,    0,
-        0,    0,    0,    0,   52,   52,   52,   52,   52,   52,
-       52,   52,   52,   52,   52,   52,    3,   52,   52,   52,
-       52,   52,   52,   11,   52,   52,   52,    0,   52,   52,
+        0,    0,   56,   54,    1,    2,   13,   54,   53,   54,
+       54,    8,   54,    8,   44,   44,    6,    3,    7,   54,
+       53,   53,   53,   53,   53,   53,   53,   53,   53,   53,
+       53,   53,   53,   54,   53,   53,   53,   53,   53,   53,
+       53,   53,   53,   54,    1,    2,    5,    0,   52,    0,
+       53,   45,   11,    0,   51,    0,    0,   46,    0,    0,
+       49,    0,   49,   44,    0,    0,    9,    3,   10,    0,
+        0,    0,    0,    0,   53,   53,   53,   53,   53,   53,
+       53,   53,   53,   53,   53,   53,    4,   53,   53,   53,
+       53,   53,   53,   12,   53,   53,   53,    0,   53,   53,
 
-       52,   52,    0,   52,   52,   52,   52,   52,   52,   52,
-       52,   11,    0,    0,    0,    0,    0,    0,   48,    0,
-       47,   46,    0,    0,    0,    0,    0,    0,    0,   14,
-       10,   13,   25,   52,   52,   52,   52,   52,   52,   52,
-       52,   37,   52,   52,   38,   39,   52,   12,   52,   52,
-       52,   52,    0,    0,   52,   52,   34,   52,   52,   52,
-       52,   52,   52,    0,    0,   37,   38,    0,   48,    0,
-       32,    0,    0,   29,   30,    0,   31,   52,    0,   52,
-       52,   26,   52,   52,   52,   52,   52,   19,   52,   15,
-       39,   22,   52,    0,   42,   35,   52,   52,    0,   52,
+       53,   53,    0,   53,   53,   53,   53,   53,   53,   53,
+       53,   12,    0,    0,    0,    0,    0,    0,   49,    0,
+       48,   47,    0,    0,    0,    0,    0,    0,    0,   15,
+       11,   14,   26,   53,   53,   53,   53,   53,   53,   53,
+       53,   38,   53,   53,   39,   40,   53,   13,   53,   53,
+       53,   53,    0,    0,   53,   53,   35,   53,   53,   53,
+       53,   53,   53,    0,    0,   38,   39,    0,   49,    0,
+       33,    0,    0,   30,   31,    0,   32,   53,    0,   53,
+       53,   27,   53,   53,   53,   53,   53,   20,   53,   16,
+       40,   23,   53,    0,   43,   36,   53,   53,    0,   53,
 
-        0,    0,    0,    0,    0,    0,   28,   52,   49,    0,
-       52,   52,   52,   52,   52,   36,   52,   52,   24,   52,
-       52,    0,    0,    0,    0,    0,    0,   33,   52,   52,
-       52,   52,   52,   52,   52,   52,   52,   52,    0,    0,
-        0,    0,   52,   52,   52,   52,   52,   52,   52,   52,
-       52,   52,    0,    0,    0,    0,   52,   52,   18,   52,
-       23,   17,   52,   37,   27,   52,    0,    0,   37,    0,
-       25,   52,   52,   52,   52,    0,    0,    0,   16,   26,
-       52,   52,    0,    0,   42,   52,   52,    0,    0,    0,
-       52,   52,    0,    0,   42,   52,   20,    0,    0,   21,
+        0,    0,    0,    0,    0,    0,   29,   53,   50,    0,
+       53,   53,   53,   53,   53,   37,   53,   53,   25,   53,
+       53,    0,    0,    0,    0,    0,    0,   34,   53,   53,
+       53,   53,   53,   53,   53,   53,   53,   53,    0,    0,
+        0,    0,   53,   53,   53,   53,   53,   53,   53,   53,
+       53,   53,    0,    0,    0,    0,   53,   53,   19,   53,
+       24,   18,   53,   38,   28,   53,    0,    0,   38,    0,
+       26,   53,   53,   53,   53,    0,    0,    0,   17,   27,
+       53,   53,    0,    0,   43,   53,   53,    0,    0,    0,
+       53,   53,    0,    0,   43,   53,   21,    0,    0,   22,
 
         0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
         0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
         0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-       41,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-        0,    0,    0,    0,   40,    0
+       42,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+        0,    0,    0,    0,   41,    0
     } ;
 
 static const YY_CHAR yy_ec[256] =
@@ -902,14 +902,14 @@ static char *yy_last_accepting_cpos;
 extern int yy_flex_debug;
 int yy_flex_debug = 1;
 
-static const flex_int16_t yy_rule_linenum[54] =
+static const flex_int16_t yy_rule_linenum[55] =
     {   0,
        29,   30,   32,   33,   34,   35,   36,   37,   38,   39,
        40,   41,   42,   43,   44,   45,   46,   47,   48,   49,
        50,   51,   52,   53,   54,   55,   56,   57,   58,   59,
        60,   61,   62,   63,   64,   65,   66,   67,   68,   69,
        70,   71,   72,   73,   74,   75,   76,   77,   78,   79,
-       80,   81,   83
+       80,   81,   82,   84
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -1340,13 +1340,13 @@ do_action:	/* This label is used only to access EOF actions. */
 			{
 			if ( yy_act == 0 )
 				fprintf( stderr, "--scanner backing up\n" );
-			else if ( yy_act < 54 )
+			else if ( yy_act < 55 )
 				fprintf( stderr, "--accepting rule at line %ld (\"%s\")\n",
 				         (long)yy_rule_linenum[yy_act], yytext );
-			else if ( yy_act == 54 )
+			else if ( yy_act == 55 )
 				fprintf( stderr, "--accepting default rule (\"%s\")\n",
 				         yytext );
-			else if ( yy_act == 55 )
+			else if ( yy_act == 56 )
 				fprintf( stderr, "--(end of buffer or a NUL)\n" );
 			else
 				fprintf( stderr, "--EOF (start condition %d)\n", YY_START );
@@ -1377,171 +1377,171 @@ return yy::parser::make_EQUAL  ();
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-return yy::parser::make_NOT_EQUAL();
+return yy::parser::make_IN  ();
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-return yy::parser::make_LESS   ();
+return yy::parser::make_NOT_EQUAL();
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-return yy::parser::make_GREATER();
+return yy::parser::make_LESS   ();
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-return yytext[0];
+return yy::parser::make_GREATER();
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-return yy::parser::make_LESS_EQUAL ();
+return yytext[0];
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-return yy::parser::make_GREATER_EQUAL ();
+return yy::parser::make_LESS_EQUAL ();
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-return yy::parser::make_AND    ();
+return yy::parser::make_GREATER_EQUAL ();
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-return yy::parser::make_OR     ();
+return yy::parser::make_AND    ();
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-return yy::parser::make_NOT();
+return yy::parser::make_OR     ();
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-return yy::parser::make_ANY();
+return yy::parser::make_NOT();
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-return yy::parser::make_ALL();
+return yy::parser::make_ANY();
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-return yy::parser::make_NONE();
+return yy::parser::make_ALL();
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-return yy::parser::make_BEGINSWITH(yytext);
+return yy::parser::make_NONE();
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-return yy::parser::make_ENDSWITH(yytext);
+return yy::parser::make_BEGINSWITH(yytext);
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-return yy::parser::make_CONTAINS(yytext);
+return yy::parser::make_ENDSWITH(yytext);
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-return yy::parser::make_LIKE(yytext);
+return yy::parser::make_CONTAINS(yytext);
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-return yy::parser::make_TRUEPREDICATE (); 
+return yy::parser::make_LIKE(yytext);
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-return yy::parser::make_FALSEPREDICATE (); 
+return yy::parser::make_TRUEPREDICATE (); 
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-return yy::parser::make_SORT();
+return yy::parser::make_FALSEPREDICATE (); 
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-return yy::parser::make_DISTINCT();
+return yy::parser::make_SORT();
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-return yy::parser::make_LIMIT();
+return yy::parser::make_DISTINCT();
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-return yy::parser::make_ASCENDING();
+return yy::parser::make_LIMIT();
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-return yy::parser::make_DESCENDING();
+return yy::parser::make_ASCENDING();
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-return yy::parser::make_SUBQUERY();
+return yy::parser::make_DESCENDING();
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-return yy::parser::make_SIZE(yytext);
+return yy::parser::make_SUBQUERY();
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-return yy::parser::make_MAX    ();
+return yy::parser::make_SIZE(yytext);
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-return yy::parser::make_MIN    ();
+return yy::parser::make_MAX    ();
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-return yy::parser::make_SUM    ();
+return yy::parser::make_MIN    ();
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-return yy::parser::make_AVG    ();
+return yy::parser::make_SUM    ();
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-return yy::parser::make_BACKLINK();
+return yy::parser::make_AVG    ();
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-return yy::parser::make_CASE    ();
+return yy::parser::make_BACKLINK();
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-return yy::parser::make_TRUE    ();
+return yy::parser::make_CASE    ();
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-return yy::parser::make_FALSE    ();
+return yy::parser::make_TRUE    ();
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-return yy::parser::make_INFINITY(yytext);
+return yy::parser::make_FALSE    ();
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-return  yy::parser::make_NAN(yytext);
+return yy::parser::make_INFINITY(yytext);
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-return yy::parser::make_NULL_VAL ();
+return  yy::parser::make_NAN(yytext);
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-return yy::parser::make_UUID(yytext); 
+return yy::parser::make_NULL_VAL ();
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-return yy::parser::make_OID(yytext); 
+return yy::parser::make_UUID(yytext); 
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-return yy::parser::make_TIMESTAMP(yytext);
+return yy::parser::make_OID(yytext); 
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-return yy::parser::make_NATURAL0 (yytext);
+return yy::parser::make_TIMESTAMP(yytext);
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-return yy::parser::make_ARG(yytext); 
+return yy::parser::make_NATURAL0 (yytext);
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-return yy::parser::make_NUMBER (yytext);
+return yy::parser::make_ARG(yytext); 
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
@@ -1549,7 +1549,7 @@ return yy::parser::make_NUMBER (yytext);
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-return yy::parser::make_FLOAT (yytext);
+return yy::parser::make_NUMBER (yytext);
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
@@ -1557,12 +1557,11 @@ return yy::parser::make_FLOAT (yytext);
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-return yy::parser::make_BASE64(yytext);
+return yy::parser::make_FLOAT (yytext);
 	YY_BREAK
 case 50:
-/* rule 50 can match eol */
 YY_RULE_SETUP
-return yy::parser::make_STRING (yytext);
+return yy::parser::make_BASE64(yytext);
 	YY_BREAK
 case 51:
 /* rule 51 can match eol */
@@ -1570,10 +1569,15 @@ YY_RULE_SETUP
 return yy::parser::make_STRING (yytext);
 	YY_BREAK
 case 52:
+/* rule 52 can match eol */
+YY_RULE_SETUP
+return yy::parser::make_STRING (yytext);
+	YY_BREAK
+case 53:
 YY_RULE_SETUP
 return yy::parser::make_ID (yytext);
 	YY_BREAK
-case 53:
+case 54:
 YY_RULE_SETUP
 {
              throw yy::parser::syntax_error
@@ -1583,7 +1587,7 @@ YY_RULE_SETUP
 case YY_STATE_EOF(INITIAL):
 return yy::parser::make_END ();
 	YY_BREAK
-case 54:
+case 55:
 YY_RULE_SETUP
 ECHO;
 	YY_BREAK

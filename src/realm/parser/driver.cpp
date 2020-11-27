@@ -269,7 +269,7 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
-Query EqualitylNode::visit(ParserDriver* drv)
+Query EqualityNode::visit(ParserDriver* drv)
 {
     auto [left, right] = drv->cmp(values);
 
@@ -279,6 +279,13 @@ Query EqualitylNode::visit(ParserDriver* drv)
     if (left_type >= 0 && right_type >= 0 && !Mixed::data_types_are_comparable(left_type, right_type)) {
         throw std::runtime_error(util::format("Unsupported comparison between type '%1' and type '%2'",
                                               get_data_type_name(left_type), get_data_type_name(right_type)));
+    }
+
+    if (op == CompareNode::IN) {
+        Subexpr* r = right.get();
+        if (!r->has_multiple_values()) {
+            throw std::invalid_argument("The keypath following 'IN' must contain a list");
+        }
     }
 
     const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(left.get());
@@ -327,6 +334,7 @@ Query EqualitylNode::visit(ParserDriver* drv)
     if (case_sensitive) {
         switch (op) {
             case CompareNode::EQUAL:
+            case CompareNode::IN:
                 return Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(right), std::move(left))));
             case CompareNode::NOT_EQUAL:
                 return Query(std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(right), std::move(left))));
@@ -335,6 +343,7 @@ Query EqualitylNode::visit(ParserDriver* drv)
     else {
         switch (op) {
             case CompareNode::EQUAL:
+            case CompareNode::IN:
                 return Query(std::unique_ptr<Expression>(new Compare<EqualIns>(std::move(right), std::move(left))));
             case CompareNode::NOT_EQUAL:
                 return Query(
@@ -1003,6 +1012,11 @@ void verify_conditions(Subexpr* left, Subexpr* right)
         throw std::runtime_error(
             util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
                          left->description(state), right->description(state)));
+    }
+    if (left->has_multiple_values() && right->has_multiple_values()) {
+        util::serializer::SerialisationState state;
+        throw std::runtime_error(util::format("Comparison between two lists is not supported ('%1' and '%2')",
+                                              left->description(state), right->description(state)));
     }
 }
 

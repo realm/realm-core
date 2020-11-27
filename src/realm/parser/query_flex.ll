@@ -29,7 +29,8 @@ blank   [ \t\r]
 {blank}+   ;
 \n+        ;
 
-("=="|"="|"in"|"IN")        return yy::parser::make_EQUAL  ();
+("=="|"=")                  return yy::parser::make_EQUAL  ();
+("in"|"IN")                 return yy::parser::make_IN  ();
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();

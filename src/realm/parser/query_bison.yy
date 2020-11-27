@@ -61,6 +61,7 @@ using namespace realm::query_parser;
   NULL_VAL "null"
   EQUAL   "=="
   NOT_EQUAL   "!="
+  IN      "IN"
   LESS    "<"
   GREATER ">"
   GREATER_EQUAL ">="
@@ -139,9 +140,9 @@ and_pred
     | and_pred "&&" atom_pred   { $1->atom_preds.emplace_back($3); $$ = $1; }
 
 atom_pred
-    : value equality value      { $$ = drv.m_parse_nodes.create<EqualitylNode>($1, $2, $3); }
+    : value equality value      { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
     | value equality CASE value {
-                                    auto tmp = drv.m_parse_nodes.create<EqualitylNode>($1, $2, $4);
+                                    auto tmp = drv.m_parse_nodes.create<EqualityNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
                                 }
@@ -236,6 +237,7 @@ aggr_op
 equality
     : EQUAL                     { $$ = CompareNode::EQUAL; }
     | NOT_EQUAL                 { $$ = CompareNode::NOT_EQUAL; }
+    | IN                        { $$ = CompareNode::IN; }
 
 relational
     : LESS                      { $$ = CompareNode::LESS; }

@@ -3622,8 +3622,6 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
 }
 
-#if 0
-
 TEST(Parser_OperatorIN)
 {
     Group g;
@@ -3719,18 +3717,16 @@ TEST(Parser_OperatorIN)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN 5.5", 1), message);
-    CHECK_EQUAL(message, "The expression following 'IN' must be a keypath to a list");
+    CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "5.5 in fav_item.price", 1), message);
     CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "'dairy' in items.allergens.name", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
+    verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
     // list property vs list property is not supported by core yet
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN items.price", 0), message);
-    CHECK_EQUAL(
-        message,
-        "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
+    CHECK_EQUAL(message, "Comparison between two lists is not supported ('items.price' and 'items.price')");
 }
 
+#if 0
 // we won't support full object comparisons until we have stable keys in core, but as an exception
 // we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
 TEST(Parser_Object)
