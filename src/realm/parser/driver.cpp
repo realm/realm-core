@@ -820,6 +820,9 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             if (hint == type_Binary) {
                 ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
+            if (hint == type_Mixed) {
+                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+            }
             break;
         }
         case Type::TIMESTAMP: {
