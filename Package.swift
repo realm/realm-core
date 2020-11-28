@@ -124,7 +124,7 @@ let package = Package(
             sources: ["realm/parser"],
             publicHeadersPath: "realm/parser",
             cxxSettings: [
-                .headerSearchPath("external/pegtl/include/tao")
+                .headerSearchPath("realm/parser/generated")
             ] + cxxSettings),
         .target(
             name: "SyncClient",
