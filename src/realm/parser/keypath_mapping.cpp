@@ -83,11 +83,6 @@ bool is_length_suffix(const std::string& s)
 }
 
 
-void KeyPathMapping::set_allow_backlinks(bool allow)
-{
-    m_allow_backlinks = allow;
-}
-
 void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
 {
     m_backlink_class_prefix = prefix;

@@ -71,11 +71,6 @@ public:
     void remove_mapping(ConstTableRef table, std::string name);
     bool has_mapping(ConstTableRef table, const std::string& name) const;
     util::Optional<std::string> get_mapping(TableKey table_key, const std::string& name) const;
-    void set_allow_backlinks(bool allow);
-    bool backlinks_allowed() const
-    {
-        return m_allow_backlinks;
-    }
     void set_backlink_class_prefix(std::string prefix);
     const std::string& get_backlink_class_prefix() const
     {
@@ -83,7 +78,6 @@ public:
     }
 
 protected:
-    bool m_allow_backlinks = true;
     std::string m_backlink_class_prefix;
     std::unordered_map<std::pair<TableKey, std::string>, std::string, TableAndColHash> m_mapping;
 };

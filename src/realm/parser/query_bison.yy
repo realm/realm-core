@@ -43,6 +43,12 @@
 #include <realm/table.hpp>
 using namespace realm;
 using namespace realm::query_parser;
+
+#ifdef _MSC_VER
+// ignore msvc warnings in this file (poped at end)
+// do this by setting the warning level to 1 (permissive)
+#pragma warning( push, 1 )
+#endif
 }
 %define api.symbol.prefix {SYM_}
 %define api.token.prefix {TOK_}
@@ -61,6 +67,7 @@ using namespace realm::query_parser;
   NULL_VAL "null"
   EQUAL   "=="
   NOT_EQUAL   "!="
+  IN      "IN"
   LESS    "<"
   GREATER ">"
   GREATER_EQUAL ">="
@@ -90,11 +97,13 @@ using namespace realm::query_parser;
 %token <std::string> TIMESTAMP "date"
 %token <std::string> UUID "UUID"
 %token <std::string> OID "ObjectId"
+%token <std::string> LINK "link"
 %token <std::string> ARG "argument"
 %token <std::string> BEGINSWITH "beginswith"
 %token <std::string> ENDSWITH "endswith"
 %token <std::string> CONTAINS "contains"
 %token <std::string> LIKE    "like"
+%token <std::string> BETWEEN "between"
 %token <std::string> SIZE "@size"
 %type  <bool> direction
 %type  <int> equality relational stringop
@@ -139,9 +148,9 @@ and_pred
     | and_pred "&&" atom_pred   { $1->atom_preds.emplace_back($3); $$ = $1; }
 
 atom_pred
-    : value equality value      { $$ = drv.m_parse_nodes.create<EqualitylNode>($1, $2, $3); }
+    : value equality value      { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
     | value equality CASE value {
-                                    auto tmp = drv.m_parse_nodes.create<EqualitylNode>($1, $2, $4);
+                                    auto tmp = drv.m_parse_nodes.create<EqualityNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
                                 }
@@ -151,6 +160,10 @@ atom_pred
                                     auto tmp = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
+                                }
+    | value BETWEEN list        {
+                                    error("The 'between' operator is not supported yet, please rewrite the expression using '>' and '<'.");
+                                    YYERROR;
                                 }
     | NOT atom_pred             { $$ = drv.m_parse_nodes.create<NotNode>($2); }
     | '(' pred ')'              { $$ = drv.m_parse_nodes.create<ParensNode>($2); }
@@ -197,7 +210,13 @@ limit: LIMIT '(' NATURAL0 ')'   { $$ = drv.m_parse_nodes.create<DescriptorNode>(
 direction
     : ASCENDING                 { $$ = true; }
     | DESCENDING                { $$ = false; }
-    
+
+list : '{' list_content '}'
+
+list_content
+    : constant
+    | list_content ',' constant
+
 constant
     : NATURAL0                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
     | NUMBER                    { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NUMBER, $1); }
@@ -209,6 +228,7 @@ constant
     | TIMESTAMP                 { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TIMESTAMP, $1); }
     | UUID                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::UUID_T, $1); }
     | OID                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::OID, $1); }
+    | LINK                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::LINK, $1); }
     | TRUE                      { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::TRUE, ""); }
     | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
     | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
@@ -236,6 +256,7 @@ aggr_op
 equality
     : EQUAL                     { $$ = CompareNode::EQUAL; }
     | NOT_EQUAL                 { $$ = CompareNode::NOT_EQUAL; }
+    | IN                        { $$ = CompareNode::IN; }
 
 relational
     : LESS                      { $$ = CompareNode::LESS; }
@@ -263,6 +284,7 @@ id
     | ENDSWITH                  { $$ = $1; }
     | CONTAINS                  { $$ = $1; }
     | LIKE                      { $$ = $1; }
+    | BETWEEN                   { $$ = $1; }
 %%
 
 void
@@ -270,3 +292,7 @@ yy::parser::error (const std::string& m)
 {
     drv.error(m);
 }
+
+#ifdef _MSC_VER
+#pragma warning( pop ) // restore normal warning levels
+#endif

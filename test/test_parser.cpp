@@ -3071,16 +3071,7 @@ TEST(Parser_Backlinks)
 
     verify_query(test_context, items, "purchasers.@count > 2", 2, mapping);
     verify_query(test_context, items, "purchasers.@max.money >= 20", 3, mapping);
-#if 0
-    // disable parsing backlink queries
-    mapping.set_allow_backlinks(false);
-    {
-        CHECK_THROW_ANY_GET_MESSAGE(q = items->query("purchasers.@max.money >= 20"), message);
-        CHECK_EQUAL(message,
-                    "Querying over backlinks is disabled but backlinks were found in the inverse relationship "
-                    "of property 'items' on type 'Person'");
-    }
-#endif
+
     // check that arbitrary aliasing for named backlinks works with a arbitrary prefix
     query_parser::KeyPathMapping mapping_with_prefix;
     mapping_with_prefix.set_backlink_class_prefix("class_");
@@ -3622,8 +3613,6 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
 }
 
-#if 0
-
 TEST(Parser_OperatorIN)
 {
     Group g;
@@ -3719,34 +3708,29 @@ TEST(Parser_OperatorIN)
 
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN 5.5", 1), message);
-    CHECK_EQUAL(message, "The expression following 'IN' must be a keypath to a list");
+    CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "5.5 in fav_item.price", 1), message);
     CHECK_EQUAL(message, "The keypath following 'IN' must contain a list");
-    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "'dairy' in items.allergens.name", 1), message);
-    CHECK_EQUAL(message, "The keypath following 'IN' must contain only one list");
+    verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
     // list property vs list property is not supported by core yet
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "items.price IN items.price", 0), message);
-    CHECK_EQUAL(
-        message,
-        "The keypath preceeding 'IN' must not contain a list, list vs list comparisons are not currently supported");
+    CHECK_EQUAL(message, "Comparison between two lists is not supported ('items.price' and 'items.price')");
 }
 
-// we won't support full object comparisons until we have stable keys in core, but as an exception
-// we allow comparison with null objects because we can serialise that and bindings use it to check agains nulls.
 TEST(Parser_Object)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto int_col = table->add_column(type_Int, "ints", true);
     auto link_col = table->add_column(*table, "link");
-    for (size_t i = 0; i < 3; ++i) {
-        table->create_object().set<int64_t>(int_col, i);
-    }
-    table->get_object(1).set(link_col, table->begin()->get_key());
+    auto linkx_col = table->add_column(*table, "linkx");
+    ObjKeys keys;
+    table->create_objects(3, keys);
+    table->get_object(keys[0]).set(link_col, keys[1]).set(linkx_col, keys[1]);
+    table->get_object(keys[1]).set(link_col, keys[1]);
     TableView tv = table->where().find_all();
 
-    verify_query(test_context, table, "link == NULL", 2); // vanilla base check
-    // FIXME: verify_query(test_context, table, "link == O0", 2);
+    verify_query(test_context, table, "link == NULL", 1); // vanilla base check
+    verify_query(test_context, table, "link == O1", 2);
 
     Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get(0));
     std::string description = q0.get_description(); // shouldn't throw
@@ -3755,10 +3739,11 @@ TEST(Parser_Object)
     Query q1 = table->column<Link>(link_col) == realm::null();
     description = q1.get_description(); // shouldn't throw
     CHECK(description.find("NULL") != std::string::npos);
-    CHECK_EQUAL(q1.count(), 2);
+    CHECK_EQUAL(q1.count(), 1);
 
-    CHECK_THROW_ANY(verify_query(test_context, table, "link == link", 3));
+    verify_query(test_context, table, "link == linkx", 2);
 }
+
 
 TEST(Parser_Between)
 {
@@ -3778,10 +3763,9 @@ TEST(Parser_Between)
     // operator between is not supported yet, but we at least use a friendly error message.
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, table, "age between {20, 25}", 1), message);
-    CHECK(message.find("Invalid Predicate. The 'between' operator is not supported yet, please rewrite the "
+    CHECK(message.find("The 'between' operator is not supported yet, please rewrite the "
                        "expression using '>' and '<'.") != std::string::npos);
 }
-#endif
 
 TEST(Parser_ChainedStringEqualQueries)
 {

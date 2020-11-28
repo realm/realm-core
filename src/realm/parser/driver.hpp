@@ -13,6 +13,7 @@ YY_DECL;
 
 #undef FALSE
 #undef TRUE
+#undef IN
 
 namespace realm {
 
@@ -85,15 +86,16 @@ public:
     static constexpr int ENDSWITH = 7;
     static constexpr int CONTAINS = 8;
     static constexpr int LIKE = 9;
+    static constexpr int IN = 10;
 };
 
-class EqualitylNode : public CompareNode {
+class EqualityNode : public CompareNode {
 public:
     std::vector<ValueNode*> values;
     int op;
     bool case_sensitive = true;
 
-    EqualitylNode(ValueNode* left, int t, ValueNode* right)
+    EqualityNode(ValueNode* left, int t, ValueNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -169,6 +171,7 @@ public:
         TIMESTAMP,
         UUID_T,
         OID,
+        LINK,
         NULL_VAL,
         TRUE,
         FALSE,
@@ -429,6 +432,7 @@ template <class T>
 Query ParserDriver::simple_query(int op, ColKey col_key, T val, bool case_sensitive)
 {
     switch (op) {
+        case CompareNode::IN:
         case CompareNode::EQUAL:
             return m_base_table->where().equal(col_key, val, case_sensitive);
         case CompareNode::NOT_EQUAL:
@@ -441,6 +445,7 @@ template <class T>
 Query ParserDriver::simple_query(int op, ColKey col_key, T val)
 {
     switch (op) {
+        case CompareNode::IN:
         case CompareNode::EQUAL:
             return m_base_table->where().equal(col_key, val);
         case CompareNode::NOT_EQUAL:

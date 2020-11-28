@@ -29,11 +29,12 @@ blank   [ \t\r]
 {blank}+   ;
 \n+        ;
 
-("=="|"="|"in"|"IN")        return yy::parser::make_EQUAL  ();
+("=="|"=")                  return yy::parser::make_EQUAL  ();
+("in"|"IN")                 return yy::parser::make_IN  ();
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();
-[,()\.]                     return yytext[0];
+[,(){}\.]                     return yytext[0];
 ("<="|"=<")                 return yy::parser::make_LESS_EQUAL ();
 (">="|"=>")                 return yy::parser::make_GREATER_EQUAL ();
 &&|(?i:and)                 return yy::parser::make_AND    ();
@@ -46,6 +47,7 @@ blank   [ \t\r]
 (?i:endswith)               return yy::parser::make_ENDSWITH(yytext);
 (?i:contains)               return yy::parser::make_CONTAINS(yytext);
 (?i:like)                   return yy::parser::make_LIKE(yytext);
+(?i:between)                return yy::parser::make_BETWEEN(yytext);
 (?i:truepredicate)          return yy::parser::make_TRUEPREDICATE (); 
 (?i:falsepredicate)         return yy::parser::make_FALSEPREDICATE (); 
 (?i:sort)                   return yy::parser::make_SORT();
@@ -69,6 +71,7 @@ blank   [ \t\r]
 "uuid("{hex}{8}"-"{hex}{4}"-"{hex}{4}"-"{hex}{4}"-"{hex}{12}")" return yy::parser::make_UUID(yytext); 
 "oid("{hex}{24}")"          return yy::parser::make_OID(yytext); 
 ("T"{sint}":"{sint})|({int}"-"{int}"-"{int}[@T]{int}":"{int}":"{int}(":"{int})?) return yy::parser::make_TIMESTAMP(yytext);
+"O"{int}                    return yy::parser::make_LINK (yytext);
 {int}                       return yy::parser::make_NATURAL0 (yytext);
 "$"{int}                    return yy::parser::make_ARG(yytext); 
 [+-]?{int}                  return yy::parser::make_NUMBER (yytext);

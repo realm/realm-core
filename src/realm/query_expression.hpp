@@ -741,6 +741,11 @@ public:
         return false;
     }
 
+    virtual bool has_multiple_values() const
+    {
+        return false;
+    }
+
     virtual bool has_search_index() const
     {
         return false;
@@ -1694,6 +1699,12 @@ public:
         return m_link_column_keys.size() > 0;
     }
 
+    ColKey get_first_column_key() const
+    {
+        REALM_ASSERT(has_links());
+        return m_link_column_keys[0];
+    }
+
     void set_base_table(ConstTableRef table);
 
     void set_cluster(const Cluster* cluster)
@@ -1877,6 +1888,11 @@ template <class T>
 class ObjPropertyExpr : public Subexpr2<T>, public ObjPropertyBase {
 public:
     using ObjPropertyBase::ObjPropertyBase;
+
+    bool has_multiple_values() const override
+    {
+        return m_link_map.has_links() && !m_link_map.only_unary_links();
+    }
 
     ConstTableRef get_base_table() const final
     {
@@ -2819,6 +2835,10 @@ public:
     {
     }
 
+    bool has_multiple_values() const override
+    {
+        return true;
+    }
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Columns<Lst<T>>>(*this);
@@ -3041,6 +3061,10 @@ public:
     ColumnListElementLength(const Columns<Lst<T>>& source)
         : m_list(source)
     {
+    }
+    bool has_multiple_values() const override
+    {
+        return true;
     }
     void evaluate(size_t index, ValueBase& destination) override
     {
