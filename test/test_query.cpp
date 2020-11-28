@@ -2196,7 +2196,8 @@ TEST(Query_TwoColumnsCrossTypes)
             ColKey rhs = columns[j];
             DataType lhs_type = DataType(lhs.get_type());
             DataType rhs_type = DataType(rhs.get_type());
-            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type);
+            bool are_comparable = Mixed::data_types_are_comparable(lhs_type, rhs_type) &&
+                                  !((lhs_type == type_Mixed || rhs_type == type_Mixed) && lhs_type != rhs_type);
             size_t num_expected_matches = are_comparable ? num_rows : 0;
             bool bool_vs_numeric_comparison = false;
             if (are_comparable && ((lhs_type == type_Bool && rhs_type != type_Bool) ||
