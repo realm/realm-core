@@ -236,21 +236,6 @@ Columns<Dictionary>& Columns<Dictionary>::key(const Mixed& key_value)
     return *this;
 }
 
-void Columns<Dictionary>::set_cluster(const Cluster* cluster)
-{
-    m_array_ptr = nullptr;
-    m_leaf_ptr = nullptr;
-    if (links_exist()) {
-        m_link_map.set_cluster(cluster);
-    }
-    else {
-        // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayInteger(m_link_map.get_base_table()->get_alloc()));
-        cluster->init_leaf(m_column_key, m_array_ptr.get());
-        m_leaf_ptr = m_array_ptr.get();
-    }
-}
-
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 {
     if (links_exist()) {
@@ -302,7 +287,7 @@ void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)
 
         REALM_ASSERT(m_leaf_ptr != nullptr);
         if (m_leaf_ptr->get(index)) {
-            DictionaryClusterTree dict_cluster(m_leaf_ptr, m_key_type, alloc, index);
+            DictionaryClusterTree dict_cluster(static_cast<Array*>(m_leaf_ptr), m_key_type, alloc, index);
             dict_cluster.init_from_parent();
 
             if (m_objkey) {
@@ -375,7 +360,7 @@ void ColumnListBase::set_cluster(const Cluster* cluster)
     }
     else {
         // Create new Leaf
-        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayList(m_link_map.get_base_table()->get_alloc()));
+        m_array_ptr = LeafPtr(new (&m_leaf_cache_storage) ArrayInteger(m_link_map.get_base_table()->get_alloc()));
         cluster->init_leaf(m_column_key, m_array_ptr.get());
         m_leaf_ptr = m_array_ptr.get();
     }
@@ -411,7 +396,7 @@ void ColumnListBase::get_lists(size_t index, Value<int64_t>& destination, size_t
         destination.init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            destination.set(t, from_ref(m_leaf_ptr->get(index + t)));
+            destination.set(t, m_leaf_ptr->get(index + t));
         }
     }
 }

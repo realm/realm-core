@@ -2120,53 +2120,6 @@ class Columns<UUID> : public SimpleQuerySupport<UUID> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
-template <>
-class Columns<Dictionary> : public ObjPropertyExpr<Mixed> {
-public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : ObjPropertyExpr<Mixed>(column, table, std::move(links), type)
-    {
-        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
-    }
-
-    Columns& key(const Mixed& key_value);
-    Columns& property(const std::string& prop)
-    {
-        REALM_ASSERT(!m_key.is_null());
-        m_prop_list.push_back(prop);
-        return *this;
-    }
-    void set_cluster(const Cluster* cluster) override;
-    void evaluate(size_t index, ValueBase& destination) override;
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<Columns<Dictionary>>(*this);
-    }
-
-    Columns(Columns const& other)
-        : ObjPropertyExpr<Mixed>(other)
-        , m_key(other.m_key)
-        , m_prop_list(other.m_prop_list)
-        , m_objkey(other.m_objkey)
-        , m_key_type(other.m_key_type)
-    {
-    }
-
-private:
-    Mixed m_key;
-    std::vector<std::string> m_prop_list;
-    ObjKey m_objkey;
-    DataType m_key_type;
-    // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(ArrayInteger)>::type;
-    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
-    LeafCacheStorage m_leaf_cache_storage;
-    LeafPtr m_array_ptr;
-    ArrayInteger* m_leaf_ptr = nullptr;
-};
-
 // Columns<Mixed> == String
 inline Query operator==(Columns<Mixed>&& left, const char* right)
 {
@@ -2812,11 +2765,11 @@ public:
     mutable ColKey m_column_key;
     LinkMap m_link_map;
     // Leaf cache
-    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayList), alignof(Array)>::type;
-    using LeafPtr = std::unique_ptr<ArrayList, PlacementDelete>;
+    using LeafCacheStorage = typename std::aligned_storage<sizeof(ArrayInteger), alignof(Array)>::type;
+    using LeafPtr = std::unique_ptr<ArrayInteger, PlacementDelete>;
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
-    ArrayList* m_leaf_ptr = nullptr;
+    ArrayInteger* m_leaf_ptr = nullptr;
     ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
@@ -3039,6 +2992,47 @@ public:
         return make_subexpr<Columns<LnkSet>>(*this);
     }
 };
+
+template <>
+class Columns<Dictionary> : public ColumnsCollection<Mixed> {
+public:
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : ColumnsCollection<Mixed>(column, table, std::move(links), type)
+    {
+        m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
+    }
+
+    Columns& key(const Mixed& key_value);
+    Columns& property(const std::string& prop)
+    {
+        REALM_ASSERT(!m_key.is_null());
+        m_prop_list.push_back(prop);
+        return *this;
+    }
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return make_subexpr<Columns<Dictionary>>(*this);
+    }
+
+    Columns(Columns const& other)
+        : ColumnsCollection<Mixed>(other)
+        , m_key(other.m_key)
+        , m_prop_list(other.m_prop_list)
+        , m_objkey(other.m_objkey)
+        , m_key_type(other.m_key_type)
+    {
+    }
+
+private:
+    Mixed m_key;
+    std::vector<std::string> m_prop_list;
+    ObjKey m_objkey;
+    DataType m_key_type;
+};
+
 
 template <typename T>
 class ColumnListSize : public ColumnsCollection<T> {
