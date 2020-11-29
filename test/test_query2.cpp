@@ -2078,13 +2078,13 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(obj1.get<Float>(col_shipping)));
 
 
-// FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
-// signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel
-// Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that
-// has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
-// that bit into being set. All this needs further investigation, so a P2 has been created. Note that
-// IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
-// to work fine on ARM in both 32 and 64 bit mode.
+    // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
+    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel
+    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that
+    // has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
+    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that
+    // IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
+    // to work fine on ARM in both 32 and 64 bit mode.
 
 #if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(obj0.get<Float>(col_shipping)));
@@ -2748,6 +2748,88 @@ TEST(Query_Link_Minimum)
     CHECK_EQUAL(k1, tv.get_key(0));
 }
 
+TEST(Query_Link_Minimum_Set)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
+    auto col_float = table1->add_column(type_Float, "float", /* nullable */ true);
+    auto col_double = table1->add_column(type_Double, "double", /* nullable */ true);
+
+    // table1
+    // 0: 789 789.0f 789.0
+    // 1: 456 456.0f 456.0
+    // 2: 123 123.0f 123.0
+    // 3: null null null
+
+    auto k0 = table1->create_object().set_all(789, 789.f, 789.).get_key();
+    auto k1 = table1->create_object().set_all(456, 456.f, 456.).get_key();
+    auto k2 = table1->create_object().set_all(123, 123.f, 123.).get_key();
+    auto k3 = table1->create_object().get_key();
+
+    TableRef table2 = group.add_table("table2");
+    auto col_linkset = table2->add_column_set(*table1, "linkset");
+
+    // table2
+    // 0: { }
+    // 1: { 1 }
+    // 2: { 1, 2 }
+    // 3: { 1, 2, 3 }
+
+    LnkSet ll;
+    table2->create_object();
+    ll = table2->create_object().get_linkset(col_linkset);
+    ll.insert(k1);
+    ll = table2->create_object().get_linkset(col_linkset);
+    ll.insert(k1);
+    ll.insert(k2);
+    ll = table2->create_object().get_linkset(col_linkset);
+    ll.insert(k1);
+    ll.insert(k2);
+    ll.insert(k3);
+
+    Query q;
+    TableView tv;
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).min() == 123;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).min() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).min() == null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_float).min() == 123.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_float).min() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_double).min() == 123.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_double).min() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+}
+
 TEST(Query_Link_MaximumSumAverage)
 {
     Group group;
@@ -2958,6 +3040,216 @@ TEST(Query_Link_MaximumSumAverage)
     CHECK_EQUAL(k1, tv.get_key(0));
 }
 
+TEST(Query_Link_MaximumSumAverage_Set)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    auto col_int = table1->add_column(type_Int, "int", /* nullable */ true);
+    auto col_flt = table1->add_column(type_Float, "float", /* nullable */ true);
+    auto col_dbl = table1->add_column(type_Double, "double", /* nullable */ true);
+
+    // table1
+    // 0: 123 123.0f 123.0
+    // 1: 456 456.0f 456.0
+    // 2: 789 789.0f 789.0
+    // 3: null null null
+
+    ObjKeys keys({3, 5, 7, 9});
+    table1->create_objects(keys);
+    auto it = table1->begin();
+    it->set_all(123, 123.f, 123.);
+    (++it)->set_all(456, 456.f, 456.);
+    (++it)->set_all(789, 789.f, 789.);
+
+    TableRef table2 = group.add_table("table2");
+    auto col_double = table2->add_column(type_Double, "double");
+    auto col_link = table2->add_column(*table1, "link");
+    auto col_linkset = table2->add_column_set(*table1, "linkset");
+
+    // table2
+    // 0: 456.0 ->0 { }
+    // 1: 456.0 ->1 { 1 }
+    // 2: 456.0 ->2 { 1, 2 }
+    // 3: 456.0 ->3 { 1, 2, 3 }
+
+    LnkSet ll;
+    auto k0 = table2->create_object().set_all(456.0, keys[0]).get_key();
+    auto k1 = table2->create_object().set_all(456.0, keys[1]).get_key();
+    auto k2 = table2->create_object().set_all(456.0, keys[2]).get_key();
+    auto k3 = table2->create_object().set_all(456.0, keys[3]).get_key();
+    ll = table2->get_object(k1).get_linkset(col_linkset);
+    ll.insert(keys[1]);
+    ll = table2->get_object(k2).get_linkset(col_linkset);
+    ll.insert(keys[1]);
+    ll.insert(keys[2]);
+    ll = table2->get_object(k3).get_linkset(col_linkset);
+    ll.insert(keys[1]);
+    ll.insert(keys[2]);
+    ll.insert(keys[3]);
+
+    Query q;
+    TableView tv;
+
+    // Maximum.
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).max() == 789;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).max() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).max() == null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).max() == table2->link(col_link).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).max() == table2->column<Double>(col_double);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_flt).max() == 789.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_flt).max() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_dbl).max() == 789.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_dbl).max() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    // Sum.
+    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
+    // flags.
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).sum() == 1245;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).sum() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).sum() == table2->link(col_link).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).sum() == table2->column<Double>(col_double);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_flt).sum() == 1245.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_flt).sum() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_dbl).sum() == 1245.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_dbl).sum() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    // Average.
+    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
+    // flags.
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).average() == 622.5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).average() == 456;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).average() == null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k0, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).average() <
+        table2->link(col_link).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k2, tv.get_key(0));
+
+    q = table2->column<Link>(col_linkset).column<Int>(col_int).average() == table2->column<Double>(col_double);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_flt).average() == 622.5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Float>(col_flt).average() == 456.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_dbl).average() == 622.5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k2, tv.get_key(0));
+    CHECK_EQUAL(k3, tv.get_key(1));
+
+    q = table2->column<Link>(col_linkset).column<Double>(col_dbl).average() == 456.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(k1, tv.get_key(0));
+}
+
 TEST(Query_OperatorsOverLink)
 {
     Group group;
@@ -3062,6 +3354,116 @@ TEST(Query_OperatorsOverLink)
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
     q = table2->column<Int>(col_int2) == 2 * table2->link(col_linklist).column<Double>(col_dbl);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+}
+
+TEST(Query_OperatorsOverLink_Set)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    auto col_int = table1->add_column(type_Int, "int");
+    auto col_dbl = table1->add_column(type_Double, "double");
+
+    // table1
+    // 0: 2 2.0
+    // 1: 3 3.0
+
+    ObjKeys keys({5, 6});
+    table1->create_objects(keys);
+    table1->get_object(keys[0]).set_all(2, 2.0);
+    table1->get_object(keys[1]).set_all(3, 3.0);
+
+    TableRef table2 = group.add_table("table2");
+    auto col_int2 = table2->add_column(type_Int, "int");
+    auto col_linkset = table2->add_column_set(*table1, "linkset");
+
+    // table2
+    // 0:  0 { }
+    // 1:  4 { 0 }
+    // 2:  4 { 1, 0 }
+
+    table2->create_object();
+    auto k1 = table2->create_object().set_all(4).get_key();
+    auto k2 = table2->create_object().set_all(4).get_key();
+
+    auto ll = table2->get_object(k1).get_linkset(col_linkset);
+    ll.insert(keys[0]);
+
+    ll = table2->get_object(k2).get_linkset(col_linkset);
+    ll.insert(keys[1]);
+    ll.insert(keys[0]);
+
+    Query q;
+    TableView tv;
+
+    // Unary operators.
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = power(table2->link(col_linkset).column<Int>(col_int)) == table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = table2->column<Int>(col_int2) == power(table2->link(col_linkset).column<Int>(col_int));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = power(table2->link(col_linkset).column<Double>(col_dbl)) == table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the power subexpression will not produce any results.
+    q = table2->column<Int>(col_int2) == power(table2->link(col_linkset).column<Double>(col_dbl));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+
+    // Binary operators.
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->link(col_linkset).column<Int>(col_int) * 2 == table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    // Rows 1 and 2 should match this query as 2 * 2 == 4.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->column<Int>(col_int2) == 2 * table2->link(col_linkset).column<Int>(col_int);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->link(col_linkset).column<Double>(col_dbl) * 2 == table2->column<Int>(col_int2);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(k1, tv.get_key(0));
+    CHECK_EQUAL(k2, tv.get_key(1));
+
+    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
+    // Row 0 should not as the multiplication will not produce any results.
+    q = table2->column<Int>(col_int2) == 2 * table2->link(col_linkset).column<Double>(col_dbl);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));

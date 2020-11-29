@@ -44,10 +44,10 @@ SyncClientTimeouts::SyncClientTimeouts()
 void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
                             const SyncClientConfig& config)
 {
-    m_app = app;
-    m_sync_route = sync_route;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        m_app = app;
+        m_sync_route = sync_route;
         m_config = std::move(config);
         if (m_sync_client)
             return;
@@ -209,9 +209,6 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    if (m_file_manager)
-        util::try_remove_dir_recursive(m_file_manager->base_path());
-    m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
 
@@ -251,6 +248,10 @@ void SyncManager::reset_for_testing()
 
         m_sync_route = "";
     }
+
+    if (m_file_manager)
+        util::try_remove_dir_recursive(m_file_manager->base_path());
+    m_file_manager = nullptr;
 }
 
 void SyncManager::set_log_level(util::Logger::Level level) noexcept
@@ -376,6 +377,7 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 
     if (m_current_user)
         return m_current_user;
+    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)
         return nullptr;
 
@@ -412,6 +414,7 @@ void SyncManager::log_out_user(const std::string& user_id)
         }
     }
 
+    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
     if (m_metadata_manager)
         m_metadata_manager->set_current_user_identity("");
     m_current_user = nullptr;
@@ -422,6 +425,7 @@ void SyncManager::set_current_user(const std::string& user_id)
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
     m_current_user = get_user_for_identity(user_id);
+    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
     if (m_metadata_manager)
         m_metadata_manager->set_current_user_identity(user_id);
 }
@@ -434,6 +438,7 @@ void SyncManager::remove_user(const std::string& user_id)
         return;
     user->set_state(SyncUser::State::Removed);
 
+    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)
         return;
 
@@ -641,6 +646,7 @@ std::string SyncManager::client_uuid() const
 
 util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
 {
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
     if (!m_metadata_manager) {
         return util::none;
     }

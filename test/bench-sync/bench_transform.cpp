@@ -56,7 +56,7 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
             for (size_t j = 0; j < num_transactions - 1; ++j) {
                 peer.start_transaction();
                 TableRef t = peer.table("class_t");
-                sync::create_object(*peer.group, *t).set(col_ndx, 123);
+                t->create_object().set(col_ndx, 123);
 
                 // Let 25% of commits contain a MoveLastOver
                 if (j % 4 == 0) {
@@ -114,11 +114,11 @@ void transform_instructions(TestContext& test_context, BenchmarkResults& results
         // Produce some mostly realistic transactions on both sides.
         auto make_instructions = [](Peer& peer) {
             peer.start_transaction();
-            TableRef t = sync::create_table(*peer.group, "class_t");
+            TableRef t = peer.group->add_table("class_t");
             ColKey col_ndx = t->add_column(type_Int, "i");
 
             for (size_t j = 0; j < num_iterations; ++j) {
-                Obj obj = sync::create_object(*peer.group, *t);
+                Obj obj = t->create_object();
                 obj.set(col_ndx, 123);
 
                 // Let 25% of commits contain a MoveLastOver
@@ -168,13 +168,13 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
             auto col_key = t->add_column(*t, "l");
 
             // Everything links to this object!
-            auto first_key = sync::create_object_with_primary_key(*peer.group, *t, "Hello").get_key();
+            auto first_key = t->create_object_with_primary_key("Hello").get_key();
 
             for (size_t j = 0; j < num_iterations; ++j) {
                 std::stringstream ss;
                 ss << j;
                 std::string pk = ss.str();
-                sync::create_object_with_primary_key(*peer.group, *t, pk).set(col_key, first_key);
+                t->create_object_with_primary_key(pk).set(col_key, first_key);
             }
 
             return peer.commit();

@@ -21,6 +21,7 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
+#include <realm/set.hpp>
 
 namespace realm::object_store {
 
@@ -151,6 +152,9 @@ Results Collection::as_results() const
     verify_attached();
     if (auto link_list = std::dynamic_pointer_cast<LnkLst>(m_coll_base)) {
         return Results(m_realm, link_list);
+    }
+    if (auto link_set = std::dynamic_pointer_cast<LnkSet>(m_coll_base)) {
+        return Results(m_realm, link_set);
     }
     return Results(m_realm, m_coll_base);
 }

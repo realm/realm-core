@@ -12,6 +12,11 @@ org = tokens[tokens.size()-3]
 repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
+warningFilters = [
+    excludeFile('/external/*'), // submodules and external libraries
+    excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
+]
+
 jobWrapper {
     stage('gather-info') {
         isPullRequest = !!env.CHANGE_TARGET
@@ -129,7 +134,8 @@ jobWrapper {
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
             buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
-            buildandroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug', false),
+            buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
+            buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
             checkRaspberryPiNative  : doLinuxCrossCompile('armhf', 'Debug', armhfNativeTestOptions),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync : "ON", sanitizeMode : "thread"]),
@@ -140,9 +146,9 @@ jobWrapper {
             extendedChecks = [
                 checkRaspberryPiQemuRelease   : doLinuxCrossCompile('armhf', 'Release', armhfQemuTestOptions),
                 checkRaspberryPiNativeRelease : doLinuxCrossCompile('armhf', 'Release', armhfNativeTestOptions),
-                checkMacOsDebug               : doBuildMacOs('Debug', true),
-                buildUWP_x64_Debug            : doBuildWindows('Debug', true, 'x64', false),
-                androidArmeabiRelease         : doAndroidBuildInDocker('armeabi-v7a', 'Release', true),
+                checkMacOsDebug               : doBuildMacOs(buildOptions + [buildType: "Release"]),
+                checkAndroidarmeabiDebug      : doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Run),
+                checkAndroidx86Release        : doAndroidBuildInDocker('x86', 'Release', TestAction.Run),
                 coverage                      : doBuildCoverage(),
                 // valgrind                : doCheckValgrind()
             ]
@@ -288,7 +294,11 @@ def doCheckInDocker(Map options = [:]) {
                         try {
                             dir('build-dir') {
                                 sh "cmake ${cmakeDefinitions} -G Ninja .."
-                                runAndCollectWarnings(script: "ninja", name: "linux-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}")
+                                runAndCollectWarnings(
+                                    script: 'ninja',
+                                    name: "linux-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}",
+                                    filters: warningFilters,
+                                )
                                 sh 'ctest --output-on-failure'
                             }
                         } finally {
@@ -347,7 +357,12 @@ def doCheckSanity(Map options = [:]) {
                     try {
                         dir('build-dir') {
                             sh "cmake ${cmakeDefinitions} -G Ninja .."
-                            runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${options.buildType}-${options.sanitizeMode}")
+                            runAndCollectWarnings(
+                                script: 'ninja',
+                                parser: "clang",
+                                name: "linux-clang-${options.buildType}-${options.sanitizeMode}",
+                                filters: warningFilters,
+                            )
                             sh 'ctest --output-on-failure'
                         }
 
@@ -393,7 +408,12 @@ def doBuildLinuxClang(String buildType) {
             docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
                 dir('build-dir') {
                     sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
-                    runAndCollectWarnings(script: "ninja", parser: "clang", name: "linux-clang-${buildType}")
+                    runAndCollectWarnings(
+                        script: 'ninja',
+                        parser: "clang",
+                        name: "linux-clang-${buildType}",
+                        filters: warningFilters,
+                    )
                     sh 'cpack -G TGZ'
                 }
             }
@@ -423,7 +443,11 @@ def doCheckValgrind() {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja", name: "linux-valgrind")
+                        runAndCollectWarnings(
+                            script: 'cd build-dir && ninja',
+                            name: "linux-valgrind",
+                            filters: warningFilters,
+                        )
                         sh """
                             cd build-dir/test
                             valgrind --version
@@ -438,8 +462,7 @@ def doCheckValgrind() {
     }
 }
 
-def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator) {
-    def cores = 4
+def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestAction.None) {
     return {
         node('docker') {
             getArchive()
@@ -448,61 +471,70 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             def buildEnv = docker.build('realm-core-android:ndk21', '-f android.Dockerfile .')
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                if(!runTestsInEmulator) {
-                    buildEnv.inside {
-                        sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_NO_TESTS=1"
-                        dir(buildDir) {
-                            archiveArtifacts('realm-*.tar.gz')
-                        }
-                        stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
-                        androidStashes << stashName
-                        if (gitTag) {
-                            publishingStashes << stashName
-                        }
-                    }
-                } else {
-                    docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
-                        buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f -DREALM_ENABLE_SYNC=0", name: "android-armeabi-${abi}-${buildType}")
-                            dir(buildDir) {
-                                archiveArtifacts('realm-*.tar.gz')
-                            }
-                            stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
-                            androidStashes << stashName
-                            if (gitTag) {
-                                publishingStashes << stashName
-                            }
-                            try {
-                                sh '''
-                                   cd $(find . -type d -maxdepth 1 -name build-android*)
-                                   adb connect emulator
-                                   timeout 10m adb wait-for-device
-                                   adb push test/realm-tests /data/local/tmp
-                                   find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                   adb shell \'cd /data/local/tmp; UNITTEST_PROGRESS=1 ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
-                                   ! grep __ADB_FAIL__ adb.log
-                               '''
-                            } finally {
-                                sh '''
-                                   mkdir -p build-dir/test
-                                   cd build-dir/test
-                                   adb pull /data/local/tmp/unit-test-report.xml
-                                '''
-                                recordTests('android')
-                            }
+            def cmakeArgs = ''
+            if (test == TestAction.None) {
+                cmakeArgs = '-DREALM_NO_TESTS=ON'
+            } else if (test.hasValue(TestAction.Build)) {
+                // TODO: should we build sync tests, too?
+                cmakeArgs = '-DREALM_ENABLE_SYNC=OFF -DREALM_FETCH_MISSING_DEPENDENCIES=ON'
+            }
+
+            def doBuild = {
+                buildEnv.inside {
+                    runAndCollectWarnings(
+                        parser: 'clang',
+                        script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f \"${cmakeArgs}\"", 
+                        name: "android-armeabi-${abi}-${buildType}",
+                        filters: warningFilters,
+                    )
+                }
+                dir(buildDir) {
+                    archiveArtifacts('realm-*.tar.gz')
+                    stash includes: 'realm-*.tar.gz', name: stashName
+                }
+                androidStashes << stashName
+                if (gitTag) {
+                    publishingStashes << stashName
+                }
+            }
+
+            // if we want to run tests, let's spin up the emulator docker image first
+            // it takes a while to warm up so we might as build in the mean time
+            // otherwise, just run the build as is
+            if (test.hasValue(TestAction.Run)) {
+                docker.image('tracer0tong/android-emulator').withRun("-e ARCH=${abi}") { emulator ->
+                    doBuild()
+                    buildEnv.inside("--link ${emulator.id}:emulator") {
+                        try {
+                            sh """
+                                cd ${buildDir}
+                                adb connect emulator
+                                timeout 10m adb wait-for-device
+                                adb push test/realm-tests /data/local/tmp
+                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                adb shell 'cd /data/local/tmp; ${environment.join(' ')} ./realm-tests || echo __ADB_FAIL__' | tee adb.log
+                                ! grep __ADB_FAIL__ adb.log
+                            """
+                        } finally {
+                            sh '''
+                                mkdir -p build-dir/test
+                                cd build-dir/test
+                                adb pull /data/local/tmp/unit-test-report.xml
+                            '''
+                            recordTests('android')
                         }
                     }
                 }
+            } else {
+                doBuild()
             }
         }
     }
 }
 
 def doBuildWindows(String buildType, boolean isUWP, String platform, boolean runTests) {
-    def warningFilters = [];
     def cpackSystemName = "${isUWP ? 'UWP' : 'Windows'}-${platform}"
     def arch = platform.toLowerCase()
     if (arch == 'win32') {
@@ -527,7 +559,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
         CMAKE_SYSTEM_NAME: 'WindowsStore',
         CMAKE_SYSTEM_VERSION: '10.0',
       ]
-      warningFilters = [excludeMessage('Publisher name .* does not match signing certificate subject')]
     } else {
       cmakeOptions << [
         CMAKE_SYSTEM_VERSION: '8.1',
@@ -553,7 +584,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         isWindows: true,
                         script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
                         name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
-                        filters: warningFilters
+                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject')] + warningFilters,
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
@@ -655,6 +686,7 @@ def doBuildMacOs(Map options = [:]) {
         CMAKE_BUILD_TYPE: options.buildType,
         CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
         REALM_ENABLE_SYNC: options.enableSync,
+        OSX_ARM64: 'ON',
     ]
     if (!options.runTests) {
         cmakeOptions << [
@@ -674,7 +706,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir("build-macosx-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -687,11 +719,21 @@ def doBuildMacOs(Map options = [:]) {
                         }
                     }
 
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-clang-${buildType}")
+                    runAndCollectWarnings(
+                        parser: 'clang',
+                        script: 'ninja package',
+                        name: "osx-clang-${buildType}",
+                        filters: warningFilters,
+                    )
                 }
             }
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.app/Contents/Developer/']) {
-                runAndCollectWarnings(parser: 'clang', script: 'xcrun swift build', name: "osx-clang-xcrun-swift-${buildType}")
+                runAndCollectWarnings(
+                    parser: 'clang',
+                    script: 'xcrun swift build',
+                    name: "osx-clang-xcrun-swift-${buildType}",
+                    filters: warningFilters,
+                )
                 sh 'xcrun swift run ObjectStoreTests'
             }
 
@@ -731,7 +773,7 @@ def doBuildMacOsCatalyst(String buildType) {
             getArchive()
 
             dir("build-maccatalyst-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-11.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     sh """
                             rm -rf *
                             cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
@@ -739,9 +781,15 @@ def doBuildMacOsCatalyst(String buildType) {
                                   -D REALM_VERSION=${gitDescribeVersion} \\
                                   -D REALM_SKIP_SHARED_LIB=ON \\
                                   -D REALM_BUILD_LIB_ONLY=ON \\
+                                  -D OSX_ARM64=1 \\
                                   -G Ninja ..
                         """
-                    runAndCollectWarnings(parser: 'clang', script: 'ninja package', name: "osx-maccatalyst-${buildType}")
+                    runAndCollectWarnings(
+                        parser: 'clang',
+                        script: 'ninja package', 
+                        name: "osx-maccatalyst-${buildType}",
+                        filters: warningFilters,
+                    )
                 }
             }
 
@@ -825,7 +873,11 @@ def doLinuxCrossCompile(String target, String buildType, Map testOptions = null)
                             ..
                     """
 
-                    runAndCollectWarnings(script: "ninja", name: "linux-x_compile-${target}-${buildType}")
+                    runAndCollectWarnings(
+                        script: 'ninja',
+                        name: "linux-x_compile-${target}-${buildType}",
+                        filters: warningFilters,
+                    )
 
                     if (testOptions != null) {
                         if (testOptions.get('emulator')) {
@@ -962,4 +1014,20 @@ def getSourceArchive() {
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )
+}
+
+enum TestAction {
+    None(0x0),
+    Build(0x1),
+    Run(0x3); // build and run
+
+    private final long value;
+
+    TestAction(long value) {
+        this.value = value;
+    }
+
+    public boolean hasValue(TestAction value) {
+        return (this.value & value.value) == value.value;
+    }
 }

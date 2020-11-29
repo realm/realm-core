@@ -80,6 +80,11 @@ public:
     template <typename T>
     void set(size_t row_ndx, T value);
 
+    void insert_any(size_t list_ndx, Mixed value);
+    void set_any(size_t list_ndx, Mixed value);
+    Mixed get_any(size_t list_ndx) const;
+    size_t find_any(Mixed value) const;
+
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
     Results filter(Query q) const;
@@ -283,13 +288,12 @@ void List::assign(Context& ctx, T&& values, CreatePolicy policy)
         return;
     }
 
-
     if (!policy.diff)
         remove_all();
 
     size_t sz = size();
     size_t index = 0;
-    ctx.enumerate_list(values, [&](auto&& element) {
+    ctx.enumerate_collection(values, [&](auto&& element) {
         if (index >= sz)
             this->add(ctx, element, policy);
         else if (policy.diff)

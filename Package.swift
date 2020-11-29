@@ -3,13 +3,14 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "10.1.2"
+let versionStr = "10.2.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
 
 let cxxSettings: [CXXSetting] = [
     .headerSearchPath("src"),
+    .define("REALM_DEBUG", .when(configuration: .debug)),
     .define("REALM_NO_CONFIG"),
     .define("REALM_INSTALL_LIBEXECDIR", to: ""),
     .define("REALM_ENABLE_ASSERTIONS", to: "1"),
@@ -38,6 +39,7 @@ let syncServerSources = [
 ]
 
 let syncCommandSources = [
+    "realm/sync/apply_to_state_command.cpp",
     "realm/sync/encrypt/encryption_transformer_command.cpp",
     "realm/sync/inspector",
     "realm/sync/noinst/vacuum_command.cpp",

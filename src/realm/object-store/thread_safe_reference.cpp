@@ -19,6 +19,7 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 
 #include <realm/object-store/list.hpp>
+#include <realm/object-store/set.hpp>
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/results.hpp>
@@ -81,6 +82,29 @@ public:
     {
         Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
         return List(r, obj, m_col_key);
+    }
+
+private:
+    ObjKey m_key;
+    TableKey m_table_key;
+    ColKey m_col_key;
+};
+
+template <>
+class ThreadSafeReference::PayloadImpl<object_store::Set> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(object_store::Set const& set)
+        : Payload(*set.get_realm())
+        , m_key(set.get_parent_object_key())
+        , m_table_key(set.get_parent_table_key())
+        , m_col_key(set.get_parent_column_key())
+    {
+    }
+
+    object_store::Set import_into(std::shared_ptr<Realm> const& r)
+    {
+        Obj obj = r->read_group().get_table(m_table_key)->get_object(m_key);
+        return object_store::Set(r, obj, m_col_key);
     }
 
 private:
@@ -204,6 +228,7 @@ ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const& value)
 }
 
 template ThreadSafeReference::ThreadSafeReference(List const&);
+template ThreadSafeReference::ThreadSafeReference(object_store::Set const&);
 template ThreadSafeReference::ThreadSafeReference(Results const&);
 template ThreadSafeReference::ThreadSafeReference(Object const&);
 
@@ -239,6 +264,7 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
 
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm> const&);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm> const&);
+template object_store::Set ThreadSafeReference::resolve<object_store::Set>(std::shared_ptr<Realm> const&);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm> const&);
 
 } // namespace realm

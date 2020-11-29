@@ -48,6 +48,8 @@ using CollectionBasePtr = std::unique_ptr<CollectionBase>;
 
 class LnkLst;
 using LnkLstPtr = std::unique_ptr<LnkLst>;
+class LnkSet;
+using LnkSetPtr = std::unique_ptr<LnkSet>;
 
 template <class>
 class Set;
@@ -259,6 +261,8 @@ public:
     }
     template <typename U>
     Set<U> get_set(ColKey col_key) const;
+    LnkSet get_linkset(ColKey col_key) const;
+    LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
     DictionaryPtr get_dictionary_ptr(ColKey col_key) const;

@@ -2883,8 +2883,23 @@ struct ResultsFromLinkView {
     }
 };
 
+struct ResultsFromLinkSet {
+    static Results call(std::shared_ptr<Realm> r, ConstTableRef table)
+    {
+        r->begin_transaction();
+        auto link_table = r->read_group().get_table("class_linking_object");
+        std::shared_ptr<LnkSet> link_set =
+            link_table->create_object().get_linkset_ptr(link_table->get_column_key("linkset"));
+        for (auto& o : *table) {
+            link_set->insert(o.get_key());
+        }
+        r->commit_transaction();
+        return Results(r, link_set);
+    }
+};
+
 TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView)
+                   ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2895,7 +2910,11 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
          {
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -2933,7 +2952,7 @@ TEMPLATE_TEST_CASE("results: get<Obj>()", "", ResultsFromTable, ResultsFromQuery
 }
 
 TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsFromQuery, ResultsFromTableView,
-                   ResultsFromLinkView)
+                   ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2948,7 +2967,11 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
          {
              {"value", PropertyType::Int},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");
@@ -3014,7 +3037,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
 }
 
 TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable, ResultsFromQuery,
-                   ResultsFromTableView, ResultsFromLinkView)
+                   ResultsFromTableView, ResultsFromLinkView, ResultsFromLinkSet)
 {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -3028,7 +3051,11 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
          }},
-        {"linking_object", {{"link", PropertyType::Array | PropertyType::Object, "object"}}},
+        {"linking_object",
+         {
+             {"link", PropertyType::Array | PropertyType::Object, "object"},
+             {"linkset", PropertyType::Set | PropertyType::Object, "object"},
+         }},
     });
 
     auto table = r->read_group().get_table("class_object");

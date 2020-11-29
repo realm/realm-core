@@ -25,6 +25,7 @@
 #include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
 #include <realm/table_tpl.hpp>
+#include <realm/set.hpp>
 
 #include <algorithm>
 
@@ -46,11 +47,29 @@ Query::Query(ConstTableRef table, const LnkLst& list)
     create();
 }
 
+Query::Query(ConstTableRef table, const LnkSet& set)
+    : m_table(table.cast_away_const())
+    , m_source_link_set(set.clone_linkset())
+{
+    m_view = m_source_link_set.get();
+    REALM_ASSERT_DEBUG(set.get_target_table() == m_table);
+    create();
+}
+
 Query::Query(ConstTableRef table, LnkLstPtr&& ll)
     : m_table(table.cast_away_const())
     , m_source_link_list(std::move(ll))
 {
     m_view = m_source_link_list.get();
+    REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
+    create();
+}
+
+Query::Query(ConstTableRef table, LnkSetPtr&& ll)
+    : m_table(table.cast_away_const())
+    , m_source_link_set(std::move(ll))
+{
+    m_view = m_source_link_set.get();
     REALM_ASSERT_DEBUG(ll->get_target_table() == m_table);
     create();
 }
@@ -92,12 +111,18 @@ Query::Query(const Query& source)
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
         m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
+        m_source_link_set = source.m_source_link_set ? source.m_source_link_set->clone_linkset() : LnkSetPtr{};
     }
     if (m_source_table_view) {
         m_view = m_source_table_view;
     }
     else {
-        m_view = m_source_link_list.get();
+        if (m_source_link_list) {
+            m_view = m_source_link_list.get();
+        }
+        else if (m_source_link_set) {
+            m_view = m_source_link_set.get();
+        }
     }
 }
 
@@ -112,6 +137,7 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = m_owned_source_table_view.get();
 
             m_source_link_list = nullptr;
+            m_source_link_set = nullptr;
         }
         else {
             // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
@@ -121,12 +147,18 @@ Query& Query::operator=(const Query& source)
 
             m_source_link_list =
                 source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
+            m_source_link_set = source.m_source_link_set ? source.m_source_link_set->clone_linkset() : LnkSetPtr{};
         }
         if (m_source_table_view) {
             m_view = m_source_table_view;
         }
         else {
-            m_view = m_source_link_list.get();
+            if (m_source_link_list) {
+                m_view = m_source_link_list.get();
+            }
+            else if (m_source_link_set) {
+                m_view = m_source_link_set.get();
+            }
         }
         m_ordering = source.m_ordering;
     }
@@ -151,6 +183,10 @@ Query::Query(const Query* source, Transaction* tr, PayloadPolicy policy)
     if (source->m_source_link_list.get()) {
         m_source_link_list = tr->import_copy_of(source->m_source_link_list);
         m_view = m_source_link_list.get();
+    }
+    else if (source->m_source_link_set.get()) {
+        m_source_link_set = tr->import_copy_of(source->m_source_link_set);
+        m_view = m_source_link_set.get();
     }
     m_groups = source->m_groups;
     if (source->m_table)
@@ -1806,6 +1842,11 @@ Query& Query::and_query(Query&& q)
             REALM_ASSERT(!m_source_link_list || *m_source_link_list == *q.m_source_link_list);
             m_source_link_list = std::move(q.m_source_link_list);
             m_view = m_source_link_list.get();
+        }
+        if (q.m_source_link_set) {
+            REALM_ASSERT(!m_source_link_set || *m_source_link_set == *q.m_source_link_set);
+            m_source_link_set = std::move(q.m_source_link_set);
+            m_view = m_source_link_set.get();
         }
     }
 
