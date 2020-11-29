@@ -119,11 +119,16 @@ Mixed DictionaryClusterTree::sum(size_t* return_cnt) const
             cnt++;
 
             if (s.is_null()) {
+                auto type = val.get_type();
+                if (type != type_Int && type != type_Float && type != type_Double && type != type_Decimal) {
+                    throw std::runtime_error(util::format("Sum not defined for %1s", get_data_type_name(type)));
+                }
                 s = val;
             }
             else {
                 if (s.get_type() != val.get_type()) {
-                    throw std::runtime_error("Sum not supported");
+                    throw std::runtime_error(util::format("Cannot add %1 and %2", get_data_type_name(s.get_type()),
+                                                          get_data_type_name(val.get_type())));
                 }
                 switch (s.get_type()) {
                     case type_Int:
@@ -139,7 +144,7 @@ Mixed DictionaryClusterTree::sum(size_t* return_cnt) const
                         s = Mixed(s.get<Decimal128>() + val.get<Decimal128>());
                         break;
                     default:
-                        throw std::runtime_error("Average not supported");
+                        REALM_UNREACHABLE();
                         break;
                 }
             }

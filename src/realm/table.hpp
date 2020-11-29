@@ -1032,7 +1032,9 @@ private:
         // Link column can be a single Link, LinkList, or BackLink.
         REALM_ASSERT(m_current_table->valid_column(ck));
         ColumnType type = ck.get_type();
-        if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
+        if (ck.is_dictionary()) {
+        }
+        else if (type == col_type_LinkList || type == col_type_Link || type == col_type_BackLink) {
             m_current_table = m_current_table->get_opposite_table(ck);
         }
         else {

@@ -230,10 +230,165 @@ Columns<Dictionary>& Columns<Dictionary>::key(const Mixed& key_value)
 
     m_key = key_value;
     if (!key_value.is_null()) {
-        auto hash = key_value.hash();
+        if (m_key.get_type() == type_String) {
+            m_buffer = std::string(m_key.get_string());
+            m_key = Mixed(m_buffer);
+        }
+        auto hash = m_key.hash();
         m_objkey = ObjKey(int64_t(hash & 0x7FFFFFFFFFFFFFFF));
     }
     return *this;
+}
+
+class DictionarySize : public Columns<Dictionary> {
+public:
+    DictionarySize(const Columns<Dictionary>& other)
+        : Columns<Dictionary>(other)
+    {
+    }
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Allocator& alloc = this->get_base_table()->get_alloc();
+        Value<int64_t> list_refs;
+        this->get_lists(index, list_refs, 1);
+        destination.init(list_refs.m_from_link_list, list_refs.size());
+        for (size_t i = 0; i < list_refs.size(); i++) {
+            ref_type ref = to_ref(list_refs[i].get_int());
+            size_t s = ClusterTree::size_from_ref(ref, alloc);
+            destination.set(i, int64_t(s));
+        }
+    }
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::unique_ptr<Subexpr>(new DictionarySize(*this));
+    }
+};
+
+class DictionaryAggregate : public Subexpr2<Mixed> {
+public:
+    using Func = std::function<Mixed(const DictionaryClusterTree&)>;
+    DictionaryAggregate(Columns<Dictionary> dict, Func fn, const char* descr)
+        : m_dict(std::move(dict))
+        , m_fn(fn)
+        , m_descr(descr)
+    {
+    }
+
+    DictionaryAggregate(const DictionaryAggregate& other) = default;
+
+    std::unique_ptr<Subexpr> clone() const override
+    {
+        return std::make_unique<DictionaryAggregate>(*this);
+    }
+
+    ConstTableRef get_base_table() const override
+    {
+        return m_dict.get_base_table();
+    }
+
+    void set_base_table(ConstTableRef table) override
+    {
+        m_dict.set_base_table(table);
+    }
+
+    void set_cluster(const Cluster* cluster) override
+    {
+        m_dict.set_cluster(cluster);
+    }
+
+    void collect_dependencies(std::vector<TableKey>& tables) const override
+    {
+        m_dict.collect_dependencies(tables);
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        if (m_dict.links_exist()) {
+            std::vector<ObjKey> links = m_dict.m_link_map.get_links(index);
+            auto sz = links.size();
+
+            destination.init_for_links(m_dict.m_link_map.only_unary_links(), sz);
+            for (size_t t = 0; t < sz; t++) {
+                const Obj obj = m_dict.m_link_map.get_target_table()->get_object(links[t]);
+                auto dict = obj.get_dictionary(m_dict.m_column_key);
+                if (dict.size() > 0) {
+                    destination.set(t, m_fn(*dict.m_clusters));
+                }
+                else {
+                    destination.set_null(t);
+                }
+            }
+        }
+        else {
+            if (m_dict.m_leaf_ptr->get(index)) {
+                Allocator& alloc = m_dict.get_base_table()->get_alloc();
+                DictionaryClusterTree dict_cluster(static_cast<Array*>(m_dict.m_leaf_ptr), m_dict.get_key_type(),
+                                                   alloc, index);
+                dict_cluster.init_from_parent();
+                destination.set(0, m_fn(dict_cluster));
+            }
+            else {
+                destination.set_null(0);
+            }
+        }
+    }
+
+    virtual std::string description(util::serializer::SerialisationState& state) const override
+    {
+        return m_dict.description(state) + util::serializer::value_separator + m_descr;
+    }
+
+private:
+    Columns<Dictionary> m_dict;
+    Func m_fn;
+    std::string m_descr;
+};
+
+SizeOperator<int64_t> Columns<Dictionary>::size()
+{
+    std::unique_ptr<Subexpr> ptr(new DictionarySize(*this));
+    return SizeOperator<int64_t>(std::move(ptr));
+}
+
+std::unique_ptr<Subexpr> Columns<Dictionary>::max_of()
+{
+    return std::make_unique<DictionaryAggregate>(
+        *this,
+        [](const DictionaryClusterTree& dict) {
+            return dict.max();
+        },
+        "@max");
+}
+
+std::unique_ptr<Subexpr> Columns<Dictionary>::min_of()
+{
+    return std::make_unique<DictionaryAggregate>(
+        *this,
+        [](const DictionaryClusterTree& dict) {
+            return dict.min();
+        },
+        "@min");
+}
+
+std::unique_ptr<Subexpr> Columns<Dictionary>::sum_of()
+{
+    return std::make_unique<DictionaryAggregate>(
+        *this,
+        [](const DictionaryClusterTree& dict) {
+            return dict.sum();
+        },
+        "@sum");
+}
+
+std::unique_ptr<Subexpr> Columns<Dictionary>::avg_of()
+{
+    return std::make_unique<DictionaryAggregate>(
+        *this,
+        [](const DictionaryClusterTree& dict) {
+            return dict.avg();
+        },
+        "@avg");
 }
 
 void Columns<Dictionary>::evaluate(size_t index, ValueBase& destination)

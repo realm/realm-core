@@ -115,6 +115,7 @@ public:
     Iterator end() const;
 
 private:
+    friend class DictionaryAggregate;
     mutable DictionaryClusterTree* m_clusters = nullptr;
     DataType m_key_type = type_String;
 

@@ -1167,6 +1167,16 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 
 Subexpr* LinkChain::column(const std::string& col)
 {
+    if (!m_link_cols.empty()) {
+        auto current_column = m_link_cols.back();
+        if (current_column.is_dictionary()) {
+            m_link_cols.pop_back();
+            auto dict = new Columns<Dictionary>(current_column, m_base_table, m_link_cols, m_comparison_type);
+            dict->key(col);
+            return dict;
+        }
+    }
+
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
         throw std::runtime_error(util::format("'%1' has no property: '%2'", m_current_table->get_name(), col));
@@ -1178,7 +1188,10 @@ Subexpr* LinkChain::column(const std::string& col)
         }
     }
 
-    if (col_key.is_list()) {
+    if (col_key.is_dictionary()) {
+        return create_subexpr<Dictionary>(col_key);
+    }
+    else if (col_key.is_list()) {
         switch (col_key.get_type()) {
             case col_type_Int:
                 return create_subexpr<Lst<Int>>(col_key);
