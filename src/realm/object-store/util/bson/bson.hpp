@@ -29,6 +29,7 @@
 #include <realm/timestamp.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
+#include <realm/uuid.hpp>
 #include <ostream>
 
 namespace realm {
@@ -52,7 +53,8 @@ public:
         MaxKey,
         MinKey,
         Document,
-        Array
+        Array,
+        Uuid
     };
 
     Bson() noexcept
@@ -75,6 +77,7 @@ public:
     Bson(realm::Timestamp) noexcept;
     Bson(Decimal128) noexcept;
     Bson(ObjectId) noexcept;
+    Bson(realm::UUID) noexcept;
 
     Bson(const RegularExpression&) noexcept;
     Bson(const std::vector<char>&) noexcept;
@@ -199,6 +202,12 @@ public:
         return *array_val;
     }
 
+    explicit operator realm::UUID() const
+    {
+        REALM_ASSERT(m_type == Bson::Type::Uuid);
+        return uuid_val;
+    }
+
     Type type() const noexcept;
     std::string to_string() const;
 
@@ -225,6 +234,7 @@ private:
         MaxKey max_key_val;
         MinKey min_key_val;
         realm::Timestamp date_val;
+        realm::UUID uuid_val;
         // ref types
         RegularExpression regex_val;
         std::string string_val;
@@ -339,6 +349,12 @@ inline Bson::Bson(std::vector<Bson>&& v) noexcept
     : m_type(Bson::Type::Array)
     , array_val(new std::vector<Bson>(std::move(v)))
 {
+}
+
+inline Bson::Bson(realm::UUID v) noexcept
+{
+    m_type = Bson::Type::Uuid;
+    uuid_val = v;
 }
 
 template <typename T>
