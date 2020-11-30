@@ -49,9 +49,6 @@ extern IdentityProvider const IdentityProviderFacebook;
 // A Google account as an identity provider.
 extern IdentityProvider const IdentityProviderGoogle;
 
-// A Google account as an identity provider (using open id).
-extern IdentityProvider const IdentityProviderGoogleOpenId;
-
 // A JSON Web Token as an identity provider.
 extern IdentityProvider const IdentityProviderCustom;
 
