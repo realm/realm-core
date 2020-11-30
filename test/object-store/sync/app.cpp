@@ -3326,7 +3326,7 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         auto credentials = realm::app::AppCredentials::google(IdToken("a_token"));
         CHECK(credentials.provider() == AuthProvider::GOOGLE);
         CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
-        CHECK(credentials.serialize_as_json() == "{\"idToken\":\"a_token\",\"provider\":\"oauth2-google\"}");
+        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-google\"}");
     }
 
     SECTION("auth providers apple") {
