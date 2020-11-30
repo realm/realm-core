@@ -13,17 +13,19 @@ function usage {
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
     echo "   -x : build as an xcframework"
+    echo "   -d : include debug libraries"
     echo "   -c : copy core to the specified folder instead of packaging it"
     echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 
 # Parse the options
-while getopts ":bmxc:f:" opt; do
+while getopts ":bmxdc:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
         x) BUILD_XCFRAMEWORK=1;;
+        d) BUILD_DEBUG=1;;
         c) COPY=1
            DESTINATION=${OPTARG};;
         f) CMAKE_FLAGS=${OPTARG};;
@@ -33,7 +35,7 @@ done
 
 shift $((OPTIND-1))
 
-readonly BUILD_TYPES=( Release MinSizeDebug )
+[[ -n $BUILD_DEBUG ]] && BUILD_TYPES=( Release Debug ) || BUILD_TYPES=( Release )
 [[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator ) || PLATFORMS=( macosx )
 
 readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator )
@@ -296,6 +298,6 @@ else
         tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
         rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
         # until realmjs requires an xcframework, only package as .xz
-        tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo.xcframework core/realm-monorepo-dbg.xcframework
+        tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo*.xcframework
     fi
 fi

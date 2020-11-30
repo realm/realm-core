@@ -14,6 +14,7 @@
 
 ### Internals
 * Fix publishing the Cocoa xcframework release package to s3.
+* Remove debug libraries from the Cocoa release packages.
 
 ----------------------------------------------
 
