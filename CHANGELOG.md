@@ -13,7 +13,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix publishing the Cocoa xcframework release package to s3.
 
 ----------------------------------------------
 

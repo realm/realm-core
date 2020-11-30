@@ -190,7 +190,7 @@ function add_to_xcframework() {
     local os="$3"
     local platform="$4"
     local build_type="$5"
-    local suffix 
+    local suffix
     [[ "$build_type" = "Release" ]] && suffix="" || suffix="-dbg"
 
     local variant=""
@@ -289,12 +289,9 @@ if [[ -n $COPY ]]; then
     cp -R core "${DESTINATION}"
 else
     rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"
-    # .tar.gz package is used by realm-js, which uses the parser
-    tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" --exclude "realm-monorepo*.xcframework" core
-    # .tar.xz package is used by cocoa, which doesn't use the parser
-    tar -cJvf "realm-monorepo-cocoa-${VERSION}.tar.xz" --exclude "realm-monorepo*.xcframework" core
+    tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" --exclude "*.xcframework" core
 
-    if [[ ! -z $BUILD_XCFRAMEWORK ]]; then
+    if [[ -n $BUILD_XCFRAMEWORK ]]; then
         rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
         tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
         rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
