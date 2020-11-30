@@ -33,6 +33,7 @@
 #include <realm/query_expression.hpp>
 #include "test.hpp"
 #include "test_table_helper.hpp"
+#include "test_types_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -5326,6 +5327,36 @@ TEST(Query_NotImmediatelyBeforeKnownRange)
 
     Query q = child->where(list).Not().equal(col_str, "a");
     CHECK_EQUAL(q.count(), 1);
+}
+
+TEST_TYPES(Query_PrimaryKeySearchForNull, Prop<String>, Prop<Int>, Prop<ObjectId>, Nullable<String>, Nullable<Int>,
+           Nullable<ObjectId>)
+{
+    using type = typename TEST_TYPE::type;
+    using underlying_type = typename TEST_TYPE::underlying_type;
+    Table table;
+    TestValueGenerator gen;
+    auto col = table.add_column(TEST_TYPE::data_type, "property", TEST_TYPE::is_nullable);
+    table.set_primary_key_column(col);
+    underlying_type v0 = gen.convert_for_test<underlying_type>(42);
+    underlying_type v1 = gen.convert_for_test<underlying_type>(43);
+    Mixed mixed_null;
+    auto obj0 = table.create_object_with_primary_key(v0);
+    auto obj1 = table.create_object_with_primary_key(v1);
+
+    auto verify_result_count = [&](Query& q, size_t expected_count) {
+        CHECK_EQUAL(q.count(), expected_count);
+        TableView tv = q.find_all();
+        CHECK_EQUAL(tv.size(), expected_count);
+    };
+    Query q = table.where().equal(col, v0);
+    verify_result_count(q, 1);
+    q = table.where().equal(col, v1);
+    verify_result_count(q, 1);
+
+    CHECK_EQUAL(table.find_first(col, v0), obj0.get_key());
+    CHECK_EQUAL(table.find_first(col, v1), obj1.get_key());
+    CHECK_NOT(table.find_first(col, type{}));
 }
 
 TEST(Query_Mixed)
