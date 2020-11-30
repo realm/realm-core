@@ -133,7 +133,7 @@ jobWrapper {
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
-            buildiosDebug           : doBuildAppleDevice('iphoneos', 'MinSizeDebug'),
+            buildiosDebug           : doBuildAppleDevice('iphoneos', 'Debug'),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             checkRaspberryPiQemu    : doLinuxCrossCompile('armhf', 'Debug', armhfQemuTestOptions),
@@ -165,9 +165,7 @@ jobWrapper {
             ]
 
             parallelExecutors = [
-                buildMacOsDebug     : doBuildMacOs(buildOptions + [buildType : "MinSizeDebug"]),
                 buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
-                buildCatalystDebug  : doBuildMacOsCatalyst('MinSizeDebug'),
                 buildCatalystRelease: doBuildMacOsCatalyst('Release'),
 
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
@@ -186,12 +184,9 @@ jobWrapper {
             appleSdks = ['iphoneos', 'iphonesimulator',
                          'appletvos', 'appletvsimulator',
                          'watchos', 'watchsimulator']
-            appleBuildTypes = ['MinSizeDebug', 'Release']
 
-            for (sdk in appleSdks) {
-                for (buildType in appleBuildTypes) {
-                    parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
-                }
+            for (buildType in appleBuildTypes) {
+                parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, 'Release')
             }
 
             linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
