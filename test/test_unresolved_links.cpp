@@ -51,11 +51,11 @@ TEST(Unresolved_Basic)
         auto cars = wt->add_table_with_primary_key("Car", type_String, "model");
         col_price = cars->add_column(type_Decimal, "price");
         auto persons = wt->add_table_with_primary_key("Person", type_String, "e-mail");
-        col_owns = persons->add_column_link(type_Link, "car", *cars);
+        col_owns = persons->add_column(*cars, "car");
         auto dealers = wt->add_table_with_primary_key("Dealer", type_Int, "cvr");
-        col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+        col_has = dealers->add_column_list(*cars, "stock");
         auto parts = wt->add_table("Parts"); // No primary key
-        col_part = cars->add_column_link(type_Link, "part", *parts);
+        col_part = cars->add_column(*parts, "part");
 
         auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
         auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -164,12 +164,12 @@ TEST(Unresolved_InvalidateObject)
 
     auto wheels = g.add_embedded_table("Wheels");
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
-    auto col_wheels = cars->add_column_link(type_LinkList, "wheels", *wheels);
+    auto col_wheels = cars->add_column_list(*wheels, "wheels");
     auto col_price = cars->add_column(type_Decimal, "price");
     auto dealers = g.add_table("Dealer");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
     auto organization = g.add_table("Organization");
-    auto col_members = organization->add_column_link(type_LinkList, "members", *dealers);
+    auto col_members = organization->add_column_list(*dealers, "members");
 
     auto dealer1 = dealers->create_object();
     auto dealer2 = dealers->create_object();
@@ -229,7 +229,7 @@ TEST(Unresolved_LinkList)
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
 
     auto dealer = dealers->create_object_with_primary_key(18454033);
     auto stock1 = dealer.get_linklist(col_has);
@@ -268,9 +268,9 @@ TEST(Unresolved_QueryOverLinks)
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto col_price = cars->add_column(type_Decimal, "price");
     auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
-    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+    auto col_owns = persons->add_column(*cars, "car");
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
 
     auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
     auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -302,7 +302,7 @@ TEST(Unresolved_QueryOverLinks)
     CHECK_EQUAL(q.count(), 1);
 
     auto new_tesla = cars->get_objkey_from_primary_key("Tesla 10");
-    bilmekka.get_linklist(col_has).insert(0, new_tesla);
+    bilmekka.get_list<ObjKey>(col_has).insert(0, new_tesla);
     CHECK_EQUAL(q.count(), 1);
 
     q = persons->link(col_owns).column<Decimal128>(col_price) < Decimal128("1000000");
@@ -321,7 +321,7 @@ TEST(Unresolved_PrimaryKeyInt)
 
     auto foo = g.add_table_with_primary_key("foo", type_Int, "id");
     auto bar = g.add_table("bar");
-    auto col = bar->add_column_link(type_Link, "link", *foo);
+    auto col = bar->add_column(*foo, "link");
 
     auto obj = bar->create_object();
     auto unres = foo->get_objkey_from_primary_key(5);
@@ -338,7 +338,7 @@ TEST(Unresolved_GarbageCollect)
 
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto persons = g.add_table_with_primary_key("Person", type_String, "e-mail");
-    auto col_owns = persons->add_column_link(type_Link, "car", *cars);
+    auto col_owns = persons->add_column(*cars, "car");
 
     auto finn = persons->create_object_with_primary_key("finn.schiermer-andersen@mongodb.com");
     auto mathias = persons->create_object_with_primary_key("mathias@10gen.com");
@@ -356,7 +356,7 @@ TEST(Unresolved_GarbageCollect)
     // Try the same with linklists. Here you have to clear the lists in order to
     // remove the unresolved links
     auto dealers = g.add_table_with_primary_key("Dealer", type_Int, "cvr");
-    auto col_has = dealers->add_column_link(type_LinkList, "stock", *cars);
+    auto col_has = dealers->add_column_list(*cars, "stock");
     auto bilcentrum = dealers->create_object_with_primary_key(18454033);
     auto bilmekka = dealers->create_object_with_primary_key(26293995);
 
@@ -431,7 +431,7 @@ TEST(Unresolved_CondensedIndices)
     Group g;
     auto t1 = g.add_table_with_primary_key("Table", type_Int, "id");
     auto t2 = g.add_table_with_primary_key("Table2", type_Int, "id");
-    t1->add_column_link(type_LinkList, "t2s", *t2);
+    t1->add_column_list(*t2, "t2s");
 
     auto obj123 = t2->create_object_with_primary_key(123);
     auto obj456 = t2->create_object_with_primary_key(456);
@@ -444,13 +444,50 @@ TEST(Unresolved_CondensedIndices)
 
     CHECK_EQUAL(obj789.get_linklist("t2s").size(), 1);
 
-    ConstObj const_obj789 = obj789;
-    ConstLnkLst list1 = const_obj789.get_linklist("t2s");
-    ConstLnkLst list2;
+    const Obj const_obj789 = obj789;
+    LnkLst list1 = const_obj789.get_linklist("t2s");
+    LnkLst list2;
     CHECK_EQUAL(list1.size(), 1);
     CHECK_EQUAL(list1.get_object(0).get_key(), obj456.get_key());
     list2 = list1;
     CHECK_EQUAL(list2.size(), 1);
+
+    auto key_list = obj789.get_list<ObjKey>("t2s");
+    CHECK_EQUAL(key_list.size(), 2);
+
+    // Check that find methods return condensed indices.
+
+    CHECK_EQUAL(list1.find_first(obj123.get_key()), not_found);
+    CHECK_EQUAL(list1.find_first(obj456.get_key()), 0);
+
+    std::vector<size_t> found_indices;
+    list1.find_all(obj123.get_key(), [&](size_t index) {
+        found_indices.push_back(index);
+    });
+    CHECK_EQUAL(found_indices.size(), 0);
+    found_indices.clear();
+    list1.find_all(obj456.get_key(), [&](size_t index) {
+        found_indices.push_back(index);
+    });
+    CHECK_EQUAL(found_indices.size(), 1);
+    CHECK_EQUAL(found_indices[0], 0);
+
+    // Check that the list of unresolved indices remains consistent over
+    // insertion to the middle. list1 currently considers index 0 to be
+    // unresolved, because obj123 was invalidated above. Insertion to index 0
+    // should bump the unresolved index to 1.
+    CHECK_EQUAL(key_list.get(0), obj123.get_key());
+    CHECK_EQUAL(key_list.get(1), obj456.get_key());
+    key_list.insert(2, obj123.get_key());
+    key_list.insert(3, obj456.get_key());
+    // Uncondensed list is now: (obj123, obj456, obj123, obj456)
+    // Condensed list is now: (obj456, obj456)
+    list1.insert(0, obj456.get_key());
+    // Uncondensed list is now: (obj123, obj456, obj456, obj123, obj456)
+    // Condensed list should now be: (obj456, obj456, obj456)
+    CHECK_EQUAL(list1.get(0), obj456.get_key());
+    CHECK_EQUAL(list1.get(1), obj456.get_key());
+    CHECK_EQUAL(list1.get(2), obj456.get_key());
 }
 
 #endif

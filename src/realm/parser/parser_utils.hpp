@@ -34,6 +34,7 @@ class Timestamp;
 class ObjectId;
 class Decimal128;
 struct Link;
+class UUID;
 
 namespace util {
 
@@ -69,6 +70,8 @@ template <>
 const char* type_to_str<Decimal128>();
 template <>
 const char* type_to_str<Link>();
+template <>
+const char* type_to_str<UUID>();
 
 const char* data_type_to_str(DataType type);
 const char* collection_operator_to_str(parser::Expression::KeyPathOp op);

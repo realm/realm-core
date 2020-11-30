@@ -12,7 +12,48 @@
 -----------
 
 ### Internals
+* Fix publishing the Cocoa xcframework release package to s3.
+
+----------------------------------------------
+
+# 10.2.0 Release notes
+
+### Enhancements
+* Includes the open-sourced Realm Sync client, as well as the merged Object Store component.
+* New data types: Mixed, UUID and TypedLink.
+* New collection types: Set and Dictionary 
+* Enable mixed comparison queries between two columns of arbitrary types according to the Mixed::compare rules. ([#4018](https://github.com/realm/realm-core/pull/4018))
+* Added `TableView::update_query()`
+
+### Fixed
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix race potentially allowing frozen transactions to access incomplete search index accessors. (Since v6)
+* Fix queries for null on non-nullable indexed integer columns returning results for zero entries. (Since v6)
+* Fix queries for null on a indexed ObjectId column returning results for the zero ObjectId. (Since v10)
+* Fix list of primitives for Optional<Float> and Optional<Double> always returning false for `Lst::is_null(ndx)` even on null values, (since v6.0.0).
+* Fix several data races in App and SyncSession initialization. These could possibly have caused strange errors the first time a synchronized Realm was opened (sinrce v10.0.0).
+
+### Breaking changes
 * None.
+
+-----------
+
+### Internals
+* Set::erase_null() would not properly erase a potential null value ([#4001](https://github.com/realm/realm-core/issues/4001), (not in any release))
+
+----------------------------------------------
+
+# 10.1.3 Release notes
+
+### Enhancements
+* Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
+
+----------------------------------------------
+
+# 10.1.3 Release notes
+
+### Enhancements
+* Add arm64 slices to the macOS builds ([PR #3921](https://github.com/realm/realm-core/pull/3921)).
 
 ----------------------------------------------
 

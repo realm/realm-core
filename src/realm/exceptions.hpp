@@ -316,8 +316,8 @@ public:
         /// You can not add index on a subtable of a subtable
         subtable_of_subtable_index,
 
-        /// You try to instantiate a list object not matching column type
-        list_type_mismatch
+        /// You try to instantiate a collection object not matching column type
+        collection_type_mismatch
     };
 
     LogicError(ErrorKind message);

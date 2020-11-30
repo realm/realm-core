@@ -122,14 +122,6 @@ public:
     Query& less_equal(ColKey column_key, int value);
     Query& between(ColKey column_key, int from, int to);
 
-    // Conditions: 2 int columns
-    Query& equal_int(ColKey column_key1, ColKey column_key2);
-    Query& not_equal_int(ColKey column_key1, ColKey column_key2);
-    Query& greater_int(ColKey column_key1, ColKey column_key2);
-    Query& less_int(ColKey column_key1, ColKey column_key2);
-    Query& greater_equal_int(ColKey column_key1, ColKey column_key2);
-    Query& less_equal_int(ColKey column_key1, ColKey column_key2);
-
     // Conditions: float
     Query& equal(ColKey column_key, float value);
     Query& not_equal(ColKey column_key, float value);
@@ -139,14 +131,6 @@ public:
     Query& less_equal(ColKey column_key, float value);
     Query& between(ColKey column_key, float from, float to);
 
-    // Conditions: 2 float columns
-    Query& equal_float(ColKey column_key1, ColKey column_key2);
-    Query& not_equal_float(ColKey column_key1, ColKey column_key2);
-    Query& greater_float(ColKey column_key1, ColKey column_key2);
-    Query& greater_equal_float(ColKey column_key1, ColKey column_key2);
-    Query& less_float(ColKey column_key1, ColKey column_key2);
-    Query& less_equal_float(ColKey column_key1, ColKey column_key2);
-
     // Conditions: double
     Query& equal(ColKey column_key, double value);
     Query& not_equal(ColKey column_key, double value);
@@ -155,14 +139,6 @@ public:
     Query& less(ColKey column_key, double value);
     Query& less_equal(ColKey column_key, double value);
     Query& between(ColKey column_key, double from, double to);
-
-    // Conditions: 2 double columns
-    Query& equal_double(ColKey column_key1, ColKey column_key2);
-    Query& not_equal_double(ColKey column_key1, ColKey column_key2);
-    Query& greater_double(ColKey column_key1, ColKey column_key2);
-    Query& greater_equal_double(ColKey column_key1, ColKey column_key2);
-    Query& less_double(ColKey column_key1, ColKey column_key2);
-    Query& less_equal_double(ColKey column_key1, ColKey column_key2);
 
     // Conditions: timestamp
     Query& equal(ColKey column_key, Timestamp value);
@@ -179,6 +155,14 @@ public:
     Query& greater_equal(ColKey column_key, ObjectId value);
     Query& less_equal(ColKey column_key, ObjectId value);
     Query& less(ColKey column_key, ObjectId value);
+
+    // Conditions: UUID
+    Query& equal(ColKey column_key, UUID value);
+    Query& not_equal(ColKey column_key, UUID value);
+    Query& greater(ColKey column_key, UUID value);
+    Query& greater_equal(ColKey column_key, UUID value);
+    Query& less_equal(ColKey column_key, UUID value);
+    Query& less(ColKey column_key, UUID value);
 
     // Conditions: Decimal128
     Query& equal(ColKey column_key, Decimal128 value);
@@ -223,6 +207,15 @@ public:
     Query& ends_with(ColKey column_key, BinaryData value, bool case_sensitive = true);
     Query& contains(ColKey column_key, BinaryData value, bool case_sensitive = true);
     Query& like(ColKey column_key, BinaryData b, bool case_sensitive = true);
+
+    // Conditions: untyped column vs column comparison
+    // if the column types are not comparable, an exception is thrown
+    Query& equal(ColKey column_key1, ColKey column_key2);
+    Query& less(ColKey column_key1, ColKey column_key2);
+    Query& less_equal(ColKey column_key1, ColKey column_key2);
+    Query& greater(ColKey column_key1, ColKey column_key2);
+    Query& greater_equal(ColKey column_key1, ColKey column_key2);
+    Query& not_equal(ColKey column_key1, ColKey column_key2);
 
     // Negation
     Query& Not();
@@ -299,7 +292,7 @@ public:
     std::string get_description() const;
     std::string get_description(util::serializer::SerialisationState& state) const;
 
-    bool eval_object(ConstObj& obj) const;
+    bool eval_object(const Obj& obj) const;
 
 private:
     void create();
@@ -322,24 +315,6 @@ public:
 
 private:
     void add_expression_node(std::unique_ptr<Expression>);
-
-    template <class ColumnType>
-    Query& equal(ColKey column_key1, ColKey column_key2);
-
-    template <class ColumnType>
-    Query& less(ColKey column_key1, ColKey column_key2);
-
-    template <class ColumnType>
-    Query& less_equal(ColKey column_key1, ColKey column_key2);
-
-    template <class ColumnType>
-    Query& greater(ColKey column_key1, ColKey column_key2);
-
-    template <class ColumnType>
-    Query& greater_equal(ColKey column_key1, ColKey column_key2);
-
-    template <class ColumnType>
-    Query& not_equal(ColKey column_key1, ColKey column_key2);
 
     template <typename TConditionFunction, class T>
     Query& add_condition(ColKey column_key, T value);

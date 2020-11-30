@@ -29,7 +29,7 @@
 namespace realm {
 namespace util {
 
-using bad_cast = ExceptionWithBacktrace<std::bad_cast>;
+using bad_cast = std::bad_cast;
 
 // A naive implementation of C++17's std::any
 // This does not perform the small-object optimization or make any particular

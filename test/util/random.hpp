@@ -58,7 +58,7 @@ T random_int() noexcept;
 void random_seed(unsigned long) noexcept;
 
 /// To the extent possible, produce a nondeterministic value for seeding a
-/// pseudorandom number genrator.
+/// pseudorandom number generator.
 ///
 /// This function is thread safe.
 unsigned int produce_nondeterministic_random_seed();
@@ -126,6 +126,9 @@ public:
     /// an equal probability of appearing.
     template <class RandomIt>
     void shuffle(RandomIt begin, RandomIt end);
+
+    template <class T>
+    void draw_ints(T* buffer, size_t size) noexcept;
 
 private:
     std::mt19937 m_engine;
@@ -221,6 +224,12 @@ inline void Random::shuffle(RandomIt begin, RandomIt end)
     }
 }
 
+template <class T>
+void Random::draw_ints(T* buffer, size_t size) noexcept
+{
+    for (size_t i = 0; i < size; ++i)
+        buffer[i] = draw_int<T>();
+}
 
 } // namespace test_util
 

@@ -180,11 +180,11 @@ TEST_IF(File_NoSpuriousTryLockFailures2, !(running_with_valgrind || running_with
 #if TEST_DURATION < 1
     const size_t num_rounds = 20;
 #elif TEST_DURATION < 2
-    const int num_rounds = 1000;
+    const size_t num_rounds = 1000;
 #elif TEST_DURATION < 3
-    const int num_rounds = 10000;
+    const size_t num_rounds = 10000;
 #else
-    const int num_rounds = 100000;
+    const size_t num_rounds = 100000;
 #endif
 
     // More threads than cores will give OS time slice yields at random places which is good for randomness

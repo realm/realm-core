@@ -18,6 +18,7 @@ RUN yum -y install \
       unzip \
       wget \
       which \
+      zlib-devel \
  && yum clean all
  
 # Install CMake

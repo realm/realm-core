@@ -39,7 +39,7 @@ Query::Query()
 
 Query::Query(ConstTableRef table, const LnkLst& list)
     : m_table(table.cast_away_const())
-    , m_source_link_list(list.clone())
+    , m_source_link_list(list.clone_linklist())
 {
     m_view = m_source_link_list.get();
     REALM_ASSERT_DEBUG(list.get_target_table() == m_table);
@@ -90,7 +90,7 @@ Query::Query(const Query& source)
         // FIXME: The lifetime of `m_source_table_view` may be tied to that of `source`, which can easily
         // turn `m_source_table_view` into a dangling reference.
         m_source_table_view = source.m_source_table_view;
-        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LnkLstPtr{};
+        m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
     }
     if (m_source_table_view) {
         m_view = m_source_table_view;
@@ -118,7 +118,8 @@ Query& Query::operator=(const Query& source)
             m_source_table_view = source.m_source_table_view;
             m_owned_source_table_view = nullptr;
 
-            m_source_link_list = source.m_source_link_list ? source.m_source_link_list->clone() : LnkLstPtr{};
+            m_source_link_list =
+                source.m_source_link_list ? source.m_source_link_list->clone_linklist() : LnkLstPtr{};
         }
         if (m_source_table_view) {
             m_view = m_source_table_view;
@@ -314,6 +315,15 @@ struct MakeConditionNode<StringNode<Cond>> {
     }
 };
 
+template <class Cond>
+struct MakeConditionNode<MixedNode<Cond>> {
+    template <class T>
+    static std::unique_ptr<ParentNode> make(ColKey col_key, T value)
+    {
+        return std::unique_ptr<ParentNode>{new MixedNode<Cond>(Mixed(value), col_key)};
+    }
+};
+
 template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey column_key, T value)
 {
@@ -351,6 +361,12 @@ std::unique_ptr<ParentNode> make_condition_node(const Table& table, ColKey colum
         }
         case type_ObjectId: {
             return MakeConditionNode<ObjectIdNode<Cond>>::make(column_key, value);
+        }
+        case type_Mixed: {
+            return MakeConditionNode<MixedNode<Cond>>::make(column_key, value);
+        }
+        case type_UUID: {
+            return MakeConditionNode<UUIDNode<Cond>>::make(column_key, value);
         }
         default: {
             throw_type_mismatch_error();
@@ -400,142 +416,42 @@ Query& Query::add_size_condition(ColKey column_key, int64_t value)
     return *this;
 }
 
-
-template <class ColumnType>
+// Two column methods, any type
 Query& Query::equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Equal>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-
-// Two column methods, any type
-template <class ColumnType>
 Query& Query::less(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Less>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::less_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<LessEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::greater(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<Greater>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::greater_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<GreaterEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
 }
-template <class ColumnType>
 Query& Query::not_equal(ColKey column_key1, ColKey column_key2)
 {
-    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_key1, column_key2));
+    auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<NotEqual>(column_key1, column_key2));
     add_node(std::move(node));
     return *this;
-}
-
-// column vs column, integer
-Query& Query::equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::not_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::less_int(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_int(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayInteger>(column_key1, column_key2);
-}
-
-Query& Query::greater_int(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayInteger>(column_key1, column_key2);
-}
-
-
-// column vs column, float
-Query& Query::not_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::less_float(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::greater_float(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayFloat>(column_key1, column_key2);
-}
-
-Query& Query::equal_float(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayFloat>(column_key1, column_key2);
-}
-
-// column vs column, double
-Query& Query::equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return equal<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::less_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return less_equal<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::greater_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return greater_equal<ArrayDouble>(column_key1, column_key2);
-}
-Query& Query::greater_double(ColKey column_key1, ColKey column_key2)
-{
-    return greater<ArrayDouble>(column_key1, column_key2);
-}
-Query& Query::less_double(ColKey column_key1, ColKey column_key2)
-{
-    return less<ArrayDouble>(column_key1, column_key2);
-}
-
-Query& Query::not_equal_double(ColKey column_key1, ColKey column_key2)
-{
-    return not_equal<ArrayDouble>(column_key1, column_key2);
 }
 
 // null vs column
@@ -771,6 +687,32 @@ Query& Query::less(ColKey column_key, ObjectId value)
     return add_condition<Less>(column_key, value);
 }
 
+// ------------- UUID
+Query& Query::equal(ColKey column_key, UUID value)
+{
+    return add_condition<Equal>(column_key, value);
+}
+Query& Query::not_equal(ColKey column_key, UUID value)
+{
+    return add_condition<NotEqual>(column_key, value);
+}
+Query& Query::greater(ColKey column_key, UUID value)
+{
+    return add_condition<Greater>(column_key, value);
+}
+Query& Query::greater_equal(ColKey column_key, UUID value)
+{
+    return add_condition<GreaterEqual>(column_key, value);
+}
+Query& Query::less_equal(ColKey column_key, UUID value)
+{
+    return add_condition<LessEqual>(column_key, value);
+}
+Query& Query::less(ColKey column_key, UUID value)
+{
+    return add_condition<Less>(column_key, value);
+}
+
 // ------------- Decimal128
 Query& Query::greater(ColKey column_key, Decimal128 value)
 {
@@ -893,7 +835,7 @@ Query& Query::like(ColKey column_key, StringData value, bool case_sensitive)
 
 // Aggregates =================================================================================
 
-bool Query::eval_object(ConstObj& obj) const
+bool Query::eval_object(const Obj& obj) const
 {
     if (has_conditions())
         return root_node()->match(obj);
@@ -923,7 +865,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
             auto pn = root_node();
             auto node = pn->m_children[find_best_node(pn)];
             if (node->has_search_index()) {
-                node->index_based_aggregate(size_t(-1), [&](ConstObj& obj) -> bool {
+                node->index_based_aggregate(size_t(-1), [&](const Obj& obj) -> bool {
                     if (eval_object(obj)) {
                         st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                         return true;
@@ -958,7 +900,7 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
         }
         else {
             for (size_t t = 0; t < m_view->size(); t++) {
-                ConstObj obj = m_view->get_object(t);
+                const Obj obj = m_view->get_object(t);
                 if (eval_object(obj)) {
                     st.template match<action, false>(size_t(obj.get_key().value), 0, obj.get<T>(column_key));
                 }
@@ -979,18 +921,20 @@ R Query::aggregate(ColKey column_key, size_t* resultcount, ObjKey* return_ndx) c
 
 size_t Query::find_best_node(ParentNode* pn) const
 {
-    auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
+    auto score_compare = [](const ParentNode* a, const ParentNode* b) {
+        return a->cost() < b->cost();
+    };
     size_t best = std::distance(pn->m_children.begin(),
                                 std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
     return best;
 }
 
 /**************************************************************************************************************
-*                                                                                                             *
-* Main entry point of a query. Schedules calls to aggregate_local                                             *
-* Return value is the result of the query, or Array pointer for FindAll.                                      *
-*                                                                                                             *
-**************************************************************************************************************/
+ *                                                                                                             *
+ * Main entry point of a query. Schedules calls to aggregate_local                                             *
+ * Return value is the result of the query, or Array pointer for FindAll.                                      *
+ *                                                                                                             *
+ **************************************************************************************************************/
 
 void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                                ArrayPayload* source_column) const
@@ -1303,7 +1247,7 @@ ObjKey Query::find()
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t i = 0; i < sz; i++) {
-            ConstObj obj = m_view->get_object(i);
+            const Obj obj = m_view->get_object(i);
             if (eval_object(obj)) {
                 return obj.get_key();
             }
@@ -1344,7 +1288,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         if (end == size_t(-1))
             end = m_view->size();
         for (size_t t = begin; t < end && ret.size() < limit; t++) {
-            ConstObj obj = m_view->get_object(t);
+            const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
             }
@@ -1388,7 +1332,7 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                 auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
                 auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
                 KeyColumn& refs = ret.m_key_values;
-                node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+                node->index_based_aggregate(limit, [&](const Obj& obj) -> bool {
                     auto key = obj.get_key();
                     if (begin_key && key < begin_key)
                         return false;
@@ -1469,7 +1413,7 @@ size_t Query::do_count(size_t limit) const
     if (m_view) {
         size_t sz = m_view->size();
         for (size_t t = 0; t < sz && cnt < limit; t++) {
-            ConstObj obj = m_view->get_object(t);
+            const Obj obj = m_view->get_object(t);
             if (eval_object(obj)) {
                 cnt++;
             }
@@ -1480,7 +1424,7 @@ size_t Query::do_count(size_t limit) const
         auto pn = root_node();
         auto node = pn->m_children[find_best_node(pn)];
         if (node->has_search_index()) {
-            node->index_based_aggregate(limit, [&](ConstObj& obj) -> bool {
+            node->index_based_aggregate(limit, [&](const Obj& obj) -> bool {
                 if (eval_object(obj)) {
                     ++counter;
                     return true;
@@ -1823,11 +1767,11 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 }
 
 /* ********************************************************************************************************************
-*
-*  Stuff related to next-generation query syntax
-*
-********************************************************************************************************************
-*/
+ *
+ *  Stuff related to next-generation query syntax
+ *
+ ********************************************************************************************************************
+ */
 
 Query& Query::and_query(const Query& q)
 {
@@ -1939,4 +1883,3 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     }
     return *this;
 }
-

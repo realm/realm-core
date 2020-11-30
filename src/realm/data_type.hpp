@@ -49,7 +49,7 @@ enum DataType {
     type_String = 2,
     type_Binary = 4,
     type_OldTable = 5,
-    type_OldMixed = 6,
+    type_Mixed = 6,
     type_OldDateTime = 7,
     type_Timestamp = 8,
     type_Float = 9,
@@ -57,7 +57,9 @@ enum DataType {
     type_Decimal = 11,
     type_Link = 12,
     type_LinkList = 13,
-    type_ObjectId = 15
+    type_ObjectId = 15,
+    type_TypedLink = 16,
+    type_UUID = 17
 };
 
 const char* get_data_type_name(DataType type) noexcept;

@@ -31,7 +31,6 @@
 using namespace std::chrono;
 
 #include <realm.hpp>
-#include <realm/column_type_traits.hpp>
 #include <realm/history.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
@@ -379,7 +378,7 @@ TEST(Table_Null)
         TableRef table = group.add_table("table");
 
         auto col_int = target->add_column(type_Int, "int");
-        auto col_link = table->add_column_link(type_Link, "link", *target);
+        auto col_link = table->add_column(*target, "link");
         CHECK(table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
     }
@@ -391,7 +390,7 @@ TEST(Table_Null)
         TableRef table = group.add_table("table");
 
         auto col_int = target->add_column(type_Int, "int");
-        auto col_link = table->add_column_link(type_LinkList, "link", *target);
+        auto col_link = table->add_column_list(*target, "link");
         CHECK(!table->is_nullable(col_link));
         CHECK(!target->is_nullable(col_int));
     }
@@ -913,14 +912,13 @@ TEST(Table_ColumnNameTooLong)
     memset(buf, 'A', buf_size);
     CHECK_LOGIC_ERROR(table->add_column(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
     CHECK_LOGIC_ERROR(table->add_column_list(type_Int, StringData(buf, buf_size)), LogicError::column_name_too_long);
-    CHECK_LOGIC_ERROR(table->add_column_link(type_Link, StringData(buf, buf_size), *table),
-                      LogicError::column_name_too_long);
+    CHECK_LOGIC_ERROR(table->add_column(*table, StringData(buf, buf_size)), LogicError::column_name_too_long);
 
     table->add_column(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'B', buf_size); // Column names must be unique
     table->add_column_list(type_Int, StringData(buf, buf_size - 1));
     memset(buf, 'C', buf_size);
-    table->add_column_link(type_Link, StringData(buf, buf_size - 1), *table);
+    table->add_column(*table, StringData(buf, buf_size - 1));
 }
 
 TEST(Table_StringOrBinaryTooBig)
@@ -2552,7 +2550,7 @@ TEST(Table_DetachedAccessor)
     auto col_int = table->add_column(type_Int, "i");
     auto col_str = table->add_column(type_String, "s");
     table->add_column(type_Binary, "b");
-    table->add_column_link(type_Link, "l", *table);
+    table->add_column(*table, "l");
     ObjKey key0 = table->create_object().get_key();
     Obj obj1 = table->create_object();
     group.remove_table("table");
@@ -2582,7 +2580,7 @@ TEST(Table_addRowsToTableWithNoColumns)
 
     // Check that links are nulled when connected table is cleared
     TableRef u = g.add_table("u");
-    auto col_link = u->add_column_link(type_Link, "link from u to t", *t);
+    auto col_link = u->add_column(*t, "link from u to t");
     Obj obj = u->create_object();
     CHECK_EQUAL(u->size(), 1);
     CHECK_EQUAL(t->size(), 3);
@@ -2980,44 +2978,11 @@ TEST_TYPES(Table_list_nullable, int64_t, float, double, Decimal128)
     table.remove_object(ObjKey(5));
 }
 
-TEST(Table_StableIteration)
-{
-    Table table;
-    auto list_col = table.add_column_list(type_Int, "int_list");
-    std::vector<int64_t> values = {1, 7, 3, 5, 5, 2, 4};
-    Obj obj = table.create_object(ObjKey(5)).set_list_values(list_col, values);
 
-    auto list = obj.get_list<int64_t>(list_col);
-    auto x = list.begin();
-    CHECK_EQUAL(*x, 1);
-    ++x; // == 7
-    ++x; // == 3
-    CHECK_EQUAL(*x, 3);
-    auto end = list.end();
-    for (auto it = list.begin(); it != end; it++) {
-        if (*it > 3) {
-            list.remove(it);
-            // When an element is removed, the iterator should be invalid
-            CHECK_THROW_ANY(*it);
-        }
-        // This iterator should keep pointing to the same element
-        CHECK_EQUAL(*x, 3);
-    }
-    // Advancing the iterator should skip the two deleted elements
-    ++x; // == 2
-    CHECK_EQUAL(*x, 2);
-    ++x; // Past end of list
-    CHECK_THROW_ANY(*x);
-    CHECK_EQUAL(list.size(), 3);
-    CHECK_EQUAL(list[0], 1);
-    CHECK_EQUAL(list[1], 3);
-    CHECK_EQUAL(list[2], 2);
-}
-
-TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>, Prop<String>, Prop<Binary>,
-           Prop<Bool>, Prop<Decimal>, Prop<ObjectId>, Nullable<Int>, Nullable<Float>, Nullable<Double>,
-           Nullable<Timestamp>, Nullable<String>, Nullable<Binary>, Nullable<Bool>, Nullable<Decimal>,
-           Nullable<ObjectId>)
+TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal>, Prop<ObjectId>, Prop<UUID>,
+           Prop<Timestamp>, Prop<String>, Prop<Binary>, Prop<Bool>, Nullable<Int>, Nullable<Float>, Nullable<Double>,
+           Nullable<Decimal>, Nullable<ObjectId>, Nullable<UUID>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<Binary>, Nullable<Bool>)
 {
     using underlying_type = typename TEST_TYPE::underlying_type;
     using type = typename TEST_TYPE::type;
@@ -3056,7 +3021,7 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>,
     list2.clear();
     CHECK_EQUAL(list2.size(), 0);
 
-    if (TEST_TYPE::is_nullable) {
+    if constexpr (TEST_TYPE::is_nullable) {
         list2.insert_null(0);
         CHECK_EQUAL(list.size(), 1);
         type item0 = list2.get(0);
@@ -3069,7 +3034,7 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Timestamp>,
 TEST(Table_ListOfPrimitives)
 {
     Group g;
-    std::vector<ConstLstBase*> lists;
+    std::vector<CollectionBase*> lists;
     TableRef t = g.add_table("table");
     ColKey int_col = t->add_column_list(type_Int, "integers");
     ColKey bool_col = t->add_column_list(type_Bool, "booleans");
@@ -3196,8 +3161,9 @@ TEST(Table_ListOfPrimitives)
 }
 
 TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
-           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
-           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>,
+           Nullable<double>, Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<BinaryData>, Nullable<UUID>)
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
@@ -3249,8 +3215,9 @@ TEST_TYPES(Table_ListOfPrimitivesSort, Prop<int64_t>, Prop<float>, Prop<double>,
 }
 
 TEST_TYPES(Table_ListOfPrimitivesDistinct, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>,
-           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
-           Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>)
+           Prop<Timestamp>, Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>,
+           Nullable<double>, Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>,
+           Nullable<BinaryData>, Nullable<UUID>)
 {
     using type = typename TEST_TYPE::type;
     TestValueGenerator gen;
@@ -3496,7 +3463,7 @@ TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(i));
+                const Obj o = table->get_object(ObjKey(i));
             }
         }
 
@@ -3514,7 +3481,7 @@ TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(i));
+                const Obj o = table->get_object(ObjKey(i));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
         }
@@ -3533,7 +3500,7 @@ TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(i));
+                const Obj o = table->get_object(ObjKey(i));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
@@ -3657,7 +3624,7 @@ TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -3675,7 +3642,7 @@ TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
             }
         }
@@ -3694,7 +3661,7 @@ TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
                 CHECK_EQUAL(key_values[i] << 1, o.get<int64_t>(c0));
             }
@@ -3780,7 +3747,7 @@ TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -3798,7 +3765,7 @@ TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
         }
@@ -3817,7 +3784,7 @@ TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                ConstObj o = table->get_object(ObjKey(key_values[i]));
+                const Obj o = table->get_object(ObjKey(key_values[i]));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
                 CHECK_EQUAL(i << 1, o.get<int64_t>(c0));
             }
@@ -4007,7 +3974,7 @@ TEST(Table_PrimaryKeyIndexBug)
     TableRef table = g.add_table("table");
     TableRef origin = g.add_table("origin");
     auto col_id = table->add_column(type_String, "id");
-    auto col_link = origin->add_column_link(type_Link, "link", *table);
+    auto col_link = origin->add_column(*table, "link");
     table->add_search_index(col_id);
     // Create an object where bit 62 is set in the ObkKey
     auto obj = table->create_object(ObjKey(0x40083f0f9b0fb598)).set(col_id, "hallo");
@@ -4288,7 +4255,7 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
     Group g;
     TableRef t = g.add_table("table");
     ColKey col0 = t->add_column(type_Int, "value", false);
-    ColKey col_link = t->add_column_link(type_Link, "link", *t);
+    ColKey col_link = t->add_column(*t, "link");
     t->add_search_index(col0);
 
     std::vector<Int> values = {0, 9, 4, 2, 7};
@@ -4321,10 +4288,11 @@ TEST(Table_QueryNullOnNonNullSearchIndex)
 }
 
 TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Prop<ObjectId>, Prop<Timestamp>,
-           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Nullable<Int>, Nullable<double>, Nullable<float>,
-           Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>, Nullable<Decimal128>,
-           Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>, Indexed<StringData>, NullableIndexed<Int>,
-           NullableIndexed<ObjectId>, NullableIndexed<Timestamp>, NullableIndexed<StringData>)
+           Prop<StringData>, Prop<BinaryData>, Prop<Decimal128>, Prop<UUID>, Nullable<Int>, Nullable<double>,
+           Nullable<float>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<StringData>, Nullable<BinaryData>,
+           Nullable<Decimal128>, Nullable<UUID>, Indexed<Int>, Indexed<ObjectId>, Indexed<Timestamp>,
+           Indexed<StringData>, Indexed<UUID>, NullableIndexed<Int>, NullableIndexed<ObjectId>,
+           NullableIndexed<Timestamp>, NullableIndexed<StringData>, NullableIndexed<UUID>)
 {
     using type = typename TEST_TYPE::type;
     using underlying_type = typename TEST_TYPE::underlying_type;
@@ -4333,7 +4301,7 @@ TEST_TYPES(Table_QuerySearchEqualsNull, Prop<Int>, Prop<double>, Prop<float>, Pr
     TableRef t = g.add_table("table");
     ColKey col0 = t->add_column(TEST_TYPE::data_type, "value", TEST_TYPE::is_nullable);
     ColKey col1 = t->add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
-    ColKey col_link = t->add_column_link(type_Link, "link", *t);
+    ColKey col_link = t->add_column(*t, "link");
 
     if constexpr (TEST_TYPE::is_indexed) {
         t->add_search_index(col0);
@@ -4626,6 +4594,21 @@ ObjectId generate_value()
 {
     return ObjectId::gen();
 }
+template <>
+UUID generate_value()
+{
+    std::string str;
+    str.resize(36);
+    std::generate<std::string::iterator, char (*)()>(str.begin(), str.end(), []() -> char {
+        char c = test_util::random_int<char>(0, 15);
+        return c >= 10 ? (c - 10 + 'a') : (c + '0');
+    });
+    str.at(8) = '-';
+    str.at(13) = '-';
+    str.at(18) = '-';
+    str.at(23) = '-';
+    return UUID(str.c_str());
+}
 
 // helper object taking care of destroying memory underlying StringData and BinaryData
 // just a passthrough for other types
@@ -4831,6 +4814,7 @@ TEST(List_Ops)
     test_lists<Timestamp>(test_context, sg, type_Timestamp);
     test_lists<Decimal128>(test_context, sg, type_Decimal);
     test_lists<ObjectId>(test_context, sg, type_ObjectId);
+    test_lists<UUID>(test_context, sg, type_UUID);
 
     test_lists<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_lists<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -4841,6 +4825,7 @@ TEST(List_Ops)
     test_lists<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_lists<Decimal128>(test_context, sg, type_Decimal, true);
     test_lists<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_lists<Optional<UUID>>(test_context, sg, type_UUID, true);
 }
 
 template <typename T, typename U = T>
@@ -5059,6 +5044,7 @@ TEST(Table_Ops)
     test_tables<Timestamp>(test_context, sg, type_Timestamp);
     test_tables<Decimal128>(test_context, sg, type_Decimal);
     test_tables<ObjectId>(test_context, sg, type_ObjectId);
+    test_tables<UUID>(test_context, sg, type_UUID);
 
     test_tables<Optional<int64_t>>(test_context, sg, type_Int, true);
     test_tables<StringData>(test_context, sg, type_String, true); // always Optional?
@@ -5069,6 +5055,7 @@ TEST(Table_Ops)
     test_tables<Timestamp>(test_context, sg, type_Timestamp, true); // always Optional?
     test_tables<Decimal128>(test_context, sg, type_Decimal, true);
     test_tables<Optional<ObjectId>>(test_context, sg, type_ObjectId, true);
+    test_tables<UUID>(test_context, sg, type_UUID, true);
 }
 
 template <typename TFrom, typename TTo>
@@ -5178,6 +5165,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
     test_dynamic_conversion_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_combi_sametype<UUID>(test_context, sg, type_UUID);
     // lists...:
     test_dynamic_conversion_list_combi<int64_t>(test_context, sg, type_Int);
     test_dynamic_conversion_list_combi<float>(test_context, sg, type_Float);
@@ -5189,6 +5177,7 @@ TEST(Table_Column_DynamicConversions)
     test_dynamic_conversion_list_combi_sametype<BinaryData>(test_context, sg, type_Binary);
     test_dynamic_conversion_list_combi_sametype<Timestamp>(test_context, sg, type_Timestamp);
     test_dynamic_conversion_list_combi_sametype<Decimal128>(test_context, sg, type_Decimal);
+    test_dynamic_conversion_list_combi_sametype<UUID>(test_context, sg, type_UUID);
 }
 
 /*
@@ -5226,7 +5215,7 @@ TEST(Table_MultipleObjs) {
 
     auto tr = sg->start_write();
     auto table = tr->add_table("my_table");
-    auto col = table->add_column_link(type_LinkList, "the links", *table);
+    auto col = table->add_column_list(*table, "the links");
     auto col_int = table->add_column_list(type_String, "the integers");
     auto obj_key = table->create_object().get_key();
     tr->commit();
@@ -5329,10 +5318,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
     {
         auto tr = sg->start_write();
         auto table = tr->add_embedded_table("myEmbeddedStuff");
-        auto col_recurse = table->add_column_link(type_Link, "theRecursiveBit", *table);
+        auto col_recurse = table->add_column(*table, "theRecursiveBit");
         CHECK_THROW(table->create_object(), LogicError);
         auto parent = tr->add_table("myParentStuff");
-        auto ck = parent->add_column_link(type_Link, "theGreatColumn", *table);
+        auto ck = parent->add_column(*table, "theGreatColumn");
         Obj o = parent->create_object();
         Obj o2 = o.create_and_set_linked_object(ck);
         o2.create_and_set_linked_object(col_recurse);
@@ -5381,10 +5370,10 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5418,10 +5407,10 @@ TEST(Table_EmbeddedObjectNotifications)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5475,10 +5464,10 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
@@ -5521,7 +5510,9 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 
 TEST(Table_EmbeddedObjectPath)
 {
-    auto collect_path = [](const ConstObj& o) { return o.get_fat_path(); };
+    auto collect_path = [](const Obj& o) {
+        return o.get_fat_path();
+    };
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -5530,10 +5521,10 @@ TEST(Table_EmbeddedObjectPath)
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
-    auto col_recurse = table->add_column_link(type_LinkList, "theRecursiveBit", *table);
+    auto col_recurse = table->add_column_list(*table, "theRecursiveBit");
     CHECK_THROW(table->create_object(), LogicError);
     auto parent = tr->add_table("myParentStuff");
-    auto ck = parent->add_column_link(type_LinkList, "theGreatColumn", *table);
+    auto ck = parent->add_column_list(*table, "theGreatColumn");
     Obj o = parent->create_object();
     auto gch = collect_path(o);
     CHECK(gch.size() == 0);
@@ -5572,5 +5563,55 @@ TEST(Table_EmbeddedObjectPath)
     CHECK(gyh[1].index == 0);
 }
 
+TEST(Table_IndexOnMixed)
+{
+    Timestamp now{std::chrono::system_clock::now()};
+    Group g;
+
+    auto bars = g.add_table("bar");
+    auto foos = g.add_table("foo");
+    auto col = foos->add_column(type_Mixed, "any");
+    foos->add_search_index(col);
+
+    auto bar = bars->create_object();
+
+    auto k0 = foos->create_object().set(col, Mixed()).get_key();
+    auto k1 = foos->create_object().set(col, Mixed(25)).get_key();
+    auto k2 = foos->create_object().set(col, Mixed(123.456f)).get_key();
+    auto k3 = foos->create_object().set(col, Mixed(987.654)).get_key();
+    auto k4 = foos->create_object().set(col, Mixed("Hello")).get_key();
+    auto k5 = foos->create_object().set(col, Mixed(now)).get_key();
+    auto k6 = foos->create_object().set(col, Mixed(Decimal128("2.25"))).get_key();
+    auto k7 = foos->create_object().set(col, Mixed(1)).get_key();
+    auto k8 = foos->create_object().set(col, Mixed(true)).get_key();
+    auto k9 = foos->create_object().set(col, Mixed(bar.get_link())).get_key();
+    auto k10 = foos->create_object().set(col, Mixed(UUID("3b241101-e2bb-4255-8caf-4136c566a962"))).get_key();
+
+    CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 123.456f), k2);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 987.654), k3);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, "Hello"), k4);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, now), k5);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, Decimal128("2.25")), k6);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
+
+    foos->remove_search_index(col);
+
+    CHECK_EQUAL(foos->find_first<Mixed>(col, {}), k0);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 25), k1);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 123.456f), k2);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 987.654), k3);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, "Hello"), k4);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, now), k5);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, Decimal128("2.25")), k6);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, 1), k7);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, true), k8);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, bar.get_link()), k9);
+    CHECK_EQUAL(foos->find_first<Mixed>(col, UUID("3b241101-e2bb-4255-8caf-4136c566a962")), k10);
+}
 
 #endif // TEST_TABLE

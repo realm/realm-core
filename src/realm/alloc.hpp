@@ -272,21 +272,25 @@ protected:
         return m_storage_versioning_counter.load(std::memory_order_acquire);
     }
 
+public:
     inline uint_fast64_t get_storage_version()
     {
         return m_storage_versioning_counter.load(std::memory_order_acquire);
     }
 
+protected:
     inline void bump_storage_version() noexcept
     {
         m_storage_versioning_counter.fetch_add(1, std::memory_order_acq_rel);
     }
 
+public:
     REALM_WORKAROUND_MSVC_BUG inline uint_fast64_t get_content_version() noexcept
     {
         return m_content_versioning_counter.load(std::memory_order_acquire);
     }
 
+protected:
     inline uint_fast64_t bump_content_version() noexcept
     {
         return m_content_versioning_counter.fetch_add(1, std::memory_order_acq_rel) + 1;
@@ -309,9 +313,10 @@ private:
     friend class ClusterTree;
     friend class Group;
     friend class WrappedAllocator;
-    friend class ConstObj;
     friend class Obj;
-    friend class ConstLstBase;
+    template <class>
+    friend class CollectionBaseImpl;
+    friend class Dictionary;
 };
 
 
@@ -325,9 +330,7 @@ public:
         m_ref_translation_ptr.store(m_alloc->m_ref_translation_ptr);
     }
 
-    ~WrappedAllocator()
-    {
-    }
+    ~WrappedAllocator() {}
 
     void switch_underlying_allocator(Allocator& underlying_allocator)
     {
@@ -428,9 +431,7 @@ inline MemRef::MemRef() noexcept
 {
 }
 
-inline MemRef::~MemRef() noexcept
-{
-}
+inline MemRef::~MemRef() noexcept {}
 
 inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
     : m_addr(addr)
@@ -543,9 +544,7 @@ inline Allocator::Allocator() noexcept
     m_ref_translation_ptr = nullptr;
 }
 
-inline Allocator::~Allocator() noexcept
-{
-}
+inline Allocator::~Allocator() noexcept {}
 
 // performance critical part of the translation process. Less critical code is in translate_less_critical.
 inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept

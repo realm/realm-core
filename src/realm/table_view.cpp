@@ -147,7 +147,7 @@ R ConstTableView::aggregate(ColKey column_key, size_t* result_count, ObjKey* ret
         if (!m_table->is_valid(key))
             continue;
 
-        ConstObj obj = m_table->get_object(key);
+        const Obj obj = m_table->get_object(key);
         auto v = obj.get<T>(column_key);
 
         if (!obj.is_null(column_key)) {
@@ -205,7 +205,7 @@ size_t ConstTableView::aggregate_count(ColKey column_key, T count_target) const
             continue;
 
         try {
-            ConstObj obj = m_table->get_object(key);
+            const Obj obj = m_table->get_object(key);
             auto v = obj.get<T>(column_key);
 
             if (v == count_target) {
@@ -226,7 +226,7 @@ Timestamp ConstTableView::minmax_timestamp(ColKey column_key, ObjKey* return_key
 {
     Timestamp best_value;
     ObjKey best_key;
-    for_each([&best_key, &best_value, column_key](ConstObj& obj) {
+    for_each([&best_key, &best_value, column_key](const Obj& obj) {
         C compare;
         auto ts = obj.get<Timestamp>(column_key);
         // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
@@ -360,7 +360,7 @@ size_t ConstTableView::count_timestamp(ColKey column_key, Timestamp target) cons
     for (size_t t = 0; t < size(); t++) {
         try {
             ObjKey key = get_key(t);
-            ConstObj obj = m_table->get_object(key);
+            const Obj obj = m_table->get_object(key);
             auto ts = obj.get<Timestamp>(column_key);
             realm::Equal e;
             if (e(ts, target, ts.is_null(), target.is_null())) {
@@ -379,7 +379,7 @@ size_t ConstTableView::count_decimal(ColKey column_key, Decimal128 target) const
     return aggregate_count<Decimal128>(column_key, target);
 }
 
-void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* renames) const
+void ConstTableView::to_json(std::ostream& out, size_t link_depth) const
 {
     // Represent table as list of objects
     out << "[";
@@ -394,7 +394,7 @@ void ConstTableView::to_json(std::ostream& out, size_t link_depth, std::map<std:
             else {
                 out << ",";
             }
-            m_table->get_object(key).to_json(out, link_depth, renames);
+            m_table->get_object(key).to_json(out, link_depth, {}, output_mode_json);
         }
     }
 
@@ -458,6 +458,14 @@ void ConstTableView::sync_if_needed() const
     }
 }
 
+void ConstTableView::update_query(const Query& q)
+{
+    REALM_ASSERT(m_query.m_table);
+    REALM_ASSERT(m_query.m_table == q.m_table);
+
+    m_query = q;
+    do_sync();
+}
 
 void TableView::remove(size_t row_ndx)
 {
@@ -581,7 +589,7 @@ void ConstTableView::do_sync()
     else if (m_source_column_key) {
         m_key_values.clear();
         if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
-            ConstObj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
+            const Obj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
             if (m_table->valid_column(m_source_column_key)) { // return empty result, if column has been removed
                 ColKey backlink_col = m_table->get_opposite_column(m_source_column_key);
                 REALM_ASSERT(backlink_col);

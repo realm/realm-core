@@ -67,14 +67,22 @@ size_t ParentNode::find_first(size_t start, size_t end)
     return not_found;
 }
 
-bool ParentNode::match(ConstObj& obj)
+template <class T>
+inline bool Obj::evaluate(T func) const
 {
-    auto cb = [this](const Cluster* cluster, size_t row) {
+    Cluster cluster(0, get_alloc(), m_table->m_clusters);
+    cluster.init(m_mem);
+    cluster.set_offset(m_key.value - cluster.get_key_value(m_row_ndx));
+    return func(&cluster, m_row_ndx);
+}
+
+bool ParentNode::match(const Obj& obj)
+{
+    return obj.evaluate([this](const Cluster* cluster, size_t row) {
         set_cluster(cluster);
         size_t m = find_first(row, row + 1);
         return m != npos;
-    };
-    return obj.evaluate(cb);
+    });
 }
 
 template <Action action>
@@ -273,6 +281,39 @@ size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 
 namespace realm {
 
+size_t do_search_index(ObjKey& last_start_key, size_t& result_get, std::vector<ObjKey>& results,
+                       const Cluster* cluster, size_t start, size_t end)
+{
+    ObjKey first_key = cluster->get_real_key(start);
+    if (first_key < last_start_key) {
+        // We are not advancing through the clusters. We basically don't know where we are,
+        // so just start over from the beginning.
+        auto it = std::lower_bound(results.begin(), results.end(), first_key);
+        result_get = (it == results.end()) ? realm::npos : (it - results.begin());
+    }
+    last_start_key = first_key;
+
+    if (result_get < results.size()) {
+        auto actual_key = results[result_get];
+        // skip through keys which are in "earlier" leafs than the one selected by start..end:
+        while (first_key > actual_key) {
+            result_get++;
+            if (result_get == results.size())
+                return not_found;
+            actual_key = results[result_get];
+        }
+
+        // if actual key is bigger than last key, it is not in this leaf
+        ObjKey last_key = cluster->get_real_key(end - 1);
+        if (actual_key > last_key)
+            return not_found;
+
+        // key is known to be in this leaf, so find key whithin leaf keys
+        return cluster->lower_bound_key(ObjKey(actual_key.value - cluster->get_offset()));
+    }
+    return not_found;
+}
+
 void StringNode<Equal>::_search_index_init()
 {
     FindRes fr;
@@ -394,6 +435,48 @@ size_t StringNode<EqualIns>::_find_first_local(size_t start, size_t end)
     return not_found;
 }
 
+std::unique_ptr<ArrayPayload> TwoColumnsNodeBase::update_cached_leaf_pointers_for_column(Allocator& alloc,
+                                                                                         const ColKey& col_key)
+{
+    switch (col_key.get_type()) {
+        case col_type_Int:
+            if (col_key.is_nullable()) {
+                return std::make_unique<ArrayIntNull>(alloc);
+            }
+            return std::make_unique<ArrayInteger>(alloc);
+        case col_type_Bool:
+            return std::make_unique<ArrayBoolNull>(alloc);
+        case col_type_String:
+            return std::make_unique<ArrayString>(alloc);
+        case col_type_Binary:
+            return std::make_unique<ArrayBinary>(alloc);
+        case col_type_Mixed:
+            return std::make_unique<ArrayMixed>(alloc);
+        case col_type_Timestamp:
+            return std::make_unique<ArrayTimestamp>(alloc);
+        case col_type_Float:
+            return std::make_unique<ArrayFloatNull>(alloc);
+        case col_type_Double:
+            return std::make_unique<ArrayDoubleNull>(alloc);
+        case col_type_Decimal:
+            return std::make_unique<ArrayDecimal128>(alloc);
+        case col_type_Link:
+            return std::make_unique<ArrayKey>(alloc);
+        case col_type_ObjectId:
+            return std::make_unique<ArrayObjectIdNull>(alloc);
+        case col_type_UUID:
+            return std::make_unique<ArrayUUIDNull>(alloc);
+        case col_type_TypedLink:
+        case col_type_BackLink:
+        case col_type_LinkList:
+        case col_type_OldDateTime:
+        case col_type_OldTable:
+            break;
+    };
+    REALM_UNREACHABLE();
+    return {};
+}
+
 size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type, bool is_nullable)
 {
     switch (col_type) {
@@ -449,13 +532,26 @@ size_t size_of_list_from_ref(ref_type ref, Allocator& alloc, ColumnType col_type
             list.init_from_ref(ref);
             return list.size();
         }
+        case col_type_UUID: {
+            BPlusTree<UUID> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
+        case col_type_Mixed: {
+            BPlusTree<Mixed> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
         case col_type_LinkList: {
             BPlusTree<ObjKey> list(alloc);
             list.init_from_ref(ref);
             return list.size();
         }
-        case col_type_OldStringEnum:
-        case col_type_OldMixed:
+        case col_type_TypedLink: {
+            BPlusTree<ObjLink> list(alloc);
+            list.init_from_ref(ref);
+            return list.size();
+        }
         case col_type_OldTable:
         case col_type_Link:
         case col_type_BackLink:

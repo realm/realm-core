@@ -45,7 +45,7 @@ function build_macos {
     mkdir -p "${folder_name}"
     (
         cd "${folder_name}" || exit 1
-        rm -f realm-core-*-devel.tar.gz
+        rm -f realm-*-devel.tar.gz
         cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/$platform.toolchain.cmake" \
               -D CMAKE_BUILD_TYPE="${bt}" \
               -D REALM_VERSION="${VERSION}" \
@@ -76,8 +76,11 @@ fi
 rm -rf core
 mkdir core
 
-filename="build-macosx-Release/realm-core-Release-${VERSION}-macosx-devel.tar.gz"
+filename="build-macosx-Release/realm-Release-${VERSION}-macosx-devel.tar.gz"
 tar -C core -zxvf "${filename}" include doc
+
+# Overwrite version.txt
+echo ${VERSION} > core/version.txt
 
 function combine_libraries {
     local device_suffix="$1"
@@ -88,39 +91,98 @@ function combine_libraries {
     # can't have two arm64 slices in the universal library
     lipo "core/librealm-${simulator_suffix}.a" -remove arm64 -output "core/librealm-${simulator_suffix}.a" || true
     lipo "core/librealm-parser-${simulator_suffix}.a" -remove arm64 -output "core/librealm-parser-${simulator_suffix}.a" || true
+    lipo "core/librealm-sync-${simulator_suffix}.a" -remove arm64 -output "core/librealm-sync-${simulator_suffix}.a" || true
+    lipo "core/librealm-object-store-${simulator_suffix}.a" -remove arm64 -output "core/librealm-object-store-${simulator_suffix}.a" || true
 
+    # core
     lipo "core/librealm-${device_suffix}.a" \
          "core/librealm-${simulator_suffix}.a" \
-         -create -output "out/librealm-${output_suffix}.a"
+         -create -output "core/librealm-${output_suffix}.a"
+    # parser
     lipo "core/librealm-parser-${device_suffix}.a" \
          "core/librealm-parser-${simulator_suffix}.a" \
-         -create -output "out/librealm-parser-${output_suffix}.a"
+         -create -output "core/librealm-parser-${output_suffix}.a"
+    # sync
+    lipo "core/librealm-sync-${device_suffix}.a" \
+         "core/librealm-sync-${simulator_suffix}.a" \
+         -create -output "core/librealm-sync-${output_suffix}.a"
+    # object store
+    lipo "core/librealm-object-store-${device_suffix}.a" \
+         "core/librealm-object-store-${simulator_suffix}.a" \
+         -create -output "core/librealm-object-store-${output_suffix}.a"
+
+    # Merge the core, sync & object store libraries together
+    libtool -static -o core/librealm-monorepo-${device_suffix}.a \
+      core/librealm-${device_suffix}.a \
+      core/librealm-sync-${device_suffix}.a \
+      core/librealm-object-store-${device_suffix}.a
+
+    libtool -static -o core/librealm-monorepo-${simulator_suffix}.a \
+      core/librealm-${simulator_suffix}.a \
+      core/librealm-sync-${simulator_suffix}.a \
+      core/librealm-object-store-${simulator_suffix}.a
+    # remove the now merged libraries, but leave the parser
+    rm -f core/librealm-${simulator_suffix}.a
+    rm -f core/librealm-${device_suffix}.a
+    rm -f core/librealm-${output_suffix}.a
+    rm -f core/librealm-sync-${simulator_suffix}.a
+    rm -f core/librealm-sync-${device_suffix}.a
+    rm -f core/librealm-sync-${output_suffix}.a
+    rm -f core/librealm-object-store-${simulator_suffix}.a
+    rm -f core/librealm-object-store-${device_suffix}.a
+    rm -f core/librealm-object-store-${output_suffix}.a
+}
+
+function combine_libraries_macos {
+    local build_type="$1"
+    # Merge the core, sync & object store libraries together
+    libtool -static -o core/librealm-monorepo-macosx${build_type}.a \
+      core/librealm-macosx${build_type}.a \
+      core/librealm-sync-macosx${build_type}.a \
+      core/librealm-object-store-macosx${build_type}.a
+    # remove the now merged libraries, but leave the parser
+    rm -f core/librealm-macosx${build_type}.a
+    rm -f core/librealm-sync-macosx${build_type}.a
+    rm -f core/librealm-object-store-macosx${build_type}.a
 }
 
 # Assemble the legacy fat libraries
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
-        filename="build-${p}-${bt}/realm-core-${bt}-${VERSION}-${p}-devel.tar.gz"
+        filename="build-${p}-${bt}/realm-${bt}-${VERSION}-${p}-devel.tar.gz"
+        # core binary
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
+        # parser binary
         tar -C core -zxvf "${filename}" "lib/librealm-parser${suffix}.a"
         mv "core/lib/librealm-parser${suffix}.a" "core/librealm-parser-${p}${suffix}.a"
+        # sync binary
+        tar -C core -zxvf "${filename}" "lib/librealm-sync${suffix}.a"
+        mv "core/lib/librealm-sync${suffix}.a" "core/librealm-sync-${p}${suffix}.a"
+        # object store binary
+        tar -C core -zxvf "${filename}" "lib/librealm-object-store${suffix}.a"
+        mv "core/lib/librealm-object-store${suffix}.a" "core/librealm-object-store-${p}${suffix}.a"
+        rm -r "core/lib"
     done
 
-    mkdir -p out
-    mv core/librealm-macosx* out
-    mv core/librealm-parser-macosx* out
+    # merge the libraries for macos
+    combine_libraries_macos ${suffix}
+
     if [[ -z $MACOS_ONLY ]]; then
-        mv core/librealm-maccatalyst* out
-        combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
-        combine_libraries "watchos${suffix}" "watchsimulator${suffix}" "watchos${suffix}"
-        combine_libraries "appletvos${suffix}" "appletvsimulator${suffix}" "tvos${suffix}"
+    # merge the libraries for maccatalyst
+    libtool -static -o core/librealm-monorepo-maccatalyst${suffix}.a \
+      core/librealm-maccatalyst${suffix}.a \
+      core/librealm-sync-maccatalyst${suffix}.a \
+      core/librealm-object-store-maccatalyst${suffix}.a
+    rm -f core/librealm-maccatalyst*.a
+
+    # merge the libraries for other Apple platforms
+    combine_libraries "iphoneos${suffix}" "iphonesimulator${suffix}" "ios${suffix}"
+    combine_libraries "watchos${suffix}" "watchsimulator${suffix}" "watchos${suffix}"
+    combine_libraries "appletvos${suffix}" "appletvsimulator${suffix}" "tvos${suffix}"
     fi
 done
-rm -f core/*.a
-mv out/*.a core
-rmdir out
 
 function add_to_xcframework() {
     local xcf="$1"
@@ -128,9 +190,8 @@ function add_to_xcframework() {
     local os="$3"
     local platform="$4"
     local build_type="$5"
-
     local suffix
-    [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
+    [[ "$build_type" = "Release" ]] && suffix="" || suffix="-dbg"
 
     local variant=""
     if [[ "$platform" = *simulator ]]; then
@@ -139,18 +200,15 @@ function add_to_xcframework() {
         variant="-maccatalyst"
     fi
 
-    # Extract the library from the source tar
-    local source_tar="build-${platform}-${build_type}/realm-core-${build_type}-${VERSION}-${platform}-devel.tar.gz"
-    tar -C "$xcf" -zxvf "${source_tar}" "lib/$library${suffix}.a"
+    local location="core/$library-${platform}${suffix}.a"
 
     # Populate the actual directory structure
-    local archs="$(lipo -archs "$xcf/lib/$library${suffix}.a")"
+    local archs="$(lipo -archs "${location}")"
     local dir="$os-$(echo "$archs" | tr ' ' '_')$variant"
     mkdir -p "$xcf/$dir/Headers"
-    mv "$xcf/lib/$library${suffix}.a" "$xcf/$dir"
-    if [ "$library" = "librealm" ]; then
-        cp -R core/include/* "$xcf/$dir/Headers"
-    fi
+
+    cp ${location} "$xcf/$dir/$library${suffix}.a"
+    cp -R core/include/* "$xcf/$dir/Headers"
 
     # Add this library to the Plist
     cat << EOF >> "$xcf/Info.plist"
@@ -205,7 +263,6 @@ EOF
             add_to_xcframework "$xcf" "$library" "tvos" "appletvos" "$bt"
             add_to_xcframework "$xcf" "$library" "tvos" "appletvsimulator" "$bt"
         fi
-        rmdir "$xcf/lib"
 
         cat << EOF >> "$xcf/Info.plist"
 	</array>
@@ -221,7 +278,7 @@ EOF
 
 # Produce xcframeworks
 if [[ -n $BUILD_XCFRAMEWORK ]]; then
-    create_xcframework realm-core librealm
+    create_xcframework realm-monorepo librealm-monorepo
     create_xcframework realm-parser librealm-parser
 fi
 
@@ -231,9 +288,14 @@ if [[ -n $COPY ]]; then
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
 else
-    v=$(git describe --tags)
-    rm -f "realm-core-cocoa-${v}.tar.xz"
-    rm -f "realm-parser-cocoa-${v}.tar.xz"
-    tar -cJvf "realm-core-cocoa-${v}.tar.xz" --exclude "realm-parser*.xcframework" core
-    tar -cJvf "realm-parser-cocoa-${v}.tar.xz" core/realm-parser*.xcframework
+    rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"
+    tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" --exclude "*.xcframework" core
+
+    if [[ -n $BUILD_XCFRAMEWORK ]]; then
+        rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
+        tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
+        rm -f "realm-monorepo-xcframework-${VERSION}.tar.xz"
+        # until realmjs requires an xcframework, only package as .xz
+        tar -cJvf "realm-monorepo-xcframework-${VERSION}.tar.xz" core/realm-monorepo.xcframework core/realm-monorepo-dbg.xcframework
+    fi
 fi

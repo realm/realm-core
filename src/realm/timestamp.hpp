@@ -181,6 +181,8 @@ public:
     }
     Timestamp& operator=(const Timestamp& rhs) = default;
 
+    size_t hash() const noexcept;
+
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
     static constexpr int32_t nanoseconds_per_second = 1000000000;
@@ -214,6 +216,11 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
     return out;
 }
 // LCOV_EXCL_STOP
+
+inline size_t Timestamp::hash() const noexcept
+{
+    return size_t(m_seconds) ^ size_t(m_nanoseconds);
+}
 
 } // namespace realm
 

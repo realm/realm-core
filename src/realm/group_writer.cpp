@@ -29,6 +29,7 @@
 #include <realm/alloc_slab.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/metrics/metric_timer.hpp>
+#include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -455,9 +456,8 @@ ref_type GroupWriter::write_group()
     size_t free_positions_size = m_free_positions.get_byte_size();
     size_t free_sizes_size = m_free_lengths.get_byte_size();
     size_t free_versions_size = is_shared ? m_free_versions.get_byte_size() : 0;
-    REALM_ASSERT(!is_shared ||
-                 Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
-                     Array::wtype_Bits);
+    REALM_ASSERT(!is_shared || Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
+                                   Array::wtype_Bits);
 
     // Calculate write positions
     ref_type reserve_ref = to_ref(reserve_pos);
@@ -601,7 +601,9 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     }
 
     REALM_ASSERT(free_in_file.size() == nb_elements);
-    std::sort(begin(free_in_file), end(free_in_file), [](auto& a, auto& b) { return a.ref < b.ref; });
+    std::sort(begin(free_in_file), end(free_in_file), [](auto& a, auto& b) {
+        return a.ref < b.ref;
+    });
 
     {
         // Copy into arrays while checking consistency
@@ -930,7 +932,7 @@ void GroupWriter::commit(ref_type new_top_ref)
 
     // Make sure that that all data relating to the new snapshot is written to
     // stable storage before flipping the slot selector
-    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector], 
+    window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
     if (!disable_sync)
         sync_all_mappings();
