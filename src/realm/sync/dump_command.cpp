@@ -70,11 +70,11 @@ public:
     std::string format_link(ObjKey);
     std::string format_link_list(const LnkLst&);
 
-    template <DataType::Type>
+    template <DataType>
     std::string format_cell(const Obj& obj, ColKey col_key);
     std::string format_cell_list(const Obj& obj, ColKey col_key);
 
-    template <DataType::Type>
+    template <DataType>
     void format_column(const Table&, ColKey col_ndx, TextColumn&);
     void format_column_list(const Table&, ColKey col_ndx, TextColumn&);
 
@@ -177,7 +177,7 @@ std::string Formatter::format_link_list(const LnkLst& list)
     return std::string{m_out.data(), m_out.size()};
 }
 
-template <DataType::Type>
+template <DataType>
 inline std::string Formatter::format_cell(const Obj&, ColKey)
 {
     return "unknown";
@@ -256,7 +256,7 @@ inline std::string Formatter::format_cell_list(const Obj& obj, ColKey col_key)
     return format_list(*ll);
 }
 
-template <DataType::Type type>
+template <DataType type>
 void Formatter::format_column(const Table& table, ColKey col_ndx, TextColumn& col)
 {
     std::size_t end;
