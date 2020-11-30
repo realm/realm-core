@@ -436,11 +436,7 @@ struct SetElementLessThan<Mixed> {
                 return a.get<UUID>() < b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() < b.get<ObjLink>();
-            case type_OldTable:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldDateTime:
                 [[fallthrough]];
             case type_Link:
                 [[fallthrough]];
@@ -492,11 +488,7 @@ struct SetElementEquals<Mixed> {
                 return a.get<UUID>() == b.get<UUID>();
             case type_TypedLink:
                 return a.get<ObjLink>() == b.get<ObjLink>();
-            case type_OldTable:
-                [[fallthrough]];
             case type_Mixed:
-                [[fallthrough]];
-            case type_OldDateTime:
                 [[fallthrough]];
             case type_Link:
                 [[fallthrough]];

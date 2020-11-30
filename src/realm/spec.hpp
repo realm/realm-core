@@ -93,8 +93,8 @@ private:
     ArrayStringShort m_names; // 2nd slot in m_top
     Array m_attr;             // 3rd slot in m_top
     // 4th slot in m_top is vacant
-    Array m_enumkeys;     // 5th slot in m_top
-    Array m_keys;         // 6th slot in m_top
+    Array m_enumkeys; // 5th slot in m_top
+    Array m_keys;     // 6th slot in m_top
     size_t m_num_public_columns;
 
     Spec(Allocator&) noexcept; // Unattached
@@ -223,8 +223,7 @@ inline size_t Spec::get_public_column_count() const noexcept
 inline ColumnType Spec::get_column_type(size_t ndx) const noexcept
 {
     REALM_ASSERT(ndx < get_column_count());
-    ColumnType type = ColumnType(m_types.get(ndx));
-    return type;
+    return ColumnType(int(m_types.get(ndx)));
 }
 
 inline ColumnAttrMask Spec::get_column_attr(size_t ndx) const noexcept
@@ -242,7 +241,7 @@ inline void Spec::set_dictionary_key_type(size_t ndx, DataType key_type)
 inline DataType Spec::get_dictionary_key_type(size_t ndx) const
 {
     REALM_ASSERT(ndx < get_column_count());
-    return DataType(m_attr.get(ndx) >> 8);
+    return DataType(int(m_attr.get(ndx) >> 8));
 }
 
 inline void Spec::set_column_attr(size_t column_ndx, ColumnAttrMask attr)

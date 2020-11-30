@@ -443,5 +443,5 @@ int64_t ArrayMixed::store(const Mixed& value)
             val = 0;
             break;
     }
-    return val + type + 1;
+    return val + int(type) + 1;
 }
